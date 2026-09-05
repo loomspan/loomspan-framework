@@ -1,0 +1,6 @@
+name: childRecursiveSkill
+description: Child recursive integration test skill.
+model: gpt-5
+planning_mode: true
+allowed_skills:
+  - name: rootRecursiveSkill

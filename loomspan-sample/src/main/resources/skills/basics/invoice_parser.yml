@@ -1,0 +1,38 @@
+name: invoiceParser
+description: Parses an unstructured invoice payload extracting Date, Amount, and Vendor.
+model: granite4-tiny
+planning_mode: false
+input_schema:
+  type: object
+  properties:
+    payload:
+      type: string
+      description: Raw invoice text to parse.
+  required:
+    - payload
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    vendorName:
+      type: string
+      description: Legal vendor name from the invoice header
+    totalAmount:
+      type: number
+      description: Total invoice amount including tax
+    invoiceDate:
+      type: string
+      format: date
+      description: Invoice date in ISO-8601 format
+  required:
+    - vendorName
+    - totalAmount
+    - invoiceDate
+  additionalProperties: false
+output_schema_max_retries: 2
+linter:
+  type: regex
+  max_retries: 1
+  regex:
+    pattern: '^\{[\s\S]*\}$'
+    message: Return raw JSON only.

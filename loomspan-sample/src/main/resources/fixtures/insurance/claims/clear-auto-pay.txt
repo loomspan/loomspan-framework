@@ -1,0 +1,20 @@
+CLAIM / FNOL #CLM-1001
+Reported: 2026-07-10 14:22 UTC
+Policy: POL-AUTO-1001
+Claimant: Jordan Lee
+
+Summary:
+I was rear-ended at a stoplight on Oak Street. Minor bumper and taillight damage to my 2022 Honda Civic.
+No injuries. Other driver admitted fault at the scene. Police report filed (PR-77821).
+
+Loss details:
+- Loss date: 2026-07-09
+- Loss type: auto / collision
+- Location: Oak St & 4th Ave, Springfield
+- Estimated repair: about $2,200
+- Parties: Jordan Lee (insured), Morgan Price (other driver)
+
+Notes:
+- First claim on this policy
+- Vehicle drivable
+- Photos available if needed

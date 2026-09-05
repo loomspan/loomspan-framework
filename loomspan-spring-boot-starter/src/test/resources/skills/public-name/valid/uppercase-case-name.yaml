@@ -1,0 +1,3 @@
+name: CaseName
+description: Uppercase case-sensitive public name.
+model: gpt-5

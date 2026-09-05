@@ -1,0 +1,12 @@
+name: attachmentMissingAllowedSkill
+description: Invalid attachment input.
+model: gpt-5
+input_schema:
+  type: object
+  required:
+    - image
+  additionalProperties: false
+  properties:
+    image:
+      type: attachment
+      media_type: image

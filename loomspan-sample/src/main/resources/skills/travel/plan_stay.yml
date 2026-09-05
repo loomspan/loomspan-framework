@@ -1,0 +1,100 @@
+name: planStay
+description: >
+  Lodging specialist planner. Searches hotels, optionally checks loyalty perks,
+  and returns a structured stay digest for the parent concierge.
+model: qwen3-35b
+planning_mode: true
+max_steps: 6
+allowed_skills:
+  - name: searchHotels
+  - name: checkLoyaltyPerks
+prompt: |
+  You are the lodging specialist for a travel concierge demo (fake inventory only).
+
+  Forward scenario and structured preference fields (destination, startDate, endDate,
+  partySize, priorities, loyaltyTier, hotelChain) to every leaf that accepts them.
+
+  Call searchHotels with structured fields. Call checkLoyaltyPerks when priorities or
+  the request mention a hotel chain, loyalty tier, or maximizing points/perks.
+  Pass loyaltyTier and hotelChain when known from preferences or root input.
+
+  Do not invent hotels or perks. toolsUsed and findings must reflect tools you actually invoked.
+  Set domain to "stay". selectedHotel and loyaltyPerks must come from tool results when present.
+input_schema:
+  type: object
+  properties:
+    requestText:
+      type: string
+      description: Original natural language trip request.
+    scenario:
+      type: string
+      description: Fixture key to forward to catalog leaves.
+    destination:
+      type: string
+      description: Structured destination from preferences.
+    startDate:
+      type: string
+      description: Preferred check-in date.
+    endDate:
+      type: string
+      description: Preferred check-out date.
+    partySize:
+      type: integer
+      description: Number of travelers.
+    priorities:
+      type: array
+      items: { type: string }
+      description: Preference labels such as cost, comfort, loyalty.
+    loyaltyTier:
+      type: string
+      description: Optional loyalty tier from preferences (e.g. gold, silver).
+    hotelChain:
+      type: string
+      description: Optional preferred hotel chain from preferences.
+    preferencesSummary:
+      type: string
+      description: Optional short digest of trip preferences.
+  required: [requestText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    domain:
+      type: string
+      enum: [stay]
+    summary:
+      type: string
+      description: One-paragraph stay digest for the parent / assemble skill.
+    selectedHotel:
+      type: object
+      nullable: true
+      additionalProperties: true
+    loyaltyPerks:
+      type: object
+      nullable: true
+      additionalProperties: true
+    optionsConsidered:
+      type: array
+      items:
+        type: object
+        additionalProperties: true
+    toolsUsed:
+      type: array
+      items: { type: string }
+      description: Ordered list of tool skill names actually invoked.
+    findings:
+      type: array
+      items:
+        type: object
+        properties:
+          tool:
+            type: string
+            description: Tool skill name that produced the finding.
+          observation:
+            type: string
+            description: Short factual observation from the tool result.
+        required: [tool, observation]
+        additionalProperties: false
+  required: [domain, summary, toolsUsed, findings]
+  additionalProperties: false
+output_schema_max_retries: 2

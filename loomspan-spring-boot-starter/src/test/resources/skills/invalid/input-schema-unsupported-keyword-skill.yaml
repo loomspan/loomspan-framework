@@ -1,0 +1,10 @@
+name: invalidInputSchemaKeyword
+description: Invalid input schema keyword.
+model: gpt-5
+input_schema:
+  type: object
+  properties:
+    payload:
+      type: string
+      oneOf:
+        - type: string

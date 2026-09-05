@@ -1,0 +1,77 @@
+name: handleBilling
+description: >
+  Billing specialist planner. Looks up customer, invoices, and refund policy facts,
+  optionally runs soft policy judgment, and returns a structured billing digest.
+model: qwen3-35b
+planning_mode: true
+max_steps: 6
+allowed_skills:
+  - name: lookupCustomer
+  - name: lookupInvoices
+  - name: lookupRefundPolicy
+  - name: checkRefundPolicy
+prompt: |
+  You are the billing specialist for a customer support case (demo only).
+
+  Forward scenario (and customerId when present) to every leaf that accepts them.
+  Prefer lookupCustomer + lookupInvoices first.
+  Call lookupRefundPolicy before checkRefundPolicy; pass policy facts (and customer/invoice
+  digests) into checkRefundPolicy as policyFactsSummary.
+  Call only tools needed; stop when the billing digest is supportable.
+  Do not invent CRM data; base findings on tool results.
+  toolsUsed and findings must reflect tools you actually invoked.
+  Set domain to "billing".
+  Set refundRecommended from checkRefundPolicy when you called it; otherwise false.
+  Include refundAmount only when a refund is recommended and grounded in tool results; otherwise null or omit.
+input_schema:
+  type: object
+  properties:
+    emailText:
+      type: string
+      description: Original customer support email.
+    scenario:
+      type: string
+      description: Fixture key to forward to CRM leaves.
+    customerId:
+      type: string
+      description: Optional customer id to forward to CRM leaves.
+    intentSummary:
+      type: string
+      description: Optional short digest from understandIntent.
+  required: [emailText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    domain:
+      type: string
+      enum: [billing]
+    summary:
+      type: string
+      description: One-paragraph billing digest for the parent / compose skill.
+    findings:
+      type: array
+      items:
+        type: object
+        properties:
+          tool:
+            type: string
+            description: Tool skill name that produced the finding.
+          observation:
+            type: string
+            description: Short factual observation from the tool result.
+        required: [tool, observation]
+        additionalProperties: false
+    toolsUsed:
+      type: array
+      items: { type: string }
+      description: Ordered list of tool skill names actually invoked.
+    refundRecommended:
+      type: boolean
+    refundAmount:
+      type: number
+      nullable: true
+      description: Goodwill amount when recommended; null or omit when not applicable.
+  required: [domain, summary, findings, toolsUsed, refundRecommended]
+  additionalProperties: false
+output_schema_max_retries: 2

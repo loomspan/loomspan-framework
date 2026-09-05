@@ -1,0 +1,8 @@
+name: invalidNegativeLinterMaxRetriesSkill
+description: Invalid skill with negative linter retry budget.
+model: gpt-5
+linter:
+  type: regex
+  max_retries: -1
+  regex:
+    pattern: '^ok$'

@@ -1,0 +1,9 @@
+name: evidenceContractWrongCaseChildSkill
+description: Invalid wrong-case child reference
+model: gpt-5
+allowed_skills:
+  - name: invoiceParser
+output_schema:
+  type: object
+  properties:
+    vendorName: { type: string, evidence: invoiceparser }

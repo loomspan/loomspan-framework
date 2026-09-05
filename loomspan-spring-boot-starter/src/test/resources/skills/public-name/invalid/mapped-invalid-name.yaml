@@ -1,0 +1,3 @@
+name: mapped.method.skill
+description: Invalid public name must be reported before mapped fields.
+mapping: null

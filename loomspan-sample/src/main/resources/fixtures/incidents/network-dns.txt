@@ -1,0 +1,16 @@
+INCIDENT TICKET #INC-2401
+Reported: 2026-07-14 09:42 UTC
+Reporter: EU Customer Success
+
+Summary:
+Multiple EU customers report they cannot reach the public API. Browser and CLI clients fail with
+"could not resolve host: api.example.com". US customers appear unaffected so far.
+
+Impact:
+- EU checkout and partner integrations failing at DNS resolution
+- No confirmed application 5xx spike from EU edge yet (clients never connect)
+
+Notes:
+- Started around 09:30 UTC
+- Internal US monitoring still shows api.example.com healthy
+- Please investigate DNS / network path first

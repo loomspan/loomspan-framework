@@ -1,0 +1,37 @@
+name: classifyIncident
+description: >
+  Classifies a free-text incident ticket into severity (SEV1–SEV4) and category
+  (network, application, mixed, unknown) with a short rationale.
+model: gpt-4o-mini
+planning_mode: false
+prompt: |
+  Classify the incident ticket.
+  Read ticketText carefully. scenario is an optional fixture hint only — do not invent facts.
+  Choose severity SEV1 (highest) through SEV4 (lowest) and category network|application|mixed|unknown.
+  Keep rationale short and grounded in the ticket text.
+input_schema:
+  type: object
+  properties:
+    ticketText:
+      type: string
+      description: Free-text incident report to classify.
+    scenario:
+      type: string
+      description: Optional fixture key; may hint expected domain but classification must still read the ticket.
+  required: [ticketText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    severity:
+      type: string
+      enum: [SEV1, SEV2, SEV3, SEV4]
+    category:
+      type: string
+      enum: [network, application, mixed, unknown]
+    rationale:
+      type: string
+      description: Short explanation of severity and category choice.
+  required: [severity, category, rationale]
+  additionalProperties: false
+output_schema_max_retries: 2

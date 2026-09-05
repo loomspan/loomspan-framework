@@ -1,0 +1,8 @@
+name: invalidBlankRegexPatternSkill
+description: Invalid skill with blank regex pattern.
+model: gpt-5
+linter:
+  type: regex
+  max_retries: 1
+  regex:
+    pattern: '   '

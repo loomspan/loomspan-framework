@@ -1,0 +1,30 @@
+loomspan:
+  connections:
+    openai-main:
+      driver: openai
+      api-key: test-openai-key
+    anthropic-main:
+      driver: anthropic
+      api-key: test-anthropic-key
+    gemini-main:
+      driver: gemini
+      api-key: test-gemini-key
+    ollama-main:
+      driver: ollama
+      base-url: http://localhost:11434
+  models:
+    gpt-5:
+      connection: openai-main
+      provider-model: openai/gpt-5
+      thinking-levels: [low, medium, high]
+    claude-sonnet:
+      connection: anthropic-main
+      provider-model: anthropic/claude-sonnet-4
+      thinking-levels: [low, medium, high]
+    gemini-pro:
+      connection: gemini-main
+      provider-model: google/gemini-2.5-pro
+      thinking-levels: [low, medium, high]
+    ollama-llama3:
+      connection: ollama-main
+      provider-model: llama3.2

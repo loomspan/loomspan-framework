@@ -1,0 +1,3 @@
+name: nonThinkingSkill
+description: Non-thinking skill with no override.
+model: ollama-llama3

@@ -1,0 +1,20 @@
+CLAIM / FNOL #CLM-3003
+Reported: 2026-07-14 19:40 UTC
+Policy: POL-AUTO-1001
+Claimant: Sam Rivera
+
+Summary:
+Third auto claim this quarter. Another "hit and run" in the same parking lot as the last two claims.
+Claiming front bumper and headlight damage again. Same repair shop as prior claims.
+
+Loss details:
+- Loss date: 2026-07-14
+- Loss type: auto / collision (hit and run alleged)
+- Location: Westside Mall parking lot, Bay City
+- Estimated repair: about $4,800
+- Parties: Sam Rivera (insured); other vehicle unknown
+
+Notes:
+- Prior similar claims ~18 and ~41 days ago
+- Same mailing address and zip as recent claims
+- No police report number provided this time

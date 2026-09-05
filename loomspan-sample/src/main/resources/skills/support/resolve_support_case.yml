@@ -1,0 +1,90 @@
+name: resolveSupportCase
+description: >
+  Root customer support case resolver. Plans intent understanding, selective
+  billing/technical/how-to specialist branches, and customer reply composition
+  into a structured case disposition.
+model: qwen3-35b
+planning_mode: true
+max_steps: 10
+allowed_skills:
+  - name: understandIntent
+  - name: handleBilling
+  - name: handleTechnical
+  - name: handleHowTo
+  - name: composeReply
+prompt: |
+  You are the root customer support case resolver (demo only).
+
+  1. Prefer calling understandIntent early with emailText (and scenario / customerId if present).
+  2. Choose specialist branch(es) from intents + email. Call handleBilling and/or handleTechnical
+     and/or handleHowTo as needed. For mixed billing+technical emails, call both specialists.
+     For pure how-to, call handleHowTo only — do not create refunds or bug tickets.
+  3. Forward scenario (and customerId when present) on every tool call that accepts them.
+  4. Call composeReply with emailText plus a factsSummary built from specialist digest(s)
+     (and optional intent summary). Do not invent facts not present in tool results.
+  5. Emit the full root report: intents, disposition, refund fields, optional bugTicketId,
+     factsSummary, draftReply, internalNotes — grounded in understandIntent + specialists + compose.
+
+  Disposition guidance (prompt-level, not hard rules):
+  - refund_offered when billing path recommends goodwill/refund
+  - escalated_bug when tech path created / needs a bug ticket
+  - how_to_answered when how-to only and help articles are sufficient
+  - needs_human when policy is ambiguous, customer is angry with high amount, or facts are insufficient
+  - resolved_draft as default when a draft resolves without refund/escalation
+
+  Default refundRecommended to false when billing did not run.
+  Omit refundAmount and bugTicketId when not applicable (null is also allowed) — do not invent them.
+
+  Do not invent CRM data, refunds, or ticket ids. Do not call L3 leaves directly — only the
+  specialists listed in allowed_skills. The minimum evidence expression accepts any one handle* specialist;
+  still run every branch the intents require.
+input_schema:
+  type: object
+  properties:
+    emailText:
+      type: string
+      description: Free-text customer support email.
+    customerId:
+      type: string
+      description: Optional customer id.
+    scenario:
+      type: string
+      description: Optional fixture key for deterministic leaf data.
+  required: [emailText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    intents:
+      type: array
+      evidence: understandIntent
+      items:
+        type: string
+        enum: [billing, technical, how_to, other]
+    disposition:
+      type: string
+      evidence: understandIntent and (handleBilling or handleTechnical or handleHowTo) and composeReply
+      enum: [resolved_draft, refund_offered, escalated_bug, needs_human, how_to_answered]
+    refundRecommended:
+      type: boolean
+      evidence: handleBilling or handleTechnical or handleHowTo
+    refundAmount: { type: number, nullable: true }
+    bugTicketId: { type: string, nullable: true }
+    factsSummary:
+      type: string
+      evidence: handleBilling or handleTechnical or handleHowTo
+    draftReply:
+      type: string
+      evidence: composeReply
+    internalNotes:
+      type: string
+      evidence: understandIntent and (handleBilling or handleTechnical or handleHowTo) and composeReply
+  required:
+    - intents
+    - disposition
+    - refundRecommended
+    - factsSummary
+    - draftReply
+    - internalNotes
+  additionalProperties: false
+output_schema_max_retries: 2

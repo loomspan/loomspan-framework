@@ -1,0 +1,6 @@
+name: mixedEntryParent
+description: Invalid mixed entries.
+model: gpt-5
+allowed_skills:
+  - name: childOne
+  - childTwo

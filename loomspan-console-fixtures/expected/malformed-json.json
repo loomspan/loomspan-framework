@@ -1,0 +1,5 @@
+{
+  "case" : "malformed-json",
+  "valid" : false,
+  "errorCategory" : "MALFORMED_JSON"
+}

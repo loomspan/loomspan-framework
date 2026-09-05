@@ -1,0 +1,12 @@
+name: structuredConstraintParent
+description: Structured task constraints.
+model: gpt-5
+planning_mode: true
+allowed_skills:
+  - name: requiredChild
+    required: true
+  - name: boundedChild
+    min_tasks: 2
+    max_tasks: 3
+  - name: optionalChild
+    required: false

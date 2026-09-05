@@ -1,0 +1,4 @@
+name: disallowedVisibleSkill
+description: Protected sibling excluded by role.
+model: gpt-5
+rbac_roles: [OTHER]

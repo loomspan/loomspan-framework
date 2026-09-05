@@ -1,0 +1,63 @@
+name: understandIntent
+description: >
+  Extracts multi-label support intents (billing, technical, how_to, other),
+  sentiment, entities, and a short summary from a free-text customer email.
+model: gpt-4o-mini
+planning_mode: false
+prompt: |
+  You classify a customer support email for a demo CRM.
+
+  Read emailText carefully. scenario and customerId are optional fixture hints only —
+  do not invent facts that are not in the email.
+
+  Extract multi-label intents from: billing | technical | how_to | other.
+  An email may have more than one intent (e.g. billing + technical).
+
+  Choose sentiment from: angry | frustrated | neutral | positive.
+
+  For entities, only capture order id / amount / product values already present in the email.
+  Prefer ids already written in the message; do not invent real personal data.
+  Treat fixture names and ids as fake demo PII — never invent SSNs, card numbers, or real addresses.
+
+  Keep summary short and grounded in the email text.
+input_schema:
+  type: object
+  properties:
+    emailText:
+      type: string
+      description: Free-text customer support email.
+    scenario:
+      type: string
+      description: Optional fixture key; may hint expected domain but classification must still read the email.
+    customerId:
+      type: string
+      description: Optional customer id hint.
+  required: [emailText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    intents:
+      type: array
+      items:
+        type: string
+        enum: [billing, technical, how_to, other]
+      description: Multi-label intents detected in the email.
+    sentiment:
+      type: string
+      enum: [angry, frustrated, neutral, positive]
+    entities:
+      type: object
+      properties:
+        orderId: { type: string, nullable: true }
+        amount: { type: number, nullable: true }
+        product: { type: string, nullable: true }
+        customerId: { type: string, nullable: true }
+      additionalProperties: false
+      description: Optional entities already present in the email; nested fields may be null when unknown.
+    summary:
+      type: string
+      description: Short grounded summary of the customer request.
+  required: [intents, sentiment, entities, summary]
+  additionalProperties: false
+output_schema_max_retries: 2

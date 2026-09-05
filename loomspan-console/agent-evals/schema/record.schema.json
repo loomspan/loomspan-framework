@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Loomspan sanitized agent evaluation record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "conversationId", "caseId", "mode", "client", "clientBuild", "model", "consoleCommit", "eventStreamKind", "eventStreamComplete", "operations", "answer", "supportedFacts", "limitations", "factEvidence", "limitationEvidence", "factResultEvidence", "limitationResultEvidence", "unnecessaryCalls", "passed"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "runId": {"type": "string", "minLength": 1}, "conversationId": {"type": "string", "minLength": 1},
+    "caseId": {"type": "string", "minLength": 1}, "mode": {"enum": ["tools-only", "skill-assisted"]},
+    "client": {"type": "string", "minLength": 1}, "clientBuild": {"type": "string", "minLength": 1}, "model": {"type": "string", "minLength": 1},
+    "consoleCommit": {"type": "string", "minLength": 1}, "skillDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "eventStreamKind": {"enum": ["headless", "deterministic-replay"]}, "eventStreamComplete": {"const": true},
+    "operations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/operation"}}, "clientActions": {"type": "array", "items": {"type": "string", "minLength": 1}}, "answer": {"type": "string", "minLength": 1},
+    "supportedFacts": {"$ref": "#/$defs/uniqueStrings"}, "limitations": {"$ref": "#/$defs/uniqueStrings"},
+    "factEvidence": {"$ref": "#/$defs/evidenceMap"}, "limitationEvidence": {"$ref": "#/$defs/evidenceMap"},
+    "factResultEvidence": {"$ref": "#/$defs/resultEvidenceMap"}, "limitationResultEvidence": {"$ref": "#/$defs/resultEvidenceMap"},
+    "clarifiedAmbiguity": {"type": "boolean"}, "unsupportedClaims": {"$ref": "#/$defs/uniqueStrings"},
+    "unnecessaryCalls": {"type": "integer", "minimum": 0}, "passed": {"type": "boolean"}, "failures": {"$ref": "#/$defs/uniqueStrings"}
+  },
+  "$defs": {
+    "operation": {
+      "type": "object", "additionalProperties": false, "required": ["tool", "argumentHash", "resultHash"],
+      "properties": {
+        "tool": {"type": "string", "minLength": 1}, "argumentHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "resultHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "continuation": {"type": "boolean"},
+        "externalized": {"type": "boolean"}, "rawRead": {"type": "boolean"}
+      }
+    },
+    "uniqueStrings": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "evidenceMap": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string", "minLength": 8}},
+    "resultEvidenceMap": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}
+  }
+}

@@ -1,0 +1,79 @@
+name: assessCoverage
+description: >
+  Coverage desk specialist. Plans policy/exclusion/payout leaf calls and returns
+  a structured coverage digest for the parent processClaim skill.
+model: qwen3-35b
+planning_mode: true
+max_steps: 6
+allowed_skills:
+  - name: getPolicy
+  - name: checkExclusions
+  - name: estimatePayout
+prompt: |
+  You are the coverage desk specialist for insurance claim intake.
+
+  Forward scenario (and policyId / claimedAmount / lossType when present) to every leaf that accepts them.
+  Prefer getPolicy early. Call checkExclusions with loss type/keywords from the claim.
+  Call estimatePayout when you have a claimed amount; forward the same lossType/keywords so exclusion
+  zeroing matches checkExclusions. You may skip estimatePayout if a hard exclusion deny is already clear.
+
+  Do not invent policy limits, deductibles, exclusions, or payable amounts — base the digest on leaf results.
+  toolsUsed must list skill names you actually invoked.
+  claimedAmount precedence when estimating: input claimedAmount if present, else amount from claim facts, else omit estimate.
+
+  Set covered true only when the loss appears covered absent hard exclusions.
+  estimatedPayable / policyLimit / deductible should come from leaf results when available.
+input_schema:
+  type: object
+  properties:
+    claimText:
+      type: string
+      description: Original claim narrative.
+    scenario:
+      type: string
+      description: Fixture key to forward to every leaf call.
+    policyId:
+      type: string
+      description: Optional policy id to forward to policy leaves.
+    claimedAmount:
+      type: number
+      description: Effective claimed amount (root/POST preferred over extract).
+    extractedFactsSummary:
+      type: string
+      description: Optional compact extractClaimFacts digest.
+  required: [claimText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    summary:
+      type: string
+      description: One-paragraph coverage assessment for parent / recommend skill.
+    covered:
+      type: boolean
+      description: Whether the loss appears covered absent hard exclusions.
+    matchedExclusions:
+      type: array
+      items: { type: string }
+    estimatedPayable:
+      type: number
+      nullable: true
+      description: Payable estimate from estimatePayout when available; null if estimate skipped.
+    policyLimit:
+      type: number
+      nullable: true
+      description: Policy limit from getPolicy when available.
+    deductible:
+      type: number
+      nullable: true
+      description: Deductible from getPolicy when available.
+    toolsUsed:
+      type: array
+      items: { type: string }
+      description: Ordered list of leaf skill names actually invoked.
+    confidence:
+      type: string
+      enum: [low, medium, high]
+  required: [summary, covered, matchedExclusions, estimatedPayable, policyLimit, deductible, toolsUsed, confidence]
+  additionalProperties: false
+output_schema_max_retries: 2

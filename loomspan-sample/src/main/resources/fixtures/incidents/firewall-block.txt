@@ -1,0 +1,16 @@
+INCIDENT TICKET #INC-2404
+Reported: 2026-07-14 09:40 UTC
+Reporter: Internal IT Helpdesk
+
+Summary:
+Office users cannot load the internal wiki (wiki.internal.example.com). Pages hang or show blank.
+VPN users can still reach the wiki normally.
+
+Impact:
+- Internal documentation unavailable from office network
+- VPN path works; service itself may be fine
+
+Notes:
+- Network team pushed firewall rule ACL-4421 around 09:15 UTC
+- No wiki deploy today
+- Suspect firewall deny on office-vlan path after the rule change

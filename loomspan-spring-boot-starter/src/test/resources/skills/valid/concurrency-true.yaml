@@ -1,0 +1,5 @@
+name: concurrencyTrue
+description: Planning concurrency enabled.
+model: gpt-5
+planning_mode: true
+concurrency: true

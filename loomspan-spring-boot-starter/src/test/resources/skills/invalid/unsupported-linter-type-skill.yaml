@@ -1,0 +1,6 @@
+name: invalidUnsupportedLinterTypeSkill
+description: Invalid skill with unsupported linter type.
+model: gpt-5
+linter:
+  type: external
+  max_retries: 1

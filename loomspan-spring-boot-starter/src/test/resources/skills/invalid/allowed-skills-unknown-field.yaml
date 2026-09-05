@@ -1,0 +1,6 @@
+name: unknownConstraintFieldParent
+description: Invalid constraint field.
+model: gpt-5
+allowed_skills:
+  - name: childOne
+    minimum_tasks: 1

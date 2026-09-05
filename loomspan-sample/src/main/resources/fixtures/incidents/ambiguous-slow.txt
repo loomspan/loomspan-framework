@@ -1,0 +1,17 @@
+INCIDENT TICKET #INC-2403
+Reported: 2026-07-14 11:05 UTC
+Reporter: Platform Reliability
+
+Summary:
+Users across regions report intermittent slowness: pages load eventually but feel "stuck" for
+several seconds. No single product team owns a clear outage.
+
+Impact:
+- Intermittent latency / degraded UX
+- Error rates only mildly elevated
+- No confirmed full outage
+
+Notes:
+- No production deploy today
+- Cache dependency has been flapping on health checks
+- Could be network, app, or shared infrastructure — needs judgment

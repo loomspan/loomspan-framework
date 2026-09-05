@@ -1,0 +1,5 @@
+name: unknownRootFieldSkill
+description: YAML skill with an unexpected top-level field.
+model: gpt-5
+lintr:
+  type: regex

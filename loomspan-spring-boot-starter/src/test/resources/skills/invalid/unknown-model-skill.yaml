@@ -1,0 +1,3 @@
+name: invalidUnknownModelSkill
+description: Invalid skill that references an unknown model.
+model: missing-model

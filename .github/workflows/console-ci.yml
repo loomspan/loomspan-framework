@@ -1,0 +1,145 @@
+name: Console CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: console-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  affected-race:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.26.5
+          cache-dependency-path: loomspan-console/go.sum
+      - name: Race-test changed skill and evaluation tooling
+        working-directory: loomspan-console
+        run: go test -race ./internal/agentskills ./internal/agenteval ./internal/buildtool
+
+  agent-skill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - name: Install pinned uv
+        run: python -m pip install uv==0.11.7
+      - name: Validate canonical Agent Skills with pinned official reference
+        working-directory: loomspan-console
+        run: |
+          uv run --frozen --project skills-ref-validation skills-ref validate ./agent-skills/loomspan
+          uv run --frozen --project skills-ref-validation skills-ref validate ../agent-skills/loomspan-docs
+          uv run --frozen --project skills-ref-validation skills-ref validate ../agent-skills/bootstrap
+      - name: Verify coordinated repository versioning
+        working-directory: loomspan-console
+        run: |
+          uv run --frozen --project skills-ref-validation python ../scripts/loomspan_version.py check
+          uv run --frozen --project skills-ref-validation python -m unittest discover ../scripts/tests -v
+
+  native-mcp:
+    name: Native MCP (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+          - name: windows-x86_64
+            os: windows-latest
+          - name: macos-arm64
+            os: macos-15
+          - name: macos-x86_64
+            os: macos-15-intel
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.26.5
+          cache-dependency-path: loomspan-console/go.sum
+      - name: Verify native MCP credential and lifecycle behavior
+        working-directory: loomspan-console
+        run: go test ./internal/mcpcredential ./internal/mcpadapter ./internal/console ./internal/webhost
+
+  mcp-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.26.5
+          cache-dependency-path: loomspan-console/go.sum
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: loomspan-console/mcp-conformance/package-lock.json
+      - name: Pin npm
+        run: npm install --global npm@12.0.2
+      - name: Run pinned MCP conformance
+        working-directory: loomspan-console
+        run: go run ./internal/buildtool mcp-conformance
+
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.26.5
+          cache-dependency-path: loomspan-console/go.sum
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: loomspan-console/web/package-lock.json
+      - name: Pin npm
+        run: npm install --global npm@12.0.2
+      - name: Verify Java fixture writer and adapters
+        run: ./mvnw -pl loomspan-spring-boot-starter -Dtest=ConsoleTraceFixtureCorpusTest test && ./mvnw -pl loomspan-sample -am test
+      - name: Verify Console
+        working-directory: loomspan-console
+        run: go run ./internal/buildtool verify
+      - name: Build E2E executable from verified assets
+        working-directory: loomspan-console
+        shell: bash
+        run: |
+          VERSION=$(../mvnw -q -f ../pom.xml help:evaluate -Dexpression=project.version -DforceStdout)
+          mkdir -p build
+          go build -trimpath -ldflags "-X=github.com/loomspan/loomspan-framework/loomspan-console/internal/release.productVersion=${VERSION}" -o build/loomspan-console ./cmd/loomspan-console
+      - name: Install Chromium
+        working-directory: loomspan-console/web
+        run: npx playwright install --with-deps chromium
+      - name: Run browser E2E
+        working-directory: loomspan-console
+        run: npm --prefix web run test:e2e
+      - name: Upload failing Playwright evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: console-playwright-failure
+          path: |
+            loomspan-console/web/test-results
+            loomspan-console/web/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7

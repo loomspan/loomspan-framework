@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "runId": "pr53-bounded-skill",
+  "conversationId": "pr53-bounded-skill-conversation",
+  "caseId": "bounded-skill-assisted",
+  "mode": "skill-assisted",
+  "client": "repository deterministic replay",
+  "clientBuild": "current checkout",
+  "model": "not-applicable",
+  "consoleCommit": "b931382b74e858ed72c81334952441b1e1250faf-dirty",
+  "skillDigest": "36e3f9e29dd29aa90e4eb19c29a07c9a93fb12ac3c56c569f8e5af4a1b35dc5d",
+  "eventStreamKind": "deterministic-replay",
+  "eventStreamComplete": true,
+  "operations": [
+    {
+      "tool": "LOOMSPAN_query_trace_records",
+      "argumentHash": "f2af64809e21d8f9c2cef6357d72ab48dbc9801dbf6a9c1a3e465d8bc7bf9508",
+      "resultHash": "f5cbbb2a0a46030ef10d90100bae34bb52a407b4f3e404bbee50fe94f7ad5e7c",
+      "continuation": true,
+      "externalized": true
+    },
+    {
+      "tool": "LOOMSPAN_query_trace_records",
+      "argumentHash": "9e3130ed505f2435cd3af7eff4475070c1c569a173a1c11774e673f72e88405a",
+      "resultHash": "83aa488ffa6aeea35a399bebd03c59a962ccd243df98536fddb909b4e91a83e2",
+      "continuation": true,
+      "externalized": true
+    },
+    {
+      "tool": "LOOMSPAN_read_trace_content",
+      "argumentHash": "de7382cbc9d0ff2129ec0c0ca9f53f0038ac553eb2fb236dec53865c0107da4e",
+      "resultHash": "e279688b75a69037103787191c708a4570c2a4c830215d2ff8e8e331f811e30f",
+      "continuation": true
+    },
+    {
+      "tool": "LOOMSPAN_read_trace_content",
+      "argumentHash": "aed8d720ce888eb87dc31ff18af34a57f65e9774d4f95278dbc3f66fa2b3c24f",
+      "resultHash": "ccd4f8120f08ad8b18186c9ea206c6f65c3942b7f4605f0df0c93906e7a25f37",
+      "continuation": true
+    },
+    {
+      "tool": "LOOMSPAN_read_trace_artifact",
+      "argumentHash": "6bce1adadc829f0e9b02eec4e6476091f16ca99dae7b2484129e14cba0ef416e",
+      "resultHash": "239164b736112244743378711e14c6998d9e5a6a7b1b71becc1d494ed1743edc",
+      "rawRead": true
+    }
+  ],
+  "answer": "Evidence: traceId selection; complete continuation traversal; descriptor inline and exact content roles; deliberate raw forensics. Limitations: client externalization is not evidence loss; raw bytes are not the ordinary semantic view.",
+  "supportedFacts": [
+    "traceId selection",
+    "complete continuation traversal",
+    "descriptor inline and exact content roles",
+    "deliberate raw forensics"
+  ],
+  "limitations": [
+    "client externalization is not evidence loss",
+    "raw bytes are not the ordinary semantic view"
+  ],
+  "factEvidence": {
+    "traceId selection": "traceId selection",
+    "complete continuation traversal": "complete continuation traversal",
+    "descriptor inline and exact content roles": "descriptor inline and exact content roles",
+    "deliberate raw forensics": "deliberate raw forensics"
+  },
+  "limitationEvidence": {
+    "client externalization is not evidence loss": "client externalization is not evidence loss",
+    "raw bytes are not the ordinary semantic view": "raw bytes are not the ordinary semantic view"
+  },
+  "factResultEvidence": {
+    "traceId selection": ["f5cbbb2a0a46030ef10d90100bae34bb52a407b4f3e404bbee50fe94f7ad5e7c"],
+    "complete continuation traversal": ["f5cbbb2a0a46030ef10d90100bae34bb52a407b4f3e404bbee50fe94f7ad5e7c", "83aa488ffa6aeea35a399bebd03c59a962ccd243df98536fddb909b4e91a83e2"],
+    "descriptor inline and exact content roles": ["f5cbbb2a0a46030ef10d90100bae34bb52a407b4f3e404bbee50fe94f7ad5e7c", "e279688b75a69037103787191c708a4570c2a4c830215d2ff8e8e331f811e30f", "ccd4f8120f08ad8b18186c9ea206c6f65c3942b7f4605f0df0c93906e7a25f37"],
+    "deliberate raw forensics": ["239164b736112244743378711e14c6998d9e5a6a7b1b71becc1d494ed1743edc"]
+  },
+  "limitationResultEvidence": {
+    "client externalization is not evidence loss": ["f5cbbb2a0a46030ef10d90100bae34bb52a407b4f3e404bbee50fe94f7ad5e7c"],
+    "raw bytes are not the ordinary semantic view": ["239164b736112244743378711e14c6998d9e5a6a7b1b71becc1d494ed1743edc"]
+  },
+  "unnecessaryCalls": 0,
+  "passed": true
+}

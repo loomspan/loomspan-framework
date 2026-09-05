@@ -1,0 +1,3 @@
+name: expenseLookup
+description: Camel-case public name.
+model: gpt-5

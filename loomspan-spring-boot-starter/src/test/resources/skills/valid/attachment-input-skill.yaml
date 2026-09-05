@@ -1,0 +1,15 @@
+name: attachmentInputSkill
+description: Accepts image attachment input.
+model: gpt-5
+input_schema:
+  type: object
+  required:
+    - image
+  additionalProperties: false
+  properties:
+    image:
+      type: attachment
+      media_type: image
+      allowed_content_types:
+        - image/jpeg
+      description: Ticket image.

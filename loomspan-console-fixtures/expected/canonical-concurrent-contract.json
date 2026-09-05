@@ -1,0 +1,601 @@
+{
+  "case" : "canonical-concurrent-contract",
+  "valid" : true,
+  "traceId" : "trace-canonical-concurrent-contract",
+  "sessionId" : "session-canonical-concurrent-contract",
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "terminalUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ ],
+  "retries" : [ ],
+  "validationLinks" : [ ],
+  "frames" : [ {
+    "frameId" : "concurrent-root",
+    "parentFrameId" : null,
+    "frameType" : "ROOT_MISSION",
+    "inclusiveDurationMillis" : 18000,
+    "selfDurationMillis" : 5000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "test.entry"
+  }, {
+    "frameId" : "concurrent-planning",
+    "parentFrameId" : "concurrent-root",
+    "frameType" : "PLANNING",
+    "inclusiveDurationMillis" : 1000,
+    "selfDurationMillis" : 1000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "test.entry#planning"
+  }, {
+    "frameId" : "step-d",
+    "parentFrameId" : "concurrent-root",
+    "frameType" : "STEP_EXECUTION",
+    "inclusiveDurationMillis" : 1000,
+    "selfDurationMillis" : 1000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "worker.d"
+  }, {
+    "frameId" : "step-e",
+    "parentFrameId" : "concurrent-root",
+    "frameType" : "STEP_EXECUTION",
+    "inclusiveDurationMillis" : 1000,
+    "selfDurationMillis" : 1000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "worker.e"
+  }, {
+    "frameId" : "step-f",
+    "parentFrameId" : "concurrent-root",
+    "frameType" : "STEP_EXECUTION",
+    "inclusiveDurationMillis" : 3000,
+    "selfDurationMillis" : 2000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "worker.f"
+  }, {
+    "frameId" : "nested-planning-f",
+    "parentFrameId" : "step-f",
+    "frameType" : "PLANNING",
+    "inclusiveDurationMillis" : 1000,
+    "selfDurationMillis" : 1000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "worker.f#planning"
+  }, {
+    "frameId" : "step-b",
+    "parentFrameId" : "concurrent-root",
+    "frameType" : "STEP_EXECUTION",
+    "inclusiveDurationMillis" : 5000,
+    "selfDurationMillis" : 1000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "worker.b"
+  }, {
+    "frameId" : "nested-planning-b",
+    "parentFrameId" : "step-b",
+    "frameType" : "PLANNING",
+    "inclusiveDurationMillis" : 4000,
+    "selfDurationMillis" : 4000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "worker.b#planning"
+  }, {
+    "frameId" : "step-a",
+    "parentFrameId" : "concurrent-root",
+    "frameType" : "STEP_EXECUTION",
+    "inclusiveDurationMillis" : 5000,
+    "selfDurationMillis" : 1000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "worker.a"
+  }, {
+    "frameId" : "model-a",
+    "parentFrameId" : "step-a",
+    "frameType" : "MODEL_CALL",
+    "inclusiveDurationMillis" : 4000,
+    "selfDurationMillis" : 4000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "worker.a#model"
+  } ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ],
+  "planTransitions" : [ {
+    "sequence" : 7,
+    "planId" : "concurrent-plan",
+    "kind" : "ADMISSION",
+    "taskIds" : [ "task-d" ],
+    "parallelGroup" : "disabled",
+    "effectiveConcurrency" : false
+  }, {
+    "sequence" : 10,
+    "planId" : "concurrent-plan",
+    "kind" : "JOIN",
+    "taskIds" : [ "task-d" ],
+    "parallelGroup" : "disabled",
+    "outcome" : "COMPLETED"
+  }, {
+    "sequence" : 11,
+    "planId" : "concurrent-plan",
+    "kind" : "ADMISSION",
+    "taskIds" : [ "task-e" ],
+    "parallelGroup" : "disabled",
+    "effectiveConcurrency" : false
+  }, {
+    "sequence" : 14,
+    "planId" : "concurrent-plan",
+    "kind" : "JOIN",
+    "taskIds" : [ "task-e" ],
+    "parallelGroup" : "disabled",
+    "outcome" : "COMPLETED"
+  }, {
+    "sequence" : 15,
+    "planId" : "concurrent-plan",
+    "kind" : "ADMISSION",
+    "taskIds" : [ "task-f" ],
+    "parallelGroup" : null,
+    "effectiveConcurrency" : false
+  }, {
+    "sequence" : 20,
+    "planId" : "concurrent-plan",
+    "kind" : "JOIN",
+    "taskIds" : [ "task-f" ],
+    "parallelGroup" : null,
+    "outcome" : "COMPLETED"
+  }, {
+    "sequence" : 21,
+    "planId" : "concurrent-plan",
+    "kind" : "ADMISSION",
+    "taskIds" : [ "task-a", "task-b", "task-c" ],
+    "parallelGroup" : "enabled",
+    "effectiveConcurrency" : true
+  }, {
+    "sequence" : 30,
+    "planId" : "concurrent-plan",
+    "kind" : "JOIN",
+    "taskIds" : [ "task-a", "task-b", "task-c" ],
+    "parallelGroup" : "enabled",
+    "outcome" : "FAILED"
+  } ],
+  "planProjections" : [ {
+    "planId" : "concurrent-plan",
+    "status" : "STALE",
+    "creationSequence" : 5,
+    "tasks" : [ {
+      "taskId" : "task-d",
+      "status" : "COMPLETED",
+      "assignedFrameId" : "step-d",
+      "effectiveConcurrency" : false,
+      "failureIds" : [ ]
+    }, {
+      "taskId" : "task-e",
+      "status" : "COMPLETED",
+      "assignedFrameId" : "step-e",
+      "effectiveConcurrency" : false,
+      "failureIds" : [ ]
+    }, {
+      "taskId" : "task-f",
+      "status" : "COMPLETED",
+      "assignedFrameId" : "step-f",
+      "effectiveConcurrency" : false,
+      "failureIds" : [ ]
+    }, {
+      "taskId" : "task-a",
+      "status" : "COMPLETED",
+      "assignedFrameId" : "step-a",
+      "effectiveConcurrency" : true,
+      "failureIds" : [ "failure-model-a" ]
+    }, {
+      "taskId" : "task-b",
+      "status" : "FAILED",
+      "assignedFrameId" : "step-b",
+      "effectiveConcurrency" : true,
+      "failureIds" : [ ]
+    }, {
+      "taskId" : "task-c",
+      "status" : "FAILED",
+      "assignedFrameId" : null,
+      "effectiveConcurrency" : true,
+      "failureIds" : [ ]
+    } ],
+    "executionUnits" : [ {
+      "parallelGroup" : "disabled",
+      "taskIds" : [ "task-d", "task-e" ],
+      "effectiveConcurrency" : false,
+      "observedOverlap" : false
+    }, {
+      "parallelGroup" : null,
+      "taskIds" : [ "task-f" ],
+      "effectiveConcurrency" : false,
+      "observedOverlap" : null
+    }, {
+      "parallelGroup" : "enabled",
+      "taskIds" : [ "task-a", "task-b", "task-c" ],
+      "effectiveConcurrency" : true,
+      "observedOverlap" : true
+    } ]
+  } ],
+  "inheritedFrameAssignments" : [ {
+    "frameId" : "step-d",
+    "planId" : "concurrent-plan",
+    "taskId" : "task-d",
+    "stepNumber" : 1,
+    "parallelGroup" : "disabled",
+    "effectiveConcurrency" : false
+  }, {
+    "frameId" : "step-e",
+    "planId" : "concurrent-plan",
+    "taskId" : "task-e",
+    "stepNumber" : 2,
+    "parallelGroup" : "disabled",
+    "effectiveConcurrency" : false
+  }, {
+    "frameId" : "step-f",
+    "planId" : "concurrent-plan",
+    "taskId" : "task-f",
+    "stepNumber" : 3,
+    "parallelGroup" : null,
+    "effectiveConcurrency" : false
+  }, {
+    "frameId" : "nested-planning-f",
+    "planId" : "concurrent-plan",
+    "taskId" : "task-f",
+    "stepNumber" : 3,
+    "parallelGroup" : null,
+    "effectiveConcurrency" : false
+  }, {
+    "frameId" : "step-b",
+    "planId" : "concurrent-plan",
+    "taskId" : "task-b",
+    "stepNumber" : 5,
+    "parallelGroup" : "enabled",
+    "effectiveConcurrency" : true
+  }, {
+    "frameId" : "nested-planning-b",
+    "planId" : "concurrent-plan",
+    "taskId" : "task-b",
+    "stepNumber" : 5,
+    "parallelGroup" : "enabled",
+    "effectiveConcurrency" : true
+  }, {
+    "frameId" : "step-a",
+    "planId" : "concurrent-plan",
+    "taskId" : "task-a",
+    "stepNumber" : 4,
+    "parallelGroup" : "enabled",
+    "effectiveConcurrency" : true
+  }, {
+    "frameId" : "model-a",
+    "planId" : "concurrent-plan",
+    "taskId" : "task-a",
+    "stepNumber" : 4,
+    "parallelGroup" : "enabled",
+    "effectiveConcurrency" : true
+  } ],
+  "activeBranchPrefixes" : [ {
+    "sequence" : 3,
+    "branches" : [ {
+      "planId" : null,
+      "taskId" : null,
+      "stepNumber" : null,
+      "parallelGroup" : null,
+      "effectiveConcurrency" : null,
+      "path" : [ {
+        "frameId" : "concurrent-root",
+        "frameType" : "ROOT_MISSION",
+        "route" : "test.entry"
+      } ]
+    } ]
+  }, {
+    "sequence" : 7,
+    "branches" : [ {
+      "planId" : null,
+      "taskId" : null,
+      "stepNumber" : null,
+      "parallelGroup" : null,
+      "effectiveConcurrency" : null,
+      "path" : [ {
+        "frameId" : "concurrent-root",
+        "frameType" : "ROOT_MISSION",
+        "route" : "test.entry"
+      } ]
+    } ]
+  }, {
+    "sequence" : 17,
+    "branches" : [ {
+      "planId" : "concurrent-plan",
+      "taskId" : "task-f",
+      "stepNumber" : 3,
+      "parallelGroup" : null,
+      "effectiveConcurrency" : false,
+      "path" : [ {
+        "frameId" : "concurrent-root",
+        "frameType" : "ROOT_MISSION",
+        "route" : "test.entry"
+      }, {
+        "frameId" : "step-f",
+        "frameType" : "STEP_EXECUTION",
+        "route" : "worker.f"
+      }, {
+        "frameId" : "nested-planning-f",
+        "frameType" : "PLANNING",
+        "route" : "worker.f#planning"
+      } ]
+    } ]
+  }, {
+    "sequence" : 20,
+    "branches" : [ {
+      "planId" : null,
+      "taskId" : null,
+      "stepNumber" : null,
+      "parallelGroup" : null,
+      "effectiveConcurrency" : null,
+      "path" : [ {
+        "frameId" : "concurrent-root",
+        "frameType" : "ROOT_MISSION",
+        "route" : "test.entry"
+      } ]
+    } ]
+  }, {
+    "sequence" : 21,
+    "branches" : [ {
+      "planId" : null,
+      "taskId" : null,
+      "stepNumber" : null,
+      "parallelGroup" : null,
+      "effectiveConcurrency" : null,
+      "path" : [ {
+        "frameId" : "concurrent-root",
+        "frameType" : "ROOT_MISSION",
+        "route" : "test.entry"
+      } ]
+    } ]
+  }, {
+    "sequence" : 25,
+    "branches" : [ {
+      "planId" : "concurrent-plan",
+      "taskId" : "task-b",
+      "stepNumber" : 5,
+      "parallelGroup" : "enabled",
+      "effectiveConcurrency" : true,
+      "path" : [ {
+        "frameId" : "concurrent-root",
+        "frameType" : "ROOT_MISSION",
+        "route" : "test.entry"
+      }, {
+        "frameId" : "step-b",
+        "frameType" : "STEP_EXECUTION",
+        "route" : "worker.b"
+      }, {
+        "frameId" : "nested-planning-b",
+        "frameType" : "PLANNING",
+        "route" : "worker.b#planning"
+      } ]
+    }, {
+      "planId" : "concurrent-plan",
+      "taskId" : "task-a",
+      "stepNumber" : 4,
+      "parallelGroup" : "enabled",
+      "effectiveConcurrency" : true,
+      "path" : [ {
+        "frameId" : "concurrent-root",
+        "frameType" : "ROOT_MISSION",
+        "route" : "test.entry"
+      }, {
+        "frameId" : "step-a",
+        "frameType" : "STEP_EXECUTION",
+        "route" : "worker.a"
+      }, {
+        "frameId" : "model-a",
+        "frameType" : "MODEL_CALL",
+        "route" : "worker.a#model"
+      } ]
+    } ]
+  }, {
+    "sequence" : 27,
+    "branches" : [ {
+      "planId" : "concurrent-plan",
+      "taskId" : "task-a",
+      "stepNumber" : 4,
+      "parallelGroup" : "enabled",
+      "effectiveConcurrency" : true,
+      "path" : [ {
+        "frameId" : "concurrent-root",
+        "frameType" : "ROOT_MISSION",
+        "route" : "test.entry"
+      }, {
+        "frameId" : "step-a",
+        "frameType" : "STEP_EXECUTION",
+        "route" : "worker.a"
+      }, {
+        "frameId" : "model-a",
+        "frameType" : "MODEL_CALL",
+        "route" : "worker.a#model"
+      } ]
+    } ]
+  }, {
+    "sequence" : 29,
+    "branches" : [ {
+      "planId" : null,
+      "taskId" : null,
+      "stepNumber" : null,
+      "parallelGroup" : null,
+      "effectiveConcurrency" : null,
+      "path" : [ {
+        "frameId" : "concurrent-root",
+        "frameType" : "ROOT_MISSION",
+        "route" : "test.entry"
+      } ]
+    } ]
+  }, {
+    "sequence" : 30,
+    "branches" : [ {
+      "planId" : null,
+      "taskId" : null,
+      "stepNumber" : null,
+      "parallelGroup" : null,
+      "effectiveConcurrency" : null,
+      "path" : [ {
+        "frameId" : "concurrent-root",
+        "frameType" : "ROOT_MISSION",
+        "route" : "test.entry"
+      } ]
+    } ]
+  }, {
+    "sequence" : 31,
+    "branches" : [ ]
+  } ]
+}

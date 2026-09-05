@@ -1,0 +1,215 @@
+package mcpadapter
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/live"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+const GetExecutionActivityToolName = "LOOMSPAN_get_execution_activity"
+
+type getExecutionActivityInput struct {
+	SessionID    string `json:"sessionId" jsonschema:"Exact active execution session identifier"`
+	PageSize     int    `json:"pageSize" jsonschema:"Number of recent activity envelopes to return, from 1 through 64"`
+	Continuation string `json:"continuation,omitempty" jsonschema:"Opaque future checkpoint; keep after hasMore=false"`
+}
+
+func addActivityTool(server *mcp.Server, options ServerOptions) {
+	addValidatedTool(server, &mcp.Tool{
+		Name:        GetExecutionActivityToolName,
+		Description: "Return bounded untrusted activity. hasMore is backlog now; continuation is a future checkpoint after false. Empty results may advance it.",
+		Annotations: readOnlyAnnotations, InputSchema: pageInputSchema[getExecutionActivityInput](),
+	}, activityOutputSchema(), func(ctx context.Context, _ *mcp.CallToolRequest, input getExecutionActivityInput) (*mcp.CallToolResult, toolEnvelope[activityResult], error) {
+		return handleGetExecutionActivity(ctx, options, input)
+	})
+}
+
+func handleGetExecutionActivity(ctx context.Context, options ServerOptions, input getExecutionActivityInput) (*mcp.CallToolResult, toolEnvelope[activityResult], error) {
+	scope, domain := captureScope(options)
+	if domain != nil {
+		return checkedDomainFailure[activityResult](ctx, options, domain)
+	}
+	if options.Live == nil {
+		return checkedDomainFailure[activityResult](ctx, options, unavailableInspectionError(string(scope.ID)))
+	}
+	cursor := ""
+	if input.Continuation != "" {
+		cursor, domain = decodeContinuation(input.Continuation, continuationActivity, string(scope.ID), input.SessionID)
+		if domain != nil {
+			return checkedDomainFailure[activityResult](ctx, options, domain)
+		}
+	}
+	recent, domain := options.Live.Recent(live.RecentRequest{Cursor: cursor, SessionID: input.SessionID, Limit: input.PageSize})
+	if domain != nil {
+		return checkedDomainFailure[activityResult](ctx, options, domain)
+	}
+	if recent.Continuity != nil && recent.Continuity.TargetScopeID != "" && recent.Continuity.TargetScopeID != string(scope.ID) {
+		domain = options.Target.RequireCurrent(target.ScopeID(recent.Continuity.TargetScopeID))
+		if domain == nil {
+			domain = consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", recent.Continuity.TargetScopeID, consolecore.Details{CurrentTargetScopeID: string(scope.ID)}, nil)
+		}
+		return checkedDomainFailure[activityResult](ctx, options, domain)
+	}
+	items := make([]activityDTO, 0, len(recent.Items))
+	admission := newActivityPageAdmission()
+	budgetLimited := false
+	for _, item := range recent.Items {
+		mapped, err := mapActivity(item)
+		if err != nil {
+			domain = consolecore.NewError(consolecore.CodeConsoleError, "The recent activity response could not be read.", string(scope.ID), consolecore.Details{}, err)
+			return checkedDomainFailure[activityResult](ctx, options, domain)
+		}
+		if !admission.admit(mapped, activityItemText(mapped, len(items))) {
+			if len(items) == 0 {
+				domain = consolecore.NewError(consolecore.CodeLimitExceeded,
+					"One recent activity item exceeds the safe response budget.", string(scope.ID),
+					consolecore.Details{LimitName: "responseBytes", LimitValue: defaultTraceResultBudget}, nil)
+				return checkedDomainFailure[activityResult](ctx, options, domain)
+			}
+			budgetLimited = true
+			break
+		}
+		items = append(items, mapped)
+	}
+	var returnedRange *cursorRangeDTO
+	resumeCursor := ""
+	if len(items) > 0 {
+		returnedRange = &cursorRangeDTO{FirstCursor: items[0].Cursor, LastCursor: items[len(items)-1].Cursor}
+		resumeCursor = items[len(items)-1].Cursor
+	} else if recent.Continuity != nil {
+		resumeCursor = recent.Continuity.LastCursor
+	}
+	continuation := ""
+	if resumeCursor != "" {
+		continuation, domain = encodeContinuationDomain(continuationActivity, string(scope.ID), resumeCursor, input.SessionID)
+		if domain != nil {
+			return checkedDomainFailure[activityResult](ctx, options, domain)
+		}
+	}
+	result := activityResult{
+		ObservedAt: recent.ObservedAt.UTC(),
+		Items:      items, ReturnedCursorRange: returnedRange, HasMore: recent.HasMore || budgetLimited,
+		Continuation: continuation, Continuity: mapContinuity(recent.Continuity), Coverage: mapCoverage(recent.Coverage),
+	}
+	if domain := publicationDomain(options, scope); domain != nil {
+		return checkedDomainFailure[activityResult](ctx, options, domain)
+	}
+	if err := authenticationGenerationError(ctx, options); err != nil {
+		return nil, toolEnvelope[activityResult]{}, err
+	}
+	return successResult(result, activityText(result))
+}
+
+func activityText(result activityResult) string {
+	var writer lineWriter
+	appendCommon(&writer, result.ObservedAt)
+	if result.ReturnedCursorRange == nil {
+		writer.lines = append(writer.lines, "returnedCursorRange: -")
+	} else {
+		writer.quoted("returnedCursorRange.firstCursor", result.ReturnedCursorRange.FirstCursor)
+		writer.quoted("returnedCursorRange.lastCursor", result.ReturnedCursorRange.LastCursor)
+	}
+	if result.Continuity == nil {
+		writer.lines = append(writer.lines, "continuity: -")
+	} else {
+		writer.quoted("continuity.intervalId", result.Continuity.IntervalID)
+		if result.Continuity.FirstCursor != "" {
+			writer.quoted("continuity.firstCursor", result.Continuity.FirstCursor)
+		}
+		if result.Continuity.LastCursor != "" {
+			writer.quoted("continuity.lastCursor", result.Continuity.LastCursor)
+		}
+		if !result.Continuity.ObservedAt.IsZero() {
+			writer.time("continuity.observedAt", result.Continuity.ObservedAt)
+		}
+		if result.Continuity.Reset == nil {
+			writer.lines = append(writer.lines, "continuity.reset: -")
+		} else {
+			writer.quoted("continuity.reset.cause", string(result.Continuity.Reset.Cause))
+			writer.time("continuity.reset.timestamp", result.Continuity.Reset.Timestamp)
+			if result.Continuity.Reset.Cursor != "" {
+				writer.quoted("continuity.reset.cursor", result.Continuity.Reset.Cursor)
+			}
+		}
+	}
+	if result.Coverage.GlobalEvictedThroughCursor != "" {
+		writer.quoted("coverage.globalEvictedThroughCursor", result.Coverage.GlobalEvictedThroughCursor)
+	}
+	if result.Coverage.SessionStartCursor != "" {
+		writer.quoted("coverage.sessionStartCursor", result.Coverage.SessionStartCursor)
+	}
+	if result.Coverage.SessionEvictedThroughCursor != "" {
+		writer.quoted("coverage.sessionEvictedThroughCursor", result.Coverage.SessionEvictedThroughCursor)
+	}
+	if result.Coverage.SessionRetainedCursorRange != nil {
+		writer.quoted("coverage.sessionRetainedCursorRange.firstCursor", result.Coverage.SessionRetainedCursorRange.FirstCursor)
+		writer.quoted("coverage.sessionRetainedCursorRange.lastCursor", result.Coverage.SessionRetainedCursorRange.LastCursor)
+	}
+	writer.integer("count", int64(len(result.Items)))
+	writer.boolean("hasMore", result.HasMore)
+	writer.continuation(result.Continuation)
+	for index, item := range result.Items {
+		writer.lines = append(writer.lines, activityItemLines(item, index)...)
+	}
+	return writer.String()
+}
+
+func activityItemText(item activityDTO, index int) string {
+	return strings.Join(activityItemLines(item, index), "\n") + "\n"
+}
+
+func activityItemLines(item activityDTO, index int) []string {
+	var writer lineWriter
+	prefix := fmt.Sprintf("items[%d].", index)
+	writer.quoted(prefix+"cursor", item.Cursor)
+	writer.quoted(prefix+"sessionId", item.SessionID)
+	writer.quoted(prefix+"traceId", item.TraceID)
+	if item.CanonicalSequence != nil {
+		writer.integer(prefix+"canonicalSequence", *item.CanonicalSequence)
+	}
+	writer.time(prefix+"timestamp", item.Timestamp)
+	writer.quoted(prefix+"kind", string(item.Kind))
+	for _, optional := range []struct{ name, value string }{
+		{prefix + "executionStatus", item.ExecutionStatus},
+		{prefix + "frameId", item.FrameID},
+		{prefix + "parentFrameId", item.ParentFrameID},
+		{prefix + "frameType", item.FrameType},
+		{prefix + "route", item.Route},
+	} {
+		if optional.value != "" {
+			writer.quoted(optional.name, optional.value)
+		}
+	}
+	facts, _ := json.Marshal(item.Facts)
+	writer.lines = append(writer.lines, prefix+"facts: "+string(facts))
+	return writer.lines
+}
+
+func mapCoverage(value live.Coverage) coverageDTO {
+	var retained *cursorRangeDTO
+	if value.SessionRetainedCursorRange != nil {
+		retained = &cursorRangeDTO{
+			FirstCursor: value.SessionRetainedCursorRange.FirstCursor,
+			LastCursor:  value.SessionRetainedCursorRange.LastCursor,
+		}
+	}
+	return coverageDTO{
+		GlobalEvictedThroughCursor:  value.GlobalEvictedThroughCursor,
+		SessionStartCursor:          value.SessionStartCursor,
+		SessionEvictedThroughCursor: value.SessionEvictedThroughCursor,
+		SessionRetainedCursorRange:  retained,
+	}
+}
+
+func mapContinuity(value *live.Continuity) *continuityDTO {
+	if value == nil {
+		return nil
+	}
+	return &continuityDTO{IntervalID: value.IntervalID, FirstCursor: value.FirstCursor, LastCursor: value.LastCursor, ObservedAt: value.ObservedAt, Reset: value.Reset}
+}

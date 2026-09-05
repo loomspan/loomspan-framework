@@ -1,0 +1,1 @@
+{"result":{"observedAt":"2026-07-25T12:00:00Z","items":[{"sessionId":"session-1","traceId":"trace-1","status":"ACTIVE","phase":"RUNNING","updatedAt":"2026-07-25T11:59:59Z","activeBranchCount":0}],"hasMore":false}}

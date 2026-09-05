@@ -1,0 +1,7 @@
+name: nullMinimumParent
+description: Null minimum.
+model: gpt-5
+planning_mode: true
+allowed_skills:
+  - name: childOne
+    min_tasks: null

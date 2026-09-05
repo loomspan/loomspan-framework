@@ -1,0 +1,9 @@
+name: evidenceContractNondirectChildSkill
+description: Invalid non-direct evidence child
+model: gpt-5
+allowed_skills:
+  - name: investigateNetwork
+output_schema:
+  type: object
+  properties:
+    likelyCause: { type: string, evidence: checkDns }

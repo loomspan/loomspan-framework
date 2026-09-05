@@ -1,0 +1,82 @@
+{
+  "case" : "validation-exhaustion",
+  "valid" : true,
+  "traceId" : "trace-validation-exhaustion",
+  "sessionId" : "session-validation-exhaustion",
+  "outcome" : "FAILED",
+  "terminalFailureId" : "failure-validation",
+  "attributedUsage" : {
+    "promptUnits" : 11,
+    "completionUnits" : 4,
+    "totalUnits" : 15
+  },
+  "terminalUsage" : {
+    "promptUnits" : 11,
+    "completionUnits" : 4,
+    "totalUnits" : 15
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ {
+    "retrySequenceId" : "retry-1",
+    "attemptId" : "attempt-1",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 6,
+      "completionUnits" : 2,
+      "totalUnits" : 8
+    },
+    "usageComplete" : true
+  }, {
+    "retrySequenceId" : "retry-1",
+    "attemptId" : "attempt-2",
+    "attemptNumber" : 2,
+    "attemptReason" : "SEMANTIC_RETRY",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 5,
+      "completionUnits" : 2,
+      "totalUnits" : 7
+    },
+    "usageComplete" : true
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "retry-1",
+    "usage" : {
+      "promptUnits" : 11,
+      "completionUnits" : 4,
+      "totalUnits" : 15
+    },
+    "usageComplete" : true
+  } ],
+  "validationLinks" : [ {
+    "status" : "retrying",
+    "retrySequenceId" : "retry-1",
+    "attemptId" : "attempt-1",
+    "attemptNumber" : 1
+  }, {
+    "status" : "exhausted",
+    "retrySequenceId" : "retry-1",
+    "attemptId" : "attempt-2",
+    "attemptNumber" : 2
+  } ],
+  "frames" : [ ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 11,
+    "completionUnits" : 4,
+    "totalUnits" : 15
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

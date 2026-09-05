@@ -1,0 +1,58 @@
+{
+  "case" : "nonterminal-error-then-success",
+  "valid" : true,
+  "traceId" : "trace-nonterminal-error-then-success",
+  "sessionId" : "session-nonterminal-error-then-success",
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 5,
+    "completionUnits" : 2,
+    "totalUnits" : 7
+  },
+  "terminalUsage" : {
+    "promptUnits" : 5,
+    "completionUnits" : 2,
+    "totalUnits" : 7
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ {
+    "retrySequenceId" : "retry-1",
+    "attemptId" : "attempt-1",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 5,
+      "completionUnits" : 2,
+      "totalUnits" : 7
+    },
+    "usageComplete" : true
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "retry-1",
+    "usage" : {
+      "promptUnits" : 5,
+      "completionUnits" : 2,
+      "totalUnits" : 7
+    },
+    "usageComplete" : true
+  } ],
+  "validationLinks" : [ ],
+  "frames" : [ ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 5,
+    "completionUnits" : 2,
+    "totalUnits" : 7
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

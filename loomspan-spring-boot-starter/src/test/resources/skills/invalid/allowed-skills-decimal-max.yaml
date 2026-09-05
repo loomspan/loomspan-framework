@@ -1,0 +1,7 @@
+name: decimalMaximumParent
+description: Decimal maximum.
+model: gpt-5
+planning_mode: true
+allowed_skills:
+  - name: childOne
+    max_tasks: 1.5

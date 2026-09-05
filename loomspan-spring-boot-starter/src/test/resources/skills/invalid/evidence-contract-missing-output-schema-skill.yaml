@@ -1,0 +1,8 @@
+name: evidenceContractMissingOutputSchemaSkill
+description: Invalid evidence contract without output schema
+model: gpt-5
+allowed_skills:
+  - name: invoiceParser
+evidence_contract:
+  claims:
+    vendorName: invoiceParser

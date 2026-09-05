@@ -1,0 +1,13 @@
+name: outputSchemaPropertyEvidenceSkill
+description: Skill with evidence colocated on an output property
+model: gpt-5
+allowed_skills:
+  - name: reviewSkill
+output_schema:
+  type: object
+  properties:
+    result:
+      type: string
+      evidence: reviewSkill
+  required: [result]
+  additionalProperties: false

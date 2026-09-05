@@ -1,0 +1,4 @@
+interface:
+  display_name: "Loomspan Docs"
+  short_description: "Prepare and consult Loomspan framework guidance"
+  default_prompt: "Use $loomspan-docs to prepare the Loomspan knowledge set relevant to my task."

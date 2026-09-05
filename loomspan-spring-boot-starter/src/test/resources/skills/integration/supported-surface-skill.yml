@@ -1,0 +1,6 @@
+name: supportedSurfaceSkill
+description: Exercises a complete LLM-backed invocation through the supported application API.
+model: integration
+planning_mode: false
+allowed_skills:
+  - name: supportedJavaLeaf

@@ -1,0 +1,8 @@
+name: invalidRegexLinterSkill
+description: Invalid skill with malformed regex syntax.
+model: gpt-5
+linter:
+  type: regex
+  max_retries: 1
+  regex:
+    pattern: '([a-z'

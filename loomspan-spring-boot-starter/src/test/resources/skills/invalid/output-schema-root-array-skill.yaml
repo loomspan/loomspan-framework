@@ -1,0 +1,7 @@
+name: outputSchemaRootArray
+description: Root array should fail.
+model: gpt-5
+output_schema:
+  type: array
+  items:
+    type: string

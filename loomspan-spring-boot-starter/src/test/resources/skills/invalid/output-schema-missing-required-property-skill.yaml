@@ -1,0 +1,10 @@
+name: outputSchemaMissingRequired
+description: Missing required property should fail.
+model: gpt-5
+output_schema:
+  type: object
+  properties:
+    totalAmount:
+      type: number
+  required:
+    - vendorName

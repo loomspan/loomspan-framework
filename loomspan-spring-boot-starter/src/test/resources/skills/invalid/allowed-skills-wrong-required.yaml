@@ -1,0 +1,7 @@
+name: wrongRequiredParent
+description: Wrong required type.
+model: gpt-5
+planning_mode: true
+allowed_skills:
+  - name: childOne
+    required: "true"

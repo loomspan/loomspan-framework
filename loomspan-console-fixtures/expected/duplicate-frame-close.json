@@ -1,0 +1,5 @@
+{
+  "case" : "duplicate-frame-close",
+  "valid" : false,
+  "errorCategory" : "INVALID_FRAME_RELATIONSHIP"
+}

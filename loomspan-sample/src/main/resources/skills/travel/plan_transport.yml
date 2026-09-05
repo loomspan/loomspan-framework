@@ -1,0 +1,114 @@
+name: planTransport
+description: >
+  Transport specialist planner. Searches flights and/or trains, optionally ranks
+  options, and returns a structured transport digest for the parent concierge.
+model: qwen3-35b
+planning_mode: true
+max_steps: 6
+allowed_skills:
+  - name: searchFlights
+  - name: searchTrains
+  - name: rankTransportOptions
+prompt: |
+  You are the transport specialist for a travel concierge demo (fake inventory only).
+
+  Forward scenario and structured preference fields (origin, destination, date / startDate,
+  priorities) to every leaf that accepts them.
+
+  Choose which searches to run — do not always call both flights and trains.
+  Prefer trains when cost is primary and the corridor is rail-friendly; prefer flights when
+  speed is primary or distance is long.
+
+  When multiple options exist, prefer calling rankTransportOptions after search:
+  - Prefer the options parameter as a JSON array (not a string). Copy only compact fields
+    from each search option: price, durationMinutes, and one identity field
+    (airline, operator, or id). Do NOT paste the full search response or long notes.
+  - optionsJson string is a fallback only if you cannot pass a native array.
+  - sortBy is optional: "price" for cost-first, "duration" for speed-first; omit for default price.
+  - Java ranks; you still pick the final option based on priorities (use prior search
+    results for full details if the ranked list is compact).
+  - If rankTransportOptions returns ok=false, read error/hint, fix options/optionsJson, or pick
+    directly from the prior search without ranking.
+  - Example tool call shape (values come from the prior search tool result, not invented):
+      rankTransportOptions(
+        options=[{"airline":"Pacific Jet","price":210.0,"durationMinutes":125},{"airline":"Bargain Multi","price":98.0,"durationMinutes":450}],
+        sortBy='duration'
+      )
+
+  Do not invent inventory. toolsUsed and findings must reflect tools you actually invoked.
+  Set domain to "transport". mode should be flight | train | mixed.
+  selectedOutbound (and selectedReturn when applicable) must come from tool results.
+input_schema:
+  type: object
+  properties:
+    requestText:
+      type: string
+      description: Original natural language trip request.
+    scenario:
+      type: string
+      description: Fixture key to forward to catalog leaves.
+    origin:
+      type: string
+      description: Structured origin from preferences.
+    destination:
+      type: string
+      description: Structured destination from preferences.
+    startDate:
+      type: string
+      description: Preferred start / outbound date.
+    endDate:
+      type: string
+      description: Preferred end / return date.
+    priorities:
+      type: array
+      items: { type: string }
+      description: Preference labels such as cost, speed, comfort.
+    preferencesSummary:
+      type: string
+      description: Optional short digest of trip preferences.
+  required: [requestText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    domain:
+      type: string
+      enum: [transport]
+    summary:
+      type: string
+      description: One-paragraph transport digest for the parent / assemble skill.
+    mode:
+      type: string
+      description: flight | train | mixed
+    selectedOutbound:
+      type: object
+      additionalProperties: true
+    selectedReturn:
+      type: object
+      nullable: true
+      additionalProperties: true
+    optionsConsidered:
+      type: array
+      items:
+        type: object
+        additionalProperties: true
+    toolsUsed:
+      type: array
+      items: { type: string }
+      description: Ordered list of tool skill names actually invoked.
+    findings:
+      type: array
+      items:
+        type: object
+        properties:
+          tool:
+            type: string
+            description: Tool skill name that produced the finding.
+          observation:
+            type: string
+            description: Short factual observation from the tool result.
+        required: [tool, observation]
+        additionalProperties: false
+  required: [domain, summary, mode, toolsUsed, findings]
+  additionalProperties: false
+output_schema_max_retries: 2

@@ -1,0 +1,60 @@
+name: outputSchemaComplexSkill
+description: Complex structured JSON.
+model: gpt-5
+output_schema:
+  type: object
+  properties:
+    vendorName:
+      type: string
+    totalAmount:
+      type: number
+    invoiceDate:
+      type: string
+    currency:
+      type: string
+    invoiceNumber:
+      type: string
+    lineItems:
+      type: array
+      items:
+        type: object
+        properties:
+          sku:
+            type: string
+          amount:
+            type: number
+          details:
+            type: object
+            properties:
+              taxable:
+                type: boolean
+            required:
+              - taxable
+        required:
+          - sku
+          - amount
+          - details
+    taxAmount:
+      type: number
+    subtotal:
+      type: number
+    shippingAmount:
+      type: number
+    dueDate:
+      type: string
+    purchaseOrder:
+      type: string
+    notes:
+      type: string
+    paymentTerms:
+      type: string
+  required:
+    - vendorName
+    - totalAmount
+    - invoiceDate
+    - currency
+    - invoiceNumber
+    - lineItems
+    - taxAmount
+    - subtotal
+    - shippingAmount

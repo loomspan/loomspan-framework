@@ -1,0 +1,5 @@
+{
+  "case" : "invalid-frame-relationship",
+  "valid" : false,
+  "errorCategory" : "INVALID_FRAME_RELATIONSHIP"
+}

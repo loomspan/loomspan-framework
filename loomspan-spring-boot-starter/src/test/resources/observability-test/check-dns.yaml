@@ -1,0 +1,3 @@
+name: CheckDns
+description: Checks DNS for observability REST tests.
+model: test

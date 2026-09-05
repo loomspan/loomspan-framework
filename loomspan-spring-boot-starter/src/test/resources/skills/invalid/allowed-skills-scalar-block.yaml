@@ -1,0 +1,5 @@
+name: scalarBlockParent
+description: Invalid scalar block entry.
+model: gpt-5
+allowed_skills:
+  - childOne

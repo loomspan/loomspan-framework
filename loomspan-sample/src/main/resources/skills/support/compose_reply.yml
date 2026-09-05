@@ -1,0 +1,53 @@
+name: composeReply
+description: >
+  Drafts a customer-facing support email reply and internal agent notes grounded
+  in gathered case facts.
+model: gpt-4o-mini
+planning_mode: false
+prompt: |
+  Compose a customer support reply for a demo CRM.
+
+  Ground every claim in factsSummary (and intentSummary / dispositionHint when present).
+  Do not invent refunds, ticket ids, policy outcomes, or CRM data that are not in factsSummary.
+
+  Match tone to the customer without escalating hostility. Be clear and professional.
+
+  PII / redaction guidance:
+  - Do not invent SSNs, card numbers, or payment instrument numbers.
+  - If the email already contains account ids, you may echo them.
+  - Prefer generic references ("your March invoice") when unsure.
+  - Treat all fixture data as fake demo PII.
+
+  draftReply is the customer-facing email body. internalNotes is agent-facing only.
+input_schema:
+  type: object
+  properties:
+    emailText:
+      type: string
+      description: Original customer support email.
+    factsSummary:
+      type: string
+      description: Digest of specialist findings (billing / technical / how-to).
+    intentSummary:
+      type: string
+      description: Optional short digest from understandIntent.
+    dispositionHint:
+      type: string
+      description: Optional disposition bias for the draft (e.g. refund_offered).
+    scenario:
+      type: string
+      description: Optional fixture key.
+  required: [emailText, factsSummary]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    draftReply:
+      type: string
+      description: Customer-facing email body.
+    internalNotes:
+      type: string
+      description: Agent-facing notes (not sent to the customer).
+  required: [draftReply, internalNotes]
+  additionalProperties: false
+output_schema_max_retries: 2

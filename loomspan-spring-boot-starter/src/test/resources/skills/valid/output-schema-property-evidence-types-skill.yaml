@@ -1,0 +1,25 @@
+name: outputSchemaPropertyEvidenceTypesSkill
+description: Skill with evidence on scalar object and array root properties
+model: gpt-5
+allowed_skills:
+  - name: reviewSkill
+  - name: auditSkill
+output_schema:
+  type: object
+  properties:
+    ResultValue:
+      type: string
+      evidence: reviewSkill
+    details:
+      type: object
+      evidence: reviewSkill and auditSkill
+      properties:
+        note: { type: string }
+    rows:
+      type: array
+      evidence: reviewSkill or auditSkill
+      items: { type: string }
+    unconstrained:
+      type: string
+  required: [ResultValue]
+  additionalProperties: false

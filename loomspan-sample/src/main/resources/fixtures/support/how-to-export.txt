@@ -1,0 +1,14 @@
+From: Riley Demo <riley.demo@example.com>
+To: support@demo.example.com
+Subject: How do I export orders to CSV?
+Customer ID: CUST-1004
+
+Hi team,
+
+I'm new on the Starter plan. How do I export my order history to a CSV file?
+Is there a scheduled export option?
+
+No billing issue and nothing is broken â€” just looking for the right steps.
+
+Thanks!
+Riley Demo

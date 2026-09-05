@@ -1,0 +1,4 @@
+ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration
+ai.loomspan.autoconfigure.LoomspanAutoConfiguration
+ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration
+ai.loomspan.autoconfigure.LoomspanObservabilityWebAutoConfiguration

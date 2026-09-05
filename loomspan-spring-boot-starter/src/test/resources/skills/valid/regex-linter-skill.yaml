@@ -1,0 +1,9 @@
+name: lintedSkill
+description: Regex-linted skill.
+model: gpt-5
+linter:
+  type: REGEX
+  max_retries: 2
+  regex:
+    pattern: '  ^```yaml[\s\S]*```$  '
+    message: 'Return fenced YAML only.'

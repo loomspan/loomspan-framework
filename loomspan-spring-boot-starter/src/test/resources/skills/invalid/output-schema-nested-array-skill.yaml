@@ -1,0 +1,14 @@
+name: outputSchemaNestedArraySkill
+description: Invalid nested arrays.
+model: gpt-5
+output_schema:
+  type: object
+  properties:
+    matrix:
+      type: array
+      items:
+        type: array
+        items:
+          type: string
+  required: [matrix]
+  additionalProperties: false

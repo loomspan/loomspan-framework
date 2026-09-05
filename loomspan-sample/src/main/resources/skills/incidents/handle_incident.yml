@@ -1,0 +1,68 @@
+name: handleIncident
+description: >
+  Root IT incident commander. Plans classification, selective network or app
+  investigation, optional runbook lookup, and response drafting into a structured
+  incident report.
+model: qwen3-35b
+planning_mode: true
+max_steps: 10
+allowed_skills:
+  - name: classifyIncident
+  - name: investigateNetwork
+  - name: investigateApp
+  - name: draftIncidentResponse
+  - name: lookupRunbook
+prompt: |
+  You are the root IT incident commander.
+
+  1. Prefer calling classifyIncident early with ticketText (and scenario if present).
+  2. Choose investigation branch(es) from classification + ticket. Call investigateNetwork
+     or investigateApp as needed. Do not call both specialists unless the ticket is
+     genuinely mixed/ambiguous.
+  3. Forward scenario on every tool call that accepts it (classify, investigate*, lookupRunbook).
+  4. Optionally call lookupRunbook with category/scenario; pass any runbook text into draft.
+  5. Call draftIncidentResponse with ticketText plus investigation digest(s)
+     (and optional classificationSummary / runbookText).
+  6. Emit the full root report fields from classification + investigation + draft results.
+
+  Do not invent telemetry. Do not call leaf probes directly — only the specialists listed
+  in allowed_skills. Either investigation specialist can satisfy investigation evidence;
+  you do not need both branches for a successful plan.
+input_schema:
+  type: object
+  properties:
+    ticketText:
+      type: string
+      description: Free-text incident report from a human or alert system.
+    scenario:
+      type: string
+      description: Optional fixture key for deterministic leaf data (e.g. network-dns, app-deploy-regression, ambiguous-slow).
+  required: [ticketText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    severity:
+      type: string
+      evidence: classifyIncident
+      description: SEV1 (highest) through SEV4 (lowest)
+      enum: [SEV1, SEV2, SEV3, SEV4]
+    category:
+      type: string
+      evidence: classifyIncident
+      enum: [network, application, mixed, unknown]
+    likelyCause:
+      type: string
+      evidence: classifyIncident and (investigateNetwork or investigateApp)
+    evidenceSummary:
+      type: string
+      evidence: investigateNetwork or investigateApp
+    recommendedAction:
+      type: string
+      evidence: investigateNetwork or investigateApp
+    userMessage:
+      type: string
+      evidence: draftIncidentResponse
+  required: [severity, category, likelyCause, evidenceSummary, recommendedAction, userMessage]
+  additionalProperties: false
+output_schema_max_retries: 2

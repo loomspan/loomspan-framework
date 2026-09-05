@@ -1,0 +1,21 @@
+CLAIM / FNOL #CLM-4004
+Reported: 2026-07-13 11:15 UTC
+Policy: POL-AUTO-1001
+Claimant: Riley Patel
+
+Summary:
+There was some kind of accident involving my car and another vehicle in a parking structure.
+I'm not sure who had the right of way. Date might have been last week? I didn't get the other
+driver's full insurance info. No photos yet. Not sure if I should claim collision or liability.
+
+Loss details:
+- Loss date: unknown / incomplete
+- Loss type: unclear (auto / possible liability)
+- Location: downtown parking garage (level unknown)
+- Claimed amount: not specified
+- Parties: Riley Patel (insured); other driver name incomplete
+
+Notes:
+- Missing loss date, police report, and other-party details
+- Fault unclear
+- Please advise next steps

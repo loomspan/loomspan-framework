@@ -1,0 +1,168 @@
+{
+  "properties": [
+    {
+      "name": "loomspan.observability.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "Opt in to the servlet observability adapter."
+    },
+    {
+      "name": "loomspan.observability.auth.api-key",
+      "type": "java.lang.String",
+      "description": "Sensitive operator credential. Supply 32 to 512 printable non-whitespace ASCII characters through external configuration."
+    },
+    {
+      "name": "loomspan.observability.completion-grace-ttl",
+      "type": "java.time.Duration",
+      "defaultValue": "15m",
+      "description": "Retention grace for completed trace artifacts; zero disables grace."
+    },
+    {
+      "name": "loomspan.observability.trace-catalog-metadata-ttl",
+      "type": "java.time.Duration",
+      "defaultValue": "24h",
+      "description": "Positive retention period for current-process finalized trace metadata."
+    },
+    {
+      "name": "loomspan.connections",
+      "type": "java.util.Map<java.lang.String,ai.loomspan.autoconfigure.LoomspanProperties$ConnectionProperties>",
+      "description": "Application-owned named AI connections. Values do not inherit or merge spring.ai.* properties."
+    },
+    {
+      "name": "loomspan.connections.*.driver",
+      "type": "ai.loomspan.autoconfigure.AiDriver",
+      "description": "Spring AI protocol/client driver used by this concrete connection."
+    },
+    {
+      "name": "loomspan.connections.*.api-key",
+      "type": "java.lang.String",
+      "description": "Sensitive credential. Supply it through an environment or external property placeholder."
+    },
+    {
+      "name": "loomspan.connections.*.base-url",
+      "type": "java.lang.String",
+      "description": "Optional driver service-root override; required for Ollama. OpenAI appends /chat/completions to the configured root, so include /v1 in the root when required by the service. Anthropic appends /v1/messages. Values are not emitted in Loomspan diagnostics."
+    },
+    {
+      "name": "loomspan.connections.*.headers",
+      "type": "java.util.Map<java.lang.String,java.lang.String>",
+      "description": "Sensitive static headers supported only for the OpenAI and Anthropic drivers; use them for supported provider-specific headers such as anthropic-beta."
+    },
+    {
+      "name": "loomspan.connections.*.openai.organization-id",
+      "type": "java.lang.String",
+      "description": "OpenAI-only organization header value."
+    },
+    {
+      "name": "loomspan.connections.*.openai.project-id",
+      "type": "java.lang.String",
+      "description": "OpenAI-only project header value."
+    },
+    {
+      "name": "loomspan.connections.*.openai.compatibility-profile",
+      "type": "ai.loomspan.autoconfigure.LoomspanProperties$OpenAiCompatibilityProfile",
+      "defaultValue": "standard",
+      "description": "Explicit OpenAI compatibility profile. OpenRouter error-completion decoding is enabled only by openrouter."
+    },
+    {
+      "name": "loomspan.connections.*.provider-retry.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": true,
+      "description": "Whether Loomspan retries retryable synchronous provider failures. Disabled always means one total attempt."
+    },
+    {
+      "name": "loomspan.connections.*.provider-retry.max-attempts",
+      "type": "java.lang.Integer",
+      "defaultValue": 3,
+      "description": "Maximum total sends for one unchanged synchronous request (1 through 10)."
+    },
+    {
+      "name": "loomspan.connections.*.provider-retry.initial-backoff",
+      "type": "java.time.Duration",
+      "defaultValue": "500ms",
+      "description": "Nonnegative initial provider retry delay."
+    },
+    {
+      "name": "loomspan.connections.*.provider-retry.multiplier",
+      "type": "java.lang.Double",
+      "defaultValue": 2.0,
+      "description": "Finite exponential backoff multiplier of at least 1.0."
+    },
+    {
+      "name": "loomspan.connections.*.provider-retry.max-backoff",
+      "type": "java.time.Duration",
+      "defaultValue": "5s",
+      "description": "Maximum provider retry backoff; must not be less than initial-backoff."
+    },
+    {
+      "name": "loomspan.connections.*.provider-retry.jitter",
+      "type": "java.lang.Double",
+      "defaultValue": 0.2,
+      "description": "Uniform plus/minus jitter fraction from 0.0 through 1.0."
+    },
+    {
+      "name": "loomspan.session.quotas.max-provider-attempts",
+      "type": "java.lang.Integer",
+      "defaultValue": 192,
+      "description": "Session-wide physical provider-attempt quota; zero disables enforcement."
+    },
+    {
+      "name": "loomspan.connections.*.gemini.vertex-ai",
+      "type": "java.lang.Boolean",
+      "description": "Enables Gemini Vertex AI mode; mutually exclusive with api-key mode."
+    },
+    {
+      "name": "loomspan.connections.*.gemini.project-id",
+      "type": "java.lang.String",
+      "description": "Required Google Cloud project in Gemini Vertex AI mode."
+    },
+    {
+      "name": "loomspan.connections.*.gemini.location",
+      "type": "java.lang.String",
+      "description": "Required Google Cloud location in Gemini Vertex AI mode."
+    },
+    {
+      "name": "loomspan.connections.*.gemini.credentials-uri",
+      "type": "java.lang.String",
+      "description": "Optional Spring resource URI for credentials in Gemini Vertex AI mode."
+    },
+    {
+      "name": "loomspan.models",
+      "type": "java.util.Map<java.lang.String,ai.loomspan.autoconfigure.LoomspanProperties$ModelCatalogEntry>",
+      "description": "Framework model aliases referenced by YAML skills."
+    },
+    {
+      "name": "loomspan.models.*.connection",
+      "type": "java.lang.String",
+      "description": "Required name of an entry in loomspan.connections."
+    },
+    {
+      "name": "loomspan.models.*.provider-model",
+      "type": "java.lang.String",
+      "description": "Provider model ID applied to each request through the selected connection."
+    },
+    {
+      "name": "loomspan.models.*.thinking-levels",
+      "type": "java.util.Set<java.lang.String>",
+      "description": "Thinking levels that skills selecting this model alias may request."
+    }
+  ],
+  "hints": [
+    {
+      "name": "loomspan.connections.*.driver",
+      "values": [
+        { "value": "openai" },
+        { "value": "anthropic" },
+        { "value": "gemini" },
+        { "value": "ollama" }
+      ]
+    },
+    {
+      "name": "loomspan.connections.*.openai.compatibility-profile",
+      "values": [
+        { "value": "standard" },
+        { "value": "openrouter" }
+      ]
+    }
+  ]
+}

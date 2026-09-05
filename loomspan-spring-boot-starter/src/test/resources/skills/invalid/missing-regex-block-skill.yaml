@@ -1,0 +1,6 @@
+name: invalidMissingRegexBlockSkill
+description: Invalid skill with missing regex block.
+model: gpt-5
+linter:
+  type: regex
+  max_retries: 1

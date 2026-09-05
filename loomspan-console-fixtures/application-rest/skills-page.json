@@ -1,0 +1,1 @@
+{"items":[{"registeredName":"CheckDns","source":"YAML","sourcePath":"classpath:/skills/check-dns.yaml","href":"skills/CheckDns"},{"registeredName":"LookupDns","source":"JAVA","beanName":"dnsSkills","method":"example.DnsSkills.lookup(java.lang.String)","href":"skills/LookupDns"}],"hasMore":false,"nextCursor":null,"observedAt":"2026-07-25T12:00:00Z"}

@@ -1,0 +1,20 @@
+CLAIM / FNOL #CLM-5005
+Reported: 2026-07-11 16:50 UTC
+Policy: POL-AUTO-1001
+Claimant: Casey Nguyen
+
+Summary:
+My car was totaled in a multi-vehicle highway pileup. Airbags deployed; vehicle not drivable.
+Body shop estimate is $25,000 for replacement value / total loss settlement request.
+
+Loss details:
+- Loss date: 2026-07-10
+- Loss type: auto / collision
+- Location: I-95 northbound near Exit 42
+- Claimed amount: $25,000
+- Parties: Casey Nguyen (insured); multiple other vehicles (police report PR-99102)
+
+Notes:
+- Clean claims history
+- Policy collision limit may be lower than claimed amount
+- Requesting payout estimate against policy limits

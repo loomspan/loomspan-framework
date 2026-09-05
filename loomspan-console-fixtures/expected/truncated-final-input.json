@@ -1,0 +1,5 @@
+{
+  "case" : "truncated-final-input",
+  "valid" : false,
+  "errorCategory" : "TRUNCATED_INPUT"
+}

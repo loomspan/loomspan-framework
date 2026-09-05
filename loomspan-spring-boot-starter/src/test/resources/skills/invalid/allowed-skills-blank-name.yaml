@@ -1,0 +1,5 @@
+name: blankChildNameParent
+description: Blank child name.
+model: gpt-5
+allowed_skills:
+  - name: " "

@@ -1,0 +1,10 @@
+name: outputSchemaRootEvidenceSkill
+description: Invalid evidence on the root schema
+model: gpt-5
+allowed_skills:
+  - name: reviewSkill
+output_schema:
+  type: object
+  evidence: reviewSkill
+  properties:
+    result: { type: string }

@@ -1,0 +1,55 @@
+name: extractClaimFacts
+description: >
+  Extracts structured claim facts (loss date, type, amount, location, parties)
+  from free-text FNOL / claim narrative.
+model: gpt-4o-mini
+planning_mode: false
+prompt: |
+  Extract claim facts from claimText.
+  scenario and optional structured fields are hints only — do not invent facts not supported by the text.
+  lossType must be one of: auto, property, theft, liability, other.
+  Use null-equivalent omission only where the schema allows; always provide description and parties (empty array if none).
+  claimedAmount should be a number when clearly stated; otherwise omit or leave null-capable.
+  Keep description concise and grounded in the claim text.
+input_schema:
+  type: object
+  properties:
+    claimText:
+      type: string
+      description: Free-text claim / FNOL narrative.
+    scenario:
+      type: string
+      description: Optional fixture key; may hint expected domain but extraction must still read the text.
+    policyId:
+      type: string
+      description: Optional policy id if already known.
+    claimedAmount:
+      type: number
+      description: Optional claimed amount if already known from the caller.
+  required: [claimText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    lossDate:
+      type: string
+      description: ISO-ish loss date when known; may be omitted when unknown.
+    lossType:
+      type: string
+      enum: [auto, property, theft, liability, other]
+    claimedAmount:
+      type: number
+      description: Claimed amount when extractable from text or provided.
+    location:
+      type: string
+      description: Loss location when known.
+    description:
+      type: string
+      description: Short grounded summary of the loss narrative.
+    parties:
+      type: array
+      items: { type: string }
+      description: Named parties involved (insured, other driver, etc.).
+  required: [lossType, description, parties]
+  additionalProperties: false
+output_schema_max_retries: 2

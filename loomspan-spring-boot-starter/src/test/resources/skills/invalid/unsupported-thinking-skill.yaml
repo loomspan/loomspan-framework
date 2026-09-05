@@ -1,0 +1,4 @@
+name: invalidUnsupportedThinkingSkill
+description: Invalid skill with an unsupported thinking level.
+model: ollama-llama3
+thinking_level: high

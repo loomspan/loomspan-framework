@@ -1,0 +1,5 @@
+{
+  "case" : "missing-frame-parent",
+  "valid" : false,
+  "errorCategory" : "INVALID_FRAME_RELATIONSHIP"
+}

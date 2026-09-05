@@ -1,0 +1,3 @@
+name: "expenseLookup "
+description: Invalid public name with a trailing space.
+model: gpt-5

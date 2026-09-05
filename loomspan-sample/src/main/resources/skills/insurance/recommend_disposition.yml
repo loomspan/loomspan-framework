@@ -1,0 +1,64 @@
+name: recommendDisposition
+description: >
+  Single-shot adjudication writer. Produces a structured disposition recommendation
+  from claim text plus extract/coverage/fraud digests for the root processClaim skill.
+model: gpt-4o-mini
+planning_mode: false
+prompt: |
+  You are the adjudication writer for insurance claim intake (demo only — not legal advice).
+  Ground every field in claimText and the three digests. Do not invent policy limits, payouts,
+  exclusions, or fraud scores.
+
+  Disposition biases:
+  - High fraudRisk / SIU signals → prefer refer_siu
+  - Hard matched exclusions → prefer deny
+  - Missing or ambiguous facts → prefer refer_human
+  - Covered loss with clean fraud → prefer pay or partial_pay
+  - When paying or partial_pay, prefer coverage digest estimatedPayable for payableAmount
+
+  Copy coverageSummary / fraudRisk / matchedExclusions from digests when available.
+  rationale and evidenceNotes must cite what the digests actually said.
+input_schema:
+  type: object
+  properties:
+    claimText:
+      type: string
+      description: Original claim narrative.
+    extractedFactsSummary:
+      type: string
+      description: Compact extractClaimFacts result (JSON string or prose).
+    coverageSummary:
+      type: string
+      description: assessCoverage digest summary / JSON string.
+    fraudSummary:
+      type: string
+      description: fraudScreen digest summary / JSON string.
+    scenario:
+      type: string
+      description: Optional fixture key.
+  required: [claimText, extractedFactsSummary, coverageSummary, fraudSummary]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    disposition:
+      type: string
+      enum: [pay, partial_pay, deny, refer_human, refer_siu]
+    payableAmount:
+      type: number
+      description: Recommended payable when paying/partial; omit for deny/refer when unknown.
+    coverageSummary:
+      type: string
+    fraudRisk:
+      type: string
+      enum: [low, medium, high]
+    matchedExclusions:
+      type: array
+      items: { type: string }
+    rationale:
+      type: string
+    evidenceNotes:
+      type: string
+  required: [disposition, coverageSummary, fraudRisk, matchedExclusions, rationale, evidenceNotes]
+  additionalProperties: false
+output_schema_max_retries: 2

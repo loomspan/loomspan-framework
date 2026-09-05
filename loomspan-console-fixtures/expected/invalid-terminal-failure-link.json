@@ -1,0 +1,5 @@
+{
+  "case" : "invalid-terminal-failure-link",
+  "valid" : false,
+  "errorCategory" : "INVALID_TERMINAL_FAILURE"
+}

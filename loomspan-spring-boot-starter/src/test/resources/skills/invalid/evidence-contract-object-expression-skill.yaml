@@ -1,0 +1,9 @@
+name: evidenceContractObjectExpressionSkill
+description: Invalid object-valued evidence expression
+model: gpt-5
+allowed_skills:
+  - name: invoiceParser
+output_schema:
+  type: object
+  properties:
+    vendorName: { type: string, evidence: { skill: invoiceParser } }

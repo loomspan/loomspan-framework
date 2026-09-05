@@ -1,0 +1,5 @@
+name: concurrencyWrongTypePlanner
+description: Invalid concurrency type.
+model: gpt-5
+planning_mode: true
+concurrency: enabled

@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "runId": "pr53-finalized-tools",
+  "conversationId": "pr53-finalized-tools-conversation",
+  "caseId": "finalized-tools-only",
+  "mode": "tools-only",
+  "client": "repository deterministic replay",
+  "clientBuild": "current checkout",
+  "model": "not-applicable",
+  "consoleCommit": "b931382b74e858ed72c81334952441b1e1250faf-dirty",
+  "eventStreamKind": "deterministic-replay",
+  "eventStreamComplete": true,
+  "operations": [
+    {
+      "tool": "LOOMSPAN_list_traces",
+      "argumentHash": "04052b7a126b84145eeb91abbc554c8fe4b74a62e69b9efe661f49f46fb7a1b0",
+      "resultHash": "c0f534dd5114ab89c95475ab5523a62f85610153189b02c219117cb129fd936e"
+    },
+    {
+      "tool": "LOOMSPAN_get_trace",
+      "argumentHash": "f6e42ee91f1ba9862cc715a4ab5cd406459e597aa21684418148805d77118d2c",
+      "resultHash": "a8e7afb95d0a150eb2a668c7216575a4f56a0990596469dab24c262c3891684d"
+    },
+    {
+      "tool": "LOOMSPAN_query_trace_plans",
+      "argumentHash": "2a987591b621eadc9bc7c9085551710ab0d2e8b6ef411f630c189cdfa37a9596",
+      "resultHash": "6d9eb8ea4894a1626e2e96c4ec842e9405f0823c31d97cf3512a71dfda865003"
+    },
+    {
+      "tool": "LOOMSPAN_query_trace_frames",
+      "argumentHash": "6753a45a0370577e0e8af762190b58a2086e3b7649a1b5b6e946a1ff0dcdc614",
+      "resultHash": "7278778d033f7b3a49b2f8e601693452cfb6347696a936a1c05b88e604123a00"
+    },
+    {
+      "tool": "LOOMSPAN_get_trace",
+      "argumentHash": "acbd6759cdc27c45afe643499d1eaa4bc38002f7f8d784b1e3ff9abac141979b",
+      "resultHash": "34a9433d45c313a1c81f8b187bbd20b9918ce19d05a2bab92596dee86dc3fd30"
+    },
+    {
+      "tool": "LOOMSPAN_get_trace",
+      "argumentHash": "b916b8859e0590376785564cb3e71642c23e7172972560def671818629f85c59",
+      "resultHash": "4a024908fbfb8a535a80bbf74e5b06548cf5e7a93a669d29fac7a6b7e619122a"
+    },
+    {
+      "tool": "LOOMSPAN_query_trace_plans",
+      "argumentHash": "0b9411971d47f7b337c46b007314613802874de3e8346f506d616ffc8a44e0ae",
+      "resultHash": "9e3ab11de8702c6ab140852d677ca9065fa759f9da05a607cf44e126e48db89b"
+    },
+    {
+      "tool": "LOOMSPAN_query_trace_frames",
+      "argumentHash": "9472031bc3e04f93e20baa6c8651799eb82f23288c19b87e02deb0f08aca8e41",
+      "resultHash": "71ed2e0901bd8cf5541fb5d47d5859332e5d90698ae4aff5d8786bf0ff1237da"
+    },
+    {
+      "tool": "LOOMSPAN_query_trace_records",
+      "argumentHash": "00ff345cbbc5c98938f01765893bf364da20d936b1dc896443c448347bf32b7d",
+      "resultHash": "afc8d35bc1ffbc2afa612f6ccffa6731b120a67680d16051389d70e975e3a008"
+    }
+  ],
+  "answer": "Evidence: whole plans in creation order; accepted task and unit order; admission and join transitions; nullable overlap and inherited assignment; accepted-order folding; retry and terminal identity. Limitations: completion order is not folding order; sequence is not concurrent causality; unknown overlap remains null.",
+  "supportedFacts": [
+    "whole plans in creation order",
+    "accepted task and unit order",
+    "admission and join transitions",
+    "nullable overlap and inherited assignment",
+    "accepted-order folding",
+    "retry and terminal identity"
+  ],
+  "limitations": [
+    "completion order is not folding order",
+    "sequence is not concurrent causality",
+    "unknown overlap remains null"
+  ],
+  "unnecessaryCalls": 0,
+  "passed": true,
+  "factEvidence": {
+    "whole plans in creation order": "whole plans in creation order",
+    "accepted task and unit order": "accepted task and unit order",
+    "admission and join transitions": "admission and join transitions",
+    "nullable overlap and inherited assignment": "nullable overlap and inherited assignment",
+    "accepted-order folding": "accepted-order folding",
+    "retry and terminal identity": "retry and terminal identity"
+  },
+  "limitationEvidence": {
+    "completion order is not folding order": "completion order is not folding order",
+    "sequence is not concurrent causality": "sequence is not concurrent causality",
+    "unknown overlap remains null": "unknown overlap remains null"
+  },
+  "factResultEvidence": {
+    "whole plans in creation order": ["6d9eb8ea4894a1626e2e96c4ec842e9405f0823c31d97cf3512a71dfda865003"],
+    "accepted task and unit order": ["6d9eb8ea4894a1626e2e96c4ec842e9405f0823c31d97cf3512a71dfda865003"],
+    "admission and join transitions": ["6d9eb8ea4894a1626e2e96c4ec842e9405f0823c31d97cf3512a71dfda865003"],
+    "nullable overlap and inherited assignment": ["6d9eb8ea4894a1626e2e96c4ec842e9405f0823c31d97cf3512a71dfda865003", "9e3ab11de8702c6ab140852d677ca9065fa759f9da05a607cf44e126e48db89b", "71ed2e0901bd8cf5541fb5d47d5859332e5d90698ae4aff5d8786bf0ff1237da"],
+    "accepted-order folding": ["6d9eb8ea4894a1626e2e96c4ec842e9405f0823c31d97cf3512a71dfda865003"],
+    "retry and terminal identity": ["4a024908fbfb8a535a80bbf74e5b06548cf5e7a93a669d29fac7a6b7e619122a", "afc8d35bc1ffbc2afa612f6ccffa6731b120a67680d16051389d70e975e3a008"]
+  },
+  "limitationResultEvidence": {
+    "completion order is not folding order": ["6d9eb8ea4894a1626e2e96c4ec842e9405f0823c31d97cf3512a71dfda865003"],
+    "sequence is not concurrent causality": ["6d9eb8ea4894a1626e2e96c4ec842e9405f0823c31d97cf3512a71dfda865003"],
+    "unknown overlap remains null": ["6d9eb8ea4894a1626e2e96c4ec842e9405f0823c31d97cf3512a71dfda865003", "9e3ab11de8702c6ab140852d677ca9065fa759f9da05a607cf44e126e48db89b"]
+  }
+}

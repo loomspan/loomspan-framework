@@ -1,0 +1,13 @@
+name: inputSchemaSkill
+description: YAML skill with an explicit input schema.
+model: gpt-5
+input_schema:
+  type: object
+  additionalProperties: false
+  required:
+    - payload
+  properties:
+    payload:
+      type: string
+    includeHistory:
+      type: boolean

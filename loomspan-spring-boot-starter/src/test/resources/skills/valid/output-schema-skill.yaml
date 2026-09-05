@@ -1,0 +1,13 @@
+name: outputSchemaSkill
+description: Returns structured JSON.
+model: gpt-5
+output_schema:
+  type: object
+  properties:
+    vendorName:
+      type: string
+      description: Vendor legal name
+    totalAmount:
+      type: number
+  required:
+    - vendorName

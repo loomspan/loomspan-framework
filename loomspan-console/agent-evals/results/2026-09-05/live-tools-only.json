@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "runId": "pr53-live-tools",
+  "conversationId": "pr53-live-tools-conversation",
+  "caseId": "live-tools-only",
+  "mode": "tools-only",
+  "client": "repository deterministic replay",
+  "clientBuild": "current checkout",
+  "model": "not-applicable",
+  "consoleCommit": "b931382b74e858ed72c81334952441b1e1250faf-dirty",
+  "eventStreamKind": "deterministic-replay",
+  "eventStreamComplete": true,
+  "operations": [
+    {
+      "tool": "LOOMSPAN_get_runtime",
+      "argumentHash": "59809c0e23a388584e9d2c8cfdbb80d015a006718a272de6e695107c3a6bd199",
+      "resultHash": "3631188d317169a3bc43e880ee3d8f5dfbeb60d8ab4ee4a6ee0b567f9fab6c8c"
+    },
+    {
+      "tool": "LOOMSPAN_list_executions",
+      "argumentHash": "5d188acebd8847a191ccee2199b0a263e178413bd531a1b1fbc56f8aa87a7d16",
+      "resultHash": "a3055b8d2c7fe711bac581ec345bc23e7d3fbfb911b47080e826c948ef1db6dc"
+    },
+    {
+      "tool": "LOOMSPAN_get_execution",
+      "argumentHash": "0b3c1c34e369da2f4351bdd0b0f035f4ebe2721656ecef1d5243bd7d9d61c60d",
+      "resultHash": "2516e06852ce5a2386f04692473e89c9a6f382e8e1bfd7d9fb0f4c054179b088"
+    },
+    {
+      "tool": "LOOMSPAN_get_execution",
+      "argumentHash": "27c40e2e48595fa653ed924715d14522514a1bcae41fdd1cfc9c3ee3a80aa7f3",
+      "resultHash": "71744ed6765b22bfd3fe4c454d5b0b656c241ff0c56648fa959ff41042a90454"
+    },
+    {
+      "tool": "LOOMSPAN_get_execution",
+      "argumentHash": "bea1830d16f7c2b248229acffcb0f7a717f8afef714627ced7f72e5bb74fe67a",
+      "resultHash": "1c1092a245ea7a9c09d0088e1a2aadaacee5d692d3e9ea8271a7b216895bea83"
+    },
+    {
+      "tool": "LOOMSPAN_get_execution",
+      "argumentHash": "7332e619164784a0143f6021710f6fbd53075ae6f39624197af17b6727d95f1d",
+      "resultHash": "8e40ce20588cb1050f430cfdca6dfefd72fcc25ded893d6d3eb811d93b1e54c8"
+    },
+    {
+      "tool": "LOOMSPAN_get_execution",
+      "argumentHash": "bd1ca66a31129f47c1b0940c16be9a6a3a264d4b62eed50f0c69f23c2c26c447",
+      "resultHash": "74a99aa939160406a3d4e43fa83614720c5192615a1fe0270147281ebaf5a903"
+    },
+    {
+      "tool": "LOOMSPAN_get_execution",
+      "argumentHash": "9a8c1ae46cca6926298b4fab09e6e901f03436292fb4e947fa4784300c887bf6",
+      "resultHash": "1fa9ee05b04966e9304c8f2262fc28c5155c1c02e3f7bd02d2f0fd8c661ba10d"
+    },
+    {
+      "tool": "LOOMSPAN_get_execution",
+      "argumentHash": "247dc9c3fb9482f898e9ad399166ce1a6a8c705477ab3bf13fde08771c3f72ee",
+      "resultHash": "97579178a9b450b7b947927058825deff742a96e21f3c79592c23ac919661143"
+    },
+    {
+      "tool": "LOOMSPAN_get_execution",
+      "argumentHash": "783a30cdfe0fcb9b812e0e79354ec625109b54afe2b5eb37e0a04a5958585f1c",
+      "resultHash": "97487d7c9fd7c5fb2bd4a529394679a03618055662b7630e8c3cfe5dd0540627"
+    }
+  ],
+  "answer": "Evidence: complete root-to-leaf branches; nullable nearest assignment; same-snapshot predicate; disabled and ungrouped work. Limitations: live facts are provisional; eligibility is not finalized overlap; canonical sequence is not causality.",
+  "supportedFacts": [
+    "complete root-to-leaf branches",
+    "nullable nearest assignment",
+    "same-snapshot predicate",
+    "disabled and ungrouped work"
+  ],
+  "limitations": [
+    "live facts are provisional",
+    "eligibility is not finalized overlap",
+    "canonical sequence is not causality"
+  ],
+  "unnecessaryCalls": 0,
+  "passed": true,
+  "factEvidence": {
+    "complete root-to-leaf branches": "complete root-to-leaf branches",
+    "nullable nearest assignment": "nullable nearest assignment",
+    "same-snapshot predicate": "same-snapshot predicate",
+    "disabled and ungrouped work": "disabled and ungrouped work"
+  },
+  "limitationEvidence": {
+    "live facts are provisional": "live facts are provisional",
+    "eligibility is not finalized overlap": "eligibility is not finalized overlap",
+    "canonical sequence is not causality": "canonical sequence is not causality"
+  },
+  "factResultEvidence": {
+    "complete root-to-leaf branches": ["2516e06852ce5a2386f04692473e89c9a6f382e8e1bfd7d9fb0f4c054179b088", "71744ed6765b22bfd3fe4c454d5b0b656c241ff0c56648fa959ff41042a90454", "1c1092a245ea7a9c09d0088e1a2aadaacee5d692d3e9ea8271a7b216895bea83", "8e40ce20588cb1050f430cfdca6dfefd72fcc25ded893d6d3eb811d93b1e54c8", "74a99aa939160406a3d4e43fa83614720c5192615a1fe0270147281ebaf5a903", "1fa9ee05b04966e9304c8f2262fc28c5155c1c02e3f7bd02d2f0fd8c661ba10d", "97579178a9b450b7b947927058825deff742a96e21f3c79592c23ac919661143", "97487d7c9fd7c5fb2bd4a529394679a03618055662b7630e8c3cfe5dd0540627"],
+    "nullable nearest assignment": ["1c1092a245ea7a9c09d0088e1a2aadaacee5d692d3e9ea8271a7b216895bea83", "8e40ce20588cb1050f430cfdca6dfefd72fcc25ded893d6d3eb811d93b1e54c8"],
+    "same-snapshot predicate": ["2516e06852ce5a2386f04692473e89c9a6f382e8e1bfd7d9fb0f4c054179b088", "97579178a9b450b7b947927058825deff742a96e21f3c79592c23ac919661143", "97487d7c9fd7c5fb2bd4a529394679a03618055662b7630e8c3cfe5dd0540627"],
+    "disabled and ungrouped work": ["71744ed6765b22bfd3fe4c454d5b0b656c241ff0c56648fa959ff41042a90454", "1fa9ee05b04966e9304c8f2262fc28c5155c1c02e3f7bd02d2f0fd8c661ba10d"]
+  },
+  "limitationResultEvidence": {
+    "live facts are provisional": ["a3055b8d2c7fe711bac581ec345bc23e7d3fbfb911b47080e826c948ef1db6dc"],
+    "eligibility is not finalized overlap": ["2516e06852ce5a2386f04692473e89c9a6f382e8e1bfd7d9fb0f4c054179b088", "71744ed6765b22bfd3fe4c454d5b0b656c241ff0c56648fa959ff41042a90454"],
+    "canonical sequence is not causality": ["2516e06852ce5a2386f04692473e89c9a6f382e8e1bfd7d9fb0f4c054179b088"]
+  }
+}

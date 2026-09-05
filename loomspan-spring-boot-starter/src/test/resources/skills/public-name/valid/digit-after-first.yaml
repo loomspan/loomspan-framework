@@ -1,0 +1,3 @@
+name: Skill2
+description: Public name with a digit after the first character.
+model: gpt-5

@@ -1,0 +1,1 @@
+This tracked file keeps the embed package compilable before a production build.

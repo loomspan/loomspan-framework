@@ -1,0 +1,4 @@
+name: planningDisabledSkill
+description: YAML skill that disables planning mode.
+model: gpt-5
+planning_mode: false

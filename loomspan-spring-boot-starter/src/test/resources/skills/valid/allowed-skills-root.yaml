@@ -1,0 +1,7 @@
+name: rootVisibleSkill
+description: Root YAML skill with an explicit allowed skill list.
+model: gpt-5
+planning_mode: true
+allowed_skills:
+  - name: allowedVisibleSkill
+  - name: disallowedVisibleSkill

@@ -1,0 +1,7 @@
+name: falsePlanningConstraintParent
+description: Constraint with planning disabled.
+model: gpt-5
+planning_mode: false
+allowed_skills:
+  - name: childOne
+    max_tasks: 1

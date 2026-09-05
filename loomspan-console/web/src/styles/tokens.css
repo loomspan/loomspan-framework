@@ -1,0 +1,74 @@
+:root {
+  color-scheme: light dark;
+  --bf-background: #eef1f4;
+  --bf-surface: #ffffff;
+  --bf-sunken: #f2f5f7;
+  --bf-text: #131b1d;
+  --bf-muted: #55666b;
+  --bf-border: #d3dbde;
+  --bf-border-strong: #b3bfc3;
+  --bf-accent: #0a6d73;
+  --bf-accent-strong: #075358;
+  --bf-accent-soft: #e2f0f0;
+  --bf-on-accent: #ffffff;
+  --bf-focus: #e05a33;
+  --bf-success: #27784a;
+  --bf-warning: #9a6500;
+  --bf-danger: #b73838;
+  --bf-error: #b73838;
+  --bf-mono: "Cascadia Code", "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Consolas,
+    "Liberation Mono", monospace;
+  --bf-radius: 0.375rem;
+  --bf-radius-md: 0.5rem;
+  --bf-radius-lg: 0.625rem;
+  --bf-shadow-1: 0 1px 2px color-mix(in srgb, var(--bf-text) 6%, transparent),
+    0 1px 1px color-mix(in srgb, var(--bf-text) 4%, transparent);
+  --bf-shadow-2: 0 0.5rem 1.5rem color-mix(in srgb, var(--bf-text) 12%, transparent);
+  --bf-app-bar-height: 3.25rem;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bf-background: #0d1416;
+  --bf-surface: #151f22;
+  --bf-sunken: #1b272b;
+  --bf-text: #eef5f4;
+  --bf-muted: #a2b4b7;
+  --bf-border: #2f4045;
+  --bf-border-strong: #485d62;
+  --bf-accent: #66d2ce;
+  --bf-accent-strong: #8ee3df;
+  --bf-accent-soft: #1e3436;
+  --bf-on-accent: #06181a;
+  --bf-focus: #ff9a6f;
+  --bf-success: #6bd39a;
+  --bf-warning: #f2c66d;
+  --bf-danger: #ff8d88;
+  --bf-error: #ff8d88;
+  --bf-shadow-1: 0 1px 2px rgb(0 0 0 / 40%);
+  --bf-shadow-2: 0 0.5rem 1.5rem rgb(0 0 0 / 45%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bf-background: #0d1416;
+    --bf-surface: #151f22;
+    --bf-sunken: #1b272b;
+    --bf-text: #eef5f4;
+    --bf-muted: #a2b4b7;
+    --bf-border: #2f4045;
+    --bf-border-strong: #485d62;
+    --bf-accent: #66d2ce;
+    --bf-accent-strong: #8ee3df;
+    --bf-accent-soft: #1e3436;
+    --bf-on-accent: #06181a;
+    --bf-focus: #ff9a6f;
+    --bf-success: #6bd39a;
+    --bf-warning: #f2c66d;
+    --bf-danger: #ff8d88;
+    --bf-error: #ff8d88;
+    --bf-shadow-1: 0 1px 2px rgb(0 0 0 / 40%);
+    --bf-shadow-2: 0 0.5rem 1.5rem rgb(0 0 0 / 45%);
+  }
+}

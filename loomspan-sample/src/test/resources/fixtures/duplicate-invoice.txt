@@ -1,0 +1,4 @@
+Vendor: Acme Corp
+Invoice Number: INV-123
+Amount: 42.50
+Date: 03/30/2026

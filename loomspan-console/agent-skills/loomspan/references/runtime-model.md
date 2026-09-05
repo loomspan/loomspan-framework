@@ -1,0 +1,75 @@
+# Runtime evidence model
+
+Keep identities distinct: an application instance contains execution sessions;
+a session records one trace; frames represent nested execution structure; and
+records are ordered facts. Failure, model-attempt, retry-sequence, tool-call,
+content, and continuation identifiers link specific evidence rather than
+establishing cause by themselves.
+
+Active executions and recent activity are live, bounded observations. Cite
+`observedAt`, the latest canonical sequence, continuity/reset facts, and
+the exact coverage cursors Console observed: global eviction, selected-session
+start, selected-session eviction, and selected-session retained range. Missing
+optional cursors establish neither presence nor absence of complete coverage.
+A quiet window is not proof that an execution is stuck, and a live
+status/branch/usage conclusion is provisional. Finalized trace
+evidence is stable while Console can resolve its installed evidence, but an
+incomplete artifact does not imply an outcome.
+
+Execution-list continuation is a keyset traversal, not a snapshot. Its first
+page fixes a high-water first-admission ordinal and later admissions do not
+enter that traversal. Replacement keeps an admitted execution's ordinal, but
+its later-page values may be newer; removal can omit it before its page. Keep
+each page's facts with that page's `observedAt`. A page union establishes
+neither an atomic fleet, complete membership, absence, finalization, nor
+co-temporal state.
+
+Execution detail contains complete root-to-leaf active branches, not one
+preferred active path. Assignment is nullable and uses the nearest inherited
+plan/task/step/group facts. Keep author eligibility, effective runtime mode,
+same-observation simultaneity, and finalized observed overlap distinct.
+
+Finalized plan queries preserve whole plans in creation order. Within each
+plan, task and execution-unit order is accepted order; admission and full-join
+transitions are explicit. Results fold in accepted task order even when
+completion order differs. Canonical record sequence is an ordering fact, not
+proof that one concurrent branch caused another.
+
+For finalized traces, the model-facing identity is `traceId`. Console resolves
+installed target evidence, imported evidence, or safe target acquisition
+internally. A unique imported trace remains inspectable without a selected
+target. A known collision is reported as `AMBIGUOUS_TRACE`; Console never
+silently prefers one owner. Discovery may return useful candidates with
+`complete: false` when uniqueness or absence could not be established.
+
+For recent imported evidence, `importedAt` and `IMPORTED_DESC` answer import
+recency. They do not establish who uploaded the bytes or their integrity,
+authenticity, durability, or provenance.
+
+Target generations, evidence owners, installed handles, acquisition,
+single-flight, expiry, leases, and capacity remain internal safety mechanisms.
+The MCP client does not supply or compare them. `TRACE_UNAVAILABLE` is the
+domain-level result when safe reuse or acquisition cannot provide evidence.
+
+Content references and continuations are opaque, transient, and bound to their
+content or query in the current Console process. On a stale continuation,
+restart the query by `traceId`. On a stale content reference, re-query the
+relevant record by `traceId` and use the refreshed descriptor. On
+`TARGET_CHANGED`, restart the operation by `traceId`.
+
+For activity, `hasMore` describes retained matching backlog at the observation.
+The returned continuation is also a future checkpoint after `hasMore: false`;
+an empty call may advance it to the current continuity boundary.
+
+Application-returned registered YAML is authoritative only as the running
+application's supplied representation. Exact registered names and mapping IDs
+can help search a checkout. `sourcePath` is descriptive untrusted text, not a
+Console path, integrity assertion, or deployment-provenance fact.
+
+Live orientation deliberately omits model-authored task title, intent, and
+expected outputs. Registered YAML can answer an explicitly requested
+skill-level purpose question as application-supplied untrusted context.
+Task-level plan content is available only after finalized trace resolution and
+`LOOMSPAN_query_trace_plans`; it remains model-authored untrusted evidence.
+Selected raw plan-record content is an exact-forensics path, not the ordinary
+task-purpose source.

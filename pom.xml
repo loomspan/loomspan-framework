@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>ai.loomspan</groupId>
+  <artifactId>loomspan-framework-parent</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>Loomspan Framework Parent</name>
+  <description>Aggregator parent POM for the Loomspan Framework project.</description>
+  <url>https://loomspan.ai</url>
+
+  <organization>
+    <name>Loomspan</name>
+    <url>https://loomspan.ai</url>
+  </organization>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>mgiacomi</id>
+      <name>mgiacomi</name>
+      <url>https://github.com/mgiacomi</url>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/loomspan/loomspan-framework.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/loomspan/loomspan-framework.git</developerConnection>
+    <url>https://github.com/loomspan/loomspan-framework</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <modules>
+    <module>loomspan-spring-boot-starter</module>
+    <module>loomspan-sample</module>
+  </modules>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <spring-boot.version>4.1.0</spring-boot.version>
+    <spring-ai.version>2.0.0</spring-ai.version>
+    <mockwebserver.version>4.12.0</mockwebserver.version>
+    <archunit.version>1.4.2</archunit.version>
+
+    <maven.compiler-plugin.version>3.13.0</maven.compiler-plugin.version>
+    <maven.surefire-plugin.version>3.5.2</maven.surefire-plugin.version>
+    <maven.enforcer-plugin.version>3.5.0</maven.enforcer-plugin.version>
+    <minimum.maven.version>3.9.0</minimum.maven.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.ai</groupId>
+        <artifactId>spring-ai-bom</artifactId>
+        <version>${spring-ai.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.okhttp3</groupId>
+        <artifactId>mockwebserver</artifactId>
+        <version>${mockwebserver.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit-junit5</artifactId>
+        <version>${archunit.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven.compiler-plugin.version}</version>
+          <configuration>
+            <release>${maven.compiler.release}</release>
+            <parameters>true</parameters>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${maven.surefire-plugin.version}</version>
+          <configuration>
+            <useModulePath>false</useModulePath>
+            <properties>
+              <configurationParameters>junit.jupiter.extensions.autodetection.enabled=true</configurationParameters>
+            </properties>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>${maven.enforcer-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>enforce-java-and-maven</id>
+              <phase>validate</phase>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <fail>true</fail>
+                <rules>
+                  <requireJavaVersion>
+                    <version>[21,)</version>
+                    <message>Java 21 or newer is required to build Loomspan.</message>
+                  </requireJavaVersion>
+                  <requireMavenVersion>
+                    <version>[${minimum.maven.version},)</version>
+                    <message>Maven ${minimum.maven.version}+ is required to build Loomspan.</message>
+                  </requireMavenVersion>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

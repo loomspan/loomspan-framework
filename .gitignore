@@ -1,0 +1,73 @@
+# Maven
+target/
+!loomspan-console/internal/target/
+!loomspan-console/internal/target/**
+!loomspan-console/web/src/target/
+!loomspan-console/web/src/target/**
+!loomspan-console/browser-fixtures/target/
+!loomspan-console/browser-fixtures/target/**
+biforst-sample/target/
+loomspan-spring-boot-starter/target/
+*.jar
+*.war
+*.zip
+*.tar.gz
+*.rar
+
+# Maven Wrapper
+.mvn/wrapper/maven-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Visual Studio Code
+.vscode/
+
+# Eclipse
+.project
+.classpath
+.settings/
+.factorypath
+
+# NetBeans
+nbproject/
+nbbuild/
+nbdist/
+nbactions.xml
+nb-configuration.xml
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Log Files
+*.log
+logs/
+
+# Temporary Files
+*.swp
+*.bak
+*~
+
+# Python test caches
+__pycache__/
+*.py[cod]
+
+# loomspan Console build outputs
+loomspan-console/web/node_modules/
+loomspan-console/mcp-conformance/node_modules/
+loomspan-console/web/coverage/
+loomspan-console/web/test-results/
+loomspan-console/web/playwright-report/
+loomspan-console/internal/webassets/generated/*
+!loomspan-console/internal/webassets/generated/embed-placeholder.txt
+loomspan-console/build/
+loomspan-console/dist/
+
+# Go test binaries
+*.test.exe

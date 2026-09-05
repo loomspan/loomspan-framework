@@ -1,0 +1,5 @@
+{
+  "case" : "configured-limits-missing-member",
+  "valid" : false,
+  "errorCategory" : "UNSUPPORTED_VALUE"
+}

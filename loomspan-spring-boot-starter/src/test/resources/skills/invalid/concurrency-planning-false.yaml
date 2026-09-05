@@ -1,0 +1,5 @@
+name: concurrencyPlanningFalse
+description: Inapplicable concurrency.
+model: gpt-5
+planning_mode: false
+concurrency: null

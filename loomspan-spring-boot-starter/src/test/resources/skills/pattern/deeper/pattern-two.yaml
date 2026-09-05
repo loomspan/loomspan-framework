@@ -1,0 +1,3 @@
+name: patternTwoSkill
+description: Pattern discovery skill two.
+model: ollama-llama3

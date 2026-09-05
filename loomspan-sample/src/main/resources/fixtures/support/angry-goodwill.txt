@@ -1,0 +1,14 @@
+From: Morgan Demo <morgan.demo@example.com>
+To: support@demo.example.com
+Subject: This is ridiculous â€” you overcharged me
+Customer ID: CUST-1005
+
+I am furious.
+
+My Pro plan is supposed to be $49/month. You charged me $54 this month
+(INV-2026-0312). That is a $5 overcharge. This is my first time contacting
+support and I expect this fixed immediately with a refund.
+
+Do not send me a generic FAQ. Fix the charge.
+
+Morgan Demo

@@ -1,0 +1,11 @@
+name: attachmentOutputSkill
+description: Invalid attachment output.
+model: gpt-5
+output_schema:
+  type: object
+  properties:
+    image:
+      type: attachment
+  required:
+    - image
+  additionalProperties: false

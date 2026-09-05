@@ -1,0 +1,6 @@
+name: concurrencyPlanningMalformed
+description: Inapplicable concurrency.
+model: gpt-5
+planning_mode:
+  enabled: true
+concurrency: 4

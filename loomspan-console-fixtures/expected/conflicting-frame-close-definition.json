@@ -1,0 +1,5 @@
+{
+  "case" : "conflicting-frame-close-definition",
+  "valid" : false,
+  "errorCategory" : "INVALID_FRAME_RELATIONSHIP"
+}

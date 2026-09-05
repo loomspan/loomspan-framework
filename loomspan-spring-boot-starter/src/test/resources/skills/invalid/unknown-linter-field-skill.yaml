@@ -1,0 +1,8 @@
+name: invalidUnknownLinterFieldSkill
+description: Invalid skill with unknown linter field.
+model: gpt-5
+linter:
+  type: regex
+  max_retries: 1
+  regex:
+    patterns: '^ok$'

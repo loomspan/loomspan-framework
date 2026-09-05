@@ -1,0 +1,3 @@
+name: "expenseService#getLatestExpenses"
+description: Invalid public name using internal target syntax.
+model: gpt-5

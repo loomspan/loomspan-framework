@@ -1,0 +1,15 @@
+From: Alex Demo <alex.demo@example.com>
+To: support@demo.example.com
+Subject: App crashes when I try to pay
+Customer ID: CUST-1002
+
+Hello,
+
+Every time I reach the checkout pay step the app freezes and then crashes.
+I tried Chrome and Edge. Order draft is for product "Pro Annual renewal".
+
+This started around March 10. I cannot complete payment at all.
+
+Please help â€” is this a known issue?
+
+Alex Demo

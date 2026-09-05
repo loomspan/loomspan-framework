@@ -1,0 +1,70 @@
+name: assembleItinerary
+description: >
+  Synthesizes a structured trip itinerary and narrative from preference,
+  transport, and stay digests only (no leaf re-search).
+model: gpt-4o-mini
+planning_mode: false
+prompt: |
+  You assemble a final trip itinerary for a travel concierge demo (fake inventory only).
+
+  Synthesize only from preferencesSummary, transportSummary, and staySummary (plus requestText
+  for tone). Do not invent flights, trains, or hotels that are not present in the digests.
+
+  Soft budget: if estimatedTotal exceeds a known budget, explain in rationale and openQuestions
+  rather than inventing cheaper inventory.
+
+  If preferences are under-specified (missing origin/destination/dates), populate openQuestions
+  with concrete clarifying questions. Prefer non-empty openQuestions over inventing airports.
+
+  estimatedTotal should be a USD number grounded in the digests when possible.
+  transport.mode should be flight | train | mixed when known.
+input_schema:
+  type: object
+  properties:
+    requestText:
+      type: string
+      description: Original natural language trip request.
+    preferencesSummary:
+      type: string
+      description: Digest of structured preferences from understandPreferences.
+    transportSummary:
+      type: string
+      description: Digest from planTransport (selected options and findings).
+    staySummary:
+      type: string
+      description: Digest from planStay (selected hotel and perks).
+    scenario:
+      type: string
+      description: Optional fixture key.
+  required: [requestText, preferencesSummary, transportSummary, staySummary]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    summary: { type: string, description: Short human-readable trip proposal summary. }
+    transport:
+      type: object
+      properties:
+        mode: { type: string }
+        outbound:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Selected outbound option from the transport digest; null when unavailable. Never invent details or use an empty object for unavailable data.
+        returnLeg:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Selected return option from the transport digest; null when unavailable. Never invent details or use an empty object for unavailable data.
+      required: [mode, outbound, returnLeg]
+      additionalProperties: true
+    hotel: { type: object, nullable: true, additionalProperties: true }
+    estimatedTotal: { type: number, description: Estimated total cost in USD. }
+    rationale: { type: string, description: Why these options fit preferences. }
+    openQuestions:
+      type: array
+      items: { type: string }
+      description: Clarifying questions when under-specified or budget soft-overrun.
+  required: [summary, transport, estimatedTotal, rationale, openQuestions]
+  additionalProperties: false
+output_schema_max_retries: 2

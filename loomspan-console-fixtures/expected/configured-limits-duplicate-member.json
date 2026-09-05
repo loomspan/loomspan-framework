@@ -1,0 +1,5 @@
+{
+  "case" : "configured-limits-duplicate-member",
+  "valid" : false,
+  "errorCategory" : "UNSUPPORTED_VALUE"
+}

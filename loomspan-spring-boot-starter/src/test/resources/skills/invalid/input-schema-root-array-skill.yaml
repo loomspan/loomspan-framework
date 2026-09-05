@@ -1,0 +1,7 @@
+name: invalidInputSchemaRoot
+description: Invalid input schema root.
+model: gpt-5
+input_schema:
+  type: array
+  items:
+    type: string

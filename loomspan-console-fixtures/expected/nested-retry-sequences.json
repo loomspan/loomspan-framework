@@ -1,0 +1,94 @@
+{
+  "case" : "nested-retry-sequences",
+  "valid" : true,
+  "traceId" : "trace-nested-retry-sequences",
+  "sessionId" : "session-nested-retry-sequences",
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 12,
+    "completionUnits" : 4,
+    "totalUnits" : 16
+  },
+  "terminalUsage" : {
+    "promptUnits" : 12,
+    "completionUnits" : 4,
+    "totalUnits" : 16
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ {
+    "retrySequenceId" : "retry-outer",
+    "attemptId" : "attempt-outer-1",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "usageComplete" : true
+  }, {
+    "retrySequenceId" : "retry-inner",
+    "attemptId" : "attempt-inner-1",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 5,
+      "completionUnits" : 1,
+      "totalUnits" : 6
+    },
+    "usageComplete" : true
+  }, {
+    "retrySequenceId" : "retry-inner",
+    "attemptId" : "attempt-inner-2",
+    "attemptNumber" : 2,
+    "attemptReason" : "SEMANTIC_RETRY",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 3,
+      "completionUnits" : 1,
+      "totalUnits" : 4
+    },
+    "usageComplete" : true
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "retry-outer",
+    "usage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "usageComplete" : true
+  }, {
+    "retrySequenceId" : "retry-inner",
+    "usage" : {
+      "promptUnits" : 8,
+      "completionUnits" : 2,
+      "totalUnits" : 10
+    },
+    "usageComplete" : true
+  } ],
+  "validationLinks" : [ ],
+  "frames" : [ ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 12,
+    "completionUnits" : 4,
+    "totalUnits" : 16
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

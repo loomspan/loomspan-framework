@@ -1,0 +1,5 @@
+{
+  "case" : "overflowing-usage",
+  "valid" : false,
+  "errorCategory" : "INVALID_USAGE"
+}

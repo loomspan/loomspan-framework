@@ -1,0 +1,5 @@
+{
+  "case" : "excessive-json-nesting",
+  "valid" : false,
+  "errorCategory" : "EXCESSIVE_JSON_DEPTH"
+}

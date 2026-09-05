@@ -1,0 +1,3 @@
+name: expénsèLookup
+description: Invalid public name with non-ASCII letters.
+model: gpt-5

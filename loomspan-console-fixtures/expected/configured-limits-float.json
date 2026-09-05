@@ -1,0 +1,5 @@
+{
+  "case" : "configured-limits-float",
+  "valid" : false,
+  "errorCategory" : "UNSUPPORTED_VALUE"
+}

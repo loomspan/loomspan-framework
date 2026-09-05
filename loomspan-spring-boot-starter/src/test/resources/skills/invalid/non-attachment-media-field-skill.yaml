@@ -1,0 +1,12 @@
+name: nonAttachmentMediaFieldSkill
+description: Invalid media field on string input.
+model: gpt-5
+input_schema:
+  type: object
+  required:
+    - payload
+  additionalProperties: false
+  properties:
+    payload:
+      type: string
+      media_type: image

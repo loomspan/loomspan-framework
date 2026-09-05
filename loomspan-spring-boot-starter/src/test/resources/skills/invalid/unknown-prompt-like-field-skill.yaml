@@ -1,0 +1,4 @@
+name: unknownPromptFieldSkill
+description: Short public summary
+model: gpt-5
+system_prompt: Do not accept prompt aliases.

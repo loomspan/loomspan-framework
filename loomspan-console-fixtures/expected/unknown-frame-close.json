@@ -1,0 +1,5 @@
+{
+  "case" : "unknown-frame-close",
+  "valid" : false,
+  "errorCategory" : "INVALID_FRAME_RELATIONSHIP"
+}

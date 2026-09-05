@@ -1,0 +1,4 @@
+name: concurrencyOmitted
+description: Planning concurrency defaults on.
+model: gpt-5
+planning_mode: true

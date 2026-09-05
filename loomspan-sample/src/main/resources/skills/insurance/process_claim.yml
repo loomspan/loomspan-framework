@@ -1,0 +1,78 @@
+name: processClaim
+description: >
+  Root insurance claim intake commander. Plans fact extraction, coverage assessment,
+  fraud screening, and disposition recommendation into a structured adjudication report.
+model: qwen3-35b
+planning_mode: true
+max_steps: 10
+allowed_skills:
+  - name: extractClaimFacts
+  - name: assessCoverage
+  - name: fraudScreen
+  - name: recommendDisposition
+prompt: |
+  You are the root insurance claim intake commander (demo only — not legal advice).
+
+  1. Call extractClaimFacts early with claimText (and scenario / optional structured fields if present).
+  2. Call assessCoverage with claim facts + scenario / policyId / effective claimed amount.
+  3. Call fraudScreen with claim facts + scenario. Always run fraud screening — required by evidence;
+     clean claims still get fraudRisk low after screening.
+  4. Call recommendDisposition with claimText plus string digests from extract, coverage, and fraud
+     (extractedFactsSummary, coverageSummary, fraudSummary).
+  5. COPY recommendDisposition fields into the root report (disposition, payableAmount when present,
+     coverageSummary, fraudRisk, matchedExclusions, rationale, evidenceNotes). Do not re-author
+     disposition language or payable math.
+  6. Do not invent policy/history numbers. Do not call L3 leaves (getPolicy, estimatePayout, etc.)
+     directly — only the four specialists in allowed_skills.
+
+  claimedAmount precedence when forwarding to coverage:
+  (1) root claimedAmount if present, else (2) extract claimedAmount, else (3) omit
+  (scenario defaults are injected only by GET /claims/process-scenario, not by this skill).
+input_schema:
+  type: object
+  properties:
+    claimText:
+      type: string
+      description: Free-text claim / FNOL narrative.
+    policyId:
+      type: string
+      description: Optional policy id (e.g. POL-AUTO-1001).
+    claimedAmount:
+      type: number
+      description: Optional claimed amount from the caller (preferred over extract).
+    scenario:
+      type: string
+      description: Optional fixture key for deterministic leaf data.
+  required: [claimText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    disposition:
+      type: string
+      evidence: assessCoverage and fraudScreen and recommendDisposition
+      enum: [pay, partial_pay, deny, refer_human, refer_siu]
+    payableAmount:
+      type: number
+      evidence: assessCoverage
+      description: Recommended payable when paying/partial; may be omitted for deny/refer.
+    coverageSummary:
+      type: string
+      evidence: assessCoverage
+    fraudRisk:
+      type: string
+      evidence: fraudScreen
+      enum: [low, medium, high]
+    matchedExclusions:
+      type: array
+      evidence: assessCoverage
+      items: { type: string }
+    rationale:
+      type: string
+      evidence: extractClaimFacts and assessCoverage and fraudScreen and recommendDisposition
+    evidenceNotes:
+      type: string
+      evidence: extractClaimFacts and assessCoverage and fraudScreen
+  required: [disposition, coverageSummary, fraudRisk, matchedExclusions, rationale, evidenceNotes]
+  additionalProperties: false
+output_schema_max_retries: 2

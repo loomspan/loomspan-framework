@@ -1,0 +1,18 @@
+From: Sam Demo <sam.demo@example.com>
+To: support@demo.example.com
+Subject: Charged twice AND the app crashes on checkout
+Customer ID: CUST-1003
+
+Hi,
+
+Two problems:
+
+1) Billing â€” I was charged twice for March Pro Monthly ($49 + $49). Invoice
+   references look like INV-2026-0308 and a duplicate.
+
+2) Technical â€” when I try to pay or update my card the checkout page crashes
+   right after I click Pay. Happens on mobile and desktop.
+
+Please fix the double charge and the crash. I need this resolved today.
+
+Sam Demo

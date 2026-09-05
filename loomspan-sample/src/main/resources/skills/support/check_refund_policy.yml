@@ -1,0 +1,49 @@
+name: checkRefundPolicy
+description: >
+  Soft refund / goodwill policy judgment grounded in structured policy facts from
+  lookupRefundPolicy and billing digests.
+model: gpt-4o-mini
+planning_mode: false
+prompt: |
+  You apply soft refund / goodwill policy judgment for a demo support case.
+
+  Ground every recommendation in policyFactsSummary only (and the billing context string).
+  Do not invent eligibility flags, max amounts, or invoice amounts.
+
+  Soft policy guidance:
+  - Goodwill refunds may be recommended under maxGoodwillAmount when firstComplaintEligible
+    and goodwillEligible are true and the overcharge / dispute is small.
+  - Never recommend a refundAmount above maxGoodwillAmount from the facts.
+  - If not eligible, set refundRecommended to false and explain in rationale.
+
+  scenario is an optional fixture hint only.
+input_schema:
+  type: object
+  properties:
+    emailText:
+      type: string
+      description: Original email or short billing context string.
+    policyFactsSummary:
+      type: string
+      description: Digest of lookupRefundPolicy facts plus customer/invoice notes.
+    scenario:
+      type: string
+      description: Optional fixture key.
+  required: [emailText, policyFactsSummary]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    refundRecommended:
+      type: boolean
+    refundAmount:
+      type: number
+      nullable: true
+      description: Suggested goodwill amount; null or omit when not recommending a refund.
+    rationale:
+      type: string
+    policyNotes:
+      type: string
+  required: [refundRecommended, rationale, policyNotes]
+  additionalProperties: false
+output_schema_max_retries: 2

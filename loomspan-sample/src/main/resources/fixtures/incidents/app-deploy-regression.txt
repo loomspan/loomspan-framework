@@ -1,0 +1,16 @@
+INCIDENT TICKET #INC-2402
+Reported: 2026-07-14 14:18 UTC
+Reporter: Checkout On-Call
+
+Summary:
+Checkout is returning HTTP 500 for a large share of payment-submit requests since about 14:05 UTC.
+Customers see "Something went wrong completing your order."
+
+Impact:
+- Elevated checkout 5xx
+- Revenue-impacting; SEV likely high
+
+Notes:
+- CI deployed checkout-2.14.0 at 14:02 UTC
+- Payments dependency probes still green
+- No DNS complaints; issue looks application-side after the deploy

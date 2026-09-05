@@ -1,0 +1,44 @@
+name: draftIncidentResponse
+description: >
+  Drafts an internal ops summary, likely cause, recommended action, and short
+  user-facing status message from investigation digests.
+model: gpt-4o-mini
+planning_mode: false
+prompt: |
+  Draft the incident response pieces from the provided ticket and investigation summary.
+  Do not invent telemetry. Base likelyCause and recommendedAction on investigationSummary
+  (and classificationSummary / runbookText when present).
+  userMessage should be a short status blurb suitable for a ticket comment.
+input_schema:
+  type: object
+  properties:
+    ticketText:
+      type: string
+      description: Original incident ticket text.
+    classificationSummary:
+      type: string
+      description: Short classify digest (severity, category, rationale).
+    investigationSummary:
+      type: string
+      description: Concatenated or single investigation specialist summary/findings.
+    runbookText:
+      type: string
+      description: Optional runbook excerpt from lookupRunbook.
+  required: [ticketText, investigationSummary]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    summary:
+      type: string
+      description: Internal ops summary of the incident state.
+    likelyCause:
+      type: string
+    recommendedAction:
+      type: string
+    userMessage:
+      type: string
+      description: Short status blurb suitable for an end user or ticket comment.
+  required: [summary, likelyCause, recommendedAction, userMessage]
+  additionalProperties: false
+output_schema_max_retries: 2

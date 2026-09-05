@@ -1,0 +1,6 @@
+name: promptSkill
+description: Short public summary
+model: gpt-5
+prompt: |
+  LONG_PROMPT_SENTINEL
+  Follow the private skill instructions.

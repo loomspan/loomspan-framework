@@ -1,0 +1,86 @@
+{
+  "case" : "incomplete-frame-duration",
+  "valid" : true,
+  "traceId" : "trace-incomplete-frame-duration",
+  "sessionId" : "session-incomplete-frame-duration",
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "terminalUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ ],
+  "retries" : [ ],
+  "validationLinks" : [ ],
+  "frames" : [ {
+    "frameId" : "root",
+    "parentFrameId" : null,
+    "frameType" : "ROOT_MISSION",
+    "inclusiveDurationMillis" : 4000,
+    "selfDurationMillis" : null,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "root.skill"
+  }, {
+    "frameId" : "incomplete",
+    "parentFrameId" : "root",
+    "frameType" : "TOOL_INVOCATION",
+    "inclusiveDurationMillis" : null,
+    "selfDurationMillis" : null,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "root.tool"
+  } ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ ],
+  "gaps" : [ {
+    "kind" : "OPEN_FRAME_NOT_CLOSED",
+    "frameId" : "incomplete"
+  } ],
+  "uncertainties" : [ {
+    "kind" : "SELF_DURATION_UNAVAILABLE_INCOMPLETE_CHILD",
+    "frameId" : "root"
+  } ]
+}

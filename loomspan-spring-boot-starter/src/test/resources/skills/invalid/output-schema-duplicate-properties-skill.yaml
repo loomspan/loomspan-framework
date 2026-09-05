@@ -1,0 +1,10 @@
+name: outputSchemaDuplicateProperties
+description: Duplicate properties by case should fail.
+model: gpt-5
+output_schema:
+  type: object
+  properties:
+    vendorName:
+      type: string
+    VendorName:
+      type: string

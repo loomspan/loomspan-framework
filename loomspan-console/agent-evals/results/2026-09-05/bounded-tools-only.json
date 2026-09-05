@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "runId": "pr53-bounded-tools",
+  "conversationId": "pr53-bounded-tools-conversation",
+  "caseId": "bounded-tools-only",
+  "mode": "tools-only",
+  "client": "repository deterministic replay",
+  "clientBuild": "current checkout",
+  "model": "not-applicable",
+  "consoleCommit": "b931382b74e858ed72c81334952441b1e1250faf-dirty",
+  "eventStreamKind": "deterministic-replay",
+  "eventStreamComplete": true,
+  "operations": [
+    {
+      "tool": "LOOMSPAN_query_trace_records",
+      "argumentHash": "8cdec9467e1cb825147a69403264b5fa8010ec299eca0071e04f5954c8ad4977",
+      "resultHash": "08c765fbb73215733c78119c4760e4b4fa0a524b80bb8103736b36896cc7e0c0",
+      "continuation": true,
+      "externalized": true
+    },
+    {
+      "tool": "LOOMSPAN_query_trace_records",
+      "argumentHash": "02962bd56749b1c9211a2397a51462b25d5305660a47c768b99741bcb20d6443",
+      "resultHash": "2b8f6c795f95cd4b209cf501103d45f1b317084fdabeb412ec5da1ad770f7aec",
+      "continuation": true,
+      "externalized": true
+    },
+    {
+      "tool": "LOOMSPAN_read_trace_content",
+      "argumentHash": "6d504f0e17735184f8230c14db1173757fa5ca8f8bb2cef3ad7741d6cd6fae29",
+      "resultHash": "508ae82e75029663b4e8c01879c24570dddca431fa1681d165895766e865730d",
+      "continuation": true
+    },
+    {
+      "tool": "LOOMSPAN_read_trace_content",
+      "argumentHash": "4f62974c4e092a7a25d5fd3cf9e04e10fd0ed7df861d532549be7e6edb7da5ba",
+      "resultHash": "9186a84acbed2b67cdfd67edba02c005e0f8d0cb7af2e3a2fc7423cdebea265f",
+      "continuation": true
+    },
+    {
+      "tool": "LOOMSPAN_read_trace_artifact",
+      "argumentHash": "7dcdae1fa1aac93e636ccb5cc2a37120a1aaa3b9c0c620e5c2fc1de7283764e2",
+      "resultHash": "ade4bf6afc2c95bcdea48a70698873e552b83fb9441d771e678c589092b27c86",
+      "rawRead": true
+    }
+  ],
+  "answer": "Evidence: traceId selection; complete continuation traversal; descriptor inline and exact content roles; deliberate raw forensics. Limitations: client externalization is not evidence loss; raw bytes are not the ordinary semantic view.",
+  "supportedFacts": [
+    "traceId selection",
+    "complete continuation traversal",
+    "descriptor inline and exact content roles",
+    "deliberate raw forensics"
+  ],
+  "limitations": [
+    "client externalization is not evidence loss",
+    "raw bytes are not the ordinary semantic view"
+  ],
+  "factEvidence": {
+    "traceId selection": "traceId selection",
+    "complete continuation traversal": "complete continuation traversal",
+    "descriptor inline and exact content roles": "descriptor inline and exact content roles",
+    "deliberate raw forensics": "deliberate raw forensics"
+  },
+  "limitationEvidence": {
+    "client externalization is not evidence loss": "client externalization is not evidence loss",
+    "raw bytes are not the ordinary semantic view": "raw bytes are not the ordinary semantic view"
+  },
+  "factResultEvidence": {
+    "traceId selection": ["08c765fbb73215733c78119c4760e4b4fa0a524b80bb8103736b36896cc7e0c0"],
+    "complete continuation traversal": ["08c765fbb73215733c78119c4760e4b4fa0a524b80bb8103736b36896cc7e0c0", "2b8f6c795f95cd4b209cf501103d45f1b317084fdabeb412ec5da1ad770f7aec"],
+    "descriptor inline and exact content roles": ["08c765fbb73215733c78119c4760e4b4fa0a524b80bb8103736b36896cc7e0c0", "508ae82e75029663b4e8c01879c24570dddca431fa1681d165895766e865730d", "9186a84acbed2b67cdfd67edba02c005e0f8d0cb7af2e3a2fc7423cdebea265f"],
+    "deliberate raw forensics": ["ade4bf6afc2c95bcdea48a70698873e552b83fb9441d771e678c589092b27c86"]
+  },
+  "limitationResultEvidence": {
+    "client externalization is not evidence loss": ["08c765fbb73215733c78119c4760e4b4fa0a524b80bb8103736b36896cc7e0c0"],
+    "raw bytes are not the ordinary semantic view": ["ade4bf6afc2c95bcdea48a70698873e552b83fb9441d771e678c589092b27c86"]
+  },
+  "unnecessaryCalls": 0,
+  "passed": true
+}

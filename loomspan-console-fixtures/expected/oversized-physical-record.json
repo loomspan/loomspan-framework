@@ -1,0 +1,5 @@
+{
+  "case" : "oversized-physical-record",
+  "valid" : false,
+  "errorCategory" : "LINE_TOO_LARGE"
+}

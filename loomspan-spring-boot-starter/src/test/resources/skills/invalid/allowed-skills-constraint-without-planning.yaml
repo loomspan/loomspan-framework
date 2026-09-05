@@ -1,0 +1,6 @@
+name: directConstraintParent
+description: Constraint on a direct skill.
+model: gpt-5
+allowed_skills:
+  - name: childOne
+    required: false

@@ -1,0 +1,7 @@
+name: invalidMissingLinterTypeSkill
+description: Invalid skill with missing linter type.
+model: gpt-5
+linter:
+  max_retries: 1
+  regex:
+    pattern: '^ok$'

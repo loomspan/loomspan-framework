@@ -1,0 +1,9 @@
+name: evidenceContractReservedChildSkill
+description: Invalid reserved-word evidence child
+model: gpt-5
+allowed_skills:
+  - name: and
+output_schema:
+  type: object
+  properties:
+    result: { type: string, evidence: and }

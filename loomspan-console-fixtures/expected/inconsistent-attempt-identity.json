@@ -1,0 +1,5 @@
+{
+  "case" : "inconsistent-attempt-identity",
+  "valid" : false,
+  "errorCategory" : "INVALID_ATTEMPT"
+}

@@ -1,0 +1,5 @@
+name: nullEntryParent
+description: Invalid null entry.
+model: gpt-5
+allowed_skills:
+  - null

@@ -1,0 +1,67 @@
+name: fraudScreen
+description: >
+  SIU-lite fraud screening specialist. Plans history/anomaly/address leaf calls
+  and returns a structured fraud digest for the parent processClaim skill.
+model: qwen3-35b
+planning_mode: true
+max_steps: 6
+allowed_skills:
+  - name: priorClaimsLookup
+  - name: anomalyScore
+  - name: addressRiskSignals
+prompt: |
+  You are the SIU-lite fraud screening specialist for insurance claim intake.
+
+  Forward scenario to every leaf that accepts it.
+  Prefer priorClaimsLookup and anomalyScore; call addressRiskSignals when velocity or address risk is in play
+  (or when prior claims / anomaly already look elevated).
+  Call only the leaves needed; stop when the fraud digest is supportable.
+
+  Do not invent prior claim counts, anomaly scores, or risk flags — base the digest on leaf results.
+  toolsUsed must list skill names you actually invoked.
+  Map anomalyScore and history into fraudRisk: low | medium | high.
+  Clean history with low anomaly → fraudRisk low (screening still ran).
+input_schema:
+  type: object
+  properties:
+    claimText:
+      type: string
+      description: Original claim narrative.
+    scenario:
+      type: string
+      description: Fixture key to forward to every leaf call.
+    extractedFactsSummary:
+      type: string
+      description: Optional compact extractClaimFacts digest.
+  required: [claimText]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    summary:
+      type: string
+      description: One-paragraph fraud screen summary for parent / recommend skill.
+    fraudRisk:
+      type: string
+      enum: [low, medium, high]
+    anomalyScore:
+      type: number
+      nullable: true
+      description: Anomaly score from anomalyScore leaf when available; null if leaf not called.
+    priorClaimsCount:
+      type: integer
+      nullable: true
+      description: Prior claims count from history leaf when available; null if leaf not called.
+    riskSignals:
+      type: array
+      items: { type: string }
+    toolsUsed:
+      type: array
+      items: { type: string }
+      description: Ordered list of leaf skill names actually invoked.
+    confidence:
+      type: string
+      enum: [low, medium, high]
+  required: [summary, fraudRisk, anomalyScore, priorClaimsCount, riskSignals, toolsUsed, confidence]
+  additionalProperties: false
+output_schema_max_retries: 2

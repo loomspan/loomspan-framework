@@ -1,0 +1,159 @@
+name: Console Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: console-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - name: Install pinned uv
+        run: python -m pip install uv==0.11.7
+      - name: Validate canonical Agent Skills with pinned official reference
+        working-directory: loomspan-console
+        run: |
+          uv run --frozen --project skills-ref-validation skills-ref validate ./agent-skills/loomspan
+          uv run --frozen --project skills-ref-validation skills-ref validate ../agent-skills/loomspan-docs
+          uv run --frozen --project skills-ref-validation skills-ref validate ../agent-skills/bootstrap
+      - name: Verify coordinated repository versioning
+        working-directory: loomspan-console
+        run: |
+          uv run --frozen --project skills-ref-validation python ../scripts/loomspan_version.py check
+          uv run --frozen --project skills-ref-validation python -m unittest discover ../scripts/tests -v
+      - id: version
+        shell: bash
+        run: |
+          VERSION=$(sed -n '0,/<version>/{s:.*<version>\([^<]*\)</version>.*:\1:p}' pom.xml)
+          test -n "$VERSION"
+          PUBLISH=false
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            test "${GITHUB_REF_NAME#v}" = "$VERSION"
+            [[ "$VERSION" != *-SNAPSHOT ]]
+            PUBLISH=true
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+
+  package:
+    needs: validate
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: windows-latest
+            target: windows-x86_64
+          - runner: ubuntu-latest
+            target: linux-x86_64
+          - runner: macos-15
+            target: macos-arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.26.5
+          cache-dependency-path: loomspan-console/go.sum
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: loomspan-console/web/package-lock.json
+      - name: Pin npm
+        run: npm install --global npm@12.0.2
+      - name: Build deterministic native package
+        working-directory: loomspan-console
+        run: go run ./internal/buildtool package --expected-version "${{ needs.validate.outputs.version }}"
+      - name: Extract and smoke native package
+        working-directory: loomspan-console
+        shell: bash
+        run: go run ./internal/buildtool smoke --expected-version "${{ needs.validate.outputs.version }}" --archive "dist/loomspan-console-${{ needs.validate.outputs.version }}-${{ matrix.target }}${{ matrix.target == 'windows-x86_64' && '.zip' || '.tar.gz' }}"
+      - name: Upload archive and checksum
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: console-${{ matrix.target }}
+          path: |
+            loomspan-console/dist/*.zip
+            loomspan-console/dist/*.tar.gz
+            loomspan-console/dist/*.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  aggregate:
+    needs: [validate, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: console-*
+          path: release-input
+      - name: Verify exact artifacts and build SHA256SUMS
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir release-output
+          mapfile -t ALL_FILES < <(find release-input -type f | sort)
+          test "${#ALL_FILES[@]}" -eq 6
+          mapfile -t ARCHIVES < <(find release-input -type f \( -name '*.zip' -o -name '*.tar.gz' \) | sort)
+          test "${#ARCHIVES[@]}" -eq 3
+          mapfile -t SIDECARS < <(find release-input -type f -name '*.sha256' | sort)
+          test "${#SIDECARS[@]}" -eq 3
+          test -z "$(printf '%s\n' "${ARCHIVES[@]}" | xargs -n1 basename | sort | uniq -d)"
+          for expected in "loomspan-console-$VERSION-windows-x86_64.zip" "loomspan-console-$VERSION-linux-x86_64.tar.gz" "loomspan-console-$VERSION-macos-arm64.tar.gz"; do
+            archive=$(find release-input -type f -name "$expected")
+            test -n "$archive"
+            sidecar="$archive.sha256"
+            test -f "$sidecar"
+            (cd "$(dirname "$archive")" && sha256sum -c "$(basename "$sidecar")")
+            cp "$archive" release-output/
+          done
+          cat "${SIDECARS[@]}" | LC_ALL=C sort > release-output/SHA256SUMS
+          (cd release-output && sha256sum -c SHA256SUMS)
+      - name: Upload validated release set
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: console-release-${{ needs.validate.outputs.version }}
+          path: release-output
+          if-no-files-found: error
+
+  publish:
+    if: needs.validate.outputs.publish == 'true'
+    needs: [validate, aggregate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: console-release-${{ needs.validate.outputs.version }}
+          path: release-output
+      - name: Publish coordinated release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          PRERELEASE=()
+          [[ "$VERSION" == *-* ]] && PRERELEASE=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" release-output/* --verify-tag --title "loomspan $VERSION" "${PRERELEASE[@]}"

@@ -1,0 +1,14 @@
+From: Jane Demo <jane.demo@example.com>
+To: support@demo.example.com
+Subject: Charged twice for March
+Customer ID: CUST-1001
+
+Hi support,
+
+I was charged twice for my Pro Monthly plan in March. I see two $49 charges on
+invoice period 2026-03 (INV-2026-0301 and a second identical charge).
+
+I only use one seat and did not upgrade. Please reverse the duplicate charge.
+
+Thanks,
+Jane Demo

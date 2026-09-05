@@ -1,0 +1,20 @@
+name: evidenceContractSkill
+description: Skill with an evidence contract
+model: gpt-5
+allowed_skills:
+  - name: invoiceParser
+  - name: expenseLookup
+output_schema:
+  type: object
+  additionalProperties: false
+  properties:
+    vendorName:
+      type: string
+      evidence: invoiceParser
+    isDuplicate:
+      type: boolean
+      evidence: invoiceParser and expenseLookup
+  required:
+    - vendorName
+    - isDuplicate
+output_schema_max_retries: 1

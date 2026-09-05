@@ -1,0 +1,126 @@
+{
+  "case" : "recovered-provider-attempt-diagnostic",
+  "valid" : true,
+  "traceId" : "trace-recovered-provider-attempt-diagnostic",
+  "sessionId" : "session-recovered-provider-attempt-diagnostic",
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 4,
+    "completionUnits" : 2,
+    "totalUnits" : 6
+  },
+  "terminalUsage" : {
+    "promptUnits" : 4,
+    "completionUnits" : 2,
+    "totalUnits" : 6
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : false,
+  "attempts" : [ {
+    "retrySequenceId" : "retry-provider",
+    "attemptId" : "attempt-provider-1",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "FAILED",
+    "failureClassification" : "TRANSIENT",
+    "failureCategory" : "TIMEOUT",
+    "retryDecision" : "RETRY",
+    "retryDelayMillis" : 0,
+    "retryDelaySource" : "BACKOFF",
+    "usage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "usageComplete" : false,
+    "payloadId" : "payload-1"
+  }, {
+    "retrySequenceId" : "retry-provider",
+    "attemptId" : "attempt-provider-2",
+    "attemptNumber" : 2,
+    "attemptReason" : "PROVIDER_RETRY",
+    "providerAttemptNumber" : 2,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "usageComplete" : true
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "retry-provider",
+    "usage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "usageComplete" : false
+  } ],
+  "validationLinks" : [ ],
+  "frames" : [ {
+    "frameId" : "root",
+    "parentFrameId" : null,
+    "frameType" : "ROOT_MISSION",
+    "inclusiveDurationMillis" : 5000,
+    "selfDurationMillis" : 2000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "route" : "recoverProviderCall"
+  }, {
+    "frameId" : "model",
+    "parentFrameId" : "root",
+    "frameType" : "MODEL_CALL",
+    "inclusiveDurationMillis" : 3000,
+    "selfDurationMillis" : 3000,
+    "directUsage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "route" : "recoverProviderCall#model"
+  } ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ {
+    "logicalRecordSequence" : 6,
+    "payloadId" : "payload-1",
+    "contentType" : "application/json",
+    "chunkCount" : 3
+  } ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

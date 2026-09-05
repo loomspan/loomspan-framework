@@ -1,0 +1,124 @@
+{
+  "case" : "nested-frame-usage",
+  "valid" : true,
+  "traceId" : "trace-nested-frame-usage",
+  "sessionId" : "session-nested-frame-usage",
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 5,
+    "completionUnits" : 3,
+    "totalUnits" : 8
+  },
+  "terminalUsage" : {
+    "promptUnits" : 5,
+    "completionUnits" : 3,
+    "totalUnits" : 8
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ {
+    "retrySequenceId" : "retry-framed",
+    "attemptId" : "attempt-framed",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "usageComplete" : true
+  }, {
+    "retrySequenceId" : "retry-unframed",
+    "attemptId" : "attempt-unframed",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 1,
+      "completionUnits" : 1,
+      "totalUnits" : 2
+    },
+    "usageComplete" : true
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "retry-framed",
+    "usage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "usageComplete" : true
+  }, {
+    "retrySequenceId" : "retry-unframed",
+    "usage" : {
+      "promptUnits" : 1,
+      "completionUnits" : 1,
+      "totalUnits" : 2
+    },
+    "usageComplete" : true
+  } ],
+  "validationLinks" : [ ],
+  "frames" : [ {
+    "frameId" : "root",
+    "parentFrameId" : null,
+    "frameType" : "ROOT_MISSION",
+    "inclusiveDurationMillis" : 8000,
+    "selfDurationMillis" : 4000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "route" : "root.skill"
+  }, {
+    "frameId" : "skill",
+    "parentFrameId" : "root",
+    "frameType" : "SKILL_EXECUTION",
+    "inclusiveDurationMillis" : 4000,
+    "selfDurationMillis" : 4000,
+    "directUsage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 4,
+      "completionUnits" : 2,
+      "totalUnits" : 6
+    },
+    "route" : "root.skill"
+  } ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 1,
+    "completionUnits" : 1,
+    "totalUnits" : 2
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "runId": "pr53-imported-tools",
+  "conversationId": "pr53-imported-tools-conversation",
+  "caseId": "imported-tools-only",
+  "mode": "tools-only",
+  "client": "repository deterministic replay",
+  "clientBuild": "current checkout",
+  "model": "not-applicable",
+  "consoleCommit": "b931382b74e858ed72c81334952441b1e1250faf-dirty",
+  "eventStreamKind": "deterministic-replay",
+  "eventStreamComplete": true,
+  "operations": [
+    {
+      "tool": "LOOMSPAN_list_traces",
+      "argumentHash": "01b233b49d41c00baa290e70320cdddd657336bcd5bda00672054e4b85c871c1",
+      "resultHash": "79c1232a5626fd52d4e7bbb9b1770c3010744e0748f7b9ea69319e5a69f5e6cb",
+      "continuation": true
+    },
+    {
+      "tool": "LOOMSPAN_list_traces",
+      "argumentHash": "8ad08824884fce198679cc1279c0d68e690c5e03f698bbfcd5d0961000cb2c54",
+      "resultHash": "8d280ef804290db055cdfd68da1df0f001416dea6e3db4c0e1351393aabc519e",
+      "continuation": true
+    }
+  ],
+  "answer": "Evidence: IMPORTED_DESC ordering; two equally recent traceId candidates; complete continuation traversal. Limitations: ambiguous candidates require clarification; import does not prove ownership integrity or provenance.",
+  "supportedFacts": [
+    "IMPORTED_DESC ordering",
+    "two equally recent traceId candidates",
+    "complete continuation traversal"
+  ],
+  "limitations": [
+    "ambiguous candidates require clarification",
+    "import does not prove ownership integrity or provenance"
+  ],
+  "factEvidence": {
+    "IMPORTED_DESC ordering": "IMPORTED_DESC ordering",
+    "two equally recent traceId candidates": "two equally recent traceId candidates",
+    "complete continuation traversal": "complete continuation traversal"
+  },
+  "limitationEvidence": {
+    "ambiguous candidates require clarification": "ambiguous candidates require clarification",
+    "import does not prove ownership integrity or provenance": "import does not prove ownership integrity or provenance"
+  },
+  "factResultEvidence": {
+    "IMPORTED_DESC ordering": ["79c1232a5626fd52d4e7bbb9b1770c3010744e0748f7b9ea69319e5a69f5e6cb"],
+    "two equally recent traceId candidates": ["79c1232a5626fd52d4e7bbb9b1770c3010744e0748f7b9ea69319e5a69f5e6cb", "8d280ef804290db055cdfd68da1df0f001416dea6e3db4c0e1351393aabc519e"],
+    "complete continuation traversal": ["79c1232a5626fd52d4e7bbb9b1770c3010744e0748f7b9ea69319e5a69f5e6cb", "8d280ef804290db055cdfd68da1df0f001416dea6e3db4c0e1351393aabc519e"]
+  },
+  "limitationResultEvidence": {
+    "ambiguous candidates require clarification": ["79c1232a5626fd52d4e7bbb9b1770c3010744e0748f7b9ea69319e5a69f5e6cb", "8d280ef804290db055cdfd68da1df0f001416dea6e3db4c0e1351393aabc519e"],
+    "import does not prove ownership integrity or provenance": ["79c1232a5626fd52d4e7bbb9b1770c3010744e0748f7b9ea69319e5a69f5e6cb"]
+  },
+  "clarifiedAmbiguity": true,
+  "unnecessaryCalls": 0,
+  "passed": true
+}
