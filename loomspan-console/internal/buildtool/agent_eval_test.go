@@ -21,6 +21,16 @@ func TestAgentEvalVerificationRejectsStaleSummary(t *testing.T) {
 	}
 }
 
+func TestRealPipelineVerifiesHistoricalReplayPackage(t *testing.T) {
+	paths, err := resolveProjectPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (realRunner{}).run(phaseAgentEval, pipelineContext{paths: paths}); err != nil {
+		t.Fatalf("real evaluation phase rejected the preserved replay package: %v", err)
+	}
+}
+
 func TestHistoricalReplayKeepsCurrentDigestGateAndRejectsChangedEvidence(t *testing.T) {
 	directory, cases := historicalReplayFixture(t)
 	if err := verifyAgentEvalResults(directory, cases, true); err != nil {

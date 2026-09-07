@@ -34,7 +34,7 @@ func (realRunner) run(current phase, context pipelineContext) error {
 	case phaseAgentSkill:
 		return agentskills.ValidateRuntimeDebugging(filepath.Join(context.paths.agentSkills, agentskills.RuntimeDebuggingSkillName))
 	case phaseAgentEval:
-		return runAgentEval([]string{"verify", "--results", filepath.Join(context.paths.agentEvals, "results", "2026-09-05")})
+		return runAgentEval([]string{"verify-replay", "--results", filepath.Join(context.paths.agentEvals, "results", "2026-09-05")})
 	case phaseFrontendTypecheck:
 		return runCommand(context.paths.web, nil, "npm", "run", "typecheck")
 	case phaseFrontendCoverage:
