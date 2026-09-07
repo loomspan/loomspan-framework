@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -45,6 +46,7 @@ func handleListExecutions(ctx context.Context, options ServerOptions, input list
 	if domain != nil {
 		return checkedDomainFailure[executionListResult](ctx, options, domain)
 	}
+	ctx = diagnostics.WithScope(ctx, string(scope.ID))
 	if options.Observability == nil {
 		return checkedDomainFailure[executionListResult](ctx, options, unavailableInspectionError(string(scope.ID)))
 	}
@@ -91,6 +93,7 @@ func handleGetExecution(ctx context.Context, options ServerOptions, input getExe
 	if domain != nil {
 		return checkedDomainFailure[executionDetailResult](ctx, options, domain)
 	}
+	ctx = diagnostics.WithScope(ctx, string(scope.ID))
 	if options.Observability == nil {
 		return checkedDomainFailure[executionDetailResult](ctx, options, unavailableInspectionError(string(scope.ID)))
 	}

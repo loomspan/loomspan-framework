@@ -6,6 +6,7 @@ import (
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/artifact"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
@@ -71,6 +72,7 @@ func (service *Service) Resolve(ctx context.Context, traceID string) (Resolved, 
 	if hasTarget {
 		installed, domain = service.artifacts.Lookup(evidence.ForTarget(scope.ID), traceID)
 		if domain != nil {
+			diagnostics.Report(diagnostics.WithScope(diagnostics.Operation(ctx, "traceresolution.lookup"), string(scope.ID)), domain)
 			return Resolved{}, translateUnavailable(domain)
 		}
 	}
@@ -103,6 +105,7 @@ func (service *Service) Resolve(ctx context.Context, traceID string) (Resolved, 
 			return Resolved{}, ambiguous()
 		}
 		if probeDomain.Code != consolecore.CodeNotFound {
+			diagnostics.Report(diagnostics.WithScope(diagnostics.Operation(ctx, "traceresolution.probe"), string(scope.ID)), probeDomain)
 			return Resolved{}, probeDomain
 		}
 		if domain := service.target.RequireCurrent(scope.ID); domain != nil {

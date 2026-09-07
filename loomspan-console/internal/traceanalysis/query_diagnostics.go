@@ -48,7 +48,7 @@ func (service *Service) getFailureDiagnosticWithLease(ctx context.Context, lease
 		return false
 	})
 	if err != nil {
-		return FailureDiagnostic{}, storageError(scopeID.ID(), err)
+		return FailureDiagnostic{}, payloadStorageError(scopeID.ID(), err)
 	}
 	if !found || req.Ordinal >= len(fact.Diagnostics) {
 		return FailureDiagnostic{}, invalidityError(CategoryUnsupportedValue, scopeID.ID())
@@ -57,17 +57,17 @@ func (service *Service) getFailureDiagnosticWithLease(ctx context.Context, lease
 	if fact.PayloadID != "" {
 		desc, err := findPayloadDescriptorInIndex(lease, fact.PayloadID)
 		if err != nil {
-			return FailureDiagnostic{}, storageError(scopeID.ID(), err)
+			return FailureDiagnostic{}, payloadStorageError(scopeID.ID(), err)
 		}
 		if desc == nil {
-			return FailureDiagnostic{}, storageError(scopeID.ID(), fmt.Errorf("failure payload descriptor not found"))
+			return FailureDiagnostic{}, payloadStorageError(scopeID.ID(), fmt.Errorf("failure payload descriptor not found"))
 		}
 		raw, err = readInlinePayload(ctx, lease, *desc)
 		if err != nil {
 			if ctx.Err() != nil {
 				return FailureDiagnostic{}, canceledError(ctx.Err())
 			}
-			return FailureDiagnostic{}, storageError(scopeID.ID(), err)
+			return FailureDiagnostic{}, payloadStorageError(scopeID.ID(), err)
 		}
 	} else {
 		raw, err = readFailureRecordData(ctx, lease, fact.Sequence)
@@ -75,7 +75,7 @@ func (service *Service) getFailureDiagnosticWithLease(ctx context.Context, lease
 			if ctx.Err() != nil {
 				return FailureDiagnostic{}, canceledError(ctx.Err())
 			}
-			return FailureDiagnostic{}, storageError(scopeID.ID(), err)
+			return FailureDiagnostic{}, payloadStorageError(scopeID.ID(), err)
 		}
 	}
 	if err := ctx.Err(); err != nil {
@@ -86,19 +86,19 @@ func (service *Service) getFailureDiagnosticWithLease(ctx context.Context, lease
 		if ctx.Err() != nil {
 			return FailureDiagnostic{}, canceledError(ctx.Err())
 		}
-		return FailureDiagnostic{}, storageError(scopeID.ID(), fmt.Errorf("failure diagnostic payload mismatch"))
+		return FailureDiagnostic{}, payloadStorageError(scopeID.ID(), fmt.Errorf("failure diagnostic payload mismatch"))
 	}
 	if req.Ordinal >= len(data.Diagnostics) {
-		return FailureDiagnostic{}, storageError(scopeID.ID(), fmt.Errorf("failure diagnostic payload mismatch"))
+		return FailureDiagnostic{}, payloadStorageError(scopeID.ID(), fmt.Errorf("failure diagnostic payload mismatch"))
 	}
 	selected := data.Diagnostics[req.Ordinal]
 	desc := fact.Diagnostics[req.Ordinal]
 	if selected.Text == nil || selected.Truncated == nil || desc.Ordinal != req.Ordinal || selected.Kind != desc.Kind || selected.ContentType != desc.ContentType || *selected.Truncated != desc.Truncated || selected.CaptureLimitBytes != desc.CaptureLimitBytes || len([]byte(*selected.Text)) != desc.DecodedBytes || len([]byte(*selected.Text)) > desc.CaptureLimitBytes || len([]byte(*selected.Text)) > 1<<20 {
-		return FailureDiagnostic{}, storageError(scopeID.ID(), fmt.Errorf("failure diagnostic descriptor mismatch"))
+		return FailureDiagnostic{}, payloadStorageError(scopeID.ID(), fmt.Errorf("failure diagnostic descriptor mismatch"))
 	}
 	traceCtx, err := traceContextForLease(lease, scopeID, req.Handle)
 	if err != nil {
-		return FailureDiagnostic{}, storageError(scopeID.ID(), err)
+		return FailureDiagnostic{}, payloadStorageError(scopeID.ID(), err)
 	}
 	if err := ctx.Err(); err != nil {
 		return FailureDiagnostic{}, canceledError(err)

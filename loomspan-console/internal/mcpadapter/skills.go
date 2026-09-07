@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -46,6 +47,7 @@ func handleListSkills(ctx context.Context, options ServerOptions, input listSkil
 	if domain != nil {
 		return checkedDomainFailure[skillListResult](ctx, options, domain)
 	}
+	ctx = diagnostics.WithScope(ctx, string(scope.ID))
 	if options.Observability == nil {
 		return checkedDomainFailure[skillListResult](ctx, options, unavailableInspectionError(string(scope.ID)))
 	}
@@ -92,6 +94,7 @@ func handleGetSkill(ctx context.Context, options ServerOptions, input getSkillIn
 	if domain != nil {
 		return checkedDomainFailure[skillDetailResult](ctx, options, domain)
 	}
+	ctx = diagnostics.WithScope(ctx, string(scope.ID))
 	if options.Observability == nil {
 		return checkedDomainFailure[skillDetailResult](ctx, options, unavailableInspectionError(string(scope.ID)))
 	}

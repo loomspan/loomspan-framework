@@ -130,7 +130,7 @@ func TestObservabilityRoutesDoNotRequireCSRF(t *testing.T) {
 	entropy := bytes.Repeat([]byte{6}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 
 	router, _ := New(Options{
@@ -156,7 +156,7 @@ func TestObservabilityRoutesRejectInvalidJSON(t *testing.T) {
 	entropy := bytes.Repeat([]byte{8}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
@@ -199,7 +199,7 @@ func TestObservabilityRoutesApplySecurityHeadersAndCacheControl(t *testing.T) {
 	entropy := bytes.Repeat([]byte{10}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
@@ -240,7 +240,7 @@ func TestObservabilityRoutesRejectOversizedBody(t *testing.T) {
 	entropy := bytes.Repeat([]byte{11}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
@@ -273,7 +273,7 @@ func TestObservabilityRoutesReturnCanonicalDTOs(t *testing.T) {
 	entropy := bytes.Repeat([]byte{12}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	client := &fixtureObservabilityClient{}
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
@@ -358,7 +358,7 @@ func observabilityFixtureRouter(t *testing.T, client *fixtureObservabilityClient
 	entropy := bytes.Repeat([]byte{14}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) { return client, nil }, func() (target.ScopeID, error) { return "scope-1", nil }, nil)
 	if err := targetContext.Select("http://127.0.0.1:8080"); err != nil {
@@ -378,7 +378,7 @@ func TestTraceRoutesFallBackToInstalledAcquisitionFacts(t *testing.T) {
 	entropy := bytes.Repeat([]byte{13}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	client := &fixtureObservabilityClient{}
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {

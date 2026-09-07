@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 )
 
 // InvalidityCategory is the stable internal classification of a rejected
@@ -77,4 +78,19 @@ func categoryOf(err *consolecore.Error) (InvalidityCategory, bool) {
 		return "", false
 	}
 	return cause.category, true
+}
+
+func (cause invalidityCause) DiagnosticFacts() diagnostics.Facts {
+	f := diagnostics.Facts{Cause: string(cause.category), Stage: "parse"}
+	switch cause.category {
+	case CategoryLineTooLarge:
+		f.Cause = "line_limit"
+		f.LimitName = "maxPhysicalLineBytes"
+		f.LimitValue = maxPhysicalLineBytes
+	case CategoryExcessiveJSONDepth:
+		f.Cause = "depth_limit"
+		f.LimitName = "maxJSONDepth"
+		f.LimitValue = maxJSONDepth
+	}
+	return f
 }

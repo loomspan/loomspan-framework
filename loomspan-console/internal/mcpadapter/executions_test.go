@@ -1,16 +1,19 @@
 package mcpadapter
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -129,9 +132,17 @@ func TestGetExecutionRejectsAnIndivisibleDetailAboveTheResponseBudget(t *testing
 		t.Fatal(err)
 	}
 	options := newMCPTestOptions(t, func(string) ([]byte, error) { return body, nil })
-	result, envelope, err := handleGetExecution(context.Background(), options, getExecutionInput{SessionID: "session-1"})
+	var logs bytes.Buffer
+	ctx := diagnostics.WithRequest(diagnostics.WithLogger(context.Background(), slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))), "mcp."+GetExecutionToolName)
+	result, envelope, err := handleGetExecution(ctx, options, getExecutionInput{SessionID: "session-1"})
 	if err != nil || result == nil || !result.IsError || envelope.Error == nil || envelope.Error.Code != "LIMIT_EXCEEDED" || envelope.Result != nil {
 		t.Fatalf("result=%#v envelopeError=%+v envelopeResult=%#v err=%v", result, envelope.Error, envelope.Result, err)
+	}
+	if envelope.Error.Details.LimitName != "responseBytes" || envelope.Error.Details.LimitValue != defaultTraceResultBudget {
+		t.Fatalf("budget metadata: %+v", envelope.Error.Details)
+	}
+	if strings.Contains(logs.String(), `"level":"WARN"`) || strings.Contains(logs.String(), `"level":"ERROR"`) {
+		t.Fatalf("expected budget rejection became actionable: %s", logs.String())
 	}
 }
 

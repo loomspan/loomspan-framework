@@ -10,6 +10,7 @@ import (
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/artifact"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/browserauth"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/live"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/mcpcredential"
@@ -95,14 +96,18 @@ func New(options Options) (*Router, error) {
 }
 
 func (router *Router) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+	request = request.WithContext(withResponseEndpoint(diagnostics.WithRequest(request.Context(), browserOperation(request.URL.Path)), browserOperation(request.URL.Path)))
+	response = wrapDiagnosticWriter(response, request.Context())
 	ApplyHeaders(response.Header())
 	response.Header().Set("Cache-Control", "no-store")
 	if !router.options.Policy.ValidateHost(request) {
+		diagnostics.Reject(request.Context(), "browser", "host")
 		writeError(response, http.StatusBadRequest, "INVALID_REQUEST", "Browser request rejected.")
 		return
 	}
 	if strings.HasPrefix(request.URL.Path, "/api/console/v1/artifacts/") && strings.HasSuffix(request.URL.Path, "/raw") {
 		if !router.options.Policy.ValidateDownloadRequest(request) {
+			diagnostics.Reject(request.Context(), "browser", "origin")
 			writeError(response, http.StatusForbidden, "BROWSER_SECURITY_REJECTED", "Browser request rejected.")
 			return
 		}
@@ -110,6 +115,7 @@ func (router *Router) ServeHTTP(response http.ResponseWriter, request *http.Requ
 		return
 	}
 	if !router.options.Policy.ValidateOrigin(request) {
+		diagnostics.Reject(request.Context(), "browser", "origin")
 		writeError(response, http.StatusForbidden, "BROWSER_SECURITY_REJECTED", "Browser request rejected.")
 		return
 	}
@@ -224,12 +230,13 @@ func (router *Router) exchange(response http.ResponseWriter, request *http.Reque
 		writeError(response, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request.")
 		return
 	}
-	if !router.options.Pairing.Consume(body.Secret) {
+	if !router.options.Pairing.Consume(request.Context(), body.Secret) {
 		writeError(response, http.StatusUnauthorized, "PAIRING_REJECTED", "Pairing link is invalid or expired.")
 		return
 	}
-	sessionID, err := router.options.Sessions.CreateSession()
+	sessionID, err := router.options.Sessions.CreateSession(request.Context())
 	if err != nil {
+		diagnostics.Report(request.Context(), err)
 		writeError(response, http.StatusTooManyRequests, "LIMIT_EXCEEDED", "Browser session limit reached.")
 		return
 	}
@@ -242,13 +249,15 @@ func (router *Router) manualChallenge(response http.ResponseWriter, request *htt
 		writeError(response, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request.")
 		return
 	}
-	secret, err := router.options.Pairing.Create(true)
+	secret, err := router.options.Pairing.Create(request.Context(), true)
 	if err != nil {
+		diagnostics.Report(request.Context(), err)
 		writeError(response, http.StatusTooManyRequests, "RATE_LIMITED", "A pairing challenge is already available. Try again shortly.")
 		return
 	}
 	if router.options.PrintPairing != nil {
 		if err := router.options.PrintPairing(router.options.PairingURL(secret)); err != nil {
+			diagnostics.Report(request.Context(), err)
 			writeError(response, http.StatusInternalServerError, "PAIRING_UNAVAILABLE", "Pairing challenge could not be displayed.")
 			return
 		}
@@ -261,6 +270,7 @@ type authenticatedHandler func(http.ResponseWriter, *http.Request, string)
 func (router *Router) withSession(response http.ResponseWriter, request *http.Request, csrf bool, handler authenticatedHandler) {
 	cookie, err := request.Cookie(browserauth.SessionCookieName)
 	if err != nil || !router.options.Sessions.Authenticate(cookie.Value) {
+		diagnostics.Reject(request.Context(), "browser", "session")
 		http.SetCookie(response, browserauth.ExpiredSessionCookie())
 		writeError(response, http.StatusUnauthorized, "SESSION_REQUIRED", "Pairing is required.")
 		return
@@ -285,8 +295,9 @@ func (router *Router) bootstrap(response http.ResponseWriter, request *http.Requ
 		writeError(response, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request.")
 		return
 	}
-	result, err := router.options.Sessions.Bootstrap(sessionID, body.TabID)
+	result, err := router.options.Sessions.Bootstrap(request.Context(), sessionID, body.TabID)
 	if err != nil {
+		diagnostics.Report(request.Context(), err)
 		writeError(response, http.StatusTooManyRequests, "LIMIT_EXCEEDED", "Browser tab limit reached.")
 		return
 	}
@@ -316,8 +327,9 @@ func (router *Router) pairingLink(response http.ResponseWriter, request *http.Re
 		writeError(response, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request.")
 		return
 	}
-	secret, err := router.options.Pairing.Create(false)
+	secret, err := router.options.Pairing.Create(request.Context(), false)
 	if err != nil {
+		diagnostics.Report(request.Context(), err)
 		writeError(response, http.StatusInternalServerError, "PAIRING_UNAVAILABLE", "Pairing link could not be created.")
 		return
 	}

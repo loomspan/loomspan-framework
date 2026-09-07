@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log/slog"
 	"math/rand/v2"
 	"strconv"
 	"sync"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/applicationclient"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
 )
@@ -65,7 +65,16 @@ type Baseline struct {
 	ObservedAt   time.Time
 }
 
+type workerDiagnostics struct {
+	openFailures     diagnostics.Repeat
+	stream           context.Context
+	baseline         context.Context
+	failures         diagnostics.Repeat
+	baselineFailures diagnostics.Repeat
+}
+
 type Service struct {
+	diagnostic                 *workerDiagnostics
 	mu                         sync.Mutex
 	scope                      *target.Scope
 	stream                     *applicationclient.ActivityStream
@@ -206,13 +215,16 @@ func (service *Service) ActivateActivity(scope target.Scope) {
 	service.liveUnavailable = false
 	service.connection = ConnectionFact{Connected: false, Reason: "connecting", At: service.now()}
 	ctx, cancel := context.WithCancel(service.parentCtx)
+	ctx = diagnostics.WithScope(diagnostics.Detach(ctx, scope.Context, "live.stream"), string(scope.ID))
+	service.diagnostic = &workerDiagnostics{stream: ctx, baseline: diagnostics.Detach(ctx, ctx, "live.baseline")}
 	service.cancel = cancel
+	diagnostic := service.diagnostic
 	service.mu.Unlock()
-	go service.run(ctx, scopeCopy)
+	go service.run(ctx, scopeCopy, diagnostic)
 	go service.runBaselineRefresh(ctx, scopeCopy)
 }
 
-func (service *Service) run(ctx context.Context, scope target.Scope) {
+func (service *Service) run(ctx context.Context, scope target.Scope, diagnostic *workerDiagnostics) {
 	backoff := reconnectBaseDelay
 	if cursor, domain := service.refreshBaseline(ctx, scope); domain == nil {
 		service.mu.Lock()
@@ -234,7 +246,9 @@ func (service *Service) run(ctx context.Context, scope target.Scope) {
 		service.mu.Unlock()
 		stream, domain := scope.OpenActivity(ctx, afterCursor)
 		if domain != nil {
-			slog.Error("live activity stream open failed", "scopeId", scope.ID, "error", domain.Code)
+			if ctx.Err() == nil && scope.Context.Err() == nil {
+				diagnostic.openFailures.Failure(ctx, diagnostics.Annotate(domain, diagnostics.Facts{Endpoint: "activity.stream"}))
+			}
 			if !service.publishConnectionFor(scope.ID, false, string(domain.Code)) {
 				return
 			}
@@ -288,6 +302,7 @@ func (service *Service) run(ctx context.Context, scope target.Scope) {
 				continue
 			}
 		}
+		diagnostic.openFailures.Recover(ctx)
 		backoff = reconnectBaseDelay
 		service.mu.Lock()
 		if !service.scopeCurrentLocked(scope.ID) {
@@ -301,7 +316,7 @@ func (service *Service) run(ctx context.Context, scope target.Scope) {
 			_ = stream.Close()
 			return
 		}
-		resetCause := service.consume(ctx, stream, scope)
+		resetCause := service.consumeWithSeries(ctx, stream, scope, &diagnostic.failures)
 		_ = stream.Close()
 		service.mu.Lock()
 		if service.stream == stream {
@@ -389,6 +404,17 @@ func (service *Service) publishConnectionFor(scopeID target.ScopeID, connected b
 		service.mu.Unlock()
 		return false
 	}
+	if service.connection.Connected != connected {
+		state, previous := "disconnected", "connected"
+		if connected {
+			state, previous = "connected", "disconnected"
+		}
+		ctx := diagnostics.WithScope(service.parentCtx, string(scopeID))
+		if service.diagnostic != nil {
+			ctx = service.diagnostic.stream
+		}
+		diagnostics.Event(diagnostics.Operation(ctx, "live.connection"), state, previous)
+	}
 	fact := ConnectionFact{Connected: connected, Reason: reason, At: service.now()}
 	service.connection = fact
 	for sub := range service.subscriptions {
@@ -421,6 +447,7 @@ func (service *Service) refreshBaseline(ctx context.Context, scope target.Scope)
 		return "", consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", string(scope.ID), consolecore.Details{}, nil)
 	}
 	loader := service.baselineLoader
+	diagnostic := service.diagnostic
 	service.mu.Unlock()
 	if loader == nil {
 		service.mu.Lock()
@@ -429,7 +456,19 @@ func (service *Service) refreshBaseline(ctx context.Context, scope target.Scope)
 		service.mu.Unlock()
 		return "0", nil
 	}
+	if diagnostic != nil {
+		ctx = diagnostics.Detach(ctx, diagnostic.baseline, "live.baseline")
+	}
 	baseline, domain := loader(ctx, scope)
+	service.mu.Lock()
+	if service.scopeCurrentLocked(scope.ID) && ctx.Err() == nil && diagnostic != nil {
+		if domain != nil {
+			diagnostic.baselineFailures.Failure(diagnostic.baseline, domain)
+		} else {
+			diagnostic.baselineFailures.Recover(diagnostic.baseline)
+		}
+	}
+	service.mu.Unlock()
 	if domain == nil {
 		cursor := baseline.ResumeCursor
 		if cursor == "" {
@@ -471,23 +510,38 @@ func (service *Service) Baseline() Baseline {
 }
 
 func (service *Service) consume(ctx context.Context, stream *applicationclient.ActivityStream, scope target.Scope) ResetCause {
+	var failures diagnostics.Repeat
+	return service.consumeWithSeries(ctx, stream, scope, &failures)
+}
+
+func (service *Service) consumeWithSeries(ctx context.Context, stream *applicationclient.ActivityStream, scope target.Scope, failures *diagnostics.Repeat) ResetCause {
+	ctx = diagnostics.WithScope(ctx, string(scope.ID))
+	fail := func(err error, cause string) {
+		if ctx.Err() == nil && scope.Context.Err() == nil {
+			failures.Failure(ctx, diagnostics.Annotate(err, diagnostics.Facts{Endpoint: "activity.stream", Cause: cause}))
+		}
+	}
 	for {
 		frame, err := stream.Next()
 		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
+			if ctx.Err() != nil || scope.Context.Err() != nil {
 				return ""
 			}
 			var mismatch *applicationclient.InstanceMismatch
 			if errors.As(err, &mismatch) {
 				return ResetInstanceChanged
 			}
-			slog.Error("live activity stream read error", "error", err)
+			if errors.Is(err, io.EOF) {
+				fail(err, "body_read")
+			} else {
+				fail(err, "")
+			}
 			return ""
 		}
 		if frame.Event == "handshake" {
 			var hs Handshake
 			if err := json.Unmarshal(frame.Data, &hs); err != nil {
-				slog.Error("live activity handshake parse error", "error", err)
+				fail(err, "handshake")
 				return ""
 			}
 			service.mu.Lock()
@@ -513,11 +567,11 @@ func (service *Service) consume(ctx context.Context, stream *applicationclient.A
 		}
 		var activity Activity
 		if err := json.Unmarshal(frame.Data, &activity); err != nil {
-			slog.Error("live activity parse error", "error", err)
+			fail(err, "response_decode")
 			return ""
 		}
 		if err := activity.Validate(); err != nil {
-			slog.Error("live activity validation error", "error", err, "cursor", activity.Cursor)
+			fail(err, "response_decode")
 			return ""
 		}
 		service.mu.Lock()
@@ -536,7 +590,7 @@ func (service *Service) consume(ctx context.Context, stream *applicationclient.A
 		appended, err := service.acceptActivity(activity)
 		if err != nil {
 			service.mu.Unlock()
-			slog.Error("live activity cursor protocol error", "error", err, "cursor", activity.Cursor)
+			fail(err, "")
 			return ""
 		}
 		if !appended {
@@ -551,6 +605,7 @@ func (service *Service) consume(ctx context.Context, stream *applicationclient.A
 				}
 			}
 		}
+		failures.Recover(ctx)
 		service.publishActivityLocked(activity)
 		service.mu.Unlock()
 	}
@@ -617,13 +672,13 @@ func (service *Service) acceptActivity(activity Activity) (bool, error) {
 	}
 	if previous, exists := service.seenCursors[activity.Cursor]; exists {
 		if string(previous) != string(encoded) {
-			return false, errors.New("activity cursor was reused with different content")
+			return false, diagnostics.Annotate(errors.New("activity cursor was reused with different content"), diagnostics.Facts{Cause: "cursor_protocol"})
 		}
 		return false, nil
 	}
 	cursor, err := strconv.ParseUint(activity.Cursor, 10, 64)
 	if err != nil || cursor == 0 {
-		return false, errors.New("activity cursor must be a positive decimal integer")
+		return false, diagnostics.Annotate(errors.New("activity cursor must be a positive decimal integer"), diagnostics.Facts{Cause: "cursor_protocol"})
 	}
 	previousCursor := service.lastCursor
 	if previousCursor == "" && service.interval != nil {
@@ -632,13 +687,12 @@ func (service *Service) acceptActivity(activity Activity) (bool, error) {
 	if previousCursor != "" {
 		previous, parseErr := strconv.ParseUint(previousCursor, 10, 64)
 		if parseErr != nil || cursor <= previous {
-			return false, errors.New("activity cursor regressed")
+			return false, diagnostics.Annotate(errors.New("activity cursor regressed"), diagnostics.Facts{Cause: "cursor_protocol"})
 		}
 	}
 	size := activity.EncodedSize()
 	if size > maxActivityUTF8Bytes {
-		slog.Error("live activity exceeds max size", "cursor", activity.Cursor, "size", size)
-		return false, errors.New("activity exceeds maximum encoded size")
+		return false, diagnostics.Annotate(errors.New("activity exceeds maximum encoded size"), diagnostics.Facts{Cause: "body_limit", LimitName: "max_activity_utf8_bytes", LimitValue: maxActivityUTF8Bytes})
 	}
 	evictedAny := false
 	for len(service.activities) >= ringMaxCount || service.ringBytes+size > ringMaxBytes {

@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log/slog"
 	"time"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/applicationclient"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/workspace"
@@ -97,7 +97,7 @@ func (service *Service) installStream(entry *entry, stream inputStream, metadata
 		domain := service.reserveCapacity(knownSize)
 		if domain != nil {
 			service.mu.Unlock()
-			_ = stream.Close()
+			service.closeInput(entry, stream)
 			return AcquiredArtifact{}, domain
 		}
 		service.totalCharged += knownSize
@@ -109,8 +109,8 @@ func (service *Service) installStream(entry *entry, stream inputStream, metadata
 	// Create the staging bundle directory.
 	stagingDir, err := service.storage.createStagingDir()
 	if err != nil {
-		_ = stream.Close()
-		domain := service.storageError(err, entry)
+		service.closeInput(entry, stream)
+		domain := service.storageError(storageCause(err, "open"), entry)
 		return AcquiredArtifact{}, service.classifyArtifactFailure(domain, entry, "")
 	}
 
@@ -124,16 +124,16 @@ func (service *Service) installStream(entry *entry, stream inputStream, metadata
 	// Create and stream the raw component.
 	rawFile, _, err := service.storage.createComponent(stagingDir, ComponentRawArtifact)
 	if err != nil {
-		_ = stream.Close()
-		return cleanupBundle(service.storageError(err, entry))
+		service.closeInput(entry, stream)
+		return cleanupBundle(service.storageError(storageCause(err, "open"), entry))
 	}
 
 	// copyCleanup closes the raw file and stream, then removes the bundle.
 	copyCleanup := func(domain *consolecore.Error) (AcquiredArtifact, *consolecore.Error) {
 		if closeErr := rawFile.Close(); closeErr != nil {
-			domain = service.storageError(errors.Join(domain, closeErr), entry)
+			domain = service.storageError(errors.Join(domain, service.reportCleanup(entry, closeErr, "close")), entry)
 		}
-		_ = stream.Close()
+		service.closeInput(entry, stream)
 		return cleanupBundle(domain)
 	}
 
@@ -145,14 +145,14 @@ func (service *Service) installStream(entry *entry, stream inputStream, metadata
 
 	// Sync and close the raw component.
 	if err := rawFile.Sync(); err != nil {
-		return copyCleanup(service.storageError(err, entry))
+		return copyCleanup(service.storageError(storageCause(err, "sync"), entry))
 	}
 	if err := rawFile.Close(); err != nil {
-		_ = stream.Close()
-		return cleanupBundle(service.storageError(err, entry))
+		service.closeInput(entry, stream)
+		return cleanupBundle(service.storageError(storageCause(err, "close"), entry))
 	}
 
-	_ = stream.Close()
+	service.closeInput(entry, stream)
 
 	// Validate the observed raw byte count against declared length and metadata.
 	if declaredLength >= 0 && observed != declaredLength {
@@ -198,7 +198,7 @@ func (service *Service) installStream(entry *entry, stream inputStream, metadata
 		return cleanupBundle(domain)
 	}
 	if err := service.storage.renameDir(stagingDir, installedDir); err != nil {
-		domain := service.storageError(err, entry)
+		domain := service.storageError(storageCause(err, "install"), entry)
 		return cleanupBundle(domain)
 	}
 
@@ -253,7 +253,7 @@ func (service *Service) installStream(entry *entry, stream inputStream, metadata
 func (service *Service) runProcessor(entry *entry, stagingDir string, metadata TraceMetadata) (ProcessResult, *consolecore.Error) {
 	rawReader, err := service.storage.openComponent(stagingDir, ComponentRawArtifact)
 	if err != nil {
-		return ProcessResult{}, service.storageError(err, entry)
+		return ProcessResult{}, service.storageError(storageCause(err, "open"), entry)
 	}
 
 	sink := &stagingSink{
@@ -273,7 +273,7 @@ func (service *Service) runProcessor(entry *entry, stagingDir string, metadata T
 	}
 	result, domain := service.processor.Process(req)
 	hadOpenWriters := sink.closeOpenWriters()
-	_ = rawReader.Close()
+	_ = service.reportCleanup(entry, rawReader.Close(), "close")
 	if domain != nil {
 		// Release any derived bytes the sink charged before the failure.
 		service.mu.Lock()
@@ -385,9 +385,13 @@ func (service *Service) copyStream(entry *entry, stream inputStream, file writab
 			if errors.Is(readErr, context.Canceled) {
 				return observed, service.cancellationError(entry)
 			}
+			facts := diagnostics.Facts{Cause: "body_read", Stage: "copy"}
+			if entry.key.owner.Source() == evidence.SourceTarget {
+				facts.Endpoint = "artifact.download"
+			}
 			return observed, consolecore.NewError(consolecore.CodeTargetUnavailable,
 				"The artifact stream was interrupted.", entry.key.owner.ID(),
-				consolecore.Details{}, readErr)
+				consolecore.Details{}, diagnostics.Annotate(readErr, facts))
 		}
 	}
 }
@@ -410,16 +414,16 @@ func (service *Service) cancellationError(entry *entry) *consolecore.Error {
 	if closed {
 		return consolecore.NewError(consolecore.CodeConsoleError,
 			"The Console is shutting down.", entry.key.owner.ID(),
-			consolecore.Details{}, nil)
+			consolecore.Details{}, context.Canceled)
 	}
 	if entry.key.owner.Source() == evidence.SourceTarget && currentScopeID != entry.key.owner.TargetScope() {
 		return consolecore.NewError(consolecore.CodeTargetChanged,
 			"The selected target changed. Start this operation again.",
-			entry.key.owner.ID(), consolecore.Details{}, nil)
+			entry.key.owner.ID(), consolecore.Details{}, context.Canceled)
 	}
 	return consolecore.NewError(consolecore.CodeTargetUnavailable,
 		"The operation was canceled.", entry.key.owner.ID(),
-		consolecore.Details{}, nil)
+		consolecore.Details{}, context.Canceled)
 }
 
 // storageError maps a filesystem error to a domain error. In unlimited
@@ -429,7 +433,7 @@ func (service *Service) cancellationError(entry *entry) *consolecore.Error {
 func (service *Service) storageError(err error, entry *entry) *consolecore.Error {
 	return consolecore.NewError(consolecore.CodeLocalStorageUnavailable,
 		"Local artifact storage is unavailable.", entry.key.owner.ID(),
-		consolecore.Details{}, err)
+		consolecore.Details{}, storageCause(err, "write"))
 }
 
 // classifyArtifactFailure removes the staged bundle and verifies that the
@@ -438,12 +442,14 @@ func (service *Service) storageError(err error, entry *entry) *consolecore.Error
 func (service *Service) classifyArtifactFailure(domain *consolecore.Error, entry *entry, stagingDir string) *consolecore.Error {
 	classified := service.workspace.ClassifyArtifactFailure(domain, func() error {
 		if stagingDir != "" {
-			return service.storage.removeBundle(stagingDir)
+			return service.reportCleanup(entry, service.storage.removeBundle(stagingDir), "remove")
 		}
 		return nil
 	})
 	if workspace.IsFatal(classified) {
-		slog.Error("artifact storage failure is fatal", "ownerId", entry.key.owner.ID())
+		service.reportAcquisition(entry, domain)
+		classified = diagnostics.Annotate(classified, diagnostics.Facts{Stage: "workspace", Cause: "workspace"})
+		diagnostics.Report(service.entryDiagnostic(entry, "artifact.cleanup"), classified)
 		if service.fatal != nil {
 			service.fatal(classified)
 		}
@@ -460,6 +466,7 @@ func (service *Service) classifyArtifactFailure(domain *consolecore.Error, entry
 // failAcquisition releases the already-cleaned reservation and publishes the
 // terminal error to all waiters.
 func (service *Service) failAcquisition(entry *entry, domain *consolecore.Error) {
+	service.reportAcquisition(entry, domain)
 	service.mu.Lock()
 	defer service.mu.Unlock()
 	if entry.state == stateRemoved {
@@ -635,7 +642,7 @@ func (sink *stagingSink) closeOpenWriters() bool {
 	}
 	sink.service.mu.Unlock()
 	for _, writer := range writers {
-		_ = writer.Close()
+		_ = sink.service.reportCleanup(sink.entry, writer.Close(), "close")
 	}
 	return len(writers) > 0
 }
@@ -738,7 +745,7 @@ func (w *sinkWriter) Sync() error {
 		w.sink.service.mu.Lock()
 		w.sink.invalid = true
 		w.sink.service.mu.Unlock()
-		return err
+		return storageCause(err, "sync")
 	}
 	w.synced = true
 	return nil
@@ -762,7 +769,7 @@ func (w *sinkWriter) Close() error {
 	}
 	w.sink.service.mu.Unlock()
 	if closeErr != nil {
-		return closeErr
+		return storageCause(closeErr, "close")
 	}
 	if !w.synced {
 		return errors.New("artifact component was closed without syncing its final contents")

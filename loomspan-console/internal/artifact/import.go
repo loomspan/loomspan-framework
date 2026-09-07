@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 )
 
 const hardImportLimit int64 = 4 << 30
@@ -12,7 +13,15 @@ const hardImportLimit int64 = 4 << 30
 // Import admits one untrusted canonical NDJSON stream under the process-local
 // imported-evidence owner. Identity and metadata come only from processor
 // validation; declaredLength is used solely as an admission bound.
-func (service *Service) Import(ctx context.Context, reader io.Reader, declaredLength int64) (AcquiredArtifact, *consolecore.Error) {
+func (service *Service) Import(ctx context.Context, reader io.Reader, declaredLength int64) (resultArtifact AcquiredArtifact, resultDomain *consolecore.Error) {
+	if ctx != nil {
+		ctx = diagnostics.WithScope(diagnostics.Operation(ctx, "artifact.import"), "")
+		defer func() {
+			if resultDomain != nil {
+				diagnostics.Report(ctx, diagnostics.Annotate(resultDomain, diagnostics.Facts{Expected: resultDomain.Code == consolecore.CodeInvalidArtifact || resultDomain.Code == consolecore.CodeIncompatibleArtifact}))
+			}
+		}()
+	}
 	if ctx == nil || reader == nil || declaredLength < -1 {
 		return AcquiredArtifact{}, consolecore.NewError(consolecore.CodeInvalidArgument,
 			"A valid trace stream is required.", service.importedOwner.ID(), consolecore.Details{}, nil)
@@ -62,6 +71,7 @@ func (service *Service) Import(ctx context.Context, reader io.Reader, declaredLe
 			"The artifact handle could not be generated.", service.importedOwner.ID(), consolecore.Details{}, err)
 	}
 	acquireCtx, cancel := context.WithCancel(service.lifetime)
+	acquireCtx = diagnostics.WithScope(diagnostics.Detach(acquireCtx, ctx, "artifact.import"), "")
 	requestStop := context.AfterFunc(ctx, cancel)
 	now := service.clock()
 	entry := &entry{

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/live"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -35,6 +36,7 @@ func handleGetExecutionActivity(ctx context.Context, options ServerOptions, inpu
 	if domain != nil {
 		return checkedDomainFailure[activityResult](ctx, options, domain)
 	}
+	ctx = diagnostics.WithScope(ctx, string(scope.ID))
 	if options.Live == nil {
 		return checkedDomainFailure[activityResult](ctx, options, unavailableInspectionError(string(scope.ID)))
 	}

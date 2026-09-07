@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/workspace"
@@ -213,6 +214,7 @@ func (service *Service) Acquire(ctx context.Context, scope target.Scope, traceID
 				"The artifact handle could not be generated.", string(scope.ID), consolecore.Details{}, err)
 		}
 		acquireCtx, acquireCancel := context.WithCancel(service.lifetime)
+		acquireCtx = diagnostics.WithScope(diagnostics.Detach(acquireCtx, ctx, "artifact.acquire"), string(scope.ID))
 		scopeStop := context.AfterFunc(scope.Context, acquireCancel)
 		now := service.clock()
 		ent = &entry{
@@ -239,6 +241,9 @@ func (service *Service) Acquire(ctx context.Context, scope target.Scope, traceID
 		service.mu.Lock()
 		result := ent.acquireResult
 		service.mu.Unlock()
+		if result.err != nil && ctx.Err() == nil && !diagnostics.Extract(result.err).Expected {
+			diagnostics.Link(diagnostics.WithScope(ctx, string(scope.ID)), ent.acquireCtx)
+		}
 		return result.artifact, result.err
 	case <-ctx.Done():
 		service.mu.Lock()
@@ -514,8 +519,12 @@ func (service *Service) Close() {
 		service.invalidateLeasesLocked(entry)
 		_ = service.removeEntryLocked(entry)
 	}
-	if err := service.storage.removeAllContents(); err != nil && service.fatal != nil {
-		service.fatal(err)
+	if err := service.storage.removeAllContents(); err != nil {
+		err = storageCause(err, "remove")
+		diagnostics.Report(diagnostics.Detach(context.Background(), service.lifetime, "artifact.shutdown"), err)
+		if service.fatal != nil {
+			service.fatal(err)
+		}
 	}
 }
 
@@ -555,10 +564,13 @@ func (service *Service) removeInstalledBundleLocked(entry *entry) *consolecore.E
 	}
 	path := entry.installedDir
 	if err := service.storage.removeBundle(path); err != nil {
+		err = service.reportCleanup(entry, err, "remove")
 		classified := service.workspace.ClassifyArtifactFailure(err, func() error {
-			return service.storage.removeBundle(path)
+			return service.reportCleanup(entry, service.storage.removeBundle(path), "remove")
 		})
 		if workspace.IsFatal(classified) {
+			classified = diagnostics.Annotate(classified, diagnostics.Facts{Stage: "workspace", Cause: "workspace"})
+			diagnostics.Report(service.entryDiagnostic(entry, "artifact.cleanup"), classified)
 			domain := consolecore.NewError(consolecore.CodeConsoleError,
 				"The Console workspace is no longer safe.",
 				entry.key.owner.ID(), consolecore.Details{}, classified)

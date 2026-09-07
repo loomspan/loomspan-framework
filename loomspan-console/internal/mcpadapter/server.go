@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/live"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
@@ -98,7 +99,7 @@ func authenticationGenerationError(ctx context.Context, options ServerOptions) e
 		return fmt.Errorf("INTERNAL: MCP authentication is unavailable")
 	}
 	if generation, ok := admittedGeneration(ctx); ok && options.Credentials.Snapshot().Generation != generation {
-		return fmt.Errorf("INTERNAL: MCP authentication generation changed")
+		return diagnostics.Annotate(fmt.Errorf("INTERNAL: MCP authentication generation changed"), diagnostics.Facts{Expected: true, Cause: "authentication_generation"})
 	}
 	return nil
 }
@@ -107,6 +108,7 @@ func checkedDomainFailure[T any](ctx context.Context, options ServerOptions, dom
 	if err := authenticationGenerationError(ctx, options); err != nil {
 		return nil, toolEnvelope[T]{}, err
 	}
+	diagnostics.Report(ctx, domain)
 	return domainFailure[T](domain)
 }
 

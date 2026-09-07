@@ -15,11 +15,11 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log/slog"
 	"strings"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/artifact"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/release"
 )
 
@@ -92,20 +92,6 @@ func (processor *Processor) PreflightImport(ctx context.Context, raw io.Reader) 
 func (processor *Processor) Process(req artifact.ProcessRequest) (result artifact.ProcessResult, domain *consolecore.Error) {
 	scopeID := req.Metadata.TraceID
 	ctx := req.Context
-
-	// Log the exact invalidity category for any content rejection. The outward
-	// error message is deliberately generic (see invalidityError); this defer is
-	// the only place the operator-visible reason is recorded. Non-content errors
-	// (cancellation, local storage) carry no category and are not logged here.
-	defer func() {
-		if domain == nil {
-			return
-		}
-		if category, ok := categoryOf(domain); ok {
-			slog.Warn("trace artifact rejected by analysis processor",
-				"scopeId", scopeID, "category", string(category))
-		}
-	}()
 
 	// Open the payload store component first so chunked payloads stream directly
 	// to disk during parsing without whole-payload allocation.
@@ -544,7 +530,7 @@ func openPayloadStore(ctx context.Context, sink artifact.ComponentSink, scopeID 
 // storageError maps a storage failure to a domain error.
 func storageError(scopeID string, cause error) *consolecore.Error {
 	return consolecore.NewError(consolecore.CodeLocalStorageUnavailable,
-		"Local artifact storage is unavailable.", scopeID, consolecore.Details{}, cause)
+		"Local artifact storage is unavailable.", scopeID, consolecore.Details{}, diagnostics.Annotate(cause, diagnostics.Facts{Cause: "storage_read", Stage: "read"}))
 }
 
 // isModelRecord reports whether a record type is a consumed model lifecycle
@@ -813,3 +799,7 @@ func componentSizesMap(in map[component]int64) map[artifact.ComponentName]int64 
 // interface.
 var _ artifact.Processor = (*Processor)(nil)
 var _ artifact.ImportProcessor = (*Processor)(nil)
+
+func payloadStorageError(scopeID string, cause error) *consolecore.Error {
+	return storageError(scopeID, diagnostics.Annotate(cause, diagnostics.Facts{Cause: "storage_read", Stage: "payload"}))
+}

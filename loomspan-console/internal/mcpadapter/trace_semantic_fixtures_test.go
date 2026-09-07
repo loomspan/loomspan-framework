@@ -586,7 +586,7 @@ func newSemanticBrowserTransport(t *testing.T, h *realSemanticHarness) (http.Han
 	entropy := bytes.Repeat([]byte{20}, 32*16)
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
 	t.Cleanup(registry.Close)
-	sessionID, err := registry.CreateSession()
+	sessionID, err := registry.CreateSession(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 )
 
 type ListenFunc func(network, address string) (net.Listener, error)
@@ -68,6 +70,7 @@ func (host Host) Run(runContext context.Context) error {
 		host.OnListen(listener.Addr())
 	}
 	server := &http.Server{
+		ErrorLog:          diagnostics.ServerLog(runContext),
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,

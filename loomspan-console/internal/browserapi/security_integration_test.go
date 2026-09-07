@@ -2,6 +2,7 @@ package browserapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +19,7 @@ func TestPairingBootstrapAndProtectedPairingLink(t *testing.T) {
 		entropy[index] = byte(index/32 + 1)
 	}
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
-	secret, _ := pairing.Create(false)
+	secret, _ := pairing.Create(context.Background(), false)
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy[32:]))
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	router, err := New(Options{
@@ -109,8 +110,8 @@ func TestPairingLinkRequiresOriginSessionAndCSRFIndependently(t *testing.T) {
 	entropy := bytes.Repeat([]byte{7}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
-	state, _ := registry.Bootstrap(sessionID, "")
+	sessionID, _ := registry.CreateSession(context.Background())
+	state, _ := registry.Bootstrap(context.Background(), sessionID, "")
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	router, _ := New(Options{Policy: policy, Pairing: pairing, Sessions: registry, PairingURL: func(value string) string { return value }})
 	validCookie := browserauth.SessionCookie(sessionID)
@@ -152,8 +153,8 @@ func TestEveryEmptyBodyOperationRejectsInvalidJSON(t *testing.T) {
 	entropy := bytes.Repeat([]byte{9}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
-	state, _ := registry.Bootstrap(sessionID, "")
+	sessionID, _ := registry.CreateSession(context.Background())
+	state, _ := registry.Bootstrap(context.Background(), sessionID, "")
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	router, _ := New(Options{
 		Policy: policy, Pairing: pairing, Sessions: registry,
@@ -221,7 +222,7 @@ func TestRawDownloadRequiresSameSitePairedNavigation(t *testing.T) {
 	entropy := bytes.Repeat([]byte{40}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	router, _ := New(Options{
 		Policy: policy, Pairing: pairing, Sessions: registry,

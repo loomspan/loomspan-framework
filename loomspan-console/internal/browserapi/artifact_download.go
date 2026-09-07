@@ -3,12 +3,12 @@ package browserapi
 import (
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"path"
 	"strings"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/applicationclient"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 )
 
 const (
@@ -33,6 +33,7 @@ func (router *Router) artifactRawDownload(response http.ResponseWriter, request 
 		}
 	}
 	if router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Target service is unavailable.")
 		return
 	}
@@ -49,6 +50,8 @@ func (router *Router) artifactRawDownload(response http.ResponseWriter, request 
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	stream, domain := scope.OpenArtifact(request.Context(), traceID)
 	if domain != nil {
 		writeDomainError(response, domain)
@@ -85,8 +88,8 @@ func (router *Router) artifactRawDownload(response http.ResponseWriter, request 
 			}
 		}
 		if err != nil {
-			if err != io.EOF {
-				slog.Error("artifact raw download stream failed", "traceId", traceID, "err", err)
+			if err != io.EOF && scope.Context.Err() == nil {
+				diagnostics.Report(diagnostics.WithScope(request.Context(), string(scope.ID)), diagnostics.Annotate(err, diagnostics.Facts{Classification: "internal", Cause: "body_read", Endpoint: "artifact.download", Stage: "stream"}))
 			}
 			return
 		}

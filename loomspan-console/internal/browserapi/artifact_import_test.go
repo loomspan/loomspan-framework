@@ -1,6 +1,7 @@
 package browserapi
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -31,7 +32,7 @@ func TestArtifactImportStreamsRawNDJSONAndReturnsImportedSource(t *testing.T) {
 		Metadata: artifact.TraceMetadata{TraceID: "trace-import", SessionID: "session-import", Outcome: "SUCCEEDED"},
 	}}
 	router, tab, cookie := artifactTestRouter(t, fake)
-	security, err := router.options.Sessions.Bootstrap(cookie.Value, tab)
+	security, err := router.options.Sessions.Bootstrap(context.Background(), cookie.Value, tab)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +51,7 @@ func TestArtifactImportAuthenticatesBeforeReadingAndRequiresExactMediaType(t *te
 	if unauthorized.Code != http.StatusUnauthorized || fake.importCalled {
 		t.Fatalf("unauthorized status=%d importCalled=%v", unauthorized.Code, fake.importCalled)
 	}
-	security, err := router.options.Sessions.Bootstrap(cookie.Value, tab)
+	security, err := router.options.Sessions.Bootstrap(context.Background(), cookie.Value, tab)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +64,7 @@ func TestArtifactImportAuthenticatesBeforeReadingAndRequiresExactMediaType(t *te
 func TestArtifactImportMapsKnownAndUnknownLengthLimitFailuresTo413(t *testing.T) {
 	fake := &fakeArtifactService{importLimit: 3}
 	router, tab, cookie := artifactTestRouter(t, fake)
-	security, err := router.options.Sessions.Bootstrap(cookie.Value, tab)
+	security, err := router.options.Sessions.Bootstrap(context.Background(), cookie.Value, tab)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +72,7 @@ func TestArtifactImportMapsKnownAndUnknownLengthLimitFailuresTo413(t *testing.T)
 	if known.Code != http.StatusRequestEntityTooLarge || fake.importCalled {
 		t.Fatalf("known-length status=%d importCalled=%v", known.Code, fake.importCalled)
 	}
-	security, err = router.options.Sessions.Bootstrap(cookie.Value, security.TabID)
+	security, err = router.options.Sessions.Bootstrap(context.Background(), cookie.Value, security.TabID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +100,7 @@ func TestArtifactImportErrorsNeverExposeImportedOwnerAsTargetScope(t *testing.T)
 		nil,
 	)}
 	router, tab, cookie := artifactTestRouter(t, fake)
-	security, err := router.options.Sessions.Bootstrap(cookie.Value, tab)
+	security, err := router.options.Sessions.Bootstrap(context.Background(), cookie.Value, tab)
 	if err != nil {
 		t.Fatal(err)
 	}

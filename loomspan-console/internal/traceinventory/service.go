@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"sort"
 	"time"
 
@@ -48,12 +49,15 @@ func New(a ArtifactService, c CatalogService, t TargetProvider, now func() time.
 	return &Service{a, c, t, now}
 }
 
-func (s *Service) EnrichTargetCatalogPage(scopeID target.ScopeID, page observability.Page[observability.Trace]) observability.Page[observability.Trace] {
+func (s *Service) EnrichTargetCatalogPage(ctx context.Context, scopeID target.ScopeID, page observability.Page[observability.Trace]) observability.Page[observability.Trace] {
 	if s == nil || s.artifacts == nil {
 		return page
 	}
 	for i := range page.Items {
 		lookup, d := s.artifacts.Lookup(evidence.ForTarget(scopeID), page.Items[i].TraceID)
+		if d != nil {
+			diagnostics.Report(diagnostics.WithScope(diagnostics.Operation(ctx, "traceinventory.enrich"), string(scopeID)), d)
+		}
 		if d == nil && lookup.LocalAvailable {
 			page.Items[i].LocalAvailable = true
 			page.Items[i].ArtifactHandle = string(lookup.Handle)
@@ -142,6 +146,7 @@ func (s *Service) List(ctx context.Context, q Query) (Result, *consolecore.Error
 				if pd == nil {
 					g.instances = append(g.instances, instanceFromCatalog(tr))
 				} else if pd.Code != consolecore.CodeNotFound {
+					diagnostics.Report(diagnostics.WithScope(diagnostics.Operation(ctx, "traceinventory.probe"), string(scope.ID)), pd)
 					markIncomplete(&result)
 				}
 			}
@@ -186,6 +191,7 @@ func (s *Service) List(ctx context.Context, q Query) (Result, *consolecore.Error
 	_ = segment // segment remains in the opaque shape for strict decoding.
 	page, pd := s.catalog.ListTraces(ctx, scope, observability.ListRequest{Cursor: appCursor, PageSize: maxPageSize})
 	if pd != nil {
+		diagnostics.Report(diagnostics.WithScope(diagnostics.Operation(ctx, "traceinventory.list"), string(scope.ID)), pd)
 		markIncomplete(&result)
 		end, admissionDomain := appendInstalledPage(&result, installed, offset, pageSize, q.Admit)
 		if admissionDomain != nil {

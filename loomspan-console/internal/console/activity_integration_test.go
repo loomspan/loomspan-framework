@@ -81,7 +81,7 @@ func TestActivitySSEEndToEndRelay(t *testing.T) {
 	sessions := browserauth.NewRegistry(nil, nil)
 	defer pairing.Close()
 	defer sessions.Close()
-	sessionID, _ := sessions.CreateSession()
+	sessionID, _ := sessions.CreateSession(context.Background())
 
 	router, err := browserapi.New(browserapi.Options{
 		Policy:     mustNewPolicy(t),
@@ -162,7 +162,7 @@ func TestActivitySSEStreamEndToEndWithTabHeader(t *testing.T) {
 	sessions := browserauth.NewRegistry(nil, nil)
 	defer pairing.Close()
 	defer sessions.Close()
-	sessionID, _ := sessions.CreateSession()
+	sessionID, _ := sessions.CreateSession(context.Background())
 
 	router, err := browserapi.New(browserapi.Options{
 		Policy:     mustNewPolicy(t),
@@ -322,7 +322,7 @@ func TestActivitySSEStreamDoesNotTreatLifetimeThroughputAsBackpressure(t *testin
 	sessions := browserauth.NewRegistry(nil, nil)
 	defer pairing.Close()
 	defer sessions.Close()
-	sessionID, _ := sessions.CreateSession()
+	sessionID, _ := sessions.CreateSession(context.Background())
 
 	router, err := browserapi.New(browserapi.Options{
 		Policy:     mustNewPolicy(t),

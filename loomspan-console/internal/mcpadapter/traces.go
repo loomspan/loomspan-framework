@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/traceanalysis"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/traceinventory"
@@ -79,6 +80,7 @@ func handleQueryTracePlans(ctx context.Context, options ServerOptions, input que
 	if domain != nil {
 		return checkedDomainFailure[queryPlansResult](ctx, options, domain)
 	}
+	ctx = diagnostics.WithScope(ctx, string(resolved.Reference.TargetScope))
 	if options.TraceAnalysis == nil {
 		return checkedDomainFailure[queryPlansResult](ctx, options, unavailableInspectionError(""))
 	}
@@ -225,6 +227,7 @@ func handleGetTrace(ctx context.Context, options ServerOptions, input getTraceIn
 	if domain != nil {
 		return checkedDomainFailure[getTraceResult](ctx, options, domain)
 	}
+	ctx = diagnostics.WithScope(ctx, string(resolved.Reference.TargetScope))
 	if options.TraceAnalysis == nil {
 		return checkedDomainFailure[getTraceResult](ctx, options, unavailableInspectionError(""))
 	}
@@ -249,6 +252,7 @@ func handleQueryTraceFrames(ctx context.Context, options ServerOptions, input qu
 	if domain != nil {
 		return checkedDomainFailure[queryFramesResult](ctx, options, domain)
 	}
+	ctx = diagnostics.WithScope(ctx, string(resolved.Reference.TargetScope))
 	if options.TraceAnalysis == nil {
 		return checkedDomainFailure[queryFramesResult](ctx, options, unavailableInspectionError(""))
 	}
@@ -289,6 +293,7 @@ func handleQueryTraceRecords(ctx context.Context, options ServerOptions, input q
 	if domain != nil {
 		return checkedDomainFailure[queryRecordsResult](ctx, options, domain)
 	}
+	ctx = diagnostics.WithScope(ctx, string(resolved.Reference.TargetScope))
 	if options.TraceAnalysis == nil {
 		return checkedDomainFailure[queryRecordsResult](ctx, options, unavailableInspectionError(""))
 	}
@@ -395,6 +400,7 @@ func handleTraceRange(ctx context.Context, options ServerOptions, input traceRan
 	if domain != nil {
 		return checkedDomainFailure[rangeResult](ctx, options, domain)
 	}
+	ctx = diagnostics.WithScope(ctx, string(resolved.Reference.TargetScope))
 	if options.TraceAnalysis == nil {
 		return checkedDomainFailure[rangeResult](ctx, options, unavailableInspectionError(""))
 	}
@@ -533,13 +539,13 @@ func mapTraceAnalysisError(domain *consolecore.Error, traceID string, continuati
 		return nil
 	}
 	if domain.Code == consolecore.CodeArtifactExpired {
-		return consolecore.NewError(consolecore.CodeTraceUnavailable, "Trace evidence is unavailable. Retry inspection by traceId after the evidence or target becomes available.", "", consolecore.Details{}, nil)
+		return consolecore.NewError(consolecore.CodeTraceUnavailable, "Trace evidence is unavailable. Retry inspection by traceId after the evidence or target becomes available.", "", consolecore.Details{}, domain)
 	}
 	if continuation && domain.Code == consolecore.CodeInvalidCursor {
-		return consolecore.NewError(consolecore.CodeInvalidCursor, "The continuation is stale or invalid. Restart this query by traceId.", "", consolecore.Details{}, nil)
+		return consolecore.NewError(consolecore.CodeInvalidCursor, "The continuation is stale or invalid. Restart this query by traceId.", "", consolecore.Details{}, domain)
 	}
 	if payload && domain.Code == consolecore.CodeInvalidArgument && strings.Contains(strings.ToLower(domain.Message), "content reference") {
-		return consolecore.NewError(consolecore.CodeInvalidArgument, "The content reference is stale or invalid. Re-query the relevant record descriptor by traceId.", "", consolecore.Details{}, nil)
+		return consolecore.NewError(consolecore.CodeInvalidArgument, "The content reference is stale or invalid. Re-query the relevant record descriptor by traceId.", "", consolecore.Details{}, domain)
 	}
 	_ = traceID
 	return domain

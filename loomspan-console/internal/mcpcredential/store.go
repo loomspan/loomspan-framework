@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"io"
 	"os"
 	"path/filepath"
@@ -145,7 +146,7 @@ func (store *Store) Reveal() (string, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 	if store.state != Enabled {
-		return "", fmt.Errorf("MCP is not enabled")
+		return "", diagnostics.Annotate(fmt.Errorf("MCP is not enabled"), diagnostics.Facts{Cause: "authentication_generation", Expected: true})
 	}
 	return string(store.key), nil
 }
@@ -171,7 +172,7 @@ func (store *Store) CommitEnable(prepared *Prepared) (string, error) {
 	defer store.mu.Unlock()
 	if store.state != Disabled {
 		prepared.discard()
-		return "", fmt.Errorf("MCP can be enabled only from disabled state")
+		return "", diagnostics.Annotate(fmt.Errorf("MCP can be enabled only from disabled state"), diagnostics.Facts{Cause: "authentication_generation", Expected: true})
 	}
 	mutation := store.operations.enable(prepared.path, store.canonical)
 	if mutation.err != nil {
@@ -193,7 +194,7 @@ func (store *Store) CommitRegenerate(prepared *Prepared) (string, error) {
 	defer store.mu.Unlock()
 	if store.state != Enabled {
 		prepared.discard()
-		return "", fmt.Errorf("MCP is not enabled")
+		return "", diagnostics.Annotate(fmt.Errorf("MCP is not enabled"), diagnostics.Facts{Cause: "authentication_generation", Expected: true})
 	}
 	mutation := store.operations.replace(prepared.path, store.canonical)
 	if mutation.err != nil {
@@ -254,7 +255,7 @@ func (store *Store) Disable() error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	if store.state != Enabled {
-		return fmt.Errorf("MCP is not enabled")
+		return diagnostics.Annotate(fmt.Errorf("MCP is not enabled"), diagnostics.Facts{Cause: "authentication_generation", Expected: true})
 	}
 	mutation := store.operations.delete(store.canonical)
 	if mutation.err != nil {
@@ -274,11 +275,11 @@ func (store *Store) RemoveInvalid() error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	if store.state != DisabledInvalid || store.invalid == nil {
-		return fmt.Errorf("MCP access key is not in removable invalid state")
+		return diagnostics.Annotate(fmt.Errorf("MCP access key is not in removable invalid state"), diagnostics.Facts{Cause: "authentication_generation", Expected: true})
 	}
 	current, err := os.Lstat(store.canonical)
 	if err != nil || !os.SameFile(store.invalid, current) || current.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("invalid MCP access key changed; restart before removal")
+		return diagnostics.Annotate(fmt.Errorf("invalid MCP access key changed; restart before removal"), diagnostics.Facts{Cause: "authentication_generation", Expected: true})
 	}
 	mutation := store.operations.delete(store.canonical)
 	if mutation.err != nil {

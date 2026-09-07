@@ -9,6 +9,7 @@ import (
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/artifact"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 )
 
@@ -108,7 +109,12 @@ func (service *Service) leaseForCursor(scopeID evidence.Reference, handle artifa
 }
 
 // readManifest reads and parses the manifest component from a lease.
-func readManifest(lease *artifact.Lease) (manifest, error) {
+func readManifest(lease *artifact.Lease) (result manifest, resultErr error) {
+	defer func() {
+		if resultErr != nil {
+			resultErr = diagnostics.Annotate(resultErr, diagnostics.Facts{Cause: "storage_read", Stage: "manifest"})
+		}
+	}()
 	reader, err := lease.OpenComponent(ComponentManifest)
 	if err != nil {
 		return manifest{}, err
@@ -163,7 +169,12 @@ func scanFactRows[T any](lease *artifact.Lease, name component, start int64, vis
 
 // scanFactRowsContext is the cancellable form used by page enrichment and
 // other request work that may traverse a fact component.
-func scanFactRowsContext[T any](ctx context.Context, lease *artifact.Lease, name component, start int64, visit func(row T, next int64) bool) error {
+func scanFactRowsContext[T any](ctx context.Context, lease *artifact.Lease, name component, start int64, visit func(row T, next int64) bool) (resultErr error) {
+	defer func() {
+		if resultErr != nil {
+			resultErr = diagnostics.Annotate(resultErr, diagnostics.Facts{Cause: "storage_read", Stage: "index"})
+		}
+	}()
 	reader, err := lease.OpenComponent(artifact.ComponentName(name))
 	if err != nil {
 		return err

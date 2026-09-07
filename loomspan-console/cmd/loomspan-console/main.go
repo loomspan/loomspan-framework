@@ -4,7 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,9 +29,11 @@ type runtimeDependencies struct {
 }
 
 func main() {
+	slog.SetDefault(diagnostics.NewLogger(os.Stderr))
+	startup := diagnostics.Operation(context.Background(), "console.startup")
 	files, err := webassets.Embedded()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		diagnostics.Report(startup, diagnostics.Annotate(err, diagnostics.Facts{Cause: "assets", Stage: "startup"}))
 		os.Exit(1)
 	}
 	dependencies := runtimeDependencies{
@@ -53,12 +57,18 @@ func main() {
 	context, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := run(context, os.Args[1:], os.Stdout, dependencies); err != nil {
-		fmt.Fprintln(os.Stderr, "loomspan-console:", err)
+		diagnostics.Report(startup, err)
 		os.Exit(1)
 	}
 }
 
-func run(context context.Context, arguments []string, output io.Writer, dependencies runtimeDependencies) error {
+func run(context context.Context, arguments []string, output io.Writer, dependencies runtimeDependencies) (result error) {
+	stage := "configuration"
+	defer func() {
+		if result != nil {
+			result = diagnostics.Annotate(result, diagnostics.Facts{Cause: stage, Stage: "startup"})
+		}
+	}()
 	flags := flag.NewFlagSet("loomspan-console", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	versionOnly := flags.Bool("version", false, "print the Loomspan product version")
@@ -81,9 +91,11 @@ func run(context context.Context, arguments []string, output io.Writer, dependen
 	if dependencies.verify == nil || dependencies.serve == nil {
 		return fmt.Errorf("runtime dependencies are incomplete")
 	}
+	stage = "assets"
 	if err := dependencies.verify(); err != nil {
 		return fmt.Errorf("validate embedded browser assets: %w", err)
 	}
+	stage = "configuration"
 	if *versionOnly {
 		_, err := fmt.Fprintln(output, dependencies.version)
 		return err
@@ -112,7 +124,8 @@ func run(context context.Context, arguments []string, output io.Writer, dependen
 			return fmt.Errorf("LOOMSPAN_OBSERVABILITY_API_KEY: %w", err)
 		}
 	}
-	return dependencies.serve(context, console.Options{
+	stage = "unknown"
+	return dependencies.serve(diagnostics.Operation(context, "console.run"), console.Options{
 		ConfigPath:              *configPath,
 		WorkDirectory:           *workDirectory,
 		ListenOverride:          *address,

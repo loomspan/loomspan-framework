@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -88,7 +88,12 @@ func New(address Address, policy NetworkPolicy, expectedVersion string) (*Client
 
 func (client *Client) Close() { client.transport.CloseIdleConnections() }
 
-func (client *Client) Get(parent context.Context, endpoint string, maxBytes int64, credential Credential) ([]byte, string, error) {
+func (client *Client) Get(parent context.Context, endpoint string, maxBytes int64, credential Credential) (bodyResult []byte, instanceResult string, result error) {
+	defer func() {
+		if result != nil {
+			result = annotateFailure(result, diagnostics.Facts{Endpoint: client.address.endpointFamily(endpoint), Expected: parent.Err() != nil})
+		}
+	}()
 	if credential == nil {
 		return nil, "", newFailure(FailureAuthentication, "", nil)
 	}
@@ -119,39 +124,37 @@ func (client *Client) Get(parent context.Context, endpoint string, maxBytes int6
 		return nil, "", newFailure(FailureUnavailable, CategoryRedirect, nil)
 	}
 	if encoding := response.Header.Get("Content-Encoding"); encoding != "" && !strings.EqualFold(encoding, "identity") {
-		return nil, "", protocolFailure()
+		return nil, "", protocolReason("content_encoding")
 	}
 	if response.StatusCode != http.StatusOK {
 		body, err := readBounded(response.Body, problemMaxBytes)
 		if err != nil {
-			slog.Error("upstream error body read failed", "status", response.StatusCode, "limit", problemMaxBytes, "err", err)
-			return nil, "", protocolFailure()
+			return nil, "", protocolCause(err)
 		}
-		failure := mapProblem(response.StatusCode, response.Header.Get("Content-Type"), body)
-		if f, ok := failure.(*Failure); ok {
-			slog.Error("upstream returned non-200", "status", response.StatusCode, "failureKind", f.Kind)
-		} else {
-			slog.Error("upstream returned non-200", "status", response.StatusCode)
-		}
+		failure := annotateFailure(mapProblem(response.StatusCode, response.Header.Get("Content-Type"), body), diagnostics.Facts{Status: response.StatusCode})
 		instanceID, identityErr := optionalResponseInstanceID(response.Header.Values(InstanceIDHeader))
 		if identityErr != nil {
-			return nil, "", protocolFailure()
+			return nil, "", protocolReason("instance_header")
 		}
 		return nil, instanceID, failure
 	}
 	instanceID, err := responseInstanceID(response.Header.Values(InstanceIDHeader))
 	if err != nil {
-		return nil, "", protocolFailure()
+		return nil, "", protocolReason("instance_header")
 	}
 	body, err := readBounded(response.Body, maxBytes)
 	if err != nil {
-		slog.Error("upstream response body exceeds limit", "maxBytes", maxBytes, "err", err)
-		return nil, "", newFailure(FailureLimitExceeded, "", nil)
+		return nil, "", newFailure(FailureLimitExceeded, "", err)
 	}
 	return body, instanceID, nil
 }
 
-func (client *Client) Probe(parent context.Context, credential Credential) (Instance, error) {
+func (client *Client) Probe(parent context.Context, credential Credential) (instanceResult Instance, result error) {
+	defer func() {
+		if result != nil {
+			result = annotateFailure(result, diagnostics.Facts{Endpoint: "instance", Expected: parent.Err() != nil})
+		}
+	}()
 	if credential == nil {
 		return Instance{}, newFailure(FailureAuthentication, "", nil)
 	}
@@ -182,14 +185,14 @@ func (client *Client) Probe(parent context.Context, credential Credential) (Inst
 		return Instance{}, newFailure(FailureUnavailable, CategoryRedirect, nil)
 	}
 	if encoding := response.Header.Get("Content-Encoding"); encoding != "" && !strings.EqualFold(encoding, "identity") {
-		return Instance{}, protocolFailure()
+		return Instance{}, protocolReason("content_encoding")
 	}
 	body, err := readBounded(response.Body, maxResponseBytes)
 	if err != nil {
-		return Instance{}, protocolFailure()
+		return Instance{}, protocolCause(err)
 	}
 	if response.StatusCode != http.StatusOK {
-		return Instance{}, mapProblem(response.StatusCode, response.Header.Get("Content-Type"), body)
+		return Instance{}, annotateFailure(mapProblem(response.StatusCode, response.Header.Get("Content-Type"), body), diagnostics.Facts{Status: response.StatusCode})
 	}
 	return client.decodeInstance(response.Header.Values(InstanceIDHeader), body)
 }
@@ -244,8 +247,11 @@ func ValidateCredential(value []byte) error {
 
 func readBounded(reader io.Reader, maxBytes int64) ([]byte, error) {
 	content, err := io.ReadAll(io.LimitReader(reader, maxBytes+1))
-	if err != nil || int64(len(content)) > maxBytes {
-		return nil, fmt.Errorf("upstream body exceeds limit")
+	if err != nil {
+		return nil, diagnostics.Annotate(err, diagnostics.Facts{Cause: "body_read", LimitName: "maxBytes", LimitValue: maxBytes})
+	}
+	if int64(len(content)) > maxBytes {
+		return nil, diagnostics.Annotate(fmt.Errorf("upstream body exceeds limit"), diagnostics.Facts{Cause: "body_limit", LimitName: "maxBytes", LimitValue: maxBytes})
 	}
 	return content, nil
 }

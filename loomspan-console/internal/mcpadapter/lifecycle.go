@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/mcpcredential"
 )
 
@@ -36,6 +37,8 @@ func (lifecycle *Lifecycle) Enable(ctx context.Context) (credential string, err 
 		return "", err
 	}
 	defer lifecycle.releaseMutation()
+	before := lifecycle.store.Snapshot()
+	defer lifecycle.diagnosticTransition(ctx, before)
 	prepared, err := lifecycle.store.Prepare()
 	if err != nil {
 		return "", err
@@ -48,6 +51,8 @@ func (lifecycle *Lifecycle) Regenerate(ctx context.Context) (credential string, 
 		return "", err
 	}
 	defer lifecycle.releaseMutation()
+	before := lifecycle.store.Snapshot()
+	defer lifecycle.diagnosticTransition(ctx, before)
 	prepared, err := lifecycle.store.Prepare()
 	if err != nil {
 		return "", err
@@ -60,6 +65,8 @@ func (lifecycle *Lifecycle) Disable(ctx context.Context) error {
 		return err
 	}
 	defer lifecycle.releaseMutation()
+	before := lifecycle.store.Snapshot()
+	defer lifecycle.diagnosticTransition(ctx, before)
 	_, err := lifecycle.mutate(func() (string, error) { return "", lifecycle.store.Disable() })
 	return err
 }
@@ -69,6 +76,8 @@ func (lifecycle *Lifecycle) RemoveInvalid(ctx context.Context) error {
 		return err
 	}
 	defer lifecycle.releaseMutation()
+	before := lifecycle.store.Snapshot()
+	defer lifecycle.diagnosticTransition(ctx, before)
 	_, err := lifecycle.mutate(func() (string, error) { return "", lifecycle.store.RemoveInvalid() })
 	return err
 }
@@ -129,7 +138,7 @@ func (lifecycle *Lifecycle) acquireMutation(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-lifecycle.shutdown:
-		return fmt.Errorf("MCP lifecycle is shutting down")
+		return diagnostics.Annotate(fmt.Errorf("MCP lifecycle is shutting down"), diagnostics.Facts{Expected: true, Cause: "shutdown"})
 	case <-lifecycle.mutationGate:
 		if err := ctx.Err(); err != nil {
 			lifecycle.releaseMutation()
@@ -140,7 +149,7 @@ func (lifecycle *Lifecycle) acquireMutation(ctx context.Context) error {
 		lifecycle.stateMu.Unlock()
 		if shuttingDown {
 			lifecycle.releaseMutation()
-			return fmt.Errorf("MCP lifecycle is shutting down")
+			return diagnostics.Annotate(fmt.Errorf("MCP lifecycle is shutting down"), diagnostics.Facts{Expected: true, Cause: "shutdown"})
 		}
 		return nil
 	}
@@ -152,7 +161,7 @@ func (lifecycle *Lifecycle) beginMutationDrain() (context.Context, context.Cance
 	lifecycle.stateMu.Lock()
 	defer lifecycle.stateMu.Unlock()
 	if lifecycle.shuttingDown {
-		return nil, nil, fmt.Errorf("MCP lifecycle is shutting down")
+		return nil, nil, diagnostics.Annotate(fmt.Errorf("MCP lifecycle is shutting down"), diagnostics.Facts{Expected: true, Cause: "shutdown"})
 	}
 	drain, cancel := context.WithTimeout(context.Background(), mutationDrainTimeout)
 	lifecycle.drainCancel = cancel
@@ -173,7 +182,29 @@ func (lifecycle *Lifecycle) commitUnlessShuttingDown(prepared *mcpcredential.Pre
 		if prepared != nil {
 			lifecycle.store.Discard(prepared)
 		}
-		return "", fmt.Errorf("MCP lifecycle is shutting down")
+		return "", diagnostics.Annotate(fmt.Errorf("MCP lifecycle is shutting down"), diagnostics.Facts{Expected: true, Cause: "shutdown"})
 	}
 	return commit()
+}
+
+// The mutation gate remains held while this compares the committed state.
+func (lifecycle *Lifecycle) diagnosticTransition(ctx context.Context, before mcpcredential.Snapshot) {
+	after := lifecycle.store.Snapshot()
+	if before.State != after.State {
+		diagnostics.Event(diagnostics.Operation(ctx, "mcp.authentication"), credentialDiagnosticState(after.State), credentialDiagnosticState(before.State))
+	} else if before.Generation != after.Generation {
+		diagnostics.Event(diagnostics.Operation(ctx, "mcp.authentication"), "rotated", credentialDiagnosticState(before.State))
+	}
+}
+func credentialDiagnosticState(state mcpcredential.State) string {
+	switch state {
+	case mcpcredential.Enabled:
+		return "enabled"
+	case mcpcredential.Disabled:
+		return "disabled"
+	case mcpcredential.DisabledInvalid:
+		return "invalid"
+	default:
+		return "unknown"
+	}
 }

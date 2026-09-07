@@ -3,6 +3,7 @@ package console
 import (
 	"context"
 	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"io"
 	"io/fs"
 	"net"
@@ -51,13 +52,24 @@ type Dependencies struct {
 }
 
 func Run(parent context.Context, options Options, dependencies Dependencies) (result error) {
+	parent = diagnostics.Operation(parent, "console.run")
+	stage := "profile"
+	defer func() {
+		if result != nil {
+			result = diagnostics.Annotate(result, diagnostics.Facts{Cause: stage})
+			diagnostics.Report(context.WithoutCancel(parent), result)
+		}
+	}()
 	ownedProfile, err := profile.Open(options.ConfigPath)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if closeErr := ownedProfile.Close(); result == nil && closeErr != nil {
-			result = fmt.Errorf("release profile lock: %w", closeErr)
+		if closeErr := ownedProfile.Close(); closeErr != nil {
+			closeErr = shutdownFailure(parent, closeErr, "profile", "storage_close")
+			if result == nil {
+				result = fmt.Errorf("release profile lock: %w", closeErr)
+			}
 		}
 	}()
 
@@ -68,13 +80,17 @@ func Run(parent context.Context, options Options, dependencies Dependencies) (re
 			return err
 		}
 	}
+	stage = "workspace"
 	ownedWorkspace, err := workspace.Open(workPath)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if closeErr := ownedWorkspace.Close(); result == nil && closeErr != nil {
-			result = fmt.Errorf("release work lock: %w", closeErr)
+		if closeErr := ownedWorkspace.Close(); closeErr != nil {
+			closeErr = shutdownFailure(parent, closeErr, "workspace", "storage_close")
+			if result == nil {
+				result = fmt.Errorf("release work lock: %w", closeErr)
+			}
 		}
 	}()
 	if dependencies.Output != nil {
@@ -130,8 +146,8 @@ func Run(parent context.Context, options Options, dependencies Dependencies) (re
 	}
 
 	coordinator := lifecycle.New(parent)
-	go ownedProfile.Monitor(coordinator.Context(), 0, coordinator.Fatal)
-	go ownedWorkspace.Monitor(coordinator.Context(), 0, coordinator.Fatal)
+	go ownedProfile.Monitor(coordinator.Context(), 0, monitorFailure(parent, coordinator.Fatal, "profile"))
+	go ownedWorkspace.Monitor(coordinator.Context(), 0, monitorFailure(parent, coordinator.Fatal, "workspace"))
 	pairing := browserauth.NewPairing(nil, nil)
 	sessions := browserauth.NewRegistry(nil, nil)
 	defer pairing.Close()
@@ -232,7 +248,8 @@ func Run(parent context.Context, options Options, dependencies Dependencies) (re
 		return err
 	}
 	host := webhost.Host{
-		Address: address,
+		Address:  address,
+		OnListen: func(net.Addr) { diagnostics.Event(parent, "ready", "") },
 		PreShutdown: func(ctx context.Context) error {
 			if mcpLifecycle == nil {
 				return nil
@@ -286,7 +303,7 @@ func Run(parent context.Context, options Options, dependencies Dependencies) (re
 			if err != nil {
 				return nil, err
 			}
-			secret, err := pairing.Create(false)
+			secret, err := pairing.Create(parent, false)
 			if err != nil {
 				return nil, err
 			}
@@ -303,19 +320,42 @@ func Run(parent context.Context, options Options, dependencies Dependencies) (re
 		},
 	}
 	targetContext.StartServing()
+	stage = "listener"
 	runErr := host.Run(coordinator.Context())
+	diagnostics.Event(parent, "stopped", "ready")
 	coordinator.Stop()
 	sessions.Close()
 	pairing.Close()
-	if err := ownedWorkspace.Cleanup(); err != nil && runErr == nil {
+	if err := ownedWorkspace.Cleanup(); err != nil {
 		// Cleanup is best-effort during shutdown once an invariant may have
 		// failed. A healthy workspace still reports ordinary cleanup failure.
 		if ownedWorkspace.Check() == nil {
-			runErr = fmt.Errorf("clean transient workspace: %w", err)
+			err = shutdownFailure(parent, err, "workspace", "storage_remove")
+			if runErr == nil {
+				runErr = fmt.Errorf("clean transient workspace: %w", err)
+			}
 		}
 	}
 	if cause := coordinator.Cause(); cause != nil && cause != context.Canceled {
 		return cause
 	}
 	return runErr
+}
+
+func monitorFailure(parent context.Context, fatal func(error), stage string) func(error) {
+	ctx := diagnostics.Detach(context.Background(), parent, "console.monitor")
+	return func(err error) {
+		if err == nil {
+			return
+		}
+		err = diagnostics.Annotate(err, diagnostics.Facts{Cause: stage, Stage: "monitor"})
+		diagnostics.Report(ctx, err)
+		fatal(err)
+	}
+}
+
+func shutdownFailure(parent context.Context, err error, stage, cause string) error {
+	err = diagnostics.Annotate(err, diagnostics.Facts{Cause: cause, Stage: stage})
+	diagnostics.Report(diagnostics.Detach(context.Background(), parent, "console.shutdown"), err)
+	return err
 }

@@ -25,6 +25,7 @@ type analysisRequest struct {
 // small wrapper also keeps every response scope-published.
 func (router *Router) resolveAnalysis(response http.ResponseWriter, request *http.Request, body *analysisRequest) (evidence.Reference, artifact.Handle, bool) {
 	if router.options.TraceAnalysis == nil || router.options.Artifacts == nil {
+		reportUnavailable(response)
 		writeError(response, 500, "CONSOLE_ERROR", "Trace analysis is unavailable.")
 		return evidence.Reference{}, "", false
 	}
@@ -37,6 +38,7 @@ func (router *Router) resolveAnalysis(response http.ResponseWriter, request *htt
 		writeDomainError(response, domain)
 		return evidence.Reference{}, "", false
 	}
+	responseScope(response, string(ref.TargetScope))
 	entry, domain := router.options.Artifacts.Lookup(ref, body.TraceID)
 	if domain != nil {
 		writeEvidenceDomainError(response, ref, domain)

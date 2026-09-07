@@ -3,6 +3,7 @@ package browserapi
 import (
 	"net/http"
 
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/mcpcredential"
 )
 
@@ -57,6 +58,7 @@ func (router *Router) mcpEnable(response http.ResponseWriter, request *http.Requ
 	}
 	credential, err := router.options.MCP.Enable(request.Context())
 	if err != nil {
+		diagnostics.Report(request.Context(), err)
 		router.mcpOperationError(response)
 		return
 	}
@@ -73,6 +75,7 @@ func (router *Router) mcpReveal(response http.ResponseWriter, request *http.Requ
 	}
 	credential, err := router.options.MCP.Reveal()
 	if err != nil {
+		diagnostics.Report(request.Context(), err)
 		router.mcpOperationError(response)
 		return
 	}
@@ -85,6 +88,7 @@ func (router *Router) mcpRegenerate(response http.ResponseWriter, request *http.
 	}
 	credential, err := router.options.MCP.Regenerate(request.Context())
 	if err != nil {
+		diagnostics.Report(request.Context(), err)
 		router.mcpOperationError(response)
 		return
 	}
@@ -96,6 +100,7 @@ func (router *Router) mcpDisable(response http.ResponseWriter, request *http.Req
 		return
 	}
 	if err := router.options.MCP.Disable(request.Context()); err != nil {
+		diagnostics.Report(request.Context(), err)
 		router.mcpOperationError(response)
 		return
 	}
@@ -107,6 +112,7 @@ func (router *Router) mcpRemoveInvalid(response http.ResponseWriter, request *ht
 		return
 	}
 	if err := router.options.MCP.RemoveInvalid(request.Context()); err != nil {
+		diagnostics.Report(request.Context(), err)
 		router.mcpOperationError(response)
 		return
 	}

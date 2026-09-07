@@ -10,6 +10,7 @@ import (
 
 func (router *Router) artifactImport(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Artifacts == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Artifact service is unavailable.")
 		return
 	}

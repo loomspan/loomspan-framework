@@ -1,6 +1,10 @@
 package consolecore
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
+	"sync/atomic"
+)
 
 type Code string
 
@@ -43,13 +47,14 @@ type Error struct {
 	TargetScopeID string
 	Details       Details
 	cause         error
+	claim         *atomic.Bool
 }
 
 func NewError(code Code, message, scope string, details Details, cause error) *Error {
 	if message == "" || len(message) > 512 {
 		message = "The Console operation could not be completed."
 	}
-	return &Error{Code: code, Message: message, TargetScopeID: scope, Details: details, cause: cause}
+	return &Error{Code: code, Message: message, TargetScopeID: scope, Details: details, cause: cause, claim: diagnostics.Claim(cause)}
 }
 
 func (err *Error) Error() string {
@@ -60,6 +65,26 @@ func (err *Error) Error() string {
 }
 
 func (err *Error) Unwrap() error { return err.cause }
+
+func (err *Error) DiagnosticClaim() *atomic.Bool {
+	if err.cause != nil {
+		return diagnostics.ClaimOr(err.cause, diagnostics.EnsureClaim(&err.claim))
+	}
+	return diagnostics.EnsureClaim(&err.claim)
+}
+func (err *Error) DiagnosticFacts() diagnostics.Facts {
+	f := diagnostics.Facts{Classification: string(err.Code), LimitName: err.Details.LimitName, LimitValue: err.Details.LimitValue}
+	switch err.Code {
+	case CodeInvalidArgument, CodeTargetAuthentication, CodeTargetAccessBlocked, CodeTargetChanged, CodeInvalidCursor, CodeStaleCursor, CodeNotFound, CodeArtifactExpired, CodeAmbiguousTrace, CodeTraceUnavailable, CodeArtifactInUse, CodeArtifactAlreadyExists, CodeLiveMonitoringUnavailable:
+		f.Expected = true
+	case CodeLocalStorageUnavailable:
+		f.Cause = "storage_read"
+	case CodeLimitExceeded:
+		f.Cause = "body_limit"
+		f.Expected = err.cause == nil
+	}
+	return f
+}
 
 func (err *Error) GoString() string {
 	if err == nil {

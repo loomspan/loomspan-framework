@@ -21,7 +21,7 @@ func activityTestRouter(t *testing.T, liveService *live.Service) (*Router, strin
 	entropy := bytes.Repeat([]byte{14}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -152,7 +152,7 @@ func TestActivityRecentReturnsErrorWhenLiveIsNil(t *testing.T) {
 	entropy := bytes.Repeat([]byte{14}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -175,7 +175,7 @@ func TestActivityStreamReturnsErrorWhenLiveIsNil(t *testing.T) {
 	entropy := bytes.Repeat([]byte{14}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil

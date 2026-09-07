@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"io"
 	"net/http"
 	"strconv"
@@ -45,7 +46,12 @@ type ActivityStream struct {
 	mu            sync.Mutex
 }
 
-func (client *Client) OpenActivity(parent context.Context, instanceID, afterCursor string, credential Credential) (*ActivityStream, error) {
+func (client *Client) OpenActivity(parent context.Context, instanceID, afterCursor string, credential Credential) (streamResult *ActivityStream, result error) {
+	defer func() {
+		if result != nil {
+			result = annotateFailure(result, diagnostics.Facts{Endpoint: "activity.stream", Expected: parent.Err() != nil})
+		}
+	}()
 	if credential == nil {
 		return nil, newFailure(FailureAuthentication, "", nil)
 	}
@@ -85,9 +91,9 @@ func (client *Client) OpenActivity(parent context.Context, instanceID, afterCurs
 		body, readErr := readBounded(response.Body, problemMaxBytes)
 		response.Body.Close()
 		if readErr != nil {
-			return nil, protocolFailure()
+			return nil, protocolCause(readErr)
 		}
-		return nil, mapProblem(response.StatusCode, response.Header.Get("Content-Type"), body)
+		return nil, annotateFailure(mapProblem(response.StatusCode, response.Header.Get("Content-Type"), body), diagnostics.Facts{Status: response.StatusCode})
 	}
 	contentType := response.Header.Get("Content-Type")
 	if !strings.HasPrefix(strings.ToLower(contentType), "text/event-stream") {
@@ -115,7 +121,12 @@ func (stream *ActivityStream) InstanceID() string {
 	return stream.instanceID
 }
 
-func (stream *ActivityStream) Next() (ActivityFrame, error) {
+func (stream *ActivityStream) Next() (frameResult ActivityFrame, result error) {
+	defer func() {
+		if result != nil && result != io.EOF && result != context.Canceled {
+			result = annotateFailure(result, diagnostics.Facts{Endpoint: "activity.stream"})
+		}
+	}()
 	stream.mu.Lock()
 	if stream.closed {
 		stream.mu.Unlock()
@@ -134,11 +145,11 @@ func (stream *ActivityStream) Next() (ActivityFrame, error) {
 			if errors.Is(err, context.Canceled) {
 				return ActivityFrame{}, context.Canceled
 			}
-			return ActivityFrame{}, protocolFailure()
+			return ActivityFrame{}, protocolCause(diagnostics.Annotate(err, diagnostics.Facts{Cause: "body_read"}))
 		}
 		frameSize += len(line)
 		if frameSize > maxSSEFrameBytes {
-			return ActivityFrame{}, protocolFailure()
+			return ActivityFrame{}, streamLimit("maxSSEFrameBytes", maxSSEFrameBytes)
 		}
 		trimmed := strings.TrimRight(string(line), "\r\n")
 		if trimmed == "" {
@@ -169,7 +180,7 @@ func (stream *ActivityStream) Next() (ActivityFrame, error) {
 			return frame, nil
 		}
 		if len(trimmed) > maxSSELineBytes {
-			return ActivityFrame{}, protocolFailure()
+			return ActivityFrame{}, streamLimit("maxSSELineBytes", maxSSELineBytes)
 		}
 		lines = append(lines, trimmed)
 	}
@@ -180,7 +191,7 @@ func (stream *ActivityStream) readBoundedLine() ([]byte, error) {
 	for {
 		fragment, err := stream.reader.ReadSlice('\n')
 		if len(line)+len(fragment) > maxSSELineBytes+2 {
-			return nil, protocolFailure()
+			return nil, streamLimit("maxSSELineBytes", maxSSELineBytes)
 		}
 		line = append(line, fragment...)
 		if errors.Is(err, bufio.ErrBufferFull) {
@@ -282,7 +293,7 @@ func parseActivityFrame(lines []string, handshakeSeen bool) (ActivityFrame, erro
 		}
 	}
 	if len(data) > maxSSEDataBytes {
-		return ActivityFrame{}, protocolFailure()
+		return ActivityFrame{}, streamLimit("maxSSEDataBytes", maxSSEDataBytes)
 	}
 	if !json.Valid(data) {
 		return ActivityFrame{}, protocolFailure()
@@ -337,4 +348,8 @@ func validateActivityData(instanceID, id string, data []byte) error {
 		return protocolFailure()
 	}
 	return nil
+}
+
+func streamLimit(name string, value int64) *Failure {
+	return protocolCause(diagnostics.Annotate(fmt.Errorf("activity stream limit exceeded"), diagnostics.Facts{Cause: "body_limit", LimitName: name, LimitValue: value}))
 }

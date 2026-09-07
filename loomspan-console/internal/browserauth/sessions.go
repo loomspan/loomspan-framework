@@ -1,9 +1,11 @@
 package browserauth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"io"
 	"sync"
 	"time"
@@ -17,6 +19,7 @@ const (
 )
 
 type tab struct {
+	diagnostic  context.Context
 	id          string
 	csrf        []byte
 	lastSeen    time.Time
@@ -25,6 +28,7 @@ type tab struct {
 }
 
 type session struct {
+	diagnostic context.Context
 	id         string
 	lastActive time.Time
 	tabs       map[string]*tab
@@ -54,21 +58,23 @@ func NewRegistry(clock Clock, entropy io.Reader) *Registry {
 	return &Registry{clock: clock, entropy: entropy, sessions: make(map[string]*session)}
 }
 
-func (registry *Registry) CreateSession() (string, error) {
+func (registry *Registry) CreateSession(ctx context.Context) (string, error) {
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	registry.expireLocked()
 	if registry.closed {
-		return "", fmt.Errorf("browser sessions are unavailable")
+		return "", diagnostics.Annotate(fmt.Errorf("browser sessions are unavailable"), diagnostics.Facts{Expected: true})
 	}
 	if len(registry.sessions) >= MaxSessions {
-		return "", fmt.Errorf("browser session limit reached")
+		return "", diagnostics.Annotate(fmt.Errorf("browser session limit reached"), diagnostics.Facts{Expected: true})
 	}
 	id, err := Generate(registry.entropy)
 	if err != nil {
-		return "", err
+		return "", diagnostics.Annotate(err, diagnostics.Facts{Cause: "entropy"})
 	}
-	registry.sessions[id] = &session{id: id, lastActive: registry.clock(), tabs: make(map[string]*tab)}
+	ctx = diagnostics.Detach(context.Background(), ctx, "browser.session")
+	registry.sessions[id] = &session{diagnostic: ctx, id: id, lastActive: registry.clock(), tabs: make(map[string]*tab)}
+	diagnostics.Event(ctx, "created", "")
 	return id, nil
 }
 
@@ -84,31 +90,32 @@ func (registry *Registry) Authenticate(id string) bool {
 	return true
 }
 
-func (registry *Registry) Bootstrap(sessionID, requestedTab string) (Bootstrap, error) {
+func (registry *Registry) Bootstrap(ctx context.Context, sessionID, requestedTab string) (Bootstrap, error) {
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	registry.expireLocked()
 	current := registry.findSessionLocked(sessionID)
 	if registry.closed || current == nil {
-		return Bootstrap{}, fmt.Errorf("browser session is invalid")
+		return Bootstrap{}, diagnostics.Annotate(fmt.Errorf("browser session is invalid"), diagnostics.Facts{Expected: true})
 	}
 	now := registry.clock()
 	current.lastActive = now
 	selected := current.tabs[requestedTab]
 	if selected == nil {
 		if registry.tabCountLocked() >= MaxTabs {
-			return Bootstrap{}, fmt.Errorf("browser tab limit reached")
+			return Bootstrap{}, diagnostics.Annotate(fmt.Errorf("browser tab limit reached"), diagnostics.Facts{Expected: true})
 		}
 		id, err := Generate(registry.entropy)
 		if err != nil {
-			return Bootstrap{}, err
+			return Bootstrap{}, diagnostics.Annotate(err, diagnostics.Facts{Cause: "entropy"})
 		}
-		selected = &tab{id: id}
+		selected = &tab{id: id, diagnostic: diagnostics.Detach(context.Background(), ctx, "browser.tab")}
+		diagnostics.Event(selected.diagnostic, "created", "")
 		current.tabs[id] = selected
 	}
 	token, err := Generate(registry.entropy)
 	if err != nil {
-		return Bootstrap{}, err
+		return Bootstrap{}, diagnostics.Annotate(err, diagnostics.Facts{Cause: "entropy"})
 	}
 	selected.csrf, _ = decodeSecret(token)
 	selected.lastSeen = now
@@ -139,6 +146,9 @@ func (registry *Registry) ReleaseTab(sessionID, tabID string) {
 	if current := registry.findSessionLocked(sessionID); current != nil {
 		if selected := current.tabs[tabID]; selected != nil && selected.cancelRelay != nil {
 			selected.cancelRelay()
+		}
+		if selected := current.tabs[tabID]; selected != nil {
+			diagnostics.Event(selected.diagnostic, "released", "created")
 		}
 		delete(current.tabs, tabID)
 	}
@@ -171,7 +181,9 @@ func (registry *Registry) Close() {
 	defer registry.mu.Unlock()
 	registry.closed = true
 	for _, current := range registry.sessions {
+		diagnostics.Event(current.diagnostic, "closed", "created")
 		for _, selected := range current.tabs {
+			diagnostics.Event(selected.diagnostic, "closed", "created")
 			if selected.cancelRelay != nil {
 				selected.cancelRelay()
 			}
@@ -217,6 +229,10 @@ func (registry *Registry) expireLocked() {
 					selected.cancelRelay()
 				}
 			}
+			diagnostics.Event(current.diagnostic, "expired", "created")
+			for _, selected := range current.tabs {
+				diagnostics.Event(selected.diagnostic, "expired", "created")
+			}
 			delete(registry.sessions, id)
 			continue
 		}
@@ -225,6 +241,7 @@ func (registry *Registry) expireLocked() {
 				if selected.cancelRelay != nil {
 					selected.cancelRelay()
 				}
+				diagnostics.Event(selected.diagnostic, "expired", "created")
 				delete(current.tabs, tabID)
 			}
 		}

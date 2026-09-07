@@ -34,6 +34,7 @@ func writeError(response http.ResponseWriter, status int, code, message string) 
 func writeJSON(response http.ResponseWriter, status int, value any) {
 	content, err := json.Marshal(value)
 	if err != nil {
+		reportResponse(response, err, "response_encode")
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "The Console response could not be created.")
 		return
 	}

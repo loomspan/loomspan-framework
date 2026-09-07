@@ -150,3 +150,31 @@ func (address Address) TraceEndpoint(traceId string) string {
 func (address Address) ArtifactEndpoint(traceId string) string {
 	return address.observabilityRoot + "/traces/" + url.PathEscape(traceId) + "/artifact"
 }
+
+// endpointFamily recognizes only routes constructed by this client; no URL text is emitted.
+func (address Address) endpointFamily(endpoint string) string {
+	path := strings.SplitN(endpoint, "?", 2)[0]
+	switch path {
+	case address.InstanceEndpoint():
+		return "instance"
+	case address.SkillsEndpoint():
+		return "skills.list"
+	case address.ActiveExecutionsEndpoint():
+		return "executions.list"
+	case address.TracesEndpoint():
+		return "traces.list"
+	}
+	if strings.HasPrefix(path, address.SkillsEndpoint()+"/") {
+		return "skills.get"
+	}
+	if strings.HasPrefix(path, address.ActiveExecutionsEndpoint()+"/") {
+		return "executions.get"
+	}
+	if strings.HasPrefix(path, address.TracesEndpoint()+"/") {
+		if strings.HasSuffix(path, "/artifact") {
+			return "artifact.download"
+		}
+		return "traces.get"
+	}
+	return "unknown"
+}

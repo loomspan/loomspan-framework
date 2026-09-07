@@ -2,6 +2,7 @@ package browserauth
 
 import (
 	"bytes"
+	"context"
 	"testing"
 	"time"
 )
@@ -18,7 +19,7 @@ func TestRegistryAdmitsEightSessionsAndRejectsNinthWithoutEviction(t *testing.T)
 	registry := NewRegistry(nil, deterministicEntropy())
 	var first string
 	for index := 0; index < MaxSessions; index++ {
-		id, err := registry.CreateSession()
+		id, err := registry.CreateSession(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -26,7 +27,7 @@ func TestRegistryAdmitsEightSessionsAndRejectsNinthWithoutEviction(t *testing.T)
 			first = id
 		}
 	}
-	if _, err := registry.CreateSession(); err == nil {
+	if _, err := registry.CreateSession(context.Background()); err == nil {
 		t.Fatal("ninth session admitted")
 	}
 	if !registry.Authenticate(first) {
@@ -36,10 +37,10 @@ func TestRegistryAdmitsEightSessionsAndRejectsNinthWithoutEviction(t *testing.T)
 
 func TestBootstrapRotatesOnlyRequestingTabsToken(t *testing.T) {
 	registry := NewRegistry(nil, deterministicEntropy())
-	sessionID, _ := registry.CreateSession()
-	first, _ := registry.Bootstrap(sessionID, "")
-	second, _ := registry.Bootstrap(sessionID, "")
-	rotated, _ := registry.Bootstrap(sessionID, first.TabID)
+	sessionID, _ := registry.CreateSession(context.Background())
+	first, _ := registry.Bootstrap(context.Background(), sessionID, "")
+	second, _ := registry.Bootstrap(context.Background(), sessionID, "")
+	rotated, _ := registry.Bootstrap(context.Background(), sessionID, first.TabID)
 	if registry.ValidateCSRF(sessionID, first.TabID, first.CSRF) {
 		t.Fatal("stale token accepted")
 	}
@@ -54,7 +55,7 @@ func TestBootstrapRotatesOnlyRequestingTabsToken(t *testing.T) {
 func TestSessionExpiresAfterEightIdleHours(t *testing.T) {
 	now := time.Unix(100, 0)
 	registry := NewRegistry(func() time.Time { return now }, deterministicEntropy())
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	now = now.Add(SessionIdle)
 	if registry.Authenticate(sessionID) {
 		t.Fatal("expired session authenticated")
@@ -64,8 +65,8 @@ func TestSessionExpiresAfterEightIdleHours(t *testing.T) {
 func TestHeartbeatKeepsTabRegisteredAndDisconnectedTabExpires(t *testing.T) {
 	now := time.Unix(100, 0)
 	registry := NewRegistry(func() time.Time { return now }, deterministicEntropy())
-	sessionID, _ := registry.CreateSession()
-	active, _ := registry.Bootstrap(sessionID, "")
+	sessionID, _ := registry.CreateSession(context.Background())
+	active, _ := registry.Bootstrap(context.Background(), sessionID, "")
 	now = now.Add(DisconnectedTabTTL - time.Second)
 	if !registry.ValidateCSRF(sessionID, active.TabID, active.CSRF) {
 		t.Fatal("heartbeat rejected before tab expiry")
@@ -75,7 +76,7 @@ func TestHeartbeatKeepsTabRegisteredAndDisconnectedTabExpires(t *testing.T) {
 		t.Fatal("heartbeat did not extend tab registration")
 	}
 
-	disconnected, _ := registry.Bootstrap(sessionID, "")
+	disconnected, _ := registry.Bootstrap(context.Background(), sessionID, "")
 	now = now.Add(DisconnectedTabTTL)
 	if registry.ValidateCSRF(sessionID, disconnected.TabID, disconnected.CSRF) {
 		t.Fatal("disconnected tab remained registered after expiry")
@@ -84,7 +85,7 @@ func TestHeartbeatKeepsTabRegisteredAndDisconnectedTabExpires(t *testing.T) {
 
 func TestSessionAuthenticationRejectsNonCanonicalCredentialShapes(t *testing.T) {
 	registry := NewRegistry(nil, deterministicEntropy())
-	sessionID, err := registry.CreateSession()
+	sessionID, err := registry.CreateSession(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,13 +106,13 @@ func TestSessionAuthenticationRejectsNonCanonicalCredentialShapes(t *testing.T) 
 
 func TestRegistryAdmitsSixteenTabsAcrossSessionsAndRejectsSeventeenth(t *testing.T) {
 	registry := NewRegistry(nil, deterministicEntropy())
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	for index := 0; index < MaxTabs; index++ {
-		if _, err := registry.Bootstrap(sessionID, ""); err != nil {
+		if _, err := registry.Bootstrap(context.Background(), sessionID, ""); err != nil {
 			t.Fatalf("tab %d: %v", index, err)
 		}
 	}
-	if _, err := registry.Bootstrap(sessionID, ""); err == nil {
+	if _, err := registry.Bootstrap(context.Background(), sessionID, ""); err == nil {
 		t.Fatal("seventeenth tab admitted")
 	}
 }
@@ -119,8 +120,8 @@ func TestRegistryAdmitsSixteenTabsAcrossSessionsAndRejectsSeventeenth(t *testing
 func TestActiveRelayKeepsSessionAliveAndOneRelayPerTabIsEnforced(t *testing.T) {
 	now := time.Unix(100, 0)
 	registry := NewRegistry(func() time.Time { return now }, deterministicEntropy())
-	sessionID, _ := registry.CreateSession()
-	bootstrap, _ := registry.Bootstrap(sessionID, "")
+	sessionID, _ := registry.CreateSession(context.Background())
+	bootstrap, _ := registry.Bootstrap(context.Background(), sessionID, "")
 	release, err := registry.AdmitRelay(sessionID, bootstrap.TabID, func() {})
 	if err != nil {
 		t.Fatal(err)
@@ -137,8 +138,8 @@ func TestActiveRelayKeepsSessionAliveAndOneRelayPerTabIsEnforced(t *testing.T) {
 
 func TestReleaseTabCancelsActiveRelay(t *testing.T) {
 	registry := NewRegistry(nil, deterministicEntropy())
-	sessionID, _ := registry.CreateSession()
-	bootstrap, _ := registry.Bootstrap(sessionID, "")
+	sessionID, _ := registry.CreateSession(context.Background())
+	bootstrap, _ := registry.Bootstrap(context.Background(), sessionID, "")
 	cancelled := make(chan struct{})
 	_, err := registry.AdmitRelay(sessionID, bootstrap.TabID, func() { close(cancelled) })
 	if err != nil {

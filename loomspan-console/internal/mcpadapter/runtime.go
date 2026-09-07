@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -45,7 +46,7 @@ func buildRuntimeOutput(ctx context.Context, provider StatusProvider, credential
 		return RuntimeOutput{}, fmt.Errorf("INTERNAL: runtime status is unavailable")
 	}
 	if generation, ok := admittedGeneration(ctx); ok && credentials.Snapshot().Generation != generation {
-		return RuntimeOutput{}, fmt.Errorf("INTERNAL: MCP authentication generation changed")
+		return RuntimeOutput{}, diagnostics.Annotate(fmt.Errorf("INTERNAL: MCP authentication generation changed"), diagnostics.Facts{Expected: true, Cause: "authentication_generation"})
 	}
 	return RuntimeOutput{ObservedAt: status.ObservedAt, TargetSelection: status.TargetSelection, TargetConnection: status.TargetConnection, TargetAuthentication: status.TargetAuthentication, JavaGoCompatibility: status.JavaGoCompatibility, RuntimeIdentity: status.RuntimeIdentity, LiveMonitoring: status.LiveMonitoring}, nil
 }

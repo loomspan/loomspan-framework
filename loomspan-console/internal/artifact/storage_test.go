@@ -538,7 +538,7 @@ func TestFatalStorageErrorLogsDoNotLeakPathsOrCredentials(t *testing.T) {
 	}
 
 	// The scopeId is expected and safe — verify it IS logged for ops debugging.
-	if !strings.Contains(logOutput, "ownerId") {
-		t.Fatalf("expected ownerId in log output for ops debugging:\n%s", logOutput)
+	if !strings.Contains(logOutput, "scope_id=scope-1") {
+		t.Fatalf("expected scope_id in log output for ops debugging:\n%s", logOutput)
 	}
 }

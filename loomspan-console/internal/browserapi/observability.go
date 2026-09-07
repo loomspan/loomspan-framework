@@ -1,11 +1,13 @@
 package browserapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
@@ -15,6 +17,7 @@ const maxObservabilityJSONBody = 4 * 1024
 
 func (router *Router) observabilityInstance(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Observability == nil || router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Observability service is unavailable.")
 		return
 	}
@@ -27,6 +30,8 @@ func (router *Router) observabilityInstance(response http.ResponseWriter, reques
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	status, domain := router.options.Observability.GetInstance(request.Context(), scope)
 	if domain != nil {
 		writeDomainError(response, domain)
@@ -37,6 +42,7 @@ func (router *Router) observabilityInstance(response http.ResponseWriter, reques
 
 func (router *Router) skillsList(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Observability == nil || router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Observability service is unavailable.")
 		return
 	}
@@ -53,6 +59,8 @@ func (router *Router) skillsList(response http.ResponseWriter, request *http.Req
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	page, domain := router.options.Observability.ListSkills(request.Context(), scope, observability.ListRequest{
 		Cursor:   body.Cursor,
 		PageSize: body.PageSize,
@@ -66,6 +74,7 @@ func (router *Router) skillsList(response http.ResponseWriter, request *http.Req
 
 func (router *Router) skillDetail(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Observability == nil || router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Observability service is unavailable.")
 		return
 	}
@@ -81,6 +90,8 @@ func (router *Router) skillDetail(response http.ResponseWriter, request *http.Re
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	detail, domain := router.options.Observability.GetSkill(request.Context(), scope, body.RegisteredName)
 	if domain != nil {
 		writeDomainError(response, domain)
@@ -91,6 +102,7 @@ func (router *Router) skillDetail(response http.ResponseWriter, request *http.Re
 
 func (router *Router) activeExecutionsList(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Observability == nil || router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Observability service is unavailable.")
 		return
 	}
@@ -107,6 +119,8 @@ func (router *Router) activeExecutionsList(response http.ResponseWriter, request
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	page, domain := router.options.Observability.ListActiveExecutions(request.Context(), scope, observability.ListRequest{
 		Cursor:   body.Cursor,
 		PageSize: body.PageSize,
@@ -120,6 +134,7 @@ func (router *Router) activeExecutionsList(response http.ResponseWriter, request
 
 func (router *Router) activeExecutionDetail(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Observability == nil || router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Observability service is unavailable.")
 		return
 	}
@@ -135,6 +150,8 @@ func (router *Router) activeExecutionDetail(response http.ResponseWriter, reques
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	execution, domain := router.options.Observability.GetActiveExecution(request.Context(), scope, body.SessionID)
 	if domain != nil {
 		writeDomainError(response, domain)
@@ -145,6 +162,7 @@ func (router *Router) activeExecutionDetail(response http.ResponseWriter, reques
 
 func (router *Router) tracesList(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Observability == nil || router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Observability service is unavailable.")
 		return
 	}
@@ -161,13 +179,16 @@ func (router *Router) tracesList(response http.ResponseWriter, request *http.Req
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	page, domain := router.options.Observability.ListTraces(request.Context(), scope, observability.ListRequest{
 		Cursor:   body.Cursor,
 		PageSize: body.PageSize,
 	})
 	if domain != nil {
+		diagnostics.Report(request.Context(), domain)
 		if allowsCachedTraceFallback(domain) {
-			if cached, ok := router.cachedTracePage(scope.ID); ok {
+			if cached, ok := router.cachedTracePage(request.Context(), scope.ID); ok {
 				router.writeScopedJSON(response, scope.ID, cached)
 				return
 			}
@@ -175,12 +196,13 @@ func (router *Router) tracesList(response http.ResponseWriter, request *http.Req
 		writeDomainError(response, domain)
 		return
 	}
-	page = router.enrichTracePage(scope.ID, page)
+	page = router.enrichTracePage(request.Context(), scope.ID, page)
 	router.writeScopedJSON(response, scope.ID, page)
 }
 
 func (router *Router) traceDetail(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Observability == nil || router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Observability service is unavailable.")
 		return
 	}
@@ -196,10 +218,13 @@ func (router *Router) traceDetail(response http.ResponseWriter, request *http.Re
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	trace, domain := router.options.Observability.GetTrace(request.Context(), scope, body.TraceID)
 	if domain != nil {
+		diagnostics.Report(request.Context(), domain)
 		if allowsCachedTraceFallback(domain) {
-			if cached, ok := router.cachedTrace(scope.ID, body.TraceID); ok {
+			if cached, ok := router.cachedTrace(request.Context(), scope.ID, body.TraceID); ok {
 				router.writeScopedJSON(response, scope.ID, cached)
 				return
 			}
@@ -207,7 +232,7 @@ func (router *Router) traceDetail(response http.ResponseWriter, request *http.Re
 		writeDomainError(response, domain)
 		return
 	}
-	trace = router.enrichTrace(scope.ID, trace)
+	trace = router.enrichTrace(request.Context(), scope.ID, trace)
 	router.writeScopedJSON(response, scope.ID, trace)
 }
 
@@ -230,11 +255,14 @@ func allowsCachedTraceFallback(domain *consolecore.Error) bool {
 // cachedTrace returns acquisition-time trace facts for a valid installed
 // artifact without claiming that the application is currently reachable or
 // authorized.
-func (router *Router) cachedTrace(scope target.ScopeID, traceID string) (observability.Trace, bool) {
+func (router *Router) cachedTrace(ctx context.Context, scope target.ScopeID, traceID string) (observability.Trace, bool) {
 	if router.options.Artifacts == nil {
 		return observability.Trace{}, false
 	}
 	lookup, domain := router.options.Artifacts.Lookup(evidence.ForTarget(scope), traceID)
+	if domain != nil {
+		diagnostics.Report(diagnostics.Operation(ctx, "browser.cachedTrace"), domain)
+	}
 	if domain != nil || !lookup.LocalAvailable {
 		return observability.Trace{}, false
 	}
@@ -254,11 +282,14 @@ func (router *Router) cachedTrace(scope target.ScopeID, traceID string) (observa
 	}, true
 }
 
-func (router *Router) cachedTracePage(scope target.ScopeID) (observability.Page[observability.Trace], bool) {
+func (router *Router) cachedTracePage(ctx context.Context, scope target.ScopeID) (observability.Page[observability.Trace], bool) {
 	if router.options.Artifacts == nil {
 		return observability.Page[observability.Trace]{}, false
 	}
 	snapshot, domain := router.options.Artifacts.StorageSnapshot()
+	if domain != nil {
+		diagnostics.Report(diagnostics.Operation(ctx, "browser.cachedTracePage"), domain)
+	}
 	if domain != nil || len(snapshot.Entries) == 0 {
 		return observability.Page[observability.Trace]{}, false
 	}
@@ -268,7 +299,7 @@ func (router *Router) cachedTracePage(scope target.ScopeID) (observability.Page[
 		if entry.AcquiredAt.After(observedAt) {
 			observedAt = entry.AcquiredAt
 		}
-		if trace, ok := router.cachedTrace(scope, entry.TraceID); ok {
+		if trace, ok := router.cachedTrace(ctx, scope, entry.TraceID); ok {
 			items = append(items, trace)
 		}
 	}
@@ -286,6 +317,7 @@ func (router *Router) cachedTracePage(scope target.ScopeID) (observability.Page[
 func (router *Router) writeScopedJSON(response http.ResponseWriter, scope target.ScopeID, value any) {
 	content, err := json.Marshal(value)
 	if err != nil {
+		reportResponse(response, err, "response_encode")
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "The Console response could not be created.")
 		return
 	}

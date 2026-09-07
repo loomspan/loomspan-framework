@@ -32,7 +32,7 @@ func downloadTestRouterWithTarget(t *testing.T, client target.ProbeClient) (*Rou
 	entropy := bytes.Repeat([]byte{50}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return client, nil
@@ -491,7 +491,7 @@ func TestRawDownloadBackpressureDoesNotBufferCompleteArtifact(t *testing.T) {
 	entropy := bytes.Repeat([]byte{60}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 
 	server := httptest.NewUnstartedServer(nil)
 	host := server.Listener.Addr().String()
@@ -791,7 +791,7 @@ func TestCachedTraceFallbackPreservesOriginalFactsWithoutClaimingCurrentApplicat
 	}
 	router, _, _ := artifactTestRouter(t, fake)
 	trace := observabilityTraceForTest()
-	enriched := router.enrichTrace("scope-1", trace)
+	enriched := router.enrichTrace(context.Background(), "scope-1", trace)
 
 	if !enriched.LocalAvailable {
 		t.Fatal("expected trace to be enriched as locally available")
@@ -820,8 +820,8 @@ func TestArtifactJSONRoutesRejectMethodBodyAndScopeVariants(t *testing.T) {
 	// Get the CSRF token by bootstrapping.
 	entropy := bytes.Repeat([]byte{51}, 32*16)
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := registry.CreateSession()
-	result, _ := registry.Bootstrap(sid, "")
+	sid, _ := registry.CreateSession(context.Background())
+	result, _ := registry.Bootstrap(context.Background(), sid, "")
 
 	// Rebuild router with the registry that has the bootstrap result.
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
@@ -881,8 +881,8 @@ func TestAcquireAndStorageSnapshotReturnOpaquePathFreeDTOs(t *testing.T) {
 	// Build a fresh setup with a known CSRF token.
 	entropy := bytes.Repeat([]byte{52}, 32*16)
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := registry.CreateSession()
-	result, _ := registry.Bootstrap(sid, "")
+	sid, _ := registry.CreateSession(context.Background())
+	result, _ := registry.Bootstrap(context.Background(), sid, "")
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -953,8 +953,8 @@ func TestArtifactDomainErrorsMapToStableHTTPEnvelopes(t *testing.T) {
 			}
 			entropy := bytes.Repeat([]byte{53}, 32*16)
 			registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-			sid, _ := registry.CreateSession()
-			result, _ := registry.Bootstrap(sid, "")
+			sid, _ := registry.CreateSession(context.Background())
+			result, _ := registry.Bootstrap(context.Background(), sid, "")
 			policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 			tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 				return &fakeProbeClient{}, nil

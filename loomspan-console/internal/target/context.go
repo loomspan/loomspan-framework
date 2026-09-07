@@ -11,6 +11,7 @@ import (
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/applicationclient"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 )
 
 type ProbeClient interface {
@@ -40,14 +41,16 @@ type ownerRegistration struct {
 }
 
 type state struct {
-	id        ScopeID
-	context   context.Context
-	cancel    context.CancelFunc
-	address   applicationclient.Address
-	client    ProbeClient
-	instance  applicationclient.Instance
-	status    consolecore.StatusSnapshot
-	activated bool
+	diagnostic context.Context
+	failures   diagnostics.Repeat
+	id         ScopeID
+	context    context.Context
+	cancel     context.CancelFunc
+	address    applicationclient.Address
+	client     ProbeClient
+	instance   applicationclient.Instance
+	status     consolecore.StatusSnapshot
+	activated  bool
 }
 
 type Snapshot struct {
@@ -142,7 +145,7 @@ func (target *Context) Select(addressValue string) *consolecore.Error {
 		client.Close()
 		return nil
 	}
-	if err := target.rotateLocked(address, client, false); err != nil {
+	if err := target.rotateLocked(address, client, false, context.Background()); err != nil {
 		client.Close()
 		return consolecore.NewError(consolecore.CodeConsoleError, "The target could not be selected.", "", consolecore.Details{}, err)
 	}
@@ -170,7 +173,7 @@ func (target *Context) SelectAndConnect(parent context.Context, addressValue str
 		client.Close()
 		return target.Snapshot(), target.consoleClosed()
 	}
-	if err := target.rotateLocked(address, client, true); err != nil {
+	if err := target.rotateLocked(address, client, true, parent); err != nil {
 		target.mu.Unlock()
 		client.Close()
 		return target.Snapshot(), consolecore.NewError(consolecore.CodeConsoleError, "The target could not be selected.", "", consolecore.Details{}, err)
@@ -207,7 +210,7 @@ func (target *Context) SupplyCredential(parent context.Context, credential []byt
 			target.mu.Unlock()
 			return target.Snapshot(), consolecore.NewError(consolecore.CodeConsoleError, "The credential could not be replaced.", "", consolecore.Details{}, err)
 		}
-		if err := target.rotateLocked(target.current.address, client, true); err != nil {
+		if err := target.rotateLocked(target.current.address, client, true, parent); err != nil {
 			target.mu.Unlock()
 			client.Close()
 			return target.Snapshot(), consolecore.NewError(consolecore.CodeConsoleError, "The credential could not be replaced.", "", consolecore.Details{}, err)
@@ -343,6 +346,19 @@ func (target *Context) probe(parent context.Context, manual bool, expected Scope
 	if manual {
 		target.stopRetryLocked()
 	}
+	if current.diagnostic == nil {
+		current.diagnostic = diagnostics.WithScope(diagnostics.Detach(current.context, parent, "target.probe"), string(current.id))
+		current.context = diagnostics.WithScope(diagnostics.Detach(current.context, parent, "target.scope"), string(current.id))
+	}
+	diagnostic := current.diagnostic
+	previous := current.status
+	defer func() {
+		target.mu.Lock()
+		defer target.mu.Unlock()
+		if target.current == current {
+			target.transitionsLocked(current, previous)
+		}
+	}()
 	credential := target.credentials.capability()
 	if credential == nil {
 		current.status.TargetAuthentication = consolecore.AuthenticationRequired
@@ -365,7 +381,9 @@ func (target *Context) probe(parent context.Context, manual bool, expected Scope
 		target.mu.Unlock()
 		return snapshot, domain
 	}
-	if errors.Is(err, context.Canceled) && parent.Err() != nil {
+	// Retained body-read causes must not replace the client's response mapping.
+	var mappedFailure *applicationclient.Failure
+	if errors.Is(err, context.Canceled) && parent.Err() != nil && !errors.As(err, &mappedFailure) {
 		snapshot := target.snapshotLocked()
 		target.mu.Unlock()
 		return snapshot, consolecore.NewError(
@@ -378,6 +396,10 @@ func (target *Context) probe(parent context.Context, manual bool, expected Scope
 	}
 	if err != nil {
 		domain := target.commitFailureLocked(target.current, err)
+		current.failures.Failure(diagnostic, diagnostics.Annotate(domain, diagnostics.Facts{Endpoint: "instance", Expected: parent.Err() != nil}))
+		if manual && parent.Err() == nil && !diagnostics.Extract(domain).Expected {
+			diagnostics.Link(diagnostics.WithScope(parent, string(scopeID)), diagnostic)
+		}
 		var failure *applicationclient.Failure
 		if errors.As(err, &failure) && failure.Retryable {
 			target.scheduleRetryLocked(scopeID)
@@ -391,16 +413,34 @@ func (target *Context) probe(parent context.Context, manual bool, expected Scope
 		newClient, factoryErr := target.factory(address)
 		if factoryErr != nil {
 			snapshot := target.snapshotLocked()
+			domain := consolecore.NewError(consolecore.CodeConsoleError, "The target runtime changed but could not be re-established.", string(scopeID), consolecore.Details{}, factoryErr)
+			current.failures.Failure(diagnostic, domain)
+			if manual && parent.Err() == nil {
+				diagnostics.Link(diagnostics.WithScope(parent, string(scopeID)), diagnostic)
+			}
 			target.mu.Unlock()
-			return snapshot, consolecore.NewError(consolecore.CodeConsoleError, "The target runtime changed but could not be re-established.", string(scopeID), consolecore.Details{}, factoryErr)
+			return snapshot, domain
 		}
-		if rotationErr := target.rotateLocked(address, newClient, true); rotationErr != nil {
+		if rotationErr := target.rotateLocked(address, newClient, true, parent); rotationErr != nil {
 			newClient.Close()
 			snapshot := target.snapshotLocked()
+			domain := consolecore.NewError(consolecore.CodeConsoleError, "The target runtime could not be reset.", string(scopeID), consolecore.Details{}, rotationErr)
+			current.failures.Failure(diagnostic, domain)
+			if manual && parent.Err() == nil {
+				diagnostics.Link(diagnostics.WithScope(parent, string(scopeID)), diagnostic)
+			}
 			target.mu.Unlock()
-			return snapshot, consolecore.NewError(consolecore.CodeConsoleError, "The target runtime could not be reset.", string(scopeID), consolecore.Details{}, rotationErr)
+			return snapshot, domain
 		}
 	}
+	if target.current != current {
+		current = target.current
+		previous = current.status
+		current.diagnostic = diagnostics.WithScope(diagnostics.Detach(current.context, parent, "target.probe"), string(current.id))
+		current.context = diagnostics.WithScope(diagnostics.Detach(current.context, parent, "target.scope"), string(current.id))
+		diagnostic = current.diagnostic
+	}
+	current.failures.Recover(diagnostic)
 	target.current.instance = instance
 	target.current.status.TargetConnection = consolecore.ConnectionReachable
 	target.current.status.TargetAuthentication = consolecore.AuthenticationEstablished
@@ -477,7 +517,7 @@ func (target *Context) commitFailureLocked(current *state, err error) *consoleco
 	}
 }
 
-func (target *Context) rotateLocked(address applicationclient.Address, client ProbeClient, preserveCredential bool) error {
+func (target *Context) rotateLocked(address applicationclient.Address, client ProbeClient, preserveCredential bool, source context.Context) error {
 	target.stopRetryLocked()
 	id, err := target.scopeIDs()
 	if err != nil {
@@ -485,6 +525,8 @@ func (target *Context) rotateLocked(address applicationclient.Address, client Pr
 	}
 	if target.current != nil {
 		old := target.current
+		old.failures.Reset()
+		diagnostics.Event(diagnostics.Operation(old.context, "target.selection"), "rotated", "selected")
 		old.cancel()
 		target.current = nil
 		old.client.Close()
@@ -498,7 +540,7 @@ func (target *Context) rotateLocked(address applicationclient.Address, client Pr
 		target.credentials.close()
 		target.credentials = credentialProvider{}
 	}
-	scopeContext, cancel := context.WithCancel(context.Background())
+	scopeContext, cancel := context.WithCancel(diagnostics.WithScope(diagnostics.Detach(context.Background(), source, "target.scope"), string(id)))
 	target.current = &state{
 		id: id, context: scopeContext, cancel: cancel, address: address, client: client,
 		status: consolecore.StatusSnapshot{
@@ -511,6 +553,7 @@ func (target *Context) rotateLocked(address applicationclient.Address, client Pr
 			LiveMonitoring:       consolecore.LiveUnknown,
 		},
 	}
+	diagnostics.Event(diagnostics.Operation(diagnostics.WithScope(scopeContext, string(id)), "target.selection"), "selected", "")
 	return nil
 }
 
@@ -544,8 +587,9 @@ func (target *Context) scheduleRetryLocked(scope ScopeID) {
 			return
 		}
 		target.retryTimer = nil
+		retryContext := target.current.diagnostic
 		target.mu.Unlock()
-		_, _ = target.probe(context.Background(), false, scope)
+		_, _ = target.probe(retryContext, false, scope)
 	})
 }
 
@@ -591,6 +635,8 @@ func (target *Context) Close() {
 	var old *state
 	if target.current != nil {
 		old = target.current
+		old.failures.Reset()
+		diagnostics.Event(diagnostics.Operation(old.context, "target.selection"), "closed", "selected")
 		old.cancel()
 		target.current = nil
 		old.client.Close()
@@ -614,4 +660,40 @@ func (target *Context) Close() {
 func (target *Context) GoString() string {
 	snapshot := target.Snapshot()
 	return fmt.Sprintf("TargetContext{scope:%q,address:%q,authentication:%q}", snapshot.Status.TargetScopeID, snapshot.Address, snapshot.Status.TargetAuthentication)
+}
+
+func (target *Context) transitionsLocked(current *state, previous consolecore.StatusSnapshot) {
+	ctx := current.diagnostic
+	if ctx == nil {
+		ctx = current.context
+	}
+	if current.status.TargetConnection != previous.TargetConnection {
+		state := "disconnected"
+		if current.status.TargetConnection == consolecore.ConnectionReachable {
+			state = "connected"
+		}
+		previousState := "none"
+		if previous.TargetConnection == consolecore.ConnectionReachable {
+			previousState = "connected"
+		} else if previous.TargetConnection == consolecore.ConnectionUnavailable {
+			previousState = "disconnected"
+		}
+		diagnostics.Event(diagnostics.Operation(ctx, "target.connection"), state, previousState)
+	}
+	if current.status.TargetAuthentication != previous.TargetAuthentication {
+		state := "required"
+		if current.status.TargetAuthentication == consolecore.AuthenticationEstablished {
+			state = "accepted"
+		}
+		if current.status.TargetAuthentication == consolecore.AuthenticationBlocked {
+			state = "blocked"
+		}
+		previousState := "required"
+		if previous.TargetAuthentication == consolecore.AuthenticationEstablished {
+			previousState = "accepted"
+		} else if previous.TargetAuthentication == consolecore.AuthenticationBlocked {
+			previousState = "blocked"
+		}
+		diagnostics.Event(diagnostics.Operation(ctx, "target.authentication"), state, previousState)
+	}
 }

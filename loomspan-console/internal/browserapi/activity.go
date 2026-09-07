@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/browserauth"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/live"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
 )
@@ -21,6 +22,7 @@ type sseHandler func(http.ResponseWriter, *http.Request, string)
 func (router *Router) withSessionSSE(response http.ResponseWriter, request *http.Request, handler sseHandler) {
 	cookie, err := request.Cookie(browserauth.SessionCookieName)
 	if err != nil || !router.options.Sessions.Authenticate(cookie.Value) {
+		diagnostics.Reject(request.Context(), "browser", "session")
 		http.SetCookie(response, browserauth.ExpiredSessionCookie())
 		writeError(response, http.StatusUnauthorized, "SESSION_REQUIRED", "Pairing is required.")
 		return
@@ -38,6 +40,7 @@ func (router *Router) withSessionSSE(response http.ResponseWriter, request *http
 func writeSSEEvent(response http.ResponseWriter, event string, data any) {
 	encoded, err := json.Marshal(data)
 	if err != nil {
+		reportResponse(response, err, "response_encode")
 		return
 	}
 	frame := "event: " + event + "\ndata: " + string(encoded) + "\n\n"
@@ -46,6 +49,7 @@ func writeSSEEvent(response http.ResponseWriter, event string, data any) {
 
 func (router *Router) activityStream(response http.ResponseWriter, request *http.Request, sessionID string) {
 	if router.options.Live == nil || router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Live activity monitoring is unavailable.")
 		return
 	}
@@ -66,6 +70,8 @@ func (router *Router) activityStream(response http.ResponseWriter, request *http
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	tabID := request.Header.Get("X-loomspan-Console-Tab")
 	relayContext, cancelRelay := context.WithCancel(request.Context())
 	defer cancelRelay()
@@ -113,6 +119,9 @@ func (router *Router) activityStream(response http.ResponseWriter, request *http
 
 	ctx := relayContext
 	for {
+		if responseFailed(response) {
+			return
+		}
 		select {
 		case <-ctx.Done():
 			return
@@ -145,7 +154,11 @@ func (router *Router) activityStream(response http.ResponseWriter, request *http
 				return
 			}
 			acknowledge(activity)
-			encoded, _ := json.Marshal(activity)
+			encoded, encodeErr := json.Marshal(activity)
+			if encodeErr != nil {
+				reportResponse(response, encodeErr, "response_encode")
+				return
+			}
 			if _, err := response.Write([]byte("event: loomspan.activity\ndata: ")); err != nil {
 				return
 			}
@@ -162,6 +175,7 @@ func (router *Router) activityStream(response http.ResponseWriter, request *http
 
 func (router *Router) activityRecent(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Live == nil || router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Live activity monitoring is unavailable.")
 		return
 	}
@@ -175,6 +189,8 @@ func (router *Router) activityRecent(response http.ResponseWriter, request *http
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	result, domain := router.options.Live.Recent(body)
 	if domain != nil {
 		writeDomainError(response, domain)
@@ -186,6 +202,7 @@ func (router *Router) activityRecent(response http.ResponseWriter, request *http
 	}
 	content, err := json.Marshal(result)
 	if err != nil {
+		reportResponse(response, err, "response_encode")
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "The Console response could not be created.")
 		return
 	}

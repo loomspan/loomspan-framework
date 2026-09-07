@@ -124,7 +124,7 @@ func artifactTestRouterWithCSRF(t *testing.T, artifacts ArtifactService) (*Route
 	entropy := bytes.Repeat([]byte{20}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
@@ -153,7 +153,7 @@ func artifactTestRouterWithCSRF(t *testing.T, artifacts ArtifactService) (*Route
 		Artifacts:      artifacts,
 		TraceInventory: inventory,
 	})
-	bootstrapResult, _ := registry.Bootstrap(sessionID, "")
+	bootstrapResult, _ := registry.Bootstrap(context.Background(), sessionID, "")
 	return router, bootstrapResult.TabID, bootstrapResult.CSRF, browserauth.SessionCookie(sessionID)
 }
 
@@ -202,7 +202,7 @@ func TestArtifactMutationRoutesRequireCSRF(t *testing.T) {
 	entropy := bytes.Repeat([]byte{22}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
@@ -286,7 +286,7 @@ func TestArtifactAcquireReturnsHandle(t *testing.T) {
 	entropy := bytes.Repeat([]byte{24}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	reg := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := reg.CreateSession()
+	sid, _ := reg.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -299,7 +299,7 @@ func TestArtifactAcquireReturnsHandle(t *testing.T) {
 		Target:     tc, Artifacts: fake,
 	})
 	ck := browserauth.SessionCookie(sid)
-	result, _ := reg.Bootstrap(sid, "")
+	result, _ := reg.Bootstrap(context.Background(), sid, "")
 	resp := artifactRequestWithCSRF(r, "/api/console/v1/artifacts/acquire", `{"traceId":"trace-1"}`, ck, result.TabID, result.CSRF)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
@@ -317,7 +317,7 @@ func TestArtifactRemoveReturnsRemoved(t *testing.T) {
 	entropy := bytes.Repeat([]byte{25}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	reg := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := reg.CreateSession()
+	sid, _ := reg.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -330,7 +330,7 @@ func TestArtifactRemoveReturnsRemoved(t *testing.T) {
 		Target:     tc, Artifacts: fake,
 	})
 	ck := browserauth.SessionCookie(sid)
-	result, _ := reg.Bootstrap(sid, "")
+	result, _ := reg.Bootstrap(context.Background(), sid, "")
 	resp := artifactRequestWithCSRF(r, "/api/console/v1/artifacts/remove", `{"source":"TARGET","traceId":"trace-1"}`, ck, result.TabID, result.CSRF)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
@@ -351,7 +351,7 @@ func TestArtifactRemoveMapsArtifactInUse(t *testing.T) {
 	entropy := bytes.Repeat([]byte{26}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	reg := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := reg.CreateSession()
+	sid, _ := reg.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -364,7 +364,7 @@ func TestArtifactRemoveMapsArtifactInUse(t *testing.T) {
 		Target:     tc, Artifacts: fake,
 	})
 	ck := browserauth.SessionCookie(sid)
-	result, _ := reg.Bootstrap(sid, "")
+	result, _ := reg.Bootstrap(context.Background(), sid, "")
 	resp := artifactRequestWithCSRF(r, "/api/console/v1/artifacts/remove", `{"source":"TARGET","traceId":"trace-1"}`, ck, result.TabID, result.CSRF)
 	if resp.Code != http.StatusConflict {
 		t.Fatalf("expected 409 for ARTIFACT_IN_USE, got %d: %s", resp.Code, resp.Body.String())
@@ -379,7 +379,7 @@ func TestArtifactClearExpiredReturnsCleared(t *testing.T) {
 	entropy := bytes.Repeat([]byte{27}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	reg := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := reg.CreateSession()
+	sid, _ := reg.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -392,7 +392,7 @@ func TestArtifactClearExpiredReturnsCleared(t *testing.T) {
 		Target:     tc, Artifacts: fake,
 	})
 	ck := browserauth.SessionCookie(sid)
-	result, _ := reg.Bootstrap(sid, "")
+	result, _ := reg.Bootstrap(context.Background(), sid, "")
 	resp := artifactRequestWithCSRF(r, "/api/console/v1/artifacts/clear-expired", `{}`, ck, result.TabID, result.CSRF)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
@@ -410,7 +410,7 @@ func TestArtifactClearAllUnusedReturnsCleared(t *testing.T) {
 	entropy := bytes.Repeat([]byte{28}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	reg := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := reg.CreateSession()
+	sid, _ := reg.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -423,7 +423,7 @@ func TestArtifactClearAllUnusedReturnsCleared(t *testing.T) {
 		Target:     tc, Artifacts: fake,
 	})
 	ck := browserauth.SessionCookie(sid)
-	result, _ := reg.Bootstrap(sid, "")
+	result, _ := reg.Bootstrap(context.Background(), sid, "")
 	resp := artifactRequestWithCSRF(r, "/api/console/v1/artifacts/clear-all-unused", `{}`, ck, result.TabID, result.CSRF)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
@@ -492,7 +492,7 @@ func TestArtifactAcquireRejectsEmptyTraceID(t *testing.T) {
 	entropy := bytes.Repeat([]byte{29}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	reg := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := reg.CreateSession()
+	sid, _ := reg.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -505,7 +505,7 @@ func TestArtifactAcquireRejectsEmptyTraceID(t *testing.T) {
 		Target:     tc, Artifacts: fake,
 	})
 	ck := browserauth.SessionCookie(sid)
-	result, _ := reg.Bootstrap(sid, "")
+	result, _ := reg.Bootstrap(context.Background(), sid, "")
 	resp := artifactRequestWithCSRF(r, "/api/console/v1/artifacts/acquire", `{"traceId":""}`, ck, result.TabID, result.CSRF)
 	if resp.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for empty trace ID, got %d: %s", resp.Code, resp.Body.String())
@@ -568,7 +568,7 @@ func TestArtifactRawDownloadRejectsPost(t *testing.T) {
 	entropy := bytes.Repeat([]byte{31}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	router, _ := New(Options{
 		Policy: policy, Pairing: pairing, Sessions: registry,
@@ -647,7 +647,7 @@ func TestEnrichTracePageAddsArtifactAvailability(t *testing.T) {
 			{TraceID: "trace-2"},
 		},
 	}
-	enriched := router.enrichTracePage("scope-1", page)
+	enriched := router.enrichTracePage(context.Background(), "scope-1", page)
 	for i, item := range enriched.Items {
 		if !item.LocalAvailable {
 			t.Fatalf("item %d: expected locally available", i)
@@ -676,7 +676,7 @@ func TestEnrichTracePageSkipsWhenNotAvailable(t *testing.T) {
 	page := observability.Page[observability.Trace]{
 		Items: []observability.Trace{{TraceID: "trace-1"}},
 	}
-	enriched := router.enrichTracePage("scope-1", page)
+	enriched := router.enrichTracePage(context.Background(), "scope-1", page)
 	if enriched.Items[0].LocalAvailable {
 		t.Fatalf("expected trace to remain unenriched when lookup returns not available")
 	}
@@ -692,7 +692,7 @@ func TestEnrichTraceAddsArtifactAvailability(t *testing.T) {
 	}
 	router, _, _ := artifactTestRouter(t, fake)
 	trace := observability.Trace{TraceID: "trace-1"}
-	enriched := router.enrichTrace("scope-1", trace)
+	enriched := router.enrichTrace(context.Background(), "scope-1", trace)
 	if !enriched.LocalAvailable {
 		t.Fatalf("expected trace to be enriched as locally available")
 	}
@@ -707,7 +707,7 @@ func TestEnrichTraceAddsArtifactAvailability(t *testing.T) {
 func TestEnrichTraceNoArtifactsServiceSkipsEnrichment(t *testing.T) {
 	router, _, _ := artifactTestRouter(t, nil)
 	trace := observability.Trace{TraceID: "trace-1"}
-	enriched := router.enrichTrace("scope-1", trace)
+	enriched := router.enrichTrace(context.Background(), "scope-1", trace)
 	if enriched.LocalAvailable {
 		t.Fatalf("expected trace to remain unenriched when artifact service is nil")
 	}
@@ -721,7 +721,7 @@ func TestArtifactAcquireMapsTargetChanged(t *testing.T) {
 	entropy := bytes.Repeat([]byte{40}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	reg := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := reg.CreateSession()
+	sid, _ := reg.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -734,7 +734,7 @@ func TestArtifactAcquireMapsTargetChanged(t *testing.T) {
 		Target:     tc, Artifacts: fake,
 	})
 	ck := browserauth.SessionCookie(sid)
-	result, _ := reg.Bootstrap(sid, "")
+	result, _ := reg.Bootstrap(context.Background(), sid, "")
 	resp := artifactRequestWithCSRF(r, "/api/console/v1/artifacts/acquire", `{"traceId":"trace-1"}`, ck, result.TabID, result.CSRF)
 	if resp.Code != http.StatusConflict {
 		t.Fatalf("expected 409 for TARGET_CHANGED, got %d: %s", resp.Code, resp.Body.String())
@@ -752,7 +752,7 @@ func TestArtifactRemoveMapsTargetChanged(t *testing.T) {
 	entropy := bytes.Repeat([]byte{41}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	reg := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := reg.CreateSession()
+	sid, _ := reg.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -765,7 +765,7 @@ func TestArtifactRemoveMapsTargetChanged(t *testing.T) {
 		Target:     tc, Artifacts: fake,
 	})
 	ck := browserauth.SessionCookie(sid)
-	result, _ := reg.Bootstrap(sid, "")
+	result, _ := reg.Bootstrap(context.Background(), sid, "")
 	resp := artifactRequestWithCSRF(r, "/api/console/v1/artifacts/remove", `{"source":"TARGET","traceId":"trace-1"}`, ck, result.TabID, result.CSRF)
 	if resp.Code != http.StatusConflict {
 		t.Fatalf("expected 409 for TARGET_CHANGED, got %d: %s", resp.Code, resp.Body.String())
@@ -783,7 +783,7 @@ func TestArtifactStorageMapsTargetChanged(t *testing.T) {
 	entropy := bytes.Repeat([]byte{42}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	reg := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sid, _ := reg.CreateSession()
+	sid, _ := reg.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	tc, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return &fakeProbeClient{}, nil
@@ -848,7 +848,7 @@ func TestArtifactRawDownloadStreamsWithUndeclaredLength(t *testing.T) {
 	entropy := bytes.Repeat([]byte{43}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	client := &undeclaredLengthArtifactProbeClient{artifactBody: []byte(artifactBody)}
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
@@ -943,7 +943,7 @@ func TestArtifactRawDownloadStopsOnClientCancellation(t *testing.T) {
 	entropy := bytes.Repeat([]byte{44}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
+	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	probeClient := &blockingArtifactProbeClient{}
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {

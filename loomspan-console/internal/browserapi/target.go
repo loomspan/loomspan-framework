@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
 )
 
@@ -34,6 +35,7 @@ func (router *Router) targetStatus(response http.ResponseWriter, request *http.R
 
 func (router *Router) targetConnect(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Target service is unavailable.")
 		return
 	}
@@ -58,6 +60,7 @@ func (router *Router) targetConnect(response http.ResponseWriter, request *http.
 
 func (router *Router) targetCredential(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Target service is unavailable.")
 		return
 	}
@@ -81,6 +84,7 @@ func (router *Router) targetCredential(response http.ResponseWriter, request *ht
 
 func (router *Router) targetRecheck(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Target service is unavailable.")
 		return
 	}
@@ -97,6 +101,7 @@ func (router *Router) targetRecheck(response http.ResponseWriter, request *http.
 }
 
 func writeDomainError(response http.ResponseWriter, domain *consolecore.Error) {
+	diagnostics.Report(responseContext(response), domain)
 	var details any
 	if domain.Details != (consolecore.Details{}) {
 		details = domain.Details

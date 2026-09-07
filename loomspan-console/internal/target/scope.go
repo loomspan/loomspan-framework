@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/applicationclient"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
@@ -51,7 +50,6 @@ func (scope Scope) Upstream(parent context.Context, endpoint string, maxBytes in
 	}()
 	body, instanceID, err := scope.client.Get(operation, endpoint, maxBytes, scope.credential)
 	if instanceID != "" && scope.InstanceID != "" && scope.InstanceID != instanceID {
-		slog.Error("upstream instance ID mismatch", "scopeId", scope.ID, "expected", scope.InstanceID, "actual", instanceID)
 		if scope.Context.Err() != nil {
 			return nil, consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", string(scope.ID), consolecore.Details{}, nil)
 		}
@@ -64,20 +62,18 @@ func (scope Scope) Upstream(parent context.Context, endpoint string, maxBytes in
 		return nil, consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", string(scope.ID), consolecore.Details{}, nil)
 	}
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			if parent.Err() != nil {
-				slog.Error("upstream operation canceled by caller", "scopeId", scope.ID)
-				return nil, consolecore.NewError(consolecore.CodeTargetUnavailable, "The operation was canceled.", string(scope.ID), consolecore.Details{}, err)
-			}
-			slog.Error("upstream operation canceled by scope rotation", "scopeId", scope.ID)
-			return nil, consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", string(scope.ID), consolecore.Details{}, err)
-		}
+		// Body-read diagnostics retain cancellation below an already mapped
+		// Failure; preserve that response before handling transport cancellation.
 		var failure *applicationclient.Failure
 		if errors.As(err, &failure) {
-			slog.Error("upstream request failed", "scopeId", scope.ID, "failureKind", failure.Kind)
 			return nil, failure.ConsoleError(string(scope.ID))
 		}
-		slog.Error("upstream request transport error", "scopeId", scope.ID)
+		if errors.Is(err, context.Canceled) {
+			if parent.Err() != nil {
+				return nil, consolecore.NewError(consolecore.CodeTargetUnavailable, "The operation was canceled.", string(scope.ID), consolecore.Details{}, err)
+			}
+			return nil, consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", string(scope.ID), consolecore.Details{}, err)
+		}
 		return nil, consolecore.NewError(consolecore.CodeTargetUnavailable, "The selected target is unavailable.", string(scope.ID), consolecore.Details{}, err)
 	}
 	return body, nil
@@ -116,20 +112,16 @@ func (scope Scope) OpenActivity(parent context.Context, afterCursor string) (*ap
 				return nil, domain
 			}
 		}
-		if errors.Is(err, context.Canceled) {
-			if parent.Err() != nil {
-				slog.Error("activity stream canceled by caller", "scopeId", scope.ID)
-				return nil, consolecore.NewError(consolecore.CodeTargetUnavailable, "The operation was canceled.", string(scope.ID), consolecore.Details{}, err)
-			}
-			slog.Error("activity stream canceled by scope rotation", "scopeId", scope.ID)
-			return nil, consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", string(scope.ID), consolecore.Details{}, err)
-		}
 		var failure *applicationclient.Failure
 		if errors.As(err, &failure) {
-			slog.Error("activity stream upstream failure", "scopeId", scope.ID, "failureKind", failure.Kind)
 			return nil, failure.ConsoleError(string(scope.ID))
 		}
-		slog.Error("activity stream transport error", "scopeId", scope.ID)
+		if errors.Is(err, context.Canceled) {
+			if parent.Err() != nil {
+				return nil, consolecore.NewError(consolecore.CodeTargetUnavailable, "The operation was canceled.", string(scope.ID), consolecore.Details{}, err)
+			}
+			return nil, consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", string(scope.ID), consolecore.Details{}, err)
+		}
 		return nil, consolecore.NewError(consolecore.CodeTargetUnavailable, "The selected target is unavailable.", string(scope.ID), consolecore.Details{}, err)
 	}
 	context.AfterFunc(operation, func() {
@@ -186,20 +178,16 @@ func (scope Scope) OpenArtifact(parent context.Context, traceId string) (*applic
 				return nil, domain
 			}
 		}
-		if errors.Is(err, context.Canceled) {
-			if parent.Err() != nil {
-				slog.Error("artifact stream canceled by caller", "scopeId", scope.ID)
-				return nil, consolecore.NewError(consolecore.CodeTargetUnavailable, "The operation was canceled.", string(scope.ID), consolecore.Details{}, err)
-			}
-			slog.Error("artifact stream canceled by scope rotation", "scopeId", scope.ID)
-			return nil, consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", string(scope.ID), consolecore.Details{}, err)
-		}
 		var failure *applicationclient.Failure
 		if errors.As(err, &failure) {
-			slog.Error("artifact stream upstream failure", "scopeId", scope.ID, "failureKind", failure.Kind)
 			return nil, failure.ConsoleError(string(scope.ID))
 		}
-		slog.Error("artifact stream transport error", "scopeId", scope.ID)
+		if errors.Is(err, context.Canceled) {
+			if parent.Err() != nil {
+				return nil, consolecore.NewError(consolecore.CodeTargetUnavailable, "The operation was canceled.", string(scope.ID), consolecore.Details{}, err)
+			}
+			return nil, consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", string(scope.ID), consolecore.Details{}, err)
+		}
 		return nil, consolecore.NewError(consolecore.CodeTargetUnavailable, "The selected target is unavailable.", string(scope.ID), consolecore.Details{}, err)
 	}
 	context.AfterFunc(operation, func() {

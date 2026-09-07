@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 )
 
@@ -45,10 +46,10 @@ func (lease *Lease) OpenComponent(name ComponentName) (ComponentReader, error) {
 	}
 	reader, err := lease.service.storage.openComponent(lease.entry.installedDir, name)
 	if err != nil {
-		return nil, err
+		return nil, componentFailure(err, name, "storage_open")
 	}
 	lease.readers[reader] = struct{}{}
-	return &leaseReader{lease: lease, reader: reader}, nil
+	return &leaseReader{lease: lease, reader: reader, name: name}, nil
 }
 
 // ComponentSize returns the synced byte size of a named bundle component. The
@@ -106,7 +107,7 @@ func (lease *Lease) Close(success bool) error {
 	lease.closed = true
 	entry := lease.entry
 	for reader := range lease.readers {
-		_ = reader.Close()
+		_ = lease.service.reportCleanup(entry, reader.Close(), "close")
 		delete(lease.readers, reader)
 	}
 	delete(entry.leases, lease)
@@ -156,7 +157,7 @@ func (service *Service) invalidateLeasesLocked(entry *entry) {
 	for lease := range entry.leases {
 		lease.closed = true
 		for reader := range lease.readers {
-			_ = reader.Close()
+			_ = service.reportCleanup(entry, reader.Close(), "close")
 			delete(lease.readers, reader)
 		}
 		delete(entry.leases, lease)
@@ -165,13 +166,18 @@ func (service *Service) invalidateLeasesLocked(entry *entry) {
 }
 
 type leaseReader struct {
+	name   ComponentName
 	lease  *Lease
 	reader io.ReadCloser
 	closed bool
 }
 
 func (reader *leaseReader) Read(buffer []byte) (int, error) {
-	return reader.reader.Read(buffer)
+	n, err := reader.reader.Read(buffer)
+	if err != nil && !errors.Is(err, io.EOF) {
+		err = componentFailure(err, reader.name, "storage_read")
+	}
+	return n, err
 }
 
 func (reader *leaseReader) Seek(offset int64, whence int) (int64, error) {
@@ -179,7 +185,11 @@ func (reader *leaseReader) Seek(offset int64, whence int) (int64, error) {
 	if !ok {
 		return 0, errors.New("artifact component reader is not seekable")
 	}
-	return seeker.Seek(offset, whence)
+	offset, err := seeker.Seek(offset, whence)
+	if err != nil {
+		err = componentFailure(err, reader.name, "storage_read")
+	}
+	return offset, err
 }
 
 func (reader *leaseReader) Close() error {
@@ -190,5 +200,22 @@ func (reader *leaseReader) Close() error {
 	}
 	reader.closed = true
 	delete(reader.lease.readers, reader.reader)
-	return reader.reader.Close()
+	return reader.lease.service.reportCleanup(reader.lease.entry, reader.reader.Close(), "close")
+}
+
+func componentStage(name ComponentName) string {
+	switch name {
+	case "manifest.json":
+		return "manifest"
+	case "payloads.store":
+		return "payload"
+	case ComponentRawArtifact:
+		return "read"
+	default:
+		return "index"
+	}
+}
+
+func componentFailure(err error, name ComponentName, cause string) error {
+	return diagnostics.Annotate(err, diagnostics.Facts{Cause: cause, Stage: componentStage(name)})
 }

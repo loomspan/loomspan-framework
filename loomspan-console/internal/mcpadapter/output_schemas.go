@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/traceanalysis"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -18,11 +19,14 @@ func addValidatedTool[In, Out any](server *mcp.Server, tool *mcp.Tool, compact *
 	validate := newCompleteOutputValidator[Out](tool.Name)
 	tool.OutputSchema = compact
 	mcp.AddTool(server, tool, func(ctx context.Context, request *mcp.CallToolRequest, input In) (*mcp.CallToolResult, Out, error) {
+		ctx = diagnostics.Operation(ctx, "mcp."+tool.Name)
 		result, output, callErr := handler(ctx, request, input)
 		if callErr != nil {
+			diagnostics.Report(ctx, callErr)
 			return result, output, callErr
 		}
 		if err := validate(output); err != nil {
+			diagnostics.Report(ctx, diagnostics.Annotate(err, diagnostics.Facts{Classification: "internal", Cause: "response_encode", Stage: "response"}))
 			var zero Out
 			return nil, zero, err
 		}

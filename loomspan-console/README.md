@@ -629,3 +629,78 @@ availability at acquisition time). These facts are distinct from the
 observability service's current application-side metadata. The Trace Storage
 view in the browser shows the full cache snapshot with per-entry removal
 actions and bulk clear operations.
+
+## Server diagnostics
+
+The executable configures standard-library `slog` JSON output on stderr before
+loading browser assets. The default threshold is Info; no flags or configuration
+keys are needed. Version output, workspace information, pairing URLs and
+interactive credential prompts remain on their existing interactive output
+channels. Pairing secrets are never copied into diagnostic records.
+
+Every diagnostic has `time`, `level`, a static `msg`, a constant `operation`,
+and a process-generated `operation_id`. Failed operations add `classification`
+and `cause`. Available metadata includes:
+
+| Field | Meaning |
+| --- | --- |
+| `request_id` | New Console-generated browser/MCP ingress identity; incoming IDs are ignored |
+| `parent_operation_id` | Parent of a tool, worker, or other child operation |
+| `scope_id` | Authoritative target scope; omitted for imported evidence |
+| `endpoint` | Constant endpoint family such as `skills.get` or `activity.stream`, never a URL |
+| `stage` | Safe processing, storage, response, or lifecycle stage |
+| `status` | Numeric upstream HTTP status when applicable |
+| `limit_name`, `limit_value` | Enforced limit identity and value |
+| `state`, `previous_state` | Actual lifecycle transition |
+| `suppressed_count` | Repeated failures omitted since the previous record |
+
+For example, a synthetic upstream reader failure is distinguishable from a
+response that actually exceeded its byte limit:
+
+```json
+{"time":"2026-09-06T12:00:00Z","level":"ERROR","msg":"operation failed","operation":"browser.skillDetail","operation_id":"op-2","request_id":"op-1","classification":"LIMIT_EXCEEDED","cause":"body_read","endpoint":"skills.get","limit_name":"maxBytes","limit_value":4194304}
+```
+
+The outward error classification in this example remains unchanged for browser
+and MCP compatibility. The diagnostic `body_read` cause preserves the distinction
+from actual overflow (`body_limit`); the raw reader error is never rendered.
+
+Unexpected transport, protocol, decoding, local storage, encoding and stream
+failures are Error. Unusable upstream artifacts and incompatible targets are
+Warn. Successful pairing and actual session, tab, target, connection and MCP
+authentication transitions are Info. Routine validation, unavailable/expired
+resources, invalid user imports, stale cursors, target rotation and caller
+cancellation do not produce Warn or Error. A configured internal timeout while
+the caller remains active is actionable. Successful requests and unchanged
+polls stay quiet.
+
+Browser handlers and MCP tool completion own synchronous failures. Target probes,
+live workers and baseline refreshes own their background retry series. Shared
+artifact acquisition has one leader operation; its error retains one primary
+claim across all waiters and adapter wrappers. Failed waiters emit an Info
+`operation.link` record with `shared_operation_id`, allowing each interaction to
+be traced to that primary. Later manual target checks also link their request to
+the target retry series. Pairing, session and tab creation preserve the initiating
+request identity in their lifecycle diagnostics; entropy failures remain
+distinguishable even when the protected browser response describes a limit.
+Response writers own distinct downstream write errors,
+including failures after headers are committed. Cleanup and process monitors
+own their failures; propagation to the executable does not repeat the primary.
+Inventory/enrichment operations report unexpected failures before reducing them
+to incomplete results, including browser cached-trace fallbacks. The HTTP server's emergency logger emits a safe
+`http.server` diagnostic and discards its arbitrary emergency-message text.
+
+Retry owners retain one current failure signature per series. They emit the
+first failure, suppress identical retries, emit a changed failure with the prior
+suppression count, and emit one recovery summary. Scope retirement discards the
+series. Security rejections are Debug-only, with fixed adapter/reason buckets:
+the first rejection and at most one count summary per minute. Independent
+requests are not globally deduplicated.
+
+Diagnostic contexts copied to detached workers contain only log metadata and
+retain the worker's existing cancellation lifetime. IDs never reuse credentials,
+session/tab tokens, trace IDs, artifact handles or cursor values. Facts are
+allowlisted enums and numbers: unknown values become `unknown`. Never pass raw
+errors, arbitrary `LogValuer` values, URLs, paths, headers, bodies or trace
+content to a log call. Causes remain available through Go error chains for
+internal inspection, but neither error messages nor nested errors are serialized.

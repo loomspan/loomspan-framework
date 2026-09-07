@@ -245,7 +245,7 @@ func joinedBrowserRouter(t *testing.T, targetContext *target.Context, artifacts 
 	entropy := bytes.Repeat([]byte{31}, 32*16)
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
 	t.Cleanup(registry.Close)
-	sessionID, err := registry.CreateSession()
+	sessionID, err := registry.CreateSession(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +257,7 @@ func joinedBrowserRouter(t *testing.T, targetContext *target.Context, artifacts 
 	if err != nil {
 		t.Fatal(err)
 	}
-	bootstrap, err := registry.Bootstrap(sessionID, "")
+	bootstrap, err := registry.Bootstrap(context.Background(), sessionID, "")
 	if err != nil {
 		t.Fatal(err)
 	}

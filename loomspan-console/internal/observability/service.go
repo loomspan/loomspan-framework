@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"net/url"
 	"strings"
 
@@ -36,10 +37,10 @@ func (service *Service) GetInstance(ctx context.Context, scope target.Scope) (In
 	}
 	var status InstanceStatus
 	if err := json.Unmarshal(body, &status); err != nil {
-		return InstanceStatus{}, consolecore.NewError(consolecore.CodeConsoleError, "The instance status response could not be read.", string(scope.ID), consolecore.Details{}, err)
+		return InstanceStatus{}, consolecore.NewError(consolecore.CodeConsoleError, "The instance status response could not be read.", string(scope.ID), consolecore.Details{}, diagnostics.Annotate(err, diagnostics.Facts{Cause: "response_decode", Endpoint: "instance"}))
 	}
 	if err := validateInstanceStatus(status, scope.InstanceID); err != nil {
-		return InstanceStatus{}, invalidUpstreamResponse(scope, "instance status", err)
+		return InstanceStatus{}, invalidUpstreamResponse(scope, "instance", "instance status", err)
 	}
 	status.TargetScopeID = string(scope.ID)
 	if domain := scope.RequireCurrent(); domain != nil {
@@ -60,10 +61,10 @@ func (service *Service) ListSkills(ctx context.Context, scope target.Scope, requ
 	}
 	var page Page[SkillSummary]
 	if err := json.Unmarshal(body, &page); err != nil {
-		return Page[SkillSummary]{}, consolecore.NewError(consolecore.CodeConsoleError, "The skills response could not be read.", string(scope.ID), consolecore.Details{}, err)
+		return Page[SkillSummary]{}, consolecore.NewError(consolecore.CodeConsoleError, "The skills response could not be read.", string(scope.ID), consolecore.Details{}, diagnostics.Annotate(err, diagnostics.Facts{Cause: "response_decode", Endpoint: "skills.list"}))
 	}
 	if err := validatePage(page, validateSkillSummary); err != nil {
-		return Page[SkillSummary]{}, invalidUpstreamResponse(scope, "skills", err)
+		return Page[SkillSummary]{}, invalidUpstreamResponse(scope, "skills.list", "skills", err)
 	}
 	page.TargetScopeID = string(scope.ID)
 	if domain := scope.RequireCurrent(); domain != nil {
@@ -83,10 +84,10 @@ func (service *Service) GetSkill(ctx context.Context, scope target.Scope, regist
 	}
 	var detail SkillDetail
 	if err := json.Unmarshal(body, &detail); err != nil {
-		return SkillDetail{}, consolecore.NewError(consolecore.CodeConsoleError, "The skill detail response could not be read.", string(scope.ID), consolecore.Details{}, err)
+		return SkillDetail{}, consolecore.NewError(consolecore.CodeConsoleError, "The skill detail response could not be read.", string(scope.ID), consolecore.Details{}, diagnostics.Annotate(err, diagnostics.Facts{Cause: "response_decode", Endpoint: "skills.get"}))
 	}
 	if err := validateSkillDetail(detail, registeredName); err != nil {
-		return SkillDetail{}, invalidUpstreamResponse(scope, "skill detail", err)
+		return SkillDetail{}, invalidUpstreamResponse(scope, "skills.get", "skill detail", err)
 	}
 	detail.TargetScopeID = string(scope.ID)
 	if domain := scope.RequireCurrent(); domain != nil {
@@ -106,14 +107,14 @@ func (service *Service) ListActiveExecutions(ctx context.Context, scope target.S
 		return ActivePage{}, domain
 	}
 	if err := validateActivePageJSON(body); err != nil {
-		return ActivePage{}, invalidUpstreamResponse(scope, "active executions", err)
+		return ActivePage{}, invalidUpstreamResponse(scope, "executions.list", "active executions", err)
 	}
 	var page ActivePage
 	if err := json.Unmarshal(body, &page); err != nil {
-		return ActivePage{}, consolecore.NewError(consolecore.CodeConsoleError, "The active executions response could not be read.", string(scope.ID), consolecore.Details{}, err)
+		return ActivePage{}, consolecore.NewError(consolecore.CodeConsoleError, "The active executions response could not be read.", string(scope.ID), consolecore.Details{}, diagnostics.Annotate(err, diagnostics.Facts{Cause: "response_decode", Endpoint: "executions.list"}))
 	}
 	if err := validatePage(page.Page, validateActiveExecution); err != nil {
-		return ActivePage{}, invalidUpstreamResponse(scope, "active executions", err)
+		return ActivePage{}, invalidUpstreamResponse(scope, "executions.list", "active executions", err)
 	}
 	page.TargetScopeID = string(scope.ID)
 	for index := range page.Items {
@@ -135,17 +136,17 @@ func (service *Service) GetActiveExecution(ctx context.Context, scope target.Sco
 		return ActiveExecution{}, domain
 	}
 	if err := validateActiveExecutionJSON(body); err != nil {
-		return ActiveExecution{}, invalidUpstreamResponse(scope, "active execution detail", err)
+		return ActiveExecution{}, invalidUpstreamResponse(scope, "executions.get", "active execution detail", err)
 	}
 	var execution ActiveExecution
 	if err := json.Unmarshal(body, &execution); err != nil {
-		return ActiveExecution{}, consolecore.NewError(consolecore.CodeConsoleError, "The active execution detail response could not be read.", string(scope.ID), consolecore.Details{}, err)
+		return ActiveExecution{}, consolecore.NewError(consolecore.CodeConsoleError, "The active execution detail response could not be read.", string(scope.ID), consolecore.Details{}, diagnostics.Annotate(err, diagnostics.Facts{Cause: "response_decode", Endpoint: "executions.get"}))
 	}
 	if err := validateActiveExecution(execution); err != nil || execution.SessionID != sessionId {
 		if err == nil {
 			err = errors.New("session ID does not match the requested resource")
 		}
-		return ActiveExecution{}, invalidUpstreamResponse(scope, "active execution detail", err)
+		return ActiveExecution{}, invalidUpstreamResponse(scope, "executions.get", "active execution detail", err)
 	}
 	execution.TargetScopeID = string(scope.ID)
 	if domain := scope.RequireCurrent(); domain != nil {
@@ -166,10 +167,10 @@ func (service *Service) ListTraces(ctx context.Context, scope target.Scope, requ
 	}
 	var page Page[Trace]
 	if err := json.Unmarshal(body, &page); err != nil {
-		return Page[Trace]{}, consolecore.NewError(consolecore.CodeConsoleError, "The traces response could not be read.", string(scope.ID), consolecore.Details{}, err)
+		return Page[Trace]{}, consolecore.NewError(consolecore.CodeConsoleError, "The traces response could not be read.", string(scope.ID), consolecore.Details{}, diagnostics.Annotate(err, diagnostics.Facts{Cause: "response_decode", Endpoint: "traces.list"}))
 	}
 	if err := validatePage(page, validateTrace); err != nil {
-		return Page[Trace]{}, invalidUpstreamResponse(scope, "traces", err)
+		return Page[Trace]{}, invalidUpstreamResponse(scope, "traces.list", "traces", err)
 	}
 	page.TargetScopeID = string(scope.ID)
 	for index := range page.Items {
@@ -192,13 +193,13 @@ func (service *Service) GetTrace(ctx context.Context, scope target.Scope, traceI
 	}
 	var trace Trace
 	if err := json.Unmarshal(body, &trace); err != nil {
-		return Trace{}, consolecore.NewError(consolecore.CodeConsoleError, "The trace detail response could not be read.", string(scope.ID), consolecore.Details{}, err)
+		return Trace{}, consolecore.NewError(consolecore.CodeConsoleError, "The trace detail response could not be read.", string(scope.ID), consolecore.Details{}, diagnostics.Annotate(err, diagnostics.Facts{Cause: "response_decode", Endpoint: "traces.get"}))
 	}
 	if err := validateTrace(trace); err != nil || trace.TraceID != traceId {
 		if err == nil {
 			err = errors.New("trace ID does not match the requested resource")
 		}
-		return Trace{}, invalidUpstreamResponse(scope, "trace detail", err)
+		return Trace{}, invalidUpstreamResponse(scope, "traces.get", "trace detail", err)
 	}
 	trace.TargetScopeID = string(scope.ID)
 	if domain := scope.RequireCurrent(); domain != nil {
@@ -232,13 +233,13 @@ func buildCollectionURL(base, cursor string, pageSize int) string {
 	return base + "?" + params.Encode()
 }
 
-func invalidUpstreamResponse(scope target.Scope, resource string, err error) *consolecore.Error {
+func invalidUpstreamResponse(scope target.Scope, endpoint, resource string, err error) *consolecore.Error {
 	return consolecore.NewError(
 		consolecore.CodeConsoleError,
 		"The "+resource+" response was invalid.",
 		string(scope.ID),
 		consolecore.Details{},
-		err,
+		diagnostics.Annotate(err, diagnostics.Facts{Cause: "response_decode", Endpoint: endpoint}),
 	)
 }
 

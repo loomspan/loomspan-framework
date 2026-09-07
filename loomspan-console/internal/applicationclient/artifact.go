@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"io"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -126,7 +126,12 @@ func (stream *ArtifactStream) Close() error {
 // The returned stream is owned by the caller and must be closed to release the
 // upstream connection. Caller or scope cancellation interrupts a blocked read
 // and is surfaced as context.Canceled.
-func (client *Client) OpenArtifact(parent context.Context, traceId, instanceID string, credential Credential) (*ArtifactStream, error) {
+func (client *Client) OpenArtifact(parent context.Context, traceId, instanceID string, credential Credential) (streamResult *ArtifactStream, result error) {
+	defer func() {
+		if result != nil {
+			result = annotateFailure(result, diagnostics.Facts{Endpoint: "artifact.download", Expected: parent.Err() != nil})
+		}
+	}()
 	if credential == nil {
 		return nil, newFailure(FailureAuthentication, "", nil)
 	}
@@ -187,16 +192,10 @@ func (client *Client) OpenArtifact(parent context.Context, traceId, instanceID s
 		body, readErr := readBounded(response.Body, problemMaxBytes)
 		response.Body.Close()
 		if readErr != nil {
-			slog.Error("artifact error body read failed", "status", response.StatusCode, "limit", problemMaxBytes, "err", readErr)
 			cancel()
-			return nil, protocolFailure()
+			return nil, protocolCause(readErr)
 		}
-		failure := mapProblem(response.StatusCode, response.Header.Get("Content-Type"), body)
-		if f, ok := failure.(*Failure); ok {
-			slog.Error("artifact upstream returned non-200", "status", response.StatusCode, "failureKind", f.Kind)
-		} else {
-			slog.Error("artifact upstream returned non-200", "status", response.StatusCode)
-		}
+		failure := annotateFailure(mapProblem(response.StatusCode, response.Header.Get("Content-Type"), body), diagnostics.Facts{Status: response.StatusCode})
 		instanceIDFromHeader, identityErr := optionalResponseInstanceID(response.Header.Values(InstanceIDHeader))
 		if identityErr != nil {
 			cancel()

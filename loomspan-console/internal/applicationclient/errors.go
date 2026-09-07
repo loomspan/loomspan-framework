@@ -2,6 +2,8 @@ package applicationclient
 
 import (
 	"fmt"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
+	"sync/atomic"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
 )
@@ -9,17 +11,17 @@ import (
 type FailureKind string
 
 const (
-	FailureAuthentication             FailureKind = "authentication"
-	FailureAccess                     FailureKind = "access"
-	FailureIncompatible               FailureKind = "incompatible"
-	FailureUnavailable                FailureKind = "unavailable"
-	FailureProtocol                   FailureKind = "protocol"
-	FailureInvalidArgument            FailureKind = "invalid_argument"
-	FailureInvalidCursor              FailureKind = "invalid_cursor"
-	FailureStaleCursor                FailureKind = "stale_cursor"
-	FailureNotFound                   FailureKind = "not_found"
-	FailureLimitExceeded              FailureKind = "limit_exceeded"
-	FailureLiveMonitoringUnavailable  FailureKind = "live_monitoring_unavailable"
+	FailureAuthentication            FailureKind = "authentication"
+	FailureAccess                    FailureKind = "access"
+	FailureIncompatible              FailureKind = "incompatible"
+	FailureUnavailable               FailureKind = "unavailable"
+	FailureProtocol                  FailureKind = "protocol"
+	FailureInvalidArgument           FailureKind = "invalid_argument"
+	FailureInvalidCursor             FailureKind = "invalid_cursor"
+	FailureStaleCursor               FailureKind = "stale_cursor"
+	FailureNotFound                  FailureKind = "not_found"
+	FailureLimitExceeded             FailureKind = "limit_exceeded"
+	FailureLiveMonitoringUnavailable FailureKind = "live_monitoring_unavailable"
 )
 
 type TransportCategory string
@@ -46,6 +48,7 @@ type Failure struct {
 	Observed  string
 	Retryable bool
 	cause     error
+	claim     *atomic.Bool
 }
 
 func (failure *Failure) Error() string {
@@ -74,6 +77,18 @@ func (failure *Failure) Error() string {
 }
 
 func (failure *Failure) Unwrap() error { return failure.cause }
+
+func (failure *Failure) DiagnosticClaim() *atomic.Bool {
+	return diagnostics.ClaimOr(failure.cause, diagnostics.EnsureClaim(&failure.claim))
+}
+func (failure *Failure) DiagnosticFacts() diagnostics.Facts {
+	f := diagnostics.Facts{Classification: string(failure.Kind), Cause: string(failure.Category)}
+	switch failure.Kind {
+	case FailureAuthentication, FailureAccess, FailureInvalidArgument, FailureInvalidCursor, FailureStaleCursor, FailureNotFound, FailureLiveMonitoringUnavailable:
+		f.Expected = true
+	}
+	return f
+}
 
 func (failure *Failure) ConsoleError(scopeID string) *consolecore.Error {
 	details := consolecore.Details{TransportCategory: string(failure.Category)}
@@ -104,9 +119,24 @@ func (failure *Failure) ConsoleError(scopeID string) *consolecore.Error {
 }
 
 func newFailure(kind FailureKind, category TransportCategory, cause error) *Failure {
-	return &Failure{Kind: kind, Category: category, cause: cause}
+	return &Failure{Kind: kind, Category: category, cause: cause, claim: diagnostics.Claim(cause)}
 }
 
 func protocolFailure() *Failure {
-	return newFailure(FailureProtocol, CategoryUpstreamProtocol, fmt.Errorf("invalid upstream protocol"))
+	return newFailure(FailureProtocol, CategoryUpstreamProtocol, diagnostics.Annotate(fmt.Errorf("invalid upstream protocol"), diagnostics.Facts{Cause: "response_decode"}))
+}
+
+func protocolCause(err error) *Failure {
+	return newFailure(FailureProtocol, CategoryUpstreamProtocol, err)
+}
+func protocolReason(reason string) *Failure {
+	return protocolCause(diagnostics.Annotate(fmt.Errorf("invalid upstream protocol"), diagnostics.Facts{Cause: reason}))
+}
+
+func annotateFailure(err error, facts diagnostics.Facts) error {
+	if failure, ok := err.(*Failure); ok {
+		failure.cause = diagnostics.Annotate(failure.cause, facts)
+		return failure
+	}
+	return diagnostics.Annotate(err, facts)
 }

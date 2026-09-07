@@ -1,12 +1,14 @@
 package browserapi
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/artifact"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/browserauth"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
@@ -42,6 +44,7 @@ type storageSnapshotDTO struct {
 
 func (router *Router) artifactAcquire(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Artifacts == nil || router.options.Target == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Artifact service is unavailable.")
 		return
 	}
@@ -61,6 +64,8 @@ func (router *Router) artifactAcquire(response http.ResponseWriter, request *htt
 		writeDomainError(response, domain)
 		return
 	}
+	responseScope(response, string(scope.ID))
+	request = request.WithContext(diagnostics.WithScope(request.Context(), string(scope.ID)))
 	acquired, domain := router.options.Artifacts.Acquire(request.Context(), scope, body.TraceID)
 	if domain != nil {
 		writeDomainError(response, domain)
@@ -85,6 +90,7 @@ func (router *Router) artifactAcquire(response http.ResponseWriter, request *htt
 
 func (router *Router) artifactStorage(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Artifacts == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Artifact service is unavailable.")
 		return
 	}
@@ -112,6 +118,7 @@ func (router *Router) artifactStorage(response http.ResponseWriter, request *htt
 
 func (router *Router) artifactRemove(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Artifacts == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Artifact service is unavailable.")
 		return
 	}
@@ -141,6 +148,7 @@ func (router *Router) artifactRemove(response http.ResponseWriter, request *http
 
 func (router *Router) artifactClearExpired(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Artifacts == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Artifact service is unavailable.")
 		return
 	}
@@ -157,6 +165,7 @@ func (router *Router) artifactClearExpired(response http.ResponseWriter, request
 
 func (router *Router) artifactClearAllUnused(response http.ResponseWriter, request *http.Request, _ string) {
 	if router.options.Artifacts == nil {
+		reportUnavailable(response)
 		writeError(response, http.StatusInternalServerError, "CONSOLE_ERROR", "Artifact service is unavailable.")
 		return
 	}
@@ -173,20 +182,21 @@ func (router *Router) artifactClearAllUnused(response http.ResponseWriter, reque
 
 // enrichTracePage enriches each trace in a page with local artifact
 // availability and opaque handle from the artifact service.
-func (router *Router) enrichTracePage(scope target.ScopeID, page observability.Page[observability.Trace]) observability.Page[observability.Trace] {
+func (router *Router) enrichTracePage(ctx context.Context, scope target.ScopeID, page observability.Page[observability.Trace]) observability.Page[observability.Trace] {
 	if router.options.TraceInventory == nil {
 		return page
 	}
-	return router.options.TraceInventory.EnrichTargetCatalogPage(scope, page)
+	return router.options.TraceInventory.EnrichTargetCatalogPage(ctx, scope, page)
 }
 
 // enrichTrace enriches a single trace with local artifact availability.
-func (router *Router) enrichTrace(scope target.ScopeID, trace observability.Trace) observability.Trace {
+func (router *Router) enrichTrace(ctx context.Context, scope target.ScopeID, trace observability.Trace) observability.Trace {
 	if router.options.Artifacts == nil {
 		return trace
 	}
 	lookup, domain := router.options.Artifacts.Lookup(evidence.ForTarget(scope), trace.TraceID)
 	if domain != nil {
+		diagnostics.Report(diagnostics.WithScope(ctx, string(scope)), domain)
 		return trace
 	}
 	if lookup.LocalAvailable {
@@ -213,6 +223,7 @@ func (router *Router) resolveEvidenceReference(source string) (evidence.Referenc
 }
 
 func (router *Router) writeEvidenceJSON(response http.ResponseWriter, ref evidence.Reference, value any) {
+	responseScope(response, string(ref.TargetScope))
 	if ref.Source == evidence.SourceTarget {
 		router.writeScopedJSON(response, ref.TargetScope, value)
 		return
@@ -224,6 +235,7 @@ func (router *Router) writeEvidenceJSON(response http.ResponseWriter, ref eviden
 // evidence while ensuring the process-local imported owner ID is never exposed
 // through the browser's targetScopeId field.
 func writeEvidenceDomainError(response http.ResponseWriter, ref evidence.Reference, domain *consolecore.Error) {
+	responseScope(response, string(ref.TargetScope))
 	if ref.Source != evidence.SourceImported {
 		writeDomainError(response, domain)
 		return
@@ -234,6 +246,7 @@ func writeEvidenceDomainError(response http.ResponseWriter, ref evidence.Referen
 // writeUnscopedDomainError prevents aggregate operations from attributing an
 // error to an internal artifact owner through the browser's targetScopeId field.
 func writeUnscopedDomainError(response http.ResponseWriter, domain *consolecore.Error) {
+	diagnostics.Report(responseContext(response), domain)
 	sanitized := *domain
 	sanitized.TargetScopeID = ""
 	writeDomainError(response, &sanitized)
@@ -259,6 +272,7 @@ func (router *Router) withSessionDownload(response http.ResponseWriter, request 
 	}
 	cookie, err := request.Cookie(browserauth.SessionCookieName)
 	if err != nil || !router.options.Sessions.Authenticate(cookie.Value) {
+		diagnostics.Reject(request.Context(), "browser", "session")
 		http.SetCookie(response, browserauth.ExpiredSessionCookie())
 		writeError(response, http.StatusUnauthorized, "SESSION_REQUIRED", "Pairing is required.")
 		return

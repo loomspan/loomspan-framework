@@ -48,8 +48,8 @@ func mcpTestRouter(t *testing.T, manager MCPManager) (*Router, *http.Cookie, str
 	entropy := bytes.Repeat([]byte{11}, 32*16)
 	pairing := browserauth.NewPairing(nil, bytes.NewReader(entropy))
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
-	sessionID, _ := registry.CreateSession()
-	security, _ := registry.Bootstrap(sessionID, "")
+	sessionID, _ := registry.CreateSession(context.Background())
+	security, _ := registry.Bootstrap(context.Background(), sessionID, "")
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
 	router, err := New(Options{Policy: policy, Pairing: pairing, Sessions: registry, PairingURL: func(value string) string { return value }, MCP: manager, MCPEndpoint: "http://127.0.0.1:7943/mcp"})
 	if err != nil {
