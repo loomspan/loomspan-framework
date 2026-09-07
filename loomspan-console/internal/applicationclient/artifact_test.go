@@ -77,7 +77,7 @@ func (reader *guardedChunkReader) Close() error {
 func artifactServer(handler http.HandlerFunc) (*httptest.Server, *Client, Address) {
 	server := httptest.NewServer(handler)
 	address, _ := NormalizeAddress(server.URL)
-	client, _ := New(address, testPolicy(), "0.1.0-SNAPSHOT")
+	client, _ := New(address, testPolicy(), "1.0.0-beta.1")
 	return server, client, address
 }
 
@@ -195,7 +195,7 @@ func TestOpenArtifactBodyOutlivesBoundedJSONRequestTimeout(t *testing.T) {
 	address, _ := NormalizeAddress(server.URL)
 	policy := testPolicy()
 	policy.RequestTimeout = 10 * time.Millisecond
-	client, err := New(address, policy, "0.1.0-SNAPSHOT")
+	client, err := New(address, policy, "1.0.0-beta.1")
 	if err != nil {
 		t.Fatal(err)
 	}

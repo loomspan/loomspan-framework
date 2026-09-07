@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -15,7 +17,6 @@ import xml.etree.ElementTree as ET
 
 MODULE_POMS = (
     Path("loomspan-spring-boot-starter/pom.xml"),
-    Path("loomspan-sample/pom.xml"),
 )
 VERSIONED_SKILLS = (
     Path("loomspan-console/agent-skills/loomspan/SKILL.md"),
@@ -141,10 +142,46 @@ def require_clean_worktree(root: Path) -> None:
 
 
 def tracked_text_files_containing(root: Path, value: str) -> tuple[Path, ...]:
-    result = _git(root, ["grep", "-Il", "-F", "-e", value, "--"], check=False)
+    result = _git(root, ["grep", "-Il", "-F", "-e", value, "--", ".",
+                         ":(exclude)loomspan-console/agent-evals/results/**"], check=False)
     if result.returncode not in (0, 1):
         raise VersionCommandError(result.stderr.strip() or "Cannot inspect tracked version files")
     return tuple(root / line for line in result.stdout.splitlines() if line)
+
+
+def refresh_fixture_metadata(root: Path, replacements: dict[Path, bytes]) -> None:
+    """Refresh byte-derived metadata against the proposed versioned fixtures."""
+    def content(path: Path) -> bytes:
+        return replacements[path] if path in replacements else path.read_bytes()
+
+    artifact = root / "loomspan-console-fixtures/application-artifact/download-response.json"
+    if artifact.is_file():
+        raw = content(artifact)
+        metadata = json.loads(raw)
+        body = (artifact.parent / metadata["bodyFixture"]).resolve()
+        if not body.is_relative_to(root):
+            raise VersionCommandError("Artifact fixture body must stay within the repository")
+        length = len(content(body))
+        updated = re.sub(rb'("Content-Length"\s*:\s*)\d+',
+                         lambda match: match[1] + str(length).encode(), raw)
+        if updated != raw:
+            replacements[artifact] = updated
+
+    evaluations = root / "loomspan-console/agent-evals"
+    manifests = [evaluations / "fixtures.json", *sorted((evaluations / "cases").glob("*.json"))]
+    for manifest in manifests:
+        if not manifest.is_file():
+            continue
+        raw = content(manifest)
+        updated = raw
+        for fixture in json.loads(raw)["fixtures"]:
+            path = (root / fixture["path"]).resolve()
+            if not path.is_relative_to(root):
+                raise VersionCommandError("Evaluation fixture must stay within the repository")
+            digest = hashlib.sha256(content(path)).hexdigest()
+            updated = updated.replace(fixture["sha256"].encode(), digest.encode())
+        if updated != raw:
+            replacements[manifest] = updated
 
 
 def set_version(root: Path, new_version: str) -> tuple[Path, ...]:
@@ -174,6 +211,8 @@ def set_version(root: Path, new_version: str) -> tuple[Path, ...]:
             raise VersionCommandError(f"Tracked version disappeared from {path}")
         replacements[path] = content.replace(old_bytes, new_bytes)
 
+    refresh_fixture_metadata(root, replacements)
+
     for path, content in replacements.items():
         mode = path.stat().st_mode
         temporary = path.with_name(path.name + ".loomspan-version-tmp")
@@ -186,7 +225,7 @@ def set_version(root: Path, new_version: str) -> tuple[Path, ...]:
                 temporary.unlink()
 
     check_consistency(root, new_version)
-    return files
+    return tuple(replacements)
 
 
 def create_tag(root: Path, version: str) -> str:

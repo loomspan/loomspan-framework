@@ -94,14 +94,33 @@ func Score(record *Record, caseValue Case) error {
 }
 
 func ValidateResults(records []Record, cases map[string]Case) error {
-	if len(records) != len(cases) {
-		return fmt.Errorf("result matrix has %d records, want %d", len(records), len(cases))
-	}
-	seen := map[string]bool{}
 	expectedSkillDigest, err := RuntimeSkillDigest()
 	if err != nil {
 		return err
 	}
+	return validateResults(records, cases, expectedSkillDigest)
+}
+
+// ValidateHistoricalReplay verifies recorded replays against their preserved
+// package. It does not establish evaluation coverage of the current package.
+func ValidateHistoricalReplay(records []Record, cases map[string]Case, packageDirectory string) error {
+	for _, record := range records {
+		if record.EventStreamKind != "deterministic-replay" {
+			return fmt.Errorf("historical replay verification requires deterministic-replay records")
+		}
+	}
+	digest, err := skillPackageDigest(packageDirectory)
+	if err != nil {
+		return err
+	}
+	return validateResults(records, cases, digest)
+}
+
+func validateResults(records []Record, cases map[string]Case, expectedSkillDigest string) error {
+	if len(records) != len(cases) {
+		return fmt.Errorf("result matrix has %d records, want %d", len(records), len(cases))
+	}
+	seen := map[string]bool{}
 	type pairMetadata struct{ client, clientBuild, model, consoleCommit string }
 	pairs := map[string]pairMetadata{}
 	var checkoutIdentity string
@@ -118,7 +137,7 @@ func ValidateResults(records []Record, cases map[string]Case) error {
 			return fmt.Errorf("result matrix contains multiple checkout identities")
 		}
 		if record.Mode == "skill-assisted" && record.SkillDigest != expectedSkillDigest {
-			return fmt.Errorf("%s skill digest does not match the canonical package", record.CaseID)
+			return fmt.Errorf("%s skill digest does not match the verification package", record.CaseID)
 		}
 		metadata := pairMetadata{record.Client, record.ClientBuild, record.Model, record.ConsoleCommit}
 		if previous, ok := pairs[caseValue.PairID]; ok && previous != metadata {

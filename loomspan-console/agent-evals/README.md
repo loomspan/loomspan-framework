@@ -12,10 +12,18 @@ answer evidence and an observed result-hash reference for each reviewed
 criterion, and unedited final answers—never MCP keys,
 headers, absolute paths, payloads, or internal evidence selectors.
 
-Run `go run ./internal/buildtool agent-eval verify --results agent-evals/results/2026-09-05`
+Run `go run ./internal/buildtool agent-eval verify-replay --results agent-evals/results/2026-09-05`
 to validate cases, rescore records without relying on prose or call order, and
-verify the committed deterministic paired replay matrix. These checked-in
+verify the committed historical deterministic paired replay matrix against its
+preserved `skill-package` directory. Its digest must exactly match the records;
+only deterministic replay records are accepted in this mode. These checked-in
 records are explicitly labeled repository replays and contain replay metadata,
 not complete native event evidence or fresh provider/client conversations. `serve` creates a protected loopback production MCP
 adapter session; `record`, `score`, and `summarize` are explicit local evidence
 operations. CI never invokes a remote model.
+
+Use `agent-eval verify --results <directory>` for a current-package evaluation.
+That command still requires the complete current skill-package digest. Historical
+replay verification does not establish current-release model or client quality.
+Version changes preserve dated records and their archived packages; they refresh
+only current case fixture checksums and generated transport lengths.

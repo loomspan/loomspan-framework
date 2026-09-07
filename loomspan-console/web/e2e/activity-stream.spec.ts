@@ -21,7 +21,7 @@ const test = consoleTest.extend<{ targetApplication: { origin: string; close(): 
       if (path === "/_loomspan/observability/v1/instance") {
         response.writeHead(200, headers);
         response.end(
-          '{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"0.1.0-SNAPSHOT","observedAt":"2026-07-27T00:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}',
+          '{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-27T00:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}',
         );
         return;
       }

@@ -8,7 +8,8 @@ func TestValidateProductVersion(t *testing.T) {
 		value   string
 		wantErr bool
 	}{
-		{name: "snapshot", value: "0.1.0-SNAPSHOT"},
+		{name: "beta", value: "1.0.0-beta.1"},
+		{name: "snapshot", value: "9.8.7-SNAPSHOT"},
 		{name: "prerelease and build", value: "1.2.3-rc.1+build.7"},
 		{name: "blank", value: "", wantErr: true},
 		{name: "whitespace", value: " 0.1.0", wantErr: true},
@@ -28,11 +29,11 @@ func TestValidateProductVersion(t *testing.T) {
 }
 
 func TestVersionPreservesCompleteQualifier(t *testing.T) {
-	const version = "0.1.0-SNAPSHOT"
+	const version = "1.0.0-beta.1"
 	if err := ValidateProductVersion(version); err != nil {
 		t.Fatal(err)
 	}
-	if got := version; got != "0.1.0-SNAPSHOT" {
+	if got := version; got != "1.0.0-beta.1" {
 		t.Fatalf("version = %q", got)
 	}
 }

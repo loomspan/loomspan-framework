@@ -22,7 +22,7 @@ Use the following evidence order:
 1. **This knowledge base** explains intended authoring semantics, design judgment, and recommended patterns.
 2. **Focused tests** demonstrate behavior the repository deliberately protects.
 3. **Valid and invalid fixtures** demonstrate accepted and rejected manifest shapes.
-4. **Samples** demonstrate composition in representative applications.
+4. **Application examples**, when available for the matching framework version, demonstrate composition in representative applications.
 5. **Production source** resolves exact runtime behavior and edge cases.
 
 The executable framework remains authoritative for what the corresponding revision accepts and does. If this guide conflicts with matching tests or production code, do not silently choose one. Report the conflict, identify whether it affects authoring advice, and treat it as documentation drift or a possible framework defect.

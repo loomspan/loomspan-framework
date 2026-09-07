@@ -65,7 +65,7 @@ class ObservabilityPhaseOneIntegrationTest
         HttpResponse<byte[]> instance = get(ObservabilityApiPaths.INSTANCE, "application/json");
         assertThat(instance.statusCode()).isEqualTo(200);
         JsonNode status = json.readTree(instance.body());
-        assertThat(status.get("consoleCompatibilityVersion").asText()).isEqualTo("0.1.0-SNAPSHOT");
+        assertThat(status.get("consoleCompatibilityVersion").asText()).isEqualTo("1.0.0-beta.1");
         String instanceId = status.get("instanceId").asText();
 
         String activityPath = ObservabilityApiPaths.ACTIVITY

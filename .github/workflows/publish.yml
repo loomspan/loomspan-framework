@@ -1,0 +1,78 @@
+name: Maven Central Release
+
+on:
+  push:
+    tags: ["v*"]
+  # Manual runs only verify the build; they never access publishing secrets.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maven-central-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - name: Check coordinated versions
+        run: |
+          python scripts/loomspan_version.py check
+          python -m unittest discover scripts/tests -v
+      - name: Check release tag against committed Maven version
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from scripts.loomspan_version import read_root_version
+          version = read_root_version(Path.cwd())
+          if "SNAPSHOT" in version.upper():
+              raise SystemExit("A release tag cannot publish a SNAPSHOT version")
+          if os.environ["GITHUB_REF"] != f"refs/tags/v{version}":
+              raise SystemExit("Release tag must match the committed Maven version")
+          PY
+      - name: Verify all Java modules, including API architecture
+        run: ./mvnw --batch-mode --no-transfer-progress clean verify
+      - name: Verify release sources and Javadoc without signing or uploading
+        run: ./mvnw --batch-mode --no-transfer-progress -Prelease -pl loomspan-spring-boot-starter -am -DskipTests -Dgpg.skip=true verify
+
+  upload:
+    name: Upload for manual publication in Sonatype
+    needs: verify
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          server-id: central
+          server-username: CENTRAL_TOKEN_USERNAME
+          server-password: CENTRAL_TOKEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Sign and upload parent POM and starter
+        run: ./mvnw --batch-mode --no-transfer-progress -Prelease -pl loomspan-spring-boot-starter -am -DskipTests deploy
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Describe remaining publication step
+        run: echo 'Upload validated. Review the deployment at https://central.sonatype.com/publishing/deployments and publish it manually.' >> "$GITHUB_STEP_SUMMARY"

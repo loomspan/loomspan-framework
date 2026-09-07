@@ -65,8 +65,12 @@ func RuntimeSkillDigest() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	hash := sha256.New()
 	root := filepath.Join(repo, "loomspan-console", "agent-skills", agentskills.RuntimeDebuggingSkillName)
+	return skillPackageDigest(root)
+}
+
+func skillPackageDigest(root string) (string, error) {
+	hash := sha256.New()
 	for _, name := range agentskills.RuntimeDebuggingFiles {
 		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
 		if err != nil {

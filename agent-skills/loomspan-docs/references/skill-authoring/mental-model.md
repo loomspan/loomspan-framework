@@ -169,7 +169,7 @@ Do not automatically treat repeated business inputs as runtime metadata. Explici
 - `SkillMethodBeanPostProcessor` and its focused tests protect exact names, canonical discovery, reflection, final-proxy invocation, and Java policies.
 - `YamlSkillCatalog` validates model-backed manifests and rejects legacy mappings. `YamlSkillCapabilityRegistrar#completeRegistration` finishes discovery and validates cross-source child references.
 - `DefaultSkillVisibilityResolver` filters the local shared child surface. `CapabilityExecutionRouter` and `ExecutionCoordinator` own dispatch and common isolated mission boundaries.
-- `SupportedSurfaceIntegrationTest` and `SampleApplicationTests` demonstrate application methods called through the supported facade.
+- `SupportedSurfaceIntegrationTest` demonstrates application methods called through the supported facade.
 - `DefaultRegisteredSkillCatalogTest`, `ConsoleRestFixtureCorpusTest`, and Console component tests cover both diagnostic source variants.
 
 ## Coverage Boundary

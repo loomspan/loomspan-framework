@@ -6,7 +6,6 @@ target/
 !loomspan-console/web/src/target/**
 !loomspan-console/browser-fixtures/target/
 !loomspan-console/browser-fixtures/target/**
-biforst-sample/target/
 loomspan-spring-boot-starter/target/
 *.jar
 *.war

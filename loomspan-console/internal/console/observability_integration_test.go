@@ -32,7 +32,7 @@ func TestObservabilityRoutesDoNotLeakApplicationCredential(t *testing.T) {
 		response.Header().Set("Content-Type", "application/json")
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"0.1.0-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 			return
 		}
 		_, _ = response.Write(fixture)
@@ -42,7 +42,7 @@ func TestObservabilityRoutesDoNotLeakApplicationCredential(t *testing.T) {
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "0.1.0-SNAPSHOT")
+		return applicationclient.New(address, policy, "1.0.0-beta.1")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +112,7 @@ func TestScopeOpenArtifactStreamsJavaProducedFixtureBytesThroughCompositionRoot(
 		}
 		response.Header().Set(applicationclient.InstanceIDHeader, instanceID)
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"0.1.0-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 	}))
 	defer server.Close()
 
@@ -120,7 +120,7 @@ func TestScopeOpenArtifactStreamsJavaProducedFixtureBytesThroughCompositionRoot(
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 30 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "0.1.0-SNAPSHOT")
+		return applicationclient.New(address, policy, "1.0.0-beta.1")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -181,7 +181,7 @@ func TestScopeOpenArtifactRejectsIncompatibleTarget(t *testing.T) {
 		}
 		response.Header().Set(applicationclient.InstanceIDHeader, instanceID)
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"0.1.0-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 	}))
 	defer server.Close()
 

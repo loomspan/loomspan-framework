@@ -74,7 +74,7 @@ class ObservabilityRestIntegrationTest
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(header().exists(ObservabilityApiKeyFilter.INSTANCE_HEADER))
-                .andExpect(jsonPath("$.consoleCompatibilityVersion").value("0.1.0-SNAPSHOT"))
+                .andExpect(jsonPath("$.consoleCompatibilityVersion").value("1.0.0-beta.1"))
                 .andExpect(jsonPath("$.registeredSkillCount").value(1))
                 .andExpect(jsonPath("$.completionGraceTtl").value("PT15M"));
     }

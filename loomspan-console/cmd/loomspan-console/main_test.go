@@ -28,7 +28,7 @@ func TestRunRejectsInvalidAssetsBeforeListen(t *testing.T) {
 	listened := false
 	sentinel := errors.New("invalid assets")
 	err := run(context.Background(), nil, &bytes.Buffer{}, runtimeDependencies{
-		version: "0.1.0-SNAPSHOT",
+		version: "1.0.0-beta.1",
 		verify:  func() error { return sentinel },
 		serve: func(context.Context, console.Options) error {
 			listened = true
@@ -43,7 +43,7 @@ func TestRunRejectsInvalidAssetsBeforeListen(t *testing.T) {
 func TestRunStartsOnlyAfterAssetValidation(t *testing.T) {
 	validated := false
 	err := run(context.Background(), []string{"--listen", "127.0.0.1:0"}, &bytes.Buffer{}, runtimeDependencies{
-		version: "0.1.0-SNAPSHOT",
+		version: "1.0.0-beta.1",
 		verify: func() error {
 			validated = true
 			return nil
@@ -64,7 +64,7 @@ func TestVersionFlagPrintsInjectedProductVersion(t *testing.T) {
 	var output bytes.Buffer
 	listened := false
 	err := run(context.Background(), []string{"--version"}, &output, runtimeDependencies{
-		version: "0.1.0-SNAPSHOT",
+		version: "1.0.0-beta.1",
 		verify:  func() error { return nil },
 		serve: func(context.Context, console.Options) error {
 			listened = true
@@ -74,7 +74,7 @@ func TestVersionFlagPrintsInjectedProductVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if output.String() != "0.1.0-SNAPSHOT\n" || listened {
+	if output.String() != "1.0.0-beta.1\n" || listened {
 		t.Fatalf("output=%q listened=%v", output.String(), listened)
 	}
 }
@@ -91,7 +91,7 @@ func TestRunPassesCLIOverridesToService(t *testing.T) {
 		"--prompt-for-application-key",
 		"--target-address", "http://127.0.0.1:8080/context",
 	}, &bytes.Buffer{}, runtimeDependencies{
-		version: "0.1.0-SNAPSHOT",
+		version: "1.0.0-beta.1",
 		verify:  func() error { return nil },
 		serve: func(_ context.Context, received console.Options) error {
 			options = received
@@ -129,7 +129,7 @@ func TestRunRejectsInvalidTargetFormDefaultsBeforeService(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			served := false
 			err := run(context.Background(), test.arguments, &bytes.Buffer{}, runtimeDependencies{
-				version: "0.1.0-SNAPSHOT",
+				version: "1.0.0-beta.1",
 				verify:  func() error { return nil },
 				serve: func(context.Context, console.Options) error {
 					served = true
@@ -147,7 +147,7 @@ func TestRunRejectsInvalidTargetFormDefaultsBeforeService(t *testing.T) {
 func TestRunRejectsDevelopmentOriginBeforeService(t *testing.T) {
 	served := false
 	err := run(context.Background(), []string{"--development-origin", "http://localhost:5173"}, &bytes.Buffer{}, runtimeDependencies{
-		version: "0.1.0-SNAPSHOT",
+		version: "1.0.0-beta.1",
 		verify:  func() error { return nil },
 		serve: func(context.Context, console.Options) error {
 			served = true

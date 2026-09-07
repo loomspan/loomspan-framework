@@ -201,12 +201,12 @@ func TestExecutionActivityMaximumPageStopsAtCompleteItemsAndContinues(t *testing
 			return
 		}
 		response.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(response, `{"instanceId":%q,"consoleCompatibilityVersion":"0.1.0-SNAPSHOT","observedAt":"2026-08-13T20:00:00Z","liveMonitoringAvailable":true}`, mcpTestInstanceID)
+		fmt.Fprintf(response, `{"instanceId":%q,"consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-08-13T20:00:00Z","liveMonitoringAvailable":true}`, mcpTestInstanceID)
 	}))
 	defer applicationServer.Close()
 	policy := applicationclient.NetworkPolicy{ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: time.Second}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "0.1.0-SNAPSHOT")
+		return applicationclient.New(address, policy, "1.0.0-beta.1")
 	}, func() (target.ScopeID, error) { return "scope-1", nil }, time.Now)
 	if err != nil {
 		t.Fatal(err)

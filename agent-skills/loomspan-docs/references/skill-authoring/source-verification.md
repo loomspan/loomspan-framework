@@ -15,7 +15,7 @@ Open source access gives a SkillBuilder the ability to verify Loomspan rather th
 
 ## Repository Alignment
 
-This project has no production release yet. Use the guide, tests, samples, and source from the same repository revision. In a Loomspan source checkout, inspect that checkout. In a consumer project, inspect the official Loomspan GitHub tag matching the Maven dependency once releases exist. If matching source is unavailable, keep the answer within the bundled guide's documented coverage and state the limitation.
+This project has no production release yet. Use the guide, tests, fixtures, and source from the same repository revision. In a Loomspan source checkout, inspect that checkout. In a consumer project, inspect the official Loomspan GitHub tag matching the Maven dependency once releases exist. If matching source is unavailable, keep the answer within the bundled guide's documented coverage and state the limitation.
 
 Do not mix bundled documentation with source from another branch, stale clone, fork, or remote default branch without stating the mismatch. When releases exist, inspect the tag that corresponds to the developer's Loomspan dependency.
 
@@ -45,7 +45,7 @@ Tests are strong evidence of intended behavior, but they may have incomplete cov
 
 ### 3. Inspect fixtures and implemented samples
 
-Use fixtures to learn accepted and rejected syntax. Use samples to learn composition patterns.
+Use fixtures to learn accepted and rejected syntax. When separate application examples are available, verify their Loomspan dependency version before using them to learn composition patterns. Do not assume an example application is included in the framework checkout.
 
 Distinguish:
 

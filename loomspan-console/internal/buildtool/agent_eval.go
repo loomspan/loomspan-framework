@@ -16,15 +16,15 @@ import (
 
 func runAgentEval(arguments []string) error {
 	if len(arguments) == 0 {
-		return fmt.Errorf("usage: agent-eval <serve|record|score|verify|summarize>")
+		return fmt.Errorf("usage: agent-eval <serve|record|score|verify|verify-replay|summarize>")
 	}
 	cases, err := agenteval.LoadCases()
 	if err != nil {
 		return err
 	}
 	switch arguments[0] {
-	case "verify":
-		flags := flag.NewFlagSet("agent-eval verify", flag.ContinueOnError)
+	case "verify", "verify-replay":
+		flags := flag.NewFlagSet("agent-eval "+arguments[0], flag.ContinueOnError)
 		results := flags.String("results", "", "dated result directory")
 		if err := flags.Parse(arguments[1:]); err != nil {
 			return err
@@ -32,7 +32,7 @@ func runAgentEval(arguments []string) error {
 		if *results == "" {
 			return fmt.Errorf("verify requires --results")
 		}
-		return verifyAgentEvalResults(*results, cases)
+		return verifyAgentEvalResults(*results, cases, arguments[0] == "verify-replay")
 	case "score":
 		flags := flag.NewFlagSet("agent-eval score", flag.ContinueOnError)
 		name := flags.String("record", "", "record file")
@@ -145,12 +145,17 @@ func readAgentEvalRecords(directory string, cases map[string]agenteval.Case) ([]
 	}
 	return records, nil
 }
-func verifyAgentEvalResults(directory string, cases map[string]agenteval.Case) error {
+func verifyAgentEvalResults(directory string, cases map[string]agenteval.Case, historicalReplay bool) error {
 	records, err := readAgentEvalRecords(directory, cases)
 	if err != nil {
 		return err
 	}
-	if err := agenteval.ValidateResults(records, cases); err != nil {
+	if historicalReplay {
+		err = agenteval.ValidateHistoricalReplay(records, cases, filepath.Join(directory, "skill-package"))
+	} else {
+		err = agenteval.ValidateResults(records, cases)
+	}
+	if err != nil {
 		return err
 	}
 	want := renderAgentEvalSummary(records)
@@ -159,6 +164,9 @@ func verifyAgentEvalResults(directory string, cases map[string]agenteval.Case) e
 		return err
 	}
 	if string(got) != want {
+		if historicalReplay {
+			return fmt.Errorf("historical summary.md is stale relative to the preserved records")
+		}
 		return fmt.Errorf("summary.md is stale; run agent-eval summarize")
 	}
 	return nil

@@ -203,7 +203,7 @@ func fixtureTraceParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"0.1.0-SNAPSHOT"`), []byte(`"consoleCompatibilityVersion":"development"`))
+	raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"1.0.0-beta.1"`), []byte(`"consoleCompatibilityVersion":"development"`))
 	h := newRealSemanticHarnessFromRaw(t, raw)
 	options := newMCPTestOptions(t, nil)
 	options.TraceAnalysis = h.analysis
@@ -315,7 +315,7 @@ func TestPlanAndSearchAdaptersPreserveSameSemantics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"0.1.0-SNAPSHOT"`), []byte(`"consoleCompatibilityVersion":"development"`))
+	raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"1.0.0-beta.1"`), []byte(`"consoleCompatibilityVersion":"development"`))
 	h := newRealSemanticHarnessFromRaw(t, raw)
 	options := newMCPTestOptions(t, nil)
 	options.TraceAnalysis = h.analysis
@@ -381,7 +381,7 @@ func TestValidationOutcomeStatusIsConsistentAcrossMCPAndBrowser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"0.1.0-SNAPSHOT"`), []byte(`"consoleCompatibilityVersion":"development"`))
+	raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"1.0.0-beta.1"`), []byte(`"consoleCompatibilityVersion":"development"`))
 	h := newRealSemanticHarnessFromRaw(t, raw)
 	options := newMCPTestOptions(t, nil)
 	options.TraceAnalysis = h.analysis
@@ -436,7 +436,7 @@ func TestFrameRetryMinimumAndAttemptFailureFallbackUseRealParsedFacts(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"0.1.0-SNAPSHOT"`), []byte(`"consoleCompatibilityVersion":"development"`))
+		raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"1.0.0-beta.1"`), []byte(`"consoleCompatibilityVersion":"development"`))
 		h := newRealSemanticHarnessFromRaw(t, raw)
 		options := newMCPTestOptions(t, nil)
 		options.TraceAnalysis = h.analysis
@@ -456,7 +456,7 @@ func TestFrameRetryMinimumAndAttemptFailureFallbackUseRealParsedFacts(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"0.1.0-SNAPSHOT"`), []byte(`"consoleCompatibilityVersion":"development"`))
+		raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"1.0.0-beta.1"`), []byte(`"consoleCompatibilityVersion":"development"`))
 		h := newRealSemanticHarnessFromRaw(t, raw)
 		options := newMCPTestOptions(t, nil)
 		options.TraceAnalysis = h.analysis
@@ -492,7 +492,7 @@ func TestRecoveredProviderAttemptDiagnosticUsesExistingRecordAndContentTools(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"0.1.0-SNAPSHOT"`), []byte(`"consoleCompatibilityVersion":"development"`))
+	raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"1.0.0-beta.1"`), []byte(`"consoleCompatibilityVersion":"development"`))
 	h := newRealSemanticHarnessFromRaw(t, raw)
 	options := newMCPTestOptions(t, nil)
 	options.TraceAnalysis = h.analysis
@@ -620,7 +620,7 @@ func assertSemanticFactFixture(t *testing.T, name string) map[string]int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"0.1.0-SNAPSHOT"`), []byte(`"consoleCompatibilityVersion":"development"`))
+	raw = bytes.ReplaceAll(raw, []byte(`"consoleCompatibilityVersion":"1.0.0-beta.1"`), []byte(`"consoleCompatibilityVersion":"development"`))
 	h := newRealSemanticHarnessFromRaw(t, raw)
 	options := newMCPTestOptions(t, nil)
 	options.TraceAnalysis = h.analysis
