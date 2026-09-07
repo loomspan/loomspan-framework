@@ -134,7 +134,7 @@ function makeTargetServer(initial: TargetState) {
     if (pathname === "/_loomspan/observability/v1/skills") {
       response.writeHead(200, headers);
       response.end(JSON.stringify({
-        items: [{ registeredName: "root.skill", sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml", href: "skills/root.skill" }],
+        items: [{ registeredName: "root.skill", source: "YAML", sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml", href: "skills/root.skill" }],
         hasMore: false, nextCursor: null, observedAt: "2026-07-27T00:00:00Z",
       }));
       return;
@@ -143,6 +143,7 @@ function makeTargetServer(initial: TargetState) {
       response.writeHead(200, headers);
       response.end(JSON.stringify({
         registeredName: "root.skill",
+        source: "YAML",
         sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml",
         yaml: "name: root.skill\ninstructions: '<script>window.location=\\\"https://attacker.invalid\\\"</script><a href=\\\"/target\\\">connect</a>'\n",
       }));
@@ -366,7 +367,9 @@ test("WF-AS-01E acquired trace opens bounded explorer evidence without exposing 
   await expect(page.getByText("handle-abc")).toHaveCount(0);
   await page.getByRole("tab", { name: "Records" }).click();
   await expect(page.getByRole("heading", { name: "Records" })).toBeVisible();
-  await page.getByRole("button", { name: "Read raw record" }).first().click();
+  await page.getByRole("checkbox", { name: "Show all records" }).check();
+  await page.getByRole("row", { name: "Record 1, TRACE_STARTED", exact: true })
+    .getByRole("button", { name: "Read raw record" }).click();
   const rawRecord = page.getByRole("region", { name: "Raw record 1" });
   await expect(rawRecord).toBeVisible();
   await expect(rawRecord.getByRole("link")).toHaveCount(0);
