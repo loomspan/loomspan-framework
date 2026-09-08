@@ -17,7 +17,7 @@ func TestEvaluationServerUsesProductionAdapterAndThirteenTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	server, err := StartServer(t.TempDir(), cases["finalized-tools-only"], "1.0.0-beta.2-SNAPSHOT")
+	server, err := StartServer(t.TempDir(), cases["finalized-tools-only"], "1.0.0-beta.2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestLiveEvaluationCaseServesCompleteBranchesThroughProductionAdapter(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	server, err := StartServer(t.TempDir(), cases["live-tools-only"], "1.0.0-beta.2-SNAPSHOT")
+	server, err := StartServer(t.TempDir(), cases["live-tools-only"], "1.0.0-beta.2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestImportedEvaluationCasePresentsAmbiguousSameTimeCandidates(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	server, err := StartServer(t.TempDir(), cases["imported-tools-only"], "1.0.0-beta.2-SNAPSHOT")
+	server, err := StartServer(t.TempDir(), cases["imported-tools-only"], "1.0.0-beta.2")
 	if err != nil {
 		t.Fatal(err)
 	}

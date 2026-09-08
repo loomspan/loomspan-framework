@@ -54,7 +54,7 @@ Add the starter to your application:
 <dependency>
     <groupId>ai.loomspan</groupId>
     <artifactId>loomspan-spring-boot-starter</artifactId>
-    <version>1.0.0-beta.2-SNAPSHOT</version>
+    <version>1.0.0-beta.2</version>
 </dependency>
 ```
 
@@ -217,10 +217,10 @@ bootstrap version list to update.
 
 Keep the project on the next anticipated beta version with `-SNAPSHOT` during
 normal development. Remove that suffix when preparing the beta release. The
-current development version is `1.0.0-beta.2-SNAPSHOT`. A complete beta cycle looks like:
+current development version is `1.0.0-beta.2`. A complete beta cycle looks like:
 
 ```text
-1.0.0-beta.2-SNAPSHOT -> 1.0.0-beta.2 -> tag v1.0.0-beta.2 -> 1.0.0-beta.3-SNAPSHOT
+1.0.0-beta.2 -> 1.0.0-beta.2 -> tag v1.0.0-beta.2 -> 1.0.0-beta.3-SNAPSHOT
 ```
 
 Starting from a clean development snapshot worktree, prepare the release.

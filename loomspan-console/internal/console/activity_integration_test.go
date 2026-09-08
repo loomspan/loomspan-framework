@@ -33,7 +33,7 @@ func TestActivitySSEEndToEndRelay(t *testing.T) {
 		}
 		response.Header().Set(applicationclient.InstanceIDHeader, instanceID)
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.2","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 	}))
 	defer server.Close()
 
@@ -41,7 +41,7 @@ func TestActivitySSEEndToEndRelay(t *testing.T) {
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.2-SNAPSHOT")
+		return applicationclient.New(address, policy, "1.0.0-beta.2")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +126,7 @@ func TestActivitySSEStreamEndToEndWithTabHeader(t *testing.T) {
 		}
 		response.Header().Set(applicationclient.InstanceIDHeader, instanceID)
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.2","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 	}))
 	defer server.Close()
 
@@ -134,7 +134,7 @@ func TestActivitySSEStreamEndToEndWithTabHeader(t *testing.T) {
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.2-SNAPSHOT")
+		return applicationclient.New(address, policy, "1.0.0-beta.2")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -286,7 +286,7 @@ func TestActivitySSEStreamDoesNotTreatLifetimeThroughputAsBackpressure(t *testin
 		}
 		response.Header().Set(applicationclient.InstanceIDHeader, instanceID)
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.2","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 	}))
 	defer server.Close()
 
@@ -294,7 +294,7 @@ func TestActivitySSEStreamDoesNotTreatLifetimeThroughputAsBackpressure(t *testin
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 30 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.2-SNAPSHOT")
+		return applicationclient.New(address, policy, "1.0.0-beta.2")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -410,7 +410,7 @@ func TestCommittedTerminalActivityUsesCanonicalApplicationTraceAvailability(t *t
 	address, _ := applicationclient.NormalizeAddress(server.URL)
 	client, _ := applicationclient.New(address, applicationclient.NetworkPolicy{
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: time.Second,
-	}, "1.0.0-beta.2-SNAPSHOT")
+	}, "1.0.0-beta.2")
 	defer client.Close()
 
 	stream, err := client.OpenActivity(context.Background(), instanceID, "0", testCredentialValue())

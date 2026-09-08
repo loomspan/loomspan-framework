@@ -151,7 +151,7 @@ class ConsoleRestFixtureCorpusTest
                 TracePersistencePolicy.ONERROR, Instant.parse("2026-07-25T12:15:00Z"));
 
         result.put("instance-status.json", new ObservabilityDtos.InstanceStatus(
-                "11111111-1111-4111-8111-111111111111", "1.0.0-beta.2-SNAPSHOT", OBSERVED, true,
+                "11111111-1111-4111-8111-111111111111", "1.0.0-beta.2", OBSERVED, true,
                 1, 1, 1, TracePersistencePolicy.ONERROR, Duration.ofMinutes(15), Duration.ofHours(24)));
         result.put("skills-page.json", new ObservabilityDtos.Page<>(List.of(skill, new ObservabilityDtos.SkillSummary(
                 "LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", "skills/LookupDns")), false, null, OBSERVED));

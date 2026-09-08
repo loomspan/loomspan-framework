@@ -3,7 +3,7 @@ name: loomspan-docs
 description: Prepare and consult version-aligned Loomspan framework documentation. Use when a developer asks to read up on a Loomspan knowledge set such as skill-authoring or java-api, or needs grounded guidance for designing, invoking, reviewing, implementing, or diagnosing Loomspan skills and application integrations. Use the separate loomspan skill for live runtime inspection.
 license: Apache-2.0
 metadata:
-  loomspan-version: "1.0.0-beta.2-SNAPSHOT"
+  loomspan-version: "1.0.0-beta.2"
 ---
 
 # Loomspan framework documentation
