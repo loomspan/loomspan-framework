@@ -73,6 +73,9 @@ jobs:
       - name: Verify native MCP credential and lifecycle behavior
         working-directory: loomspan-console
         run: go test ./internal/mcpcredential ./internal/mcpadapter ./internal/console ./internal/webhost
+      - name: Verify native skill validation and release tooling
+        working-directory: loomspan-console
+        run: go test ./internal/agentskills ./internal/buildtool
 
   mcp-conformance:
     runs-on: ubuntu-latest

@@ -74,6 +74,11 @@ func TestRuntimeDebuggingSkillMatchesInstalledPR52Contract(t *testing.T) {
 }
 
 func TestRuntimeDebuggingSkillValidationRejectsUnsafeAndNonPortableVariants(t *testing.T) {
+	t.Run("valid temporary copy", func(t *testing.T) {
+		if err := ValidateRuntimeDebugging(copyCanonical(t)); err != nil {
+			t.Fatal(err)
+		}
+	})
 	tests := []struct {
 		name   string
 		mutate func(*testing.T, string)
@@ -107,6 +112,16 @@ func TestRuntimeDebuggingSkillValidationRejectsUnsafeAndNonPortableVariants(t *t
 	}
 
 	if runtime.GOOS != "windows" {
+		t.Run("symlink ancestor", func(t *testing.T) {
+			root := copyCanonical(t)
+			link := filepath.Join(t.TempDir(), "linked-parent")
+			if err := os.Symlink(filepath.Dir(root), link); err != nil {
+				t.Fatal(err)
+			}
+			if err := ValidateRuntimeDebugging(filepath.Join(link, RuntimeDebuggingSkillName)); err == nil {
+				t.Fatal("symlink ancestor was accepted")
+			}
+		})
 		t.Run("symlink file", func(t *testing.T) {
 			root := copyCanonical(t)
 			name := filepath.Join(root, "references", "runtime-model.md")
@@ -134,7 +149,13 @@ func canonicalSkill(t *testing.T) string {
 
 func copyCanonical(t *testing.T) string {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), RuntimeDebuggingSkillName)
+	// macOS temp directories can have a symlinked ancestor (/var).
+	// Resolve the test-owned parent without weakening skill link validation.
+	parent, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(parent, RuntimeDebuggingSkillName)
 	for _, relative := range RuntimeDebuggingFiles {
 		content, err := os.ReadFile(filepath.Join(canonicalSkill(t), filepath.FromSlash(relative)))
 		if err != nil {

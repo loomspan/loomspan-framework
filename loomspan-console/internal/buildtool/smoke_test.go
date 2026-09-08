@@ -42,7 +42,10 @@ func TestStrictSmokeRequiresExactRuntimeDebuggingSkill(t *testing.T) {
 		expected[name] = 0o644
 		entries[name] = smokeEntry{0o644, mustRead(t, filepath.Join(canonical, filepath.FromSlash(relative)))}
 	}
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	archive := filepath.Join(root, "good.zip")
 	writeSmokeZIP(t, archive, "package", entries, "")
 	out := filepath.Join(root, "out")

@@ -234,10 +234,22 @@ python scripts/loomspan_version.py set 1.0.0-beta.2
 # Review and run the appropriate tests before committing.
 git add .
 git commit -m "Release 1.0.0-beta.2"
+git push origin main
+
+# Before tagging, run Console Release and Maven Central Release manually
+# against main in GitHub Actions. Both manual runs only validate.
+# Require both runs and Console CI to pass on this exact commit.
 
 python scripts/loomspan_version.py tag 1.0.0-beta.2
 git push origin main v1.0.0-beta.2
 ```
+
+The Console preflight must pass native packaging and archive smoke checks on
+Windows x86_64, Linux x86_64, and macOS ARM64, including the aggregate checksum
+check. If any check fails, fix it and repeat the preflight on the new commit
+before creating the tag. After pushing the tag, verify that Maven Central
+publication succeeds and the GitHub Release contains all three Console archives
+and `SHA256SUMS` before announcing the release.
 
 After releasing beta 2, start beta 3 development from a clean worktree. This
 updates the working branch; the beta 2 tag continues to identify its release:

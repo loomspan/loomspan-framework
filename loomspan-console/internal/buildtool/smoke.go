@@ -39,6 +39,13 @@ func smokeReleaseArchive(archive, version string) error {
 		return err
 	}
 	defer os.RemoveAll(root)
+	// Resolve only the newly created staging directory, before extracting files.
+	// macOS's system temp path can traverse /var -> /private/var; the
+	// extracted skill itself must still pass strict link validation.
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return fmt.Errorf("resolve smoke staging directory: %w", err)
+	}
 	top := strings.TrimSuffix(expectedName, target.extension)
 	executableName := "loomspan-console"
 	if target.goos == "windows" {
