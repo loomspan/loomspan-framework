@@ -18,7 +18,7 @@ test("consumes the complete browser target fixture contract", () => {
   expect(accessBlocked.error.code).toBe("TARGET_ACCESS_BLOCKED");
   expect(unavailable.error.details.transportCategory).toBe("timeout");
   expect(incompatible.error.details.expectedCompatibilityVersion).toBe(
-    "1.0.0-beta.2",
+    "1.0.0-beta.3-SNAPSHOT",
   );
   expect(targetChanged.error.details.currentTargetScopeId).toBe(
     "33333333-3333-4333-8333-333333333333",

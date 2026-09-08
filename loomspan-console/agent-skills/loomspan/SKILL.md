@@ -4,7 +4,7 @@ description: Investigate Loomspan runtime status, plans, model and tool content,
 license: Apache-2.0
 compatibility: Requires a local client that can use Agent Skills and an already configured Loomspan Console MCP connection for live inspection.
 metadata:
-  loomspan-version: "1.0.0-beta.2"
+  loomspan-version: "1.0.0-beta.3-SNAPSHOT"
 ---
 
 # Loomspan runtime debugging

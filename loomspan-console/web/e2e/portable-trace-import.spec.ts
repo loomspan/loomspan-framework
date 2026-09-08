@@ -27,7 +27,7 @@ test("opens a same-version trace file without a configured target", async ({ pag
 
 test("rejects a different-version trace without installing it", async ({ page, consoleProcess }) => {
   const mismatched = fs.readFileSync(portableTrace).toString("utf8")
-    .replace('"consoleCompatibilityVersion":"1.0.0-beta.2"', '"consoleCompatibilityVersion":"9.9.9"');
+    .replace('"consoleCompatibilityVersion":"1.0.0-beta.3-SNAPSHOT"', '"consoleCompatibilityVersion":"9.9.9"');
   await page.goto(consoleProcess.pairingUrl);
   await page.goto(`${consoleProcess.origin}/trace-storage`);
 
@@ -38,7 +38,7 @@ test("rejects a different-version trace without installing it", async ({ page, c
   });
   const results = page.getByRole("region", { name: "Trace import results" });
   await expect(results).toContainText("incompatible Loomspan version");
-  await expect(results).toContainText("1.0.0-beta.2");
+  await expect(results).toContainText("1.0.0-beta.3-SNAPSHOT");
   await expect(results).toContainText("9.9.9");
   await expect(page.getByText("No artifacts are currently stored.")).toBeVisible();
 });

@@ -54,7 +54,7 @@ Add the starter to your application:
 <dependency>
     <groupId>ai.loomspan</groupId>
     <artifactId>loomspan-spring-boot-starter</artifactId>
-    <version>1.0.0-beta.2</version>
+    <version>1.0.0-beta.3-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -200,9 +200,9 @@ Skill versions with one command:
 
 ```bash
 python scripts/loomspan_version.py check
-python scripts/loomspan_version.py set 1.0.0-beta.2
+python scripts/loomspan_version.py set 1.0.0-beta.3-SNAPSHOT
 # Review, test, and commit the release version.
-python scripts/loomspan_version.py tag 1.0.0-beta.2
+python scripts/loomspan_version.py tag 1.0.0-beta.3-SNAPSHOT
 ```
 
 `set` requires a clean worktree and replaces the exact current version in all
@@ -217,31 +217,31 @@ bootstrap version list to update.
 
 Keep the project on the next anticipated beta version with `-SNAPSHOT` during
 normal development. Remove that suffix when preparing the beta release. The
-current development version is `1.0.0-beta.2`. A complete beta cycle looks like:
+current development version is `1.0.0-beta.3-SNAPSHOT`. A complete beta cycle looks like:
 
 ```text
-1.0.0-beta.2 -> 1.0.0-beta.2 -> tag v1.0.0-beta.2 -> 1.0.0-beta.3-SNAPSHOT
+1.0.0-beta.3-SNAPSHOT -> 1.0.0-beta.3-SNAPSHOT -> tag v1.0.0-beta.3-SNAPSHOT -> 1.0.0-beta.3-SNAPSHOT
 ```
 
 Starting from a clean development snapshot worktree, prepare the release.
-If the version is already `1.0.0-beta.2`, skip the `set` command. Pushing
+If the version is already `1.0.0-beta.3-SNAPSHOT`, skip the `set` command. Pushing
 the tag below starts the Console release and automatic Maven Central publication:
 
 ```bash
 python scripts/loomspan_version.py check
-python scripts/loomspan_version.py set 1.0.0-beta.2
+python scripts/loomspan_version.py set 1.0.0-beta.3-SNAPSHOT
 
 # Review and run the appropriate tests before committing.
 git add .
-git commit -m "Release 1.0.0-beta.2"
+git commit -m "Release 1.0.0-beta.3-SNAPSHOT"
 git push origin main
 
 # Before tagging, run Console Release and Maven Central Release manually
 # against main in GitHub Actions. Both manual runs only validate.
 # Require both runs and Console CI to pass on this exact commit.
 
-python scripts/loomspan_version.py tag 1.0.0-beta.2
-git push origin main v1.0.0-beta.2
+python scripts/loomspan_version.py tag 1.0.0-beta.3-SNAPSHOT
+git push origin main v1.0.0-beta.3-SNAPSHOT
 ```
 
 The Console preflight must pass native packaging and archive smoke checks on

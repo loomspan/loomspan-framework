@@ -1,12 +1,12 @@
 {
-  "consoleCompatibilityVersion" : "1.0.0-beta.2",
+  "consoleCompatibilityVersion" : "1.0.0-beta.3-SNAPSHOT",
   "method" : "GET",
   "path" : "/_loomspan/observability/v1/traces/single-attempt-success/artifact",
   "status" : 200,
   "headers" : {
     "Content-Type" : "application/x-ndjson;charset=UTF-8",
     "Content-Disposition" : "attachment; filename=\"=?UTF-8?Q?loomspan-trace-single-attempt-success.ndjson?=\"; filename*=UTF-8''loomspan-trace-single-attempt-success.ndjson",
-    "Content-Length" : 2315,
+    "Content-Length" : 2324,
     "Cache-Control" : "no-store",
     "X-loomspan-Instance-Id" : "11111111-1111-4111-8111-111111111111"
   },

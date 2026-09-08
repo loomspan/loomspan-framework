@@ -38,11 +38,11 @@ func TestInstanceRequestSendsExactlyOneBoundedCredentialHeader(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		received = request.Header.Clone()
 		response.Header().Set(InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
-		_, _ = response.Write(validInstanceBody("1.0.0-beta.2"))
+		_, _ = response.Write(validInstanceBody("1.0.0-beta.3-SNAPSHOT"))
 	}))
 	defer server.Close()
 	address, _ := NormalizeAddress(server.URL)
-	client, err := New(address, testPolicy(), "1.0.0-beta.2")
+	client, err := New(address, testPolicy(), "1.0.0-beta.3-SNAPSHOT")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestClientConsumesCommittedInstanceFixtureOnlyAfterExactCompatibility(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	instance := serveBody(t, fixture, "1.0.0-beta.2")
+	instance := serveBody(t, fixture, "1.0.0-beta.3-SNAPSHOT")
 	if instance.InstanceID != "11111111-1111-4111-8111-111111111111" || !instance.LiveMonitoringAvailable {
 		t.Fatalf("unexpected instance: %#v", instance)
 	}
@@ -81,7 +81,7 @@ func TestClientConsumesCommittedInstanceFixtureOnlyAfterExactCompatibility(t *te
 	value["consoleCompatibilityVersion"] = "0.1.0"
 	value["instanceId"] = 4
 	mismatch, _ := json.Marshal(value)
-	failure := serveFailure(t, mismatch, "1.0.0-beta.2")
+	failure := serveFailure(t, mismatch, "1.0.0-beta.3-SNAPSHOT")
 	if failure.Kind != FailureIncompatible || failure.Observed != "0.1.0" {
 		t.Fatalf("unexpected mismatch: %#v", failure)
 	}
@@ -97,7 +97,7 @@ func TestTransportUsesDirectSelectedAuthorityAndNeverFollowsRedirect(t *testing.
 	defer selected.Close()
 	t.Setenv("HTTP_PROXY", receiver.URL)
 	address, _ := NormalizeAddress(selected.URL)
-	client, _ := New(address, testPolicy(), "1.0.0-beta.2")
+	client, _ := New(address, testPolicy(), "1.0.0-beta.3-SNAPSHOT")
 	defer client.Close()
 	_, err := client.Probe(context.Background(), testCredential(strings.Repeat("k", 32)))
 	failure, ok := err.(*Failure)
@@ -114,7 +114,7 @@ func TestProbeReturnsCallerCancellationWithoutTransportRetryClassification(t *te
 	}))
 	defer server.Close()
 	address, _ := NormalizeAddress(server.URL)
-	client, _ := New(address, testPolicy(), "1.0.0-beta.2")
+	client, _ := New(address, testPolicy(), "1.0.0-beta.3-SNAPSHOT")
 	defer client.Close()
 
 	parent, cancel := context.WithCancel(context.Background())
@@ -154,7 +154,7 @@ func TestClientMapsJavaProblemsAndGenericUpstreamFailuresPrecisely(t *testing.T)
 			_, _ = response.Write(body)
 		}))
 		address, _ := NormalizeAddress(server.URL)
-		client, _ := New(address, testPolicy(), "1.0.0-beta.2")
+		client, _ := New(address, testPolicy(), "1.0.0-beta.3-SNAPSHOT")
 		_, probeErr := client.Probe(context.Background(), testCredential(strings.Repeat("k", 32)))
 		client.Close()
 		server.Close()
@@ -173,7 +173,7 @@ func TestClientMapsJavaProblemsAndGenericUpstreamFailuresPrecisely(t *testing.T)
 			_, _ = response.Write([]byte(`{"status":` + fmt.Sprint(status) + `,"code":"UPSTREAM","message":"blocked"}`))
 		}))
 		address, _ := NormalizeAddress(server.URL)
-		client, _ := New(address, testPolicy(), "1.0.0-beta.2")
+		client, _ := New(address, testPolicy(), "1.0.0-beta.3-SNAPSHOT")
 		_, probeErr := client.Probe(context.Background(), testCredential(strings.Repeat("k", 32)))
 		client.Close()
 		server.Close()
@@ -186,11 +186,11 @@ func TestClientMapsJavaProblemsAndGenericUpstreamFailuresPrecisely(t *testing.T)
 func TestTransportUsesOptionalCustomCAWithoutWeakeningVerification(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
 		response.Header().Set(InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
-		_, _ = response.Write(validInstanceBody("1.0.0-beta.2"))
+		_, _ = response.Write(validInstanceBody("1.0.0-beta.3-SNAPSHOT"))
 	}))
 	defer server.Close()
 	address, _ := NormalizeAddress(server.URL)
-	untrusted, _ := New(address, testPolicy(), "1.0.0-beta.2")
+	untrusted, _ := New(address, testPolicy(), "1.0.0-beta.3-SNAPSHOT")
 	_, err := untrusted.Probe(context.Background(), testCredential(strings.Repeat("k", 32)))
 	untrusted.Close()
 	failure, ok := err.(*Failure)
@@ -199,7 +199,7 @@ func TestTransportUsesOptionalCustomCAWithoutWeakeningVerification(t *testing.T)
 	}
 	policy := testPolicy()
 	policy.CABundlePEM = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
-	trusted, err := New(address, policy, "1.0.0-beta.2")
+	trusted, err := New(address, policy, "1.0.0-beta.3-SNAPSHOT")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestTransportUsesOptionalCustomCAWithoutWeakeningVerification(t *testing.T)
 		t.Fatal(err)
 	}
 	wrongAddress, _ := NormalizeAddress(strings.Replace(server.URL, "127.0.0.1", "localhost", 1))
-	wrongHost, _ := New(wrongAddress, policy, "1.0.0-beta.2")
+	wrongHost, _ := New(wrongAddress, policy, "1.0.0-beta.3-SNAPSHOT")
 	defer wrongHost.Close()
 	_, err = wrongHost.Probe(context.Background(), testCredential(strings.Repeat("k", 32)))
 	if failure, ok := err.(*Failure); !ok || failure.Category != CategoryTLSHostname {

@@ -43,7 +43,7 @@ type fakeGetClient struct {
 func (client *fakeGetClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
 		InstanceID:                  client.instanceID,
-		ConsoleCompatibilityVersion: "1.0.0-beta.2",
+		ConsoleCompatibilityVersion: "1.0.0-beta.3-SNAPSHOT",
 		ObservedAt:                  time.Now(),
 		LiveMonitoringAvailable:     true,
 	}, nil
@@ -344,7 +344,7 @@ func TestObservabilityServiceAgainstHTTPTestServer(t *testing.T) {
 		response.Header().Set("Content-Type", "application/json")
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.3-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 			return
 		}
 		_, _ = response.Write(fixture)
@@ -354,7 +354,7 @@ func TestObservabilityServiceAgainstHTTPTestServer(t *testing.T) {
 		ConnectTimeout: testTimeout, ResponseHeaderTimeout: testTimeout, RequestTimeout: testTimeout,
 	}
 	targetContext, _ := target.New(func(addr applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(addr, policy, "1.0.0-beta.2")
+		return applicationclient.New(addr, policy, "1.0.0-beta.3-SNAPSHOT")
 	}, nil, nil)
 	if err := targetContext.Select(server.URL); err != nil {
 		t.Fatal(err)
@@ -382,7 +382,7 @@ func TestObservabilityServiceMapsStaleCursorFromUpstream(t *testing.T) {
 		response.Header().Set("Content-Type", "application/json")
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.3-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 			return
 		}
 		response.WriteHeader(410)
@@ -393,7 +393,7 @@ func TestObservabilityServiceMapsStaleCursorFromUpstream(t *testing.T) {
 		ConnectTimeout: testTimeout, ResponseHeaderTimeout: testTimeout, RequestTimeout: testTimeout,
 	}
 	targetContext, _ := target.New(func(addr applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(addr, policy, "1.0.0-beta.2")
+		return applicationclient.New(addr, policy, "1.0.0-beta.3-SNAPSHOT")
 	}, nil, nil)
 	if err := targetContext.Select(server.URL); err != nil {
 		t.Fatal(err)
@@ -421,7 +421,7 @@ func TestObservabilityServiceMapsNotFoundFromUpstream(t *testing.T) {
 		response.Header().Set("Content-Type", "application/json")
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.3-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 			return
 		}
 		response.WriteHeader(404)
@@ -432,7 +432,7 @@ func TestObservabilityServiceMapsNotFoundFromUpstream(t *testing.T) {
 		ConnectTimeout: testTimeout, ResponseHeaderTimeout: testTimeout, RequestTimeout: testTimeout,
 	}
 	targetContext, _ := target.New(func(addr applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(addr, policy, "1.0.0-beta.2")
+		return applicationclient.New(addr, policy, "1.0.0-beta.3-SNAPSHOT")
 	}, nil, nil)
 	if err := targetContext.Select(server.URL); err != nil {
 		t.Fatal(err)
@@ -460,7 +460,7 @@ func TestObservabilityServiceMapsLiveMonitoringUnavailableFromUpstream(t *testin
 		response.Header().Set("Content-Type", "application/json")
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.3-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 			return
 		}
 		response.WriteHeader(503)
@@ -471,7 +471,7 @@ func TestObservabilityServiceMapsLiveMonitoringUnavailableFromUpstream(t *testin
 		ConnectTimeout: testTimeout, ResponseHeaderTimeout: testTimeout, RequestTimeout: testTimeout,
 	}
 	targetContext, _ := target.New(func(addr applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(addr, policy, "1.0.0-beta.2")
+		return applicationclient.New(addr, policy, "1.0.0-beta.3-SNAPSHOT")
 	}, nil, nil)
 	if err := targetContext.Select(server.URL); err != nil {
 		t.Fatal(err)

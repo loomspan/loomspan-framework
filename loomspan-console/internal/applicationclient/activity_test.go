@@ -27,7 +27,7 @@ func activityFrame(id, cursor, kind string) string {
 func sseServer(handler http.HandlerFunc) (*httptest.Server, *Client, Address) {
 	server := httptest.NewServer(handler)
 	address, _ := NormalizeAddress(server.URL)
-	client, _ := New(address, testPolicy(), "1.0.0-beta.2")
+	client, _ := New(address, testPolicy(), "1.0.0-beta.3-SNAPSHOT")
 	return server, client, address
 }
 
