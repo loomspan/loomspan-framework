@@ -47,7 +47,7 @@ class ObservabilityContextPathIntegrationTest
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(scoped.statusCode()).isEqualTo(200);
-        assertThat(scoped.body()).contains("\"consoleCompatibilityVersion\":\"1.0.0-beta.1\"");
+        assertThat(scoped.body()).contains("\"consoleCompatibilityVersion\":\"1.0.0-beta.2-SNAPSHOT\"");
         assertThat(scoped.headers().firstValue(ObservabilityApiKeyFilter.INSTANCE_HEADER)).isPresent();
         assertThat(root.statusCode()).isEqualTo(404);
         assertThat(root.headers().firstValue(ObservabilityApiKeyFilter.INSTANCE_HEADER)).isEmpty();

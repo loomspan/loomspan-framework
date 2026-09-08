@@ -83,9 +83,9 @@ func TestRuntimeDebuggingSkillValidationRejectsUnsafeAndNonPortableVariants(t *t
 		{"missing file", func(t *testing.T, root string) { os.Remove(filepath.Join(root, "references", "runtime-model.md")) }, "incomplete"},
 		{"unsupported frontmatter", replaceSkill("license: Apache-2.0", "allowed-tools: []\nlicense: Apache-2.0"), "unsupported"},
 		{"wrong name", replaceSkill("name: loomspan", "name: another-skill"), "name"},
-		{"unknown metadata", replaceSkill("loomspan-version: \"1.0.0-beta.1\"", "another-version: \"1.0.0-beta.1\""), "metadata"},
-		{"blank version metadata", replaceSkill("loomspan-version: \"1.0.0-beta.1\"", "loomspan-version: \"\""), "metadata"},
-		{"unresolved version metadata", replaceSkill("loomspan-version: \"1.0.0-beta.1\"", "loomspan-version: \"${project.version}\""), "metadata"},
+		{"unknown metadata", replaceSkill("loomspan-version: \"1.0.0-beta.2-SNAPSHOT\"", "another-version: \"1.0.0-beta.2-SNAPSHOT\""), "metadata"},
+		{"blank version metadata", replaceSkill("loomspan-version: \"1.0.0-beta.2-SNAPSHOT\"", "loomspan-version: \"\""), "metadata"},
+		{"unresolved version metadata", replaceSkill("loomspan-version: \"1.0.0-beta.2-SNAPSHOT\"", "loomspan-version: \"${project.version}\""), "metadata"},
 		{"broken reference", replaceSkill("references/runtime-model.md", "references/missing.md"), "reference"},
 		{"endpoint", func(t *testing.T, root string) { appendSkill(t, root, "\nUse https://example.invalid/mcp\n") }, "endpoint"},
 		{"access key", func(t *testing.T, root string) {

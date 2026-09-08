@@ -40,10 +40,10 @@ type serviceTestHarness struct {
 }
 
 // javaCompatibleInstanceJSON is the exact instance probe body a Java adapter at
-// consoleCompatibilityVersion "1.0.0-beta.1" emits. Reused from the console
+// consoleCompatibilityVersion "1.0.0-beta.2-SNAPSHOT" emits. Reused from the console
 // integration tests so the scope's compatibility gate is established exactly
 // as in production.
-const javaCompatibleInstanceJSON = `{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`
+const javaCompatibleInstanceJSON = `{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`
 
 // deriveSessionID returns the session ID that matches the NDJSON content for
 // the given trace ID. Test traces use different conventions:
@@ -106,7 +106,7 @@ func newServiceTestHarnessForVersion(t *testing.T, traceID, ndjson, compatibilit
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 30 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.1")
+		return applicationclient.New(address, policy, "1.0.0-beta.2-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatalf("create target context: %v", err)

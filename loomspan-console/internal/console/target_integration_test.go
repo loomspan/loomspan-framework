@@ -29,14 +29,14 @@ func TestApplicationCredentialNeverAppearsOutsideSelectedRequestHeader(t *testin
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		received = append(received, request.Header.Values(applicationclient.APIKeyHeader)...)
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
-		_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true}`))
+		_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true}`))
 	}))
 	defer server.Close()
 	policy := applicationclient.NetworkPolicy{
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.1")
+		return applicationclient.New(address, policy, "1.0.0-beta.2-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -100,14 +100,14 @@ func (r *scopeOwnerRecorder) InvalidateTargetScope(previous target.ScopeID, canc
 func TestTargetContextNotifiesScopeOwnersOnActivationAndRotation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
-		_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true}`))
+		_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true}`))
 	}))
 	defer server.Close()
 	policy := applicationclient.NetworkPolicy{
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.1")
+		return applicationclient.New(address, policy, "1.0.0-beta.2-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -135,7 +135,7 @@ func TestTargetContextNotifiesScopeOwnersOnActivationAndRotation(t *testing.T) {
 	// Rotate by re-selecting with a different instance.
 	server2 := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "22222222-2222-4222-8222-222222222222")
-		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true}`))
+		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true}`))
 	}))
 	defer server2.Close()
 	if err := targetContext.Select(server2.URL); err != nil {
@@ -160,7 +160,7 @@ func TestArtifactServiceAcquiresAndUsesThroughTargetScope(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1") {
@@ -182,7 +182,7 @@ func TestArtifactServiceAcquiresAndUsesThroughTargetScope(t *testing.T) {
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 10 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.1")
+		return applicationclient.New(address, policy, "1.0.0-beta.2-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -317,7 +317,7 @@ func TestArtifactScopeRotationDuringMetadataFetchReturnsTargetChanged(t *testing
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1") && !strings.HasSuffix(request.URL.Path, "/artifact") {
@@ -336,7 +336,7 @@ func TestArtifactScopeRotationDuringMetadataFetchReturnsTargetChanged(t *testing
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 10 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.1")
+		return applicationclient.New(address, policy, "1.0.0-beta.2-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -411,7 +411,7 @@ func TestArtifactScopeRotationDuringMetadataFetchReturnsTargetChanged(t *testing
 	<-traceLoaded
 	server2 := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "22222222-2222-4222-8222-222222222222")
-		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 	}))
 	defer server2.Close()
 	if err := targetContext.Select(server2.URL); err != nil {
@@ -448,7 +448,7 @@ func TestArtifactScopeRotationDuringLeaseUseReturnsTargetChanged(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1") && !strings.HasSuffix(request.URL.Path, "/artifact") {
@@ -470,7 +470,7 @@ func TestArtifactScopeRotationDuringLeaseUseReturnsTargetChanged(t *testing.T) {
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 10 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.1")
+		return applicationclient.New(address, policy, "1.0.0-beta.2-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -538,7 +538,7 @@ func TestArtifactScopeRotationDuringLeaseUseReturnsTargetChanged(t *testing.T) {
 	// Rotate the scope.
 	server2 := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "22222222-2222-4222-8222-222222222222")
-		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 	}))
 	defer server2.Close()
 	if err := targetContext.Select(server2.URL); err != nil {
@@ -563,7 +563,7 @@ func TestArtifactRawPassThroughDuringScopeRotationReturnsTargetChanged(t *testin
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1/artifact") {
@@ -580,7 +580,7 @@ func TestArtifactRawPassThroughDuringScopeRotationReturnsTargetChanged(t *testin
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 10 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.1")
+		return applicationclient.New(address, policy, "1.0.0-beta.2-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -600,7 +600,7 @@ func TestArtifactRawPassThroughDuringScopeRotationReturnsTargetChanged(t *testin
 	// Rotate the scope before the raw pass-through.
 	server2 := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "22222222-2222-4222-8222-222222222222")
-		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.1","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.2-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
 	}))
 	defer server2.Close()
 	if err := targetContext.Select(server2.URL); err != nil {

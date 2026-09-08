@@ -11,7 +11,7 @@ func TestReadProductVersionReadsOnlyDirectProjectVersion(t *testing.T) {
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <!-- preserve the complete version -->
   <parent><version>99.0.0</version></parent>
-  <version>1.0.0-beta.1</version>
+  <version>1.0.0-beta.2-SNAPSHOT</version>
   <properties><dependency.version>2.0.0</dependency.version></properties>
   <dependencies><dependency><version>3.0.0</version></dependency></dependencies>
 </project>`
@@ -20,7 +20,7 @@ func TestReadProductVersionReadsOnlyDirectProjectVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "1.0.0-beta.1" {
+	if got != "1.0.0-beta.2-SNAPSHOT" {
 		t.Fatalf("version = %q", got)
 	}
 }

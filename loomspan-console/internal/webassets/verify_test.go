@@ -9,14 +9,14 @@ import (
 )
 
 func TestVerifyManifestAcceptsCompleteCurrentAssetSet(t *testing.T) {
-	files := validAssetFS(t, "1.0.0-beta.1")
-	if _, err := Verify(files, "1.0.0-beta.1"); err != nil {
+	files := validAssetFS(t, "1.0.0-beta.2-SNAPSHOT")
+	if _, err := Verify(files, "1.0.0-beta.2-SNAPSHOT"); err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}
 }
 
 func TestVerifyManifestRejectsVersionMismatch(t *testing.T) {
-	files := validAssetFS(t, "1.0.0-beta.1")
+	files := validAssetFS(t, "1.0.0-beta.2-SNAPSHOT")
 	if _, err := Verify(files, "0.2.0"); err == nil {
 		t.Fatal("Verify() accepted a stale asset version")
 	}
@@ -34,9 +34,9 @@ func TestVerifyManifestRejectsInventoryMismatch(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			files := validAssetFS(t, "1.0.0-beta.1")
+			files := validAssetFS(t, "1.0.0-beta.2-SNAPSHOT")
 			test.mutate(files)
-			if _, err := Verify(files, "1.0.0-beta.1"); err == nil {
+			if _, err := Verify(files, "1.0.0-beta.2-SNAPSHOT"); err == nil {
 				t.Fatal("Verify() accepted invalid inventory")
 			}
 		})
@@ -44,9 +44,9 @@ func TestVerifyManifestRejectsInventoryMismatch(t *testing.T) {
 }
 
 func TestVerifyManifestRejectsMissingManifest(t *testing.T) {
-	files := validAssetFS(t, "1.0.0-beta.1")
+	files := validAssetFS(t, "1.0.0-beta.2-SNAPSHOT")
 	delete(files, ManifestName)
-	if _, err := Verify(files, "1.0.0-beta.1"); err == nil {
+	if _, err := Verify(files, "1.0.0-beta.2-SNAPSHOT"); err == nil {
 		t.Fatal("Verify() accepted a missing manifest")
 	}
 }
@@ -68,14 +68,14 @@ func TestVerifyManifestRejectsInvalidManifest(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			files := validAssetFS(t, "1.0.0-beta.1")
+			files := validAssetFS(t, "1.0.0-beta.2-SNAPSHOT")
 			var value map[string]any
 			if err := json.Unmarshal(files[ManifestName].Data, &value); err != nil {
 				t.Fatal(err)
 			}
 			test.mutate(value)
 			files[ManifestName].Data, _ = json.Marshal(value)
-			if _, err := Verify(files, "1.0.0-beta.1"); err == nil {
+			if _, err := Verify(files, "1.0.0-beta.2-SNAPSHOT"); err == nil {
 				t.Fatal("Verify() accepted invalid manifest")
 			}
 		})
@@ -113,10 +113,10 @@ func TestVerifyManifestRejectsInvalidViteEntryReferences(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			files := validAssetFS(t, "1.0.0-beta.1")
+			files := validAssetFS(t, "1.0.0-beta.2-SNAPSHOT")
 			test.mutate(files)
-			rewriteManifest(t, files, "1.0.0-beta.1")
-			if _, err := Verify(files, "1.0.0-beta.1"); err == nil {
+			rewriteManifest(t, files, "1.0.0-beta.2-SNAPSHOT")
+			if _, err := Verify(files, "1.0.0-beta.2-SNAPSHOT"); err == nil {
 				t.Fatal("Verify() accepted an invalid entry dependency graph")
 			}
 		})
@@ -124,13 +124,13 @@ func TestVerifyManifestRejectsInvalidViteEntryReferences(t *testing.T) {
 }
 
 func TestVerifyManifestRejectsNonContentAddressedJavaScript(t *testing.T) {
-	files := validAssetFS(t, "1.0.0-beta.1")
+	files := validAssetFS(t, "1.0.0-beta.2-SNAPSHOT")
 	files["assets/app.js"] = files["assets/app-12345678.js"]
 	delete(files, "assets/app-12345678.js")
 	files[DefaultEntry].Data = []byte(`<script type="module" src="/assets/app.js"></script><link rel="stylesheet" href="/assets/app-12345678.css">`)
 	files[DefaultViteManifest].Data = []byte(`{"index.html":{"file":"assets/app.js","css":["assets/app-12345678.css"],"isEntry":true}}`)
-	rewriteManifest(t, files, "1.0.0-beta.1")
-	if _, err := Verify(files, "1.0.0-beta.1"); err == nil {
+	rewriteManifest(t, files, "1.0.0-beta.2-SNAPSHOT")
+	if _, err := Verify(files, "1.0.0-beta.2-SNAPSHOT"); err == nil {
 		t.Fatal("Verify() accepted non-content-addressed JavaScript")
 	}
 }

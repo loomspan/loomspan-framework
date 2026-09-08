@@ -54,7 +54,7 @@ Add the starter to your application:
 <dependency>
     <groupId>ai.loomspan</groupId>
     <artifactId>loomspan-spring-boot-starter</artifactId>
-    <version>1.0.0-beta.1</version>
+    <version>1.0.0-beta.2-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -200,9 +200,9 @@ Skill versions with one command:
 
 ```bash
 python scripts/loomspan_version.py check
-python scripts/loomspan_version.py set 1.0.0-beta.1
+python scripts/loomspan_version.py set 1.0.0-beta.2
 # Review, test, and commit the release version.
-python scripts/loomspan_version.py tag 1.0.0-beta.1
+python scripts/loomspan_version.py tag 1.0.0-beta.2
 ```
 
 `set` requires a clean worktree and replaces the exact current version in all
@@ -217,40 +217,38 @@ bootstrap version list to update.
 
 Keep the project on the next anticipated beta version with `-SNAPSHOT` during
 normal development. Remove that suffix when preparing the beta release. The
-current release being prepared is `1.0.0-beta.1`. A complete beta cycle looks like:
+current development version is `1.0.0-beta.2-SNAPSHOT`. A complete beta cycle looks like:
 
 ```text
-1.0.0-beta.1-SNAPSHOT -> 1.0.0-beta.1 -> tag v1.0.0-beta.1 -> 1.0.0-beta.2-SNAPSHOT
+1.0.0-beta.2-SNAPSHOT -> 1.0.0-beta.2 -> tag v1.0.0-beta.2 -> 1.0.0-beta.3-SNAPSHOT
 ```
 
 Starting from a clean development snapshot worktree, prepare the release.
-If the version is already `1.0.0-beta.1`, skip the `set` command. Pushing
-the tag below starts the Console release and the Maven Central upload workflow:
+If the version is already `1.0.0-beta.2`, skip the `set` command. Pushing
+the tag below starts the Console release and automatic Maven Central publication:
 
 ```bash
 python scripts/loomspan_version.py check
-python scripts/loomspan_version.py set 1.0.0-beta.1
+python scripts/loomspan_version.py set 1.0.0-beta.2
 
 # Review and run the appropriate tests before committing.
 git add .
-git commit -m "Release 1.0.0-beta.1"
+git commit -m "Release 1.0.0-beta.2"
 
-python scripts/loomspan_version.py tag 1.0.0-beta.1
-git push origin main v1.0.0-beta.1
+python scripts/loomspan_version.py tag 1.0.0-beta.2
+git push origin main v1.0.0-beta.2
 ```
 
-After releasing beta 1, start beta 2 development from a clean worktree. This
-updates the working branch; the beta 1 tag continues to identify its release:
+After releasing beta 2, start beta 3 development from a clean worktree. This
+updates the working branch; the beta 2 tag continues to identify its release:
 
 ```bash
-python scripts/loomspan_version.py set 1.0.0-beta.2-SNAPSHOT
+python scripts/loomspan_version.py set 1.0.0-beta.3-SNAPSHOT
 git add .
-git commit -m "Begin beta 2 development"
+git commit -m "Begin beta 3 development"
 git push origin main
 ```
 
-When beta 2 is ready, use `python scripts/loomspan_version.py set 1.0.0-beta.2`,
-review and commit, then create the `v1.0.0-beta.2` tag with the version script.
 Continue incrementing the beta number for later betas. Release candidates use
 `1.0.0-rc.1`, and the first production release uses `1.0.0`.
 
@@ -301,10 +299,10 @@ supported by [Sonatype's GPG requirements](https://central.sonatype.org/publish/
 The workflow imports the private key on its runner and supplies the passphrase
 through an environment variable.
 
-The upload uses `autoPublish=false` and waits for validation. Review the
-validated deployment in the [Central Portal](https://central.sonatype.com/publishing/deployments)
-and select **Publish** to make it available on Maven Central. Upload success
-alone does not mean the release is publicly available. Published versions
+The upload uses `autoPublish=true` and waits up to 30 minutes for Sonatype to
+report `PUBLISHED`. Publication happens automatically after validation; no
+manual Publish action is needed in the [Central Portal](https://central.sonatype.com/publishing/deployments).
+Maven Central search indexing may take additional time. Published versions
 cannot be overwritten; fixes require a new version.
 
 The Console release also runs on the same tag and can publish independently

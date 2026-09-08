@@ -94,7 +94,7 @@ func (client *callbackArtifactProbeClient) OpenArtifact(ctx context.Context, tra
 func (c *countingArtifactProbeClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
 		InstanceID:                  "11111111-1111-4111-8111-111111111111",
-		ConsoleCompatibilityVersion: "1.0.0-beta.1",
+		ConsoleCompatibilityVersion: "1.0.0-beta.2-SNAPSHOT",
 		ObservedAt:                  time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC),
 		LiveMonitoringAvailable:     true,
 	}, nil
@@ -133,7 +133,7 @@ type errorArtifactProbeClient struct {
 func (c *errorArtifactProbeClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
 		InstanceID:                  "11111111-1111-4111-8111-111111111111",
-		ConsoleCompatibilityVersion: "1.0.0-beta.1",
+		ConsoleCompatibilityVersion: "1.0.0-beta.2-SNAPSHOT",
 		ObservedAt:                  time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC),
 		LiveMonitoringAvailable:     true,
 	}, nil
@@ -163,7 +163,7 @@ type shortReadArtifactProbeClient struct {
 func (c *shortReadArtifactProbeClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
 		InstanceID:                  "11111111-1111-4111-8111-111111111111",
-		ConsoleCompatibilityVersion: "1.0.0-beta.1",
+		ConsoleCompatibilityVersion: "1.0.0-beta.2-SNAPSHOT",
 		ObservedAt:                  time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC),
 		LiveMonitoringAvailable:     true,
 	}, nil
@@ -426,7 +426,7 @@ type midStreamErrorProbeClient struct {
 func (c *midStreamErrorProbeClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
 		InstanceID:                  "11111111-1111-4111-8111-111111111111",
-		ConsoleCompatibilityVersion: "1.0.0-beta.1",
+		ConsoleCompatibilityVersion: "1.0.0-beta.2-SNAPSHOT",
 		ObservedAt:                  time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC),
 		LiveMonitoringAvailable:     true,
 	}, nil
@@ -627,7 +627,7 @@ type gatedArtifactProbeClient struct {
 func (c *gatedArtifactProbeClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
 		InstanceID:                  "11111111-1111-4111-8111-111111111111",
-		ConsoleCompatibilityVersion: "1.0.0-beta.1",
+		ConsoleCompatibilityVersion: "1.0.0-beta.2-SNAPSHOT",
 		ObservedAt:                  time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC),
 		LiveMonitoringAvailable:     true,
 	}, nil

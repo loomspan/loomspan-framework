@@ -82,7 +82,7 @@ test("overview presents established HTTP facts and safe incompatibility details"
       409,
       "scope-1",
       {
-        expectedCompatibilityVersion: "1.0.0-beta.1",
+        expectedCompatibilityVersion: "1.0.0-beta.2-SNAPSHOT",
         observedCompatibilityVersion: "0.1.0",
       },
     ),
@@ -91,7 +91,7 @@ test("overview presents established HTTP facts and safe incompatibility details"
   render(<Overview />);
   expect(screen.getByText(/Unencrypted/)).toBeVisible();
   expect(
-    screen.getByText(/Expected 1.0.0-beta.1; observed 0.1.0/),
+    screen.getByText(/Expected 1.0.0-beta.2-SNAPSHOT; observed 0.1.0/),
   ).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Recheck target" }));
   expect(operations.recheck).toHaveBeenCalled();

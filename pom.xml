@@ -6,7 +6,7 @@
 
   <groupId>ai.loomspan</groupId>
   <artifactId>loomspan-framework-parent</artifactId>
-  <version>1.0.0-beta.1</version>
+  <version>1.0.0-beta.2-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Loomspan Framework Parent</name>
@@ -200,8 +200,9 @@
             <extensions>true</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
-              <autoPublish>false</autoPublish>
-              <waitUntil>validated</waitUntil>
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
+              <waitMaxTime>1800</waitMaxTime>
             </configuration>
           </plugin>
         </plugins>

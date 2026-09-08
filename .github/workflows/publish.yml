@@ -51,11 +51,11 @@ jobs:
         run: ./mvnw --batch-mode --no-transfer-progress -Prelease -pl loomspan-spring-boot-starter -am -DskipTests -Dgpg.skip=true verify
 
   upload:
-    name: Upload for manual publication in Sonatype
+    name: Publish to Maven Central
     needs: verify
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07 # v4
@@ -68,11 +68,11 @@ jobs:
           server-password: CENTRAL_TOKEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
-      - name: Sign and upload parent POM and starter
+      - name: Sign and publish parent POM and starter
         run: ./mvnw --batch-mode --no-transfer-progress -Prelease -pl loomspan-spring-boot-starter -am -DskipTests deploy
         env:
           CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      - name: Describe remaining publication step
-        run: echo 'Upload validated. Review the deployment at https://central.sonatype.com/publishing/deployments and publish it manually.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Confirm publication
+        run: echo 'Sonatype reports PUBLISHED for the parent POM and starter. Maven Central search indexing may take additional time.' >> "$GITHUB_STEP_SUMMARY"
