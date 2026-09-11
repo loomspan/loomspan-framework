@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v4"
 )
 
 func TestProjectDeclarationsMatchPinnedToolchains(t *testing.T) {
@@ -245,6 +247,10 @@ func TestConsoleWorkflowsArePinnedAndLeastPrivilege(t *testing.T) {
 	ci := readTestFile(t, filepath.Join(workflowDirectory, "console-ci.yml"))
 	releaseWorkflow := readTestFile(t, filepath.Join(workflowDirectory, "console-release.yml"))
 	for name, contents := range map[string]string{"console-ci.yml": ci, "console-release.yml": releaseWorkflow} {
+		var document any
+		if err := yaml.Unmarshal([]byte(contents), &document); err != nil {
+			t.Errorf("%s is invalid YAML: %v", name, err)
+		}
 		if strings.Contains(contents, "pull_request_target") {
 			t.Fatalf("%s executes pull_request_target", name)
 		}
@@ -264,7 +270,7 @@ func TestConsoleWorkflowsArePinnedAndLeastPrivilege(t *testing.T) {
 			t.Errorf("CI workflow does not contain %q", required)
 		}
 	}
-	for _, required := range []string{"windows-latest", "ubuntu-latest", "macos-15", "windows-x86_64", "linux-x86_64", "macos-arm64", "workflow_dispatch:", "tags: [\"v*\"]", "SHA256SUMS"} {
+	for _, required := range []string{"windows-latest", "ubuntu-latest", "macos-15", "windows-x86_64", "linux-x86_64", "macos-arm64", "macos-arm64.dmg", "MACOS_SIGNING_IDENTITY", "MACOS_NOTARY_KEY_ID", "hdiutil verify", "workflow_dispatch:", "tags: [\"v*\"]", "SHA256SUMS"} {
 		if !strings.Contains(releaseWorkflow, required) {
 			t.Errorf("release workflow does not contain %q", required)
 		}

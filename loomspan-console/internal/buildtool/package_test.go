@@ -54,6 +54,9 @@ func TestReleasePackagesAreDeterministicAndContainRuntimeDebuggingSkill(t *testi
 			readme := writePackageInput(t, root, "readme", "runtime instructions")
 			request := packageRequest{version: "1.2.3-rc.1", target: target, executable: executable,
 				license: license, readme: readme, skill: skill, outputDirectory: filepath.Join(root, "dist")}
+			if target.goos == "darwin" {
+				request.macOSApp = writeTestMacOSApplication(t, root)
+			}
 			first, err := writeReleasePackage(request)
 			if err != nil {
 				t.Fatal(err)
@@ -80,12 +83,17 @@ func TestReleasePackagesAreDeterministicAndContainRuntimeDebuggingSkill(t *testi
 				t.Fatalf("sidecar = %q", sidecar)
 			}
 			top := strings.TrimSuffix(expectedName, target.extension)
-			executableName := "loomspan-console"
-			if target.goos == "windows" {
-				executableName += ".exe"
-			}
-			want := map[string]os.FileMode{
-				top + "/LICENSE": 0o644, top + "/README.md": 0o644, top + "/" + executableName: 0o755,
+			want := map[string]os.FileMode{top + "/LICENSE": 0o644, top + "/README.md": 0o644}
+			if target.goos == "darwin" {
+				for _, file := range macOSApplicationPackageFiles(request.macOSApp) {
+					want[pathJoin(top, file.name)] = file.mode
+				}
+			} else {
+				executableName := "loomspan-console"
+				if target.goos == "windows" {
+					executableName += ".exe"
+				}
+				want[top+"/"+executableName] = 0o755
 			}
 			for _, relative := range agentskills.RuntimeDebuggingFiles {
 				want[pathJoin(top, "skills", agentskills.RuntimeDebuggingSkillName, relative)] = 0o644
@@ -140,6 +148,29 @@ func writePackageInput(t *testing.T, root, name, contents string) string {
 		t.Fatal(err)
 	}
 	return filename
+}
+
+func writeTestMacOSApplication(t *testing.T, root string) string {
+	t.Helper()
+	application := filepath.Join(root, macOSApplicationName)
+	for _, file := range []struct {
+		name, contents string
+		mode           os.FileMode
+	}{
+		{filepath.Join("Contents", "Info.plist"), string(macOSInfoPlist("1.2.3-rc.1")), 0o644},
+		{filepath.Join("Contents", "MacOS", "loomspan-console"), "executable", 0o755},
+		{filepath.Join("Contents", "Resources", macOSIconFilename), "icns", 0o644},
+		{filepath.Join("Contents", "_CodeSignature", "CodeResources"), "signature", 0o644},
+	} {
+		filename := filepath.Join(application, file.name)
+		if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filename, []byte(file.contents), file.mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return application
 }
 
 func archiveEntries(t *testing.T, filename, extension string) map[string]os.FileMode {

@@ -31,12 +31,18 @@ type releaseTarget struct {
 
 type packageRequest struct {
 	version, executable, license, readme, skill, outputDirectory string
+	macOSApp                                                     string
 	target                                                       releaseTarget
+}
+
+type packageArtifact struct {
+	file, sidecar, digest string
 }
 
 type packageResult struct {
 	archive, sidecar string
 	digest           string
+	additional       []packageArtifact
 }
 
 func packageCurrentTarget(context pipelineContext) (packageResult, error) {
@@ -44,14 +50,37 @@ func packageCurrentTarget(context pipelineContext) (packageResult, error) {
 	if err != nil {
 		return packageResult{}, err
 	}
-	return writeReleasePackage(packageRequest{
+	request := packageRequest{
 		version: context.productVersion, target: target,
 		executable:      filepath.Join(context.paths.build, executableName()),
 		license:         filepath.Join(context.paths.repository, "LICENSE"),
 		readme:          filepath.Join(context.paths.release, "README.md"),
 		skill:           filepath.Join(context.paths.agentSkills, agentskills.RuntimeDebuggingSkillName),
 		outputDirectory: context.paths.dist,
-	})
+	}
+	var signing macOSSigningConfiguration
+	if target.goos == "darwin" {
+		signing, err = macOSSigningConfigurationFromEnvironment()
+		if err != nil {
+			return packageResult{}, err
+		}
+		request.macOSApp, err = assembleMacOSApplication(context, signing)
+		if err != nil {
+			return packageResult{}, err
+		}
+	}
+	result, err := writeReleasePackage(request)
+	if err != nil {
+		return packageResult{}, err
+	}
+	if target.goos == "darwin" {
+		dmg, err := createMacOSDiskImage(context, request, signing)
+		if err != nil {
+			return packageResult{}, err
+		}
+		result.additional = append(result.additional, dmg)
+	}
+	return result, nil
 }
 
 func supportedReleaseTarget(goos, goarch string) (releaseTarget, error) {
@@ -82,14 +111,21 @@ func writeReleasePackage(request packageRequest) (packageResult, error) {
 	if err := agentskills.ValidateRuntimeDebugging(request.skill); err != nil {
 		return packageResult{}, fmt.Errorf("validate runtime debugging skill: %w", err)
 	}
-	executableName := "loomspan-console"
-	if request.target.goos == "windows" {
-		executableName += ".exe"
-	}
 	files := []packageFile{
 		{name: "LICENSE", source: request.license, mode: 0o644},
 		{name: "README.md", source: request.readme, mode: 0o644},
-		{name: executableName, source: request.executable, mode: 0o755},
+	}
+	if request.target.goos == "darwin" {
+		if request.macOSApp == "" {
+			return packageResult{}, fmt.Errorf("macOS application bundle is required")
+		}
+		files = append(files, macOSApplicationPackageFiles(request.macOSApp)...)
+	} else {
+		executableName := "loomspan-console"
+		if request.target.goos == "windows" {
+			executableName += ".exe"
+		}
+		files = append(files, packageFile{name: executableName, source: request.executable, mode: 0o755})
 	}
 	for _, relative := range agentskills.RuntimeDebuggingFiles {
 		archiveName := path.Join("skills", agentskills.RuntimeDebuggingSkillName, relative)
@@ -121,13 +157,21 @@ func writeReleasePackage(request packageRequest) (packageResult, error) {
 	if err := os.WriteFile(archivePath, archive.Bytes(), 0o644); err != nil {
 		return packageResult{}, err
 	}
-	digestBytes := sha256.Sum256(archive.Bytes())
-	digest := hex.EncodeToString(digestBytes[:])
-	sidecarPath := archivePath + ".sha256"
-	if err := os.WriteFile(sidecarPath, []byte(digest+"  "+archiveName+"\n"), 0o644); err != nil {
+	artifact, err := writeChecksumSidecar(archivePath, archive.Bytes())
+	if err != nil {
 		return packageResult{}, err
 	}
-	return packageResult{archive: archivePath, sidecar: sidecarPath, digest: digest}, nil
+	return packageResult{archive: artifact.file, sidecar: artifact.sidecar, digest: artifact.digest}, nil
+}
+
+func writeChecksumSidecar(filename string, contents []byte) (packageArtifact, error) {
+	digestBytes := sha256.Sum256(contents)
+	digest := hex.EncodeToString(digestBytes[:])
+	sidecarPath := filename + ".sha256"
+	if err := os.WriteFile(sidecarPath, []byte(digest+"  "+filepath.Base(filename)+"\n"), 0o644); err != nil {
+		return packageArtifact{}, err
+	}
+	return packageArtifact{file: filename, sidecar: sidecarPath, digest: digest}, nil
 }
 
 type packageFile struct {

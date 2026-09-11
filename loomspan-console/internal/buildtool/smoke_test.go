@@ -198,6 +198,23 @@ func TestStrictExtractionRejectsTraversalAndUnexpectedFiles(t *testing.T) {
 	}
 }
 
+func TestStrictExtractionAllowsOnlyDeclaredOptionalFiles(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "optional.zip")
+	writeSmokeZIP(t, archive, "package", map[string]smokeEntry{
+		"required": {0o644, []byte("required")},
+		"ticket":   {0o644, []byte("ticket")},
+	}, "")
+	if err := extractStrictArchiveWithOptional(archive, ".zip", filepath.Join(root, "out"), "package",
+		map[string]os.FileMode{"required": 0o644}, map[string]os.FileMode{"ticket": 0o644}); err != nil {
+		t.Fatal(err)
+	}
+	if err := extractStrictArchive(archive, ".zip", filepath.Join(root, "strict"), "package",
+		map[string]os.FileMode{"required": 0o644}); err == nil {
+		t.Fatal("optional file was accepted without an explicit declaration")
+	}
+}
+
 func TestPackageModeRejectsVersionMismatchBeforeBuilding(t *testing.T) {
 	err := run([]string{"package", "--expected-version", "not-the-product-version"})
 	if err == nil || !strings.Contains(err.Error(), "does not match root POM version") {

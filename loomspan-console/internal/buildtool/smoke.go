@@ -47,15 +47,27 @@ func smokeReleaseArchive(archive, version string) error {
 		return fmt.Errorf("resolve smoke staging directory: %w", err)
 	}
 	top := strings.TrimSuffix(expectedName, target.extension)
-	executableName := "loomspan-console"
+	expected := map[string]os.FileMode{"LICENSE": 0o644, "README.md": 0o644}
+	executableRelative := "loomspan-console"
 	if target.goos == "windows" {
-		executableName += ".exe"
+		executableRelative += ".exe"
+	} else if target.goos == "darwin" {
+		executableRelative = filepath.ToSlash(filepath.Join(macOSApplicationName, "Contents", "MacOS", "loomspan-console"))
+		for _, file := range macOSApplicationPackageFiles(filepath.Join(root, top, macOSApplicationName)) {
+			expected[file.name] = file.mode
+		}
 	}
-	expected := map[string]os.FileMode{"LICENSE": 0o644, "README.md": 0o644, executableName: 0o755}
+	if target.goos != "darwin" {
+		expected[executableRelative] = 0o755
+	}
 	for _, relative := range agentskills.RuntimeDebuggingFiles {
 		expected[filepath.ToSlash(filepath.Join("skills", agentskills.RuntimeDebuggingSkillName, relative))] = 0o644
 	}
-	if err := extractStrictArchive(archive, target.extension, root, top, expected); err != nil {
+	optional := map[string]os.FileMode{}
+	if target.goos == "darwin" {
+		optional[filepath.ToSlash(filepath.Join(macOSApplicationName, "Contents", "CodeResources"))] = 0o644
+	}
+	if err := extractStrictArchiveWithOptional(archive, target.extension, root, top, expected, optional); err != nil {
 		return err
 	}
 	extractedSkill := filepath.Join(root, top, "skills", agentskills.RuntimeDebuggingSkillName)
@@ -77,7 +89,31 @@ func smokeReleaseArchive(archive, version string) error {
 			return fmt.Errorf("packaged skill %s differs from canonical source", relative)
 		}
 	}
-	executable := filepath.Join(root, top, executableName)
+	if target.goos == "darwin" {
+		application := filepath.Join(root, top, macOSApplicationName)
+		plist, err := os.ReadFile(filepath.Join(application, "Contents", "Info.plist"))
+		if err != nil {
+			return err
+		}
+		if err := validateMacOSInfoPlist(plist, version); err != nil {
+			return err
+		}
+		icon, err := os.ReadFile(filepath.Join(application, "Contents", "Resources", macOSIconFilename))
+		if err != nil || len(icon) < 4 || string(icon[:4]) != "icns" {
+			return fmt.Errorf("packaged macOS icon is not an ICNS resource")
+		}
+		if err := runCommand(filepath.Dir(application), nil, "codesign", "--verify", "--deep", "--strict", application); err != nil {
+			return fmt.Errorf("verify packaged macOS application signature: %w", err)
+		}
+		if _, err := os.Stat(filepath.Join(application, "Contents", "CodeResources")); err == nil {
+			if err := runCommand(filepath.Dir(application), nil, "xcrun", "stapler", "validate", application); err != nil {
+				return fmt.Errorf("validate packaged macOS notarization ticket: %w", err)
+			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+	executable := filepath.Join(root, top, filepath.FromSlash(executableRelative))
 	versionOutput, err := commandOutput(filepath.Dir(executable), nil, executable, "--version")
 	if err != nil {
 		return err
@@ -106,6 +142,10 @@ func verifyArchiveSidecar(archive string) error {
 }
 
 func extractStrictArchive(filename, extension, destination, top string, expected map[string]os.FileMode) error {
+	return extractStrictArchiveWithOptional(filename, extension, destination, top, expected, nil)
+}
+
+func extractStrictArchiveWithOptional(filename, extension, destination, top string, expected, optional map[string]os.FileMode) error {
 	seen := make(map[string]bool)
 	write := func(name string, mode os.FileMode, contents io.Reader) error {
 		prefix := top + "/"
@@ -117,6 +157,9 @@ func extractStrictArchive(filename, extension, destination, top string, expected
 		}
 		relative := strings.TrimPrefix(name, prefix)
 		wantedMode, ok := expected[relative]
+		if !ok {
+			wantedMode, ok = optional[relative]
+		}
 		if !ok || seen[relative] || mode.Perm() != wantedMode {
 			return fmt.Errorf("unexpected archive entry %q with mode %04o", name, mode.Perm())
 		}
@@ -181,8 +224,10 @@ func extractStrictArchive(filename, extension, destination, top string, expected
 			}
 		}
 	}
-	if len(seen) != len(expected) {
-		return fmt.Errorf("archive contains %d required files, want %d", len(seen), len(expected))
+	for name := range expected {
+		if !seen[name] {
+			return fmt.Errorf("archive is missing required file %q", name)
+		}
 	}
 	return nil
 }

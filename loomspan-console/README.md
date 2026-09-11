@@ -43,9 +43,11 @@ The product version cannot be overridden. A release caller may add
 the root POM value.
 
 `package` performs the same clean native build, accepts only the current
-supported release target, and writes one deterministic archive plus its
-`.sha256` sidecar beneath `dist/`. Validate an extracted archive on its native
-host with:
+supported release target, and writes one archive plus its `.sha256` sidecar
+beneath `dist/`. Archives from identical unsigned inputs are deterministic;
+Developer ID timestamps intentionally make signed output unique. On macOS it
+also writes a DMG and checksum; the native DMG container is not byte-for-byte
+reproducible. Validate an extracted archive on its native host with:
 
 ```text
 go run ./internal/buildtool smoke --expected-version VERSION --archive dist/ARCHIVE
@@ -54,9 +56,10 @@ go run ./internal/buildtool smoke --expected-version VERSION --archive dist/ARCH
 The release names are
 `loomspan-console-VERSION-windows-x86_64.zip`,
 `loomspan-console-VERSION-linux-x86_64.tar.gz`, and
-`loomspan-console-VERSION-macos-arm64.tar.gz`. Each has one top-level directory
-containing the executable, `LICENSE`, the runtime `README.md`, and the exact
-six-file portable Agent Skill at `skills/loomspan/`
+`loomspan-console-VERSION-macos-arm64.tar.gz`, with an additional
+`loomspan-console-VERSION-macos-arm64.dmg`. Each archive has one top-level
+directory containing the executable—or `Loomspan Console.app` on macOS—plus
+`LICENSE`, the runtime `README.md`, and the exact six-file portable Agent Skill at `skills/loomspan/`
 (`SKILL.md` plus five files in `references/`). The canonical skill remains
 unversioned while Loomspan is unreleased; its contents are packaged and tested
 atomically with the Console and are not target negotiation.
@@ -65,7 +68,19 @@ PowerShell compare `(Get-FileHash -Algorithm SHA256 .\\ARCHIVE).Hash` with the
 matching entry. `.github/workflows/console-ci.yml` runs Java fixture/adapter,
 canonical Console, and Playwright verification. The tag/manual validation
 workflow in `.github/workflows/console-release.yml` builds and smokes all three
-native targets; only its final tag-gated job can publish.
+native targets, verifies the macOS disk image, and publishes checksums for all
+four artifacts; only its final tag-gated job can publish.
+
+The macOS package is an ARM64 application bundle with an ICNS icon generated
+from `release/icon.png`. Without Apple credentials the build tool applies an
+ad-hoc signature and emits an unnotarized `.app` and DMG. GitHub Actions uses a
+Developer ID and submits and staples both the app and DMG when all corresponding
+repository secrets are configured: `MACOS_CERTIFICATE_P12_BASE64`,
+`MACOS_CERTIFICATE_PASSWORD`, `MACOS_SIGNING_IDENTITY`,
+`MACOS_NOTARY_KEY_P8_BASE64`, `MACOS_NOTARY_KEY_ID`, and
+`MACOS_NOTARY_ISSUER_ID`. Signing can be enabled without notarization by setting
+only the first three secrets; partial signing or notarization secret sets fail
+closed.
 
 Run the browser workflow suite after a canonical build with:
 
@@ -439,6 +454,15 @@ On Windows, run `.\build\loomspan-console.exe` instead. Then start Vite:
 cd web
 npm ci
 npm run dev
+```
+
+The shared Windows/macOS application icon source is `release/icon.png`. The
+Windows executable embeds a committed architecture-specific Go resource object
+generated from that image. After replacing the source image, regenerate the
+Windows resource from the module directory with:
+
+```text
+go generate ./cmd/loomspan-console
 ```
 
 Vite is the development browser origin at `127.0.0.1:5173`. It handles HMR and

@@ -78,6 +78,61 @@ jobs:
           cache-dependency-path: loomspan-console/web/package-lock.json
       - name: Pin npm
         run: npm install --global npm@12.0.2
+      - name: Configure optional macOS signing and notarization
+        if: matrix.target == 'macos-arm64'
+        shell: bash
+        env:
+          CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          NOTARY_KEY_P8_BASE64: ${{ secrets.MACOS_NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          signing_values=0
+          for value in "$CERTIFICATE_P12_BASE64" "$CERTIFICATE_PASSWORD" "$SIGNING_IDENTITY"; do
+            [[ -n "$value" ]] && signing_values=$((signing_values + 1))
+          done
+          notary_values=0
+          for value in "$NOTARY_KEY_P8_BASE64" "$NOTARY_KEY_ID" "$NOTARY_ISSUER_ID"; do
+            [[ -n "$value" ]] && notary_values=$((notary_values + 1))
+          done
+          if [[ "$signing_values" -ne 0 && "$signing_values" -ne 3 ]]; then
+            echo "macOS signing secrets must be configured together" >&2
+            exit 1
+          fi
+          if [[ "$notary_values" -ne 0 && "$notary_values" -ne 3 ]]; then
+            echo "macOS notarization secrets must be configured together" >&2
+            exit 1
+          fi
+          if [[ "$notary_values" -eq 3 && "$signing_values" -ne 3 ]]; then
+            echo "macOS notarization secrets require the signing secrets" >&2
+            exit 1
+          fi
+          if [[ "$signing_values" -eq 0 ]]; then
+            echo "Apple credentials are absent; producing an ad-hoc-signed, unnotarized release"
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/loomspan-signing.keychain-db"
+          certificate="$RUNNER_TEMP/loomspan-signing.p12"
+          keychain_password=$(openssl rand -hex 24)
+          printf '%s' "$CERTIFICATE_P12_BASE64" | base64 -D > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" -P "$CERTIFICATE_PASSWORD" -A -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          echo "LOOMSPAN_MACOS_SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
+          if [[ "$notary_values" -eq 3 ]]; then
+            notary_key="$RUNNER_TEMP/AuthKey_$NOTARY_KEY_ID.p8"
+            printf '%s' "$NOTARY_KEY_P8_BASE64" | base64 -D > "$notary_key"
+            chmod 600 "$notary_key"
+            echo "LOOMSPAN_MACOS_NOTARY_KEY_PATH=$notary_key" >> "$GITHUB_ENV"
+            echo "LOOMSPAN_MACOS_NOTARY_KEY_ID=$NOTARY_KEY_ID" >> "$GITHUB_ENV"
+            echo "LOOMSPAN_MACOS_NOTARY_ISSUER_ID=$NOTARY_ISSUER_ID" >> "$GITHUB_ENV"
+          fi
       - name: Build deterministic native package
         working-directory: loomspan-console
         run: go run ./internal/buildtool package --expected-version "${{ needs.validate.outputs.version }}"
@@ -85,6 +140,11 @@ jobs:
         working-directory: loomspan-console
         shell: bash
         run: go run ./internal/buildtool smoke --expected-version "${{ needs.validate.outputs.version }}" --archive "dist/loomspan-console-${{ needs.validate.outputs.version }}-${{ matrix.target }}${{ matrix.target == 'windows-x86_64' && '.zip' || '.tar.gz' }}"
+      - name: Verify macOS disk image
+        if: matrix.target == 'macos-arm64'
+        working-directory: loomspan-console
+        shell: bash
+        run: hdiutil verify "dist/loomspan-console-${{ needs.validate.outputs.version }}-macos-arm64.dmg"
       - name: Upload archive and checksum
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -92,6 +152,7 @@ jobs:
           path: |
             loomspan-console/dist/*.zip
             loomspan-console/dist/*.tar.gz
+            loomspan-console/dist/*.dmg
             loomspan-console/dist/*.sha256
           if-no-files-found: error
           retention-days: 7
@@ -113,13 +174,13 @@ jobs:
           set -euo pipefail
           mkdir release-output
           mapfile -t ALL_FILES < <(find release-input -type f | sort)
-          test "${#ALL_FILES[@]}" -eq 6
-          mapfile -t ARCHIVES < <(find release-input -type f \( -name '*.zip' -o -name '*.tar.gz' \) | sort)
-          test "${#ARCHIVES[@]}" -eq 3
+          test "${#ALL_FILES[@]}" -eq 8
+          mapfile -t ARCHIVES < <(find release-input -type f \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.dmg' \) | sort)
+          test "${#ARCHIVES[@]}" -eq 4
           mapfile -t SIDECARS < <(find release-input -type f -name '*.sha256' | sort)
-          test "${#SIDECARS[@]}" -eq 3
+          test "${#SIDECARS[@]}" -eq 4
           test -z "$(printf '%s\n' "${ARCHIVES[@]}" | xargs -n1 basename | sort | uniq -d)"
-          for expected in "loomspan-console-$VERSION-windows-x86_64.zip" "loomspan-console-$VERSION-linux-x86_64.tar.gz" "loomspan-console-$VERSION-macos-arm64.tar.gz"; do
+          for expected in "loomspan-console-$VERSION-windows-x86_64.zip" "loomspan-console-$VERSION-linux-x86_64.tar.gz" "loomspan-console-$VERSION-macos-arm64.tar.gz" "loomspan-console-$VERSION-macos-arm64.dmg"; do
             archive=$(find release-input -type f -name "$expected")
             test -n "$archive"
             sidecar="$archive.sha256"

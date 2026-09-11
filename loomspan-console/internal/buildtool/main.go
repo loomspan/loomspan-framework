@@ -75,6 +75,9 @@ func run(arguments []string) error {
 			return err
 		}
 		fmt.Printf("Created %s\nCreated %s\n", result.archive, result.sidecar)
+		for _, artifact := range result.additional {
+			fmt.Printf("Created %s\nCreated %s\n", artifact.file, artifact.sidecar)
+		}
 	}
 	return nil
 }
