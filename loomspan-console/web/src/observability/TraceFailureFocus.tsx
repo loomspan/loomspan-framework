@@ -1,11 +1,17 @@
-import type { TraceAnalysisSummary, TraceFailure, TraceFrame } from "../api/contracts";
+import type { TraceAnalysisSummary, TraceFailure, TraceFrame, TraceRange, TraceSource } from "../api/contracts";
 import { formatDuration } from "../duration";
+import { TraceAttemptDiagnostics } from "./TraceAttemptDiagnostics";
 
-export function TraceFailureFocus({ summary, failure, frame, onView }: {
+export function TraceFailureFocus({ summary, failure, frame, onView, traceId, source = "TARGET", scopeGeneration = 0, verifyScope, onArtifactUnavailable }: {
   summary: TraceAnalysisSummary;
   failure?: TraceFailure;
   frame?: TraceFrame;
   onView: (view: "timeline" | "usage" | "records") => void;
+  traceId: string;
+  source?: TraceSource;
+  scopeGeneration?: number;
+  verifyScope?: (response: TraceRange) => Promise<TraceRange>;
+  onArtifactUnavailable?: (error: unknown) => void;
 }) {
   if ((summary.outcome !== "FAILED" && summary.outcome !== "ABORTED") || !summary.terminalFailureId) return null;
   return <section className="failure-focus" aria-labelledby="failure-focus-title">
@@ -25,6 +31,16 @@ export function TraceFailureFocus({ summary, failure, frame, onView }: {
       <div><dt>Evidence gaps</dt><dd>{summary.gapCount} gaps; {summary.uncertaintyCount} uncertainties</dd></div>
     </dl>
     <p>This view relates directly recorded evidence. It does not identify root cause.</p>
+    {failure?.providerAttemptContentRef && <TraceAttemptDiagnostics
+      traceId={traceId}
+      source={source}
+      recordSequence={failure.sequence}
+      contentRef={failure.providerAttemptContentRef}
+      scopeGeneration={scopeGeneration}
+      verifyScope={verifyScope}
+      onArtifactUnavailable={onArtifactUnavailable}
+      ariaLabel="Linked provider attempt diagnostics"
+    />}
     <div className="trace-actions" aria-label="Related failure evidence">
       <button type="button" onClick={() => onView("timeline")}>Show in timeline</button>
       <button type="button" onClick={() => onView("usage")}>Show usage</button>

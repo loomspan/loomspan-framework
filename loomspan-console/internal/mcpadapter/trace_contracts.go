@@ -268,18 +268,19 @@ type validationDTO struct {
 	AttemptNumber   int64  `json:"attemptNumber"`
 }
 type failureDTO struct {
-	FailureID        string          `json:"failureId"`
-	Terminal         bool            `json:"terminal"`
-	Sequence         int64           `json:"sequence"`
-	TimestampMillis  int64           `json:"timestampMillis"`
-	RecordType       string          `json:"recordType"`
-	FrameID          string          `json:"frameId,omitempty"`
-	Route            string          `json:"route,omitempty"`
-	AttemptID        string          `json:"attemptId,omitempty"`
-	RetrySequenceID  string          `json:"retrySequenceId,omitempty"`
-	ValidationStatus string          `json:"validationStatus,omitempty"`
-	ExceptionType    string          `json:"exceptionType,omitempty"`
-	Diagnostics      []diagnosticDTO `json:"diagnostics"`
+	FailureID                 string          `json:"failureId"`
+	Terminal                  bool            `json:"terminal"`
+	Sequence                  int64           `json:"sequence"`
+	TimestampMillis           int64           `json:"timestampMillis"`
+	RecordType                string          `json:"recordType"`
+	FrameID                   string          `json:"frameId,omitempty"`
+	Route                     string          `json:"route,omitempty"`
+	AttemptID                 string          `json:"attemptId,omitempty"`
+	RetrySequenceID           string          `json:"retrySequenceId,omitempty"`
+	ValidationStatus          string          `json:"validationStatus,omitempty"`
+	ExceptionType             string          `json:"exceptionType,omitempty"`
+	Diagnostics               []diagnosticDTO `json:"diagnostics"`
+	ProviderAttemptContentRef string          `json:"providerAttemptContentRef,omitempty"`
 }
 type searchMatchDTO struct {
 	Sequence      int64  `json:"sequence"`

@@ -281,7 +281,7 @@ func (router *Router) traceAnalysisFailures(w http.ResponseWriter, r *http.Reque
 		for _, d := range x.Diagnostics {
 			diagnostics = append(diagnostics, diagnosticDescriptorDTO{Ordinal: d.Ordinal, Kind: d.Kind, ContentType: d.ContentType, Truncated: d.Truncated, CaptureLimitBytes: d.CaptureLimitBytes, DecodedBytes: d.DecodedBytes})
 		}
-		items = append(items, failureDTO{FailureID: x.FailureID, Terminal: x.Terminal, Sequence: x.Sequence, TimestampMillis: x.TimestampMillis, RecordType: x.RecordType, FrameID: x.FrameID, Route: x.Route, AttemptID: x.AttemptID, RetrySequenceID: x.RetrySequenceID, ValidationStatus: x.ValidationStatus, ExceptionType: x.ExceptionType, ContextSummary: x.ContextSummary, Diagnostics: diagnostics})
+		items = append(items, failureDTO{FailureID: x.FailureID, Terminal: x.Terminal, Sequence: x.Sequence, TimestampMillis: x.TimestampMillis, RecordType: x.RecordType, FrameID: x.FrameID, Route: x.Route, AttemptID: x.AttemptID, RetrySequenceID: x.RetrySequenceID, ValidationStatus: x.ValidationStatus, ExceptionType: x.ExceptionType, ContextSummary: x.ContextSummary, Diagnostics: diagnostics, ProviderAttemptContentRef: x.ProviderAttemptContentRef})
 	}
 	router.writeEvidenceJSON(w, s, pageDTO[failureDTO]{Source: s.Source, TargetScopeID: string(s.TargetScope), Items: items, HasMore: v.HasMore, NextCursor: nullCursor(v.NextCursor)})
 }
@@ -676,19 +676,20 @@ type validationDTO struct {
 	AttemptNumber   int64  `json:"attemptNumber"`
 }
 type failureDTO struct {
-	FailureID        string                    `json:"failureId"`
-	Terminal         bool                      `json:"terminal"`
-	Sequence         int64                     `json:"sequence"`
-	TimestampMillis  int64                     `json:"timestampMillis"`
-	RecordType       string                    `json:"recordType"`
-	FrameID          string                    `json:"frameId"`
-	Route            string                    `json:"route"`
-	AttemptID        string                    `json:"attemptId"`
-	RetrySequenceID  string                    `json:"retrySequenceId"`
-	ValidationStatus string                    `json:"validationStatus"`
-	ExceptionType    string                    `json:"exceptionType,omitempty"`
-	ContextSummary   string                    `json:"contextSummary,omitempty"`
-	Diagnostics      []diagnosticDescriptorDTO `json:"diagnostics,omitempty"`
+	FailureID                 string                    `json:"failureId"`
+	Terminal                  bool                      `json:"terminal"`
+	Sequence                  int64                     `json:"sequence"`
+	TimestampMillis           int64                     `json:"timestampMillis"`
+	RecordType                string                    `json:"recordType"`
+	FrameID                   string                    `json:"frameId"`
+	Route                     string                    `json:"route"`
+	AttemptID                 string                    `json:"attemptId"`
+	RetrySequenceID           string                    `json:"retrySequenceId"`
+	ValidationStatus          string                    `json:"validationStatus"`
+	ExceptionType             string                    `json:"exceptionType,omitempty"`
+	ContextSummary            string                    `json:"contextSummary,omitempty"`
+	Diagnostics               []diagnosticDescriptorDTO `json:"diagnostics,omitempty"`
+	ProviderAttemptContentRef string                    `json:"providerAttemptContentRef,omitempty"`
 }
 type diagnosticDescriptorDTO struct {
 	Ordinal           int    `json:"ordinal"`

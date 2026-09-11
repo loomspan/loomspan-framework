@@ -539,7 +539,9 @@ function TraceExplorerEvidence({ traceId, source = "TARGET", onArtifactUnavailab
     {!summary ? <p role="status">Loading trace evidence&hellip;</p> : <>
       <p className="trace-explorer-summary">{summary.outcome} &middot; {summary.frameCount} frames &middot; {summary.recordCount} records{!summary.usageComplete && " · usage incomplete"}</p>
       {hasFailurePanel && <section id="trace-failure-panel" className="trace-failure-panel" aria-label="Trace failure details" tabIndex={-1}>
-        <TraceFailureFocus summary={summary} failure={selectedFailure} frame={selectedFrame} onView={showFailureView} />
+        <TraceFailureFocus summary={summary} failure={selectedFailure} frame={selectedFrame} onView={showFailureView}
+          traceId={traceId} source={source} scopeGeneration={source === "TARGET" ? scopeGeneration : 0}
+          verifyScope={verifyScope} onArtifactUnavailable={(value) => reportError(value, true)} />
         <TraceFailureDiagnostic traceId={traceId} source={source} failure={selectedFailure} scopeGeneration={source === "TARGET" ? scopeGeneration : 0} verifyScope={verifyScope} />
       </section>}
       {breadcrumbs.length > 0 && <nav className="trace-breadcrumbs" aria-label="Selected frame breadcrumbs">{breadcrumbs.map((frame, index) => <span key={frame.frameId}>{index > 0 && " / "}<button type="button" onClick={() => selectFrame(frame.frameId)}>{frame.route || frame.frameId}</button></span>)}</nav>}

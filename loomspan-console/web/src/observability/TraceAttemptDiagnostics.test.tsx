@@ -18,6 +18,7 @@ function base64Range(bytes: Uint8Array, actualStart: number, totalLength: number
 
 const payload = JSON.stringify({ diagnostics: [
   { kind: "JAVA_STACK_TRACE", contentType: "text/plain; charset=utf-8", text: "wrapper\n<script>alert(1)</script>\nCaused by: timeout", truncated: true, captureLimitBytes: 1048576 },
+  { kind: "LOOMSPAN_PROVIDER_GUIDANCE", contentType: "text/plain; charset=utf-8", text: "Check loomspan.connections.primary.api-key", truncated: false, captureLimitBytes: 8192 },
   { kind: "PROVIDER_ERROR", contentType: "application/json", text: "{\"message\":\"overloaded\"}", truncated: false, captureLimitBytes: 4096 },
 ] });
 
@@ -38,7 +39,7 @@ test("loads every range and renders stack and provider diagnostics in recorded o
   expect(api.getContentRange).toHaveBeenNthCalledWith(1, "trace-1", "opaque", undefined, "TARGET");
   expect(api.getContentRange).toHaveBeenNthCalledWith(2, "trace-1", "opaque", "next-1", "TARGET");
   const headings = screen.getAllByRole("heading", { level: 6 });
-  expect(headings.map((heading) => heading.textContent)).toEqual(["Java stack trace", "Text diagnostic (PROVIDER_ERROR)"]);
+  expect(headings.map((heading) => heading.textContent)).toEqual(["Java stack trace", "Loomspan provider guidance", "Text diagnostic (PROVIDER_ERROR)"]);
   expect(screen.getByText("Yes")).toBeInTheDocument();
   expect(screen.getByText("1048576 bytes")).toBeInTheDocument();
   expect(screen.getByText(/<script>alert\(1\)<\/script>/)).toBeInTheDocument();

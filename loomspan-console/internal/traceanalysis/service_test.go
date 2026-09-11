@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -65,10 +66,14 @@ func deriveSessionID(traceID string) string {
 // traceanalysis.Service + artifact.Service composition and returns a harness
 // ready for query tests.
 func newServiceTestHarness(t *testing.T, traceID, ndjson string) *serviceTestHarness {
-	return newServiceTestHarnessForVersion(t, traceID, ndjson, "")
+	return newServiceTestHarnessForOutcomeAndVersion(t, traceID, ndjson, "SUCCEEDED", "")
 }
 
 func newServiceTestHarnessForVersion(t *testing.T, traceID, ndjson, compatibilityVersion string) *serviceTestHarness {
+	return newServiceTestHarnessForOutcomeAndVersion(t, traceID, ndjson, "SUCCEEDED", compatibilityVersion)
+}
+
+func newServiceTestHarnessForOutcomeAndVersion(t *testing.T, traceID, ndjson, outcome, compatibilityVersion string) *serviceTestHarness {
 	t.Helper()
 	body := []byte(ndjson)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -82,8 +87,8 @@ func newServiceTestHarnessForVersion(t *testing.T, traceID, ndjson, compatibilit
 			// The session ID must match the NDJSON content's sessionId.
 			// All test traces use "session-" + (traceID without "trace-" prefix).
 			sessionID := deriveSessionID(traceID)
-			_, _ = fmt.Fprintf(w, `{"targetScopeId":"scope-test","traceId":"%s","sessionId":"%s","entrySkill":"CheckDns","outcome":"SUCCEEDED","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":%d,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-08-01T12:00:00Z"}`,
-				traceID, sessionID, len(body))
+			_, _ = fmt.Fprintf(w, `{"targetScopeId":"scope-test","traceId":"%s","sessionId":"%s","entrySkill":"CheckDns","outcome":"%s","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":%d,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-08-01T12:00:00Z"}`,
+				traceID, sessionID, outcome, len(body))
 		case strings.HasSuffix(r.URL.Path, "/traces/"+traceID+"/artifact"):
 			w.Header().Set("Content-Type", applicationclient.ArtifactMediaType)
 			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
@@ -132,7 +137,7 @@ func newServiceTestHarnessForVersion(t *testing.T, traceID, ndjson, compatibilit
 			return artifact.TraceMetadata{
 				TraceID:           traceID,
 				SessionID:         deriveSessionID(traceID),
-				Outcome:           "SUCCEEDED",
+				Outcome:           outcome,
 				SizeBytes:         int64(len(body)),
 				PersistencePolicy: "ALWAYS",
 			}, nil
@@ -1009,6 +1014,50 @@ func TestServiceQueryFailures(t *testing.T) {
 	}
 	if len(page.Items) != 0 {
 		t.Fatalf("expected 0 failures, got %d", len(page.Items))
+	}
+}
+
+func TestTerminalProviderFailureRetainsOnlyItsValidatedFinalAttemptPayload(t *testing.T) {
+	attempt := &attemptBuild{attemptID: "attempt-1", retrySequenceID: "retry-1", hasFailure: true,
+		retryDecision: "DO_NOT_RETRY", payloadID: "attempt-payload", ownerSequence: 17}
+	attempts := &attemptGraph{attempts: map[string]*attemptBuild{"attempt-1": attempt},
+		lastByRetry: map[string]*attemptBuild{"retry-1": attempt}}
+	graph := newFailureGraph()
+	graph.failures["failure-terminal"] = failureResult{FailureID: "failure-terminal", Terminal: true,
+		AttemptID: "attempt-1", RetrySequenceID: "retry-1"}
+
+	if domain := graph.validateTerminalAttemptLink("failure-terminal", attempts, "trace"); domain != nil {
+		t.Fatalf("validate terminal attempt link: %v", domain)
+	}
+	if got := graph.failures["failure-terminal"].ProviderAttemptPayloadID; got != "attempt-payload" {
+		t.Fatalf("provider attempt payload=%q", got)
+	}
+	if got := graph.failures["failure-terminal"].ProviderAttemptSequence; got != 17 {
+		t.Fatalf("provider attempt sequence=%d", got)
+	}
+}
+
+func TestTerminalProviderFailureFixtureProjectsReadableInlineAttemptContent(t *testing.T) {
+	traceID := "trace-terminal-provider-failure-actionable"
+	fixture, err := os.ReadFile(filepath.Join(fixtureRoot(t), "traces", "terminal-provider-failure-actionable.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newServiceTestHarnessForOutcomeAndVersion(t, traceID, string(fixture), "FAILED", fixtureCompatibilityVersion)
+
+	page, domain := h.service.QueryFailures(context.Background(), targetEvidence(h.scopeID), FailureQuery{Handle: h.handle, PageSize: 10})
+	if domain != nil || len(page.Items) != 1 {
+		t.Fatalf("failure query: page=%+v domain=%v", page, domain)
+	}
+	ref := page.Items[0].ProviderAttemptContentRef
+	if ref == "" {
+		t.Fatal("terminal provider failure has no attempt content reference")
+	}
+	content, domain := h.service.ReadContentRange(context.Background(), targetEvidence(h.scopeID), RangeRequest{
+		Handle: h.handle, ContentRef: ref, Start: 0, MaxBytes: 64 << 10,
+	})
+	if domain != nil || content.HasMore || !bytes.Contains(content.Content, []byte(`"kind":"LOOMSPAN_PROVIDER_GUIDANCE"`)) {
+		t.Fatalf("attempt content=%q hasMore=%v domain=%v", content.Content, content.HasMore, domain)
 	}
 }
 

@@ -85,6 +85,23 @@ class NamedAiConnectionRegistryTests {
                 .isSameAs(disabled);
     }
 
+    @Test
+    void genericGeminiConstructionFailureNamesOnlyApplicableSettings() {
+        SpringAiProviderIntegration integration = mock(SpringAiProviderIntegration.class);
+        LoomspanProperties.ConnectionProperties properties = geminiConnection();
+        when(integration.create("gemini", properties)).thenThrow(new IllegalArgumentException("unsafe detail"));
+
+        assertThatThrownBy(() -> new NamedAiConnectionRegistry(Map.of("gemini", properties), integration))
+                .hasMessageContaining("loomspan.connections.gemini.api-key")
+                .hasMessageContaining("loomspan.connections.gemini.gemini.vertex-ai")
+                .hasMessageContaining("loomspan.connections.gemini.gemini.project-id")
+                .hasMessageContaining("loomspan.connections.gemini.gemini.location")
+                .hasMessageContaining("loomspan.connections.gemini.gemini.credentials-uri")
+                .hasMessageNotContaining("loomspan.connections.gemini.base-url")
+                .hasMessageNotContaining("unsafe detail")
+                .hasNoCause();
+    }
+
     private static ProviderConnectionRuntime runtime(ChatModel model) {
         return new ProviderConnectionRuntime(model, AiDriver.OLLAMA, AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
                 ProviderRetryPolicy.from(new LoomspanProperties.ProviderRetryProperties()), ignored -> ProviderFailureDetails.unknown());

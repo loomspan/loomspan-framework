@@ -80,7 +80,7 @@ class SensitiveConnectionDataRedactionTest {
                 descriptor, meterTags, output.getAll());
         assertThat(allOwnedOutput)
                 .doesNotContain(API_KEY, HEADER_VALUE, BASE_URL, CREDENTIAL_URI)
-                .contains("safe-connection", "OPENAI");
+                .contains("safe-connection", "OPENAI", "loomspan.connections.sensitive.base-url");
     }
 
     private static String registryFailure(LoomspanProperties.ConnectionProperties connection) {

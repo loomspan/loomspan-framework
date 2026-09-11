@@ -1,0 +1,107 @@
+{
+  "case" : "terminal-provider-failure-actionable",
+  "valid" : true,
+  "traceId" : "trace-terminal-provider-failure-actionable",
+  "sessionId" : "session-terminal-provider-failure-actionable",
+  "outcome" : "FAILED",
+  "terminalFailureId" : "failure-terminal-provider",
+  "attributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "terminalUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : false,
+  "attempts" : [ {
+    "retrySequenceId" : "retry-terminal-provider",
+    "attemptId" : "attempt-terminal-provider",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "FAILED",
+    "failureClassification" : "PERMANENT",
+    "failureCategory" : "AUTHENTICATION",
+    "retryDecision" : "DO_NOT_RETRY",
+    "retryDelayMillis" : 0,
+    "retryDelaySource" : "NONE",
+    "httpStatus" : 401,
+    "usage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "usageComplete" : false
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "retry-terminal-provider",
+    "usage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "usageComplete" : false
+  } ],
+  "validationLinks" : [ ],
+  "frames" : [ {
+    "frameId" : "root",
+    "parentFrameId" : null,
+    "frameType" : "ROOT_MISSION",
+    "inclusiveDurationMillis" : 3000,
+    "selfDurationMillis" : 2000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "diagnoseProvider"
+  }, {
+    "frameId" : "model",
+    "parentFrameId" : "root",
+    "frameType" : "MODEL_CALL",
+    "inclusiveDurationMillis" : 1000,
+    "selfDurationMillis" : 1000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "diagnoseProvider#model"
+  } ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

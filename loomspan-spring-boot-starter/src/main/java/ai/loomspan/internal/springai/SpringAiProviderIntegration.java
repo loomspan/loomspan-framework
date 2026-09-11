@@ -15,6 +15,7 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.genai.Client;
 import com.google.genai.errors.ApiException;
 import com.anthropic.errors.AnthropicServiceException;
+import com.openai.errors.OpenAIServiceException;
 import io.micrometer.observation.ObservationRegistry;
 import com.google.genai.types.HttpOptions;
 import com.google.genai.types.HttpRetryOptions;
@@ -249,6 +250,17 @@ public final class SpringAiProviderIntegration
                 String retryAfter = response.headers().values("Retry-After").stream().findFirst().orElse(null);
                 return httpFailure(response.statusCode(), retryAfter, body, truncated);
             }
+            if (current instanceof OpenAIServiceException response)
+            {
+                byte[] body = openAiBody(response.body());
+                boolean truncated = body.length > DIAGNOSTIC_LIMIT_BYTES;
+                if (truncated) body = java.util.Arrays.copyOf(body, DIAGNOSTIC_LIMIT_BYTES);
+                String retryAfter = response.headers().values("Retry-After").stream().findFirst().orElse(null);
+                ProviderFailureDetails base = httpFailure(response.statusCode(), retryAfter, body, truncated);
+                return new ProviderFailureDetails(base.classification(), base.category(), base.httpStatus(),
+                        base.retryAfter(), openAiOptional(response::type), openAiOptional(response::code),
+                        base.summary(), base.diagnostics());
+            }
             if (current instanceof RestClientResponseException response)
             {
                 byte[] body = response.getResponseBodyAsByteArray();
@@ -280,6 +292,37 @@ public final class SpringAiProviderIntegration
             current = current.getCause();
         }
         return ProviderFailureDetails.unknown();
+    }
+
+    private byte[] openAiBody(com.openai.core.JsonValue body)
+    {
+        try
+        {
+            return objectMapper.writeValueAsBytes(body.convert(Object.class));
+        }
+        catch (RuntimeException ignored)
+        {
+            try
+            {
+                return objectMapper.writeValueAsBytes(String.valueOf(body));
+            }
+            catch (tools.jackson.core.JacksonException impossible)
+            {
+                return new byte[0];
+            }
+        }
+    }
+
+    private static String openAiOptional(java.util.function.Supplier<java.util.Optional<String>> accessor)
+    {
+        try
+        {
+            return accessor.get().orElse(null);
+        }
+        catch (RuntimeException ignored)
+        {
+            return null;
+        }
     }
 
     private boolean isProviderReadTimeout(Throwable failure)
@@ -397,8 +440,18 @@ public final class SpringAiProviderIntegration
 
     private static Map<String, Object> diagnostic(byte[] body, boolean truncated)
     {
+        // TODO: Scrub sensitive provider diagnostic content at this capture/emission boundary.
+        String text = new String(body, StandardCharsets.UTF_8);
+        byte[] encoded = text.getBytes(StandardCharsets.UTF_8);
+        if (encoded.length > DIAGNOSTIC_LIMIT_BYTES)
+        {
+            int end = DIAGNOSTIC_LIMIT_BYTES;
+            while (end > 0 && (encoded[end] & 0xc0) == 0x80) end--;
+            text = new String(encoded, 0, end, StandardCharsets.UTF_8);
+            truncated = true;
+        }
         return Map.of("kind", "PROVIDER_ERROR", "contentType", "application/json; charset=utf-8",
-                "text", new String(body, StandardCharsets.UTF_8), "truncated", truncated,
+                "text", text, "truncated", truncated,
                 "captureLimitBytes", DIAGNOSTIC_LIMIT_BYTES);
     }
 

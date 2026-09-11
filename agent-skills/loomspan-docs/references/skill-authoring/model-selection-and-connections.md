@@ -80,6 +80,10 @@ A model alias MAY declare `thinking-levels`. A skill's `thinking_level` MUST be 
 
 Startup errors include the complete property path for missing, unknown, or driver-inapplicable settings. Runtime resolution errors identify the skill, framework model, connection, driver, and provider model. Start diagnosis at the named connection, then verify its driver-specific requirements and the alias reference.
 
+Terminal provider failures emit one framework-owned WARN after retry policy decides that the request will escape. The warning identifies the framework model, connection, driver, and provider model and names the settings to investigate. Authentication points to the connection credential setting without claiming it is missing. Connectivity points to network reachability and the driver's applicable connection settings—`loomspan.connections.<name>.base-url` for OpenAI, Anthropic, and Ollama, or Gemini's `api-key`/`gemini.vertex-ai` mode plus `gemini.project-id` and `gemini.location`—without proving that the configured endpoint is wrong. Invalid-request and HTTP 404 guidance points to those driver-applicable connection settings and `loomspan.models.<framework-model>.provider-model` because endpoint, model, and access failures can be ambiguous. A retry that later recovers emits no terminal WARN.
+
+The identical bounded guidance is recorded on every failed physical attempt, including recovered attempts, so diagnosis can continue in Console alongside the original provider evidence. Provider evidence remains untrusted diagnostic content and may contain sensitive values; Loomspan does not generally scrub it. Follow [traces-and-debugging.md](traces-and-debugging.md) for the exact failure-to-attempt inspection path.
+
 ## Source verification anchors
 
 - Configuration and validation: `LoomspanProperties`, `LoomspanPropertiesTest`.

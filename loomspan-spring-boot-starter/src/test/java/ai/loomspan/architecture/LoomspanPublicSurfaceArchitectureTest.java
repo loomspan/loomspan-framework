@@ -72,6 +72,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.provider.ProviderFailureCategory", "Public only for typed internal provider failure diagnostics."),
             Map.entry("ai.loomspan.internal.provider.ProviderFailureClassification", "Public only for typed internal provider retry classification."),
             Map.entry("ai.loomspan.internal.provider.ProviderFailureDetails", "Public only to carry sanitized provider failure details between internal integration, retry, and trace packages."),
+            Map.entry("ai.loomspan.internal.provider.ProviderFailureGuidance", "Public only to carry bounded framework-owned provider guidance into the internal chat attempt boundary."),
             Map.entry("ai.loomspan.internal.provider.ProviderFailureTranslator", "Public only for the neutral retry advisor to invoke a version-scoped provider failure translator."),
             Map.entry("ai.loomspan.internal.provider.ProviderRetryDecider", "Public only for internal provider retry policy evaluation by the chat advisor."),
             Map.entry("ai.loomspan.internal.provider.ProviderRetryDecision", "Public only to carry a typed internal retry decision into tracing and execution."),

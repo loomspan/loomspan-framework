@@ -506,15 +506,20 @@ test("expired local artifact clears explorer state and requests reacquisition", 
 });
 
 test("failure focus selects the recorded terminal failure and never loads raw payloads", async () => {
+  const attemptPayload = JSON.stringify({ diagnostics: [{ kind: "LOOMSPAN_PROVIDER_GUIDANCE", contentType: "text/plain; charset=utf-8", text: "Check loomspan.connections.primary.api-key", truncated: false, captureLimitBytes: 8192 }] });
+  api.getContentRange.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", actualStart: 0, actualEnd: attemptPayload.length, totalLength: attemptPayload.length, contentType: "application/json", encoding: "TEXT", content: attemptPayload, hasMore: false, nextCursor: null });
   api.getTraceAnalysisSummary.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", traceId: "trace-1", sessionId: "session-1", outcome: "FAILED", terminalFailureId: "terminal-1", recordCount: 120, frameCount: 1, attemptCount: 1, retryCount: 1, validationCount: 1, failureCount: 2, payloadCount: 1, gapCount: 1, uncertaintyCount: 1, rootFrameIds: ["f-1"], usageComplete: false, configuredLimits: null });
-  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "recovered", terminal: false, sequence: 3, timestampMillis: 3, recordType: "ERROR_RECORDED", frameId: "", route: "", attemptId: "", retrySequenceId: "", validationStatus: "" }], hasMore: true, nextCursor: "failure-next" }).mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "terminal-1", terminal: true, sequence: 119, timestampMillis: 119, recordType: "ERROR_RECORDED", frameId: "f-1", route: "hello", attemptId: "a-1", retrySequenceId: "r-1", validationStatus: "exhausted" }], hasMore: false, nextCursor: null });
+  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "recovered", terminal: false, sequence: 3, timestampMillis: 3, recordType: "ERROR_RECORDED", frameId: "", route: "", attemptId: "", retrySequenceId: "", validationStatus: "" }], hasMore: true, nextCursor: "failure-next" }).mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "terminal-1", terminal: true, sequence: 119, timestampMillis: 119, recordType: "ERROR_RECORDED", frameId: "f-1", route: "hello", attemptId: "a-1", retrySequenceId: "r-1", validationStatus: "exhausted", providerAttemptContentRef: "opaque-attempt" }], hasMore: false, nextCursor: null });
   render(<MemoryRouter><TraceExplorer traceId="trace-1" /><LocationProbe /></MemoryRouter>);
   expect(await screen.findByRole("heading", { name: "Terminal failure evidence" })).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Trace failure details" })).toHaveClass("trace-failure-panel");
   await screen.findByText("ERROR_RECORDED sequence 119");
   await vi.waitFor(() => expect(screen.getByLabelText("location")).toHaveTextContent("frameId=f-1"));
   expect(screen.getByText(/does not identify root cause/)).toBeInTheDocument();
-  expect(api.getContentRange).not.toHaveBeenCalled();
+  expect(screen.getByRole("region", { name: "Linked provider attempt diagnostics" })).toBeInTheDocument();
+  expect(await screen.findByText("Loomspan provider guidance")).toBeInTheDocument();
+  expect(screen.getByText("Check loomspan.connections.primary.api-key")).toBeInTheDocument();
+  expect(api.getContentRange).toHaveBeenCalledWith("trace-1", "opaque-attempt", undefined, "TARGET");
   expect(api.getRawRecordRange).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Show in timeline" }));
   await vi.waitFor(() => expect(within(screen.getByRole("tree")).getByRole("button", { name: "hello" })).toHaveFocus());

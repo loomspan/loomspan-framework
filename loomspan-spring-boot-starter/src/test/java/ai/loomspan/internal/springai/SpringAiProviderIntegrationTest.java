@@ -3,6 +3,9 @@ package ai.loomspan.internal.springai;
 import com.google.genai.errors.ClientException;
 import com.google.genai.errors.GenAiIOException;
 import com.google.genai.errors.ServerException;
+import com.openai.core.JsonValue;
+import com.openai.core.http.Headers;
+import com.openai.errors.OpenAIServiceException;
 import com.google.genai.Client;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.autoconfigure.LoomspanProperties;
@@ -34,12 +37,15 @@ import java.io.InterruptedIOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.Optional;
+import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import javax.net.ssl.SSLException;
 
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class SpringAiProviderIntegrationTest
 {
@@ -107,6 +113,62 @@ class SpringAiProviderIntegrationTest
 
         var genericIo = translator.translate(new GenAiIOException("decode failed", new IOException("invalid body")));
         assertThat(genericIo.classification()).isEqualTo(ProviderFailureClassification.UNKNOWN);
+    }
+
+    @Test
+    void translatesOpenAiServiceExceptionsThroughExistingHttpPolicy()
+    {
+        var translator = integration.create("openai", openAi()).failureTranslator();
+        int[] statuses = {401, 403, 404, 429, 503};
+        ProviderFailureClassification[] classifications = {
+                ProviderFailureClassification.PERMANENT, ProviderFailureClassification.PERMANENT,
+                ProviderFailureClassification.PERMANENT, ProviderFailureClassification.TRANSIENT,
+                ProviderFailureClassification.TRANSIENT};
+        ProviderFailureCategory[] categories = {
+                ProviderFailureCategory.AUTHENTICATION, ProviderFailureCategory.AUTHORIZATION,
+                ProviderFailureCategory.INVALID_REQUEST, ProviderFailureCategory.RATE_LIMITED,
+                ProviderFailureCategory.SERVER_ERROR};
+
+        for (int index = 0; index < statuses.length; index++)
+        {
+            OpenAIServiceException exception = mock(OpenAIServiceException.class);
+            Headers headers = Headers.builder().put("Retry-After", "7").build();
+            JsonValue body = JsonValue.from(java.util.Map.of("error", "provider detail"));
+            when(exception.statusCode()).thenReturn(statuses[index]);
+            when(exception.headers()).thenReturn(headers);
+            when(exception.body()).thenReturn(body);
+            when(exception.type()).thenReturn(Optional.of("provider_type"));
+            when(exception.code()).thenReturn(Optional.of("provider_code"));
+
+            var details = translator.translate(new RuntimeException(exception));
+
+            assertThat(details.classification()).isEqualTo(classifications[index]);
+            assertThat(details.category()).isEqualTo(categories[index]);
+            assertThat(details.httpStatus()).isEqualTo(statuses[index]);
+            assertThat(details.retryAfter()).isEqualTo(Duration.ofSeconds(7));
+            assertThat(details.providerErrorType()).isEqualTo("provider_type");
+            assertThat(details.providerErrorCode()).isEqualTo("provider_code");
+            assertThat(details.diagnostics()).singleElement().satisfies(diagnostic ->
+                    assertThat(diagnostic.get("text")).isEqualTo("{\"error\":\"provider detail\"}"));
+        }
+
+        int limit = SpringAiProviderIntegration.DIAGNOSTIC_LIMIT_BYTES;
+        OpenAIServiceException oversized = mock(OpenAIServiceException.class);
+        when(oversized.statusCode()).thenReturn(401);
+        when(oversized.headers()).thenReturn(Headers.builder().build());
+        when(oversized.body()).thenReturn(JsonValue.from(java.util.Map.of(
+                "error", "a".repeat(limit - 11) + "💥")));
+        when(oversized.type()).thenReturn(Optional.empty());
+        when(oversized.code()).thenReturn(Optional.empty());
+
+        var oversizedDetails = translator.translate(oversized);
+
+        assertThat(oversizedDetails.diagnostics()).singleElement().satisfies(diagnostic ->
+        {
+            assertThat(diagnostic.get("truncated")).isEqualTo(true);
+            assertThat(((String) diagnostic.get("text")).getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                    .hasSizeLessThanOrEqualTo(limit);
+        });
     }
 
     @Test

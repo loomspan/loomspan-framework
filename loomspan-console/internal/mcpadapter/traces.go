@@ -684,7 +684,7 @@ func mapRecord(x traceanalysis.RecordSummary) recordDTO {
 	return out
 }
 func mapFailure(f traceanalysis.FailureSummary) failureDTO {
-	out := failureDTO{FailureID: f.FailureID, Terminal: f.Terminal, Sequence: f.Sequence, TimestampMillis: f.TimestampMillis, RecordType: f.RecordType, FrameID: f.FrameID, Route: f.Route, AttemptID: f.AttemptID, RetrySequenceID: f.RetrySequenceID, ValidationStatus: f.ValidationStatus, ExceptionType: f.ExceptionType, Diagnostics: []diagnosticDTO{}}
+	out := failureDTO{FailureID: f.FailureID, Terminal: f.Terminal, Sequence: f.Sequence, TimestampMillis: f.TimestampMillis, RecordType: f.RecordType, FrameID: f.FrameID, Route: f.Route, AttemptID: f.AttemptID, RetrySequenceID: f.RetrySequenceID, ValidationStatus: f.ValidationStatus, ExceptionType: f.ExceptionType, Diagnostics: []diagnosticDTO{}, ProviderAttemptContentRef: f.ProviderAttemptContentRef}
 	for _, d := range f.Diagnostics {
 		out.Diagnostics = append(out.Diagnostics, diagnosticDTO{d.Ordinal, d.Kind, d.ContentType, d.Truncated, d.CaptureLimitBytes, d.DecodedBytes, d.ContentRef})
 	}

@@ -218,21 +218,23 @@ type frameResult struct {
 }
 
 type failureResult struct {
-	FailureID        string                 `json:"failureId"`
-	Terminal         bool                   `json:"terminal"`
-	Sequence         int64                  `json:"sequence"`
-	TimestampMillis  int64                  `json:"timestampMillis"`
-	RecordType       string                 `json:"recordType"`
-	FrameID          string                 `json:"frameId,omitempty"`
-	Route            string                 `json:"route,omitempty"`
-	AttemptID        string                 `json:"attemptId,omitempty"`
-	RetrySequenceID  string                 `json:"retrySequenceId,omitempty"`
-	ValidationStatus string                 `json:"validationStatus,omitempty"`
-	ExceptionType    string                 `json:"exceptionType,omitempty"`
-	ContextSummary   string                 `json:"contextSummary,omitempty"`
-	Diagnostics      []DiagnosticDescriptor `json:"diagnostics,omitempty"`
-	PayloadID        string                 `json:"payloadId,omitempty"`
-	data             json.RawMessage
+	FailureID                string                 `json:"failureId"`
+	Terminal                 bool                   `json:"terminal"`
+	Sequence                 int64                  `json:"sequence"`
+	TimestampMillis          int64                  `json:"timestampMillis"`
+	RecordType               string                 `json:"recordType"`
+	FrameID                  string                 `json:"frameId,omitempty"`
+	Route                    string                 `json:"route,omitempty"`
+	AttemptID                string                 `json:"attemptId,omitempty"`
+	RetrySequenceID          string                 `json:"retrySequenceId,omitempty"`
+	ValidationStatus         string                 `json:"validationStatus,omitempty"`
+	ExceptionType            string                 `json:"exceptionType,omitempty"`
+	ContextSummary           string                 `json:"contextSummary,omitempty"`
+	Diagnostics              []DiagnosticDescriptor `json:"diagnostics,omitempty"`
+	PayloadID                string                 `json:"payloadId,omitempty"`
+	ProviderAttemptPayloadID string                 `json:"providerAttemptPayloadId,omitempty"`
+	ProviderAttemptSequence  int64                  `json:"providerAttemptSequence,omitempty"`
+	data                     json.RawMessage
 }
 
 type DiagnosticDescriptor struct {

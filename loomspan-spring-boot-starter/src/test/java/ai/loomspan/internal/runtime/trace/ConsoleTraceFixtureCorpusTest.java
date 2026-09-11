@@ -77,6 +77,7 @@ class ConsoleTraceFixtureCorpusTest
             "single-attempt-success",
             "java-root-success",
             "runtime-terminal-failure",
+            "terminal-provider-failure-actionable",
             "runtime-terminal-abort",
             "advisor-retry",
             "recovered-provider-attempt-diagnostic",
@@ -437,6 +438,10 @@ class ConsoleTraceFixtureCorpusTest
                             "retryDelaySource", node.at("/metadata/retryDelaySource").asText(),
                             "usage", Usage.ZERO.asMap(),
                             "usageComplete", false);
+                    if (node.at("/metadata/httpStatus").isInt())
+                    {
+                        failedAttempt.put("httpStatus", node.at("/metadata/httpStatus").asInt());
+                    }
                     if (node.at("/metadata/payloadId").isTextual())
                     {
                         failedAttempt.put("payloadId", node.at("/metadata/payloadId").asText());
@@ -853,6 +858,11 @@ class ConsoleTraceFixtureCorpusTest
                 terminal = new Usage(7, 2);
                 outcome = "FAILED";
             }
+            case "terminal-provider-failure-actionable" ->
+            {
+                terminalFailureId = executeActionableTerminalProviderFixture(session, handle);
+                outcome = "FAILED";
+            }
             case "runtime-terminal-abort" ->
             {
                 terminalFailureId = executeRuntimeTerminal(session, handle, true);
@@ -1032,7 +1042,8 @@ class ConsoleTraceFixtureCorpusTest
 
         int toolInvocations = name.equals("planned-tool-success") || name.equals("unplanned-tool-failure") ? 1 : 0;
         int modelCalls = name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
-        int providerAttempts = name.equals("recovered-provider-attempt-diagnostic") ? 2 : 0;
+        int providerAttempts = name.equals("recovered-provider-attempt-diagnostic") ? 2
+                : name.equals("terminal-provider-failure-actionable") ? 1 : 0;
         int exactModelResponses = name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
         SessionUsageSnapshot usageSnapshot = new SessionUsageSnapshot(
                 0, toolInvocations, 0, modelCalls, providerAttempts,
@@ -1373,6 +1384,54 @@ class ConsoleTraceFixtureCorpusTest
                 Map.of("content", "provider retry recovered"));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, model, CLOCK.instant().plusSeconds(4));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, root, CLOCK.instant().plusSeconds(5));
+    }
+
+    private static String executeActionableTerminalProviderFixture(
+            LoomspanSession session, DefaultExecutionTraceHandle handle) throws Exception
+    {
+        PhysicalBranchContext branch = new PhysicalBranchContext(session);
+        ExecutionBinding binding = fixtureBinding(session, branch, "diagnoseProvider", "root");
+        return ExecutionBindingScope.callWith(binding, () ->
+        {
+            ExecutionFrame root = frame("root", null, TraceFrameType.ROOT_MISSION, "diagnoseProvider");
+            ExecutionFrame model = frame("model", "root", TraceFrameType.MODEL_CALL, "diagnoseProvider#model");
+            appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant());
+            branch.push(root);
+            appendFrame(handle, TraceRecordType.FRAME_OPENED, model, CLOCK.instant().plusSeconds(1));
+            branch.push(model);
+            Map<String, Object> attempt = attempt("retry-terminal-provider", "attempt-terminal-provider", 1,
+                    Map.of("providerAttemptNumber", 1));
+            handle.append(TraceRecordType.MODEL_REQUEST_SENT, model, TraceFrameType.MODEL_CALL,
+                    attempt, Map.of("messages", List.of("diagnose provider")));
+            handle.append(TraceRecordType.MODEL_ATTEMPT_FAILED, model, TraceFrameType.MODEL_CALL,
+                    attempt("retry-terminal-provider", "attempt-terminal-provider", 1, ordered(
+                            "providerAttemptNumber", 1,
+                            "failureClassification", "PERMANENT",
+                            "failureCategory", "AUTHENTICATION",
+                            "retryDecision", "DO_NOT_RETRY",
+                            "retryDelayMillis", 0,
+                            "retryDelaySource", "NONE",
+                            "httpStatus", 401)),
+                    ordered("diagnostics", List.of(
+                            ordered("kind", "JAVA_STACK_TRACE", "contentType", "text/plain; charset=utf-8",
+                                    "text", "java.lang.IllegalStateException: provider rejected credentials\n",
+                                    "truncated", false, "captureLimitBytes", 1024 * 1024),
+                            ordered("kind", "LOOMSPAN_PROVIDER_GUIDANCE", "contentType", "text/plain; charset=utf-8",
+                                    "text", "Loomspan provider failure for framework model 'support-model', connection 'primary-openai', driver OPENAI, provider model 'gpt-example'. The provider rejected the request credentials. Check loomspan.connections.primary-openai.api-key.",
+                                    "truncated", false, "captureLimitBytes", 8192),
+                            ordered("kind", "PROVIDER_ERROR", "contentType", "application/json",
+                                    "text", "{\"error\":\"invalid credential\"}",
+                                    "truncated", false, "captureLimitBytes", 1024 * 1024))));
+            IllegalStateException failure = fixtureFailure("provider rejected credentials");
+            DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK);
+            stateService.registerProviderFailure(session, failure, attempt);
+            String failureId = stateService.recordFailure(session, failure, Map.of("message", failure.getMessage()));
+            appendFrame(handle, TraceRecordType.FRAME_CLOSED, model, CLOCK.instant().plusSeconds(2));
+            branch.close(model);
+            appendFrame(handle, TraceRecordType.FRAME_CLOSED, root, CLOCK.instant().plusSeconds(3));
+            branch.close(root);
+            return failureId;
+        });
     }
 
     private static String executeTimeoutStepFailureFixture(
@@ -1781,6 +1840,7 @@ class ConsoleTraceFixtureCorpusTest
             case "nonterminal-error-then-success" -> "failure-recovered";
             case "unplanned-tool-failure" -> "failure-tool";
             case "timeout-step-failure" -> "failure-timeout-step";
+            case "terminal-provider-failure-actionable" -> "failure-terminal-provider";
             default -> throw new IllegalStateException("Unexpected fixture failure for " + name);
         };
     }
@@ -2171,6 +2231,21 @@ class ConsoleTraceFixtureCorpusTest
                             "retryDelayMillis", 0,
                             "usage", new Usage(4, 2).asMap(),
                             "usageComplete", true));
+            case "terminal-provider-failure-actionable" -> List.of(ordered(
+                    "retrySequenceId", "retry-terminal-provider",
+                    "attemptId", "attempt-terminal-provider",
+                    "attemptNumber", 1,
+                    "attemptReason", "INITIAL",
+                    "providerAttemptNumber", 1,
+                    "outcome", "FAILED",
+                    "failureClassification", "PERMANENT",
+                    "failureCategory", "AUTHENTICATION",
+                    "retryDecision", "DO_NOT_RETRY",
+                    "retryDelayMillis", 0,
+                    "retryDelaySource", "NONE",
+                    "httpStatus", 401,
+                    "usage", Usage.ZERO.asMap(),
+                    "usageComplete", false));
             case "nested-retry-sequences" -> List.of(
                     expectedAttempt(name, "retry-outer", "attempt-outer-1", 1),
                     expectedAttempt(name, "retry-inner", "attempt-inner-1", 1),
@@ -2212,6 +2287,7 @@ class ConsoleTraceFixtureCorpusTest
         return !name.equals("unavailable-usage")
                 && !name.equals("missing-response-usage")
                 && !name.equals("timeout-step-failure")
+                && !name.equals("terminal-provider-failure-actionable")
                 && !name.equals("recovered-provider-attempt-diagnostic")
                 && !name.startsWith("runtime-terminal-");
     }
@@ -2297,6 +2373,11 @@ class ConsoleTraceFixtureCorpusTest
                             Usage.ZERO, new Usage(4, 2), new Usage(4, 2)),
                     expectedFrame("model", "root", "MODEL_CALL", "recoverProviderCall#model", 3000, 3000,
                             new Usage(4, 2), Usage.ZERO, new Usage(4, 2)));
+            case "terminal-provider-failure-actionable" -> List.of(
+                    expectedFrame("root", null, "ROOT_MISSION", "diagnoseProvider", 3000, 2000,
+                            Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("model", "root", "MODEL_CALL", "diagnoseProvider#model", 1000, 1000,
+                            Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "timeout-step-failure" -> List.of(
                     expectedFrame("root", null, "ROOT_MISSION", "handleIncident", 5000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
                     expectedFrame("step", "root", "STEP_EXECUTION", "handleIncident#step-1", 3000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),

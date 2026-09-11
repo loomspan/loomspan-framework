@@ -447,12 +447,27 @@ func (service *Service) QueryFailures(ctx context.Context, scopeID evidence.Refe
 				return FailureSummary{}, err
 			}
 		}
+		providerAttemptContentRef := ""
+		if f.ProviderAttemptPayloadID != "" {
+			var err error
+			providerAttemptContentRef, err = encodeEnvelopeContentReference(scopeID, query.Handle, f.ProviderAttemptPayloadID)
+			if err != nil {
+				return FailureSummary{}, err
+			}
+		} else if f.ProviderAttemptSequence > 0 {
+			var err error
+			providerAttemptContentRef, err = encodeRecordContentReference(scopeID, query.Handle, f.ProviderAttemptSequence)
+			if err != nil {
+				return FailureSummary{}, err
+			}
+		}
 		return FailureSummary{
 			Context: traceCtx, FailureID: f.FailureID, Terminal: f.Terminal,
 			Sequence: f.Sequence, TimestampMillis: f.TimestampMillis, RecordType: f.RecordType,
 			FrameID: f.FrameID, Route: f.Route, AttemptID: f.AttemptID,
 			RetrySequenceID: f.RetrySequenceID, ValidationStatus: f.ValidationStatus,
 			ExceptionType: f.ExceptionType, ContextSummary: f.ContextSummary, Diagnostics: diagnostics,
+			ProviderAttemptContentRef: providerAttemptContentRef,
 		}, nil
 	})
 	if domain != nil {
@@ -471,20 +486,22 @@ func (service *Service) QueryFailures(ctx context.Context, scopeID evidence.Refe
 
 // failureSummary is the internal parsed failure fact.
 type failureSummary struct {
-	FailureID        string                 `json:"failureId"`
-	Terminal         bool                   `json:"terminal"`
-	Sequence         int64                  `json:"sequence"`
-	TimestampMillis  int64                  `json:"timestampMillis"`
-	RecordType       string                 `json:"recordType"`
-	FrameID          string                 `json:"frameId,omitempty"`
-	Route            string                 `json:"route,omitempty"`
-	AttemptID        string                 `json:"attemptId,omitempty"`
-	RetrySequenceID  string                 `json:"retrySequenceId,omitempty"`
-	ValidationStatus string                 `json:"validationStatus,omitempty"`
-	ExceptionType    string                 `json:"exceptionType,omitempty"`
-	ContextSummary   string                 `json:"contextSummary,omitempty"`
-	Diagnostics      []DiagnosticDescriptor `json:"diagnostics,omitempty"`
-	PayloadID        string                 `json:"payloadId,omitempty"`
+	FailureID                string                 `json:"failureId"`
+	Terminal                 bool                   `json:"terminal"`
+	Sequence                 int64                  `json:"sequence"`
+	TimestampMillis          int64                  `json:"timestampMillis"`
+	RecordType               string                 `json:"recordType"`
+	FrameID                  string                 `json:"frameId,omitempty"`
+	Route                    string                 `json:"route,omitempty"`
+	AttemptID                string                 `json:"attemptId,omitempty"`
+	RetrySequenceID          string                 `json:"retrySequenceId,omitempty"`
+	ValidationStatus         string                 `json:"validationStatus,omitempty"`
+	ExceptionType            string                 `json:"exceptionType,omitempty"`
+	ContextSummary           string                 `json:"contextSummary,omitempty"`
+	Diagnostics              []DiagnosticDescriptor `json:"diagnostics,omitempty"`
+	PayloadID                string                 `json:"payloadId,omitempty"`
+	ProviderAttemptPayloadID string                 `json:"providerAttemptPayloadId,omitempty"`
+	ProviderAttemptSequence  int64                  `json:"providerAttemptSequence,omitempty"`
 }
 
 // PayloadQuery is a bounded, continuable payload descriptor query.

@@ -7,6 +7,7 @@ import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.ModelTraceContext;
 import ai.loomspan.internal.provider.ProviderConnectionRuntime;
 import ai.loomspan.internal.provider.ProviderFailureDetails;
+import ai.loomspan.internal.provider.ProviderFailureGuidance;
 import ai.loomspan.internal.provider.ProviderRetryDecider;
 import ai.loomspan.internal.provider.ProviderRetryOutcome;
 import ai.loomspan.internal.runtime.state.ExecutionStateService;
@@ -19,6 +20,8 @@ import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.core.Ordered;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -29,6 +32,7 @@ import java.util.concurrent.CancellationException;
 
 public final class ProviderAttemptCallAdvisor implements CallAdvisor
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProviderAttemptCallAdvisor.class);
     static final int ORDER = Ordered.LOWEST_PRECEDENCE - 1;
     private final ProviderConnectionRuntime runtime;
     private final ExecutionStateService executionStateService;
@@ -74,12 +78,17 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
             {
                 ProviderFailureDetails details = runtime.failureTranslator().translate(failure);
                 ProviderRetryOutcome outcome = retryDecider.decide(runtime.retryPolicy(), details, providerAttempt);
+                ProviderFailureGuidance.Guidance guidance = ProviderFailureGuidance.explain(context.identity(), details);
+                List<Map<String, Object>> diagnostics = new java.util.ArrayList<>(details.diagnostics().size() + 1);
+                diagnostics.add(guidance.diagnostic());
+                diagnostics.addAll(details.diagnostics());
                 sessionUsageService.recordProviderAttemptOutcome(session, context.skillName(), context.identity(), "failed",
                         details.category(), outcome.decision());
                 executionStateService.recordModelAttemptFailed(session, frame, context, attempt,
-                        failureMetadata(details, outcome), failure, details.diagnostics());
+                        failureMetadata(details, outcome), failure, List.copyOf(diagnostics));
                 if (outcome.decision() != ai.loomspan.internal.provider.ProviderRetryDecision.RETRY)
                 {
+                    LOGGER.warn("{}", guidance.text());
                     executionStateService.registerProviderFailure(session, failure, attempt);
                     throw failure;
                 }

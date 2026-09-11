@@ -42,12 +42,23 @@ public final class NamedAiConnectionRegistry implements DisposableBean
             catch (RuntimeException ex)
             {
                 IllegalStateException failure = new IllegalStateException(
-                        "Failed to construct AI connection '" + name + "' for driver " + properties.getDriver());
+                        "Failed to construct AI connection '" + name + "' for driver " + properties.getDriver()
+                                + "; check " + constructionSettings(name, properties));
                 cleanupAfterConstructionFailure(built, failure);
                 throw failure;
             }
         }
         this.connections = Map.copyOf(built);
+    }
+
+    private static String constructionSettings(String name, LoomspanProperties.ConnectionProperties properties)
+    {
+        String connection = "loomspan.connections." + name;
+        return properties.getDriver() == ai.loomspan.autoconfigure.AiDriver.GEMINI
+                ? connection + ".api-key or " + connection + ".gemini.vertex-ai, "
+                        + connection + ".gemini.project-id, "
+                        + connection + ".gemini.location, and " + connection + ".gemini.credentials-uri"
+                : connection + ".base-url";
     }
 
     ProviderConnectionRuntime get(String connectionName)

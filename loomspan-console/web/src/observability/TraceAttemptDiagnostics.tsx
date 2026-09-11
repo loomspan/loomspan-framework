@@ -10,6 +10,7 @@ type Props = {
   scopeGeneration?: number;
   verifyScope?: (response: TraceRange) => Promise<TraceRange>;
   onArtifactUnavailable?: (error: unknown) => void;
+  ariaLabel?: string;
 };
 
 type LoadedDiagnostics = {
@@ -77,10 +78,12 @@ function parsePayload(bytes: Uint8Array): LoadedDiagnostics {
 }
 
 function kindLabel(kind: string) {
-  return kind === "JAVA_STACK_TRACE" ? "Java stack trace" : `Text diagnostic (${kind})`;
+  return kind === "JAVA_STACK_TRACE" ? "Java stack trace"
+    : kind === "LOOMSPAN_PROVIDER_GUIDANCE" ? "Loomspan provider guidance"
+    : `Text diagnostic (${kind})`;
 }
 
-export function TraceAttemptDiagnostics({ traceId, source = "TARGET", recordSequence, contentRef, scopeGeneration = 0, verifyScope, onArtifactUnavailable }: Props) {
+export function TraceAttemptDiagnostics({ traceId, source = "TARGET", recordSequence, contentRef, scopeGeneration = 0, verifyScope, onArtifactUnavailable, ariaLabel }: Props) {
   const evidenceGeneration = source === "TARGET" ? scopeGeneration : 0;
   const unavailableCallback = useRef(onArtifactUnavailable);
   unavailableCallback.current = onArtifactUnavailable;
@@ -150,7 +153,7 @@ export function TraceAttemptDiagnostics({ traceId, source = "TARGET", recordSequ
     return () => { requestGeneration.current += 1; };
   }, [contentRef, evidenceGeneration, source, traceId, verifyScope]);
 
-  return <section className="attempt-diagnostics" aria-label={`Attempt diagnostics for record ${recordSequence}`}>
+  return <section className="attempt-diagnostics" aria-label={ariaLabel ?? `Attempt diagnostics for record ${recordSequence}`}>
     <h5>Attempt diagnostics</h5>
     {loading && <p role="status">Loading all attempt diagnostic content&hellip;</p>}
     {error && <p role="alert">{error}</p>}

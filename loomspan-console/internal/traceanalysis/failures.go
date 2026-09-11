@@ -146,6 +146,9 @@ func (g *failureGraph) validateTerminalAttemptLink(terminalFailureID string, att
 		attempt.retryDecision == "RETRY" || attempts.lastByRetry[failure.RetrySequenceID] != attempt {
 		return invalidityError(CategoryInvalidTerminalFailure, traceID)
 	}
+	failure.ProviderAttemptPayloadID = attempt.payloadID
+	failure.ProviderAttemptSequence = attempt.ownerSequence
+	g.failures[terminalFailureID] = failure
 	return nil
 }
 

@@ -429,13 +429,14 @@ func TestTraceAnalysisMapsConfiguredLimitsAndDirectFailureRelationships(t *testi
 		FailureID: "failure-1", Terminal: true, Sequence: 42, TimestampMillis: 1000,
 		RecordType: "ERROR_RECORDED", FrameID: "frame-1", Route: "root.child",
 		AttemptID: "attempt-1", RetrySequenceID: "retry-1", ValidationStatus: "exhausted",
+		ProviderAttemptContentRef: "opaque-attempt-content",
 	}}}
 	summary := traceAnalysisRequest(router, "/api/console/v1/traces/analysis/summary", `{"source":"TARGET","traceId":"trace-1"}`, cookie)
 	if summary.Code != http.StatusOK || !strings.Contains(summary.Body.String(), `"configuredLimits":{"maxSkillInvocations":7,"maxToolInvocations":11,"maxLinterRetries":3,"maxModelCalls":5,"maxProviderAttempts":15,"maxUsageUnits":1234}`) {
 		t.Fatalf("summary=%s", summary.Body.String())
 	}
 	failures := traceAnalysisRequest(router, "/api/console/v1/traces/analysis/failures", `{"source":"TARGET","traceId":"trace-1"}`, cookie)
-	for _, expected := range []string{`"sequence":42`, `"recordType":"ERROR_RECORDED"`, `"frameId":"frame-1"`, `"attemptId":"attempt-1"`, `"validationStatus":"exhausted"`} {
+	for _, expected := range []string{`"sequence":42`, `"recordType":"ERROR_RECORDED"`, `"frameId":"frame-1"`, `"attemptId":"attempt-1"`, `"validationStatus":"exhausted"`, `"providerAttemptContentRef":"opaque-attempt-content"`} {
 		if !strings.Contains(failures.Body.String(), expected) {
 			t.Errorf("missing %s in %s", expected, failures.Body.String())
 		}

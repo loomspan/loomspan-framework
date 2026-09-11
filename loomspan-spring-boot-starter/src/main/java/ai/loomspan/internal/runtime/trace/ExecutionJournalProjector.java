@@ -120,6 +120,7 @@ public final class ExecutionJournalProjector
         copyMetadata(payload, record, "retryDecision");
         copyMetadata(payload, record, "retryDelayMillis");
         copyMetadata(payload, record, "retryDelaySource");
+        copyMetadata(payload, record, "httpStatus");
         return payload;
     }
 

@@ -25,10 +25,16 @@ import ai.loomspan.internal.runtime.usage.NoOpUsageMetricsRecorder;
 import ai.loomspan.internal.provider.*;
 import ai.loomspan.internal.springai.SpringAiProviderIntegration;
 import ai.loomspan.internal.skill.YamlSkillManifest;
+import com.openai.core.JsonValue;
+import com.openai.core.http.Headers;
+import com.openai.errors.OpenAIServiceException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
@@ -61,7 +67,10 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(OutputCaptureExtension.class)
 class ModelAttemptCallAdvisorIntegrationTest
 {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-24T12:00:00Z"), ZoneOffset.UTC);
@@ -295,7 +304,7 @@ class ModelAttemptCallAdvisorIntegrationTest
     }
 
     @Test
-    void recordsSentButNoResponseWhenProviderThrows()
+    void recordsSentButNoResponseWhenProviderThrows(CapturedOutput output)
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
@@ -326,6 +335,7 @@ class ModelAttemptCallAdvisorIntegrationTest
         assertThat(session.getSessionUsage()
                 .orElse(ai.loomspan.internal.runtime.usage.SessionUsageSnapshot.empty())
                 .modelCalls()).isZero();
+        assertThat(occurrences(output.getOut(), "Loomspan provider failure for framework model")).isEqualTo(1);
 
         closeFrame(binding, stateService, session, modelFrame, Map.of("status", "failed"));
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(
@@ -333,7 +343,88 @@ class ModelAttemptCallAdvisorIntegrationTest
     }
 
     @Test
-    void retriesTransientProviderFailuresAsDistinctPhysicalAttempts()
+    void terminalOpenAiAuthenticationFailureIsActionableInWarningAndAttemptTrace(CapturedOutput output)
+    {
+        OpenAIServiceException authenticationFailure = mock(OpenAIServiceException.class);
+        JsonValue body = JsonValue.from(java.util.Map.of("error", "invalid credential"));
+        when(authenticationFailure.statusCode()).thenReturn(401);
+        when(authenticationFailure.headers()).thenReturn(Headers.builder().build());
+        when(authenticationFailure.body()).thenReturn(body);
+        when(authenticationFailure.type()).thenReturn(java.util.Optional.of("authentication_error"));
+        when(authenticationFailure.code()).thenReturn(java.util.Optional.of("invalid_api_key"));
+
+        LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
+        properties.setDriver(AiDriver.OPENAI);
+        properties.setApiKey("not-configured");
+        ProviderFailureTranslator translator = new SpringAiProviderIntegration(new DefaultResourceLoader())
+                .create("primary-openai", properties)
+                .failureTranslator();
+        AtomicInteger calls = new AtomicInteger();
+        ChatModel model = prompt ->
+        {
+            calls.incrementAndGet();
+            throw authenticationFailure;
+        };
+        ProviderConnectionRuntime runtime = new ProviderConnectionRuntime(
+                model,
+                AiDriver.OPENAI,
+                AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
+                new ProviderRetryPolicy(true, 3, java.time.Duration.ZERO, 2.0d,
+                        java.time.Duration.ZERO, 0.0d),
+                translator);
+        DefaultSessionUsageService usageService = usageService();
+        DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
+        LoomspanSession session = TestLoomspanSessions.withId("openai-authentication", "test.entry", 4);
+        ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(
+                binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
+        ModelTraceContext traceContext = new ModelTraceContext(
+                new ModelExecutionIdentity("support-model", "primary-openai", AiDriver.OPENAI, "gpt-example"),
+                "test.skill",
+                "mission");
+        ChatClient client = ChatClient.builder(model)
+                .defaultAdvisors(new ProviderAttemptCallAdvisor(runtime, stateService,
+                        new ModelUsageExtractor(), usageService))
+                .build();
+
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+                .user("user")
+                .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext))
+                .call()
+                .content()))
+                .isSameAs(authenticationFailure);
+
+        assertThat(calls).hasValue(1);
+        TraceRecord failedAttempt = records(session).stream()
+                .filter(record -> record.recordType() == TraceRecordType.MODEL_ATTEMPT_FAILED)
+                .findFirst()
+                .orElseThrow();
+        assertThat(failedAttempt.metadata())
+                .containsEntry("failureClassification", "PERMANENT")
+                .containsEntry("failureCategory", "AUTHENTICATION")
+                .containsEntry("retryDecision", "DO_NOT_RETRY")
+                .containsEntry("httpStatus", 401)
+                .containsEntry("providerErrorType", "authentication_error")
+                .containsEntry("providerErrorCode", "invalid_api_key");
+        assertThat(failedAttempt.data().path("diagnostics")).hasSize(3);
+        assertThat(failedAttempt.data().path("diagnostics").get(0).path("kind").asText())
+                .isEqualTo("JAVA_STACK_TRACE");
+        assertThat(failedAttempt.data().path("diagnostics").get(1).path("kind").asText())
+                .isEqualTo("LOOMSPAN_PROVIDER_GUIDANCE");
+        assertThat(failedAttempt.data().path("diagnostics").get(2).path("kind").asText())
+                .isEqualTo("PROVIDER_ERROR");
+        String guidance = failedAttempt.data().path("diagnostics").get(1).path("text").asText();
+        assertThat(guidance)
+                .contains("support-model", "primary-openai", "OPENAI", "gpt-example",
+                        "loomspan.connections.primary-openai.api-key", "rejected")
+                .doesNotContain("missing", "not-configured", "invalid credential");
+        assertThat(output.getOut()).contains(guidance);
+        assertThat(occurrences(output.getOut(), guidance)).isEqualTo(1);
+    }
+
+    @Test
+    void retriesTransientProviderFailuresAsDistinctPhysicalAttempts(CapturedOutput output)
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
@@ -390,19 +481,24 @@ class ModelAttemptCallAdvisorIntegrationTest
                     .containsEntry("providerAttemptNumber", 1)
                     .containsEntry("failureClassification", "TRANSIENT")
                     .containsEntry("retryDecision", "RETRY");
-            assertThat(record.data().path("diagnostics")).hasSize(3);
+            assertThat(record.data().path("diagnostics")).hasSize(4);
             assertThat(record.data().path("diagnostics").get(0).path("kind").asText())
                     .isEqualTo("JAVA_STACK_TRACE");
             assertThat(record.data().path("diagnostics").get(1).path("kind").asText())
-                    .isEqualTo("PROVIDER_ERROR");
+                    .isEqualTo("LOOMSPAN_PROVIDER_GUIDANCE");
             assertThat(record.data().path("diagnostics").get(1).path("text").asText())
-                    .isEqualTo("provider diagnostic one");
+                    .contains("loomspan.connections.test-connection.base-url");
             assertThat(record.data().path("diagnostics").get(2).path("kind").asText())
-                    .isEqualTo("PROVIDER_RESPONSE");
+                    .isEqualTo("PROVIDER_ERROR");
             assertThat(record.data().path("diagnostics").get(2).path("text").asText())
+                    .isEqualTo("provider diagnostic one");
+            assertThat(record.data().path("diagnostics").get(3).path("kind").asText())
+                    .isEqualTo("PROVIDER_RESPONSE");
+            assertThat(record.data().path("diagnostics").get(3).path("text").asText())
                     .isEqualTo("{\"error\":\"provider diagnostic two\"}");
-            assertThat(record.data().path("diagnostics").get(2).path("truncated").asBoolean()).isTrue();
+            assertThat(record.data().path("diagnostics").get(3).path("truncated").asBoolean()).isTrue();
         });
+        assertThat(output.getOut()).doesNotContain("Loomspan provider failure for framework model");
         assertThat(records(session).stream()
                 .filter(record -> record.recordType() == TraceRecordType.MODEL_RESPONSE_RECEIVED)
                 .findFirst().orElseThrow().metadata())
@@ -467,7 +563,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                             .containsEntry("failureCategory", "TIMEOUT")
                             .containsEntry("retryDecision", "RETRY")
                             .containsEntry("providerAttemptNumber", 1);
-                    assertThat(record.data().path("diagnostics")).hasSize(1);
+                    assertThat(record.data().path("diagnostics")).hasSize(2);
                     assertThat(record.data().path("diagnostics").get(0).path("kind").asText())
                             .isEqualTo("JAVA_STACK_TRACE");
                     assertThat(record.data().path("diagnostics").get(0).path("text").asText())
@@ -477,6 +573,8 @@ class ModelAttemptCallAdvisorIntegrationTest
                     assertThat(record.data().path("diagnostics").get(0).path("truncated").asBoolean()).isFalse();
                     assertThat(record.data().path("diagnostics").get(0).path("captureLimitBytes").asInt())
                             .isEqualTo(1024 * 1024);
+                    assertThat(record.data().path("diagnostics").get(1).path("kind").asText())
+                            .isEqualTo("LOOMSPAN_PROVIDER_GUIDANCE");
                 });
         assertThat(records.stream().filter(record -> record.recordType() == TraceRecordType.MODEL_RESPONSE_RECEIVED))
                 .hasSize(1);
@@ -486,7 +584,7 @@ class ModelAttemptCallAdvisorIntegrationTest
     }
 
     @Test
-    void exhaustedProviderRetriesRetainExactAttemptQuotaMetricAndTerminalFacts()
+    void exhaustedProviderRetriesRetainExactAttemptQuotaMetricAndTerminalFacts(CapturedOutput output)
     {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         DefaultSessionUsageService usageService = new DefaultSessionUsageService(
@@ -552,13 +650,16 @@ class ModelAttemptCallAdvisorIntegrationTest
                 .containsOnly(failures.getFirst().metadata().get("retrySequenceId"));
         assertThat(failures).allSatisfy(record ->
         {
-            assertThat(record.data().path("diagnostics")).hasSize(1);
+            assertThat(record.data().path("diagnostics")).hasSize(2);
             assertThat(record.data().path("diagnostics").get(0).path("kind").asText())
                     .isEqualTo("JAVA_STACK_TRACE");
             assertThat(record.data().path("diagnostics").get(0).path("text").asText())
                     .contains("java.lang.IllegalStateException: provider remained unavailable")
                     .contains("exhaustedProviderRetriesRetainExactAttemptQuotaMetricAndTerminalFacts");
+            assertThat(record.data().path("diagnostics").get(1).path("kind").asText())
+                    .isEqualTo("LOOMSPAN_PROVIDER_GUIDANCE");
         });
+        assertThat(occurrences(output.getOut(), "Loomspan provider failure for framework model")).isEqualTo(1);
         assertThat(meterRegistry.get("loomspan.provider.attempts")
                 .tag("skill", "test.skill")
                 .tag("connection", "test-connection")
@@ -781,6 +882,11 @@ class ModelAttemptCallAdvisorIntegrationTest
         {
             stateService.recordAdvisorResponseMutation(LoomspanSession.getCurrentSession(), fact.context(), fact.attributes());
         }
+    }
+
+    private static int occurrences(String value, String needle)
+    {
+        return value.split(java.util.regex.Pattern.quote(needle), -1).length - 1;
     }
 
     private static DefaultSessionUsageService usageService()
