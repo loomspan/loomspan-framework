@@ -254,9 +254,9 @@ test("usage preserves returned values and record-row evidence actions remain del
   const cells = within(recordRow).getAllByRole("cell");
   expect(cells[0]).toHaveTextContent(/^1$/);
   expect(cells[1]).toHaveTextContent(/^PAYLOAD$/);
-  expect(cells[2]).toHaveTextContent(/^frame-1$/);
+  expect(cells[2]).toHaveTextContent(/^Context unavailable$/);
   expect(cells[3]).toHaveTextContent(/^—$/);
-  expect(recordRow).toHaveTextContent("frame-1");
+  expect(recordRow).not.toHaveTextContent("frame-1");
   expect(within(recordRow).getAllByRole("button").map((button) => button.textContent)).toEqual(["Hide raw record", "Read content"]);
   fireEvent.click(recordRow);
   expect(selectRecord).toHaveBeenCalled();
@@ -320,13 +320,14 @@ test("selecting a step lifecycle record highlights its loaded counterpart", () =
   const props = { records, failures: [], onSelectRecord: vi.fn(), onSelectFailure: vi.fn(), onContent: vi.fn() };
   const { rerender } = render(<TraceRecords {...props} selectedRecordSequence={1} />);
 
-  expect(screen.getByRole("row", { name: "Record 1, STEP_STARTED" })).toHaveAttribute("aria-current", "true");
+  expect(screen.getByRole("row", { name: /Record 1, STEP_STARTED, related to selected step/ })).toHaveAttribute("aria-current", "true");
+  expect(screen.getByRole("row", { name: /Record 1, STEP_STARTED/ })).toHaveClass("trace-record-related");
   expect(screen.getByRole("row", { name: /Record 2, STEP_COMPLETED, related to selected step/ })).toHaveClass("trace-record-related");
   expect(screen.getByRole("row", { name: "Record 3, STEP_COMPLETED" })).not.toHaveClass("trace-record-related");
 
   rerender(<TraceRecords {...props} selectedRecordSequence={2} />);
   expect(screen.getByRole("row", { name: /Record 1, STEP_STARTED, related to selected step/ })).toHaveClass("trace-record-related");
-  expect(screen.getByRole("row", { name: "Record 2, STEP_COMPLETED" })).toHaveAttribute("aria-current", "true");
+  expect(screen.getByRole("row", { name: /Record 2, STEP_COMPLETED, related to selected step/ })).toHaveAttribute("aria-current", "true");
 });
 test("selecting an overlapping step lightly highlights only records in that step", () => {
   const record = (sequence: number, type: string, frameId: string, parentFrameId: string): TraceRecord => ({
@@ -366,6 +367,16 @@ test("selecting an overlapping step lightly highlights only records in that step
   expect(screen.getByRole("row", { name: "Record 3, MODEL_REQUEST_SENT" })).not.toHaveClass("trace-record-step-context");
   expect(screen.getByRole("row", { name: /Record 4, MODEL_REQUEST_SENT, part of selected step/ })).toHaveClass("trace-record-step-context");
   expect(screen.getByRole("row", { name: /Record 6, STEP_COMPLETED, related to selected step/ })).toHaveClass("trace-record-related");
+
+  for (const sequence of [3, 5]) {
+    rerender(<TraceRecords {...props} selectedRecordSequence={sequence} />);
+    expect(screen.getByRole("row", { name: /Record 1, STEP_STARTED/ })).toHaveClass("trace-record-related");
+    expect(screen.getByRole("row", { name: /Record 5, STEP_COMPLETED/ })).toHaveClass("trace-record-related");
+    expect(screen.getByRole("row", { name: /Record 3, MODEL_REQUEST_SENT/ })).toHaveClass("trace-record-step-context");
+    expect(screen.getByRole("row", { name: /Record 4, MODEL_REQUEST_SENT/ })).not.toHaveClass("trace-record-step-context");
+    expect(document.querySelectorAll('tr[aria-current="true"]')).toHaveLength(1);
+    expect(document.querySelector(`#trace-record-${sequence}`)).toHaveAttribute("aria-current", "true");
+  }
 });
 test("evidence detail renders text inertly and exposes continuation", () => {
   const next = vi.fn();

@@ -105,6 +105,25 @@ test("preserves a plain-text model response", async () => {
   expect(await screen.findByText("Plain model response")).toBeVisible();
 });
 
+test("shows context in rows and expanded content while retaining UUIDs only in raw records", async () => {
+  const value = record(56, "MODEL_RESPONSE_RECEIVED");
+  value.route = "hotelSelection#step-3-model";
+  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify({ content: "Selected hotels" }) };
+  getRawRecordRangeMock.mockResolvedValue(range(JSON.stringify({ frameId: value.frameId })));
+  renderRecords([value]);
+
+  expect(screen.getByRole("columnheader", { name: "Context" })).toBeVisible();
+  expect(screen.queryByRole("columnheader", { name: "Frame" })).toBeNull();
+  expect(screen.getByRole("cell", { name: "hotelSelection / Step 3" })).toBeVisible();
+  expect(screen.queryByText(value.frameId, { exact: false })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Response" }));
+  const detail = screen.getByRole("region", { name: "Model response for record 56" });
+  expect(within(detail).getByRole("heading", { name: "hotelSelection / Step 3" })).toBeVisible();
+  expect(await within(detail).findByText("Selected hotels")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Read raw record" }));
+  expect(await within(screen.getByRole("region", { name: "Raw record 56" })).findByText(/model-frame/)).toBeVisible();
+});
+
 test("reports malformed model content without displaying a partial fallback", async () => {
   const value = record(14, "MODEL_RESPONSE_RECEIVED");
   value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: "{not-json" };

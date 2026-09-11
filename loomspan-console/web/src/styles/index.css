@@ -1068,15 +1068,10 @@ input,
   color: var(--bf-surface);
 }
 
-/* Selection: the current record, frame, plan, or transition is marked with an accent stripe and tint
-   rather than an outline, which the rounded, clipped table and timeline surfaces would cut off. */
+/* Ungrouped record selection retains a tint; step groups own their row colors. */
 
-.trace-explorer .trace-record-row[aria-current="true"] > td {
+.trace-record-row[aria-current="true"]:not(.trace-record-related):not(.trace-record-step-context):not(.trace-record-error):not(.trace-record-warning) > td {
   background: color-mix(in srgb, var(--bf-accent) 16%, var(--bf-surface));
-}
-
-.trace-record-row[aria-current="true"]:not(.trace-record-error):not(.trace-record-warning) > td:first-child {
-  box-shadow: inset 0.25rem 0 0 var(--bf-accent);
 }
 
 .finalized-plan[aria-current="true"] {
@@ -1498,23 +1493,58 @@ input,
   min-inline-size: 52rem;
 }
 
-/* Sequence, type, and frame identifiers stay on one line; the actions column takes the remaining width. */
+/* Sequence and type stay on one line; readable context can wrap. */
 .trace-records-table td.trace-record-identifier,
 .trace-records-table td.trace-record-type {
   white-space: nowrap;
   overflow-wrap: normal;
 }
 
-.trace-records-table th:last-child,
-.trace-records-table td.trace-record-actions-cell {
+.trace-records-table th:nth-child(3),
+.trace-records-table td.trace-record-context {
   inline-size: 100%;
+}
+
+.trace-records-table .trace-record-actions {
+  inline-size: max-content;
+  max-inline-size: 28rem;
 }
 
 /* Text cells sit on the same baseline as the compact action buttons beside them. */
 .trace-records-table td.trace-record-identifier,
 .trace-records-table td.trace-record-type,
+.trace-records-table td.trace-record-context,
 .trace-records-table td.trace-numeric {
   padding-top: 0.65rem;
+}
+
+.trace-record-context {
+  min-inline-size: 14rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.trace-context-trigger {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}
+
+.trace-context-trigger:focus-visible {
+  outline: 2px solid var(--bf-accent);
+  outline-offset: 3px;
+}
+
+.trace-context-tooltip {
+  max-inline-size: min(40rem, calc(100vw - 2rem));
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--bf-border-strong);
+  border-radius: var(--bf-radius);
+  background: var(--bf-text);
+  color: var(--bf-surface);
+  box-shadow: var(--bf-shadow-2);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
 }
 
 .trace-record-type {
@@ -1545,7 +1575,7 @@ input,
   cursor: pointer;
 }
 
-.trace-record-row:not(.trace-record-error):not(.trace-record-warning):not([aria-current="true"]):hover > td {
+.trace-record-row:not(.trace-record-error):not(.trace-record-warning):not(.trace-record-related):not(.trace-record-step-context):not([aria-current="true"]):hover > td {
   background: color-mix(in srgb, var(--bf-accent) 5%, var(--bf-surface));
 }
 
@@ -1553,26 +1583,15 @@ input,
   background: color-mix(in srgb, var(--bf-accent) 6%, var(--bf-surface));
 }
 
-.trace-record-row.trace-record-step-context:not(.trace-record-error):not(.trace-record-warning):hover > td {
-  background: color-mix(in srgb, var(--bf-accent) 9%, var(--bf-surface));
-}
-
 .trace-record-row.trace-record-step-context:not(.trace-record-error):not(.trace-record-warning) > td:first-child {
   box-shadow: inset 0.125rem 0 0 color-mix(in srgb, var(--bf-accent) 50%, transparent);
 }
 
 .trace-record-row.trace-record-related:not(.trace-record-error):not(.trace-record-warning) > td {
-  background: color-mix(in srgb, var(--bf-accent) 11%, var(--bf-surface));
+  background: color-mix(in srgb, var(--bf-accent) 16%, var(--bf-surface));
 }
 
-.trace-record-row.trace-record-related > td {
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bf-accent) 65%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--bf-accent) 65%, transparent);
-}
-
-.trace-record-row.trace-record-related > td:first-child {
-  box-shadow: inset 0.15rem 0 0 color-mix(in srgb, var(--bf-accent) 65%, transparent), inset 0 1px 0 color-mix(in srgb, var(--bf-accent) 65%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--bf-accent) 65%, transparent);
-}
-
+.trace-record-row[aria-current="true"],
 .trace-record-row:focus-visible {
   outline: 2px solid var(--bf-accent);
   outline-offset: -2px;
@@ -1761,8 +1780,7 @@ input,
     box-shadow: none;
   }
   .trace-record-row.trace-record-related {
-    outline: 1px dashed Highlight;
-    outline-offset: -2px;
+    border-inline-start: 3px solid Highlight;
   }
   .trace-record-row.trace-record-step-context {
     border-inline-start: 1px solid Highlight;

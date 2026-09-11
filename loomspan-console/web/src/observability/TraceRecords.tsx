@@ -1,10 +1,12 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { Focusable, Tooltip, TooltipTrigger } from "react-aria-components";
 import { getContentRange, getRawRecordRange, getTraceRecords } from "../api/client";
 import type { TraceRange, TraceSource } from "../api/contracts";
 import type { TraceFailure, TraceFrame, TraceRecord } from "../api/contracts";
 import { TraceEvidenceDetail } from "./TraceEvidenceDetail";
 import { TraceAttemptDiagnostics } from "./TraceAttemptDiagnostics";
 import { formatDuration } from "../duration";
+import { recordContext } from "./recordContext";
 
 type Props = { traceId?: string; source?: TraceSource; scopeGeneration?: number; verifyScope?: (response: TraceRange) => Promise<TraceRange>; records: TraceRecord[]; frames?: TraceFrame[]; failures: TraceFailure[]; selectedRecordSequence?: number; selectedFailureId?: string; activeContentRecordSequence?: number; contentRange?: TraceRange; contentPending?: boolean; contentError?: string; onSelectRecord: (record: TraceRecord) => void; onSelectFailure: (failureId: string) => void; onSelectPlan?: (planId: string, transitionSequence?: number) => void; onContent: (contentRef: string, recordSequence: number) => void; onNextContent?: () => void; onClearContent?: () => void; onArtifactUnavailable?: (error: unknown) => void };
 
@@ -41,7 +43,20 @@ const frameDurationRecordTypes = new Set([
 
 const stepTerminalRecordTypes = new Set(["STEP_COMPLETED", "STEP_FAILED"]);
 
-function recordBelongsToStep(record: TraceRecord, stepFrameId: string, framesById: Map<string, TraceFrame>): boolean {
+type RecordFrame = Pick<TraceFrame, "frameId" | "parentFrameId" | "frameType" | "route">;
+
+function enclosingStep(record: TraceRecord | undefined, framesById: ReadonlyMap<string, RecordFrame>): string | undefined {
+  const visited = new Set<string>();
+  let frame: RecordFrame | undefined = record;
+  while (frame && !visited.has(frame.frameId)) {
+    visited.add(frame.frameId);
+    if (frame.frameType === "STEP_EXECUTION") return frame.frameId || undefined;
+    frame = frame.parentFrameId ? framesById.get(frame.parentFrameId) : undefined;
+  }
+  return undefined;
+}
+
+function recordBelongsToStep(record: TraceRecord, stepFrameId: string, framesById: ReadonlyMap<string, RecordFrame>): boolean {
   if (record.frameId === stepFrameId) return true;
   const visited = new Set<string>();
   let parentFrameId: string | null = framesById.get(record.frameId)?.parentFrameId ?? record.parentFrameId;
@@ -800,10 +815,13 @@ function RecordDetailView({ detail, onOpenRelated, onSelectFailure }: { detail: 
 
 export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, verifyScope, records, frames = [], failures, selectedRecordSequence, selectedFailureId, activeContentRecordSequence, contentRange, contentPending = false, contentError, onSelectRecord, onSelectFailure, onSelectPlan, onContent, onNextContent = () => {}, onClearContent = () => {}, onArtifactUnavailable }: Props) {
   const framesById = useMemo(() => new Map(frames.map((frame) => [frame.frameId, frame])), [frames]);
+  const contextFrames = useMemo(() => {
+    const known = new Map<string, RecordFrame>(framesById);
+    for (const record of records) if (record.frameId && !known.has(record.frameId)) known.set(record.frameId, record);
+    return known;
+  }, [framesById, records]);
   const selectedRecord = records.find((record) => record.sequence === selectedRecordSequence);
-  const selectedStepFrameId = selectedRecord?.frameId && (selectedRecord.type === "STEP_STARTED" || stepTerminalRecordTypes.has(selectedRecord.type))
-    ? selectedRecord.frameId
-    : undefined;
+  const selectedStepFrameId = enclosingStep(selectedRecord, contextFrames);
   const selectedStepStartSequence = selectedStepFrameId
     ? records.find((record) => record.frameId === selectedStepFrameId && record.type === "STEP_STARTED")?.sequence
     : undefined;
@@ -974,7 +992,8 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
   };
 
   return <div aria-label="Trace records">
-    <h4>Records</h4><div className="trace-table-region" role="region" aria-label="Record list" tabIndex={0}><table className="trace-records-table"><thead><tr><th className="trace-numeric">Sequence</th><th>Type</th><th>Frame</th><th className="trace-numeric">Frame duration</th><th>Actions</th></tr></thead><tbody>{records.map((record) => {
+    <h4>Records</h4><div className="trace-table-region" role="region" aria-label="Record list" tabIndex={0}><table className="trace-records-table"><thead><tr><th className="trace-numeric">Sequence</th><th>Type</th><th>Context</th><th className="trace-numeric">Frame duration</th><th>Actions</th></tr></thead><tbody>{records.map((record) => {
+      const context = recordContext(record, contextFrames);
       const isModelRequest = record.type === "MODEL_REQUEST_SENT";
       const isModelResponse = record.type === "MODEL_RESPONSE_RECEIVED";
       const isModelRecord = isModelRequest || isModelResponse;
@@ -1016,15 +1035,12 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
       const severityLabel = severity === "error" ? "Failure" : severity === "warning" ? "Retry or warning" : undefined;
       const isRelatedStepRecord = selectedStepFrameId !== undefined
         && record.frameId === selectedStepFrameId
-        && record.sequence !== selectedRecordSequence
-        && ((selectedRecord?.type === "STEP_STARTED" && stepTerminalRecordTypes.has(record.type))
-          || (selectedRecord !== undefined && stepTerminalRecordTypes.has(selectedRecord.type) && record.type === "STEP_STARTED"));
+        && (record.type === "STEP_STARTED" || stepTerminalRecordTypes.has(record.type));
       const isSelectedStepActivity = selectedStepFrameId !== undefined
-        && record.sequence !== selectedRecordSequence
         && !isRelatedStepRecord
         && (selectedStepStartSequence === undefined || record.sequence > selectedStepStartSequence)
         && (selectedStepTerminalSequence === undefined || record.sequence < selectedStepTerminalSequence)
-        && recordBelongsToStep(record, selectedStepFrameId, framesById);
+        && recordBelongsToStep(record, selectedStepFrameId, contextFrames);
       const recordLabel = severityLabel ? `${severityLabel}: record ${record.sequence}, ${record.type}` : `Record ${record.sequence}, ${record.type}`;
       const frameDuration = frameDurationRecordTypes.has(record.type)
         ? framesById.get(record.frameId)?.inclusiveDurationMillis
@@ -1034,7 +1050,12 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
           <tr id={`trace-record-${record.sequence}`} className={`trace-record-row${severity === "normal" ? "" : ` trace-record-${severity}`}${isRelatedStepRecord ? " trace-record-related" : ""}${isSelectedStepActivity ? " trace-record-step-context" : ""}`} aria-label={`${recordLabel}${isRelatedStepRecord ? ", related to selected step" : isSelectedStepActivity ? ", part of selected step" : ""}`} aria-current={selectedRecordSequence === record.sequence ? "true" : undefined} tabIndex={0} onClick={(event) => { if (!(event.target as Element).closest("button")) onSelectRecord(record); }} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onSelectRecord(record); } }}>
             <td className="trace-record-identifier trace-numeric">{record.sequence}</td>
             <td className="trace-record-type">{record.type}</td>
-            <td className="trace-record-identifier">{record.frameId}</td>
+            <td className="trace-record-context">{context.label === context.fullPath ? context.label : (
+              <TooltipTrigger delay={250} closeDelay={0}>
+                <Focusable><span className="trace-context-trigger" tabIndex={0}>{context.label}</span></Focusable>
+                <Tooltip className="trace-context-tooltip" placement="top" offset={6}>{context.fullPath}</Tooltip>
+              </TooltipTrigger>
+            )}</td>
             <td className="trace-numeric">{frameDuration == null ? "—" : <span>{formatDuration(frameDuration)}</span>}</td>
             <td className="trace-record-actions-cell">
               <div className="trace-record-actions">
@@ -1115,6 +1136,7 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
             <tr key={`${record.sequence}-model`} className="trace-record-detail-row">
               <td colSpan={5}>
                 <div id={`model-detail-${record.sequence}`} className="trace-model-expanded trace-expanded" role="region" aria-label={`${modelRegionLabel} for record ${record.sequence}`}>
+                  <h5 className="trace-record-context">{context.fullPath}</h5>
                   {!traceId && <p role="status">Trace context unavailable.</p>}
                   {traceId && modelEntry?.loading && <p role="status">Loading {modelLabel.toLowerCase()}&hellip;</p>}
                   {modelEntry?.error && <p role="alert">{modelEntry.error}</p>}
