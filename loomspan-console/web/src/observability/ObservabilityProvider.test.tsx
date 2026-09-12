@@ -118,7 +118,7 @@ test("provider fetches instance status when consumer requests it on mount", asyn
   vi.mocked(getObservabilityInstance).mockResolvedValue({
     targetScopeId: "scope-1",
     instanceId: "test-id",
-    consoleCompatibilityVersion: "1.0.0-beta.3",
+    consoleCompatibilityVersion: "1.0.0-beta.4-SNAPSHOT",
     observedAt: "2026-07-27T00:00:00Z",
     liveMonitoringAvailable: true,
     registeredSkillCount: 0,
@@ -156,7 +156,7 @@ test("scopeGeneration change resets state", async () => {
   vi.mocked(getObservabilityInstance).mockResolvedValue({
     targetScopeId: "scope-1",
     instanceId: "test-id",
-    consoleCompatibilityVersion: "1.0.0-beta.3",
+    consoleCompatibilityVersion: "1.0.0-beta.4-SNAPSHOT",
     observedAt: "2026-07-27T00:00:00Z",
     liveMonitoringAvailable: true,
     registeredSkillCount: 0,
@@ -189,7 +189,7 @@ test("manual refresh calls loadInstance again", async () => {
   vi.mocked(getObservabilityInstance).mockResolvedValue({
     targetScopeId: "scope-1",
     instanceId: "test-id",
-    consoleCompatibilityVersion: "1.0.0-beta.3",
+    consoleCompatibilityVersion: "1.0.0-beta.4-SNAPSHOT",
     observedAt: "2026-07-27T00:00:00Z",
     liveMonitoringAvailable: true,
     registeredSkillCount: 0,

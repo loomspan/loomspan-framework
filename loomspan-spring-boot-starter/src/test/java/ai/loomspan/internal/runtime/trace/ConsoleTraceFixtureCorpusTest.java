@@ -208,7 +208,7 @@ class ConsoleTraceFixtureCorpusTest
     void portableTraceCorpusRetainsExactCompatibilityMarker() throws Exception
     {
         String expectedVersion = ai.loomspan.internal.release.LoomspanReleaseVersion.load();
-        assertThat(expectedVersion).isEqualTo("1.0.0-beta.3");
+        assertThat(expectedVersion).isEqualTo("1.0.0-beta.4-SNAPSHOT");
         for (String name : VALID)
         {
             List<JsonNode> records = parseLines(fixtureRoot().resolve("traces").resolve(name + ".ndjson"));
@@ -2635,18 +2635,18 @@ class ConsoleTraceFixtureCorpusTest
 
         List<String> missingCompatibility = new ArrayList<>(base);
         missingCompatibility.set(0, missingCompatibility.getFirst().replace(
-                ",\"consoleCompatibilityVersion\":\"1.0.0-beta.3\"", ""));
+                ",\"consoleCompatibilityVersion\":\"1.0.0-beta.4-SNAPSHOT\"", ""));
         writeInvalid(root, "missing-console-compatibility-version", missingCompatibility);
 
         List<String> blankCompatibility = new ArrayList<>(base);
         blankCompatibility.set(0, blankCompatibility.getFirst().replace(
-                "\"consoleCompatibilityVersion\":\"1.0.0-beta.3\"",
+                "\"consoleCompatibilityVersion\":\"1.0.0-beta.4-SNAPSHOT\"",
                 "\"consoleCompatibilityVersion\":\"\""));
         writeInvalid(root, "blank-console-compatibility-version", blankCompatibility);
 
         List<String> nonStringCompatibility = new ArrayList<>(base);
         nonStringCompatibility.set(0, nonStringCompatibility.getFirst().replace(
-                "\"consoleCompatibilityVersion\":\"1.0.0-beta.3\"",
+                "\"consoleCompatibilityVersion\":\"1.0.0-beta.4-SNAPSHOT\"",
                 "\"consoleCompatibilityVersion\":25"));
         writeInvalid(root, "non-string-console-compatibility-version", nonStringCompatibility);
 

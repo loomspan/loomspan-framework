@@ -29,10 +29,10 @@ import (
 )
 
 // javaCompatibleInstanceJSON is the exact instance probe body a Java adapter at
-// consoleCompatibilityVersion "1.0.0-beta.3" emits. Tests reuse it so the
+// consoleCompatibilityVersion "1.0.0-beta.4-SNAPSHOT" emits. Tests reuse it so the
 // scope's compatibility gate and runtime identity are established exactly as in
 // production.
-const javaCompatibleInstanceJSON = `{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.3","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`
+const javaCompatibleInstanceJSON = `{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.4-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`
 
 const javaInstanceID = "11111111-1111-4111-8111-111111111111"
 
@@ -65,7 +65,7 @@ func newArtifactTestServer(t *testing.T, artifactBody []byte) *artifactTestServe
 	}
 	if artifactBody == nil {
 		artifactBody = bytes.Replace(fixture,
-			[]byte(`"consoleCompatibilityVersion":"1.0.0-beta.3"`),
+			[]byte(`"consoleCompatibilityVersion":"1.0.0-beta.4-SNAPSHOT"`),
 			[]byte(`"consoleCompatibilityVersion":"development"`), 1)
 	}
 	traceMetadata := fmt.Sprintf(
@@ -140,7 +140,7 @@ func buildArtifactService(t *testing.T, server *artifactTestServer) (*artifact.S
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 30 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.3")
+		return applicationclient.New(address, policy, "1.0.0-beta.4-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatalf("create target context: %v", err)
@@ -547,7 +547,7 @@ func TestArtifactShutdownWaitsForStreamCleanup(t *testing.T) {
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 30 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.3")
+		return applicationclient.New(address, policy, "1.0.0-beta.4-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatalf("create target context: %v", err)
@@ -657,7 +657,7 @@ func TestArtifactAcquisitionDoesNotLeakPathsOrCredentials(t *testing.T) {
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 30 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.3")
+		return applicationclient.New(address, policy, "1.0.0-beta.4-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatalf("create target context: %v", err)
@@ -820,7 +820,7 @@ func fixtureSHA256(t *testing.T, override []byte) string {
 			t.Fatalf("read fixture: %v", err)
 		}
 		data = bytes.Replace(fixture,
-			[]byte(`"consoleCompatibilityVersion":"1.0.0-beta.3"`),
+			[]byte(`"consoleCompatibilityVersion":"1.0.0-beta.4-SNAPSHOT"`),
 			[]byte(`"consoleCompatibilityVersion":"development"`), 1)
 	}
 	sum := sha256.Sum256(data)
@@ -845,7 +845,7 @@ func buildArtifactServiceWithQueryService(t *testing.T, server *artifactTestServ
 		ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: 30 * time.Second,
 	}
 	targetContext, err := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, policy, "1.0.0-beta.3")
+		return applicationclient.New(address, policy, "1.0.0-beta.4-SNAPSHOT")
 	}, nil, time.Now)
 	if err != nil {
 		t.Fatalf("create target context: %v", err)

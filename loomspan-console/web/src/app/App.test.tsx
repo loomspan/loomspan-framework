@@ -13,7 +13,7 @@ test("renders the console shell and runtime compatibility version", () => {
   expect(screen.getByRole("link", { name: "Active Executions" })).toHaveAttribute("href", "/active-executions");
   expect(screen.getByRole("link", { name: "Traces" })).toHaveAttribute("href", "/traces");
   expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings/mcp");
-  expect(screen.getByTestId("console-version")).toHaveTextContent("1.0.0-beta.3");
+  expect(screen.getByTestId("console-version")).toHaveTextContent("1.0.0-beta.4-SNAPSHOT");
 });
 
 test("does not retain the obsolete foundation deep route", () => {

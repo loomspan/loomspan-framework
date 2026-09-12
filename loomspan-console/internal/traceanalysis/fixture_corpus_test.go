@@ -79,7 +79,7 @@ type fixtureActivePrefix struct {
 	Branches []activeBranch `json:"branches"`
 }
 
-const fixtureCompatibilityVersion = "1.0.0-beta.3"
+const fixtureCompatibilityVersion = "1.0.0-beta.4-SNAPSHOT"
 
 func TestCanonicalConcurrentFixtureMatchesTransitionsPrefixesAndOverlap(t *testing.T) {
 	root := fixtureRoot(t)

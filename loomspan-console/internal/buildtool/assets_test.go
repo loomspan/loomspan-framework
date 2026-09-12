@@ -9,10 +9,10 @@ import (
 func TestGenerateManifestSortsAndHashesDeterministically(t *testing.T) {
 	first := createAssetDirectory(t, []string{"assets/app-12345678.css", "index.html", "assets/app-12345678.js", ".vite/manifest.json"})
 	second := createAssetDirectory(t, []string{".vite/manifest.json", "assets/app-12345678.js", "index.html", "assets/app-12345678.css"})
-	if err := generateManifest(first, "1.0.0-beta.3"); err != nil {
+	if err := generateManifest(first, "1.0.0-beta.4-SNAPSHOT"); err != nil {
 		t.Fatal(err)
 	}
-	if err := generateManifest(second, "1.0.0-beta.3"); err != nil {
+	if err := generateManifest(second, "1.0.0-beta.4-SNAPSHOT"); err != nil {
 		t.Fatal(err)
 	}
 	one, _ := os.ReadFile(filepath.Join(first, "loomspan-assets.json"))

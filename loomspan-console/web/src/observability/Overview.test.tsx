@@ -73,7 +73,7 @@ import { ObservabilityOverview } from "./Overview";
 const instanceStatus: InstanceStatus = {
   targetScopeId: "scope-1",
   instanceId: "11111111-1111-4111-8111-111111111111",
-  consoleCompatibilityVersion: "1.0.0-beta.3",
+  consoleCompatibilityVersion: "1.0.0-beta.4-SNAPSHOT",
   observedAt: "2026-07-27T00:00:00Z",
   liveMonitoringAvailable: true,
   registeredSkillCount: 3,
@@ -126,7 +126,7 @@ test("overview collapses static configuration facts behind a disclosure", () => 
   render(<ObservabilityOverview />);
   const disclosure = screen.getByText("Instance configuration");
   expect(disclosure).toBeVisible();
-  for (const value of ["1.0.0-beta.3", "PERSISTENT", "PT2M", "PT168H"]) {
+  for (const value of ["1.0.0-beta.4-SNAPSHOT", "PERSISTENT", "PT2M", "PT168H"]) {
     expect(screen.getByText(value)).not.toBeVisible();
   }
   expect(
@@ -137,7 +137,7 @@ test("overview collapses static configuration facts behind a disclosure", () => 
 
   fireEvent.click(disclosure);
 
-  for (const value of ["1.0.0-beta.3", "PERSISTENT", "PT2M", "PT168H"]) {
+  for (const value of ["1.0.0-beta.4-SNAPSHOT", "PERSISTENT", "PT2M", "PT168H"]) {
     expect(screen.getByText(value)).toBeVisible();
   }
 });

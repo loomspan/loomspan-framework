@@ -29,7 +29,7 @@ type fixtureBootstrap struct {
 func TestBrowserTargetFixtureCorpusMatchesCommittedInventoryByteForByte(t *testing.T) {
 	observed := time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC)
 	scope := "11111111-1111-4111-8111-111111111111"
-	base := fixtureBootstrap{ProcessID: "process-1", ConsoleVersion: "1.0.0-beta.3", WorkspacePath: `C:\workspace`, TabID: "tab-1", CSRFToken: "csrf-1", TargetFormDefaults: map[string]string{"address": "", "applicationKey": ""}}
+	base := fixtureBootstrap{ProcessID: "process-1", ConsoleVersion: "1.0.0-beta.4-SNAPSHOT", WorkspacePath: `C:\workspace`, TabID: "tab-1", CSRFToken: "csrf-1", TargetFormDefaults: map[string]string{"address": "", "applicationKey": ""}}
 	noTarget := base
 	noTarget.Target = targetDTO{Status: consolecore.NoTargetStatus(observed)}
 	required := base
@@ -66,7 +66,7 @@ func TestBrowserTargetFixtureCorpusMatchesCommittedInventoryByteForByte(t *testi
 		}},
 		"error-incompatible.json": errorEnvelope{Error: browserError{
 			Code: "INCOMPATIBLE_TARGET", Message: "The selected target uses a different Loomspan release.", TargetScopeID: scope,
-			Details: consolecore.Details{ExpectedCompatibilityVersion: "1.0.0-beta.3", ObservedCompatibilityVersion: "0.1.0"},
+			Details: consolecore.Details{ExpectedCompatibilityVersion: "1.0.0-beta.4-SNAPSHOT", ObservedCompatibilityVersion: "0.1.0"},
 		}},
 		"error-target-changed.json": errorEnvelope{Error: browserError{
 			Code: "TARGET_CHANGED", Message: "The selected target changed. Start this operation again.", TargetScopeID: scope,

@@ -76,7 +76,7 @@ function makeTargetServer(initialState: TargetState) {
       response.end(
         JSON.stringify({
           instanceId: state.instanceId,
-          consoleCompatibilityVersion: "1.0.0-beta.3",
+          consoleCompatibilityVersion: "1.0.0-beta.4-SNAPSHOT",
           observedAt: "2026-07-27T00:00:00Z",
           liveMonitoringAvailable: true,
           registeredSkillCount: 0,
