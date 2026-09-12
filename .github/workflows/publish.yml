@@ -74,5 +74,5 @@ jobs:
           CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      - name: Confirm publication
-        run: echo 'Sonatype reports PUBLISHED for the parent POM and starter. Maven Central search indexing may take additional time.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Confirm deployment
+        run: echo 'Sonatype accepted and validated the parent POM and starter. Automatic publication continues in Maven Central and indexing may take additional time.' >> "$GITHUB_STEP_SUMMARY"
