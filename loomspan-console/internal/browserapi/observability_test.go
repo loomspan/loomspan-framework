@@ -43,7 +43,7 @@ type fixtureObservabilityClient struct {
 func (*fixtureObservabilityClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
 		InstanceID:                  "11111111-1111-4111-8111-111111111111",
-		ConsoleCompatibilityVersion: "1.0.0-beta.3-SNAPSHOT",
+		ConsoleCompatibilityVersion: "1.0.0-beta.3",
 		ObservedAt:                  time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC),
 		LiveMonitoringAvailable:     true,
 	}, nil
@@ -57,7 +57,7 @@ func (client *fixtureObservabilityClient) Get(_ context.Context, endpoint string
 	var body string
 	switch {
 	case strings.HasSuffix(endpoint, "/instance"):
-		body = `{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.3-SNAPSHOT","observedAt":"2026-07-27T00:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":1,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`
+		body = `{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.3","observedAt":"2026-07-27T00:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":1,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`
 	case strings.Contains(endpoint, "/skills/"):
 		body = `{"registeredName":"CheckDns","source": "YAML", "sourcePath":"classpath:/skills/check-dns.yaml","yaml":"name: CheckDns"}`
 	case strings.Contains(endpoint, "/skills"):

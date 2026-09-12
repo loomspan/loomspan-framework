@@ -520,7 +520,7 @@ type fakeArtifactProbeClient struct {
 func (f *fakeArtifactProbeClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
 		InstanceID:                  "11111111-1111-4111-8111-111111111111",
-		ConsoleCompatibilityVersion: "1.0.0-beta.3-SNAPSHOT",
+		ConsoleCompatibilityVersion: "1.0.0-beta.3",
 		ObservedAt:                  time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC),
 		LiveMonitoringAvailable:     true,
 	}, nil
@@ -820,7 +820,7 @@ type undeclaredLengthArtifactProbeClient struct {
 func (c *undeclaredLengthArtifactProbeClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
 		InstanceID:                  "11111111-1111-4111-8111-111111111111",
-		ConsoleCompatibilityVersion: "1.0.0-beta.3-SNAPSHOT",
+		ConsoleCompatibilityVersion: "1.0.0-beta.3",
 	}, nil
 }
 
@@ -915,7 +915,7 @@ type blockingArtifactProbeClient struct {
 func (*blockingArtifactProbeClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
 		InstanceID:                  "11111111-1111-4111-8111-111111111111",
-		ConsoleCompatibilityVersion: "1.0.0-beta.3-SNAPSHOT",
+		ConsoleCompatibilityVersion: "1.0.0-beta.3",
 	}, nil
 }
 

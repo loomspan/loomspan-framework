@@ -44,7 +44,7 @@ func (*fakeClient) Close() {}
 
 func fixedInstance(id string) applicationclient.Instance {
 	return applicationclient.Instance{
-		InstanceID: id, ConsoleCompatibilityVersion: "1.0.0-beta.3-SNAPSHOT",
+		InstanceID: id, ConsoleCompatibilityVersion: "1.0.0-beta.3",
 		ObservedAt: time.Now(), LiveMonitoringAvailable: true,
 	}
 }

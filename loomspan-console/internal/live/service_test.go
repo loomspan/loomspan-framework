@@ -47,10 +47,10 @@ func setupTargetWithOwner(t *testing.T, sse string, owner target.ScopeOwner) (*t
 		}
 		response.Header().Set(applicationclient.InstanceIDHeader, testInstanceID)
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"instanceId":"` + testInstanceID + `","consoleCompatibilityVersion":"1.0.0-beta.3-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true}`))
+		_, _ = response.Write([]byte(`{"instanceId":"` + testInstanceID + `","consoleCompatibilityVersion":"1.0.0-beta.3","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true}`))
 	}))
 	address, _ := applicationclient.NormalizeAddress(server.URL)
-	client, _ := applicationclient.New(address, testPolicy(), "1.0.0-beta.3-SNAPSHOT")
+	client, _ := applicationclient.New(address, testPolicy(), "1.0.0-beta.3")
 	targetContext, _ := target.New(func(addr applicationclient.Address) (target.ProbeClient, error) {
 		return client, nil
 	}, nil, time.Now)
@@ -135,7 +135,7 @@ func TestServiceRebaselinesAndReconnectsAfterStaleCursor(t *testing.T) {
 		}
 		response.Header().Set(applicationclient.InstanceIDHeader, testInstanceID)
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"instanceId":"` + testInstanceID + `","consoleCompatibilityVersion":"1.0.0-beta.3-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true}`))
+		_, _ = response.Write([]byte(`{"instanceId":"` + testInstanceID + `","consoleCompatibilityVersion":"1.0.0-beta.3","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true}`))
 	}))
 	defer server.Close()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -148,7 +148,7 @@ func TestServiceRebaselinesAndReconnectsAfterStaleCursor(t *testing.T) {
 		return Baseline{ResumeCursor: "0"}, nil
 	})
 	targetContext, _ := target.New(func(address applicationclient.Address) (target.ProbeClient, error) {
-		return applicationclient.New(address, testPolicy(), "1.0.0-beta.3-SNAPSHOT")
+		return applicationclient.New(address, testPolicy(), "1.0.0-beta.3")
 	}, nil, time.Now)
 	if err := targetContext.RegisterOwner("live", service); err != nil {
 		t.Fatal(err)

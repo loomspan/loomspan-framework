@@ -42,7 +42,7 @@ func assertJSONGolden(t *testing.T, name string, value any) {
 
 func (*mcpTestTargetClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
 	return applicationclient.Instance{
-		InstanceID: mcpTestInstanceID, ConsoleCompatibilityVersion: "1.0.0-beta.3-SNAPSHOT",
+		InstanceID: mcpTestInstanceID, ConsoleCompatibilityVersion: "1.0.0-beta.3",
 		ObservedAt: time.Date(2026, 8, 13, 20, 0, 0, 0, time.UTC), LiveMonitoringAvailable: true,
 	}, nil
 }
