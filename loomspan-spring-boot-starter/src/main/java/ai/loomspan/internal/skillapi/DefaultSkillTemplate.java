@@ -91,13 +91,14 @@ public class DefaultSkillTemplate implements SkillTemplate
     @Override
     public String invoke(String skillName, Map<String, Object> input, Consumer<SkillExecutionView> observer)
     {
-        ExecutionResult execution;
+        CapabilityMetadata capability;
+        SkillInputValidationResult validation;
         try
         {
-            CapabilityMetadata capability = requireSkill(skillName);
+            capability = requireSkill(skillName);
             SkillInputContract contract = capability.inputContract();
             Map<String, Object> safeInput = normalizeNullInput(input, contract);
-            SkillInputValidationResult validation = inputValidator.validate(safeInput, contract);
+            validation = inputValidator.validate(safeInput, contract);
 
             if (!validation.valid())
             {
@@ -106,12 +107,6 @@ public class DefaultSkillTemplate implements SkillTemplate
                         .toList();
                 throw new SkillInputValidationException(buildValidationMessage(skillName, validation), issues);
             }
-
-            Authentication authentication = securityContextStrategy.getContext().getAuthentication();
-            execution = sessionRunner.callWithNewSession(
-                    capability.name(),
-                    authentication,
-                    session -> executeValidated(capability, validation, session));
         }
         catch (AccessDeniedException | SkillException ex)
         {
@@ -122,12 +117,29 @@ public class DefaultSkillTemplate implements SkillTemplate
             throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
         }
 
-        if (observer != null)
+        try
         {
-            observer.accept(executionViewMapper.map(execution.session()));
+            Authentication authentication = securityContextStrategy.getContext().getAuthentication();
+            return sessionRunner.callWithNewSession(
+                    capability.name(), authentication,
+                    session -> executeValidated(capability, validation, session),
+                    (execution, session) -> {
+                        if (observer != null) observer.accept(executionViewMapper.map(session));
+                        return execution.result();
+                    });
         }
-
-        return execution.result();
+        catch (LoomspanSessionRunner.CompletionPhaseFailure ex)
+        {
+            throw ex.original();
+        }
+        catch (AccessDeniedException | SkillException ex)
+        {
+            throw ex;
+        }
+        catch (RuntimeException ex)
+        {
+            throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+        }
     }
 
     private ExecutionResult executeValidated(CapabilityMetadata capability,

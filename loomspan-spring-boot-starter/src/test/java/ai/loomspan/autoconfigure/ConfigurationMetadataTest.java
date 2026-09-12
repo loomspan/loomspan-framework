@@ -71,6 +71,7 @@ class ConfigurationMetadataTest {
                     .contains("loomspan.observability.auth.api-key")
                     .contains("loomspan.observability.completion-grace-ttl")
                     .contains("loomspan.observability.trace-catalog-metadata-ttl")
+                    .contains("loomspan.shutdown.timeout")
                     .contains("\"value\": \"openai\"")
                     .doesNotContain("unversioned URLs use /v1/chat/completions")
                     .doesNotContain("headers supported only for the OpenAI driver")

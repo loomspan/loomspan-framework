@@ -25,6 +25,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
+import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.lang.Nullable;
 import org.springframework.security.access.AccessDeniedException;
@@ -39,6 +40,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -1326,6 +1328,83 @@ class ExecutionCoordinatorTest {
                     .filter(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
                     .map(record -> record.metadata().get("failureId")))
                     .contains(terminalFailureId);
+        }
+    }
+
+    @Test
+    void preservesFrameworkShutdownPrimaryWhenCutoffCancelsDirectMission() throws Exception {
+        EffectiveSkillExecutionConfiguration executionConfiguration = new EffectiveSkillExecutionConfiguration(
+                "gpt-5",
+                "test-connection", AiDriver.OPENAI,
+                "openai/gpt-5",
+                "medium");
+        YamlSkillManifest manifest = manifest("rootVisibleSkill", List.of());
+        manifest.setPlanningMode(false);
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(
+                new ByteArrayResource(new byte[0]), manifest, executionConfiguration));
+        CapabilityMetadata rootMetadata = new CapabilityMetadata(
+                "yaml:root", "rootVisibleSkill", "root",
+                SkillExecutionDescriptor.from(executionConfiguration),
+                ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
+                arguments -> "root", CapabilityKind.YAML_SKILL,
+                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"), null);
+        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        registry.register(rootMetadata.name(), rootMetadata);
+
+        var context = new StaticApplicationContext();
+        var started = new CountDownLatch(1);
+        try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor();
+             ExecutorService callerExecutor = Executors.newSingleThreadExecutor()) {
+            FrameworkExecutionLifecycle frameworkLifecycle = new FrameworkExecutionLifecycle(
+                    context, Duration.ofMillis(25), missionExecutor);
+            FrameworkExecutionLifecycle.AdmittedRoot admittedRoot = frameworkLifecycle.admitRoot();
+            ExecutionStateService stateService = fixedStateService();
+            PlanningService planningService = fixedPlanningService(stateService);
+            MissionExecutionEngine missionExecutionEngine = new DefaultMissionExecutionEngine(
+                    planningService, stateService,
+                    new ai.loomspan.internal.runtime.MissionWorkExecutor(
+                            stateService, Duration.ofSeconds(5), missionExecutor,
+                            new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
+            ExecutionCoordinator coordinator = coordinator(
+                    catalog, registry,
+                    (currentSkillName, sessionState, authentication) -> List.of(),
+                    (ignored, mode) -> request -> {
+                        started.countDown();
+                        try {
+                            new CountDownLatch(1).await();
+                            throw new AssertionError("Blocking model unexpectedly resumed");
+                        }
+                        catch (InterruptedException ex) {
+                            throw new IllegalStateException("Blocking model interrupted", ex);
+                        }
+                    },
+                    (value, session) -> value, null, stateService, planningService,
+                    missionExecutionEngine, null);
+            LoomspanSession session = new LoomspanSession("session-framework-cutoff", "rootVisibleSkill", 3);
+            session.attachAdmittedRoot(admittedRoot);
+
+            var invocation = callerExecutor.submit(
+                    () -> coordinator.execute("rootVisibleSkill", "Wait for cutoff", session, null));
+            assertThat(started.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            frameworkLifecycle.closeAdmission();
+            frameworkLifecycle.stop();
+
+            Throwable invocationFailure = catchThrowable(invocation::get);
+            assertThat(invocationFailure).isInstanceOf(ExecutionException.class);
+            Throwable frameworkFailure = invocationFailure.getCause();
+            assertThat(frameworkFailure).isInstanceOf(FrameworkShutdownException.class);
+            assertThat(frameworkFailure.getSuppressed()).isEmpty();
+            List<TraceRecord> records = readTraceRecords(session);
+            TraceRecord closedRoot = records.stream()
+                    .filter(record -> record.recordType() == TraceRecordType.FRAME_CLOSED)
+                    .filter(record -> record.frameType() == TraceFrameType.ROOT_MISSION)
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(closedRoot.metadata()).containsEntry("status", "aborted");
+            assertThat(records.getLast().recordType()).isEqualTo(TraceRecordType.TRACE_COMPLETED);
+            assertThat(records.getLast().metadata()).containsEntry("outcome", TraceOutcome.ABORTED.name());
+            admittedRoot.close();
+            frameworkLifecycle.destroy();
         }
     }
 

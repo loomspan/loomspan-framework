@@ -457,6 +457,8 @@ Console displays the declared source as YAML or Java. YAML details contain resou
 
 ```yaml
 loomspan:
+  shutdown:
+    timeout: 30s
   session:
     mission-timeout: 60s
     max-depth: 32
@@ -473,6 +475,10 @@ loomspan:
 execution-trace:
   persistence: ONERROR # NEVER, ONERROR, or ALWAYS
 ```
+
+`loomspan.shutdown.timeout` is the single framework shutdown budget and must be a positive YAML duration. When the owning Spring application context begins closing, Loomspan atomically rejects new top-level skill invocations before constructing their sessions. Roots already admitted may continue nested skill work, subject to their ordinary mission timeouts, quotas, and depth limits.
+
+The budget starts when root admission closes and covers admitted execution, trace finalization, caller-thread public-view mapping and success observation, cutoff, and framework mission-executor cleanup. Loomspan's close-event listener returns promptly; bounded waiting occurs in the following Spring lifecycle-stop stage so resources required by admitted work remain available until completion or cutoff. Other application listeners remain independent and their ordering is not a Loomspan contract. This bound covers Loomspan-owned shutdown work, not unrelated application hooks or the lifetime of the JVM.
 
 When Micrometer is on the application classpath, Loomspan records usage metrics automatically. Execution traces and the `SkillTemplate` observer callback can be used to inspect a completed skill execution.
 

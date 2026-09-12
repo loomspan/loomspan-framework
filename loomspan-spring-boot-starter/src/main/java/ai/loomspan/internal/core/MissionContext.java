@@ -49,6 +49,8 @@ public final class MissionContext
         }
         this.parent = parent;
         this.lifecycle = new MissionLifecycle(this, Objects.requireNonNull(nanoTime, "nanoTime must not be null"));
+        FrameworkExecutionLifecycle.AdmittedRoot admittedRoot = session.admittedRoot();
+        if (admittedRoot != null) admittedRoot.register(this.lifecycle);
     }
 
     public LoomspanSession session() { return session; }

@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.BiFunction;
 import tools.jackson.databind.ObjectMapper;
 
 public class LoomspanSessionRunner
@@ -25,6 +26,7 @@ public class LoomspanSessionRunner
     private final ExecutionObservationHandleFactory observationHandleFactory;
     private final InternalExecutionTraceHandleFactory traceHandleFactory;
     private final ObjectMapper canonicalTraceMapper;
+    private final @Nullable FrameworkExecutionLifecycle frameworkLifecycle;
 
     public LoomspanSessionRunner(int maxDepth)
     {
@@ -121,7 +123,7 @@ public class LoomspanSessionRunner
             InternalExecutionTraceHandleFactory traceHandleFactory)
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory, traceHandleFactory,
-                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace());
+                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace(), null);
     }
 
     private LoomspanSessionRunner(
@@ -131,6 +133,19 @@ public class LoomspanSessionRunner
             ExecutionObservationHandleFactory observationHandleFactory,
             InternalExecutionTraceHandleFactory traceHandleFactory,
             ObjectMapper canonicalTraceMapper)
+    {
+        this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory, traceHandleFactory,
+                canonicalTraceMapper, null);
+    }
+
+    private LoomspanSessionRunner(
+            int maxDepth,
+            TracePersistencePolicy tracePersistencePolicy,
+            Clock clock,
+            ExecutionObservationHandleFactory observationHandleFactory,
+            InternalExecutionTraceHandleFactory traceHandleFactory,
+            ObjectMapper canonicalTraceMapper,
+            @Nullable FrameworkExecutionLifecycle frameworkLifecycle)
     {
         if (maxDepth <= 0)
         {
@@ -145,6 +160,29 @@ public class LoomspanSessionRunner
         this.traceHandleFactory = Objects.requireNonNull(traceHandleFactory, "traceHandleFactory must not be null");
         this.canonicalTraceMapper = Objects.requireNonNull(canonicalTraceMapper,
                 "canonicalTraceMapper must not be null");
+        this.frameworkLifecycle = frameworkLifecycle;
+    }
+
+    public LoomspanSessionRunner(
+            int maxDepth,
+            TracePersistencePolicy tracePersistencePolicy,
+            Clock clock,
+            ExecutionObservationHandleFactory observationHandleFactory,
+            CompletionGraceRetention completionGraceRetention,
+            LoomspanProperties.Session.Quotas quotas,
+            ObjectMapper canonicalTraceMapper,
+            FrameworkExecutionLifecycle frameworkLifecycle)
+    {
+        this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
+                (sessionId, entrySkill, policy, handleClock, observationHandle) ->
+                        new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                                sessionId, entrySkill, policy, handleClock, observationHandle,
+                                Objects.requireNonNull(completionGraceRetention,
+                                        "completionGraceRetention must not be null"),
+                                ConfiguredLimitsSnapshot.from(quotas),
+                                Objects.requireNonNull(canonicalTraceMapper,
+                                        "canonicalTraceMapper must not be null")),
+                canonicalTraceMapper, Objects.requireNonNull(frameworkLifecycle));
     }
 
     public void runWithNewSession(String entrySkill, Consumer<LoomspanSession> action)
@@ -155,39 +193,8 @@ public class LoomspanSessionRunner
     public void runWithNewSession(String entrySkill, @Nullable Authentication authentication, Consumer<LoomspanSession> action)
     {
         Objects.requireNonNull(action, "action must not be null");
-        LoomspanSession session = new LoomspanSession(
-                UUID.randomUUID().toString(),
-                entrySkill,
-                maxDepth,
-                null,
-                null,
-                null,
-                null,
-                authentication,
-                tracePersistencePolicy,
-                clock,
-                observationHandleFactory,
-                traceHandleFactory,
-                () -> UUID.randomUUID().toString(),
-                canonicalTraceMapper);
-
-        ExecutionBindingScope.runWith(ExecutionBinding.sessionOnly(session), () ->
-        {
-            Throwable failure = null;
-            try
-            {
-                action.accept(session);
-            }
-            catch (RuntimeException | Error ex)
-            {
-                failure = ex;
-                throw ex;
-            }
-            finally
-            {
-                completeSession(session, failure);
-            }
-        });
+        executeRoot(entrySkill, authentication, session -> { action.accept(session); return null; },
+                (ignored, session) -> null);
     }
 
     public <T> T callWithNewSession(String entrySkill, Function<LoomspanSession, T> action)
@@ -197,8 +204,25 @@ public class LoomspanSessionRunner
 
     public <T> T callWithNewSession(String entrySkill, @Nullable Authentication authentication, Function<LoomspanSession, T> action)
     {
+        return callWithNewSession(entrySkill, authentication, action, (result, session) -> result);
+    }
+
+    public <T, R> R callWithNewSession(String entrySkill, @Nullable Authentication authentication,
+            Function<LoomspanSession, T> action, BiFunction<T, LoomspanSession, R> completion)
+    {
+        return executeRoot(entrySkill, authentication, action, completion);
+    }
+
+    private <T, R> R executeRoot(String entrySkill, @Nullable Authentication authentication,
+            Function<LoomspanSession, T> action, BiFunction<T, LoomspanSession, R> completion)
+    {
         Objects.requireNonNull(action, "action must not be null");
-        LoomspanSession session = new LoomspanSession(
+        Objects.requireNonNull(completion, "completion must not be null");
+        FrameworkExecutionLifecycle.AdmittedRoot root = frameworkLifecycle == null
+                ? null : frameworkLifecycle.admitRoot();
+        try
+        {
+            LoomspanSession session = new LoomspanSession(
                 UUID.randomUUID().toString(),
                 entrySkill,
                 maxDepth,
@@ -213,24 +237,27 @@ public class LoomspanSessionRunner
                 traceHandleFactory,
                 () -> UUID.randomUUID().toString(),
                 canonicalTraceMapper);
-
-        return ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session), () ->
+            if (root != null) session.attachAdmittedRoot(root);
+            T result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session), () ->
+            {
+                Throwable failure = null;
+                try { return action.apply(session); }
+                catch (RuntimeException | Error ex) { failure = ex; throw ex; }
+                finally { completeSession(session, failure); }
+            });
+            try { return completion.apply(result, session); }
+            catch (RuntimeException ex) { throw new CompletionPhaseFailure(ex); }
+        }
+        finally
         {
-            Throwable failure = null;
-            try
-            {
-                return action.apply(session);
-            }
-            catch (RuntimeException | Error ex)
-            {
-                failure = ex;
-                throw ex;
-            }
-            finally
-            {
-                completeSession(session, failure);
-            }
-        });
+            if (root != null) root.close();
+        }
+    }
+
+    public static final class CompletionPhaseFailure extends RuntimeException
+    {
+        private CompletionPhaseFailure(RuntimeException cause) { super(cause); }
+        public RuntimeException original() { return (RuntimeException) getCause(); }
     }
 
     private void finalizeSessionTrace(LoomspanSession session, @Nullable Throwable failure)

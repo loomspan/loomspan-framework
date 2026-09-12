@@ -85,6 +85,17 @@ public final class MissionWorkExecutor
         catch (ExecutionException ex)
         {
             Throwable cause = ex.getCause();
+            var primaryCancellation = lifecycle.primaryCancellation();
+            if (primaryCancellation.isPresent()
+                    && (!(primaryCancellation.orElseThrow().cause() instanceof FrameworkShutdownException)
+                            || cause instanceof MissionWriteRevokedException))
+            {
+                MissionLifecycle.PrimaryCancellation primary = primaryCancellation.orElseThrow();
+                MissionLifecycle.Cutoff cutoff = lifecycle.awaitCutoff();
+                cleanupFramesPreservingPrimary(
+                        session, branch, capturedBinding.requireMission(), cutoff, primary.cause());
+                throw propagatePrimary(primary.cause());
+            }
             if (cause instanceof RuntimeException runtimeException)
             {
                 throw runtimeException;
@@ -94,6 +105,13 @@ public final class MissionWorkExecutor
                 throw error;
             }
             throw new IllegalStateException("Mission execution failed for skill '" + skillName + "'", cause);
+        }
+        catch (CancellationException ex)
+        {
+            MissionLifecycle.PrimaryCancellation primary = lifecycle.primaryCancellation().orElseThrow(() -> ex);
+            MissionLifecycle.Cutoff cutoff = lifecycle.awaitCutoff();
+            cleanupFramesPreservingPrimary(session, branch, capturedBinding.requireMission(), cutoff, primary.cause());
+            throw propagatePrimary(primary.cause());
         }
     }
 

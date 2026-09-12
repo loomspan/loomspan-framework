@@ -167,9 +167,29 @@ public class ExecutionCoordinator
         catch (RuntimeException | Error ex)
         {
             failure = ex;
-            terminalFailureId = mission.lifecycle().primaryCancellation()
-                    .map(MissionLifecycle.PrimaryCancellation::failureId)
-                    .orElseGet(() -> executionStateService.recordFailure(session, ex, errorPayload(skillName, objective, ex)));
+            Optional<MissionLifecycle.PrimaryCancellation> primaryCancellation =
+                    mission.lifecycle().primaryCancellation();
+            if (primaryCancellation.isPresent())
+            {
+                terminalFailureId = primaryCancellation.orElseThrow().failureId();
+                if (terminalFailureId == null)
+                {
+                    try
+                    {
+                        terminalFailureId = recordFrameworkCancellationFailure(
+                                session, mission, ex, errorPayload(skillName, objective, ex));
+                    }
+                    catch (RuntimeException recordingFailure)
+                    {
+                        if (recordingFailure != ex) ex.addSuppressed(recordingFailure);
+                    }
+                }
+            }
+            else
+            {
+                terminalFailureId = executionStateService.recordFailure(
+                        session, ex, errorPayload(skillName, objective, ex));
+            }
             throw ex;
         }
         finally
@@ -287,6 +307,7 @@ public class ExecutionCoordinator
         while (current != null)
         {
             if (current instanceof LoomspanMissionTimeoutException
+                    || current instanceof FrameworkShutdownException
                     || current instanceof CancellationException
                     || current instanceof InterruptedException)
             {
@@ -305,7 +326,7 @@ public class ExecutionCoordinator
                 : (Thread.currentThread().isInterrupted() || isCancellation(failure) ? "aborted" : "failed"));
         if (failure != null)
         {
-            metadata.put("failureId", Objects.requireNonNull(failureId, "failureId must not be null"));
+            if (failureId != null) metadata.put("failureId", failureId);
             TraceFailureMetadata.addTo(metadata, failure, "Mission execution failed");
         }
         return metadata;
@@ -318,6 +339,24 @@ public class ExecutionCoordinator
         payload.put("objective", objective);
         TraceFailureMetadata.addTo(payload, failure, "Mission finalization failed");
         return Map.copyOf(payload);
+    }
+
+    private String recordFrameworkCancellationFailure(LoomspanSession session,
+            MissionContext mission,
+            Throwable failure,
+            Map<String, Object> payload)
+    {
+        MissionLifecycle.Cutoff cutoff = mission.lifecycle().cutoff().orElseThrow(
+                () -> new IllegalStateException("Framework cancellation did not establish mission cutoff"));
+        ExecutionBinding binding = ExecutionBindingScope.requireCurrent();
+        String[] failureId = {null};
+        boolean recorded = cutoff.runIfPermitted(binding, () -> failureId[0] = session.recordFailure(
+                failure, payload, binding.branch().leaf().orElse(null)));
+        if (!recorded || failureId[0] == null)
+        {
+            throw new IllegalStateException("Framework cancellation failure could not be recorded");
+        }
+        return failureId[0];
     }
 
     private Map<String, Object> errorPayload(String skillName, String objective, Throwable failure)

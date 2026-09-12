@@ -36,6 +36,7 @@ class LoomspanAutoConfigurationBoundaryTest
             "skillTemplate", "modelUsageExtractor", "usageMetricsRecorder",
             "sessionUsageService", "executionStateService", "planningService", "toolSurfaceService",
             "capabilityInvoker", "LoomspanMissionExecutor", "missionExecutionEngine",
+            "frameworkExecutionLifecycle",
             "stepLoopMissionExecutionEngine", "executionCoordinator", "observabilityActivationCoordinator",
             "observabilityNonWebActivation", "observabilityReactiveWebActivation");
 
@@ -78,6 +79,16 @@ class LoomspanAutoConfigurationBoundaryTest
                 .allSatisfy(method -> assertThat(method.getModifiers())
                         .as("Framework-owned bean method %s must not be public or protected", method.getName())
                         .matches(modifiers -> !Modifier.isPublic(modifiers) && !Modifier.isProtected(modifiers)));
+    }
+
+    @Test
+    void missionExecutorDisablesBlockingInferredDestruction()
+    {
+        var executorFactory = Arrays.stream(LoomspanAutoConfiguration.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("LoomspanMissionExecutor"))
+                .findFirst().orElseThrow();
+
+        assertThat(executorFactory.getAnnotation(Bean.class).destroyMethod()).isEmpty();
     }
 
     @Test

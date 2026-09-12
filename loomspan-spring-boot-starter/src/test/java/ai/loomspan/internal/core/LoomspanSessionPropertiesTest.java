@@ -30,6 +30,8 @@ class LoomspanSessionPropertiesTest {
             LoomspanProperties.Session properties = context.getBean(LoomspanProperties.class).getSession();
             assertThat(properties.getMaxDepth()).isEqualTo(32);
             assertThat(properties.getMissionTimeout()).isEqualTo(Duration.ofSeconds(60));
+            assertThat(context.getBean(LoomspanProperties.class).getShutdown().getTimeout())
+                    .isEqualTo(Duration.ofSeconds(30));
             assertThat(properties.getQuotas().getMaxSkillInvocations()).isEqualTo(64);
             assertThat(properties.getQuotas().getMaxToolInvocations()).isEqualTo(128);
             assertThat(properties.getQuotas().getMaxLinterRetries()).isEqualTo(32);
@@ -42,6 +44,7 @@ class LoomspanSessionPropertiesTest {
                 .withPropertyValues(
                         "loomspan.session.max-depth=3",
                         "loomspan.session.mission-timeout=5s",
+                        "loomspan.shutdown.timeout=7s",
                         "loomspan.session.quotas.max-skill-invocations=4",
                         "loomspan.session.quotas.max-tool-invocations=9",
                         "loomspan.session.quotas.max-linter-retries=7",
@@ -55,6 +58,8 @@ class LoomspanSessionPropertiesTest {
 
                     assertThat(properties.getMaxDepth()).isEqualTo(3);
                     assertThat(properties.getMissionTimeout()).isEqualTo(Duration.ofSeconds(5));
+                    assertThat(context.getBean(LoomspanProperties.class).getShutdown().getTimeout())
+                            .isEqualTo(Duration.ofSeconds(7));
                     assertThat(properties.getQuotas().getMaxSkillInvocations()).isEqualTo(4);
                     assertThat(properties.getQuotas().getMaxToolInvocations()).isEqualTo(9);
                     assertThat(properties.getQuotas().getMaxLinterRetries()).isEqualTo(7);
@@ -84,6 +89,16 @@ class LoomspanSessionPropertiesTest {
                     assertThat(NestedExceptionUtils.getMostSpecificCause(context.getStartupFailure()))
                             .hasMessageContaining("missionTimeout must be greater than zero");
                 });
+
+        contextRunner.withPropertyValues("loomspan.shutdown.timeout=0s").run(context -> {
+            assertThat(context.getStartupFailure()).isNotNull().hasRootCauseInstanceOf(IllegalArgumentException.class);
+            assertThat(NestedExceptionUtils.getMostSpecificCause(context.getStartupFailure()))
+                    .hasMessageContaining("loomspan.shutdown.timeout must be greater than zero");
+        });
+
+        contextRunner.withPropertyValues("loomspan.shutdown.timeout=-1s").run(context ->
+                assertThat(context.getStartupFailure()).isNotNull()
+                        .hasRootCauseInstanceOf(IllegalArgumentException.class));
 
         contextRunner
                 .withPropertyValues("loomspan.session.quotas.max-model-calls=0")

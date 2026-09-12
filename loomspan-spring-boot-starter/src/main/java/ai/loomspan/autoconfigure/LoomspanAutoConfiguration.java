@@ -6,6 +6,7 @@ import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
 import ai.loomspan.internal.core.DefaultLoomspanExceptionTransformer;
 import ai.loomspan.internal.core.ExecutionCoordinator;
+import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
 import ai.loomspan.internal.core.InMemoryCapabilityRegistry;
 import ai.loomspan.internal.core.SkillMethodBeanPostProcessor;
 import ai.loomspan.internal.runtime.DefaultMissionExecutionEngine;
@@ -48,6 +49,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Role;
+import org.springframework.context.ApplicationContext;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnNotWebApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -146,7 +148,8 @@ public class LoomspanAutoConfiguration
     LoomspanSessionRunner LoomspanSessionRunner(LoomspanProperties properties,
             ExecutionTraceProperties executionTraceProperties,
             ObservabilityActivationCoordinator observabilityActivationCoordinator,
-            LoomspanJacksonCodecs codecs)
+            LoomspanJacksonCodecs codecs,
+            FrameworkExecutionLifecycle frameworkExecutionLifecycle)
     {
         return new LoomspanSessionRunner(
                 properties.getSession().getMaxDepth(),
@@ -156,7 +159,8 @@ public class LoomspanAutoConfiguration
                 observabilityActivationCoordinator.completionRetention(),
                 properties.getSession().getQuotas(),
                 // The session factory carries the canonical role into every trace reader/writer it creates.
-                codecs.canonicalTrace());
+                codecs.canonicalTrace(),
+                frameworkExecutionLifecycle);
     }
 
     @Bean
@@ -335,11 +339,21 @@ public class LoomspanAutoConfiguration
                 usageMetricsRecorder);
     }
 
-    @Bean(name = "LoomspanMissionExecutor", destroyMethod = "close")
+    @Bean(name = "LoomspanMissionExecutor", destroyMethod = "")
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     ExecutorService LoomspanMissionExecutor()
     {
         return Executors.newVirtualThreadPerTaskExecutor();
+    }
+
+    @Bean
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    FrameworkExecutionLifecycle frameworkExecutionLifecycle(ApplicationContext applicationContext,
+            LoomspanProperties properties,
+            @Qualifier("LoomspanMissionExecutor") ExecutorService missionExecutor)
+    {
+        return new FrameworkExecutionLifecycle(
+                applicationContext, properties.getShutdown().getTimeout(), missionExecutor);
     }
 
     @Bean

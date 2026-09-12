@@ -103,6 +103,8 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.core.LoomspanExceptionTransformer", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.LoomspanSession", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.LoomspanSessionRunner", "Public only for Java collaboration between distinct internal subsystem packages."),
+            Map.entry("ai.loomspan.internal.core.FrameworkExecutionLifecycle", "Public only so framework auto-configuration can wire the internal shutdown owner."),
+            Map.entry("ai.loomspan.internal.core.FrameworkShutdownException", "Public only for internal cancellation propagation across runtime packages."),
             Map.entry("ai.loomspan.internal.core.LoomspanStackOverflowException", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.CapabilityExecutionRouter", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.CapabilityInvoker", "Public only for Java collaboration between distinct internal subsystem packages."),

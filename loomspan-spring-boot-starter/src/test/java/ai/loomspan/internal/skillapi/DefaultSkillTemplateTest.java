@@ -22,6 +22,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -113,6 +114,28 @@ class DefaultSkillTemplateTest {
                 .hasMessage("Skill 'invoiceParser' execution failed.")
                 .hasCause(failure);
         assertThat(observerCalled).isFalse();
+    }
+
+    @Test
+    void wrapsSecurityContextLookupFailureWithSafeSkillExceptionAndCause() {
+        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
+        SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
+        IllegalStateException failure = new IllegalStateException("security context unavailable");
+        when(strategy.getContext()).thenThrow(failure);
+        DefaultSkillTemplate template = new DefaultSkillTemplate(
+                registry,
+                router,
+                new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
+                new ObjectMapper(),
+                new SkillInputValidator(), strategy);
+        registry.register("invoiceParser", yamlSkillMetadata());
+
+        assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of("payload", "hello")))
+                .isInstanceOf(SkillException.class)
+                .hasMessage("Skill 'invoiceParser' execution failed.")
+                .hasCause(failure);
+        verify(router, never()).execute(any(), any(), any(), any());
     }
 
     @Test

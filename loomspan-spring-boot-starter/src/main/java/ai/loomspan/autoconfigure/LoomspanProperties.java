@@ -33,6 +33,9 @@ public class LoomspanProperties implements InitializingBean
     private Session session = new Session();
 
     @Valid
+    private Shutdown shutdown = new Shutdown();
+
+    @Valid
     private Skills skills = new Skills();
 
     @Valid
@@ -47,6 +50,16 @@ public class LoomspanProperties implements InitializingBean
     public Session getSession()
     {
         return session;
+    }
+
+    public Shutdown getShutdown()
+    {
+        return shutdown;
+    }
+
+    public void setShutdown(Shutdown shutdown)
+    {
+        this.shutdown = shutdown == null ? new Shutdown() : shutdown;
     }
 
     public void setSession(Session session)
@@ -269,6 +282,27 @@ public class LoomspanProperties implements InitializingBean
     private static IllegalStateException invalid(String path, String detail)
     {
         return new IllegalStateException(path + " " + detail);
+    }
+
+    /** Framework shutdown admission and drain settings. */
+    public static class Shutdown
+    {
+        @NotNull
+        private Duration timeout = Duration.ofSeconds(30);
+
+        public Duration getTimeout()
+        {
+            return timeout;
+        }
+
+        public void setTimeout(Duration timeout)
+        {
+            if (timeout == null || timeout.isZero() || timeout.isNegative())
+            {
+                throw new IllegalArgumentException("loomspan.shutdown.timeout must be greater than zero");
+            }
+            this.timeout = timeout;
+        }
     }
 
     public static class Session

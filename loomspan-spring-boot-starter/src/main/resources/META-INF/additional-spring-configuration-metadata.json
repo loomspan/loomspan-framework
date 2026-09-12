@@ -1,6 +1,12 @@
 {
   "properties": [
     {
+      "name": "loomspan.shutdown.timeout",
+      "type": "java.time.Duration",
+      "defaultValue": "30s",
+      "description": "Positive framework shutdown budget shared by admitted execution, observation, cutoff, and executor cleanup."
+    },
+    {
       "name": "loomspan.observability.enabled",
       "type": "java.lang.Boolean",
       "defaultValue": false,

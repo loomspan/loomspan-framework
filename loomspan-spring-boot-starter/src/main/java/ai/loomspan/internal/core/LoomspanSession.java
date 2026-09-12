@@ -70,6 +70,8 @@ public final class LoomspanSession
     private SessionUsageSnapshot sessionUsage;
     @JsonIgnore
     private Authentication authentication;
+    @JsonIgnore
+    private @Nullable FrameworkExecutionLifecycle.AdmittedRoot admittedRoot;
 
     public LoomspanSession(int maxDepth, String entrySkill)
     {
@@ -266,6 +268,17 @@ public final class LoomspanSession
         this.lastOutputSchemaOutcome = lastOutputSchemaOutcome;
         this.sessionUsage = sessionUsage;
         this.authentication = authentication;
+    }
+
+    void attachAdmittedRoot(FrameworkExecutionLifecycle.AdmittedRoot admittedRoot)
+    {
+        if (this.admittedRoot != null) throw new IllegalStateException("Session already has an admitted root");
+        this.admittedRoot = Objects.requireNonNull(admittedRoot, "admittedRoot must not be null");
+    }
+
+    @Nullable FrameworkExecutionLifecycle.AdmittedRoot admittedRoot()
+    {
+        return admittedRoot;
     }
 
     public String getSessionId()

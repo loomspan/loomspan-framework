@@ -26,6 +26,40 @@ import static org.mockito.Mockito.mock;
 class JavaSkillMissionCutoffTest
 {
     @Test
+    void completedExceptionalFutureStillPropagatesInstalledFrameworkPrimary()
+    {
+        var session = TestLoomspanSessions.withId("java-framework-race", "javaRoot", 3);
+        var mission = new MissionContext(session, "javaRoot", "frame", null);
+        var binding = new ExecutionBinding(session, mission, new PhysicalBranchContext(session));
+        mission.lifecycle().frameworkCutoff(System.nanoTime());
+        var state = new DefaultExecutionStateService(Clock.systemUTC());
+        var executor = new InlineExecutor();
+        var workExecutor = new MissionWorkExecutor(
+                state, Duration.ofSeconds(5), executor, new NoOpSessionUsageService());
+
+        assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(
+                binding, () -> workExecutor.execute(session, "javaRoot", () -> "unreachable")))
+                .isInstanceOf(FrameworkShutdownException.class);
+    }
+
+    @Test
+    void frameworkCutoffDoesNotReplaceAnAlreadyCompletedApplicationFailure()
+    {
+        var session = TestLoomspanSessions.withId("java-application-failure-race", "javaRoot", 3);
+        var mission = new MissionContext(session, "javaRoot", "frame", null);
+        var binding = new ExecutionBinding(session, mission, new PhysicalBranchContext(session));
+        var state = new DefaultExecutionStateService(Clock.systemUTC());
+        var executor = new InlineExecutor(() -> mission.lifecycle().frameworkCutoff(System.nanoTime()));
+        var workExecutor = new MissionWorkExecutor(
+                state, Duration.ofSeconds(5), executor, new NoOpSessionUsageService());
+        var applicationFailure = new IllegalArgumentException("application failed before cutoff");
+
+        assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(
+                binding, () -> workExecutor.execute(session, "javaRoot", () -> { throw applicationFailure; })))
+                .isSameAs(applicationFailure);
+    }
+
+    @Test
     void timeoutClosesJavaRootAndFencesNonCooperativeLateReturn() throws Exception
     {
         CountDownLatch started = new CountDownLatch(1);
@@ -160,5 +194,23 @@ class JavaSkillMissionCutoffTest
         @Override public boolean isTerminated() { return delegate.isTerminated(); }
         @Override public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException
         { return delegate.awaitTermination(timeout, unit); }
+    }
+
+    private static final class InlineExecutor extends AbstractExecutorService
+    {
+        private final Runnable afterExecution;
+        private boolean shutdown;
+        private InlineExecutor() { this(() -> { }); }
+        private InlineExecutor(Runnable afterExecution) { this.afterExecution = afterExecution; }
+        @Override public void execute(Runnable command)
+        {
+            command.run();
+            afterExecution.run();
+        }
+        @Override public void shutdown() { shutdown = true; }
+        @Override public List<Runnable> shutdownNow() { shutdown = true; return List.of(); }
+        @Override public boolean isShutdown() { return shutdown; }
+        @Override public boolean isTerminated() { return shutdown; }
+        @Override public boolean awaitTermination(long timeout, TimeUnit unit) { return shutdown; }
     }
 }

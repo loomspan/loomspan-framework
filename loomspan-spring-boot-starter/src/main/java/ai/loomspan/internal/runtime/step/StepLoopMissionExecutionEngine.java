@@ -9,6 +9,7 @@ import ai.loomspan.internal.core.LoomspanStackOverflowException;
 import ai.loomspan.internal.core.CapabilityRegistry;
 import ai.loomspan.internal.core.ExecutionFrame;
 import ai.loomspan.internal.core.ExecutionPlan;
+import ai.loomspan.internal.core.FrameworkShutdownException;
 import ai.loomspan.internal.core.ModelTraceContext;
 import ai.loomspan.internal.core.ModelExecutionIdentity;
 import ai.loomspan.internal.core.PlanTask;
@@ -330,13 +331,16 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         }
         catch (ExecutionException ex)
         {
-            if (lifecycle.primaryCancellation().isPresent())
+            Throwable cause = ex.getCause();
+            var primaryCancellation = lifecycle.primaryCancellation();
+            if (primaryCancellation.isPresent()
+                    && (!(primaryCancellation.orElseThrow().cause() instanceof FrameworkShutdownException)
+                            || cause instanceof MissionWriteRevokedException))
             {
-                MissionLifecycle.PrimaryCancellation primary = lifecycle.primaryCancellation().orElseThrow();
+                MissionLifecycle.PrimaryCancellation primary = primaryCancellation.orElseThrow();
                 cleanupPreservingPrimary(session, missionContext, capturedBinding, lifecycle.awaitCutoff(), primary.cause());
                 throw propagate(primary.cause());
             }
-            Throwable cause = ex.getCause();
             if (cause instanceof RuntimeException runtimeException)
             {
                 throw unwrapMissionFailure(runtimeException);

@@ -55,6 +55,42 @@ class MissionLifecycleTest
     }
 
     @Test
+    void frameworkDeadlineClampsExistingLocalCancellation()
+    {
+        ExecutionBinding binding = binding("framework-clamp", null, () -> 100L);
+        MissionLifecycle lifecycle = binding.requireMission().lifecycle();
+        lifecycle.markOwningStarted();
+        MissionLifecycle.PrimaryCancellation local = lifecycle.beginCancellation(
+                binding, new IllegalStateException("local"), () -> "failure", false);
+
+        lifecycle.frameworkDeadline(100L);
+        MissionLifecycle.Cutoff cutoff = lifecycle.awaitCutoff();
+
+        assertThat(local.deadlineNanos()).isGreaterThan(100L);
+        assertThat(cutoff).isSameAs(lifecycle.cutoff().orElseThrow());
+    }
+
+    @Test
+    void frameworkAndLocalCancellationPreserveTheFirstInstalledCause()
+    {
+        ExecutionBinding localFirstBinding = binding("local-first", null, () -> 100L);
+        MissionLifecycle localFirst = localFirstBinding.requireMission().lifecycle();
+        IllegalStateException localFailure = new IllegalStateException("local");
+        localFirst.beginCancellation(localFirstBinding, localFailure, () -> "failure", false);
+        localFirst.frameworkCutoff(125L);
+
+        ExecutionBinding frameworkFirstBinding = binding("framework-first", null, () -> 100L);
+        MissionLifecycle frameworkFirst = frameworkFirstBinding.requireMission().lifecycle();
+        frameworkFirst.frameworkCutoff(125L);
+        MissionLifecycle.PrimaryCancellation frameworkPrimary = frameworkFirst.beginCancellation(
+                frameworkFirstBinding, new IllegalStateException("late local"), () -> "unused", false);
+
+        assertThat(localFirst.primaryCancellation().orElseThrow().cause()).isSameAs(localFailure);
+        assertThat(frameworkPrimary.cause()).isInstanceOf(FrameworkShutdownException.class);
+        assertThat(frameworkPrimary.deadlineNanos()).isEqualTo(125L);
+    }
+
+    @Test
     void admissionAndCancellationAreAllOrNone()
     {
         ExecutionBinding binding = binding("admission", null);

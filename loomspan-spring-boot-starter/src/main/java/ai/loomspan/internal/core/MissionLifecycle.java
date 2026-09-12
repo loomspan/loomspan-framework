@@ -12,7 +12,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Future;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.LongSupplier;
@@ -22,6 +26,7 @@ import java.util.function.Supplier;
 public final class MissionLifecycle
 {
     public static final Duration CLEANUP_GRACE = Duration.ofMillis(250);
+    private static final long FRAMEWORK_DEADLINE_RECHECK_NANOS = Duration.ofMillis(1).toNanos();
 
     public enum State { OPEN, CANCELLING, CLOSED }
 
@@ -31,10 +36,14 @@ public final class MissionLifecycle
     private final Condition changed = lock.newCondition();
     private final List<AdmittedTask> admitted = new ArrayList<>();
     private State state = State.OPEN;
-    private @Nullable Throwable primaryCause;
-    private @Nullable String primaryFailureId;
+    private final AtomicReference<Throwable> primaryCause = new AtomicReference<>();
+    private volatile @Nullable String primaryFailureId;
     private long deadlineNanos = Long.MAX_VALUE;
-    private @Nullable Future<?> owningFuture;
+    private volatile @Nullable Future<?> owningFuture;
+    private final Set<Future<?>> frameworkFutures = ConcurrentHashMap.newKeySet();
+    private final AtomicBoolean frameworkCutOff = new AtomicBoolean();
+    private volatile long frameworkDeadlineNanos = Long.MAX_VALUE;
+    private final AtomicReference<Throwable> frameworkCause = new AtomicReference<>();
     private boolean owningStarted;
     private boolean owningReturned;
     private @Nullable Cutoff cutoff;
@@ -58,7 +67,7 @@ public final class MissionLifecycle
         finally { lock.unlock(); }
     }
 
-    boolean writableWhileLocked() { return state != State.CLOSED; }
+    boolean writableWhileLocked() { return state != State.CLOSED && !frameworkCutOff.get(); }
 
     public void markOwningStarted()
     {
@@ -75,7 +84,8 @@ public final class MissionLifecycle
         try
         {
             owningFuture = future;
-            cancel = state != State.OPEN;
+            frameworkFutures.add(future);
+            cancel = state != State.OPEN || frameworkCutOff.get();
         }
         finally { lock.unlock(); }
         if (cancel) future.cancel(true);
@@ -141,7 +151,8 @@ public final class MissionLifecycle
         try
         {
             requireOwned(task).future = future;
-            cancel = state != State.OPEN;
+            frameworkFutures.add(future);
+            cancel = state != State.OPEN || frameworkCutOff.get();
         }
         finally { lock.unlock(); }
         if (cancel) future.cancel(true);
@@ -181,19 +192,33 @@ public final class MissionLifecycle
         Objects.requireNonNull(failureRecorder, "failureRecorder must not be null");
         List<Future<?>> futures;
         PrimaryCancellation primary;
-        primary = runWithAncestry(binding, true, () -> {
-            if (state == State.OPEN)
-            {
-                state = State.CANCELLING;
-                primaryCause = cause;
-                deadlineNanos = saturatingAdd(nanoTime.getAsLong(), CLEANUP_GRACE.toNanos());
-                primaryFailureId = Objects.requireNonNull(failureRecorder.get(), "failure id must not be null");
-                changed.signalAll();
-            }
-            return new PrimaryCancellation(
-                    Objects.requireNonNull(primaryCause, "primary cause must be present"),
-                    Objects.requireNonNull(primaryFailureId, "primary failure id must be present"), deadlineNanos);
-        }).orElseThrow();
+        if (frameworkCutOff.get())
+        {
+            return primaryCancellation().orElseThrow();
+        }
+        try
+        {
+            primary = runWithAncestry(binding, true, () -> {
+                if (state == State.OPEN)
+                {
+                    if (!primaryCause.compareAndSet(null, cause))
+                    {
+                        return currentPrimaryCancellation();
+                    }
+                    state = State.CANCELLING;
+                    deadlineNanos = Math.min(saturatingAdd(nanoTime.getAsLong(), CLEANUP_GRACE.toNanos()),
+                            frameworkDeadlineNanos);
+                    primaryFailureId = Objects.requireNonNull(failureRecorder.get(), "failure id must not be null");
+                    changed.signalAll();
+                }
+                return currentPrimaryCancellation();
+            }).orElseThrow();
+        }
+        catch (MissionWriteRevokedException ex)
+        {
+            if (!frameworkCutOff.get()) throw ex;
+            return primaryCancellation().orElseThrow();
+        }
         lock.lock();
         try
         {
@@ -223,9 +248,12 @@ public final class MissionLifecycle
             if (state == State.OPEN) return closeLocked();
             while (!allPhysicalWorkReturnedLocked())
             {
-                long remaining = deadlineNanos - nanoTime.getAsLong();
+                long remaining = Math.min(deadlineNanos, frameworkDeadlineNanos) - nanoTime.getAsLong();
                 if (remaining <= 0) break;
-                try { changed.awaitNanos(remaining); }
+                // Framework cutoff never waits for this potentially trace-held lock, so its best-effort
+                // signal can race this await. A bounded recheck prevents that lost signal from extending
+                // local cleanup beyond the shared framework deadline.
+                try { changed.awaitNanos(Math.min(remaining, FRAMEWORK_DEADLINE_RECHECK_NANOS)); }
                 catch (InterruptedException ex) { interrupted = true; }
             }
             return closeLocked();
@@ -242,8 +270,8 @@ public final class MissionLifecycle
         lock.lock();
         try
         {
-            return primaryCause == null ? Optional.empty()
-                    : Optional.of(new PrimaryCancellation(primaryCause, primaryFailureId, deadlineNanos));
+            Throwable primary = primaryCause.get();
+            return primary == null ? Optional.empty() : Optional.of(currentPrimaryCancellation());
         }
         finally { lock.unlock(); }
     }
@@ -330,7 +358,7 @@ public final class MissionLifecycle
         ancestry.forEach(lifecycle -> lifecycle.lock.lock());
         try
         {
-            if (ancestry.stream().anyMatch(lifecycle -> lifecycle.state != State.OPEN))
+            if (ancestry.stream().anyMatch(lifecycle -> lifecycle.state != State.OPEN || lifecycle.frameworkCutOff.get()))
             {
                 if (failIfNotOpen) throw new MissionWriteRevokedException(binding.requireMission().skillName());
                 return Optional.empty();
@@ -383,6 +411,40 @@ public final class MissionLifecycle
         return futures;
     }
 
+    /** Publishes the framework fence and interrupts known work without taking ancestry locks. */
+    void frameworkDeadline(long sharedDeadlineNanos)
+    {
+        frameworkDeadlineNanos = sharedDeadlineNanos;
+        signalDeadlineChangeWithoutWaiting();
+    }
+
+    void frameworkCutoff(long sharedDeadlineNanos)
+    {
+        frameworkDeadlineNanos = sharedDeadlineNanos;
+        FrameworkShutdownException candidate = new FrameworkShutdownException();
+        frameworkCause.compareAndSet(null, candidate);
+        primaryCause.compareAndSet(null, frameworkCause.get());
+        frameworkCutOff.set(true);
+        signalDeadlineChangeWithoutWaiting();
+        frameworkFutures.forEach(future -> future.cancel(true));
+        Future<?> owner = owningFuture;
+        if (owner != null) owner.cancel(true);
+    }
+
+    private void signalDeadlineChangeWithoutWaiting()
+    {
+        if (!lock.tryLock()) return;
+        try { changed.signalAll(); }
+        finally { lock.unlock(); }
+    }
+
+    private PrimaryCancellation currentPrimaryCancellation()
+    {
+        Throwable primary = Objects.requireNonNull(primaryCause.get(), "primary cause must be present");
+        long effectiveDeadline = Math.min(deadlineNanos, frameworkDeadlineNanos);
+        return new PrimaryCancellation(primary, primaryFailureId, effectiveDeadline);
+    }
+
     private boolean allPhysicalWorkReturnedLocked()
     {
         if (owningStarted && !owningReturned) return false;
@@ -403,7 +465,7 @@ public final class MissionLifecycle
                             task.future != null, task.started, task.returned);
                 })
                 .toList();
-        cutoff = new Cutoff(this, tasks, primaryCause, primaryFailureId);
+        cutoff = new Cutoff(this, tasks, primaryCause.get(), primaryFailureId);
         changed.signalAll();
         return cutoff;
     }
