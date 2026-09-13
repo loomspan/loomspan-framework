@@ -1,7 +1,9 @@
 name: supportedSurfaceSkill
 description: Exercises a complete LLM-backed invocation through the supported application API.
 model: integration
-planning_mode: false
+planning_mode: true
+concurrency: false
+max_steps: 3
 allowed_skills:
   - name: supportedJavaLeaf
   - name: supportedRestLeaf

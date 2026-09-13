@@ -103,18 +103,18 @@ publication in either repository.
 
 ## Acceptance criteria
 
-- [ ] README covers every new manifest/API/configuration/observer behavior and
+- [x] README covers every new manifest/API/configuration/observer behavior and
   all limits above accurately, including the new named supported SPI and
   security/immutability/failure distinctions, without recommending internal
   types or unintended replacement surfaces.
-- [ ] Agent authoring and java-api references and knowledge routing cover the
+- [x] Agent authoring and java-api references and knowledge routing cover the
   same contracts; bootstrap/version coupling passes `loomspan_version.py check`.
   Release examples use the actual non-SNAPSHOT release version.
-- [ ] Existing public-surface integration coverage combines YAML planner,
+- [x] Existing public-surface integration coverage combines YAML planner,
   REST and Java leaves, catalog and both pre-check semantics through
   `ai.loomspan.api` only, observing only the public view. Feature-unit proof
   remains with its owner rather than duplicated in a new harness.
-- [ ] Cumulative public proof demonstrates failure history and exception
+- [x] Cumulative public proof demonstrates failure history and exception
   precedence, including no callback on pre-session rejection and unchanged
   success-observer behavior. Compatibility notes accurately separate additive
   APIs, intentional breaks and the coordinated Console marker decision.

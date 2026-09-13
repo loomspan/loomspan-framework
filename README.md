@@ -138,7 +138,7 @@ By default, Loomspan discovers `classpath:/skills/**/*.yaml`. Add the `.yml` pat
 
 ### Invoking a skill
 
-Inject `SkillCatalog` to discover the eager, exact-name-sorted snapshot of every registered Java, model-backed YAML, and REST skill. The catalog is immutable and unfiltered: discovery does not authorize a caller. Inject `SkillTemplate` to validate or invoke a skill with a map (or an object that can be converted to a map). The result is returned as text; use a YAML `output_schema` for model-backed structured output. Java results retain Jackson serialization and REST results are returned unchanged by the application handler.
+Inject `SkillCatalog` to discover the eager, exact-name-sorted snapshot of every registered Java, model-backed YAML, and REST skill. The catalog is immutable and unfiltered: discovery does not authorize a caller. Each `SkillDescriptor` contains only the exact name, description, `SkillKind`, and exact registered JSON input schema shown to models; `skill(name)` is an exact lookup and returns empty when absent. The catalog is a snapshot, not a refresh or bean-replacement contract. Inject `SkillTemplate` to validate or invoke a skill with a map (or an object that can be converted to a map). The result is returned as text; use a YAML `output_schema` for model-backed structured output. Java results retain Jackson serialization and REST results are returned unchanged by the application handler.
 
 ```java
 import ai.loomspan.api.SkillTemplate;
@@ -164,7 +164,7 @@ public class InvoiceWorkflow {
 }
 ```
 
-`validate` has Map and Object overloads and performs exact lookup, conversion/input validation, and root authorization against the calling authentication without creating a session, trace, callback, execution, or quota use. It is an advisory pre-dispatch check: it reserves no admission, checks no nested child, and `invoke` independently repeats validation and authorization at execution time. A null Object is always rejected; a null Map is accepted only by a generic or empty-permitting contract. Catalog schemas are the exact registered JSON tool schemas shown to models.
+`validate` has Map and Object overloads and performs the same exact lookup, conversion/input validation, safe error mapping, and root authorization against the calling authentication used by invocation preparation, without creating a session, trace, callback, execution, or quota use. A null Object is always rejected before conversion; a null Map is accepted only by a generic or empty-permitting contract. Invalid input raises `SkillInputValidationException`, an unknown skill or conversion/runtime failure raises `SkillException`, and authorization denial remains `AccessDeniedException`. Validation is an advisory pre-dispatch check: it reserves no shutdown admission, checks no future nested child, and `invoke` independently repeats input and authorization enforcement at execution time.
 
 The supported starter Java API is closed to these thirteen types in `ai.loomspan.api`: `SkillTemplate`, `SkillCatalog`, `SkillDescriptor`, `SkillKind`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `RestSkillHandler`, `RestSkillInvocation`, `SkillException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. `RestSkillHandler` is the sole supported SPI; it does not make any framework bean replaceable. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API.
 
@@ -210,7 +210,7 @@ Skill versions with one command:
 python scripts/loomspan_version.py check
 python scripts/loomspan_version.py set 1.0.0-beta.4-SNAPSHOT
 # Review, test, and commit the release version.
-python scripts/loomspan_version.py tag 1.0.0-beta.4-SNAPSHOT
+python scripts/loomspan_version.py tag 1.0.0-beta.4
 ```
 
 `set` requires a clean worktree and replaces the exact current version in all
@@ -225,31 +225,34 @@ bootstrap version list to update.
 
 Keep the project on the next anticipated beta version with `-SNAPSHOT` during
 normal development. Remove that suffix when preparing the beta release. The
-current development version is `1.0.0-beta.4-SNAPSHOT`. A complete beta cycle looks like:
+current development version is `1.0.0-beta.4-SNAPSHOT`. The beta 4 release transition is:
 
 ```text
-1.0.0-beta.4-SNAPSHOT -> 1.0.0-beta.4-SNAPSHOT -> tag v1.0.0-beta.4-SNAPSHOT -> 1.0.0-beta.4-SNAPSHOT
+development: 1.0.0-beta.4-SNAPSHOT
+release: 1.0.0-beta.4
+tag: v1.0.0-beta.4
+then begin the next development snapshot
 ```
 
 Starting from a clean development snapshot worktree, prepare the release.
-If the version is already `1.0.0-beta.4-SNAPSHOT`, skip the `set` command. Pushing
+If the version is already `1.0.0-beta.4`, skip the `set` command. Pushing
 the tag below starts the Console release and automatic Maven Central publication:
 
 ```bash
 python scripts/loomspan_version.py check
-python scripts/loomspan_version.py set 1.0.0-beta.4-SNAPSHOT
+python scripts/loomspan_version.py set 1.0.0-beta.4
 
 # Review and run the appropriate tests before committing.
 git add .
-git commit -m "Release 1.0.0-beta.4-SNAPSHOT"
+git commit -m "Release 1.0.0-beta.4"
 git push origin main
 
 # Before tagging, run Console Release and Maven Central Release manually
 # against main in GitHub Actions. Both manual runs only validate.
 # Require both runs and Console CI to pass on this exact commit.
 
-python scripts/loomspan_version.py tag 1.0.0-beta.4-SNAPSHOT
-git push origin main v1.0.0-beta.4-SNAPSHOT
+python scripts/loomspan_version.py tag 1.0.0-beta.4
+git push origin main v1.0.0-beta.4
 ```
 
 The Console preflight must pass native packaging and archive smoke checks on
@@ -259,13 +262,13 @@ before creating the tag. After pushing the tag, verify that Maven Central
 publication succeeds and the GitHub Release contains all three Console archives
 and `SHA256SUMS` before announcing the release.
 
-After releasing beta 2, start beta 3 development from a clean worktree. This
-updates the working branch; the beta 2 tag continues to identify its release:
+After releasing beta 4, start the next development version from a clean worktree.
+This updates the working branch; the beta 4 tag continues to identify its release:
 
 ```bash
-python scripts/loomspan_version.py set 1.0.0-beta.4-SNAPSHOT
+python scripts/loomspan_version.py set <next-version>-SNAPSHOT
 git add .
-git commit -m "Begin beta 3 development"
+git commit -m "Begin next development cycle"
 git push origin main
 ```
 
@@ -276,6 +279,13 @@ Substitute the actual release and next-development versions in these commands.
 Bootstrap resolves a release from its exact `v<version>` tag. It resolves a
 SNAPSHOT from `main` only when the root POM and version-coupled skill metadata
 on `main` declare that exact SNAPSHOT version.
+
+For beta 4 compatibility and migration details, read
+[`docs/releases/1.0.0-beta.4.md`](docs/releases/1.0.0-beta.4.md). Local preparation,
+the external Sidecar SC5 gate, and final validation-only workflow evidence are
+tracked separately in
+[`ai/thoughts/release-readiness/1.0.0-beta.4.md`](ai/thoughts/release-readiness/1.0.0-beta.4.md).
+That readiness record does not authorize tagging or publication.
 
 ### Maven Central releases
 
@@ -428,9 +438,13 @@ input_schema:
 rbac_roles: [ACCOUNT_READER]
 ```
 
-Only `name`, `description`, `rest: true`, optional `input_schema`, and optional `rbac_roles` are valid. REST declarations must not contain model, prompt, planning, child-skill, linter, or output-schema fields. `rest` accepts only boolean `true`; omit it for model-backed YAML skills. If any REST manifests exist, startup requires exactly one `RestSkillHandler` bean.
+Only nonblank `name`, nonblank `description`, `rest: true`, optional `input_schema`, and optional `rbac_roles` are valid. The following fields MUST be absent, even when their value is null or empty: `model`, `prompt`, `thinking_level`, `allowed_skills`, `planning_mode`, `concurrency`, `max_steps`, `linter`, `output_schema`, and `output_schema_max_retries`. `rest` accepts only Boolean `true`; omit it for model-backed YAML skills. Omitting `input_schema` selects the generic object schema. REST skills use the shared exact-name registry, normal input validation and `ref://` resolution, root and nested authorization, and success-only task/evidence credit. They execute directly without a framework model request.
 
-The handler receives a `RestSkillInvocation` after input validation and reference resolution. Its map/list containers are recursively immutable snapshots; null values and resolved Spring `Resource` leaves are preserved, but Resource contents are not promised immutable. Caller authentication is scoped to the actual handler thread and YAML roles are enforced. A null handler result fails, an empty string succeeds, and REST exceptions remain visible through the normal facade boundary rather than Java skill exception-to-text adaptation. Console identifies these declarations as `REST` and shows their YAML resource path/text under the exact matching framework/Console version policy.
+If any REST manifests exist, startup requires exactly one application `RestSkillHandler` bean; Loomspan supplies no default. With no REST manifests, handler beans are unused and do not trigger cardinality validation. The one handler serves every declaration and owns routing, URLs, headers, credentials, retries, and response mapping. The model sees only schema-permitted inputs; endpoint and credential details are not manifest fields.
+
+The handler receives one `RestSkillInvocation` containing only `skillName()` and `input()` after input validation and reference resolution. Its map/list containers are recursively copied into immutable snapshots; null values and non-container leaf identity are preserved, including resolved Spring `Resource` handles, but bytes behind a `Resource` are outside the immutability promise. Caller authentication is scoped through `SecurityContextHolder` on the actual handler thread and the previous context is restored; identity and session data are not SPI arguments. The handler is called once. A null result fails, an empty string succeeds, `AccessDeniedException` and existing `SkillException` failures retain their facade behavior, other runtime failures become safe `SkillException` failures, and JVM `Error` is not caught. Unlike annotation-defined Java skill failures, REST failures do not use the Java exception-to-text adapter.
+
+REST input, result, error, and observation data receive no new comprehensive sanitization guarantee. Console identifies these declarations as `REST` and shows their YAML resource path/text under the exact matching framework/Console version policy.
 
 ### Annotation-defined Java skills
 
@@ -502,9 +516,11 @@ execution-trace:
   persistence: ONERROR # NEVER, ONERROR, or ALWAYS
 ```
 
-`loomspan.shutdown.timeout` is the single framework shutdown budget and must be a positive YAML duration. When the owning Spring application context begins closing, Loomspan atomically rejects new top-level skill invocations before constructing their sessions. Roots already admitted may continue nested skill work, subject to their ordinary mission timeouts, quotas, and depth limits.
+`loomspan.shutdown.timeout` defaults to `30s`, is the single framework shutdown budget, and must be a positive YAML duration. When the owning Spring application context begins closing, Loomspan atomically rejects new top-level skill invocations before constructing their sessions. Roots already admitted may continue nested skill work, subject to their ordinary mission deadlines, quotas, and depth limits.
 
-The budget starts when root admission closes and covers admitted execution, trace finalization, caller-thread public-view mapping and success or available-failure observation, cutoff, and framework mission-executor cleanup. Loomspan's close-event listener returns promptly; bounded waiting occurs in the following Spring lifecycle-stop stage so resources required by admitted work remain available until completion or cutoff. Other application listeners remain independent and their ordering is not a Loomspan contract. This bound covers Loomspan-owned shutdown work, not unrelated application hooks or the lifetime of the JVM.
+The one overall budget starts when root admission closes and covers admitted execution, trace finalization, caller-thread public-view mapping and success or available-failure observation, cutoff, and framework mission-executor cleanup. Loomspan's prompt close-event gate and framework close-event gate are independent and return promptly; bounded waiting occurs in the following Spring lifecycle-stop stage so framework resources required by admitted work remain alive until completion or cutoff. At cutoff, uncooperative framework work is fenced from late writes and interrupted. Other application listeners remain independent: Loomspan defines no shared listener-priority convention and does not bound unrelated application hooks or halt the JVM.
+
+The Loomspan Sidecar has a separate host rule: it stops dispatch immediately and discards queued work, with no drain timer. Its listener and resource ordering must be proven in Sidecar packaging tests and is not part of the framework listener contract.
 
 When Micrometer is on the application classpath, Loomspan records usage metrics automatically. Execution traces and the `SkillTemplate` observer callback can be used to inspect a completed skill execution.
 

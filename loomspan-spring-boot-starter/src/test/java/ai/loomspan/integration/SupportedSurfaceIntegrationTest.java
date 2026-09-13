@@ -1,19 +1,22 @@
 package ai.loomspan.integration;
 
-import ai.loomspan.api.SkillExecutionView;
+import ai.loomspan.api.RestSkillHandler;
+import ai.loomspan.api.RestSkillInvocation;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillException;
+import ai.loomspan.api.SkillExecutionView;
+import ai.loomspan.api.SkillInputValidationException;
 import ai.loomspan.api.SkillKind;
 import ai.loomspan.api.SkillMethod;
 import ai.loomspan.api.SkillParam;
 import ai.loomspan.api.SkillTemplate;
-import ai.loomspan.api.RestSkillHandler;
-import ai.loomspan.api.RestSkillInvocation;
 import ai.loomspan.autoconfigure.LoomspanAutoConfiguration;
 import jakarta.annotation.security.RolesAllowed;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
@@ -39,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SupportedSurfaceIntegrationTest
 {
     @Test
-    void invokesLlmBackedYamlSkillThroughSupportedSurfaceAndStandardConnectionConfiguration() throws Exception
+    void invokesYamlPlannerAndBothLeafKindsThroughSupportedSurface() throws Exception
     {
         try (MockWebServer server = new MockWebServer())
         {
@@ -48,20 +51,34 @@ class SupportedSurfaceIntegrationTest
                     .setBody("""
                             {"id":"chatcmpl-supported-surface","object":"chat.completion","created":1,
                              "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":null,
-                                         "tool_calls":[{"id":"Java-call","type":"function","function":
-                                         {"name":"supportedJavaLeaf","arguments":"{\\\"message\\\":\\\"hello through the public API\\\"}"}},
-                                         {"id":"REST-call","type":"function","function":
-                                         {"name":"supportedRestLeaf","arguments":"{\\\"message\\\":\\\"hello through the public API\\\"}"}}]},
-                                         "finish_reason":"tool_calls"}],
+                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"capabilityName\\\":\\\"supportedSurfaceSkill\\\",\\\"createdAt\\\":\\\"2026-09-12T12:00:00Z\\\",\\\"status\\\":\\\"VALID\\\",\\\"tasks\\\":[{\\\"taskId\\\":\\\"java-task\\\",\\\"title\\\":\\\"Call Java leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"supportedJavaLeaf\\\",\\\"intent\\\":\\\"Echo through Java\\\",\\\"dependsOn\\\":[],\\\"expectedOutputs\\\":[\\\"Java echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"},{\\\"taskId\\\":\\\"rest-task\\\",\\\"title\\\":\\\"Call REST leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"supportedRestLeaf\\\",\\\"intent\\\":\\\"Echo through REST\\\",\\\"dependsOn\\\":[\\\"java-task\\\"],\\\"expectedOutputs\\\":[\\\"REST echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"}]}"},
+                                         "finish_reason":"stop"}],
                              "usage":{"prompt_tokens":3,"completion_tokens":3,"total_tokens":6}}
+                            """));
+            server.enqueue(new MockResponse()
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""
+                            {"id":"chatcmpl-supported-surface-java","object":"chat.completion","created":1,
+                             "model":"integration-model",
+                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"CALL_TOOL\\\",\\\"taskId\\\":\\\"java-task\\\",\\\"toolName\\\":\\\"supportedJavaLeaf\\\",\\\"toolArguments\\\":{\\\"message\\\":\\\"hello through the public API\\\"}}"},
+                                         "finish_reason":"stop"}],
+                             "usage":{"prompt_tokens":4,"completion_tokens":3,"total_tokens":7}}
+                            """));
+            server.enqueue(new MockResponse()
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""
+                            {"id":"chatcmpl-supported-surface-rest","object":"chat.completion","created":1,
+                             "model":"integration-model",
+                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"CALL_TOOL\\\",\\\"taskId\\\":\\\"rest-task\\\",\\\"toolName\\\":\\\"supportedRestLeaf\\\",\\\"toolArguments\\\":{\\\"message\\\":\\\"hello through the public API\\\"}}"},
+                                         "finish_reason":"stop"}],
+                             "usage":{"prompt_tokens":4,"completion_tokens":3,"total_tokens":7}}
                             """));
             server.enqueue(new MockResponse()
                     .setHeader("Content-Type", "application/json")
                     .setBody("""
                             {"id":"chatcmpl-supported-surface-final","object":"chat.completion","created":1,
                              "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":"supported surface response"},
+                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"FINAL_RESPONSE\\\",\\\"finalResponse\\\":\\\"supported surface response\\\"}"},
                                          "finish_reason":"stop"}],
                              "usage":{"prompt_tokens":4,"completion_tokens":3,"total_tokens":7}}
                             """));
@@ -116,6 +133,8 @@ class SupportedSurfaceIntegrationTest
                             assertThat(observed.get()).isNotNull();
                             assertThat(observed.get().sessionId()).isNotBlank();
                             assertThat(observed.get().events()).isNotNull();
+                            assertThat(observed.get().events()).extracting(event -> event.type())
+                                    .contains("PLAN_CREATED", "TOOL_CALL", "TOOL_RESULT", "SKILL_FINISHED");
                             List<Object> mutableValues = new ArrayList<>(List.of("first"));
                             Map<String, Object> mutableInput = new LinkedHashMap<>();
                             mutableInput.put("message", "direct");
@@ -131,6 +150,12 @@ class SupportedSurfaceIntegrationTest
                                     .isInstanceOf(UnsupportedOperationException.class);
                             assertThat(SupportedSkillConfiguration.handlerAuthentication).hasValue("supported-caller");
                             int authorizedCalls = SupportedSkillConfiguration.handlerCalls.get();
+
+                            AtomicInteger preSessionObserverCalls = new AtomicInteger();
+                            assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
+                                    "supportedRestLeaf", Map.of(), ignored -> preSessionObserverCalls.incrementAndGet())))
+                                    .isInstanceOf(SkillInputValidationException.class);
+                            assertThat(preSessionObserverCalls).hasValue(0);
 
                             AtomicReference<SkillExecutionView> failedView = new AtomicReference<>();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
@@ -164,14 +189,37 @@ class SupportedSurfaceIntegrationTest
                         }
                     });
 
-            RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
-            assertThat(request).isNotNull();
-            assertThat(request.getPath()).isEqualTo("/v1/chat/completions");
-            assertThat(request.getHeader("Authorization")).isEqualTo("Bearer integration-key");
-            assertThat(request.getBody().readUtf8())
+            RecordedRequest planningRequest = server.takeRequest(2, TimeUnit.SECONDS);
+            assertThat(planningRequest).isNotNull();
+            assertThat(planningRequest.getPath()).isEqualTo("/v1/chat/completions");
+            assertThat(planningRequest.getHeader("Authorization")).isEqualTo("Bearer integration-key");
+            assertThat(planningRequest.getBody().readUtf8())
                     .contains("\"model\":\"integration-model\"")
                     .contains("hello through the public API")
-                    .contains("supportedJavaLeaf");
+                    .contains("Create an ordered flight plan")
+                    .contains("supportedJavaLeaf", "supportedRestLeaf");
+
+            RecordedRequest javaRequest = server.takeRequest(2, TimeUnit.SECONDS);
+            assertThat(javaRequest).isNotNull();
+            String javaBody = javaRequest.getBody().readUtf8();
+            assertThat(javaBody)
+                    .contains("java-task", "supportedJavaLeaf")
+                    .doesNotContain("REST: hello through the public API");
+            JsonNode javaPayload = new ObjectMapper().readTree(javaBody);
+            assertThat(requestMessages(javaPayload))
+                    .containsOnlyOnce("--- TOOL ARGUMENT SHAPE ---")
+                    .contains("\"message\": \"<string>\"")
+                    .doesNotContain("\"values\":");
+
+            RecordedRequest restRequest = server.takeRequest(2, TimeUnit.SECONDS);
+            assertThat(restRequest).isNotNull();
+            String restBody = restRequest.getBody().readUtf8();
+            assertThat(restBody)
+                    .contains("rest-task", "supportedRestLeaf", "Java: hello through the public API");
+            JsonNode restPayload = new ObjectMapper().readTree(restBody);
+            assertThat(requestMessages(restPayload))
+                    .containsOnlyOnce("--- TOOL ARGUMENT SHAPE ---")
+                    .contains("\"message\": \"<string>\"", "\"values\": [ \"<string>\" ]");
 
             RecordedRequest finalRequest = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(finalRequest).isNotNull();
@@ -179,6 +227,13 @@ class SupportedSurfaceIntegrationTest
                     .contains("Java: hello through the public API")
                     .contains("REST: hello through the public API");
         }
+    }
+
+    private static String requestMessages(JsonNode payload)
+    {
+        StringBuilder messages = new StringBuilder();
+        payload.path("messages").forEach(message -> messages.append(message.path("content").asText()).append('\n'));
+        return messages.toString();
     }
 
     @Configuration(proxyBeanMethods = false)
