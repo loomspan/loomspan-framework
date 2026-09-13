@@ -132,7 +132,8 @@ public class ExecutionCoordinator
         try
         {
             accessGuard.checkAccess(rootCapability, session, authentication);
-            if (rootCapability.kind() == CapabilityKind.JAVA_SKILL)
+            if (rootCapability.kind() == CapabilityKind.JAVA_SKILL
+                    || rootCapability.kind() == CapabilityKind.REST_SKILL)
             {
                 Authentication caller = accessGuard.resolveAuthentication(authentication, session);
                 return missionWorkExecutor.execute(session, skillName, () -> {

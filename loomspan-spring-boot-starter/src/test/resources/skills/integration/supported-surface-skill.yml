@@ -4,3 +4,4 @@ model: integration
 planning_mode: false
 allowed_skills:
   - name: supportedJavaLeaf
+  - name: supportedRestLeaf

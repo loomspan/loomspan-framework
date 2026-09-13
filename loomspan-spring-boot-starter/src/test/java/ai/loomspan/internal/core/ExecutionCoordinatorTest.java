@@ -55,6 +55,49 @@ class ExecutionCoordinatorTest {
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-03-15T12:00:00Z"), ZoneOffset.UTC);
 
     @Test
+    void executesRestOnTheDirectWorkerWithResolvedInputAndNoModelAttempt()
+    {
+        var resolved = new ByteArrayResource(new byte[] {1, 2, 3});
+        var handlerAuthentication = new java.util.concurrent.atomic.AtomicReference<String>();
+        var handlerInput = new java.util.concurrent.atomic.AtomicReference<Map<String, Object>>();
+        CapabilityMetadata rest = new CapabilityMetadata(
+                "rest:lookup", "restLookup", "REST lookup", SkillExecutionDescriptor.none(),
+                ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("REST_USER")),
+                arguments -> {
+                    handlerAuthentication.set(org.springframework.security.core.context.SecurityContextHolder
+                            .getContext().getAuthentication().getName());
+                    handlerInput.set(arguments);
+                    return "resolved";
+                }, CapabilityKind.REST_SKILL,
+                CapabilityToolDescriptor.generic("restLookup", "REST lookup"), null);
+        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        registry.register(rest.name(), rest);
+        ExecutionStateService state = fixedStateService();
+        ExecutionCoordinator coordinator = coordinator(
+                new StubYamlSkillCatalog(), registry,
+                (currentSkillName, sessionState, authentication) -> List.of(),
+                (definition, mode) -> { throw new AssertionError("REST must not create a model interaction"); },
+                (value, session) -> "ref://attachment".equals(value) ? resolved : value,
+                null, state, fixedPlanningService(state),
+                (session, definition, objective, missionInput, model, tools, planning, authentication) -> {
+                    throw new AssertionError("REST must not enter a model execution engine");
+                }, null);
+        var caller = UsernamePasswordAuthenticationToken.authenticated(
+                "rest-caller", "unused", AuthorityUtils.createAuthorityList("ROLE_REST_USER"));
+        LoomspanSession session = TestLoomspanSessions.withId(
+                "session-rest", "restLookup", 2, null, TracePersistencePolicy.ALWAYS);
+
+        assertThat(coordinator.execute(
+                "restLookup", "Resolve the attachment", Map.of("attachment", "ref://attachment"), session, caller))
+                .isEqualTo("resolved");
+        assertThat(handlerAuthentication).hasValue("rest-caller");
+        assertThat(handlerInput.get()).containsEntry("attachment", resolved);
+        assertThat(readTraceRecords(session)).extracting(TraceRecord::recordType)
+                .contains(TraceRecordType.FRAME_OPENED, TraceRecordType.FRAME_CLOSED, TraceRecordType.TRACE_COMPLETED)
+                .doesNotContain(TraceRecordType.MODEL_REQUEST_SENT, TraceRecordType.MODEL_RESPONSE_RECEIVED);
+    }
+
+    @Test
     void deniesRestrictedRootSkillBeforePlanningOrModelExecution() {
         EffectiveSkillExecutionConfiguration executionConfiguration = new EffectiveSkillExecutionConfiguration(
                 "gpt-5",

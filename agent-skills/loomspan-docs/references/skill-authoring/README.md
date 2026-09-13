@@ -38,6 +38,7 @@ Read [source-verification.md](source-verification.md) before performing a source
 | Design or diagnose reflected Java skill inputs | [input-contracts.md](input-contracts.md) | [mental-model.md](mental-model.md) for declaration ownership |
 | Design or diagnose an `output_schema` contract | [output-contracts.md](output-contracts.md) | [evidence-contracts.md](evidence-contracts.md) for supportability or [traces-and-debugging.md](traces-and-debugging.md) for retry diagnostics |
 | Declare an annotation-only Java skill | [Java skills](../java-api/java-skills.md) | [input-contracts.md](input-contracts.md) |
+| Declare a REST leaf skill | [rest-skills.md](rest-skills.md) | [REST handler SPI](../java-api/rest-skills.md) |
 | Configure Java/YAML roles or diagnose authorization | [authorization.md](authorization.md) | [mental-model.md](mental-model.md) for local visibility |
 | Add evidence-backed output claims | [evidence-contracts.md](evidence-contracts.md) | [mental-model.md](mental-model.md) |
 | Declare or diagnose generated-plan task counts | [planning-task-constraints.md](planning-task-constraints.md) | [evidence-contracts.md](evidence-contracts.md) when output supportability is also required |
@@ -57,7 +58,7 @@ Do not load every document by default. Start with the routing entry most relevan
 | Evidence contracts | Source-verified | Immediate-root property annotations, strict scalar/placement rules, Boolean direct-child expressions, planning/final truth sets, metadata isolation, enforcement, and nested mission isolation |
 | Source verification | Initial | How an LLM should use guide, tests, fixtures, samples, and production code together |
 | Skill-design review | Initial | Cross-cutting questions; not a manifest validator |
-| YAML manifest reference | Not yet documented | Inspect current manifest, catalog validation, tests, and samples when required |
+| REST YAML manifest | Source-verified | Exact declaration matrix, direct execution, roles, handler rule, and diagnostics |
 | Input contracts | Initial, source-verified | Reflected Java `Object`, generic and typed maps, DTOs, arrays, requiredness boundaries, shared root/child reflected contracts, validation, and planner guidance; complete pure-YAML schema syntax remains undocumented |
 | Output contracts | Source-verified | Supported `output_schema` vocabulary, normalization, validation, retries, model guidance, and current limitations |
 | Prompts | Focused, source-verified | Recursive output-contract guidance is covered; general private prompt composition still needs a dedicated topic |

@@ -109,6 +109,20 @@ test("skill detail sourcePath is not a clickable link", async () => {
   expect(sourcePathElement.tagName).not.toBe("A");
 });
 
+test("REST skill detail shows distinct label, path, and unchanged manifest", async () => {
+  const yaml = "name: CheckDns\nrest: true\n# https://handler.example is inert text";
+  vi.mocked(getSkillDetail).mockResolvedValue({
+    targetScopeId: "scope-1", registeredName: "CheckDns", source: "REST",
+    sourcePath: "/skills/check_dns.yaml", yaml,
+  });
+  render(<SkillDetailView />);
+  expect(await screen.findByText("REST")).toBeInTheDocument();
+  expect(screen.getByText("/skills/check_dns.yaml")).toBeInTheDocument();
+  expect(document.querySelector("pre.yaml-block")?.textContent).toBe(yaml);
+  expect(screen.queryByText("Bean")).not.toBeInTheDocument();
+  expect(screen.queryByText("Method")).not.toBeInTheDocument();
+});
+
 test("Java skill details show bean and declared method without YAML content", async () => {
   vi.mocked(getSkillDetail).mockResolvedValue({
     targetScopeId: "scope-1", registeredName: "CheckDns", source: "JAVA",

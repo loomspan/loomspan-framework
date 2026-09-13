@@ -13,11 +13,11 @@ Use this document to establish shared vocabulary and choose the broad shape of a
 
 ## Core Model
 
-Loomspan combines model-driven YAML skills and deterministic Java `@SkillMethod` skills. Each declaration is one callable capability. An LLM-backed skill reasons about its mission and can invoke only the direct child skills exposed to it.
+Loomspan combines model-driven YAML skills, application-handled YAML REST leaves, and deterministic Java `@SkillMethod` skills. Each declaration is one callable capability. An LLM-backed skill reasons about its mission and can invoke only the direct child skills exposed to it.
 
 ```text
-Application code -> Java or YAML entry skill
-YAML planner -> YAML specialist -> Java @SkillMethod leaf
+Application code -> Java, REST, or model-backed YAML entry skill
+YAML planner -> YAML specialist -> Java @SkillMethod or REST leaf
 ```
 
 Not every tree needs every level. Java skills can be roots without a model; a simple reasoning skill can be one YAML declaration.
@@ -26,7 +26,7 @@ Not every tree needs every level. Java skills can be roots without a model; a si
 
 A YAML manifest's `name` or a Java annotation's `name` is the single callable identity. An omitted or empty Java annotation name uses the canonical method name. Every name MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$`: 1–64 ASCII characters, beginning with a letter or underscore. Names are case-sensitive and are never trimmed, sanitized, normalized, truncated, or aliased. Descriptive lowerCamelCase is recommended, but underscores and uppercase starts are valid.
 
-Use the exact name in `SkillTemplate`, `allowed_skills`, plan targets, evidence expressions, provider tool definitions, metrics, and traces. Duplicate names across Java and YAML fail startup and identify both declarations. Relevant lazy Java beans are discovered before the shared registry is completed. Every child reference must resolve after both sources finish registration; authorization filtering does not make missing names valid.
+Use the exact name in `SkillTemplate`, `allowed_skills`, plan targets, evidence expressions, provider tool definitions, metrics, and traces. Duplicate names across Java, REST, and model-backed YAML fail startup and identify both declarations. Relevant lazy Java beans are discovered before the shared registry is completed. Every child reference must resolve after all sources finish registration; authorization filtering does not make missing names valid.
 
 Bean names, source paths, and declared method signatures are diagnostic locations, never a second callable identity. Any YAML `mapping` key, including null, empty, or scalar forms, is rejected with annotation-only guidance.
 
@@ -34,7 +34,7 @@ Bean names, source paths, and declared method signatures are diagnostic location
 
 ### Entry skill
 
-An entry is any registered Java or YAML skill invoked through `SkillTemplate`. The facade accepts a map or an object convertible to a map, validates its effective input contract, and creates a fresh session. Callers SHOULD understand the entry contract without understanding the tree below it.
+An entry is any registered Java, REST, or model-backed YAML skill invoked through `SkillTemplate`. The facade accepts a map or an object convertible to a map, validates its effective input contract, and creates a fresh session. Callers SHOULD understand the entry contract without understanding the tree below it.
 
 ### Model-backed YAML skill
 
@@ -61,7 +61,7 @@ Optional primitive parameters are invalid because omission binds null; use refer
 
 Java roots and children participate in the common skill mission lifecycle. Java executes without a framework model request and shares bounded mission timeout, interruption, and late-write cutoff handling. A successful child contributes its exact name at the parent tool boundary; a denial or failure contributes no success. The parent mission resumes on every exit.
 
-Console's catalog shows `YAML` or `Java` explicitly. YAML details show the source resource and original YAML; Java details show the bean and deterministic declared method signature. Pagination and links use only the registered name.
+Console's catalog shows `YAML`, `REST`, or `Java` explicitly. YAML and REST details show the source resource and original YAML; Java details show the bean and deterministic declared method signature. Pagination and links use only the registered name.
 
 ## Root, Planner, Specialist, and Leaf Are Roles
 
@@ -77,7 +77,7 @@ A YAML skill can be a root in one tree and a nested specialist in another if its
 
 ## Visibility Is Local
 
-`allowed_skills` defines the candidate child Java or YAML skills for one LLM-backed skill. It is not transitive.
+`allowed_skills` defines the candidate child Java, REST, or model-backed YAML skills for one LLM-backed skill. It is not transitive.
 
 If a root allows `investigateNetwork`, and `investigateNetwork` allows `checkDns`, the root sees `investigateNetwork`; it does not automatically see `checkDns`.
 
@@ -170,7 +170,7 @@ Do not automatically treat repeated business inputs as runtime metadata. Explici
 - `YamlSkillCatalog` validates model-backed manifests and rejects legacy mappings. `YamlSkillCapabilityRegistrar#completeRegistration` finishes discovery and validates cross-source child references.
 - `DefaultSkillVisibilityResolver` filters the local shared child surface. `CapabilityExecutionRouter` and `ExecutionCoordinator` own dispatch and common isolated mission boundaries.
 - `SupportedSurfaceIntegrationTest` demonstrates application methods called through the supported facade.
-- `DefaultRegisteredSkillCatalogTest`, `ConsoleRestFixtureCorpusTest`, and Console component tests cover both diagnostic source variants.
+- `DefaultRegisteredSkillCatalogTest`, `ConsoleRestFixtureCorpusTest`, and Console component tests cover all three diagnostic source variants.
 
 ## Coverage Boundary
 

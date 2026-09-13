@@ -152,13 +152,18 @@ class ConsoleRestFixtureCorpusTest
 
         result.put("instance-status.json", new ObservabilityDtos.InstanceStatus(
                 "11111111-1111-4111-8111-111111111111", "1.0.0-beta.4-SNAPSHOT", OBSERVED, true,
-                1, 1, 1, TracePersistencePolicy.ONERROR, Duration.ofMinutes(15), Duration.ofHours(24)));
-        result.put("skills-page.json", new ObservabilityDtos.Page<>(List.of(skill, new ObservabilityDtos.SkillSummary(
+                3, 1, 1, TracePersistencePolicy.ONERROR, Duration.ofMinutes(15), Duration.ofHours(24)));
+        result.put("skills-page.json", new ObservabilityDtos.Page<>(List.of(skill,
+                new ObservabilityDtos.SkillSummary("FetchDns", "REST", "classpath:/skills/fetch-dns.yaml",
+                        null, null, "skills/FetchDns"), new ObservabilityDtos.SkillSummary(
                 "LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", "skills/LookupDns")), false, null, OBSERVED));
         result.put("skill-detail.json", new ObservabilityDtos.SkillDetail(
                 "CheckDns", "YAML", "classpath:/skills/check-dns.yaml", null, null, "# DNS check\r\nname: CheckDns\r\n"));
         result.put("skill-java-detail.json", new ObservabilityDtos.SkillDetail(
                 "LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", null));
+        result.put("skill-rest-detail.json", new ObservabilityDtos.SkillDetail(
+                "FetchDns", "REST", "classpath:/skills/fetch-dns.yaml", null, null,
+                "# REST DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application handler\r\nrest: true\r\n"));
         result.put("active-executions-page.json",
                 new ObservabilityDtos.ActivePage(List.of(active), false, null, OBSERVED, "9"));
         result.put("active-execution-detail.json", active);

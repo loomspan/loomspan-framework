@@ -68,7 +68,7 @@ export function SkillDetailView() {
               <dt>Registered name</dt>
               <dd>{detail.registeredName}</dd>
             </div>
-            <div><dt>Source</dt><dd>{detail.source === "JAVA" ? "Java" : "YAML"}</dd></div>
+            <div><dt>Source</dt><dd>{detail.source === "JAVA" ? "Java" : detail.source}</dd></div>
             {detail.source === "JAVA" ? <>
               <div><dt>Bean</dt><dd><code>{detail.beanName}</code></dd></div>
               <div className="skill-detail-method"><dt>Method</dt><dd><code>{formatJavaSkillMethod(detail.method)}</code></dd></div>
@@ -78,7 +78,7 @@ export function SkillDetailView() {
             </div>}
           </dl>
 
-          {detail.source === "YAML" && <section className="view-subsection" aria-labelledby="skill-yaml-title">
+          {detail.source !== "JAVA" && <section className="view-subsection" aria-labelledby="skill-yaml-title">
             <h3 id="skill-yaml-title">Skill YAML</h3>
             <pre className="yaml-block" aria-label="Skill YAML source">{detail.yaml}</pre>
           </section>}

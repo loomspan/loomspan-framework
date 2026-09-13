@@ -37,7 +37,7 @@ String description();
 
 An omitted or empty `name` uses the canonical Java method name. A nonempty name MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` exactly. Padded, whitespace-only, non-ASCII, hyphenated, and overlength names fail startup; Loomspan does not rewrite them. The annotation owns the description. A blank description retains the method-name fallback.
 
-Java and YAML share one namespace. Duplicate names fail startup with both declaration locations. Distinct overloaded methods MAY declare distinct explicit names; overloads that retain the same name collide. Bean aliases and compiler bridge methods do not create additional registrations. Bean and method locations shown in Console are diagnostics, never alternative invocation names.
+Java, REST, and model-backed YAML skills share one namespace. Duplicate names fail startup with both declaration locations. Distinct overloaded methods MAY declare distinct explicit names; overloads that retain the same name collide. Bean aliases and compiler bridge methods do not create additional registrations. Bean and method locations shown in Console are diagnostics, never alternative invocation names.
 
 A YAML `mapping` key is rejected, including null, empty, and scalar forms. Remove the wrapper and put its chosen callable name and description on the annotation.
 
@@ -59,13 +59,13 @@ Loomspan invokes the final Spring-managed bean so advice remains active. Skill m
 
 Supported visibility policies are JSR-250 `@RolesAllowed`, `@PermitAll`, and `@DenyAll`, resolved using Spring's class/method/interface rules. Applications declaring these policies MUST enable `@EnableMethodSecurity(jsr250Enabled = true)` and provide actual applicable method-security advice. Read [authorization](../skill-authoring/authorization.md) for role prefixes, hierarchy, startup checks, and caller authentication isolation.
 
-Do not import registries, descriptors, invokers, or discovery components from `ai.loomspan.internal`. No Java SPI or bean replacement contract is created by annotation-based registration.
+Do not import registries, descriptors, invokers, or discovery components from `ai.loomspan.internal`. `RestSkillHandler` is the sole supported Java SPI; annotation-based registration creates no additional SPI or bean replacement contract.
 
 ## Source anchors
 
 - `SkillMethod` and `SkillParam` define the supported annotations; their API tests protect defaults and retention.
 - `SkillMethodBeanPostProcessor` and its tests define canonical discovery, reflected inputs, and invocation of the final bean.
-- `YamlSkillCapabilityRegistrar#completeRegistration` finishes both sources before checking child references.
+- `YamlSkillCapabilityRegistrar#completeRegistration` finishes all declaration sources before checking child references.
 - `SupportedSurfaceIntegrationTest` exercises the supported facade and application-owned methods.
 - `MissionWorkExecutor` is the shared work/cutoff owner; `JavaSkillMissionCutoffTest` protects timeout, caller interruption, and noncooperative late returns.
 - `DefaultRegisteredSkillCatalogTest`, `ConsoleRestFixtureCorpusTest`, and Console `SkillCatalog.test.tsx` / `SkillDetail.test.tsx` protect mixed-source diagnostics.

@@ -10,9 +10,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CapabilityMetadataTest
 {
     @Test
-    void exposesOnlyYamlSkillCapabilityKind()
+    void exposesExactlyThreeCapabilityKinds()
     {
-        assertThat(CapabilityKind.values()).containsExactly(CapabilityKind.YAML_SKILL, CapabilityKind.JAVA_SKILL);
+        assertThat(CapabilityKind.values()).containsExactly(
+                CapabilityKind.YAML_SKILL, CapabilityKind.REST_SKILL, CapabilityKind.JAVA_SKILL);
     }
 
     @Test

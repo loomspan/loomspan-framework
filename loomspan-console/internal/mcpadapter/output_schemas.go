@@ -284,15 +284,21 @@ func compactEvidenceSchema() *jsonschema.Schema {
 }
 
 func skillSourceSchema(detail bool) *jsonschema.Schema {
-	yamlProps := map[string]*jsonschema.Schema{"registeredName": compactString(), "source": {Type: "string", Enum: []any{"YAML"}}, "sourcePath": compactString()}
+	manifestProps := func(source string) map[string]*jsonschema.Schema {
+		return map[string]*jsonschema.Schema{"registeredName": compactString(), "source": {Type: "string", Enum: []any{source}}, "sourcePath": compactString()}
+	}
+	yamlProps := manifestProps("YAML")
+	restProps := manifestProps("REST")
 	yamlRequired := []string{"registeredName", "source", "sourcePath"}
 	if detail {
 		yamlProps["yaml"] = compactString()
+		restProps["yaml"] = compactString()
 		yamlRequired = append(yamlRequired, "yaml")
 	}
 	javaProps := map[string]*jsonschema.Schema{"registeredName": compactString(), "source": {Type: "string", Enum: []any{"JAVA"}}, "beanName": compactString(), "method": compactString()}
 	return &jsonschema.Schema{AnyOf: []*jsonschema.Schema{
 		compactObject(yamlRequired, yamlProps, true),
+		compactObject(yamlRequired, restProps, true),
 		compactObject([]string{"registeredName", "source", "beanName", "method"}, javaProps, true),
 	}}
 }

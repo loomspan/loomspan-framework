@@ -177,13 +177,15 @@ public class LoomspanAutoConfiguration
     YamlSkillCapabilityRegistrar yamlSkillCapabilityRegistrar(CapabilityRegistry capabilityRegistry,
             SkillMethodBeanPostProcessor skillMethodBeanPostProcessor,
             YamlSkillCatalog yamlSkillCatalog,
-            SkillInputContractResolver skillInputContractResolver)
+            SkillInputContractResolver skillInputContractResolver,
+            org.springframework.beans.factory.ListableBeanFactory beanFactory)
     {
         return new YamlSkillCapabilityRegistrar(
                 capabilityRegistry,
                 skillMethodBeanPostProcessor,
                 yamlSkillCatalog,
-                skillInputContractResolver);
+                skillInputContractResolver,
+                beanFactory);
     }
 
     @Bean

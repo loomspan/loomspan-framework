@@ -34,7 +34,7 @@ Reject an entry design that requires callers to understand internal child propag
 
 ## 3. Design the Capability Surface
 
-- Does every Java or YAML registered name match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` and use the exact same case in every reference?
+- Does every Java, REST, or model-backed YAML registered name match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` and use the exact same case in every reference?
 - Do `SkillTemplate`, `allowed_skills`, plans, and evidence-expression references use registered names rather than bean/method diagnostic locations?
 - Which direct child capabilities does each LLM-backed skill need?
 - Are those children declared locally through `allowed_skills`?
@@ -50,7 +50,7 @@ Reject an entry design that requires callers to understand internal child propag
 - Does each Java skill's reflected input contract express its intended caller and tool contract?
 - Are Java inputs owned by method signatures and `@SkillParam`?
 - Have obsolete YAML wrappers been removed, with their chosen names/descriptions on annotations?
-- Are names unique across both sources and are all child references resolvable?
+- Are names unique across all declaration sources and are all child references resolvable?
 - Are model, planning, schema, linting, retry, tool-selection, and evidence declarations kept on LLM-backed parents with Java execution remaining annotation-defined?
 - If a different public input shape is required, is there a separate deterministic Java skill with its own name and signature?
 - Is any trusted identity, tenant, correlation, deadline, or provenance value being delegated to the model without a framework reason?

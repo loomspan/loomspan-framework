@@ -34,8 +34,10 @@ The allowlist currently contains only:
 - `SkillException`
 - `SkillInputValidationException`
 - `SkillInputValidationIssue`
+- `RestSkillHandler`
+- `RestSkillInvocation`
 
-All eight are public top-level types in `ai.loomspan.api`. A Java
+All ten are public top-level types in `ai.loomspan.api`. A Java
 `public` modifier does not make any other Loomspan type supported API. Read
 [compatibility-and-boundaries.md](compatibility-and-boundaries.md) before
 advising an application to depend on another Loomspan type.
@@ -57,8 +59,9 @@ when exact source inspection is required.
 | Developer need | Read first | Then read |
 | --- | --- | --- |
 | Determine whether a Loomspan type or extension point is supported | [compatibility-and-boundaries.md](compatibility-and-boundaries.md) | The relevant API topic below |
-| Invoke a Java or YAML skill from application code | [invocation.md](invocation.md) | [observation-and-errors.md](observation-and-errors.md) when observing or handling failures |
+| Invoke a Java, REST, or model-backed YAML skill from application code | [invocation.md](invocation.md) | [observation-and-errors.md](observation-and-errors.md) when observing or handling failures |
 | Declare an application method as a skill | [java-skills.md](java-skills.md) | [reflected input contracts](../skill-authoring/input-contracts.md) for complete input-shape guidance |
+| Implement application REST leaves | [rest-skills.md](rest-skills.md) | [REST manifests](../skill-authoring/rest-skills.md) |
 | Consume an execution view or diagnose facade failures | [observation-and-errors.md](observation-and-errors.md) | [invocation.md](invocation.md) for lifecycle timing |
 | Mock Loomspan in an application unit test | [invocation.md](invocation.md) | [compatibility-and-boundaries.md](compatibility-and-boundaries.md) for the supported testing boundary |
 | Perform a framework integration test | [compatibility-and-boundaries.md](compatibility-and-boundaries.md) | [invocation.md](invocation.md) |
@@ -71,13 +74,13 @@ relevant topic set.
 
 | Topic | Coverage | Notes |
 | --- | --- | --- |
-| Supported public types | Source-verified | Exact eight-type allowlist and package boundaries |
+| Supported public types | Source-verified | Exact ten-type allowlist and package boundaries |
 | Skill invocation | Source-verified | Four overloads, input normalization and validation, result, session, security context, and observer timing |
 | Java skill annotations | Source-verified | Exact shared names, direct root/child invocation, proxy constraints, and supported application usage; detailed reflected input shapes live in `skill-authoring` |
 | Execution observations | Source-verified | Immutable view/event values, normalization, detail-value constraints, and trust boundary |
 | Facade failures | Source-verified | Validation, authorization, safe wrapping, observer failures, and fatal errors |
 | Configuration properties | Not documented here | Public configuration behavior is user-facing but its binding types are not application Java API |
-| Framework extension SPI | Unsupported | Loomspan currently exposes no supported Java SPI or internal bean-replacement contract |
+| Framework extension SPI | Source-verified | `RestSkillHandler` is the sole supported SPI; no internal bean-replacement contract |
 
 ## Normative Language
 
@@ -85,4 +88,3 @@ relevant topic set.
   architecture tests, or runtime behavior.
 - **SHOULD / SHOULD NOT** identifies the recommended application default.
 - **MAY** identifies an optional supported choice.
-

@@ -32,17 +32,20 @@ public final class DefaultRegisteredSkillCatalog implements RegisteredSkillCatal
         {
             String name = metadata.name();
             RegisteredSkillEntry entry;
-            if (metadata.kind() == CapabilityKind.YAML_SKILL)
+            if (metadata.kind() == CapabilityKind.YAML_SKILL || metadata.kind() == CapabilityKind.REST_SKILL)
             {
-                var definition = Objects.requireNonNull(catalog.getSkill(name), "YAML registration must have a definition");
-                entry = new RegisteredSkillEntry(name, "YAML", pathResolver.resolve(definition.source()),
+                var definition = Objects.requireNonNull(catalog.getSkill(name), "manifest registration must have a definition");
+                entry = new RegisteredSkillEntry(name,
+                        metadata.kind() == CapabilityKind.REST_SKILL ? "REST" : "YAML",
+                        pathResolver.resolve(definition.source()),
                         null, null, decode(definition.source().bytes(), name));
             }
-            else
+            else if (metadata.kind() == CapabilityKind.JAVA_SKILL)
             {
                 entry = new RegisteredSkillEntry(name, "JAVA", null,
                         metadata.source().beanName(), metadata.source().method(), null);
             }
+            else throw new IllegalStateException("Unsupported capability kind " + metadata.kind());
             if (built.putIfAbsent(name, entry) != null)
                 throw new IllegalArgumentException("Duplicate registered skill name '" + name + "'");
         }

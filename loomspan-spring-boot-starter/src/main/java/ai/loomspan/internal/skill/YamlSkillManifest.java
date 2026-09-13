@@ -27,6 +27,7 @@ public class YamlSkillManifest
 {
     enum Field
     {
+        REST("rest"),
         MODEL("model"),
         THINKING_LEVEL("thinking_level"),
         PROMPT("prompt"),
@@ -58,6 +59,7 @@ public class YamlSkillManifest
     private String description;
     private String model;
     private String prompt;
+    private Boolean rest;
 
     @JsonProperty("thinking_level")
     private String thinkingLevel;
@@ -123,6 +125,17 @@ public class YamlSkillManifest
     public String getPrompt()
     {
         return prompt;
+    }
+
+    public Boolean getRest()
+    {
+        return rest;
+    }
+
+    public void setRest(Boolean rest)
+    {
+        declaredFields.add(Field.REST);
+        this.rest = rest;
     }
 
     public void setPrompt(String prompt)
@@ -667,31 +680,4 @@ public class YamlSkillManifest
         }
     }
 
-    private static Map<String, List<String>> normalizeStringListMap(Map<String, List<String>> rawMap)
-    {
-        if (rawMap == null || rawMap.isEmpty())
-        {
-            return Map.of();
-        }
-
-        LinkedHashMap<String, List<String>> normalized = new LinkedHashMap<>();
-
-        rawMap.forEach((key, values) -> normalized.put(
-                key == null ? null : key.trim(),
-                normalizeStringList(values)));
-
-                return Collections.unmodifiableMap(normalized);
-    }
-
-    private static List<String> normalizeStringList(List<String> values)
-    {
-        if (values == null || values.isEmpty())
-        {
-            return List.of();
-        }
-
-        return values.stream()
-                .map(value -> value == null ? null : value.trim())
-                .toList();
-    }
 }

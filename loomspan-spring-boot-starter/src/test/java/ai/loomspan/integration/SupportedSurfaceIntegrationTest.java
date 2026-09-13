@@ -4,6 +4,8 @@ import ai.loomspan.api.SkillExecutionView;
 import ai.loomspan.api.SkillMethod;
 import ai.loomspan.api.SkillParam;
 import ai.loomspan.api.SkillTemplate;
+import ai.loomspan.api.RestSkillHandler;
+import ai.loomspan.api.RestSkillInvocation;
 import ai.loomspan.autoconfigure.LoomspanAutoConfiguration;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -14,10 +16,18 @@ import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAut
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,7 +45,9 @@ class SupportedSurfaceIntegrationTest
                              "model":"integration-model",
                              "choices":[{"index":0,"message":{"role":"assistant","content":null,
                                          "tool_calls":[{"id":"Java-call","type":"function","function":
-                                         {"name":"supportedJavaLeaf","arguments":"{\\\"message\\\":\\\"hello through the public API\\\"}"}}]},
+                                         {"name":"supportedJavaLeaf","arguments":"{\\\"message\\\":\\\"hello through the public API\\\"}"}},
+                                         {"id":"REST-call","type":"function","function":
+                                         {"name":"supportedRestLeaf","arguments":"{\\\"message\\\":\\\"hello through the public API\\\"}"}}]},
                                          "finish_reason":"tool_calls"}],
                              "usage":{"prompt_tokens":3,"completion_tokens":3,"total_tokens":6}}
                             """));
@@ -70,16 +82,46 @@ class SupportedSurfaceIntegrationTest
 
                         SkillTemplate skills = context.getBean(SkillTemplate.class);
                         AtomicReference<SkillExecutionView> observed = new AtomicReference<>();
+                        var authorized = UsernamePasswordAuthenticationToken.authenticated(
+                                "supported-caller", "unused", AuthorityUtils.createAuthorityList("ROLE_REST_USER"));
+                        try {
+                            SecurityContextHolder.getContext().setAuthentication(authorized);
+                            assertThat(skills.invoke(
+                                    "supportedSurfaceSkill",
+                                    Map.of("message", "hello through the public API"),
+                                    observed::set))
+                                    .isEqualTo("supported surface response");
 
-                        assertThat(skills.invoke(
-                                "supportedSurfaceSkill",
-                                Map.of("message", "hello through the public API"),
-                                observed::set))
-                                .isEqualTo("supported surface response");
+                            assertThat(observed.get()).isNotNull();
+                            assertThat(observed.get().sessionId()).isNotBlank();
+                            assertThat(observed.get().events()).isNotNull();
+                            List<Object> mutableValues = new ArrayList<>(List.of("first"));
+                            Map<String, Object> mutableInput = new LinkedHashMap<>();
+                            mutableInput.put("message", "direct");
+                            mutableInput.put("values", mutableValues);
+                            assertThat(skills.invoke("supportedRestLeaf", mutableInput))
+                                    .isEqualTo("REST: direct");
+                            mutableValues.add("late");
+                            assertThat((List<Object>) SupportedSkillConfiguration.lastInvocation.get().input().get("values"))
+                                    .containsExactly("first");
+                            assertThat(org.assertj.core.api.Assertions.catchThrowable(() ->
+                                    ((List<Object>) SupportedSkillConfiguration.lastInvocation.get().input().get("values"))
+                                            .add("forbidden")))
+                                    .isInstanceOf(UnsupportedOperationException.class);
+                            assertThat(SupportedSkillConfiguration.handlerAuthentication).hasValue("supported-caller");
+                            int authorizedCalls = SupportedSkillConfiguration.handlerCalls.get();
 
-                        assertThat(observed.get()).isNotNull();
-                        assertThat(observed.get().sessionId()).isNotBlank();
-                        assertThat(observed.get().events()).isNotNull();
+                            SecurityContextHolder.getContext().setAuthentication(
+                                    UsernamePasswordAuthenticationToken.authenticated(
+                                            "denied-caller", "unused", AuthorityUtils.NO_AUTHORITIES));
+                            assertThat(org.assertj.core.api.Assertions.catchThrowable(
+                                    () -> skills.invoke("supportedRestLeaf", Map.of("message", "denied"))))
+                                    .isInstanceOf(AccessDeniedException.class);
+                            assertThat(SupportedSkillConfiguration.handlerCalls).hasValue(authorizedCalls);
+                        }
+                        finally {
+                            SecurityContextHolder.clearContext();
+                        }
                     });
 
             RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
@@ -94,17 +136,33 @@ class SupportedSurfaceIntegrationTest
             RecordedRequest finalRequest = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(finalRequest).isNotNull();
             assertThat(finalRequest.getBody().readUtf8())
-                    .contains("Java: hello through the public API");
+                    .contains("Java: hello through the public API")
+                    .contains("REST: hello through the public API");
         }
     }
 
     @Configuration(proxyBeanMethods = false)
     static class SupportedSkillConfiguration
     {
+        private static final AtomicReference<String> handlerAuthentication = new AtomicReference<>();
+        private static final AtomicReference<RestSkillInvocation> lastInvocation = new AtomicReference<>();
+        private static final AtomicInteger handlerCalls = new AtomicInteger();
+
         @Bean
         SupportedTarget supportedTargetBean()
         {
             return new SupportedTarget();
+        }
+
+        @Bean
+        RestSkillHandler restSkillHandler()
+        {
+            return invocation -> {
+                handlerCalls.incrementAndGet();
+                handlerAuthentication.set(SecurityContextHolder.getContext().getAuthentication().getName());
+                lastInvocation.set(invocation);
+                return "REST: " + invocation.input().get("message");
+            };
         }
     }
 

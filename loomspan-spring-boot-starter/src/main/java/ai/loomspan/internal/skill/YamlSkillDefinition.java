@@ -32,9 +32,11 @@ public record YamlSkillDefinition(
         source = source == null
                 ? new YamlSkillSource(resource, resource.getDescription(), new byte[0])
                 : source;
-        if (executionConfiguration == null)
+        if (isRestManifest(manifest) == (executionConfiguration != null))
         {
-            throw new IllegalArgumentException("LLM-backed YAML skill definitions require an execution configuration");
+            throw new IllegalArgumentException(isRestManifest(manifest)
+                    ? "REST skill definitions must not have an execution configuration"
+                    : "LLM-backed YAML skill definitions require an execution configuration");
         }
         if (manifest.isDeclared(YamlSkillManifest.Field.CONCURRENCY)
                 && !Boolean.TRUE.equals(manifest.getPlanningMode()))
@@ -115,6 +117,11 @@ public record YamlSkillDefinition(
         return !hasDeclaredInputSchema();
     }
 
+    public boolean rest()
+    {
+        return isRestManifest(manifest);
+    }
+
     public int outputSchemaMaxRetries()
     {
         return manifest.getOutputSchemaMaxRetries() == null ? 0 : manifest.getOutputSchemaMaxRetries();
@@ -175,5 +182,10 @@ public record YamlSkillDefinition(
     private static <T> T copyValue(T source, Class<T> type)
     {
         return source == null ? null : COPY_MAPPER.convertValue(source, type);
+    }
+
+    private static boolean isRestManifest(YamlSkillManifest manifest)
+    {
+        return manifest.isDeclared(YamlSkillManifest.Field.REST) && Boolean.TRUE.equals(manifest.getRest());
     }
 }

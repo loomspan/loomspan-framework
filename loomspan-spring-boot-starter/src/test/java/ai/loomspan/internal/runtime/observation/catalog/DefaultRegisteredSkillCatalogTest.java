@@ -51,6 +51,27 @@ class DefaultRegisteredSkillCatalogTest
     }
 
     @Test
+    void preservesRestAsDistinctManifestBackedSource() throws Exception
+    {
+        String restYaml = "name: FetchDns\ndescription: fetch DNS\nrest: true\n";
+        DefaultRegisteredSkillCatalog catalog = catalog(List.of(restDefinition("FetchDns", restYaml)), false);
+
+        assertThat(catalog.listAfter(null, 10)).singleElement().satisfies(summary ->
+        {
+            assertThat(summary.registeredName()).isEqualTo("FetchDns");
+            assertThat(summary.source()).isEqualTo("REST");
+            assertThat(summary.sourcePath()).isEqualTo("FetchDns.yaml");
+            assertThat(summary.beanName()).isNull();
+            assertThat(summary.method()).isNull();
+        });
+        assertThat(catalog.find("FetchDns").orElseThrow()).satisfies(entry ->
+        {
+            assertThat(entry.source()).isEqualTo("REST");
+            assertThat(entry.yaml()).isEqualTo(restYaml);
+        });
+    }
+
+    @Test
     void rejectsInvalidUtf8OnlyWhenInspectionCatalogIsConstructed() throws Exception
     {
         YamlSkillDefinition definition = definition("skill", "name: skill\n");
@@ -81,7 +102,9 @@ class DefaultRegisteredSkillCatalogTest
         {
             var metadata = mock(CapabilityMetadata.class);
             when(metadata.name()).thenReturn(definition.manifest().getName());
-            when(metadata.kind()).thenReturn(CapabilityKind.YAML_SKILL);
+            when(metadata.kind()).thenReturn(definition.rest()
+                    ? CapabilityKind.REST_SKILL
+                    : CapabilityKind.YAML_SKILL);
             when(yaml.getSkill(metadata.name())).thenReturn(definition);
             entries.add(metadata);
         }
@@ -113,6 +136,24 @@ class DefaultRegisteredSkillCatalogTest
                 manifest,
                 new EffectiveSkillExecutionConfiguration(
                         "model", "connection", AiDriver.OPENAI, "provider-model", null),
+                EvidenceContract.empty(),
+                new YamlSkillSource(
+                        new FileSystemResource(file),
+                        file.toUri().toString(),
+                        yaml.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private YamlSkillDefinition restDefinition(String name, String yaml) throws Exception
+    {
+        Path file = Files.writeString(tempDir.resolve(name + ".yaml"), yaml, StandardCharsets.UTF_8);
+        YamlSkillManifest manifest = new YamlSkillManifest();
+        manifest.setName(name);
+        manifest.setDescription("description");
+        manifest.setRest(true);
+        return new YamlSkillDefinition(
+                new FileSystemResource(file),
+                manifest,
+                null,
                 EvidenceContract.empty(),
                 new YamlSkillSource(
                         new FileSystemResource(file),

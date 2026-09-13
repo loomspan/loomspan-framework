@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.*;
 
-/** Shared bounded mission work, cancellation, and late-write cleanup for Java and model execution. */
+/** Shared bounded mission work, cancellation, and late-write cleanup for direct and model execution. */
 public final class MissionWorkExecutor
 {
     private final ExecutionStateService executionStateService;

@@ -7,7 +7,7 @@ import java.lang.annotation.Target;
 
 /**
  * Declares one callable skill on an application Spring bean method.
- * Its exact name is shared with YAML skills; no companion manifest is required.
+ * Its exact name is shared with REST and model-backed YAML skills; no companion manifest is required.
  * The method signature and {@link SkillParam} annotations define its inputs.
  */
 @Target({ElementType.METHOD})

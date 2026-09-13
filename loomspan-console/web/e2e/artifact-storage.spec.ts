@@ -134,7 +134,7 @@ function makeTargetServer(initial: TargetState) {
     if (pathname === "/_loomspan/observability/v1/skills") {
       response.writeHead(200, headers);
       response.end(JSON.stringify({
-        items: [{ registeredName: "root.skill", source: "YAML", sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml", href: "skills/root.skill" }],
+        items: [{ registeredName: "root.skill", source: "REST", sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml", href: "skills/root.skill" }],
         hasMore: false, nextCursor: null, observedAt: "2026-07-27T00:00:00Z",
       }));
       return;
@@ -143,9 +143,9 @@ function makeTargetServer(initial: TargetState) {
       response.writeHead(200, headers);
       response.end(JSON.stringify({
         registeredName: "root.skill",
-        source: "YAML",
+        source: "REST",
         sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml",
-        yaml: "name: root.skill\ninstructions: '<script>window.location=\\\"https://attacker.invalid\\\"</script><a href=\\\"/target\\\">connect</a>'\n",
+        yaml: "name: root.skill\ndescription: inert REST fixture\nrest: true\ninstructions: '<script>window.location=\\\"https://attacker.invalid\\\"</script><a href=\\\"/target\\\">connect</a>'\n",
       }));
       return;
     }
@@ -462,7 +462,12 @@ test("WF-UNFAMILIAR-SKILL-PATH retains repeated invocation selection across view
   await expect(skillLink).toBeVisible();
   await skillLink.click();
   await expect(page.getByRole("heading", { name: "Skill Detail" })).toBeVisible();
+  await expect(page.getByText("REST", { exact: true })).toBeVisible();
+  await expect(page.getByText("classpath:/skills/<script>alert(1)</script>.yaml", { exact: true })).toBeVisible();
+  await expect(page.locator("pre")).toContainText("rest: true");
   await expect(page.locator("pre")).toContainText("<script>window.location");
+  await expect(page.getByText("Bean", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Method", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /connect/i })).toHaveCount(0);
   await expect(page.locator("script")).toHaveCount(1);
   await expectNoSeriousAccessibilityViolations(page);

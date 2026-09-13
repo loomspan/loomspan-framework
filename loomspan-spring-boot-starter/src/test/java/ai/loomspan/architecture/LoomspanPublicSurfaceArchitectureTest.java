@@ -34,7 +34,9 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.api.SkillParam",
             "ai.loomspan.api.SkillException",
             "ai.loomspan.api.SkillInputValidationException",
-            "ai.loomspan.api.SkillInputValidationIssue");
+            "ai.loomspan.api.SkillInputValidationIssue",
+            "ai.loomspan.api.RestSkillHandler",
+            "ai.loomspan.api.RestSkillInvocation");
 
     private static final Set<String> FRAMEWORK_INTEGRATION_TYPES = Set.of(
             "ai.loomspan.autoconfigure.LoomspanAutoConfiguration",

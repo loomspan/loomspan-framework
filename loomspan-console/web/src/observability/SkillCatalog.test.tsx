@@ -35,6 +35,7 @@ beforeEach(() => {
 test("skill catalog renders items in a table", () => {
   view.current.skills.items = [
     { registeredName: "CheckDns", source: "YAML", sourcePath: "/skills/check_dns.yaml" },
+    { registeredName: "FetchDns", source: "REST", sourcePath: "/skills/fetch_dns.yaml" },
     { registeredName: "BuildProject", source: "JAVA", beanName: "buildSkills", method: "public java.lang.String example.Build.build(java.lang.String,boolean)" },
   ];
   render(<SkillCatalog />);
@@ -42,10 +43,12 @@ test("skill catalog renders items in a table", () => {
   expect(screen.getByText("BuildProject")).toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
   expect(screen.getByText("YAML")).toBeInTheDocument();
+  expect(screen.getByText("REST")).toBeInTheDocument();
   expect(screen.getByText("Java")).toBeInTheDocument();
   expect(screen.getByText("example.Build.build()")).toBeInTheDocument();
   expect(screen.queryByText(/buildSkills:/)).toBeNull();
   expect(screen.getByText("/skills/check_dns.yaml")).toBeInTheDocument();
+  expect(screen.getByText("/skills/fetch_dns.yaml")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "CheckDns" })).toHaveAttribute(
     "href",
     "/skills/CheckDns?targetScopeId=scope-1",

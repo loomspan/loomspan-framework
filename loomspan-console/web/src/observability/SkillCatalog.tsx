@@ -64,7 +64,7 @@ export function SkillCatalog() {
                   <td className="identifier-cell">
                     <Link to={scopeBoundPath(`/skills/${encodeURIComponent(s.registeredName)}`, skills.targetScopeId)}>{s.registeredName}</Link>
                   </td>
-                  <td>{s.source === "JAVA" ? "Java" : "YAML"}</td>
+                  <td>{s.source === "JAVA" ? "Java" : s.source}</td>
                   <td className="path-cell"><code className="source-path">{s.source === "JAVA" ? formatJavaSkillMethod(s.method) : s.sourcePath}</code></td>
                 </tr>
               );

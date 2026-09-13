@@ -48,7 +48,7 @@ an internal diagnostic format rather than an application dependency.
 
 ## Trace identity
 
-`entrySkill` is the exact registered name of the top-level Java or YAML skill whose invocation owns the session. Loomspan records it before execution begins, keeps it unchanged across nested skill invocations, and exposes it in Trace Catalog and Trace Detail without requiring artifact acquisition. It is a recorded fact: it does not prove that the skill is still registered or that it is more important than nested work.
+`entrySkill` is the exact registered name of the top-level Java, REST, or model-backed YAML skill whose invocation owns the session. Loomspan records it before execution begins, keeps it unchanged across nested skill invocations, and exposes it in Trace Catalog and Trace Detail without requiring artifact acquisition. It is a recorded fact: it does not prove that the skill is still registered or that it is more important than nested work.
 
 ## Live review and purpose
 

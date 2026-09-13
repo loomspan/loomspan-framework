@@ -52,15 +52,15 @@ A YAML skill can declare the equivalent role policy:
 rbac_roles: [FINANCE, ADMIN]
 ```
 
-Both sources use Spring's authority evaluation. The default prefix is `ROLE_`, so `FINANCE` requires authority `ROLE_FINANCE`. `GrantedAuthorityDefaults` configures a custom or empty prefix, and a configured `RoleHierarchy` applies to both sources. Role names are not raw authorities: writing `ROLE_FINANCE` with the default prefix requires `ROLE_ROLE_FINANCE`; Loomspan does not strip prefixes. Omitted or empty YAML roles are unrestricted.
+All skill kinds use Spring's authority evaluation. The default prefix is `ROLE_`, so `FINANCE` requires authority `ROLE_FINANCE`. `GrantedAuthorityDefaults` configures a custom or empty prefix, and a configured `RoleHierarchy` applies to Java, REST, and model-backed YAML skills. Role names are not raw authorities: writing `ROLE_FINANCE` with the default prefix requires `ROLE_ROLE_FINANCE`; Loomspan does not strip prefixes. Omitted or empty YAML roles are unrestricted.
 
 Use Spring's documented `GrantedAuthorityDefaults` bean configuration when the application uses a different prefix. Do not encode prefix handling in skill names, prompts, or business inputs.
 
 ## Local visibility and caller scope
 
-A YAML parent's `allowed_skills` names the only candidate children. Both Java and YAML children are resolved by exact name after startup registration finishes. Missing references fail startup. Authorization then filters this local set for each invocation; `@PermitAll` never makes an undeclared child visible. A denied required child can make a planning or evidence requirement unsatisfiable.
+A YAML parent's `allowed_skills` names the only candidate children. Java, REST, and model-backed YAML children are resolved by exact name after startup registration finishes. Missing references fail startup. Authorization then filters this local set for each invocation; `@PermitAll` never makes an undeclared child visible. A denied required child can make a planning or evidence requirement unsatisfiable.
 
-The facade captures the trusted caller authentication. Explicit invocation authentication has priority over session fallback. At the Java proxy boundary Loomspan installs a fresh SecurityContext and restores the exact previous context in finally. Nested calls and parallel workers carry their caller identity without sharing mutable contexts or mutating session authentication for another invocation.
+The facade captures the trusted caller authentication. Explicit invocation authentication has priority over session fallback. At Java and REST execution boundaries Loomspan installs a fresh SecurityContext on the actual worker thread and restores the exact previous context in finally. Nested calls and parallel workers carry their caller identity without sharing mutable contexts or mutating session authentication for another invocation.
 
 Spring authorization and authentication failures remain failures; they are not serialized into successful tool text. Denied business methods do not run and do not earn successful task/evidence credit. Ordinary Java exception-to-text behavior is separate and remains unchanged.
 

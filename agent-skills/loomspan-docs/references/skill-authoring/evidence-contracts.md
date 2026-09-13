@@ -40,7 +40,7 @@ output_schema:
 | Nested object property | No |
 | Array `items` or a property below an item | No |
 
-Each annotation MUST be one nonblank YAML string. Null, Boolean, numeric, list, and object values are rejected without coercion. A root property without `evidence` has no inferred evidence requirement, regardless of its name, description, requiredness, siblings, or the declaring skill's children. Java skills do not declare `output_schema`; evidence declarations belong to a model-backed YAML parent. Exact direct child names may identify either Java or YAML skills.
+Each annotation MUST be one nonblank YAML string. Null, Boolean, numeric, list, and object values are rejected without coercion. A root property without `evidence` has no inferred evidence requirement, regardless of its name, description, requiredness, siblings, or the declaring skill's children. Java and REST skills do not declare `output_schema`; evidence declarations belong to a model-backed YAML parent. Exact direct child names may identify Java, REST, or model-backed YAML skills.
 
 The removed top-level `evidence_contract` field is not accepted; there is no alias, compatibility reader, or merge behavior.
 

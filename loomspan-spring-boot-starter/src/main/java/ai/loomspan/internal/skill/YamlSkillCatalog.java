@@ -48,6 +48,12 @@ public class YamlSkillCatalog implements InitializingBean
     private static final String PUBLIC_SKILL_NAME_REGEX = "^[A-Za-z_][A-Za-z0-9_]{0,63}$";
     private static final Pattern PUBLIC_SKILL_NAME_PATTERN = Pattern.compile(PUBLIC_SKILL_NAME_REGEX);
     private static final Set<String> ALLOWED_SKILL_ENTRY_FIELDS = Set.of("name", "min_tasks", "max_tasks", "required");
+    private static final Set<YamlSkillManifest.Field> REST_FORBIDDEN_FIELDS = Set.of(
+            YamlSkillManifest.Field.MODEL, YamlSkillManifest.Field.PROMPT,
+            YamlSkillManifest.Field.THINKING_LEVEL, YamlSkillManifest.Field.ALLOWED_SKILLS,
+            YamlSkillManifest.Field.PLANNING_MODE, YamlSkillManifest.Field.CONCURRENCY,
+            YamlSkillManifest.Field.MAX_STEPS, YamlSkillManifest.Field.LINTER,
+            YamlSkillManifest.Field.OUTPUT_SCHEMA, YamlSkillManifest.Field.OUTPUT_SCHEMA_MAX_RETRIES);
     private final LoomspanProperties modelsProperties;
     private final LoomspanProperties.Skills skillProperties;
     private final ResourcePatternResolver resourcePatternResolver;
@@ -172,13 +178,26 @@ public class YamlSkillCatalog implements InitializingBean
         validateRequiredField(resource, "name", manifest.getName());
         validateRequiredField(resource, "description", manifest.getDescription());
 
-        validateConcurrency(resource, manifest);
+        boolean rest = Boolean.TRUE.equals(manifest.getRest());
+        validateInputSchema(resource, manifest);
+        if (rest)
+        {
+            for (YamlSkillManifest.Field field : REST_FORBIDDEN_FIELDS)
+            {
+                if (manifest.isDeclared(field))
+                {
+                    throw invalidNamedSkill(resource, manifest, field.yamlName(),
+                            "field is not allowed for REST skills; remove it");
+                }
+            }
+            return new YamlSkillDefinition(resource, manifest, null, EvidenceContract.empty(), source, List.of());
+        }
 
+        validateConcurrency(resource, manifest);
         if (!StringUtils.hasText(manifest.getModel()))
         {
             throw invalidNamedSkill(resource, manifest, "model", "required field is missing or blank; declare a configured model");
         }
-        validateInputSchema(resource, manifest);
         validateOutputSchema(resource, manifest);
         EvidenceContract evidenceContract = compileEvidenceContract(resource, manifest);
         validateLinter(resource, manifest);
@@ -258,6 +277,7 @@ public class YamlSkillCatalog implements InitializingBean
                 throw invalidNamedSkill(resource, skillName, "mapping",
                         "mapping is no longer supported; declare the Java skill once with @SkillMethod and remove its YAML wrapper");
             }
+            validateRawRest(resource, root, skillName);
             validateRawConcurrency(resource, root, skillName);
             validateRawAllowedSkills(resource, root, skillName);
 
@@ -281,6 +301,25 @@ public class YamlSkillCatalog implements InitializingBean
         catch (IOException ex)
         {
             throw new IllegalStateException("Failed to read YAML skill from " + describe(resource), ex);
+        }
+    }
+
+    private void validateRawRest(Resource resource, JsonNode root, String skillName)
+    {
+        if (!root.has("rest")) return;
+        JsonNode rest = root.get("rest");
+        if (rest == null || !rest.isBoolean() || !rest.booleanValue())
+        {
+            throw invalidNamedSkill(resource, skillName, "rest",
+                    "must be boolean true; omit 'rest' for non-REST skills");
+        }
+        for (YamlSkillManifest.Field field : REST_FORBIDDEN_FIELDS)
+        {
+            if (root.has(field.yamlName()))
+            {
+                throw invalidNamedSkill(resource, skillName, field.yamlName(),
+                        "field is not allowed for REST skills; remove it");
+            }
         }
     }
 

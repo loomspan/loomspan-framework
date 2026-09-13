@@ -37,7 +37,7 @@ func TestListSkillsGoldenStructuredResultAndText(t *testing.T) {
 		if !strings.HasSuffix(parsed.Path, "/skills") || parsed.Query().Get("pageSize") != "2" {
 			return nil, errors.New("unexpected endpoint: " + endpoint)
 		}
-		return []byte(`{"items":[{"registeredName":"skill-☃","source": "YAML", "sourcePath":"nested/skill.yaml","href":"/_ignored"}],"hasMore":true,"nextCursor":"next-1","observedAt":"2026-08-13T20:30:00.000000123Z"}`), nil
+		return []byte(`{"items":[{"registeredName":"skill-☃","source": "REST", "sourcePath":"nested/skill.yaml","href":"/_ignored"}],"hasMore":true,"nextCursor":"next-1","observedAt":"2026-08-13T20:30:00.000000123Z"}`), nil
 	})
 	result, envelope, err := handleListSkills(context.Background(), options, listSkillsInput{PageSize: 2})
 	if err != nil || result.IsError || envelope.Result == nil || envelope.Error != nil {
@@ -78,7 +78,7 @@ func TestGetSkillGoldenPreservesUnchangedYAML(t *testing.T) {
 		if !strings.Contains(endpoint, "/skills/") {
 			return nil, errors.New("unexpected endpoint: " + endpoint)
 		}
-		return json.Marshal(map[string]any{"registeredName": "skill-☃", "source": "YAML", "sourcePath": `C:\\deployed\\skill.yaml`, "yaml": yaml})
+		return json.Marshal(map[string]any{"registeredName": "skill-☃", "source": "REST", "sourcePath": `C:\\deployed\\skill.yaml`, "yaml": yaml})
 	})
 	result, envelope, err := handleGetSkill(context.Background(), options, getSkillInput{RegisteredName: "skill-☃"})
 	if err != nil || result.IsError || envelope.Result == nil {

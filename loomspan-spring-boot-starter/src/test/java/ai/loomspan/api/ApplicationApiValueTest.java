@@ -1,6 +1,7 @@
 package ai.loomspan.api;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ByteArrayResource;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -13,6 +14,59 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ApplicationApiValueTest
 {
+    @Test
+    void restInvocationDeeplyCopiesContainersAndPreservesLeavesAndNulls()
+    {
+        Object leaf = new ByteArrayResource(new byte[] {1, 2, 3});
+        List<Object> values = new ArrayList<>();
+        values.add(leaf);
+        values.add(null);
+        Map<String, Object> nested = new LinkedHashMap<>();
+        nested.put("values", values);
+        List<Object> nonStringKeyedValues = new ArrayList<>(List.of("nested"));
+        Map<Object, Object> nonStringKeyed = new LinkedHashMap<>();
+        nonStringKeyed.put(7, nonStringKeyedValues);
+        nested.put("nonStringKeyed", nonStringKeyed);
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("nested", nested);
+
+        RestSkillInvocation invocation = new RestSkillInvocation("lookup", input);
+        values.add("late");
+        nonStringKeyedValues.add("late");
+        nonStringKeyed.put(8, "late");
+        nested.put("late", true);
+        input.clear();
+
+        Map<?, ?> copiedNested = (Map<?, ?>) invocation.input().get("nested");
+        assertThat((List<Object>) copiedNested.get("values")).containsExactly(leaf, null);
+        assertThat(((List<?>) copiedNested.get("values")).getFirst()).isSameAs(leaf);
+        assertThat((Map<Object, Object>) copiedNested.get("nonStringKeyed"))
+                .containsEntry(7, List.of("nested"));
+        assertThatThrownBy(() -> invocation.input().put("x", "y"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> ((List<Object>) copiedNested.get("values")).add("x"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> ((Map<Object, Object>) copiedNested.get("nonStringKeyed")).put(8, "x"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> new RestSkillInvocation(null, Map.of())).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new RestSkillInvocation("lookup", null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void restSpiExposesOnlyTheTicketedJdkSignature()
+    {
+        assertThat(RestSkillInvocation.class.getRecordComponents())
+                .extracting(component -> component.getName())
+                .containsExactly("skillName", "input");
+        assertThat(RestSkillHandler.class.getDeclaredMethods())
+                .singleElement()
+                .satisfies(method -> {
+                    assertThat(method.getName()).isEqualTo("handle");
+                    assertThat(method.getReturnType()).isEqualTo(String.class);
+                    assertThat(method.getParameterTypes()).containsExactly(RestSkillInvocation.class);
+                });
+    }
+
     @Test
     void skillExecutionViewDefensivelyCopiesEvents()
     {

@@ -19,6 +19,7 @@ import ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration;
 import ai.loomspan.internal.skill.YamlSkillDefinition;
 import ai.loomspan.internal.skill.YamlSkillManifest;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,7 +39,7 @@ import static org.mockito.Mockito.when;
 class SuccessfulSkillCompletionBoundaryTest
 {
     @Test
-    void linkedCallIsCreditedOnlyThroughVerifiedPlanCompletionAfterExecutionReturns()
+    void linkedRestCallIsCreditedOnlyThroughVerifiedPlanCompletionAfterExecutionReturns()
     {
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         PlanningService planning = mock(PlanningService.class);
@@ -64,11 +65,36 @@ class SuccessfulSkillCompletionBoundaryTest
     }
 
     @Test
-    void failedAndCancelledUnplannedCallsNeverReceiveSuccessfulCredit()
+    void successfulUnplannedRestCallRecordsDirectSkillCreditOnlyAfterExecutionReturns()
+    {
+        CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
+        PlanningService planning = mock(PlanningService.class);
+        ExecutionStateService state = mock(ExecutionStateService.class);
+        CapabilityMetadata capability = capability();
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("unplanned", "test.entry", 3);
+        when(planning.markToolStarted(eq(session), eq(capability))).thenReturn(Optional.empty());
+        when(state.openFrame(eq(session), eq(TraceFrameType.TOOL_INVOCATION), eq(capability.name()), any()))
+                .thenReturn(frame(capability.name()));
+        when(router.execute(eq(capability), any(), eq(session), eq(null))).thenReturn("done");
+
+        BoundCapability callback = new DefaultCapabilityInvoker(router, planning, state)
+                .bind(session, definitionWithoutEvidenceContract(), List.of(capability), null)
+                .getFirst();
+        ai.loomspan.internal.core.TestExecutionBindings.callWithSession(
+                session, () -> callback.invoke(Map.of(), null));
+
+        org.mockito.InOrder order = inOrder(router, state);
+        order.verify(router).execute(eq(capability), any(), eq(session), eq(null));
+        order.verify(state).recordSuccessfulSkill(capability.name(), null, true);
+    }
+
+    @Test
+    void failedAndCancelledUnplannedRestCallsNeverReceiveSuccessfulCredit()
     {
         for (RuntimeException failure : List.of(
                 new IllegalStateException("failed"),
-                new CancellationException("cancelled")))
+                new CancellationException("cancelled"),
+                new AccessDeniedException("denied")))
         {
             CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
             PlanningService planning = mock(PlanningService.class);
@@ -95,12 +121,12 @@ class SuccessfulSkillCompletionBoundaryTest
     private static CapabilityMetadata capability()
     {
         return new CapabilityMetadata(
-                "yaml:child",
+                "rest:child",
                 "investigateNetwork",
                 "Investigate the network",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
-                CapabilityKind.YAML_SKILL,
+                CapabilityKind.REST_SKILL,
                 CapabilityToolDescriptor.generic("investigateNetwork", "Investigate the network"),
                 null);
     }

@@ -31,7 +31,8 @@ class SkillVisibilityResolverTest {
         catalog.afterPropertiesSet();
         InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
         var targets = new ai.loomspan.internal.core.SkillMethodBeanPostProcessor(registry);
-        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver()).afterSingletonsInstantiated();
+        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver(),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()).afterSingletonsInstantiated();
 
         DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(catalog, registry, new DefaultAccessGuard());
 
@@ -52,7 +53,8 @@ class SkillVisibilityResolverTest {
         catalog.afterPropertiesSet();
         InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
         var targets = new ai.loomspan.internal.core.SkillMethodBeanPostProcessor(registry);
-        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver()).afterSingletonsInstantiated();
+        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver(),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()).afterSingletonsInstantiated();
 
         DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(catalog, registry, new DefaultAccessGuard());
 
@@ -73,7 +75,8 @@ class SkillVisibilityResolverTest {
         catalog.afterPropertiesSet();
         InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
         var targets = new ai.loomspan.internal.core.SkillMethodBeanPostProcessor(registry);
-        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver()).afterSingletonsInstantiated();
+        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver(),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()).afterSingletonsInstantiated();
 
         DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(catalog, registry, new DefaultAccessGuard());
 
@@ -91,7 +94,8 @@ class SkillVisibilityResolverTest {
         catalog.afterPropertiesSet();
         InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
         var targets = new ai.loomspan.internal.core.SkillMethodBeanPostProcessor(registry);
-        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver()).afterSingletonsInstantiated();
+        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver(),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()).afterSingletonsInstantiated();
 
         DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(catalog, registry, new DefaultAccessGuard());
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);

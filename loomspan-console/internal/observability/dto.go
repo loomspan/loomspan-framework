@@ -141,7 +141,7 @@ func validateSkillWireFields(data []byte, source string, detail bool) error {
 		forbidden = append(forbidden, "yaml")
 	}
 	for _, name := range forbidden {
-		if value, present := fields[name]; present && string(value) != "null" {
+		if _, present := fields[name]; present {
 			return fmt.Errorf("%s is not applicable to this skill source", name)
 		}
 	}

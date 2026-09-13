@@ -20,7 +20,7 @@ func TestInstanceStatusDecodesFromFixture(t *testing.T) {
 	if !status.LiveMonitoringAvailable {
 		t.Fatal("expected liveMonitoringAvailable=true")
 	}
-	if status.RegisteredSkillCount != 1 {
+	if status.RegisteredSkillCount != 3 {
 		t.Fatalf("unexpected registeredSkillCount: %d", status.RegisteredSkillCount)
 	}
 }
@@ -31,11 +31,14 @@ func TestSkillPageDecodesFromFixture(t *testing.T) {
 	if err := json.Unmarshal(body, &page); err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Items) != 2 {
-		t.Fatalf("expected 2 items, got %d", len(page.Items))
+	if len(page.Items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(page.Items))
 	}
-	if page.Items[1].Source != "JAVA" || page.Items[1].BeanName != "dnsSkills" {
-		t.Fatalf("missing Java summary: %#v", page.Items[1])
+	if page.Items[1].Source != "REST" || page.Items[1].SourcePath == "" {
+		t.Fatalf("missing REST summary: %#v", page.Items[1])
+	}
+	if page.Items[2].Source != "JAVA" || page.Items[2].BeanName != "dnsSkills" {
+		t.Fatalf("missing Java summary: %#v", page.Items[2])
 	}
 	if page.Items[0].RegisteredName != "CheckDns" {
 		t.Fatalf("unexpected registeredName: %s", page.Items[0].RegisteredName)
@@ -45,6 +48,16 @@ func TestSkillPageDecodesFromFixture(t *testing.T) {
 	}
 	if page.NextCursor != nil {
 		t.Fatalf("expected nextCursor=null, got %v", page.NextCursor)
+	}
+}
+
+func TestRestSkillDetailDecodesFromFixture(t *testing.T) {
+	var detail SkillDetail
+	if err := json.Unmarshal(readFixture(t, "skill-rest-detail.json"), &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.Source != "REST" || detail.SourcePath == "" || !strings.Contains(detail.Yaml, "rest: true") {
+		t.Fatalf("unexpected REST detail: %#v", detail)
 	}
 }
 
@@ -360,12 +373,26 @@ func TestSkillSourceVariantsRejectMalformedDetails(t *testing.T) {
 	}
 }
 
-func TestSkillDetailDecoderRejectsInapplicableEmptyFields(t *testing.T) {
-	for _, field := range []string{"sourcePath", "yaml"} {
+func TestSkillDecodersRejectInapplicableFieldsByPresence(t *testing.T) {
+	for _, body := range []string{
+		`{"registeredName":"javaSkill","source":"JAVA","beanName":"bean","method":"lookup()","sourcePath":""}`,
+		`{"registeredName":"javaSkill","source":"JAVA","beanName":"bean","method":"lookup()","yaml":null}`,
+		`{"registeredName":"restSkill","source":"REST","sourcePath":"skill.yaml","beanName":null}`,
+		`{"registeredName":"restSkill","source":"REST","sourcePath":"skill.yaml","method":""}`,
+	} {
 		var detail SkillDetail
-		body := `{"registeredName":"javaSkill","source":"JAVA","beanName":"bean","method":"lookup()","` + field + `":""}`
 		if err := json.Unmarshal([]byte(body), &detail); err == nil {
-			t.Fatalf("accepted inapplicable field: %s", body)
+			t.Fatalf("accepted inapplicable detail field: %s", body)
+		}
+	}
+
+	for _, body := range []string{
+		`{"registeredName":"javaSkill","source":"JAVA","beanName":"bean","method":"lookup()","sourcePath":null}`,
+		`{"registeredName":"restSkill","source":"REST","sourcePath":"skill.yaml","beanName":null}`,
+	} {
+		var summary SkillSummary
+		if err := json.Unmarshal([]byte(body), &summary); err == nil {
+			t.Fatalf("accepted inapplicable summary field: %s", body)
 		}
 	}
 }

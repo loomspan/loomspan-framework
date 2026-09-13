@@ -4,7 +4,7 @@ A Java 21, Spring Boot 4.1, and Spring AI 2–based agentic framework that uses 
 
 Loomspan while still an HTN is fundamentally different from traditional HTNs. Instead of relying on rigid, rule‑based planners, Loomspan blends classical HTN structure with LLM‑powered reasoning, allowing agents to dynamically decompose missions, select skills, and orchestrate complex workflows. 
 
-At its core, Loomspan treats skills as the fundamental building blocks of capability. YAML manifests define model-backed skills, and Java `@SkillMethod` annotations define directly callable application skills. Both sources share one exact-name catalog, authorization checks, and execution lifecycle. Model-backed parents can call locally allowed children from either source. This creates a flexible planning system that combines LLM reasoning with explicit contracts and ordinary Spring services.
+At its core, Loomspan treats skills as the fundamental building blocks of capability. YAML manifests define model-backed skills and application-handled REST leaves, while Java `@SkillMethod` annotations define directly callable application skills. All three kinds share one exact-name catalog, authorization checks, and execution lifecycle. Model-backed parents can call locally allowed children of any kind. This creates a flexible planning system that combines LLM reasoning with explicit contracts and ordinary Spring services.
 
 
 ## Why Loomspan?
@@ -138,7 +138,7 @@ By default, Loomspan discovers `classpath:/skills/**/*.yaml`. Add the `.yml` pat
 
 ### Invoking a skill
 
-Inject `SkillTemplate` and invoke a Java or YAML skill with a map (or an object that can be converted to a map). The result is returned as text; use a YAML `output_schema` for model-backed structured output. Java results retain Jackson serialization.
+Inject `SkillTemplate` and invoke a Java, model-backed YAML, or REST skill with a map (or an object that can be converted to a map). The result is returned as text; use a YAML `output_schema` for model-backed structured output. Java results retain Jackson serialization and REST results are returned unchanged by the application handler.
 
 ```java
 import ai.loomspan.api.SkillTemplate;
@@ -160,12 +160,12 @@ public class InvoiceWorkflow {
 }
 ```
 
-The supported starter Java API is closed to these eight types in `ai.loomspan.api`: `SkillTemplate`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `SkillException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API. Documented configuration keys and behavior remain user-facing contracts. `SkillTemplate` is injectable and easy to mock in application tests, but replacing its framework bean or implementing Loomspan internals is unsupported. There are currently no supported Loomspan-specific SPIs or bean overrides.
+The supported starter Java API is closed to these ten types in `ai.loomspan.api`: `SkillTemplate`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `RestSkillHandler`, `RestSkillInvocation`, `SkillException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. `RestSkillHandler` is the sole supported SPI; it does not make any framework bean replaceable. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API.
 
 The installable [Java API knowledge set](agent-skills/loomspan-docs/references/java-api/README.md)
 provides LLM-oriented routing and source-verified guidance for this surface.
 
-For integration testing, configure a real or local protocol-compatible named connection and invoke the YAML skill through `SkillTemplate`. Loomspan's supported-surface integration test follows this pattern: it supplies a local OpenAI-compatible endpoint through `loomspan.connections`, invokes an LLM-backed YAML skill that calls an annotation-defined `@SkillMethod`/`@SkillParam` leaf, and observes only `SkillExecutionView` values. Tests should not replace internal resolvers, coordinators, model factories, registries, or virtual-file-system beans.
+For integration testing, configure a real or local protocol-compatible named connection and invoke the YAML skill through `SkillTemplate`. Loomspan's supported-surface integration test follows this pattern: it supplies a local OpenAI-compatible endpoint through `loomspan.connections`, invokes an LLM-backed YAML skill that calls both an annotation-defined Java leaf and an application-handled REST leaf, directly invokes the REST leaf, and observes only public API values. Tests should not replace internal resolvers, coordinators, model factories, registries, or virtual-file-system beans.
 
 Successful observers receive a session ID and immutable, current-version `SkillExecutionEvent` values. These events are intended for trusted development and debugging, may contain application business data, and are not a durable or comprehensively sanitized trace contract. Invalid caller input raises `SkillInputValidationException`, authorization failures remain Spring Security `AccessDeniedException`, and other runtime failures crossing the facade become a safe `SkillException`.
 
@@ -343,7 +343,7 @@ A YAML skill declares a configured `model` and may use model execution settings.
 
 The YAML `name` is the skill's single public identity and must match `^[A-Za-z_][A-Za-z0-9_]{0,63}$`: use 1-64 characters, start with an ASCII letter or underscore, and then use only ASCII letters, digits, or underscores. Names are case-sensitive and Loomspan does not trim, sanitize, normalize, truncate, or alias them. Descriptive lowerCamelCase names such as `duplicateInvoiceChecker` and `expenseLookup` are the recommended authoring style, though underscores and uppercase starts are also valid. Java annotations follow the same exact-name rules and share the namespace. Use registered names in `SkillTemplate`, `allowed_skills`, and property-level `evidence` expressions.
 
-Duplicate Java/Java, YAML/YAML, or Java/YAML names fail startup with both declaration locations. After registration completes, every exact `allowed_skills` reference must resolve. Missing children fail startup even if an access policy would hide them.
+Duplicate names across Java, REST, and model-backed YAML declarations fail startup with both declaration locations. After registration completes, every exact `allowed_skills` reference must resolve. Missing children fail startup even if an access policy would hide them.
 
 ```yaml
 name: duplicateInvoiceChecker
@@ -394,7 +394,7 @@ Important execution settings:
 
 - `planning_mode`: enables the step-based HTN executor only when set to `true`. It is disabled by default.
 - `concurrency`: valid only when `planning_mode: true` is explicitly declared. It defaults to `true` for such planners; set it to `false` to require serialized execution while retaining accepted `parallelGroup` metadata. Generated tasks may use an exact nullable `parallelGroup` matching `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`. Only consecutive tasks with the same non-null group form an ordered execution unit, dependencies may target only earlier units, and a full unit must fit within the remaining step budget before any member starts. For omitted or explicit `true`, the coordinator admits every member of a valid group before dispatching them concurrently, waits for every ordinary outcome, and folds results and diagnostics in task-list order so later units and final synthesis see sequential-equivalent state. Ungrouped tasks and `concurrency: false` groups execute serially. A group is an author assertion that its members are independent and safe to overlap; it records eligibility, while frame intervals establish whether work actually overlapped. Mission timeout, interruption, or partial dispatch stops later admission, uses bounded cleanup, folds available outcomes in task order, blocks admitted tasks with no outcome, marks the plan stale, and fences writes after the logical cutoff; external side effects remain the capability author's responsibility.
-- `allowed_skills`: a structured sequence of direct child declarations. Every entry requires an exact registered Java or YAML `name`; scalar entries are invalid. Optional `min_tasks` and `max_tasks` are non-negative generated-plan task counts, and `required: true` makes the effective minimum at least one. Defaults are minimum `0`, unbounded maximum, and `required: false`; the effective minimum is `max(min_tasks, required ? 1 : 0)`. Task-count fields require explicit `planning_mode: true`, while an unconstrained `{name: ...}` entry is valid for direct execution. A positive-minimum child must be visible and authorized before planning begins. Loomspan counts exact case-sensitive `PlanTask.capabilityName` bindings, includes the bounds in the planning prompt, permits one corrective planning attempt, and rejects a still-invalid plan before storage or execution. These bounds do not count runtime invocations and do not alter evidence expressions or authorization.
+- `allowed_skills`: a structured sequence of direct child declarations. Every entry requires an exact registered Java, REST, or model-backed YAML `name`; scalar entries are invalid. Optional `min_tasks` and `max_tasks` are non-negative generated-plan task counts, and `required: true` makes the effective minimum at least one. Defaults are minimum `0`, unbounded maximum, and `required: false`; the effective minimum is `max(min_tasks, required ? 1 : 0)`. Task-count fields require explicit `planning_mode: true`, while an unconstrained `{name: ...}` entry is valid for direct execution. A positive-minimum child must be visible and authorized before planning begins. Loomspan counts exact case-sensitive `PlanTask.capabilityName` bindings, includes the bounds in the planning prompt, permits one corrective planning attempt, and rejects a still-invalid plan before storage or execution. These bounds do not count runtime invocations and do not alter evidence expressions or authorization.
 - `max_steps`: bounds planning-loop steps. Each assigned task costs one step and final synthesis costs one step; correcting an invalid action for the same assignment does not consume another task step.
 - `prompt`: optional private instructions for an LLM-backed skill.
 - `thinking_level`: selects a configured thinking level for models that support it.
@@ -402,9 +402,29 @@ Important execution settings:
 - `output_schema`: validates the model response. When present, `output_schema_max_retries` defaults to `2` and accepts values from `0` through `3`.
 - `linter`: currently supports a `regex` linter with `max_retries` from `0` through `3`.
 - `output_schema.properties.<name>.evidence`: attaches a nonblank Boolean expression over exact direct `allowed_skills` names to an immediate root output property. Operators `and` and `or` are case-insensitive; skill names remain case-sensitive; `and` binds more tightly than `or`, and parentheses override precedence. Plan validation checks every annotated property against planned child names; final validation checks only annotated properties present in the candidate against successfully completed direct children. Nested child internals do not leak upward. The annotation is orchestration metadata, not candidate JSON, and enforces supportability rather than factual truth or workflow order. Nested-schema annotations are unsupported.
-- `rbac_roles`: requires one of the listed Spring roles. The default `ROLE_` prefix, configured `GrantedAuthorityDefaults`, and `RoleHierarchy` apply equally to YAML and Java policies; roles are not raw authority strings.
+- `rbac_roles`: requires one of the listed Spring roles. The default `ROLE_` prefix, configured `GrantedAuthorityDefaults`, and `RoleHierarchy` apply equally to REST and model-backed YAML policies and to Java method policies; roles are not raw authority strings.
 
 For attachment inputs, declare `type: attachment`, a `media_type` (`image`, `pdf`, `audio`, `video`, or `file`), and permitted `allowed_content_types`. Pass a Spring `Resource` or a `ref://...` virtual-file reference as the input value.
+
+### REST leaf skills
+
+A REST leaf is a YAML declaration backed by exactly one application `RestSkillHandler` bean:
+
+```yaml
+name: fetchAccount
+description: Fetch one account through the application REST integration
+rest: true
+input_schema:
+  type: object
+  properties:
+    accountId: { type: string }
+  required: [accountId]
+rbac_roles: [ACCOUNT_READER]
+```
+
+Only `name`, `description`, `rest: true`, optional `input_schema`, and optional `rbac_roles` are valid. REST declarations must not contain model, prompt, planning, child-skill, linter, or output-schema fields. `rest` accepts only boolean `true`; omit it for model-backed YAML skills. If any REST manifests exist, startup requires exactly one `RestSkillHandler` bean.
+
+The handler receives a `RestSkillInvocation` after input validation and reference resolution. Its map/list containers are recursively immutable snapshots; null values and resolved Spring `Resource` leaves are preserved, but Resource contents are not promised immutable. Caller authentication is scoped to the actual handler thread and YAML roles are enforced. A null handler result fails, an empty string succeeds, and REST exceptions remain visible through the normal facade boundary rather than Java skill exception-to-text adaptation. Console identifies these declarations as `REST` and shows their YAML resource path/text under the exact matching framework/Console version policy.
 
 ### Annotation-defined Java skills
 
@@ -435,7 +455,7 @@ Distinct overloaded methods can declare distinct explicit names; same/default na
 
 Java execution uses the common skill mission, session, failure, and observer lifecycle without a framework model request or synthetic plan. Java declarations have no YAML prompt, output schema, or planning configuration. See [Java skills](agent-skills/loomspan-docs/references/java-api/java-skills.md) for the supported annotation and invocation contract.
 
-### Java and YAML authorization
+### Skill authorization
 
 Java skills support Spring JSR-250 `@RolesAllowed`, `@PermitAll`, and `@DenyAll`. Applications using any of these policies must enable actual enforcement:
 
@@ -449,7 +469,7 @@ Use Spring's `EnableMethodSecurity` and `jakarta.annotation.security` annotation
 
 Class/method/interface policy resolution follows Spring's unique annotation scanner. Missing or disabled JSR-250, unrelated proxies, and secured declarations without applicable advice fail startup. Caller authentication is propagated to the Java proxy in a fresh context and the exact previous context is restored after success or failure. Local allowlists remain mandatory even for `@PermitAll`, and Spring denials cannot become successful tool text. See [authorization](agent-skills/loomspan-docs/references/skill-authoring/authorization.md) for precise inheritance rules and scope boundaries.
 
-Console displays the declared source as YAML or Java. YAML details contain resource path and YAML text; Java details contain bean and declared method. Links and pagination use the registered skill name for both sources.
+Console displays the declared source as YAML, REST, or Java. YAML and REST details contain resource path and YAML text; Java details contain bean and declared method. Links and pagination use the registered skill name.
 
 ## Operations and limits
 

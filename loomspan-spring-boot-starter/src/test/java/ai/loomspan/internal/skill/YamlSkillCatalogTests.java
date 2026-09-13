@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -55,6 +56,59 @@ class YamlSkillCatalogTests {
                     throw new IllegalStateException("Failed to load application-test.yml", ex);
                 }
             });
+
+    @Test
+    void loadsRestSkillWithoutModel() throws Exception {
+        Path manifest = writeManifest("rest-valid.yaml", "name: restLookup\ndescription: REST lookup\nrest: true\n");
+        modelFreeContextRunner.withPropertyValues("loomspan.skills.locations=" + manifest.toUri()).run(context -> {
+            assertThat(context).hasNotFailed();
+            YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class).getSkill("restLookup");
+            assertThat(definition.rest()).isTrue();
+            assertThat(definition.executionConfiguration()).isNull();
+            assertThat(definition.hasGenericInputContract()).isTrue();
+        });
+    }
+
+    @TestFactory
+    List<DynamicTest> rejectsInvalidRestValuesAndForbiddenFieldsByPresence() {
+        List<String> invalidValues = List.of("false", "null", "'true'", "1", "[]", "{}");
+        List<DynamicTest> tests = new java.util.ArrayList<>();
+        for (String value : invalidValues) tests.add(DynamicTest.dynamicTest("rest=" + value, () -> {
+            Path manifest = writeManifest("rest-value-" + tests.size() + ".yaml",
+                    "name: invalidRest\ndescription: Invalid REST\nrest: " + value + "\n");
+            modelFreeContextRunner.withPropertyValues("loomspan.skills.locations=" + manifest.toUri()).run(context -> {
+                assertThat(context).hasFailed();
+                assertThat(context.getStartupFailure()).hasStackTraceContaining("invalidRest")
+                        .hasStackTraceContaining("field 'rest'").hasStackTraceContaining("omit 'rest'");
+            });
+        }));
+        Map<String, String> emptyValues = Map.ofEntries(
+                Map.entry("model", "''"), Map.entry("prompt", "''"), Map.entry("thinking_level", "''"),
+                Map.entry("allowed_skills", "[]"), Map.entry("planning_mode", "false"),
+                Map.entry("concurrency", "false"), Map.entry("max_steps", "0"), Map.entry("linter", "{}"),
+                Map.entry("output_schema", "{}"), Map.entry("output_schema_max_retries", "0"));
+        for (Map.Entry<String, String> field : emptyValues.entrySet()) {
+            for (String value : List.of("null", field.getValue())) {
+                tests.add(DynamicTest.dynamicTest("forbidden " + field.getKey() + "=" + value, () -> {
+                    Path manifest = writeManifest("rest-field-" + field.getKey() + "-" + tests.size() + ".yaml",
+                            "name: invalidRest\ndescription: Invalid REST\nrest: true\n" + field.getKey() + ": " + value + "\n");
+                    modelFreeContextRunner.withPropertyValues("loomspan.skills.locations=" + manifest.toUri()).run(context -> {
+                        assertThat(context).hasFailed();
+                        assertThat(context.getStartupFailure()).hasStackTraceContaining("invalidRest")
+                                .hasStackTraceContaining("field '" + field.getKey() + "'")
+                                .hasStackTraceContaining("not allowed for REST");
+                    });
+                }));
+            }
+        }
+        return tests;
+    }
+
+    private Path writeManifest(String name, String contents) throws IOException {
+        Path manifest = temporaryManifests.resolve(name);
+        Files.writeString(manifest, contents);
+        return manifest;
+    }
 
     @Test
     void acceptsProviderPortablePublicSkillNames() {

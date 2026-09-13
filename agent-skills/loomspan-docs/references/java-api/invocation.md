@@ -21,7 +21,7 @@ String invoke(String skillName, Map<String, Object> input,
               Consumer<SkillExecutionView> observer);
 ```
 
-`skillName` MUST identify a registered Java or YAML skill by its exact name.
+`skillName` MUST identify a registered Java, REST, or model-backed YAML skill by its exact name.
 For Java, this is the annotation name or the canonical method name when omitted.
 Bean names and method signatures are diagnostics, never invocation aliases.
 
@@ -76,7 +76,7 @@ session so authorization is evaluated with the caller's security context.
 The lifecycle is:
 
 ```text
-resolve exact Java or YAML skill
+resolve exact Java, REST, or model-backed YAML skill
     -> normalize object input to a map
     -> validate the skill input contract
     -> create and execute a new root session
@@ -90,8 +90,8 @@ observer throws, its exception propagates unchanged even though skill
 execution has completed. Keep observers small and reliable; move fallible or
 slow downstream work behind an application-owned handoff if needed.
 
-Java roots use the same mission and observer lifecycle without a framework model
-request. Java children are credited at the parent boundary only after success.
+Java and REST roots use the same mission and observer lifecycle without a framework model
+request. Direct children are credited at the parent boundary only after success. REST handler semantics are documented in [rest-skills.md](rest-skills.md).
 Read [authorization](../skill-authoring/authorization.md) for caller scope and proxy enforcement.
 
 Read [observation-and-errors.md](observation-and-errors.md) before persisting or
@@ -114,4 +114,3 @@ the real facade; see [compatibility-and-boundaries.md](compatibility-and-boundar
   protects observer timing and exception propagation.
 - `DefaultSkillTemplateTest#capturesCurrentSecurityContextAuthenticationForRootInvocation`
   protects security-context capture.
-

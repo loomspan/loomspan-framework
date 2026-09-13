@@ -26,10 +26,10 @@ An observer is called only after successful execution. It is not called for
 input validation or execution failures. The callback is synchronous, and its
 own exception propagates to the caller after execution has completed.
 
-Java and YAML roots both produce a skill mission and terminal outcome. Java
-execution does not create a model interaction merely for observation. Existing
+Java, REST, and model-backed YAML roots all produce a skill mission and terminal outcome. Java and REST
+execution do not create a model interaction merely for observation. Existing
 canonical mission-frame records project into `SKILL_STARTED` and `SKILL_FINISHED`
-events for both sources, so a Java-only root has a meaningful public observer
+events for both direct sources, so a Java- or REST-only root has a meaningful public observer
 view even without model or tool events.
 
 ## Execution Events
@@ -93,8 +93,8 @@ report caller input. Catch `SkillException` at a boundary that can add
 application context or choose a safe response. Do not collapse
 `AccessDeniedException` into an ordinary execution error. Java authorization
 denials do not receive success/task/evidence credit. Ordinary Java method
-exceptions retain their established exception-to-text behavior; this differs
-from failures that reach the facade and are safely wrapped.
+exceptions retain their established exception-to-text behavior; REST handler failures bypass
+that adapter and reach the facade for the handling above.
 
 ## Source Anchors
 
