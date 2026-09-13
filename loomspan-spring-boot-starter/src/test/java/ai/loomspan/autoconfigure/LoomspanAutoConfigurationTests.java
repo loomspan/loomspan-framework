@@ -22,7 +22,10 @@ import ai.loomspan.internal.skill.SkillVisibilityResolver;
 import ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration;
 import ai.loomspan.internal.skill.YamlSkillCatalog;
 import ai.loomspan.api.SkillTemplate;
+import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.internal.skillapi.DefaultSkillTemplate;
+import ai.loomspan.internal.security.DefaultAccessGuard;
+import ai.loomspan.internal.security.SkillRoleEvaluator;
 import ai.loomspan.internal.vfs.RefResolver;
 import ai.loomspan.internal.vfs.VirtualFileSystem;
 import org.junit.jupiter.api.Test;
@@ -128,6 +131,8 @@ class LoomspanAutoConfigurationTests {
                     assertThat(context).hasSingleBean(SkillInputContractResolver.class);
                     assertThat(context).hasSingleBean(SkillInputValidator.class);
                     assertThat(context).hasSingleBean(SkillTemplate.class);
+                    assertThat(context).hasSingleBean(SkillCatalog.class);
+                    assertThat(context).hasSingleBean(SkillRoleEvaluator.class);
                     assertThat(context.getBean(LoomspanProperties.class).getSession().getMaxDepth()).isEqualTo(5);
                 });
     }
@@ -145,6 +150,7 @@ class LoomspanAutoConfigurationTests {
                     SkillInputContractResolver inputContractResolver =
                             context.getBean(SkillInputContractResolver.class);
                     DefaultSkillTemplate skillTemplate = (DefaultSkillTemplate) context.getBean(SkillTemplate.class);
+                    DefaultAccessGuard accessGuard = (DefaultAccessGuard) context.getBean(ai.loomspan.internal.security.AccessGuard.class);
                     DefaultPlanningService planningService =
                             (DefaultPlanningService) context.getBean(PlanningService.class);
                     SkillMethodBeanPostProcessor beanPostProcessor =
@@ -158,6 +164,8 @@ class LoomspanAutoConfigurationTests {
                             .isSameAs(codecs.applicationConversion());
                     assertThat(ReflectionTestUtils.getField(skillTemplate, "objectMapper"))
                             .isSameAs(codecs.applicationConversion());
+                    assertThat(ReflectionTestUtils.getField(skillTemplate, "roleEvaluator"))
+                            .isSameAs(ReflectionTestUtils.getField(accessGuard, "evaluator"));
                     assertThat(ReflectionTestUtils.getField(planningService, "objectMapper"))
                             .isSameAs(codecs.planningJson());
                     assertThat(ReflectionTestUtils.getField(planningService, "yamlObjectMapper"))

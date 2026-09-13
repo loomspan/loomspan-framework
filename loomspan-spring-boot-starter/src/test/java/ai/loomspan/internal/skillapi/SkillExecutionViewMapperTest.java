@@ -5,12 +5,14 @@ import ai.loomspan.internal.core.ExecutionJournal;
 import ai.loomspan.internal.core.JournalEntry;
 import ai.loomspan.internal.core.JournalEntryType;
 import ai.loomspan.internal.core.JournalLevel;
+import ai.loomspan.internal.core.LoomspanSession;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SkillExecutionViewMapperTest
 {
@@ -53,6 +55,16 @@ class SkillExecutionViewMapperTest
         assertThat(view.events())
                 .allSatisfy(event -> assertThat(event.details().values())
                         .noneMatch(value -> value instanceof tools.jackson.databind.JsonNode));
+    }
+
+    @Test
+    void refusesToMapSessionWithoutRetainedFinalizedHistory()
+    {
+        LoomspanSession session = new LoomspanSession(3, "entry");
+
+        assertThatThrownBy(() -> mapper.map(session))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Finalized execution history is unavailable");
     }
 
     private JournalEntry entry(JournalLevel level, JournalEntryType type, tools.jackson.databind.JsonNode payload)

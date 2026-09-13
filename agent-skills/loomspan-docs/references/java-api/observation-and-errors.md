@@ -22,9 +22,11 @@ List<SkillExecutionEvent> events;
 The session ID is non-null and nonblank. The event list is immutable and is
 defensively copied; a null list normalizes to an empty list.
 
-An observer is called only after successful execution. It is not called for
-input validation or execution failures. The callback is synchronous, and its
-own exception propagates to the caller after execution has completed.
+An observer is called at most once with available completed history after success or a
+post-session execution failure. Pre-session rejection and validation-only calls produce no
+callback. Delivery is synchronous on the caller after execution binding restoration and
+before the same admitted root is released. History is not guaranteed when session
+finalization or mapping fails and does not depend on Console storage or trace persistence.
 
 Java, REST, and model-backed YAML roots all produce a skill mission and terminal outcome. Java and REST
 execution do not create a model interaction merely for observation. Existing
@@ -77,6 +79,7 @@ application callback.
 | Spring authentication failure at a Java proxy | Remains a failure; never successful tool text |
 | Runtime implementation failure | Safe `SkillException` message with the original cause |
 | Observer throws after success | The observer's runtime exception propagates unchanged |
+| Mapping or observer throws after execution failure | The original execution failure remains primary; the later failure is suppressed |
 | JVM `Error` | Not caught by the facade |
 
 `SkillException` extends `RuntimeException` and supports a message or a message
@@ -105,7 +108,10 @@ that adapter and reach the facade for the handling above.
 - `DefaultSkillTemplateTest#preservesAccessDeniedExceptionInstance` protects
   the authorization boundary.
 - `DefaultSkillTemplateTest#preservesExistingSkillExceptionInstance` and
-  `#wrapsOtherRuntimeFailureWithSafeSkillExceptionAndCause` protect wrapping.
+  `#executionFailureDeliversAvailableHistoryOnceWithoutChangingFacadeFailure`
+  protect exception passthrough, safe wrapping, and failure-history delivery.
+- `SkillExecutionViewMapperTest#refusesToMapSessionWithoutRetainedFinalizedHistory`
+  protects the available-history limit after finalization failure.
 - `DefaultSkillTemplateTest#doesNotCatchError` protects the fatal-error boundary.
 - `DefaultSkillTemplateTest#invalidInputDoesNotInvokeObserver` protects the
-  failed-invocation observer lifecycle.
+  pre-session invalid-input no-callback boundary.

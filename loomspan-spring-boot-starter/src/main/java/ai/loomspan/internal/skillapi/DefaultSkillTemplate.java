@@ -10,6 +10,7 @@ import ai.loomspan.internal.core.CapabilityRegistry;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.runtime.input.SkillInputValidationResult;
 import ai.loomspan.internal.runtime.input.SkillInputValidator;
+import ai.loomspan.internal.security.SkillRoleEvaluator;
 import ai.loomspan.api.SkillException;
 import ai.loomspan.api.SkillExecutionView;
 import ai.loomspan.api.SkillInputValidationException;
@@ -38,6 +39,7 @@ public class DefaultSkillTemplate implements SkillTemplate
     private final ObjectMapper objectMapper;
     private final SkillInputValidator inputValidator;
     private final SkillExecutionViewMapper executionViewMapper;
+    private final SkillRoleEvaluator roleEvaluator;
     private final SecurityContextHolderStrategy securityContextStrategy;
 
     public DefaultSkillTemplate(CapabilityRegistry capabilityRegistry,
@@ -45,16 +47,43 @@ public class DefaultSkillTemplate implements SkillTemplate
             LoomspanSessionRunner sessionRunner,
             ObjectMapper objectMapper,
             SkillInputValidator inputValidator,
+            SkillRoleEvaluator roleEvaluator,
             @Nullable SecurityContextHolderStrategy securityContextStrategy)
+    {
+        this(capabilityRegistry, executionRouter, sessionRunner, objectMapper, inputValidator,
+                roleEvaluator, securityContextStrategy, new SkillExecutionViewMapper(objectMapper));
+    }
+
+    DefaultSkillTemplate(CapabilityRegistry capabilityRegistry,
+            CapabilityExecutionRouter executionRouter,
+            LoomspanSessionRunner sessionRunner,
+            ObjectMapper objectMapper,
+            SkillInputValidator inputValidator,
+            SkillRoleEvaluator roleEvaluator,
+            @Nullable SecurityContextHolderStrategy securityContextStrategy,
+            SkillExecutionViewMapper executionViewMapper)
     {
         this.capabilityRegistry = Objects.requireNonNull(capabilityRegistry, "capabilityRegistry must not be null");
         this.executionRouter = Objects.requireNonNull(executionRouter, "executionRouter must not be null");
         this.sessionRunner = Objects.requireNonNull(sessionRunner, "sessionRunner must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.inputValidator = Objects.requireNonNull(inputValidator, "inputValidator must not be null");
-        this.executionViewMapper = new SkillExecutionViewMapper(objectMapper);
+        this.executionViewMapper = Objects.requireNonNull(executionViewMapper, "executionViewMapper must not be null");
+        this.roleEvaluator = Objects.requireNonNull(roleEvaluator, "roleEvaluator must not be null");
         this.securityContextStrategy = securityContextStrategy == null
                 ? SecurityContextHolder.getContextHolderStrategy() : securityContextStrategy;
+    }
+
+    @Override
+    public void validate(String skillName, Object input)
+    {
+        validatePrepared(skillName, prepareObject(skillName, input));
+    }
+
+    @Override
+    public void validate(String skillName, Map<String, Object> input)
+    {
+        validatePrepared(skillName, prepareMap(skillName, input));
     }
 
     @Override
@@ -72,41 +101,24 @@ public class DefaultSkillTemplate implements SkillTemplate
     @Override
     public String invoke(String skillName, Object input, Consumer<SkillExecutionView> observer)
     {
-        if (input == null)
-        {
-            throw new SkillInputValidationException("Skill input must not be null.", List.of());
-        }
-        Map<String, Object> convertedInput;
-        try
-        {
-            convertedInput = objectMapper.convertValue(input, MAP_TYPE);
-        }
-        catch (RuntimeException ex)
-        {
-            throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
-        }
-        return invoke(skillName, convertedInput, observer);
+        return invokePrepared(skillName, prepareObject(skillName, input), observer);
     }
 
     @Override
     public String invoke(String skillName, Map<String, Object> input, Consumer<SkillExecutionView> observer)
     {
-        CapabilityMetadata capability;
-        SkillInputValidationResult validation;
+        return invokePrepared(skillName, prepareMap(skillName, input), observer);
+    }
+
+    private PreparedInput prepareObject(String skillName, Object input)
+    {
+        if (input == null)
+        {
+            throw new SkillInputValidationException("Skill input must not be null.", List.of());
+        }
         try
         {
-            capability = requireSkill(skillName);
-            SkillInputContract contract = capability.inputContract();
-            Map<String, Object> safeInput = normalizeNullInput(input, contract);
-            validation = inputValidator.validate(safeInput, contract);
-
-            if (!validation.valid())
-            {
-                List<SkillInputValidationIssue> issues = validation.issues().stream()
-                        .map(issue -> new SkillInputValidationIssue(issue.path(), issue.code(), issue.message()))
-                        .toList();
-                throw new SkillInputValidationException(buildValidationMessage(skillName, validation), issues);
-            }
+            return prepareMap(skillName, objectMapper.convertValue(input, MAP_TYPE));
         }
         catch (AccessDeniedException | SkillException ex)
         {
@@ -116,16 +128,62 @@ public class DefaultSkillTemplate implements SkillTemplate
         {
             throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
         }
+    }
 
+    private PreparedInput prepareMap(String skillName, Map<String, Object> input)
+    {
+        try
+        {
+            CapabilityMetadata capability = requireSkill(skillName);
+            SkillInputContract contract = capability.inputContract();
+            SkillInputValidationResult validation = inputValidator.validate(normalizeNullInput(input, contract), contract);
+            if (!validation.valid())
+            {
+                List<SkillInputValidationIssue> issues = validation.issues().stream()
+                        .map(issue -> new SkillInputValidationIssue(issue.path(), issue.code(), issue.message()))
+                        .toList();
+                throw new SkillInputValidationException(buildValidationMessage(skillName, validation), issues);
+            }
+            return new PreparedInput(capability, validation);
+        }
+        catch (AccessDeniedException | SkillException ex)
+        {
+            throw ex;
+        }
+        catch (RuntimeException ex)
+        {
+            throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+        }
+    }
+
+    private void validatePrepared(String skillName, PreparedInput prepared)
+    {
+        try
+        {
+            Authentication authentication = securityContextStrategy.getContext().getAuthentication();
+            roleEvaluator.checkAccess(prepared.capability().name(), prepared.capability().accessPolicy(), authentication);
+        }
+        catch (AccessDeniedException | SkillException ex)
+        {
+            throw ex;
+        }
+        catch (RuntimeException ex)
+        {
+            throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+        }
+    }
+
+    private String invokePrepared(String skillName, PreparedInput prepared, Consumer<SkillExecutionView> observer)
+    {
         try
         {
             Authentication authentication = securityContextStrategy.getContext().getAuthentication();
             return sessionRunner.callWithNewSession(
-                    capability.name(), authentication,
-                    session -> executeValidated(capability, validation, session),
-                    (execution, session) -> {
+                    prepared.capability().name(), authentication,
+                    session -> executeValidated(prepared.capability(), prepared.validation(), session),
+                    (result, session, failure) -> {
                         if (observer != null) observer.accept(executionViewMapper.map(session));
-                        return execution.result();
+                        return result;
                     });
         }
         catch (LoomspanSessionRunner.CompletionPhaseFailure ex)
@@ -142,12 +200,12 @@ public class DefaultSkillTemplate implements SkillTemplate
         }
     }
 
-    private ExecutionResult executeValidated(CapabilityMetadata capability,
+    private String executeValidated(CapabilityMetadata capability,
             SkillInputValidationResult validation,
             LoomspanSession session)
     {
         Object result = executionRouter.execute(capability, validation.normalizedInput(), session, null);
-        return new ExecutionResult(String.valueOf(result), session);
+        return String.valueOf(result);
     }
 
     private CapabilityMetadata requireSkill(String skillName)
@@ -190,7 +248,7 @@ public class DefaultSkillTemplate implements SkillTemplate
         return "Invalid input for skill '" + skillName + "': " + detail;
     }
 
-    private record ExecutionResult(String result, LoomspanSession session)
+    private record PreparedInput(CapabilityMetadata capability, SkillInputValidationResult validation)
     {
     }
 }

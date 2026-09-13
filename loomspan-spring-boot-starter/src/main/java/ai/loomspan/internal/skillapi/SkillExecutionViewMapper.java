@@ -31,7 +31,10 @@ final class SkillExecutionViewMapper
 
     SkillExecutionView map(LoomspanSession session)
     {
-        return map(session.getSessionId(), session.getExecutionJournal());
+        ExecutionJournal journal = session.getFinalizedExecutionJournal()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Finalized execution history is unavailable for session '" + session.getSessionId() + "'"));
+        return map(session.getSessionId(), journal);
     }
 
     SkillExecutionView map(String sessionId, ExecutionJournal journal)

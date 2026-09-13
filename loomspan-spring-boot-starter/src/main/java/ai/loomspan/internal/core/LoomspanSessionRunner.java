@@ -15,7 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.BiFunction;
 import tools.jackson.databind.ObjectMapper;
 
 public class LoomspanSessionRunner
@@ -194,7 +193,7 @@ public class LoomspanSessionRunner
     {
         Objects.requireNonNull(action, "action must not be null");
         executeRoot(entrySkill, authentication, session -> { action.accept(session); return null; },
-                (ignored, session) -> null);
+                (ignored, session, failure) -> null);
     }
 
     public <T> T callWithNewSession(String entrySkill, Function<LoomspanSession, T> action)
@@ -204,17 +203,17 @@ public class LoomspanSessionRunner
 
     public <T> T callWithNewSession(String entrySkill, @Nullable Authentication authentication, Function<LoomspanSession, T> action)
     {
-        return callWithNewSession(entrySkill, authentication, action, (result, session) -> result);
+        return callWithNewSession(entrySkill, authentication, action, (result, session, failure) -> result);
     }
 
     public <T, R> R callWithNewSession(String entrySkill, @Nullable Authentication authentication,
-            Function<LoomspanSession, T> action, BiFunction<T, LoomspanSession, R> completion)
+            Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
     {
         return executeRoot(entrySkill, authentication, action, completion);
     }
 
     private <T, R> R executeRoot(String entrySkill, @Nullable Authentication authentication,
-            Function<LoomspanSession, T> action, BiFunction<T, LoomspanSession, R> completion)
+            Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
     {
         Objects.requireNonNull(action, "action must not be null");
         Objects.requireNonNull(completion, "completion must not be null");
@@ -238,20 +237,39 @@ public class LoomspanSessionRunner
                 () -> UUID.randomUUID().toString(),
                 canonicalTraceMapper);
             if (root != null) session.attachAdmittedRoot(root);
-            T result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session), () ->
+            T result;
+            try
             {
-                Throwable failure = null;
-                try { return action.apply(session); }
-                catch (RuntimeException | Error ex) { failure = ex; throw ex; }
-                finally { completeSession(session, failure); }
-            });
-            try { return completion.apply(result, session); }
+                result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session), () ->
+                {
+                    Throwable failure = null;
+                    try { return action.apply(session); }
+                    catch (RuntimeException | Error ex) { failure = ex; throw ex; }
+                    finally { completeSession(session, failure); }
+                });
+            }
+            catch (RuntimeException | Error failure)
+            {
+                try { completion.complete(null, session, failure); }
+                catch (RuntimeException | Error completionFailure)
+                {
+                    if (completionFailure != failure) failure.addSuppressed(completionFailure);
+                }
+                throw failure;
+            }
+            try { return completion.complete(result, session, null); }
             catch (RuntimeException ex) { throw new CompletionPhaseFailure(ex); }
         }
         finally
         {
             if (root != null) root.close();
         }
+    }
+
+    @FunctionalInterface
+    public interface RootCompletion<T, R>
+    {
+        R complete(@Nullable T result, LoomspanSession session, @Nullable Throwable failure);
     }
 
     public static final class CompletionPhaseFailure extends RuntimeException

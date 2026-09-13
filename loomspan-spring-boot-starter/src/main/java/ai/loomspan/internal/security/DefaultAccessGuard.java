@@ -42,10 +42,9 @@ public class DefaultAccessGuard implements AccessGuard
     @Override
     public void checkAccess(CapabilityMetadata capability, LoomspanSession session, @Nullable Authentication invocationAuthentication)
     {
-        if (!canAccess(capability, session, invocationAuthentication))
-        {
-            throw new AccessDeniedException("Access denied for capability '" + capability.name() + "'");
-        }
+        Objects.requireNonNull(capability, "capability must not be null");
+        evaluator.checkAccess(capability.name(), capability.accessPolicy(),
+                resolveAuthentication(invocationAuthentication, session));
     }
 
 }

@@ -49,7 +49,7 @@ The Java signature and parameter metadata supply the input contract for root val
 
 Java results retain Jackson serialization into the facade's textual result. Java declarations do not have a YAML output schema, prompt, model, or planning configuration. A Java method may implement application-owned I/O, but Loomspan itself makes no model request to execute that Java skill.
 
-Java roots and children use the common mission lifecycle. Root observers receive the completed session after success. Java children retain the enclosing tool boundary, and only successful completion contributes their exact direct name to task/evidence accounting. Parent mission state resumes after return or failure.
+Java roots and children use the common mission lifecycle. Root observers receive available completed history after success or post-session failure. Java children retain the enclosing tool boundary, and only successful completion contributes their exact direct name to task/evidence accounting. Parent mission state resumes after return or failure.
 
 Java work uses the same bounded mission submission, timeout, interruption, and cleanup path as model execution. A timed-out or interrupted invocation closes its mission and fences late runtime writes, even if application code ignores interruption. This does not undo application side effects; Java implementations SHOULD honor cancellation and provide their own I/O bounds.
 

@@ -15,6 +15,38 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ApplicationApiValueTest
 {
     @Test
+    void publicCatalogAndValidationExposeOnlyTheTicketedShape() throws Exception
+    {
+        assertThat(SkillKind.values()).containsExactly(SkillKind.YAML, SkillKind.JAVA, SkillKind.REST);
+        assertThat(SkillDescriptor.class.getRecordComponents())
+                .extracting(component -> List.of(component.getName(), component.getType()))
+                .containsExactly(
+                        List.of("name", String.class),
+                        List.of("description", String.class),
+                        List.of("kind", SkillKind.class),
+                        List.of("inputSchema", String.class));
+        assertThat(SkillCatalog.class.getDeclaredMethods())
+                .extracting(java.lang.reflect.Method::getName)
+                .containsExactlyInAnyOrder("skills", "skill");
+        var skillsMethod = SkillCatalog.class.getMethod("skills");
+        assertThat(skillsMethod.getParameterTypes()).isEmpty();
+        assertThat(skillsMethod.getReturnType()).isEqualTo(List.class);
+        assertThat(skillsMethod.getGenericReturnType().getTypeName())
+                .isEqualTo("java.util.List<ai.loomspan.api.SkillDescriptor>");
+        var skillMethod = SkillCatalog.class.getMethod("skill", String.class);
+        assertThat(skillMethod.getParameterTypes()).containsExactly(String.class);
+        assertThat(skillMethod.getReturnType()).isEqualTo(java.util.Optional.class);
+        assertThat(skillMethod.getGenericReturnType().getTypeName())
+                .isEqualTo("java.util.Optional<ai.loomspan.api.SkillDescriptor>");
+        assertThat(SkillTemplate.class.getMethod("validate", String.class, Object.class).getReturnType())
+                .isEqualTo(void.class);
+        assertThat(SkillTemplate.class.getMethod("validate", String.class, Map.class).getReturnType())
+                .isEqualTo(void.class);
+        assertThatThrownBy(() -> new SkillDescriptor(" ", "description", SkillKind.YAML, "{}"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void restInvocationDeeplyCopiesContainersAndPreservesLeavesAndNulls()
     {
         Object leaf = new ByteArrayResource(new byte[] {1, 2, 3});

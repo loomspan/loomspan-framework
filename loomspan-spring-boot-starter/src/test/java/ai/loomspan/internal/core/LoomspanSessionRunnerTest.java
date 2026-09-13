@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -454,6 +455,48 @@ class LoomspanSessionRunnerTest {
     @Test
     void usesCoreFailureDispositionWhenRetentionDeletionFailsAfterCompletedFlag() throws Exception {
         assertInjectedFinalizationFailure(true);
+    }
+
+    @Test
+    void finalizationFailureLeavesHistoryUnavailableWhilePreservingActionFailure() throws Exception
+    {
+        DefaultExecutionObservationHandleFactory observation =
+                new DefaultExecutionObservationHandleFactory();
+        AtomicReference<Path> tracePath = new AtomicReference<>();
+        InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, policy, clock, handle) -> {
+            ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle delegate =
+                    new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                            sessionId, entrySkill, TracePersistencePolicy.ALWAYS, clock, handle);
+            tracePath.set(delegate.tracePath());
+            return new FailingFinalizationTraceHandle(delegate, true);
+        };
+        LoomspanSessionRunner runner = new LoomspanSessionRunner(
+                4, TracePersistencePolicy.ALWAYS, Clock.systemUTC(), observation, traceFactory);
+        IllegalStateException actionFailure = new IllegalStateException("application failed");
+        AtomicInteger completionCalls = new AtomicInteger();
+        AtomicReference<java.util.Optional<ExecutionJournal>> finalizedJournal = new AtomicReference<>();
+
+        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", null, session -> {
+            throw actionFailure;
+        }, (result, session, failure) -> {
+            completionCalls.incrementAndGet();
+            finalizedJournal.set(session.getFinalizedExecutionJournal());
+            return null;
+        })).isSameAs(actionFailure);
+
+        try
+        {
+            assertThat(completionCalls).hasValue(1);
+            assertThat(finalizedJournal.get()).isEmpty();
+            assertThat(actionFailure.getSuppressed()).hasSize(1);
+            assertThat(actionFailure.getSuppressed()[0])
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Failed to finalize execution trace");
+        }
+        finally
+        {
+            Files.deleteIfExists(tracePath.get());
+        }
     }
 
     @Test

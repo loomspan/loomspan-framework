@@ -1,12 +1,16 @@
 package ai.loomspan.integration;
 
 import ai.loomspan.api.SkillExecutionView;
+import ai.loomspan.api.SkillCatalog;
+import ai.loomspan.api.SkillException;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.api.SkillMethod;
 import ai.loomspan.api.SkillParam;
 import ai.loomspan.api.SkillTemplate;
 import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.RestSkillInvocation;
 import ai.loomspan.autoconfigure.LoomspanAutoConfiguration;
+import jakarta.annotation.security.RolesAllowed;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -20,6 +24,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -79,13 +84,29 @@ class SupportedSurfaceIntegrationTest
                     .run(context -> {
                         assertThat(context).hasNotFailed();
                         assertThat(context).hasSingleBean(SkillTemplate.class);
+                        assertThat(context).hasSingleBean(SkillCatalog.class);
 
                         SkillTemplate skills = context.getBean(SkillTemplate.class);
+                        SkillCatalog catalog = context.getBean(SkillCatalog.class);
+                        assertThat(catalog.skills()).extracting(descriptor -> descriptor.name())
+                                .isSorted()
+                                .contains("supportedSurfaceSkill", "supportedJavaLeaf", "supportedRestLeaf");
+                        assertThat(catalog.skill("supportedJavaLeaf")).get()
+                                .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.JAVA);
+                        assertThat(catalog.skill("supportedRestLeaf")).get()
+                                .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.REST);
+                        assertThat(catalog.skill("supportedSurfaceSkill")).get()
+                                .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.YAML);
+                        assertThat(catalog.skill("missing")).isEmpty();
                         AtomicReference<SkillExecutionView> observed = new AtomicReference<>();
                         var authorized = UsernamePasswordAuthenticationToken.authenticated(
                                 "supported-caller", "unused", AuthorityUtils.createAuthorityList("ROLE_REST_USER"));
                         try {
                             SecurityContextHolder.getContext().setAuthentication(authorized);
+                            skills.validate("supportedSurfaceSkill",
+                                    Map.of("message", "hello through the public API"));
+                            skills.validate("supportedJavaLeaf", new DirectRequest("precheck"));
+                            skills.validate("supportedRestLeaf", new DirectRequest("precheck"));
                             assertThat(skills.invoke(
                                     "supportedSurfaceSkill",
                                     Map.of("message", "hello through the public API"),
@@ -111,13 +132,32 @@ class SupportedSurfaceIntegrationTest
                             assertThat(SupportedSkillConfiguration.handlerAuthentication).hasValue("supported-caller");
                             int authorizedCalls = SupportedSkillConfiguration.handlerCalls.get();
 
+                            AtomicReference<SkillExecutionView> failedView = new AtomicReference<>();
+                            assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
+                                    "supportedRestLeaf", Map.of("message", "fail"), failedView::set)))
+                                    .isInstanceOf(SkillException.class)
+                                    .hasMessage("Skill 'supportedRestLeaf' execution failed.");
+                            assertThat(failedView.get()).isNotNull();
+                            assertThat(failedView.get().events()).isNotEmpty();
+
                             SecurityContextHolder.getContext().setAuthentication(
                                     UsernamePasswordAuthenticationToken.authenticated(
                                             "denied-caller", "unused", AuthorityUtils.NO_AUTHORITIES));
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(
-                                    () -> skills.invoke("supportedRestLeaf", Map.of("message", "denied"))))
+                                    () -> skills.validate("supportedRestLeaf", Map.of("message", "denied"))))
                                     .isInstanceOf(AccessDeniedException.class);
-                            assertThat(SupportedSkillConfiguration.handlerCalls).hasValue(authorizedCalls);
+                            assertThat(org.assertj.core.api.Assertions.catchThrowable(
+                                    () -> skills.validate("supportedJavaLeaf", Map.of("message", "denied"))))
+                                    .isInstanceOf(AccessDeniedException.class);
+                            AtomicReference<SkillExecutionView> rejectedView = new AtomicReference<>();
+                            assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
+                                    "supportedRestLeaf", Map.of("message", "denied"), rejectedView::set)))
+                                    .isInstanceOf(AccessDeniedException.class)
+                                    .hasMessage("Access denied for capability 'supportedRestLeaf'");
+                            assertThat(rejectedView.get()).isNotNull();
+                            assertThat(rejectedView.get().events()).extracting(event -> event.type())
+                                    .contains("ERROR");
+                            assertThat(SupportedSkillConfiguration.handlerCalls).hasValue(authorizedCalls + 1);
                         }
                         finally {
                             SecurityContextHolder.clearContext();
@@ -142,6 +182,7 @@ class SupportedSurfaceIntegrationTest
     }
 
     @Configuration(proxyBeanMethods = false)
+    @EnableMethodSecurity(jsr250Enabled = true)
     static class SupportedSkillConfiguration
     {
         private static final AtomicReference<String> handlerAuthentication = new AtomicReference<>();
@@ -161,6 +202,10 @@ class SupportedSurfaceIntegrationTest
                 handlerCalls.incrementAndGet();
                 handlerAuthentication.set(SecurityContextHolder.getContext().getAuthentication().getName());
                 lastInvocation.set(invocation);
+                if ("fail".equals(invocation.input().get("message")))
+                {
+                    throw new IllegalStateException("application REST failure");
+                }
                 return "REST: " + invocation.input().get("message");
             };
         }
@@ -169,9 +214,14 @@ class SupportedSurfaceIntegrationTest
     static class SupportedTarget
     {
         @SkillMethod(name = "supportedJavaLeaf", description = "Echo a message through an application-owned Java leaf.")
+        @RolesAllowed("REST_USER")
         String echo(@SkillParam(description = "Message supplied by the parent skill.") String message)
         {
             return "Java: " + message;
         }
+    }
+
+    private record DirectRequest(String message)
+    {
     }
 }

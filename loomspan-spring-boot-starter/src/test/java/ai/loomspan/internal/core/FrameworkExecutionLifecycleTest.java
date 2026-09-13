@@ -107,13 +107,116 @@ class FrameworkExecutionLifecycleTest
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
                 new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
 
-        String value = runner.callWithNewSession("entry", null, session -> "done", (result, session) -> {
+        String value = runner.callWithNewSession("entry", null, session -> "done", (result, session, failure) -> {
             assertThat(ExecutionBindingScope.current()).isEmpty();
             assertThat(lifecycle.activeRootCount()).isOne();
             return result;
         });
 
         assertThat(value).isEqualTo("done");
+        assertThat(lifecycle.activeRootCount()).isZero();
+        lifecycle.destroy();
+    }
+
+    @Test
+    void failureCompletionOccursOnceAfterBindingRestorationAndBeforeRootRelease()
+    {
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(5), executor);
+        var codecs = LoomspanJacksonCodecs.defaults();
+        var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
+                NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+        IllegalStateException failure = new IllegalStateException("failed");
+        AtomicLong callbacks = new AtomicLong();
+        AtomicBoolean resultWasNull = new AtomicBoolean();
+        AtomicReference<Throwable> observedFailure = new AtomicReference<>();
+        AtomicBoolean journalWasAvailable = new AtomicBoolean();
+        AtomicBoolean bindingWasRestored = new AtomicBoolean();
+        AtomicLong rootsDuringCompletion = new AtomicLong();
+
+        assertThatThrownBy(() -> runner.callWithNewSession("entry", null, session -> {
+            throw failure;
+        }, (result, session, completionFailure) -> {
+            callbacks.incrementAndGet();
+            resultWasNull.set(result == null);
+            observedFailure.set(completionFailure);
+            journalWasAvailable.set(session.getFinalizedExecutionJournal().isPresent());
+            bindingWasRestored.set(ExecutionBindingScope.current().isEmpty());
+            rootsDuringCompletion.set(lifecycle.activeRootCount());
+            return null;
+        })).isSameAs(failure);
+
+        assertThat(callbacks).hasValue(1);
+        assertThat(resultWasNull).isTrue();
+        assertThat(observedFailure).hasValue(failure);
+        assertThat(journalWasAvailable).isTrue();
+        assertThat(bindingWasRestored).isTrue();
+        assertThat(rootsDuringCompletion).hasValue(1);
+        assertThat(lifecycle.activeRootCount()).isZero();
+        lifecycle.destroy();
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void shutdownWaitsForSlowFailureCompletionUnderOneRoot() throws Exception
+    {
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(2), executor);
+        var codecs = LoomspanJacksonCodecs.defaults();
+        var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
+                NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+        var completionEntered = new CountDownLatch(1);
+        var releaseCompletion = new CountDownLatch(1);
+        var invocationFailure = new AtomicReference<Throwable>();
+        var completionThread = new AtomicReference<Thread>();
+        var stopReturned = new AtomicBoolean();
+        IllegalStateException failure = new IllegalStateException("failed");
+
+        Thread caller = Thread.ofVirtual().start(() -> {
+            try
+            {
+                runner.callWithNewSession("entry", null, session -> {
+                    throw failure;
+                }, (result, session, observedFailure) -> {
+                    completionThread.set(Thread.currentThread());
+                    completionEntered.countDown();
+                    try { releaseCompletion.await(); }
+                    catch (InterruptedException ex) { Thread.currentThread().interrupt(); }
+                    return null;
+                });
+            }
+            catch (Throwable ex)
+            {
+                invocationFailure.set(ex);
+            }
+        });
+        assertThat(completionEntered.await(1, TimeUnit.SECONDS)).isTrue();
+        Thread stopper = Thread.ofVirtual().start(() -> {
+            lifecycle.stop();
+            stopReturned.set(true);
+        });
+
+        try
+        {
+            Thread.sleep(25L);
+            assertThat(stopReturned).isFalse();
+            assertThat(lifecycle.activeRootCount()).isOne();
+            assertThat(completionThread).hasValue(caller);
+        }
+        finally
+        {
+            releaseCompletion.countDown();
+        }
+        caller.join(Duration.ofSeconds(1));
+        stopper.join(Duration.ofSeconds(1));
+        assertThat(caller.isAlive()).isFalse();
+        assertThat(stopper.isAlive()).isFalse();
+        assertThat(invocationFailure).hasValue(failure);
+        assertThat(stopReturned).isTrue();
         assertThat(lifecycle.activeRootCount()).isZero();
         lifecycle.destroy();
     }

@@ -138,10 +138,11 @@ By default, Loomspan discovers `classpath:/skills/**/*.yaml`. Add the `.yml` pat
 
 ### Invoking a skill
 
-Inject `SkillTemplate` and invoke a Java, model-backed YAML, or REST skill with a map (or an object that can be converted to a map). The result is returned as text; use a YAML `output_schema` for model-backed structured output. Java results retain Jackson serialization and REST results are returned unchanged by the application handler.
+Inject `SkillCatalog` to discover the eager, exact-name-sorted snapshot of every registered Java, model-backed YAML, and REST skill. The catalog is immutable and unfiltered: discovery does not authorize a caller. Inject `SkillTemplate` to validate or invoke a skill with a map (or an object that can be converted to a map). The result is returned as text; use a YAML `output_schema` for model-backed structured output. Java results retain Jackson serialization and REST results are returned unchanged by the application handler.
 
 ```java
 import ai.loomspan.api.SkillTemplate;
+import ai.loomspan.api.SkillCatalog;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -149,25 +150,30 @@ import java.util.Map;
 @Service
 public class InvoiceWorkflow {
     private final SkillTemplate skills;
+    private final SkillCatalog catalog;
 
-    public InvoiceWorkflow(SkillTemplate skills) {
+    public InvoiceWorkflow(SkillTemplate skills, SkillCatalog catalog) {
         this.skills = skills;
+        this.catalog = catalog;
     }
 
     public String checkInvoice(String invoiceText) {
+        skills.validate("duplicateInvoiceChecker", Map.of("payload", invoiceText));
         return skills.invoke("duplicateInvoiceChecker", Map.of("payload", invoiceText));
     }
 }
 ```
 
-The supported starter Java API is closed to these ten types in `ai.loomspan.api`: `SkillTemplate`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `RestSkillHandler`, `RestSkillInvocation`, `SkillException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. `RestSkillHandler` is the sole supported SPI; it does not make any framework bean replaceable. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API.
+`validate` has Map and Object overloads and performs exact lookup, conversion/input validation, and root authorization against the calling authentication without creating a session, trace, callback, execution, or quota use. It is an advisory pre-dispatch check: it reserves no admission, checks no nested child, and `invoke` independently repeats validation and authorization at execution time. A null Object is always rejected; a null Map is accepted only by a generic or empty-permitting contract. Catalog schemas are the exact registered JSON tool schemas shown to models.
+
+The supported starter Java API is closed to these thirteen types in `ai.loomspan.api`: `SkillTemplate`, `SkillCatalog`, `SkillDescriptor`, `SkillKind`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `RestSkillHandler`, `RestSkillInvocation`, `SkillException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. `RestSkillHandler` is the sole supported SPI; it does not make any framework bean replaceable. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API.
 
 The installable [Java API knowledge set](agent-skills/loomspan-docs/references/java-api/README.md)
 provides LLM-oriented routing and source-verified guidance for this surface.
 
 For integration testing, configure a real or local protocol-compatible named connection and invoke the YAML skill through `SkillTemplate`. Loomspan's supported-surface integration test follows this pattern: it supplies a local OpenAI-compatible endpoint through `loomspan.connections`, invokes an LLM-backed YAML skill that calls both an annotation-defined Java leaf and an application-handled REST leaf, directly invokes the REST leaf, and observes only public API values. Tests should not replace internal resolvers, coordinators, model factories, registries, or virtual-file-system beans.
 
-Successful observers receive a session ID and immutable, current-version `SkillExecutionEvent` values. These events are intended for trusted development and debugging, may contain application business data, and are not a durable or comprehensively sanitized trace contract. Invalid caller input raises `SkillInputValidationException`, authorization failures remain Spring Security `AccessDeniedException`, and other runtime failures crossing the facade become a safe `SkillException`.
+Observers receive at most one available completed view after success or a post-session execution failure. Delivery is synchronous on the caller after binding restoration and before root release; pre-session rejection and every `validate` call produce no callback. Failure-history mapping or observer errors never replace the original execution failure, while an observer error after successful execution propagates unchanged. Views contain immutable, current-version `SkillExecutionEvent` values intended for trusted development and debugging; they may contain application business data and are not a durable, guaranteed, or comprehensively sanitized history contract. Invalid caller input raises `SkillInputValidationException`, authorization failures remain Spring Security `AccessDeniedException`, and other runtime failures crossing the facade become a safe `SkillException`.
 
 ## Defining Skills
 
@@ -498,7 +504,7 @@ execution-trace:
 
 `loomspan.shutdown.timeout` is the single framework shutdown budget and must be a positive YAML duration. When the owning Spring application context begins closing, Loomspan atomically rejects new top-level skill invocations before constructing their sessions. Roots already admitted may continue nested skill work, subject to their ordinary mission timeouts, quotas, and depth limits.
 
-The budget starts when root admission closes and covers admitted execution, trace finalization, caller-thread public-view mapping and success observation, cutoff, and framework mission-executor cleanup. Loomspan's close-event listener returns promptly; bounded waiting occurs in the following Spring lifecycle-stop stage so resources required by admitted work remain available until completion or cutoff. Other application listeners remain independent and their ordering is not a Loomspan contract. This bound covers Loomspan-owned shutdown work, not unrelated application hooks or the lifetime of the JVM.
+The budget starts when root admission closes and covers admitted execution, trace finalization, caller-thread public-view mapping and success or available-failure observation, cutoff, and framework mission-executor cleanup. Loomspan's close-event listener returns promptly; bounded waiting occurs in the following Spring lifecycle-stop stage so resources required by admitted work remain available until completion or cutoff. Other application listeners remain independent and their ordering is not a Loomspan contract. This bound covers Loomspan-owned shutdown work, not unrelated application hooks or the lifetime of the JVM.
 
 When Micrometer is on the application classpath, Loomspan records usage metrics automatically. Execution traces and the `SkillTemplate` observer callback can be used to inspect a completed skill execution.
 

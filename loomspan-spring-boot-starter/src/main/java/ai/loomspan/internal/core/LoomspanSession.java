@@ -510,6 +510,20 @@ public final class LoomspanSession
         }
     }
 
+    @JsonIgnore
+    public Optional<ExecutionJournal> getFinalizedExecutionJournal()
+    {
+        lock.lock();
+        try
+        {
+            return Optional.ofNullable(finalizedExecutionJournal);
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+
     @JsonProperty("executionJournal")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public ExecutionJournal getSerializedExecutionJournal()

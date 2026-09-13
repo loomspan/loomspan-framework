@@ -9,12 +9,15 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the ten types in the closed
+Application code MAY depend on the thirteen types in the closed
 `ai.loomspan.api` allowlist:
 
 | Type | Supported purpose |
 | --- | --- |
-| `SkillTemplate` | Invoke a named Java, REST, or model-backed YAML skill |
+| `SkillTemplate` | Validate or invoke a named Java, REST, or model-backed YAML skill |
+| `SkillCatalog` | Discover the immutable startup snapshot of registered skills |
+| `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
+| `SkillKind` | Distinguish YAML, Java, and REST registrations |
 | `SkillExecutionView` | Observe the completed invocation session |
 | `SkillExecutionEvent` | Read a current-version diagnostic event |
 | `SkillMethod` | Mark an application bean method as a directly callable Java skill |
@@ -28,6 +31,20 @@ Application code MAY depend on the ten types in the closed
 Changes to these types are compatibility-sensitive. Application code SHOULD
 still use the narrowest type needed: inject or mock `SkillTemplate`, use the
 annotations on application-owned beans, and consume the public value records.
+
+## Compatibility Changes in This Revision
+
+The three catalog types are additive. The two `SkillTemplate.validate`
+methods are an intentional pre-1.0 source- and binary-sensitive interface
+change: application implementations and hand-written fakes or mocks of
+`SkillTemplate` MUST add both methods and recompile. There is no default-method
+compatibility shim.
+
+Observers passed to `SkillTemplate.invoke` now receive a callback for mappable
+post-session failures as well as successes. Applications upgrading from the
+earlier success-only behavior SHOULD make observer handling idempotent and
+MUST apply the same security and retention policy to both outcomes. There is no
+success-only compatibility mode.
 
 ## Unsupported Dependencies
 
@@ -70,7 +87,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the `api` package has exactly the ten allowlisted public top-level types;
+- the `api` package has exactly the thirteen allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

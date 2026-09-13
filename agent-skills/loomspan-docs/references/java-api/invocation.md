@@ -9,8 +9,8 @@ coverage: source-verified
 
 ## Supported Facade
 
-Inject `ai.loomspan.api.SkillTemplate` into application code. It has
-four overloads:
+Inject `ai.loomspan.api.SkillTemplate` into application code. It has four invoke
+overloads and two advisory validation overloads:
 
 ```java
 String invoke(String skillName, Object input);
@@ -19,6 +19,8 @@ String invoke(String skillName, Object input,
               Consumer<SkillExecutionView> observer);
 String invoke(String skillName, Map<String, Object> input,
               Consumer<SkillExecutionView> observer);
+void validate(String skillName, Object input);
+void validate(String skillName, Map<String, Object> input);
 ```
 
 `skillName` MUST identify a registered Java, REST, or model-backed YAML skill by its exact name.
@@ -65,7 +67,9 @@ contract or a contract that permits an empty object; otherwise it raises
 when the skill deliberately takes no fields.
 
 Input is validated before a session is run. Invalid input does not execute the
-skill and does not call the observer.
+skill and does not call the observer. `validate` additionally checks root authorization
+using the calling authentication without creating a session or reserving admission;
+see [catalog and validation](catalog-and-validation.md).
 
 ## Invocation Lifecycle
 
@@ -73,22 +77,25 @@ Each invocation creates a new root Loomspan session. The implementation
 captures the current Spring Security `Authentication`, when present, into that
 session so authorization is evaluated with the caller's security context.
 
-The lifecycle is:
+Preparation preserves the overload-specific error order. The lifecycle is:
 
 ```text
-resolve exact Java, REST, or model-backed YAML skill
-    -> normalize object input to a map
-    -> validate the skill input contract
+Object input -> reject null -> convert with Jackson -> resolve the exact skill -> prepared map
+Map input -> resolve the exact skill -> normalize an allowed null map to {} -> prepared map
+prepared map -> validate the skill input contract
+    -> capture the calling authentication
     -> create and execute a new root session
+    -> finalize available execution history and restore the execution binding
     -> build the public execution view
-    -> call the optional observer
-    -> return the textual result
+    -> call the optional observer with available completed history
+    -> return the textual result or rethrow the execution failure
 ```
 
-The observer runs synchronously after successful skill execution. If the
-observer throws, its exception propagates unchanged even though skill
-execution has completed. Keep observers small and reliable; move fallible or
-slow downstream work behind an application-owned handoff if needed.
+The observer runs synchronously after session completion on success or a post-session
+failure when history can be mapped. If it throws after success, its exception propagates
+unchanged. On execution failure, mapping or observer failure is suppressed behind the
+original failure. Keep observers small and reliable because they remain within root
+ownership and the shutdown deadline.
 
 Java and REST roots use the same mission and observer lifecycle without a framework model
 request. Direct children are credited at the parent boundary only after success. REST handler semantics are documented in [rest-skills.md](rest-skills.md).

@@ -31,13 +31,16 @@ import ai.loomspan.internal.runtime.usage.SessionUsageService;
 import ai.loomspan.internal.runtime.usage.UsageMetricsRecorder;
 import ai.loomspan.internal.security.AccessGuard;
 import ai.loomspan.internal.security.DefaultAccessGuard;
+import ai.loomspan.internal.security.SkillRoleEvaluator;
 import ai.loomspan.internal.skill.DefaultSkillVisibilityResolver;
 import ai.loomspan.internal.skill.SkillVisibilityResolver;
 import ai.loomspan.internal.skill.YamlSkillCapabilityRegistrar;
 import ai.loomspan.internal.skill.YamlSkillCatalog;
 import ai.loomspan.internal.skillapi.DefaultSkillTemplate;
+import ai.loomspan.internal.skillapi.DefaultSkillCatalog;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import ai.loomspan.api.SkillTemplate;
+import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.internal.vfs.DefaultRefResolver;
 import ai.loomspan.internal.vfs.RefResolver;
 import ai.loomspan.internal.vfs.SessionLocalVirtualFileSystem;
@@ -204,12 +207,26 @@ public class LoomspanAutoConfiguration
 
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    AccessGuard accessGuard(
+    SkillCatalog skillCatalog(CapabilityRegistry capabilityRegistry,
+            YamlSkillCapabilityRegistrar yamlSkillCapabilityRegistrar)
+    {
+        return new DefaultSkillCatalog(capabilityRegistry, yamlSkillCapabilityRegistrar);
+    }
+
+    @Bean
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    SkillRoleEvaluator skillRoleEvaluator(
             ObjectProvider<org.springframework.security.config.core.GrantedAuthorityDefaults> defaults,
             ObjectProvider<org.springframework.security.access.hierarchicalroles.RoleHierarchy> hierarchy)
     {
-        return new DefaultAccessGuard(new ai.loomspan.internal.security.SkillRoleEvaluator(
-                defaults.getIfAvailable(), hierarchy.getIfAvailable()));
+        return new SkillRoleEvaluator(defaults.getIfAvailable(), hierarchy.getIfAvailable());
+    }
+
+    @Bean
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    AccessGuard accessGuard(SkillRoleEvaluator skillRoleEvaluator)
+    {
+        return new DefaultAccessGuard(skillRoleEvaluator);
     }
 
     @Bean
@@ -266,6 +283,7 @@ public class LoomspanAutoConfiguration
             LoomspanSessionRunner LoomspanSessionRunner,
             LoomspanJacksonCodecs codecs,
             SkillInputValidator skillInputValidator,
+            SkillRoleEvaluator skillRoleEvaluator,
             ObjectProvider<org.springframework.security.core.context.SecurityContextHolderStrategy> securityContextStrategy)
     {
         return new DefaultSkillTemplate(
@@ -274,6 +292,7 @@ public class LoomspanAutoConfiguration
                 LoomspanSessionRunner,
                 codecs.applicationConversion(),
                 skillInputValidator,
+                skillRoleEvaluator,
                 securityContextStrategy.getIfAvailable());
     }
 

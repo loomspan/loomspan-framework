@@ -36,7 +36,10 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.api.SkillInputValidationException",
             "ai.loomspan.api.SkillInputValidationIssue",
             "ai.loomspan.api.RestSkillHandler",
-            "ai.loomspan.api.RestSkillInvocation");
+            "ai.loomspan.api.RestSkillInvocation",
+            "ai.loomspan.api.SkillCatalog",
+            "ai.loomspan.api.SkillDescriptor",
+            "ai.loomspan.api.SkillKind");
 
     private static final Set<String> FRAMEWORK_INTEGRATION_TYPES = Set.of(
             "ai.loomspan.autoconfigure.LoomspanAutoConfiguration",
@@ -229,6 +232,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.runtime.observation.ObservationCompletionDisposition", "Public only for Java collaboration with the internal session finalization authority."),
             Map.entry("ai.loomspan.internal.runtime.observation.ReplayResult", "Public only for Java collaboration between internal observation and future application-adapter packages."),
             Map.entry("ai.loomspan.internal.runtime.observation.catalog.DefaultRegisteredSkillCatalog", "Public only for future framework-owned observability adapter composition."),
+            Map.entry("ai.loomspan.internal.skillapi.DefaultSkillCatalog", "Public only so auto-configuration can construct the immutable application catalog."),
             Map.entry("ai.loomspan.internal.runtime.observation.catalog.FinalizedTraceCatalog", "Public only for internal finalization and future adapter collaboration."),
             Map.entry("ai.loomspan.internal.runtime.observation.catalog.FinalizedTraceCatalogEntry", "Public only for internal observation and future adapter collaboration."),
             Map.entry("ai.loomspan.internal.runtime.observation.catalog.InMemoryFinalizedTraceCatalog", "Public only for framework-owned observability composition."),
@@ -278,7 +282,7 @@ class LoomspanPublicSurfaceArchitectureTest
             .collect(Collectors.toSet());
 
     @Test
-    void apiPackageContainsExactlyEightApprovedPublicTypes()
+    void apiPackageContainsExactlyThirteenApprovedPublicTypes()
     {
         assertThat(publicTopLevelTypesIn("ai.loomspan.api"))
                 .containsExactlyInAnyOrderElementsOf(API_TYPES);

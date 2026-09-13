@@ -12,7 +12,7 @@ coverage: initial-source-verified
 This knowledge set documents the supported application-facing Java API of the
 Loomspan Spring Boot starter. Use it when writing application code that invokes
 skills, declares Java skills, observes completed executions,
-or handles errors from the supported facade.
+discovers or validates skills, or handles errors from the supported facade.
 
 Loomspan is under active development and has no production release yet. These
 documents describe the repository revision with which this skill package was
@@ -27,6 +27,9 @@ allowlist in
 The allowlist currently contains only:
 
 - `SkillTemplate`
+- `SkillCatalog`
+- `SkillDescriptor`
+- `SkillKind`
 - `SkillExecutionView`
 - `SkillExecutionEvent`
 - `SkillMethod`
@@ -37,7 +40,7 @@ The allowlist currently contains only:
 - `RestSkillHandler`
 - `RestSkillInvocation`
 
-All ten are public top-level types in `ai.loomspan.api`. A Java
+All thirteen are public top-level types in `ai.loomspan.api`. A Java
 `public` modifier does not make any other Loomspan type supported API. Read
 [compatibility-and-boundaries.md](compatibility-and-boundaries.md) before
 advising an application to depend on another Loomspan type.
@@ -60,6 +63,7 @@ when exact source inspection is required.
 | --- | --- | --- |
 | Determine whether a Loomspan type or extension point is supported | [compatibility-and-boundaries.md](compatibility-and-boundaries.md) | The relevant API topic below |
 | Invoke a Java, REST, or model-backed YAML skill from application code | [invocation.md](invocation.md) | [observation-and-errors.md](observation-and-errors.md) when observing or handling failures |
+| Discover skills or pre-check a root request | [catalog-and-validation.md](catalog-and-validation.md) | [invocation.md](invocation.md) for execution-time guarantees |
 | Declare an application method as a skill | [java-skills.md](java-skills.md) | [reflected input contracts](../skill-authoring/input-contracts.md) for complete input-shape guidance |
 | Implement application REST leaves | [rest-skills.md](rest-skills.md) | [REST manifests](../skill-authoring/rest-skills.md) |
 | Consume an execution view or diagnose facade failures | [observation-and-errors.md](observation-and-errors.md) | [invocation.md](invocation.md) for lifecycle timing |
@@ -74,8 +78,9 @@ relevant topic set.
 
 | Topic | Coverage | Notes |
 | --- | --- | --- |
-| Supported public types | Source-verified | Exact ten-type allowlist and package boundaries |
-| Skill invocation | Source-verified | Four overloads, input normalization and validation, result, session, security context, and observer timing |
+| Supported public types | Source-verified | Exact thirteen-type allowlist and package boundaries |
+| Catalog and pre-checks | Source-verified | Eager unfiltered snapshot, exact schemas, both validation overloads, authorization, and no-reservation limits |
+| Skill invocation | Source-verified | Four invoke and two validate overloads, input normalization and validation, result, session, security context, and observer timing |
 | Java skill annotations | Source-verified | Exact shared names, direct root/child invocation, proxy constraints, and supported application usage; detailed reflected input shapes live in `skill-authoring` |
 | Execution observations | Source-verified | Immutable view/event values, normalization, detail-value constraints, and trust boundary |
 | Facade failures | Source-verified | Validation, authorization, safe wrapping, observer failures, and fatal errors |

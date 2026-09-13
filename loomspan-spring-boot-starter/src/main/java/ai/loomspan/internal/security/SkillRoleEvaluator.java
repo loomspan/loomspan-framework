@@ -5,6 +5,7 @@ import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.authorization.AuthoritiesAuthorizationManager;
 import org.springframework.security.config.core.GrantedAuthorityDefaults;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.AccessDeniedException;
 
 public final class SkillRoleEvaluator
 {
@@ -26,5 +27,14 @@ public final class SkillRoleEvaluator
             case ROLES -> authentication != null && manager.authorize(() -> authentication,
                     policy.roles().stream().map(role -> rolePrefix + role).toList()).isGranted();
         };
+    }
+
+    public void checkAccess(String capabilityName, SkillAccessPolicy policy,
+            @Nullable Authentication authentication)
+    {
+        if (!canAccess(policy, authentication))
+        {
+            throw new AccessDeniedException("Access denied for capability '" + capabilityName + "'");
+        }
     }
 }

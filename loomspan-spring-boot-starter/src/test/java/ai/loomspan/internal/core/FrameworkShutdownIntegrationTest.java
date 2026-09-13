@@ -23,9 +23,19 @@ import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandleFactory;
 import ai.loomspan.internal.runtime.trace.ImmediateCompletionRetention;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
+import ai.loomspan.internal.runtime.input.SkillInputValidator;
+import ai.loomspan.internal.security.SkillAccessPolicy;
+import ai.loomspan.internal.security.SkillRoleEvaluator;
+import ai.loomspan.internal.skillapi.DefaultSkillTemplate;
+import tools.jackson.databind.ObjectMapper;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
 
 class FrameworkShutdownIntegrationTest
 {
@@ -88,6 +98,38 @@ class FrameworkShutdownIntegrationTest
         assertThat(observationCreations).hasValue(0);
         assertThat(actionCalled).isFalse();
         admitted.close();
+        lifecycle.stop();
+        lifecycle.destroy();
+        context.close();
+    }
+
+    @Test
+    void validationDoesNotReserveAdmissionForLaterInvocation()
+    {
+        var context = new AnnotationConfigApplicationContext();
+        var executor = Executors.newVirtualThreadPerTaskExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofMillis(100), executor);
+        var codecs = LoomspanJacksonCodecs.defaults();
+        var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
+                NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
+        registry.register("root", new CapabilityMetadata("test:root", "root", "Root",
+                SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
+                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("root", "Root"), null));
+        var template = new DefaultSkillTemplate(registry, router, runner, new ObjectMapper(),
+                new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
+        context.addApplicationListener(lifecycle);
+        context.refresh();
+
+        template.validate("root", Map.of());
+        context.publishEvent(new ContextClosedEvent(context));
+
+        assertThatThrownBy(() -> template.invoke("root", Map.of()))
+                .isInstanceOf(ai.loomspan.api.SkillException.class)
+                .hasCauseInstanceOf(java.util.concurrent.RejectedExecutionException.class);
+        verify(router, never()).execute(any(), any(), any(), any());
         lifecycle.stop();
         lifecycle.destroy();
         context.close();
