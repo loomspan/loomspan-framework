@@ -17,7 +17,10 @@ Whenever documented semantics and executable evidence are compared, record the o
 - **possible framework defect** — the documentation states the intent and the code appears not to honor it;
 - **unresolved** — the comparison could not be completed with confidence.
 
-Never silently choose one side. Carry material discrepancies into the step's artifact, and in pipeline mode escalate any `possible framework defect` or `unresolved` classification that affects the work's scope or semantics.
+Never silently choose one side. Carry material discrepancies into the step's
+governing artifact (the ticket's `Execution notes` when plans are intentionally
+absent), and in pipeline mode escalate any `possible framework defect` or
+`unresolved` classification that affects the work's scope or semantics.
 
 ## Skill-Authoring Knowledge Base
 

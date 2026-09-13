@@ -1,5 +1,5 @@
 ---
-description: Write a ticket that gives the five-step development pipeline the intent it cannot discover from code
+description: Write a ticket with durable intent and an advisory execution profile
 ---
 
 # Writing a Loomspan Ticket
@@ -79,9 +79,36 @@ A useful ticket answers:
 
 Context, links, source hints, design constraints, or test ideas are welcome when they carry useful intent, but they are not required sections. The pipeline verifies hints rather than treating them as authoritative.
 
+## Execution Profile Recommendation
+
+Record an advisory execution profile using the context already developed in the
+conversation. This preserves the ticket author's understanding of intent and
+risk without turning ticket writing into repository research:
+
+Read the `Execution Profiles` eligibility table in
+`ai/commands/shared/automation-protocol.md` and apply it only to the
+conversational knowledge already available. Reading that process definition
+does not call for source inspection. Full retains research and planning;
+fast-track uses ticket-led implementation plus independent review; direct
+omits independent review and is eligible only when every direct condition
+is supported by the known intent and risk.
+
+Add an `Execution profile` section containing `Recommended`, `Confidence`, a
+short intent-based `Rationale`, and any `Reassessment triggers`. Use confidence
+`high`, `medium`, or `low`. This is a recommendation, not a binding pipeline
+directive: `0_run_pipeline.md` validates it against the current checkout before
+expensive work begins. Do not perform new codebase research only to increase
+confidence; when the conversation does not establish enough, recommend `full`
+with low confidence. The recommendation controls process only; it never waives
+ticket requirements, correctness, verification, or a review explicitly required
+by the ticket.
+
 ## What the Pipeline Discovers
 
-Do not make the ticket author reproduce work owned by later steps:
+Do not make the ticket author reproduce work owned by later steps. The full
+route assigns the following responsibilities; light routes move the necessary
+targeted investigation and verification into Step 4, without requiring skipped
+artifacts, and fast-track retains Step 5:
 
 - Step 1 locates and documents the current implementation, consumers, tests, fixtures, and relevant history.
 - Step 2 turns the ticket's requirements and deliberate implementation decisions into a detailed plan, choosing the implementation details the ticket leaves open and analyzing compatibility impact.
@@ -151,6 +178,14 @@ source areas, or nonbinding implementation suggestions. Omit this section only
 when the outcome, requirements, and acceptance criteria are independently
 sufficient.>
 
+## Execution profile
+
+- **Recommended:** full | fast-track | direct
+- **Confidence:** high | medium | low
+- **Rationale:** <Why the known intent and risk support this profile.>
+- **Reassessment triggers:** <Current-checkout discoveries that should change
+  the profile, or `none`.>
+
 ## Pipeline notes
 
 - <Optional intentional exception likely to look accidental. Omit this section
@@ -165,6 +200,8 @@ sufficient.>
 - Decide product or compatibility intent that repository evidence cannot decide for you.
 - Avoid vague phrases such as "as appropriate," "where possible," or "handle gracefully" when different interpretations would change behavior.
 - Keep acceptance criteria about results, not task lists or internal file changes.
+- Base the execution-profile recommendation on known intent and risk; leave
+  current-state validation to the pipeline's bounded triage.
 - Use `Pipeline notes` only for genuine expected exceptions, not ordinary requirements.
 - A pipeline-ready ticket has enough information for an agent to choose between materially different outcomes without guessing.
 
@@ -180,6 +217,8 @@ Before completing the command, verify that:
 - Every requirement is represented by at least one observable acceptance
   criterion.
 - Known dependencies and sequencing constraints are recorded.
+- The ticket contains an advisory execution profile, confidence, rationale, and
+  reassessment triggers without claiming unverified repository state.
 - Intentional compatibility breaks are explicitly authorized in `Pipeline notes`.
 - No later step must recover unique intent or background from the chat.
 - The ticket does not prescribe research, planning, tests, or source changes
@@ -188,5 +227,5 @@ Before completing the command, verify that:
 If the check fails because material developer intent is missing, ask one
 focused question and do not create or finalize the ticket until the answer is
 resolved. If it passes, report the exact ticket path, proposed PR number, and
-that the ticket is pipeline-ready. Create only the ticket; do not start
+the recommended execution profile, and that the ticket is pipeline-ready. Create only the ticket; do not start
 `0_run_pipeline.md` unless the developer explicitly asks.

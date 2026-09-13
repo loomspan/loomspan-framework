@@ -34,7 +34,7 @@ The command may be invoked with any combination of:
 - branch, commit, pull request, or comparison base;
 - working-tree changes.
 
-Read supplied tickets, requirements, plans, and testing plans **completely** before broader investigation. If no plan exists, perform a general code review from the available requirements and diff. A plan is helpful context, not a prerequisite.
+Read supplied tickets, requirements, plans, and testing plans **completely** before broader investigation. If no plan exists, perform a ticket-led general code review from the available requirements and diff. A plan and research artifact are helpful context, not prerequisites; never require artifacts skipped by an approved fast-track route.
 
 ## Review process
 
@@ -235,7 +235,13 @@ Do not report:
 
 ## Pipeline Review/Fix Behavior
 
-In pipeline mode, one fresh context owns a complete review/fix cycle:
+In pipeline mode, apply the shared profile reassessment rule to the reviewed
+change and before implementing fixes. Use the selected profile supplied by the
+orchestrator. If a fast-track review discovers a full-profile trigger, return
+`STATUS: needs-developer` with the evidence and proposed upgrade before
+affected fixes or completion, even when the fix is clear and in scope.
+
+One fresh context owns a complete review/fix cycle:
 
 1. Perform the entire independent review process above before making any implementation change. Do not narrow the review to findings from a previous cycle.
 2. Review only the current repository state, ticket, and plans. Do not locate or read prior review documents; use the review number supplied by the orchestrator when naming this review's artifact.
