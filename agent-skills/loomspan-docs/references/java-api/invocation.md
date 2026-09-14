@@ -104,6 +104,41 @@ Read [authorization](../skill-authoring/authorization.md) for caller scope and p
 Read [observation-and-errors.md](observation-and-errors.md) before persisting or
 exposing events, or when defining exception handling.
 
+## Atomic Application Handoff
+
+Inject `SkillInvocationHandoff` when an application must transfer a request to
+Loomspan while holding its own dispatch gate, then execute it after releasing
+that gate. `handoff(name, object)` and `handoff(name, map)` perform the same
+exact lookup, conversion, and input validation as direct invocation, capture
+the current Spring Security authentication, and atomically reserve one root.
+They do not create a session, submit work, invoke an observer, or wait.
+
+```java
+AdmittedSkillInvocation admitted;
+synchronized (dispatchGate) {
+    if (dispatchClosed) return;
+    SecurityContextHolder.getContext().setAuthentication(authentication);
+    admitted = handoff.handoff("duplicateInvoiceChecker", input);
+}
+boolean invoked = false;
+try {
+    invoked = true;
+    admitted.invoke(observer);
+} finally {
+    if (!invoked) admitted.release();
+}
+```
+
+The handle is single-use. Exactly one invocation, explicit idempotent release,
+or framework cutoff can win; a losing invocation fails as `SkillException`
+without creating another session. Release after execution has claimed the root
+is harmless. Authorization is still enforced during execution with the captured
+identity, nested work receives the existing trusted identity, and the worker's
+prior security context is restored. Mission timeout accounting begins when
+ordinary mission work is submitted. If shutdown has begun, a pending handle may
+start only during the remaining single framework budget and is invalidated at
+cutoff. Finalization and observer delivery remain within root ownership.
+
 ## Application Tests
 
 Unit tests SHOULD mock `SkillTemplate` rather than Loomspan internals. For
@@ -113,6 +148,10 @@ the real facade; see [compatibility-and-boundaries.md](compatibility-and-boundar
 ## Source Anchors
 
 - `SkillTemplate.java` defines the supported signatures.
+- `SkillInvocationHandoff.java` and `AdmittedSkillInvocation.java` define the
+  supported ownership-transfer and single-use handle signatures.
+- `DefaultSkillTemplateTest#handoffCapturesPreparedInputAndCallingAuthentication`
+  protects captured identity, execution, and worker-context restoration.
 - `DefaultSkillTemplateTest#objectOverloadDelegatesThroughValidatedMapPath`
   protects object normalization followed by map validation.
 - `DefaultSkillTemplateTest#skillTemplateNullInputAndObserverLifecycle`

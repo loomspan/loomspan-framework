@@ -33,7 +33,7 @@ class LoomspanAutoConfigurationBoundaryTest
             "yamlSkillCapabilityRegistrar", "skillInputContractResolver", "skillInputValidator",
             "skillCatalog", "skillRoleEvaluator", "accessGuard", "skillVisibilityResolver", "virtualFileSystem", "refResolver",
             "missionInputMaterializer", "capabilityExecutionRouter", "missionWorkExecutor",
-            "skillTemplate", "modelUsageExtractor", "usageMetricsRecorder",
+            "skillTemplate", "skillInvocationHandoff", "modelUsageExtractor", "usageMetricsRecorder",
             "sessionUsageService", "executionStateService", "planningService", "toolSurfaceService",
             "capabilityInvoker", "LoomspanMissionExecutor", "missionExecutionEngine",
             "frameworkExecutionLifecycle",

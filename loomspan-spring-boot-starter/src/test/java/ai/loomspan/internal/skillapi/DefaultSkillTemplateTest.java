@@ -12,6 +12,12 @@ import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityRegistry;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.InMemoryCapabilityRegistry;
+import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
+import ai.loomspan.autoconfigure.LoomspanProperties;
+import ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandleFactory;
+import ai.loomspan.internal.runtime.trace.ImmediateCompletionRetention;
+import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
+import org.springframework.context.support.StaticApplicationContext;
 import ai.loomspan.internal.core.SkillExecutionDescriptor;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.runtime.input.SkillInputSchemaNode;
@@ -29,10 +35,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.time.Duration;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,6 +53,81 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DefaultSkillTemplateTest {
+
+    @Test
+    void handoffCapturesPreparedInputAndCallingAuthentication()
+    {
+        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        CapabilityMetadata metadata = yamlSkillMetadata();
+        registry.register(metadata.name(), metadata);
+        CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(2), executor);
+        var codecs = LoomspanJacksonCodecs.defaults();
+        var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS,
+                fixedClock(), NoOpExecutionObservationHandleFactory.INSTANCE,
+                ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
+                codecs.canonicalTrace(), lifecycle);
+        DefaultSkillTemplate template = new DefaultSkillTemplate(
+                registry, router, runner, new ObjectMapper(), new SkillInputValidator(),
+                new SkillRoleEvaluator(null, null), null);
+        DefaultSkillInvocationHandoff handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
+        var captured = new UsernamePasswordAuthenticationToken(
+                "captured", "n/a", List.of(new SimpleGrantedAuthority("ROLE_ALLOWED")));
+        var worker = new UsernamePasswordAuthenticationToken("worker", "n/a", List.of());
+        AtomicReference<Object> observedAuthentication = new AtomicReference<>();
+        when(router.execute(eq(metadata), eq(Map.of("payload", "hello")), any(), eq(null)))
+                .thenAnswer(invocation -> {
+                    ai.loomspan.internal.core.LoomspanSession session = invocation.getArgument(2);
+                    observedAuthentication.set(session.getAuthentication().orElse(null));
+                    return "ok";
+                });
+        SecurityContextHolder.getContext().setAuthentication(captured);
+        Map<String, Object> mutableInput = new LinkedHashMap<>();
+        mutableInput.put("payload", "hello");
+        var admitted = handoff.handoff("invoiceParser", mutableInput);
+        mutableInput.clear();
+        SecurityContextHolder.getContext().setAuthentication(worker);
+
+        assertThat(admitted.invoke()).isEqualTo("ok");
+        assertThat(observedAuthentication).hasValue(captured);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isSameAs(worker);
+        admitted.release();
+        assertThatThrownBy(admitted::invoke)
+                .isInstanceOf(SkillException.class)
+                .hasMessage("Skill 'invoiceParser' execution failed.");
+        lifecycle.destroy();
+    }
+
+    @Test
+    void releasedAndCutOffHandoffsCannotExecute()
+    {
+        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        registry.register("invoiceParser", yamlSkillMetadata());
+        CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofMillis(1), executor);
+        var codecs = LoomspanJacksonCodecs.defaults();
+        var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.NEVER,
+                fixedClock(), NoOpExecutionObservationHandleFactory.INSTANCE,
+                ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
+                codecs.canonicalTrace(), lifecycle);
+        DefaultSkillInvocationHandoff handoff = new DefaultSkillInvocationHandoff(
+                new DefaultSkillTemplate(registry, router, runner, new ObjectMapper(),
+                        new SkillInputValidator(), new SkillRoleEvaluator(null, null), null), lifecycle);
+        var released = handoff.handoff("invoiceParser", Map.of("payload", "hello"));
+        released.release();
+        released.release();
+        assertThatThrownBy(released::invoke).isInstanceOf(SkillException.class);
+
+        var cutOff = handoff.handoff("invoiceParser", Map.of("payload", "hello"));
+        lifecycle.stop();
+        assertThatThrownBy(cutOff::invoke).isInstanceOf(SkillException.class);
+        verify(router, never()).execute(any(), any(), any(), any());
+        lifecycle.destroy();
+    }
 
     @AfterEach
     void clearSecurityContext() {

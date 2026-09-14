@@ -37,9 +37,11 @@ import ai.loomspan.internal.skill.SkillVisibilityResolver;
 import ai.loomspan.internal.skill.YamlSkillCapabilityRegistrar;
 import ai.loomspan.internal.skill.YamlSkillCatalog;
 import ai.loomspan.internal.skillapi.DefaultSkillTemplate;
+import ai.loomspan.internal.skillapi.DefaultSkillInvocationHandoff;
 import ai.loomspan.internal.skillapi.DefaultSkillCatalog;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import ai.loomspan.api.SkillTemplate;
+import ai.loomspan.api.SkillInvocationHandoff;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.internal.vfs.DefaultRefResolver;
 import ai.loomspan.internal.vfs.RefResolver;
@@ -278,7 +280,7 @@ public class LoomspanAutoConfiguration
 
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    SkillTemplate skillTemplate(CapabilityRegistry capabilityRegistry,
+    DefaultSkillTemplate skillTemplate(CapabilityRegistry capabilityRegistry,
             CapabilityExecutionRouter capabilityExecutionRouter,
             LoomspanSessionRunner LoomspanSessionRunner,
             LoomspanJacksonCodecs codecs,
@@ -294,6 +296,14 @@ public class LoomspanAutoConfiguration
                 skillInputValidator,
                 skillRoleEvaluator,
                 securityContextStrategy.getIfAvailable());
+    }
+
+    @Bean
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    SkillInvocationHandoff skillInvocationHandoff(DefaultSkillTemplate skillTemplate,
+            FrameworkExecutionLifecycle frameworkExecutionLifecycle)
+    {
+        return new DefaultSkillInvocationHandoff(skillTemplate, frameworkExecutionLifecycle);
     }
 
     @Bean

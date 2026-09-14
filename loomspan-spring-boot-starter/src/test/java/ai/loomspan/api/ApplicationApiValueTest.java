@@ -47,6 +47,23 @@ class ApplicationApiValueTest
     }
 
     @Test
+    void handoffAndAdmissionHandleExposeOnlyTheSupportedSingleUseShape() throws Exception
+    {
+        assertThat(SkillInvocationHandoff.class.getDeclaredMethods())
+                .extracting(method -> List.of(method.getName(), method.getReturnType(), List.of(method.getParameterTypes())))
+                .containsExactlyInAnyOrder(
+                        List.of("handoff", AdmittedSkillInvocation.class, List.of(String.class, Object.class)),
+                        List.of("handoff", AdmittedSkillInvocation.class, List.of(String.class, Map.class)));
+        assertThat(AdmittedSkillInvocation.class.getDeclaredMethods())
+                .extracting(method -> List.of(method.getName(), method.getReturnType(), List.of(method.getParameterTypes())))
+                .containsExactlyInAnyOrder(
+                        List.of("invoke", String.class, List.of()),
+                        List.of("invoke", String.class, List.of(java.util.function.Consumer.class)),
+                        List.of("release", void.class, List.of()));
+        assertThat(SkillTemplate.class.getDeclaredMethods()).hasSize(6);
+    }
+
+    @Test
     void restInvocationDeeplyCopiesContainersAndPreservesLeavesAndNulls()
     {
         Object leaf = new ByteArrayResource(new byte[] {1, 2, 3});

@@ -125,6 +125,19 @@ public class LoomspanSessionRunner
                 ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace(), null);
     }
 
+    LoomspanSessionRunner(
+            int maxDepth,
+            TracePersistencePolicy tracePersistencePolicy,
+            Clock clock,
+            ExecutionObservationHandleFactory observationHandleFactory,
+            InternalExecutionTraceHandleFactory traceHandleFactory,
+            FrameworkExecutionLifecycle frameworkLifecycle)
+    {
+        this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory, traceHandleFactory,
+                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace(),
+                Objects.requireNonNull(frameworkLifecycle, "frameworkLifecycle must not be null"));
+    }
+
     private LoomspanSessionRunner(
             int maxDepth,
             TracePersistencePolicy tracePersistencePolicy,
@@ -219,6 +232,26 @@ public class LoomspanSessionRunner
         Objects.requireNonNull(completion, "completion must not be null");
         FrameworkExecutionLifecycle.AdmittedRoot root = frameworkLifecycle == null
                 ? null : frameworkLifecycle.admitRoot();
+        return executeAdmittedRoot(entrySkill, authentication, root, action, completion);
+    }
+
+    public <T, R> R callWithAdmittedSession(String entrySkill, @Nullable Authentication authentication,
+            FrameworkExecutionLifecycle.AdmittedRoot root,
+            Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
+    {
+        Objects.requireNonNull(root, "root must not be null");
+        return executeAdmittedRoot(entrySkill, authentication, root, action, completion);
+    }
+
+    private <T, R> R executeAdmittedRoot(String entrySkill, @Nullable Authentication authentication,
+            @Nullable FrameworkExecutionLifecycle.AdmittedRoot root,
+            Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
+    {
+        Objects.requireNonNull(action, "action must not be null");
+        Objects.requireNonNull(completion, "completion must not be null");
+        if (root != null && !root.claimExecution())
+            throw new java.util.concurrent.RejectedExecutionException(
+                    "Loomspan invocation admission is no longer executable");
         try
         {
             LoomspanSession session = new LoomspanSession(
@@ -262,7 +295,7 @@ public class LoomspanSessionRunner
         }
         finally
         {
-            if (root != null) root.close();
+            if (root != null) root.completeExecution();
         }
     }
 

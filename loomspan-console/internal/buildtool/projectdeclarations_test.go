@@ -188,6 +188,7 @@ func TestLoomspanDocsSkillIsSelfContained(t *testing.T) {
 	skillRoot := filepath.Join(paths.repository, "agent-skills", "loomspan-docs")
 	skillDefinition := readTestFile(t, filepath.Join(skillRoot, "SKILL.md"))
 	javaAPIIndex := readTestFile(t, filepath.Join(skillRoot, "references", "java-api", "README.md"))
+	javaAPIInvocation := readTestFile(t, filepath.Join(skillRoot, "references", "java-api", "invocation.md"))
 	for _, required := range []string{"`java-api`", "references/java-api/README.md", "compatibility-and-boundaries.md"} {
 		if !strings.Contains(skillDefinition, required) {
 			t.Errorf("loomspan-docs SKILL.md does not route %q", required)
@@ -196,10 +197,16 @@ func TestLoomspanDocsSkillIsSelfContained(t *testing.T) {
 	for _, required := range []string{
 		"SkillTemplate", "SkillExecutionView", "SkillExecutionEvent", "SkillMethod",
 		"SkillParam", "SkillException", "SkillInputValidationException", "SkillInputValidationIssue",
-		"RestSkillHandler", "RestSkillInvocation", "LoomspanPublicSurfaceArchitectureTest", "sole supported SPI",
+		"RestSkillHandler", "RestSkillInvocation", "SkillInvocationHandoff", "AdmittedSkillInvocation",
+		"fifteen", "LoomspanPublicSurfaceArchitectureTest", "sole supported SPI",
 	} {
 		if !strings.Contains(javaAPIIndex, required) {
 			t.Errorf("java-api README does not contain %q", required)
+		}
+	}
+	for _, required := range []string{"single-use", "captured identity", "remaining single framework budget", "idempotent release"} {
+		if !strings.Contains(javaAPIInvocation, required) {
+			t.Errorf("java-api invocation guidance does not contain %q", required)
 		}
 	}
 	linkPattern := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)

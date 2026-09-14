@@ -28,6 +28,8 @@ class LoomspanPublicSurfaceArchitectureTest
 {
     private static final Set<String> API_TYPES = Set.of(
             "ai.loomspan.api.SkillTemplate",
+            "ai.loomspan.api.SkillInvocationHandoff",
+            "ai.loomspan.api.AdmittedSkillInvocation",
             "ai.loomspan.api.SkillExecutionView",
             "ai.loomspan.api.SkillExecutionEvent",
             "ai.loomspan.api.SkillMethod",
@@ -269,6 +271,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.skill.YamlSkillSource", "Public only for immutable startup-source collaboration with the internal observability catalog."),
             Map.entry("ai.loomspan.internal.skill.YamlSkillManifest", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.skillapi.DefaultSkillTemplate", "Public only so LoomspanAutoConfiguration can construct the application facade implementation."),
+            Map.entry("ai.loomspan.internal.skillapi.DefaultSkillInvocationHandoff", "Public only so LoomspanAutoConfiguration can construct the application handoff facade implementation."),
             Map.entry("ai.loomspan.internal.vfs.DefaultRefResolver", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.vfs.RefResolver", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.vfs.SessionLocalVirtualFileSystem", "Public only for Java collaboration between distinct internal subsystem packages."),
@@ -282,7 +285,7 @@ class LoomspanPublicSurfaceArchitectureTest
             .collect(Collectors.toSet());
 
     @Test
-    void apiPackageContainsExactlyThirteenApprovedPublicTypes()
+    void apiPackageContainsExactlyFifteenApprovedPublicTypes()
     {
         assertThat(publicTopLevelTypesIn("ai.loomspan.api"))
                 .containsExactlyInAnyOrderElementsOf(API_TYPES);
@@ -330,7 +333,7 @@ class LoomspanPublicSurfaceArchitectureTest
     }
 
     @Test
-    void noSupportedSpiPackageOrTypeExists()
+    void noAdditionalSupportedSpiPackageExists()
     {
         assertThat(productionClasses.stream().map(JavaClass::getPackageName))
                 .noneMatch(packageName -> packageName.contains(".spi"));

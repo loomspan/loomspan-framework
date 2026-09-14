@@ -9,6 +9,8 @@ import org.springframework.beans.factory.DisposableBean;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
@@ -62,27 +64,56 @@ public final class FrameworkExecutionLifecycle
         }
     }
 
-    private void release(AdmittedRoot root)
+    private boolean claim(AdmittedRoot root)
     {
-        if (activeRoots.remove(root))
+        synchronized (monitor)
         {
-            synchronized (monitor) { monitor.notifyAll(); }
+            if (cutoff.get() || !activeRoots.contains(root) || root.state != RootState.PENDING)
+                return false;
+            root.state = RootState.EXECUTING;
+            return true;
+        }
+    }
+
+    private void releasePending(AdmittedRoot root)
+    {
+        synchronized (monitor)
+        {
+            if (root.state != RootState.PENDING) return;
+            root.state = RootState.RELEASED;
+            activeRoots.remove(root);
+            monitor.notifyAll();
+        }
+    }
+
+    private void completeExecution(AdmittedRoot root)
+    {
+        synchronized (monitor)
+        {
+            if (root.state != RootState.EXECUTING) return;
+            root.state = RootState.RELEASED;
+            activeRoots.remove(root);
+            monitor.notifyAll();
         }
     }
 
     /** Closes admission and establishes the deadline exactly once; it never waits. */
     public void closeAdmission()
     {
+        List<AdmittedRoot> roots = List.of();
+        long establishedDeadline = Long.MAX_VALUE;
         synchronized (monitor)
         {
             if (admissionClosed.compareAndSet(false, true))
             {
-                long deadline = saturatingAdd(nanoTime.getAsLong(), timeoutNanos);
-                deadlineNanos.set(deadline);
-                activeRoots.forEach(root -> root.establishDeadline(deadline));
+                establishedDeadline = saturatingAdd(nanoTime.getAsLong(), timeoutNanos);
+                deadlineNanos.set(establishedDeadline);
+                roots = new ArrayList<>(activeRoots);
+                for (AdmittedRoot root : roots) root.recordDeadline(establishedDeadline);
             }
             monitor.notifyAll();
         }
+        for (AdmittedRoot root : roots) root.signalDeadline(establishedDeadline);
     }
 
     @Override
@@ -170,10 +201,25 @@ public final class FrameworkExecutionLifecycle
 
     private void publishCutoff()
     {
+        List<AdmittedRoot> roots = List.of();
+        long deadline = deadlineNanos.get();
         if (cutoff.compareAndSet(false, true))
         {
-            long deadline = deadlineNanos.get();
-            activeRoots.forEach(root -> root.cutoff(deadline));
+            synchronized (monitor)
+            {
+                roots = new ArrayList<>(activeRoots);
+                for (AdmittedRoot root : roots)
+                {
+                    root.recordCutoff(deadline);
+                    if (root.state == RootState.PENDING)
+                    {
+                        root.state = RootState.CUT_OFF;
+                        activeRoots.remove(root);
+                    }
+                }
+                monitor.notifyAll();
+            }
+            for (AdmittedRoot root : roots) root.signalCutoff(deadline);
         }
         executor.shutdownNow();
     }
@@ -210,13 +256,15 @@ public final class FrameworkExecutionLifecycle
         catch (ArithmeticException ex) { return Long.MAX_VALUE; }
     }
 
+    private enum RootState { PENDING, EXECUTING, RELEASED, CUT_OFF }
+
     public static final class AdmittedRoot implements AutoCloseable
     {
         private final FrameworkExecutionLifecycle owner;
         private final Set<MissionLifecycle> missions = ConcurrentHashMap.newKeySet();
-        private final AtomicBoolean closed = new AtomicBoolean();
         private final AtomicBoolean cutOff = new AtomicBoolean();
         private volatile long cutoffDeadlineNanos = Long.MAX_VALUE;
+        private RootState state = RootState.PENDING;
 
         private AdmittedRoot(FrameworkExecutionLifecycle owner) { this.owner = owner; }
 
@@ -230,23 +278,35 @@ public final class FrameworkExecutionLifecycle
         boolean isCutOff() { return cutOff.get(); }
         long cutoffDeadlineNanos() { return cutoffDeadlineNanos; }
 
-        private synchronized void cutoff(long deadline)
+        public boolean claimExecution() { return owner.claim(this); }
+
+        public void completeExecution() { owner.completeExecution(this); }
+
+        private void recordCutoff(long deadline)
         {
             cutoffDeadlineNanos = deadline;
             cutOff.set(true);
+        }
+
+        private synchronized void signalCutoff(long deadline)
+        {
             missions.forEach(mission -> mission.frameworkCutoff(deadline));
         }
 
-        private synchronized void establishDeadline(long deadline)
+        private void recordDeadline(long deadline)
         {
             cutoffDeadlineNanos = deadline;
+        }
+
+        private synchronized void signalDeadline(long deadline)
+        {
             missions.forEach(mission -> mission.frameworkDeadline(deadline));
         }
 
         @Override
         public void close()
         {
-            if (closed.compareAndSet(false, true)) owner.release(this);
+            owner.releasePending(this);
         }
     }
 }

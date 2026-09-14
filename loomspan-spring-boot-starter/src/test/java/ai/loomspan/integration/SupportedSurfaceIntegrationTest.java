@@ -10,6 +10,7 @@ import ai.loomspan.api.SkillKind;
 import ai.loomspan.api.SkillMethod;
 import ai.loomspan.api.SkillParam;
 import ai.loomspan.api.SkillTemplate;
+import ai.loomspan.api.SkillInvocationHandoff;
 import ai.loomspan.autoconfigure.LoomspanAutoConfiguration;
 import jakarta.annotation.security.RolesAllowed;
 import okhttp3.mockwebserver.MockResponse;
@@ -101,9 +102,11 @@ class SupportedSurfaceIntegrationTest
                     .run(context -> {
                         assertThat(context).hasNotFailed();
                         assertThat(context).hasSingleBean(SkillTemplate.class);
+                        assertThat(context).hasSingleBean(SkillInvocationHandoff.class);
                         assertThat(context).hasSingleBean(SkillCatalog.class);
 
                         SkillTemplate skills = context.getBean(SkillTemplate.class);
+                        SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
                         SkillCatalog catalog = context.getBean(SkillCatalog.class);
                         assertThat(catalog.skills()).extracting(descriptor -> descriptor.name())
                                 .isSorted()
@@ -124,11 +127,19 @@ class SupportedSurfaceIntegrationTest
                                     Map.of("message", "hello through the public API"));
                             skills.validate("supportedJavaLeaf", new DirectRequest("precheck"));
                             skills.validate("supportedRestLeaf", new DirectRequest("precheck"));
-                            assertThat(skills.invoke(
+                            var admitted = handoff.handoff("supportedRestLeaf", new DirectRequest("handed-off"));
+                            SecurityContextHolder.clearContext();
+                            assertThat(admitted.invoke()).isEqualTo("REST: handed-off");
+                            admitted.release();
+                            assertThat(SupportedSkillConfiguration.handlerAuthentication)
+                                    .hasValue("supported-caller");
+                            SecurityContextHolder.getContext().setAuthentication(authorized);
+                            var admittedRoot = handoff.handoff(
                                     "supportedSurfaceSkill",
-                                    Map.of("message", "hello through the public API"),
-                                    observed::set))
+                                    Map.of("message", "hello through the public API"));
+                            assertThat(admittedRoot.invoke(observed::set))
                                     .isEqualTo("supported surface response");
+                            admittedRoot.release();
 
                             assertThat(observed.get()).isNotNull();
                             assertThat(observed.get().sessionId()).isNotBlank();

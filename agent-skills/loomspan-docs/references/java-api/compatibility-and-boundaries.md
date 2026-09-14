@@ -9,12 +9,14 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the thirteen types in the closed
+Application code MAY depend on the fifteen types in the closed
 `ai.loomspan.api` allowlist:
 
 | Type | Supported purpose |
 | --- | --- |
 | `SkillTemplate` | Validate or invoke a named Java, REST, or model-backed YAML skill |
+| `SkillInvocationHandoff` | Atomically transfer a prepared root invocation to framework ownership |
+| `AdmittedSkillInvocation` | Execute once or release an already-admitted root invocation |
 | `SkillCatalog` | Discover the immutable startup snapshot of registered skills |
 | `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
 | `SkillKind` | Distinguish YAML, Java, and REST registrations |
@@ -34,7 +36,8 @@ annotations on application-owned beans, and consume the public value records.
 
 ## Compatibility Changes in This Revision
 
-The three catalog types are additive. The two `SkillTemplate.validate`
+The handoff facade and handle are additive and leave every `SkillTemplate`
+signature unchanged. The three catalog types are additive. The two `SkillTemplate.validate`
 methods are an intentional pre-1.0 source- and binary-sensitive interface
 change: application implementations and hand-written fakes or mocks of
 `SkillTemplate` MUST add both methods and recompile. There is no default-method
@@ -87,7 +90,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the `api` package has exactly the thirteen allowlisted public top-level types;
+- the `api` package has exactly the fifteen allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

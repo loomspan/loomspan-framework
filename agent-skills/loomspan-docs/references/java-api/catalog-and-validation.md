@@ -27,11 +27,16 @@ input and access enforcement and can still be denied by changed authentication, 
 or execution-time policy. Only the root is pre-checked; nested authorization remains an
 execution outcome.
 
+When atomic ownership transfer is required, use `SkillInvocationHandoff` rather
+than `validate`: handoff prepares the input and reserves one lifecycle admission,
+while execution still enforces authorization with the authentication captured at
+handoff. See [invocation.md](invocation.md).
+
 ## Source Anchors
 
 - `DefaultSkillCatalogTest#buildsEagerUnfilteredImmutablePublicSnapshotWithExactSchemas`
   protects snapshot order, scope, immutability, kind mapping, and schema fidelity.
 - `DefaultSkillTemplateTest#validateUsesInvocationPreparationAndCallingAuthenticationWithoutExecution`
   protects session-free calling-authentication authorization.
-- `LoomspanPublicSurfaceArchitectureTest#apiPackageContainsExactlyThirteenApprovedPublicTypes`
+- `LoomspanPublicSurfaceArchitectureTest#apiPackageContainsExactlyFifteenApprovedPublicTypes`
   protects the closed public surface.

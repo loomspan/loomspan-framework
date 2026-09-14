@@ -22,9 +22,166 @@ import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandleFactory;
 import ai.loomspan.internal.runtime.trace.ImmediateCompletionRetention;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
+import ai.loomspan.internal.runtime.trace.BlockingTraceHandleTestSupport;
 
 class FrameworkExecutionLifecycleTest
 {
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void actualTraceCompletionWriteRemainsUnderRootUntilReleased() throws Exception
+    {
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(2), executor);
+        var trace = new BlockingTraceHandleTestSupport();
+        var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.ALWAYS, Clock.systemUTC(),
+                NoOpExecutionObservationHandleFactory.INSTANCE, trace::create, lifecycle);
+        var observerEntered = new AtomicBoolean();
+        Thread caller = Thread.ofVirtual().start(() -> runner.callWithNewSession(
+                "entry", null, session -> "done", (result, session, failure) -> {
+                    observerEntered.set(true);
+                    assertThat(lifecycle.activeRootCount()).isOne();
+                    return result;
+                }));
+        assertThat(trace.awaitCompletionAppend(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(lifecycle.activeRootCount()).isOne();
+        Thread stopper = Thread.ofVirtual().start(lifecycle::stop);
+        Thread.sleep(25L);
+        assertThat(stopper.isAlive()).isTrue();
+        assertThat(observerEntered).isFalse();
+
+        trace.releaseCompletionAppend();
+        caller.join(Duration.ofSeconds(1));
+        stopper.join(Duration.ofSeconds(1));
+        assertThat(observerEntered).isTrue();
+        assertThat(lifecycle.activeRootCount()).isZero();
+        lifecycle.destroy();
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void blockedActualTraceCompletionCannotExtendShutdownBudget() throws Exception
+    {
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofMillis(50), executor);
+        var trace = new BlockingTraceHandleTestSupport();
+        var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.ALWAYS, Clock.systemUTC(),
+                NoOpExecutionObservationHandleFactory.INSTANCE, trace::create, lifecycle);
+        Thread caller = Thread.ofVirtual().start(
+                () -> runner.runWithNewSession("entry", session -> { }));
+        assertThat(trace.awaitCompletionAppend(1, TimeUnit.SECONDS)).isTrue();
+
+        long started = System.nanoTime();
+        lifecycle.stop();
+        long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+
+        assertThat(elapsedMillis).isLessThan(500L);
+        assertThat(lifecycle.activeRootCount()).isOne();
+        trace.releaseCompletionAppend();
+        caller.join(Duration.ofSeconds(1));
+        assertThat(caller.isAlive()).isFalse();
+        assertThat(lifecycle.activeRootCount()).isZero();
+        lifecycle.destroy();
+    }
+
+    @Test
+    void pendingAdmissionExecutesExactlyOnceAndCompletesOneRoot()
+    {
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(1), executor);
+        var root = lifecycle.admitRoot();
+
+        assertThat(root.claimExecution()).isTrue();
+        assertThat(root.claimExecution()).isFalse();
+        root.close();
+        assertThat(lifecycle.activeRootCount()).isOne();
+        root.completeExecution();
+        root.completeExecution();
+        assertThat(lifecycle.activeRootCount()).isZero();
+        lifecycle.destroy();
+    }
+
+    @Test
+    void pendingAdmissionReleaseIsIdempotentAndPreventsExecution()
+    {
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(1), executor);
+        var root = lifecycle.admitRoot();
+
+        root.close();
+        root.close();
+
+        assertThat(root.claimExecution()).isFalse();
+        assertThat(lifecycle.activeRootCount()).isZero();
+        lifecycle.destroy();
+    }
+
+    @Test
+    void cutoffInvalidatesAndReleasesPendingAdmission()
+    {
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var nanoTime = new AtomicLong(100L);
+        var lifecycle = new FrameworkExecutionLifecycle(
+                context, Duration.ofNanos(50L), executor, nanoTime::get);
+        var root = lifecycle.admitRoot();
+        lifecycle.closeAdmission();
+        nanoTime.set(151L);
+
+        lifecycle.stop();
+
+        assertThat(root.claimExecution()).isFalse();
+        root.close();
+        assertThat(lifecycle.activeRootCount()).isZero();
+        lifecycle.destroy();
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    void executionClaimWinsReleaseAndCutoffWithoutPrematureRootRelease() throws Exception
+    {
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var nanoTime = new AtomicLong(100L);
+        var lifecycle = new FrameworkExecutionLifecycle(
+                context, Duration.ofNanos(50L), executor, nanoTime::get);
+        var root = lifecycle.admitRoot();
+        var claimed = new CountDownLatch(1);
+        var complete = new CountDownLatch(1);
+        var executionFailure = new AtomicReference<Throwable>();
+        Thread execution = Thread.ofVirtual().start(() -> {
+            try
+            {
+                assertThat(root.claimExecution()).isTrue();
+                claimed.countDown();
+                complete.await();
+                root.completeExecution();
+            }
+            catch (Throwable ex)
+            {
+                executionFailure.set(ex);
+            }
+        });
+        assertThat(claimed.await(1, TimeUnit.SECONDS)).isTrue();
+
+        root.close();
+        lifecycle.closeAdmission();
+        nanoTime.set(151L);
+        lifecycle.stop();
+
+        assertThat(root.claimExecution()).isFalse();
+        assertThat(lifecycle.activeRootCount()).isOne();
+        complete.countDown();
+        execution.join(Duration.ofSeconds(1));
+        assertThat(execution.isAlive()).isFalse();
+        assertThat(executionFailure.get()).isNull();
+        assertThat(lifecycle.activeRootCount()).isZero();
+        lifecycle.destroy();
+    }
+
     @Test
     void acceptsPositiveDurationsLargerThanNanosecondsCanRepresent()
     {

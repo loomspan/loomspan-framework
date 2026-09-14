@@ -166,7 +166,27 @@ public class InvoiceWorkflow {
 
 `validate` has Map and Object overloads and performs the same exact lookup, conversion/input validation, safe error mapping, and root authorization against the calling authentication used by invocation preparation, without creating a session, trace, callback, execution, or quota use. A null Object is always rejected before conversion; a null Map is accepted only by a generic or empty-permitting contract. Invalid input raises `SkillInputValidationException`, an unknown skill or conversion/runtime failure raises `SkillException`, and authorization denial remains `AccessDeniedException`. Validation is an advisory pre-dispatch check: it reserves no shutdown admission, checks no future nested child, and `invoke` independently repeats input and authorization enforcement at execution time.
 
-The supported starter Java API is closed to these thirteen types in `ai.loomspan.api`: `SkillTemplate`, `SkillCatalog`, `SkillDescriptor`, `SkillKind`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `RestSkillHandler`, `RestSkillInvocation`, `SkillException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. `RestSkillHandler` is the sole supported SPI; it does not make any framework bean replaceable. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API.
+Applications with their own dispatch gate can inject `SkillInvocationHandoff` and transfer ownership before releasing that gate. Handoff prepares and validates input, captures the current authentication, and atomically reserves one framework root without starting a session or skill work. Invoke the returned single-use handle on the application's existing worker, and release it if the application abandons it before invocation:
+
+```java
+AdmittedSkillInvocation admitted;
+synchronized (dispatchGate) {
+    if (dispatchClosed) return;
+    SecurityContextHolder.getContext().setAuthentication(authentication);
+    admitted = handoff.handoff("duplicateInvoiceChecker", Map.of("payload", invoiceText));
+}
+boolean invoked = false;
+try {
+    invoked = true;
+    admitted.invoke(view -> observations.accept(view));
+} finally {
+    if (!invoked) admitted.release();
+}
+```
+
+Authentication must be installed before `handoff`; execution authorizes with that captured identity and restores the worker's prior security context. Exactly one execution, release, or framework cutoff wins. Mission timeout accounting begins when ordinary mission work is submitted, while the single framework shutdown deadline may already be running; a pending handle may start within its remainder and is invalidated at cutoff. Observer delivery remains inside root ownership.
+
+The supported starter Java API is closed to these fifteen types in `ai.loomspan.api`: `SkillTemplate`, `SkillInvocationHandoff`, `AdmittedSkillInvocation`, `SkillCatalog`, `SkillDescriptor`, `SkillKind`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `RestSkillHandler`, `RestSkillInvocation`, `SkillException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. `RestSkillHandler` is the sole supported SPI; it does not make any framework bean replaceable. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API.
 
 The installable [Java API knowledge set](agent-skills/loomspan-docs/references/java-api/README.md)
 provides LLM-oriented routing and source-verified guidance for this surface.

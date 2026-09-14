@@ -27,6 +27,9 @@ import ai.loomspan.internal.runtime.input.SkillInputValidator;
 import ai.loomspan.internal.security.SkillAccessPolicy;
 import ai.loomspan.internal.security.SkillRoleEvaluator;
 import ai.loomspan.internal.skillapi.DefaultSkillTemplate;
+import ai.loomspan.internal.skillapi.DefaultSkillInvocationHandoff;
+import ai.loomspan.api.AdmittedSkillInvocation;
+import ai.loomspan.api.SkillInvocationHandoff;
 import tools.jackson.databind.ObjectMapper;
 import java.util.Map;
 
@@ -39,6 +42,47 @@ import static org.mockito.ArgumentMatchers.any;
 
 class FrameworkShutdownIntegrationTest
 {
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    void handedOffInvocationStartsAfterFrameworkCloseWithoutReacquiringAdmission() throws Exception
+    {
+        var context = new AnnotationConfigApplicationContext();
+        var executor = Executors.newVirtualThreadPerTaskExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(1), executor);
+        var codecs = LoomspanJacksonCodecs.defaults();
+        var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
+                NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
+        CapabilityMetadata metadata = new CapabilityMetadata("test:root", "root", "Root",
+                SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
+                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("root", "Root"), null);
+        registry.register("root", metadata);
+        var template = new DefaultSkillTemplate(registry, router, runner, new ObjectMapper(),
+                new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
+        var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
+        org.mockito.Mockito.when(router.execute(any(), any(), any(), any())).thenReturn("ok");
+        var admitted = handoff.handoff("root", Map.of());
+        assertThat(lifecycle.activeRootCount()).isOne();
+
+        Thread stopper = Thread.ofVirtual().start(lifecycle::stop);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (lifecycle.deadlineNanos() == Long.MAX_VALUE && System.nanoTime() < deadline)
+            Thread.onSpinWait();
+
+        assertThat(admitted.invoke()).isEqualTo("ok");
+        stopper.join(Duration.ofSeconds(1));
+        assertThat(stopper.isAlive()).isFalse();
+        assertThat(lifecycle.activeRootCount()).isZero();
+        verify(router).execute(any(), any(), any(), any());
+        assertThatThrownBy(() -> handoff.handoff("root", Map.of()))
+                .isInstanceOf(ai.loomspan.api.SkillException.class)
+                .hasCauseInstanceOf(RejectedExecutionException.class);
+        lifecycle.destroy();
+        context.close();
+    }
+
     @Test
     void parentAndChildCloseEventsOnlyCloseTheirOwningLifecycle()
     {
@@ -269,33 +313,75 @@ class FrameworkShutdownIntegrationTest
         var context = new AnnotationConfigApplicationContext();
         var executor = Executors.newVirtualThreadPerTaskExecutor();
         var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofMillis(100), executor);
-        var hostGateClosed = new AtomicBoolean();
         var eventReturns = new AtomicInteger();
-        ApplicationListener<ContextClosedEvent> hostGate = event -> {
-            hostGateClosed.set(true);
+        context.refresh();
+        var codecs = LoomspanJacksonCodecs.defaults();
+        var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
+                NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        CapabilityMetadata metadata = new CapabilityMetadata("test:root", "root", "Root",
+                SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
+                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("root", "Root"), null);
+        registry.register("root", metadata);
+        CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
+        org.mockito.Mockito.when(router.execute(any(), any(), any(), any())).thenReturn("ok");
+        var template = new DefaultSkillTemplate(registry, router, runner, new ObjectMapper(),
+                new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
+        var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
+        var hostGate = new ApplicationDispatchGate(handoff);
+        ApplicationListener<ContextClosedEvent> hostCloseListener = event -> {
+            hostGate.close();
             eventReturns.incrementAndGet();
         };
         if (hostFirst)
         {
-            context.addApplicationListener(hostGate);
+            context.addApplicationListener(hostCloseListener);
             context.addApplicationListener(lifecycle);
         }
         else
         {
             context.addApplicationListener(lifecycle);
-            context.addApplicationListener(hostGate);
+            context.addApplicationListener(hostCloseListener);
         }
-        context.refresh();
-        var admitted = lifecycle.admitRoot();
+        var admitted = hostGate.handoff("root", Map.of());
+        assertThat(admitted).isNotNull();
 
         context.publishEvent(new ContextClosedEvent(context));
 
-        assertThat(hostGateClosed).isTrue();
+        assertThat(hostGate.closed()).isTrue();
         assertThat(eventReturns).hasValue(1);
         assertThatThrownBy(lifecycle::admitRoot).isInstanceOf(RejectedExecutionException.class);
-        admitted.close();
+        assertThat(admitted.invoke()).isEqualTo("ok");
+        verify(router).execute(any(), any(), any(), any());
+        assertThat(hostGate.handoff("root", Map.of())).isNull();
+        assertThat(hostGate.handoffAttempts()).isOne();
+        admitted.release();
         lifecycle.stop();
         lifecycle.destroy();
         context.close();
+    }
+
+    private static final class ApplicationDispatchGate
+    {
+        private final SkillInvocationHandoff handoff;
+        private boolean closed;
+        private int handoffAttempts;
+
+        private ApplicationDispatchGate(SkillInvocationHandoff handoff)
+        {
+            this.handoff = handoff;
+        }
+
+        synchronized AdmittedSkillInvocation handoff(String skillName, Map<String, Object> input)
+        {
+            if (closed) return null;
+            handoffAttempts++;
+            return handoff.handoff(skillName, input);
+        }
+
+        synchronized void close() { closed = true; }
+        synchronized boolean closed() { return closed; }
+        synchronized int handoffAttempts() { return handoffAttempts; }
     }
 }

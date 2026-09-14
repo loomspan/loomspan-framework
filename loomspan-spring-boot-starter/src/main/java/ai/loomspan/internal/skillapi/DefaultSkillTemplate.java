@@ -110,7 +110,7 @@ public class DefaultSkillTemplate implements SkillTemplate
         return invokePrepared(skillName, prepareMap(skillName, input), observer);
     }
 
-    private PreparedInput prepareObject(String skillName, Object input)
+    PreparedInput prepareObject(String skillName, Object input)
     {
         if (input == null)
         {
@@ -130,7 +130,7 @@ public class DefaultSkillTemplate implements SkillTemplate
         }
     }
 
-    private PreparedInput prepareMap(String skillName, Map<String, Object> input)
+    PreparedInput prepareMap(String skillName, Map<String, Object> input)
     {
         try
         {
@@ -175,16 +175,45 @@ public class DefaultSkillTemplate implements SkillTemplate
 
     private String invokePrepared(String skillName, PreparedInput prepared, Consumer<SkillExecutionView> observer)
     {
+        return invokePrepared(skillName, prepared, observer, null);
+    }
+
+    String invokePrepared(String skillName, PreparedInput prepared, Consumer<SkillExecutionView> observer,
+            @Nullable ai.loomspan.internal.core.FrameworkExecutionLifecycle.AdmittedRoot admittedRoot)
+    {
+        Authentication authentication;
         try
         {
-            Authentication authentication = securityContextStrategy.getContext().getAuthentication();
-            return sessionRunner.callWithNewSession(
-                    prepared.capability().name(), authentication,
-                    session -> executeValidated(prepared.capability(), prepared.validation(), session),
-                    (result, session, failure) -> {
-                        if (observer != null) observer.accept(executionViewMapper.map(session));
-                        return result;
-                    });
+            authentication = currentAuthentication();
+        }
+        catch (AccessDeniedException | SkillException ex)
+        {
+            throw ex;
+        }
+        catch (RuntimeException ex)
+        {
+            throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+        }
+        return invokePrepared(skillName, prepared, observer, authentication, admittedRoot);
+    }
+
+    String invokePrepared(String skillName, PreparedInput prepared, Consumer<SkillExecutionView> observer,
+            @Nullable Authentication authentication,
+            @Nullable ai.loomspan.internal.core.FrameworkExecutionLifecycle.AdmittedRoot admittedRoot)
+    {
+        try
+        {
+            java.util.function.Function<LoomspanSession, String> action =
+                    session -> executeValidated(prepared.capability(), prepared.validation(), session);
+            LoomspanSessionRunner.RootCompletion<String, String> completion = (result, session, failure) -> {
+                if (observer != null) observer.accept(executionViewMapper.map(session));
+                return result;
+            };
+            return admittedRoot == null
+                    ? sessionRunner.callWithNewSession(
+                            prepared.capability().name(), authentication, action, completion)
+                    : sessionRunner.callWithAdmittedSession(
+                            prepared.capability().name(), authentication, admittedRoot, action, completion);
         }
         catch (LoomspanSessionRunner.CompletionPhaseFailure ex)
         {
@@ -198,6 +227,11 @@ public class DefaultSkillTemplate implements SkillTemplate
         {
             throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
         }
+    }
+
+    Authentication currentAuthentication()
+    {
+        return securityContextStrategy.getContext().getAuthentication();
     }
 
     private String executeValidated(CapabilityMetadata capability,
@@ -248,7 +282,7 @@ public class DefaultSkillTemplate implements SkillTemplate
         return "Invalid input for skill '" + skillName + "': " + detail;
     }
 
-    private record PreparedInput(CapabilityMetadata capability, SkillInputValidationResult validation)
+    record PreparedInput(CapabilityMetadata capability, SkillInputValidationResult validation)
     {
     }
 }

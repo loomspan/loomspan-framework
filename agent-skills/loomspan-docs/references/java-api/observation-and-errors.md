@@ -27,6 +27,8 @@ post-session execution failure. Pre-session rejection and validation-only calls 
 callback. Delivery is synchronous on the caller after execution binding restoration and
 before the same admitted root is released. History is not guaranteed when session
 finalization or mapping fails and does not depend on Console storage or trace persistence.
+The same timing applies to `AdmittedSkillInvocation.invoke(observer)`; an
+explicit release racing a claimed execution cannot end root ownership early.
 
 Java, REST, and model-backed YAML roots all produce a skill mission and terminal outcome. Java and REST
 execution do not create a model interaction merely for observation. Existing
@@ -78,6 +80,7 @@ application callback.
 | Spring Security denies access | The original `AccessDeniedException` propagates |
 | Spring authentication failure at a Java proxy | Remains a failure; never successful tool text |
 | Runtime implementation failure | Safe `SkillException` message with the original cause |
+| Admitted handle already executed, released, or cut off | Safe `SkillException`; no new session or work |
 | Observer throws after success | The observer's runtime exception propagates unchanged |
 | Mapping or observer throws after execution failure | The original execution failure remains primary; the later failure is suppressed |
 | JVM `Error` | Not caught by the facade |
