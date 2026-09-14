@@ -13,7 +13,7 @@ import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.support.RouterFunctionMapping;
 import org.springframework.web.servlet.handler.AbstractUrlHandlerMapping;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
-import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+import org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping;
 import org.springframework.web.servlet.resource.ResourceHttpRequestHandler;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
@@ -39,8 +39,8 @@ public final class ObservabilityRouteCollisionDetector
     {
         for (HandlerMapping mapping : handlerMappings)
         {
-            if (mapping instanceof RequestMappingHandlerMapping requestMappings
-                    && annotatedCollision(requestMappings))
+            if (mapping instanceof RequestMappingInfoHandlerMapping requestMappings
+                    && handlerMethodCollision(requestMappings))
             {
                 return true;
             }
@@ -54,17 +54,11 @@ public final class ObservabilityRouteCollisionDetector
             {
                 return true;
             }
-            if (!(mapping instanceof RequestMappingHandlerMapping)
-                    && !(mapping instanceof AbstractUrlHandlerMapping)
-                    && !(mapping instanceof RouterFunctionMapping))
-            {
-                return true;
-            }
         }
         return false;
     }
 
-    private boolean annotatedCollision(RequestMappingHandlerMapping mappings)
+    private boolean handlerMethodCollision(RequestMappingInfoHandlerMapping mappings)
     {
         for (RequestMappingInfo mapping : mappings.getHandlerMethods().keySet())
         {
@@ -117,18 +111,20 @@ public final class ObservabilityRouteCollisionDetector
 
     private boolean overlaps(String patternValue)
     {
+        if (startsWithReservedNamespace(patternValue) || mayOverlapNamespace(patternValue))
+        {
+            return true;
+        }
         try
         {
             PathPattern pattern = parser.parse(patternValue);
             PathContainer root = PathContainer.parsePath(ObservabilityApiPaths.ROOT);
             PathContainer child = PathContainer.parsePath(ObservabilityApiPaths.ROOT + "/reserved-probe");
-            return pattern.matches(root) || pattern.matches(child)
-                    || startsWithReservedNamespace(patternValue)
-                    || mayOverlapNamespace(patternValue);
+            return pattern.matches(root) || pattern.matches(child);
         }
         catch (RuntimeException ex)
         {
-            return true;
+            return false;
         }
     }
 
@@ -169,27 +165,22 @@ public final class ObservabilityRouteCollisionDetector
         return last.indexOf('*') >= 0 || last.startsWith("{*");
     }
 
-    private static List<String> pathPatterns(RequestPredicate predicate)
+    private PredicatePathVisitor.PathResult pathResult(RequestPredicate predicate)
     {
-        PredicatePathVisitor visitor = new PredicatePathVisitor();
+        PredicatePathVisitor visitor = new PredicatePathVisitor(parser);
         predicate.accept(visitor);
-        return visitor.pathPatterns();
+        return visitor.pathResult();
     }
 
     private final class CollisionVisitor implements RouterFunctions.Visitor
     {
-        private final ArrayDeque<List<String>> nested = new ArrayDeque<>();
+        private final ArrayDeque<PredicatePathVisitor.PathResult> nested = new ArrayDeque<>();
         private boolean collision;
 
         @Override
         public void startNested(RequestPredicate predicate)
         {
-            List<String> paths = pathPatterns(predicate);
-            if (paths.isEmpty())
-            {
-                collision = true;
-            }
-            nested.addLast(paths.isEmpty() ? List.of("") : paths);
+            nested.addLast(pathResult(predicate));
         }
 
         @Override
@@ -201,15 +192,16 @@ public final class ObservabilityRouteCollisionDetector
         @Override
         public void route(RequestPredicate predicate, HandlerFunction<?> handlerFunction)
         {
-            List<String> leaves = pathPatterns(predicate);
-            if (leaves.isEmpty())
-            {
-                collision = true;
-                return;
-            }
+            PredicatePathVisitor.PathResult leafResult = pathResult(predicate);
+            List<String> leaves = leafResult.unconstrained() ? List.of("") : leafResult.paths();
+            if (leaves.isEmpty()) return;
             List<String> prefixes = List.of("");
-            for (List<String> nestedPaths : nested)
+            for (PredicatePathVisitor.PathResult nestedResult : nested)
             {
+                if (nestedResult.unclassifiable() && nestedResult.paths().isEmpty()) return;
+                List<String> nestedPaths = nestedResult.unconstrained()
+                        ? List.of("")
+                        : nestedResult.paths();
                 List<String> combined = new ArrayList<>(prefixes.size() * nestedPaths.size());
                 for (String prefix : prefixes)
                 {
@@ -224,7 +216,8 @@ public final class ObservabilityRouteCollisionDetector
             {
                 for (String leaf : leaves)
                 {
-                    collision |= overlaps((prefix + leaf).replace("//", "/"));
+                    String candidate = (prefix + leaf).replace("//", "/");
+                    collision |= candidate.isEmpty() || overlaps(candidate);
                 }
             }
         }
@@ -232,7 +225,6 @@ public final class ObservabilityRouteCollisionDetector
         @Override
         public void resources(java.util.function.Function<ServerRequest, Optional<Resource>> lookupFunction)
         {
-            collision = true;
         }
 
         @Override
@@ -243,20 +235,23 @@ public final class ObservabilityRouteCollisionDetector
         @Override
         public void unknown(RouterFunction<?> routerFunction)
         {
-            collision = true;
         }
     }
 
     private static final class PredicatePathVisitor implements RequestPredicates.Visitor
     {
+        private final PathPatternParser parser;
         private final ArrayDeque<Frame> frames = new ArrayDeque<>();
         private PathResult result;
 
-        List<String> pathPatterns()
+        private PredicatePathVisitor(PathPatternParser parser)
         {
-            return result == null || result.unclassifiable() || result.unconstrained()
-                    ? List.of()
-                    : result.paths();
+            this.parser = parser;
+        }
+
+        PathResult pathResult()
+        {
+            return result == null ? PathResult.unclassifiableResult() : result;
         }
 
         @Override
@@ -397,12 +392,8 @@ public final class ObservabilityRouteCollisionDetector
             }
         }
 
-        private static PathResult combine(Operator operator, PathResult left, PathResult right)
+        private PathResult combine(Operator operator, PathResult left, PathResult right)
         {
-            if (left.unclassifiable() || right.unclassifiable())
-            {
-                return PathResult.unclassifiableResult();
-            }
             if (operator == Operator.OR)
             {
                 if (left.unconstrained() || right.unconstrained())
@@ -411,11 +402,161 @@ public final class ObservabilityRouteCollisionDetector
                 }
                 List<String> alternatives = new ArrayList<>(left.paths());
                 right.paths().stream().filter(path -> !alternatives.contains(path)).forEach(alternatives::add);
-                return new PathResult(false, false, List.copyOf(alternatives));
+                return new PathResult(left.unclassifiable() || right.unclassifiable(), false,
+                        List.copyOf(alternatives));
             }
+            if (left.unclassifiable() && left.paths().isEmpty())
+                return PathResult.unclassifiableResult();
+            if (right.unclassifiable() && right.paths().isEmpty())
+                return PathResult.unclassifiableResult();
             if (left.unconstrained()) return right;
             if (right.unconstrained()) return left;
-            return left.paths().equals(right.paths()) ? left : PathResult.unclassifiableResult();
+            List<String> intersections = new ArrayList<>();
+            for (String leftPath : left.paths())
+            {
+                for (String rightPath : right.paths())
+                {
+                    addKnownIntersection(leftPath, rightPath, intersections);
+                }
+            }
+            return intersections.isEmpty()
+                    ? PathResult.unclassifiableResult()
+                    : new PathResult(left.unclassifiable() || right.unclassifiable(), false,
+                            List.copyOf(intersections));
+        }
+
+        private void addKnownIntersection(String left, String right, List<String> intersections)
+        {
+            if (left.equals(right))
+            {
+                addDistinct(intersections, left);
+                return;
+            }
+            try
+            {
+                PathPattern leftPattern = parser.parse(left);
+                PathPattern rightPattern = parser.parse(right);
+                addMatchingLiteral(left, rightPattern, intersections);
+                addMatchingLiteral(right, leftPattern, intersections);
+                addSharedWitness(ObservabilityApiPaths.ROOT, leftPattern, rightPattern, intersections);
+                addSharedWitness(ObservabilityApiPaths.ROOT + "/reserved-probe",
+                        leftPattern, rightPattern, intersections);
+                addPatternWitness(left, leftPattern, rightPattern, intersections);
+                addPatternWitness(right, leftPattern, rightPattern, intersections);
+                addAlignedSegmentWitness(left, right, leftPattern, rightPattern, intersections);
+            }
+            catch (RuntimeException ex)
+            {
+                // An invalid or otherwise unclassifiable intersection supplies no positive path evidence.
+            }
+        }
+
+        private static void addMatchingLiteral(String candidate, PathPattern pattern,
+                List<String> intersections)
+        {
+            if (candidate.indexOf('{') < 0 && candidate.indexOf('*') < 0
+                    && candidate.indexOf('?') < 0
+                    && pattern.matches(PathContainer.parsePath(candidate)))
+            {
+                addDistinct(intersections, candidate);
+            }
+        }
+
+        private static void addSharedWitness(String candidate, PathPattern left, PathPattern right,
+                List<String> intersections)
+        {
+            PathContainer path = PathContainer.parsePath(candidate);
+            if (left.matches(path) && right.matches(path))
+            {
+                addDistinct(intersections, candidate);
+            }
+        }
+
+        private static void addAlignedSegmentWitness(String leftValue, String rightValue,
+                PathPattern left, PathPattern right, List<String> intersections)
+        {
+            String[] leftSegments = segments(leftValue);
+            String[] rightSegments = segments(rightValue);
+            if (leftSegments.length != rightSegments.length) return;
+
+            String[] reservedSegments = segments(ObservabilityApiPaths.ROOT);
+            StringBuilder candidate = new StringBuilder();
+            for (int index = 0; index < leftSegments.length; index++)
+            {
+                String leftSegment = leftSegments[index];
+                String rightSegment = rightSegments[index];
+                String segment;
+                if (!dynamicSegment(leftSegment) && !dynamicSegment(rightSegment))
+                {
+                    if (!leftSegment.equals(rightSegment)) return;
+                    segment = leftSegment;
+                }
+                else if (!dynamicSegment(leftSegment))
+                {
+                    segment = leftSegment;
+                }
+                else if (!dynamicSegment(rightSegment))
+                {
+                    segment = rightSegment;
+                }
+                else
+                {
+                    segment = index < reservedSegments.length
+                            ? reservedSegments[index]
+                            : "reserved-probe";
+                }
+                candidate.append('/').append(segment);
+            }
+            String candidateValue = candidate.isEmpty() ? "/" : candidate.toString();
+            PathContainer path = PathContainer.parsePath(candidateValue);
+            if (startsWithReservedNamespace(candidateValue)
+                    && left.matches(path) && right.matches(path))
+            {
+                addDistinct(intersections, candidateValue);
+            }
+        }
+
+        private static void addPatternWitness(String pattern, PathPattern left, PathPattern right,
+                List<String> intersections)
+        {
+            String[] patternSegments = segments(pattern);
+            String[] reservedSegments = segments(ObservabilityApiPaths.ROOT);
+            StringBuilder candidate = new StringBuilder();
+            for (int index = 0; index < patternSegments.length; index++)
+            {
+                String segment = patternSegments[index];
+                if (dynamicSegment(segment))
+                {
+                    segment = index < reservedSegments.length
+                            ? reservedSegments[index]
+                            : "reserved-probe";
+                }
+                candidate.append('/').append(segment);
+            }
+            String candidateValue = candidate.isEmpty() ? "/" : candidate.toString();
+            PathContainer path = PathContainer.parsePath(candidateValue);
+            if (startsWithReservedNamespace(candidateValue)
+                    && left.matches(path) && right.matches(path))
+            {
+                addDistinct(intersections, candidateValue);
+            }
+        }
+
+        private static String[] segments(String pattern)
+        {
+            String value = pattern.startsWith("/") ? pattern.substring(1) : pattern;
+            return value.isEmpty() ? new String[0] : value.split("/");
+        }
+
+        private static boolean dynamicSegment(String segment)
+        {
+            return segment.indexOf('{') >= 0 || segment.indexOf('*') >= 0
+                    || segment.indexOf('?') >= 0;
+        }
+
+        private static void addDistinct(List<String> intersections, String candidate)
+        {
+            if (!intersections.contains(candidate)) intersections.add(candidate);
         }
 
         private enum Operator { AND, OR, NEGATE }

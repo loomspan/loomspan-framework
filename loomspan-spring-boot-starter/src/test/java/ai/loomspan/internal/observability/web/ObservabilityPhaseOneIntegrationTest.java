@@ -129,7 +129,8 @@ class ObservabilityPhaseOneIntegrationTest
 
     @SpringBootConfiguration
     @EnableAutoConfiguration(exclude = { SecurityAutoConfiguration.class,
-            ServletWebSecurityAutoConfiguration.class })
+            ServletWebSecurityAutoConfiguration.class }, excludeName =
+            "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration")
     static class TestApplication
     {
     }

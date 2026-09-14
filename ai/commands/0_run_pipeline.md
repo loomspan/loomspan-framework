@@ -46,6 +46,22 @@ small, read-only current-checkout scan. This is triage, not Step 1 research:
    conditions that would upgrade the route. Mark verification details that
    need later investigation as unknown rather than researching them now.
 
+Use the shared protocol's display labels. Start the triage report with
+`**Recommended:** <display label>` and `**Confidence:** <High | Medium | Low>`.
+For the Full 5-Step Pipeline, list each expected step separately:
+
+1. Research — research artifact
+2. Implementation Planning — implementation plan
+3. Test Planning — testing plan
+4. Implementation & Verification — implementation and verification results
+5. Independent Review — fresh review, repeated when fixes are applied
+
+For the Fast-Track 2-Step Pipeline — Implementation & Review, list Step 4
+(Implementation & Verification) and Step 5 (Independent Review). For Direct
+Implementation — No Independent Review, list only Step 4 (Implementation &
+Verification) and state that no independent review is performed. Include
+route-specific verification details and artifacts alongside these steps.
+
 Step 0 makes no file edits, launches no research subagents, runs no tests, and
 does not trace the whole system or resolve implementation details.
 
@@ -67,6 +83,11 @@ evidence. If triage indicates that an explicit `fast-track` or
 expensive safe upgrade. Always honor an explicit `full` profile even when a
 lighter route appears sufficient.
 
+At the auto gate, ask: `Please confirm that I should proceed with the
+**<display label>**.` For example: `Please confirm that I should proceed with
+the **Full 5-Step Pipeline**.` This wording does not add a confirmation gate
+when the developer has already selected a safe profile.
+
 An unsafe requested profile is not selected for execution. If the developer
 declines the necessary upgrade, stop unless revised scope or new evidence
 removes the trigger. Do not repeatedly ask the same question or treat acceptance
@@ -79,9 +100,9 @@ reassessment rule and the profile-upgrade flow below.
 
 | Profile | Route | Durable process artifacts |
 | --- | --- | --- |
-| Full | Steps 1, 2+3, 4, and 5 | Research, implementation plan, testing plan, implementation, and review |
-| Fast track | Step 4 in ticket-led fast-track mode, then Step 5 | Implementation and independent review; no research or plan artifact required |
-| Direct | Step 4 in ticket-led direct mode | Implementation only; no research, plan, testing-plan, or independent-review artifact required |
+| Full 5-Step Pipeline | Steps 1, 2, 3, 4, and 5; Steps 2 and 3 share a context | Research, implementation plan, testing plan, implementation, and review |
+| Fast-Track 2-Step Pipeline — Implementation & Review | Step 4 in ticket-led fast-track mode, then Step 5 | Implementation and independent review; no research or plan artifact required |
+| Direct Implementation — No Independent Review | Step 4 in ticket-led direct mode | Implementation only; no research, plan, testing-plan, or independent-review artifact required |
 
 Step 4 performs targeted reconnaissance and creates an internal working and
 verification checklist when invoked without plans. Step 5 accepts the ticket

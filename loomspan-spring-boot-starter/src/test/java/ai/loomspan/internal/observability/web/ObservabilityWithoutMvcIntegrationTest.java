@@ -39,7 +39,8 @@ class ObservabilityWithoutMvcIntegrationTest
     @EnableAutoConfiguration(exclude = {
             SecurityAutoConfiguration.class,
             WebMvcAutoConfiguration.class
-    })
+    }, excludeName =
+            "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration")
     static class TestApplication
     {
     }

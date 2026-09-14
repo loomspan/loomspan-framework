@@ -16,6 +16,20 @@ Direct is still pipeline mode. The orchestrator supplies the selected profile
 to every stage. Ticket recommendations, saved execution notes, and absent
 artifacts are not authorization to select or change a profile.
 
+Use these display labels in developer-facing recommendations, confirmations,
+upgrade requests, and report prose:
+
+| Profile value | Display label |
+| --- | --- |
+| `full` | Full 5-Step Pipeline |
+| `fast-track` | Fast-Track 2-Step Pipeline — Implementation & Review |
+| `direct` | Direct Implementation — No Independent Review |
+
+Keep `full`, `fast-track`, and `direct` as command values, orchestration
+identifiers, and structured `PROFILE` field values. Step counts exclude Step 0
+triage and count the defined stages, not agent contexts or repeated review
+passes. The full route has five steps even though Steps 2 and 3 share a context.
+
 Use this single eligibility table for advisory ticket recommendations, Step 0
 triage, and later reassessment. Only `0_run_pipeline.md` selects the run's route.
 
