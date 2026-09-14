@@ -1,5 +1,24 @@
 # Beta 4 ticket preparation
 
+## Current handoff — 2026-09-13
+
+Framework feature implementation and documentation/local readiness preparation
+have landed. The developer confirmed the completed framework manual acceptance
+checks; SC5 integration and final release gates remain pending. The SC phases
+have been aligned with framework `385729a254261de128df491505acd8898cc0a021`
+and transferred to the Sidecar repository. Its
+[delivery handoff](../../../loomspan-sidecar/ai/thoughts/beta4-handoff.md)
+now owns Sidecar bootstrap and ticket sequencing, and its committed ticket
+command uses dated filenames. The old empty-checkout and proposed-PR-number
+instructions below are historical, not current Sidecar workflow requirements.
+The original planning rationale and framework acceptance ownership follow.
+
+The subsequent local-first decision also supersedes the original Sidecar CI
+bootstrap instructions below: develop against the locally installed snapshot,
+retain local integration evidence, publish framework beta.4 to Maven Central,
+then run Sidecar's final build/tests and CI against that release before its final
+commit. Sidecar CI does not build framework source.
+
 This completes the planning pass requested before ticket creation. It assigns
 ownership and coherent delivery boundaries, not PR numbers, tickets, source
 changes, or detailed implementation/test plans. No pipeline has been started.
@@ -65,11 +84,11 @@ The linked phase checklist remains the requirement text.
 | [FW2](phases/phase-fw2.md#acceptance-criteria) | 11 | External caller API owns all catalog/pre-check/observer criteria, including both null-overload rules, callback cardinality/context/exception precedence, and overlap with the existing root shutdown lifecycle. |
 | [FW3](phases/phase-fw3.md#acceptance-criteria) | 5 | REST skills and Console owns all operator DTO, deterministic fixture, UI/trace rendering, compatibility-marker, and cross-language verification criteria. |
 | [FW4](phases/phase-fw4.md#acceptance-criteria) | 5 | Framework documentation/readiness owns all documentation/version and cumulative public-surface checks. Feature units supply the actual feature tests. Final release-commit/workflow verification occurs after the SC5 snapshot integration gate and before framework publication. |
-| [SC1](phases/phase-sc1.md#acceptance-criteria) | 6 | Sidecar scaffold owns all build, architecture, mount/model configuration, CI, and pin checks. |
-| [SC2](phases/phase-sc2.md#acceptance-criteria) | 21 | Authenticated execution API owns every admission/accounting, HTTP/outcome, ownership/expiry, diagnostic mode, payload and queued-auth criterion. Its shutdown gate has local application proof here; SC5 adds packaged lifecycle/resource proof. |
-| [SC3](phases/phase-sc3.md#acceptance-criteria) | 7 | Authenticated execution API owns every decoder/key mode, claim/role/prefix, namespace security, JWT identity propagation and error-envelope criterion. Use a test handler here; SC4 proves the real outbound callback. |
-| [SC4](phases/phase-sc4.md#acceptance-criteria) | 16 | Generic REST handler owns every file/startup, binding, transport, response, auth, TLS, restart and callback criterion. |
-| [SC5](phases/phase-sc5.md#acceptance-criteria) | 10 | Sidecar packaging/release owns all packaged lifecycle, probe, quick-start, configuration reference and release-pin/image/archive criteria, plus snapshot and released-dependency integration gates. |
+| [SC1](../../../loomspan-sidecar/ai/thoughts/phases/phase-sc1.md#acceptance-criteria) | 6 | Sidecar scaffold owns all build, architecture, mount/model configuration, CI, and pin checks. |
+| [SC2](../../../loomspan-sidecar/ai/thoughts/phases/phase-sc2.md#acceptance-criteria) | 21 | Authenticated execution API owns every admission/accounting, HTTP/outcome, ownership/expiry, diagnostic mode, payload and queued-auth criterion. Its shutdown gate has local application proof here; SC5 adds packaged lifecycle/resource proof. |
+| [SC3](../../../loomspan-sidecar/ai/thoughts/phases/phase-sc3.md#acceptance-criteria) | 7 | Authenticated execution API owns every decoder/key mode, claim/role/prefix, namespace security, JWT identity propagation and error-envelope criterion. Use a test handler here; SC4 proves the real outbound callback. |
+| [SC4](../../../loomspan-sidecar/ai/thoughts/phases/phase-sc4.md#acceptance-criteria) | 16 | Generic REST handler owns every file/startup, binding, transport, response, auth, TLS, restart and callback criterion. |
+| [SC5](../../../loomspan-sidecar/ai/thoughts/phases/phase-sc5.md#acceptance-criteria) | 10 | Sidecar packaging/release owns all packaged lifecycle, probe, quick-start, configuration reference and release-pin/image/archive criteria, plus snapshot and released-dependency integration gates. |
 
 Total: **101 existing checkboxes**. Cross-phase extensions above add evidence
 where new components become available; they do not move the owning feature's

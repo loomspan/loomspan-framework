@@ -1,5 +1,20 @@
 # Beta 4 roadmap — REST skills and Loomspan Sidecar
 
+## Current delivery status — 2026-09-13
+
+FW1–FW3 implementation and FW4 documentation/local snapshot preparation have
+landed through PRs 5.1–5.4. The developer confirmed the completed framework
+manual acceptance checks. FW4's final release gates remain pending until SC5
+snapshot integration and final release-commit validation.
+
+SC1–SC5 were reviewed against implemented framework commit
+`385729a254261de128df491505acd8898cc0a021` and transferred to Sidecar. Their
+[authoritative handoff](../../../../loomspan-sidecar/ai/thoughts/beta4-handoff.md)
+and [alignment evidence](../../../../loomspan-sidecar/ai/thoughts/beta4-framework-alignment.md)
+now live there; the local SC files below forward to those phases. This roadmap
+retains the cross-repository release sequence and original product decisions;
+its Sidecar summaries defer to the transferred phase requirements.
+
 ## Purpose
 
 Beta 4 extends Loomspan's reach beyond applications that embed the Spring
@@ -37,8 +52,9 @@ FW1 and FW2, have now received source grounding at `1e4eb455`; see
 [the grounding report](../beta4-code-grounding.md). G1–G3 product policies are
 resolved. R1 now uses independent, prompt shutdown-event listeners followed
 by the framework's bounded lifecycle wait, without a cross-repository
-listener-order contract. Required cutoff/observer-lifetime corrections remain;
-see the review and grounding report's fresh-recheck sections.
+listener-order contract. The originally required cutoff/observer-lifetime
+corrections are implemented by PRs 5.1 and 5.3; the review and grounding report's
+fresh-recheck sections describe their pre-implementation evidence.
 The accepted simplicity pass requires one root completion path, one Sidecar
 admission/accounting owner, initial API/JWT delivery together, and reuse of
 existing declaration metadata, catalog completion, and test fixtures.
@@ -58,8 +74,12 @@ Sidecar application wiring or end-to-end behavior.
   release and tags its own.
 - During development Sidecar depends on
   `ai.loomspan:loomspan-spring-boot-starter:1.0.0-beta.4-SNAPSHOT` from a
-  local `mvn install`. Sidecar CI builds the framework at a pinned commit
-  before building Sidecar. No snapshot repository is introduced.
+  local `mvn install`. Record the installed framework source revision; Sidecar
+  consumes that local artifact without rebuilding framework source. After local
+  integration and framework release checks, publish framework beta.4 to Maven
+  Central, then switch Sidecar to the release for its final build/tests and final
+  commit. Sidecar CI consumes the published artifact; pre-publication Sidecar CI
+  is not required. No snapshot repository is introduced.
 
 ### Sidecar uses only the public Java API
 
@@ -475,7 +495,7 @@ phase deliverables alongside REST.
 
 | Phase | Outcome | Boundary and dependencies |
 | --- | --- | --- |
-| SC1 — Scaffold | New repository; Spring Boot 4 app on the starter; ArchUnit public-API-only test; `file:` skill loading; environment-driven configuration; local-install dependency strategy; CI building the framework at a pinned commit; Maven/release version checks and a recorded framework pin; no extra script without coupled artifacts. | Starts after framework implementation, using the locally installed snapshot before release. |
+| SC1 — Scaffold | New repository; Spring Boot 4 app on the starter; ArchUnit public-API-only test; `file:` skill loading; environment-driven configuration; local-install dependency strategy; CI consuming the published framework artifact after local integration and framework publication; Maven/release version checks and a recorded framework pin; no extra script without coupled artifacts. | Starts after framework implementation, using the locally installed snapshot before release. |
 | SC2 — Execution API | Async-only execution endpoints with polling, in-memory TTL store, catalog endpoint, problem-detail error mapping, `SkillExecutionView` projection. | Depends on SC1 and the framework snapshot; initial delivery is grouped with SC3 JWT authentication. |
 | SC3 — Inbound authentication | JWT-only resource server → verified identity and roles → Spring `Authentication`; explicit issuer/subject ownership; same-token passthrough to the host app. | Initial delivery is grouped with SC2 after SC1. |
 | SC4 — Generic REST handler | `RestSkillHandler` implementation: one `rest-routes.yaml` containing `targets` and `routes`, selected by `rest-routes-location`, with startup-only loading and validation, fixed input binding, `none`/`static`/`caller-passthrough` auth, SSL bundles, response handling and failure semantics. | Depends on SC3. Implements the FW1 SPI against the local snapshot during development. |
@@ -504,9 +524,11 @@ FW1 lifecycle -> [FW1 REST + FW3] -> FW2 -> FW4 -> SC1
 
 During development, run `mvn install` in the framework repository and build
 Sidecar against `1.0.0-beta.4-SNAPSHOT` from the local Maven repository.
-Reinstall after framework changes. Sidecar CI builds and installs the
-framework at its recorded commit before building against the snapshot; no
-snapshot repository is needed. Framework API gaps are resolved deliberately
+Reinstall after framework changes and record the actual installed revision.
+Sidecar CI resolves the published beta.4 Maven dependency after framework
+publication; no framework-source build job or snapshot repository is needed.
+Use retained local evidence for pre-publication Sidecar integration.
+Framework API gaps are resolved deliberately
 in this repository before release, never by Sidecar reaching for internals.
 
 Before tagging the framework, prove the Sidecar integration end to end:
@@ -519,18 +541,14 @@ again, and complete its release in SC5. Released versions are not overwritten.
 
 ## Next step
 
-The design and ticket-preparation passes are complete; no substantive review
-decision remains. The [handoff](../beta4-ticket-readiness.md) maps all phase
-acceptance criteria to delivery units and records Sidecar bootstrap prerequisites.
-The cutoff/observer gaps remain implementation work owned by FW1/FW2, not
-an excuse to add another execution path. Framework tickets can be created
-when requested using `ai/commands/write_ticket.md`; this planning pass has
-not created tickets or started implementation.
-Implementation must still prove the phase acceptance criteria, particularly
-Sidecar application startup, HTTP/JWT integration, limits, and shutdown.
-The Sidecar checkout now exists at `C:/opendev/code/loomspan-sidecar`.
-Seed its workflow before creating the scaffold ticket. All Sidecar tickets,
-including the scaffold ticket, must be created in
-`C:\opendev\code\loomspan-sidecar\ai\thoughts\tickets`. Transfer its
-phase documents as specified in the handoff and replace
-these local copies with links, avoiding two editable sets of requirements.
+The [SC1 scaffold ticket](../../../../loomspan-sidecar/ai/thoughts/tickets/2026-09-13-sidecar-scaffold.md)
+is prepared in the committed Sidecar workflow and recommends the full profile.
+Run its pipeline from `C:/opendev/code/loomspan-sidecar` when implementation is
+requested. Follow with SC2+SC3 together, SC4, then SC5 preparation and integration.
+This handoff has not started application implementation or release work.
+
+Keep framework available for integration-discovered defects. Framework-only
+tests do not prove Sidecar startup, HTTP/JWT, queue accounting, route transport
+or packaged shutdown. The
+[release-readiness record](../release-readiness/1.0.0-beta.4.md)
+continues to gate final framework validation and publication on SC5 evidence.
