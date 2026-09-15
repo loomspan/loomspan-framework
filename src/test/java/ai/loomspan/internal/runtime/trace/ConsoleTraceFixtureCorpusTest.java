@@ -2892,7 +2892,7 @@ class ConsoleTraceFixtureCorpusTest
     {
         Path cwd = Path.of(System.getProperty("user.dir")).toAbsolutePath();
         Path direct = cwd.resolve("loomspan-console-fixtures");
-        if (Files.isDirectory(direct) || Files.isDirectory(cwd.resolve("loomspan-spring-boot-starter")))
+        if (Files.isDirectory(direct) || Files.isDirectory(cwd.resolve("src/main/java/ai/loomspan")))
         {
             return direct;
         }

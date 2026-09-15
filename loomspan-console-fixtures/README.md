@@ -35,13 +35,13 @@ failure and attempt summaries.
 The Java test generates valid cases through `DefaultExecutionTraceHandle`; invalid cases are minimal named mutations. Normal tests generate into a temporary directory and byte-compare the complete inventory:
 
 ```text
-mvn -pl loomspan-spring-boot-starter -Dtest=ConsoleTraceFixtureCorpusTest test
+mvn -Dtest=ConsoleTraceFixtureCorpusTest test
 ```
 
 Regenerate intentionally with:
 
 ```text
-mvn -pl loomspan-spring-boot-starter -Dtest=ConsoleTraceFixtureCorpusTest -Dloomspan.console.fixtures.regenerate=true test
+mvn -Dtest=ConsoleTraceFixtureCorpusTest -Dloomspan.console.fixtures.regenerate=true test
 ```
 
 Run regeneration twice and require the second run to produce no diff. PR 06 will stream this same corpus as artifacts, and PR 13 will consume these expected results from Go; neither should copy it elsewhere.

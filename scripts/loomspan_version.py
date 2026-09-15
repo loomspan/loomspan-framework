@@ -15,9 +15,6 @@ import sys
 import xml.etree.ElementTree as ET
 
 
-MODULE_POMS = (
-    Path("loomspan-spring-boot-starter/pom.xml"),
-)
 VERSIONED_SKILLS = (
     Path("loomspan-console/agent-skills/loomspan/SKILL.md"),
     Path("agent-skills/loomspan-docs/SKILL.md"),
@@ -71,18 +68,6 @@ def read_root_version(root: Path) -> str:
     return version
 
 
-def read_parent_version(pom: Path) -> str:
-    try:
-        project = ET.parse(pom).getroot()
-    except (ET.ParseError, OSError) as exc:
-        raise VersionCommandError(f"Cannot read module POM {pom}: {exc}") from exc
-    parent = _direct_child(project, "parent")
-    return _required_text(
-        _direct_child(parent, "version") if parent is not None else None,
-        f"parent version in {pom}",
-    )
-
-
 def read_skill_version(skill_file: Path) -> str:
     try:
         lines = skill_file.read_text(encoding="utf-8").splitlines()
@@ -106,12 +91,6 @@ def check_consistency(root: Path, expected: str | None = None) -> str:
         raise VersionCommandError(
             f"Root POM version {version!r} does not equal expected version {expected!r}"
         )
-    for relative in MODULE_POMS:
-        actual = read_parent_version(root / relative)
-        if actual != version:
-            raise VersionCommandError(
-                f"{relative} parent version {actual!r} does not equal {version!r}"
-            )
     for relative in VERSIONED_SKILLS:
         actual = read_skill_version(root / relative)
         if actual != version:
@@ -193,7 +172,7 @@ def set_version(root: Path, new_version: str) -> tuple[Path, ...]:
         raise VersionCommandError(f"Project already uses version {new_version}")
 
     files = tracked_text_files_containing(root, old_version)
-    required = {root / "pom.xml", *(root / path for path in MODULE_POMS), *(root / path for path in VERSIONED_SKILLS)}
+    required = {root / "pom.xml", *(root / path for path in VERSIONED_SKILLS)}
     if not required.issubset(files):
         missing = sorted(str(path.relative_to(root)) for path in required.difference(files))
         raise VersionCommandError(

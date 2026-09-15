@@ -23,7 +23,7 @@ matching the Loomspan Maven dependency once releases exist.
 
 The supported Java surface is closed. Its executable authority is the exact
 allowlist in
-`loomspan-spring-boot-starter/src/test/java/ai/loomspan/architecture/LoomspanPublicSurfaceArchitectureTest.java`.
+`src/test/java/ai/loomspan/architecture/LoomspanPublicSurfaceArchitectureTest.java`.
 The allowlist currently contains only:
 
 - `SkillTemplate`

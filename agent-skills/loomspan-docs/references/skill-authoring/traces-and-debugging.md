@@ -281,7 +281,7 @@ An exhausted violation is terminal and produces no accepted `PLAN_CREATED`.
 Constraint and evidence failures may produce separate structured validation
 records while sharing the same single corrective attempt.
 
-`DefaultPlanningService.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/runtime/planning/DefaultPlanningService.java`)
+`DefaultPlanningService.java` (`src/main/java/ai/loomspan/internal/runtime/planning/DefaultPlanningService.java`)
 owns deterministic planning retry and trace behavior. `PlanningServiceTest`,
 `PlanTaskConstraintValidatorTest`, and `ExecutionTraceContractTest` protect
 constraint/evidence retries, terminal rejection, and attempt linkage.
@@ -333,8 +333,8 @@ recovery policy for that case.
 
 Implementation and evidence anchors:
 
-- `OutputSchemaValidator.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/outputschema/OutputSchemaValidator.java`) normalizes parser and schema facts; `OutputSchemaValidatorTest` protects paths, expected/actual types, fallbacks, and bounds.
-- `OutputSchemaCallAdvisor.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisor.java`) owns retry accounting and latest-only message construction; `OutputSchemaCallAdvisorTest` protects roles, replacement, truncation, inert candidate handling, and exhaustion.
+- `OutputSchemaValidator.java` (`src/main/java/ai/loomspan/internal/outputschema/OutputSchemaValidator.java`) normalizes parser and schema facts; `OutputSchemaValidatorTest` protects paths, expected/actual types, fallbacks, and bounds.
+- `OutputSchemaCallAdvisor.java` (`src/main/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisor.java`) owns retry accounting and latest-only message construction; `OutputSchemaCallAdvisorTest` protects roles, replacement, truncation, inert candidate handling, and exhaustion.
 - `ExecutionCoordinatorOutputSchemaIntegrationTest` protects managed retry ordering and outcomes, while `ModelAttemptCallAdvisorIntegrationTest#outputSchemaRetryReusesCompletedToolResultWhenCorrectionReturnsJsonDirectly` protects the compliant one-tool-execution path without claiming a hard tool-call block.
 
 ## Usage interpretation
@@ -438,13 +438,13 @@ cross-version application contracts.
 
 ## Implementation and test anchors
 
-- `ProviderAttemptCallAdvisor.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/chat/ProviderAttemptCallAdvisor.java`) owns the final pre-provider attempt boundary.
-- `ModelTraceContext.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/core/ModelTraceContext.java`) owns retry-sequence and attempt identity.
-- `TraceCompletion.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/core/TraceCompletion.java`) and `TraceOutcome.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/core/TraceOutcome.java`) define terminal semantics.
-- `DefaultCapabilityInvoker.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/runtime/tool/DefaultCapabilityInvoker.java`) owns the pre-capability boundary, and `ExecutionStateServiceTest` protects canonical planned and unplanned start payloads.
+- `ProviderAttemptCallAdvisor.java` (`src/main/java/ai/loomspan/internal/chat/ProviderAttemptCallAdvisor.java`) owns the final pre-provider attempt boundary.
+- `ModelTraceContext.java` (`src/main/java/ai/loomspan/internal/core/ModelTraceContext.java`) owns retry-sequence and attempt identity.
+- `TraceCompletion.java` (`src/main/java/ai/loomspan/internal/core/TraceCompletion.java`) and `TraceOutcome.java` (`src/main/java/ai/loomspan/internal/core/TraceOutcome.java`) define terminal semantics.
+- `DefaultCapabilityInvoker.java` (`src/main/java/ai/loomspan/internal/runtime/tool/DefaultCapabilityInvoker.java`) owns the pre-capability boundary, and `ExecutionStateServiceTest` protects canonical planned and unplanned start payloads.
 - `SpringAiChatClientAssemblerIntegrationTest` protects the single tool loop, semantic/provider scope, and exact model-turn/tool counts; `SpringAiObservationIntegrationTest` protects safe observation defaults and accounting canaries.
-- `ModelAttemptCallAdvisorIntegrationTest.java` (`loomspan-spring-boot-starter/src/test/java/ai/loomspan/internal/chat/ModelAttemptCallAdvisorIntegrationTest.java`) protects retry cardinality, attempt-local stack capture, diagnostic ordering, failure behavior, usage, and quota enforcement.
-- `LoomspanSessionRunnerTest.java` (`loomspan-spring-boot-starter/src/test/java/ai/loomspan/internal/core/LoomspanSessionRunnerTest.java`) and `ExecutionCoordinatorTest.java` (`loomspan-spring-boot-starter/src/test/java/ai/loomspan/internal/core/ExecutionCoordinatorTest.java`) protect terminal failure linkage.
+- `ModelAttemptCallAdvisorIntegrationTest.java` (`src/test/java/ai/loomspan/internal/chat/ModelAttemptCallAdvisorIntegrationTest.java`) protects retry cardinality, attempt-local stack capture, diagnostic ordering, failure behavior, usage, and quota enforcement.
+- `LoomspanSessionRunnerTest.java` (`src/test/java/ai/loomspan/internal/core/LoomspanSessionRunnerTest.java`) and `ExecutionCoordinatorTest.java` (`src/test/java/ai/loomspan/internal/core/ExecutionCoordinatorTest.java`) protect terminal failure linkage.
 - `LoomspanSessionTest`, Go `failures.go`/diagnostic query tests, the runtime
   fixture corpus, and `TraceExplorer` component tests protect stable failure
   identity, completion-derived terminality, bounded retrieval, and inert text.

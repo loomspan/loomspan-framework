@@ -68,7 +68,7 @@ Task-count constraints cannot express conditional branches, ordering, dependenci
 
 ## Implementation and test anchors
 
-- `YamlSkillManifest.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/skill/YamlSkillManifest.java`) defines the structured entry shape; `YamlSkillCatalog.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/skill/YamlSkillCatalog.java`) validates and normalizes it.
-- `PlanTaskConstraintValidator.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/runtime/planning/PlanTaskConstraintValidator.java`) defines exact counting and stable issue codes.
-- `DefaultPlanningService.java` (`loomspan-spring-boot-starter/src/main/java/ai/loomspan/internal/runtime/planning/DefaultPlanningService.java`) owns prompt rendering, visibility preflight, retry composition, trace facts, and terminal rejection.
+- `YamlSkillManifest.java` (`src/main/java/ai/loomspan/internal/skill/YamlSkillManifest.java`) defines the structured entry shape; `YamlSkillCatalog.java` (`src/main/java/ai/loomspan/internal/skill/YamlSkillCatalog.java`) validates and normalizes it.
+- `PlanTaskConstraintValidator.java` (`src/main/java/ai/loomspan/internal/runtime/planning/PlanTaskConstraintValidator.java`) defines exact counting and stable issue codes.
+- `DefaultPlanningService.java` (`src/main/java/ai/loomspan/internal/runtime/planning/DefaultPlanningService.java`) owns prompt rendering, visibility preflight, retry composition, trace facts, and terminal rejection.
 - `YamlSkillCatalogTests`, `PlanTaskConstraintValidatorTest`, and `PlanningServiceTest` protect syntax/defaults, exact counts, prompt, preflight, retry, exhaustion, and plan-storage exclusion.

@@ -78,7 +78,7 @@ class LiveActivityProjectorTest
     {
         Path cwd = Path.of(System.getProperty("user.dir")).toAbsolutePath();
         Path direct = cwd.resolve("loomspan-console-fixtures");
-        return Files.isDirectory(direct) || Files.isDirectory(cwd.resolve("loomspan-spring-boot-starter"))
+        return Files.isDirectory(direct) || Files.isDirectory(cwd.resolve("src/main/java/ai/loomspan"))
                 ? direct
                 : cwd.getParent().resolve("loomspan-console-fixtures");
     }

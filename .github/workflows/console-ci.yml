@@ -119,7 +119,7 @@ jobs:
       - name: Pin npm
         run: npm install --global npm@12.0.2
       - name: Verify Java fixture writer and adapters
-        run: ./mvnw -pl loomspan-spring-boot-starter -am test
+        run: ./mvnw test
       - name: Verify Console
         working-directory: loomspan-console
         run: go run ./internal/buildtool verify

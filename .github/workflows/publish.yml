@@ -45,10 +45,10 @@ jobs:
           if os.environ["GITHUB_REF"] != f"refs/tags/v{version}":
               raise SystemExit("Release tag must match the committed Maven version")
           PY
-      - name: Verify all Java modules, including API architecture
+      - name: Verify the starter, including API architecture
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
       - name: Verify release sources and Javadoc without signing or uploading
-        run: ./mvnw --batch-mode --no-transfer-progress -Prelease -pl loomspan-spring-boot-starter -am -DskipTests -Dgpg.skip=true verify
+        run: ./mvnw --batch-mode --no-transfer-progress -Prelease -DskipTests -Dgpg.skip=true verify
 
   upload:
     name: Publish to Maven Central
@@ -68,11 +68,11 @@ jobs:
           server-password: CENTRAL_TOKEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
-      - name: Sign and publish parent POM and starter
-        run: ./mvnw --batch-mode --no-transfer-progress -Prelease -pl loomspan-spring-boot-starter -am -DskipTests deploy
+      - name: Sign and publish starter
+        run: ./mvnw --batch-mode --no-transfer-progress -Prelease -DskipTests deploy
         env:
           CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       - name: Confirm deployment
-        run: echo 'Sonatype accepted and validated the parent POM and starter. Automatic publication continues in Maven Central and indexing may take additional time.' >> "$GITHUB_STEP_SUMMARY"
+        run: echo 'Sonatype accepted and validated the starter. Automatic publication continues in Maven Central and indexing may take additional time.' >> "$GITHUB_STEP_SUMMARY"

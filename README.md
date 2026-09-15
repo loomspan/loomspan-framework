@@ -39,8 +39,8 @@ The first production release will be `1.0.0`.
 
 The Loomspan Framework repository contains two projects:
 
-- `loomspan-spring-boot-starter`: the core starter.
-- `loomspan-console`: an independent Go module with an embedded React application. Its explicit build uses pinned Go, Node.js, and npm toolchains and is not part of the Maven reactor.
+- `src`: Java sources and tests for the core starter; built by the root `pom.xml`.
+- `loomspan-console`: an independent Go module with an embedded React application. Its explicit build uses pinned Go, Node.js, and npm toolchains and is not part of the Maven build.
 
 Ordinary Java development and `mvn test` do not invoke Console tooling. See
 [`loomspan-console/README.md`](loomspan-console/README.md) for the Console build
@@ -310,8 +310,7 @@ That readiness record does not authorize tagging or publication.
 ### Maven Central releases
 
 The `release` Maven profile builds sources and Javadoc JARs, signs artifacts,
-and configures Sonatype's Central Publishing plugin. Published coordinates are
-`ai.loomspan:loomspan-framework-parent` (POM) and
+and configures Sonatype's Central Publishing plugin. The published coordinate is
 `ai.loomspan:loomspan-spring-boot-starter` (JAR and attached documentation).
 
 To review the release build locally without signing, uploading, or changing
@@ -321,11 +320,11 @@ the current development version, run these commands (`mvnw.cmd` on Windows):
 python scripts/loomspan_version.py check
 python -m unittest discover scripts/tests -v
 ./mvnw --batch-mode --no-transfer-progress clean verify
-./mvnw --batch-mode --no-transfer-progress -Prelease -pl loomspan-spring-boot-starter -am -DskipTests -Dgpg.skip=true verify
+./mvnw --batch-mode --no-transfer-progress -Prelease -DskipTests -Dgpg.skip=true verify
 ```
 
 Inspect the starter's binary, `-sources.jar`, and `-javadoc.jar` in
-`loomspan-spring-boot-starter/target`. These checks do not exercise signing,
+`target`. These checks do not exercise signing,
 Central credentials, or Sonatype's server-side validation. A manual run of
 the **Maven Central Release** GitHub Actions workflow performs the same
 build-only checks, with no publishing secrets.

@@ -39,16 +39,16 @@ go test -race ./...
 ```
 
 ### Java fixture corpus
-The fixture corpus test in `loomspan-spring-boot-starter` validates that the Go trace-analysis processor matches the Java reference implementation byte-for-byte:
+The fixture corpus test in the root Java project validates that the Go trace-analysis processor matches the Java reference implementation byte-for-byte:
 
 ```powershell
-.\mvnw.cmd -pl loomspan-spring-boot-starter test -Dtest=ConsoleTraceFixtureCorpusTest -DfailIfNoTests=false
+.\mvnw.cmd test -Dtest=ConsoleTraceFixtureCorpusTest -DfailIfNoTests=false
 ```
 
 To regenerate committed fixtures (after intentionally changing the corpus):
 
 ```powershell
-.\mvnw.cmd -pl loomspan-spring-boot-starter test -Dtest=ConsoleTraceFixtureCorpusTest -Dloomspan.console.fixtures.regenerate=true -DfailIfNoTests=false
+.\mvnw.cmd test -Dtest=ConsoleTraceFixtureCorpusTest -Dloomspan.console.fixtures.regenerate=true -DfailIfNoTests=false
 ```
 
 ## Line endings
