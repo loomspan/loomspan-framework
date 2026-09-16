@@ -54,7 +54,7 @@ Add the starter to your application:
 <dependency>
     <groupId>ai.loomspan</groupId>
     <artifactId>loomspan-spring-boot-starter</artifactId>
-    <version>1.0.0-beta.4-SNAPSHOT</version>
+    <version>1.0.0-beta.4</version>
 </dependency>
 ```
 
@@ -252,7 +252,7 @@ Skill versions with one command:
 
 ```bash
 python scripts/loomspan_version.py check
-python scripts/loomspan_version.py set 1.0.0-beta.4-SNAPSHOT
+python scripts/loomspan_version.py set 1.0.0-beta.4
 # Review, test, and commit the release version.
 python scripts/loomspan_version.py tag 1.0.0-beta.4
 ```
@@ -269,10 +269,10 @@ bootstrap version list to update.
 
 Keep the project on the next anticipated beta version with `-SNAPSHOT` during
 normal development. Remove that suffix when preparing the beta release. The
-current development version is `1.0.0-beta.4-SNAPSHOT`. The beta 4 release transition is:
+current development version is `1.0.0-beta.4`. The beta 4 release transition is:
 
 ```text
-development: 1.0.0-beta.4-SNAPSHOT
+development: 1.0.0-beta.4
 release: 1.0.0-beta.4
 tag: v1.0.0-beta.4
 then begin the next development snapshot

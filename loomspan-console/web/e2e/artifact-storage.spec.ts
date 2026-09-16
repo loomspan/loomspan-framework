@@ -62,7 +62,7 @@ function makeLargeChunkedPayloadArtifact(): Buffer {
   const chunkCount = 36;
   const chunkBytes = 64 * 1024;
   const records: Array<Record<string, unknown>> = [
-    { ...common, sequence: 1, recordType: "TRACE_STARTED", metadata: { tracePath: "generated/large-chunked-payload.ndjson", consoleCompatibilityVersion: "1.0.0-beta.4-SNAPSHOT", generationId: traceId }, data: { sessionId } },
+    { ...common, sequence: 1, recordType: "TRACE_STARTED", metadata: { tracePath: "generated/large-chunked-payload.ndjson", consoleCompatibilityVersion: "1.0.0-beta.4", generationId: traceId }, data: { sessionId } },
     { ...common, sequence: 2, recordType: "TRACE_CAPTURE_POLICY_RECORDED", metadata: { persistencePolicy: "ALWAYS" }, data: null },
     { ...common, sequence: 3, recordType: "MODEL_REQUEST_SENT", metadata: { retrySequenceId: "retry-1", attemptId: "attempt-1", attemptNumber: 1, attemptReason: "INITIAL", providerAttemptNumber: 1, payloadId: "payload-large", chunkCount, payloadChunked: true, contentType: "application/json" }, data: null },
   ];
@@ -105,7 +105,7 @@ function makeTargetServer(initial: TargetState) {
       response.end(
         JSON.stringify({
           instanceId: state.instanceId,
-          consoleCompatibilityVersion: "1.0.0-beta.4-SNAPSHOT",
+          consoleCompatibilityVersion: "1.0.0-beta.4",
           observedAt: "2026-07-27T00:00:00Z",
           liveMonitoringAvailable: true,
           registeredSkillCount: 1,
