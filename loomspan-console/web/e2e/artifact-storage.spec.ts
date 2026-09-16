@@ -29,6 +29,7 @@ function makeTraceMetadata(traceId: string, sessionId: string, outcome: string, 
     targetScopeId: "scope-1",
     traceId,
     sessionId,
+    generationId: traceId,
     entrySkill: "CheckDns",
     outcome,
     // Both Java-produced fixture artifacts complete at this instant. The
@@ -42,11 +43,11 @@ function makeTraceMetadata(traceId: string, sessionId: string, outcome: string, 
 }
 
 function metadataFromArtifact(body: Buffer): string {
-  const records = body.toString("utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line) as { traceId: string; sessionId: string; timestamp: number; recordType: string; metadata?: { outcome?: string } });
+  const records = body.toString("utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line) as { traceId: string; sessionId: string; timestamp: number; recordType: string; metadata?: { outcome?: string; generationId?: string } });
   const first = records[0];
   const completion = records.findLast((record) => record.recordType === "TRACE_COMPLETED");
   return JSON.stringify({
-    targetScopeId: "scope-1", traceId: first.traceId, sessionId: first.sessionId, entrySkill: "CheckDns",
+    targetScopeId: "scope-1", traceId: first.traceId, sessionId: first.sessionId, generationId: first.metadata?.generationId, entrySkill: "CheckDns",
     outcome: completion?.metadata?.outcome ?? "SUCCEEDED",
     finalizedAt: new Date((completion?.timestamp ?? first.timestamp) * 1000).toISOString(),
     sizeBytes: body.length, persistencePolicy: "ALWAYS", applicationTraceExpiresAt: "2026-08-01T12:00:00Z",
@@ -61,7 +62,7 @@ function makeLargeChunkedPayloadArtifact(): Buffer {
   const chunkCount = 36;
   const chunkBytes = 64 * 1024;
   const records: Array<Record<string, unknown>> = [
-    { ...common, sequence: 1, recordType: "TRACE_STARTED", metadata: { tracePath: "generated/large-chunked-payload.ndjson", consoleCompatibilityVersion: "1.0.0-beta.4-SNAPSHOT" }, data: { sessionId } },
+    { ...common, sequence: 1, recordType: "TRACE_STARTED", metadata: { tracePath: "generated/large-chunked-payload.ndjson", consoleCompatibilityVersion: "1.0.0-beta.4-SNAPSHOT", generationId: traceId }, data: { sessionId } },
     { ...common, sequence: 2, recordType: "TRACE_CAPTURE_POLICY_RECORDED", metadata: { persistencePolicy: "ALWAYS" }, data: null },
     { ...common, sequence: 3, recordType: "MODEL_REQUEST_SENT", metadata: { retrySequenceId: "retry-1", attemptId: "attempt-1", attemptNumber: 1, attemptReason: "INITIAL", providerAttemptNumber: 1, payloadId: "payload-large", chunkCount, payloadChunked: true, contentType: "application/json" }, data: null },
   ];

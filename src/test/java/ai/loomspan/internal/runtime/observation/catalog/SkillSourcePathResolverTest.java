@@ -3,7 +3,11 @@ package ai.loomspan.internal.runtime.observation.catalog;
 import ai.loomspan.internal.skill.YamlSkillSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,6 +18,32 @@ class SkillSourcePathResolverTest
 {
     @TempDir
     Path tempDir;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"classpath:", "classpath*:"})
+    void exactClasspathLocationUsesOnlyFilename(String prefix) throws Exception
+    {
+        String location = prefix + "skills/valid/prompt-skill.yaml";
+        PathMatchingResourcePatternResolver resources = new PathMatchingResourcePatternResolver();
+        Resource[] matches = resources.getResources(location);
+        assertThat(matches).hasSize(1);
+        YamlSkillSource source = new YamlSkillSource(matches[0], location, matches[0].getContentAsByteArray());
+
+        assertThat(new SkillSourcePathResolver(resources).resolve(source)).isEqualTo("prompt-skill.yaml");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"classpath:", "classpath*:"})
+    void wildcardClasspathLocationProducesRootRelativePath(String prefix) throws Exception
+    {
+        String location = prefix + "skills/**/prompt-skill.yaml";
+        PathMatchingResourcePatternResolver resources = new PathMatchingResourcePatternResolver();
+        Resource[] matches = resources.getResources(location);
+        assertThat(matches).hasSize(1);
+        YamlSkillSource source = new YamlSkillSource(matches[0], location, matches[0].getContentAsByteArray());
+
+        assertThat(new SkillSourcePathResolver(resources).resolve(source)).isEqualTo("valid/prompt-skill.yaml");
+    }
 
     @Test
     void exactFileUsesOnlyFilenameAndSourceBytesAreDefensive() throws Exception

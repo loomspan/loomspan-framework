@@ -67,10 +67,12 @@ public final class SkillSourcePathResolver
 
     private static int firstPatternIndex(String value)
     {
+        // Resource prefixes such as classpath*: are not part of the path pattern.
+        int pathStart = value.indexOf(':') + 1;
         int result = -1;
         for (char marker : new char[] {'*', '?', '{'})
         {
-            int found = value.indexOf(marker);
+            int found = value.indexOf(marker, pathStart);
             if (found >= 0 && (result < 0 || found < result))
             {
                 result = found;
