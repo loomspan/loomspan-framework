@@ -65,7 +65,7 @@ Do not import registries, descriptors, invokers, or discovery components from `a
 
 - `SkillMethod` and `SkillParam` define the supported annotations; their API tests protect defaults and retention.
 - `SkillMethodBeanPostProcessor` and its tests define canonical discovery, reflected inputs, and invocation of the final bean.
-- `YamlSkillCapabilityRegistrar#completeRegistration` finishes all declaration sources before checking child references.
+- `SkillGenerationManager#prepare` finishes all declaration sources and validates child references before a complete immutable generation can activate.
 - `SupportedSurfaceIntegrationTest` exercises the supported facade and application-owned methods.
 - `MissionWorkExecutor` is the shared work/cutoff owner; `JavaSkillMissionCutoffTest` protects timeout, caller interruption, and noncooperative late returns.
 - `DefaultRegisteredSkillCatalogTest`, `ConsoleRestFixtureCorpusTest`, and Console `SkillCatalog.test.tsx` / `SkillDetail.test.tsx` protect mixed-source diagnostics.

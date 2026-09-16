@@ -131,7 +131,8 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                 List.of(rawJson));
         ExecutionCoordinator coordinator = coordinator(definition, chatClient, stateService);
 
-        String response = coordinator.execute("outputSchemaSkill", "Extract invoice", new LoomspanSession("session-3", "outputSchemaSkill", 3), null);
+        LoomspanSession session = new LoomspanSession("session-3", "outputSchemaSkill", 3);
+        String response = coordinator.execute("outputSchemaSkill", "Extract invoice", session, null);
 
         assertThat(response).isEqualTo(rawJson);
     }
@@ -140,7 +141,7 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                                                     ModelInteractionFactory factory,
                                                     ExecutionStateService stateService) {
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(definition);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         EffectiveSkillExecutionConfiguration executionConfiguration = definition.executionConfiguration();
         CapabilityMetadata metadata = new CapabilityMetadata(
                 "yaml:output-schema",
@@ -166,9 +167,8 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), ForkJoinPool.commonPool(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
+        var generation = registry.generation(catalog);
         return new ExecutionCoordinator(
-                catalog,
-                registry,
                 factory,
                 toolSurfaceService,
                 toolCallbackFactory,
@@ -178,7 +178,16 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                 new DefaultAccessGuard(),
                 (value, session) -> value,
                 new ai.loomspan.internal.security.ScopedAuthentication(null),
-                new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
+                new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()))
+        {
+            @Override
+            public String execute(String skillName, String objective, LoomspanSession session,
+                    org.springframework.security.core.Authentication authentication)
+            {
+                return TestExecutionBindings.callWithGeneration(session, generation,
+                        () -> super.execute(skillName, objective, session, authentication));
+            }
+        };
     }
 
     private static YamlSkillDefinition definition(boolean withLinter) {

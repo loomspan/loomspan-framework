@@ -25,7 +25,7 @@ class ExecutionBindingTest
     void scopesAndRestoresTheExactBindingForEveryThrowablePath() throws Exception
     {
         LoomspanSession session = new LoomspanSession("binding", "entry", 3);
-        ExecutionBinding parent = ExecutionBinding.sessionOnly(session);
+        ExecutionBinding parent = ExecutionBinding.sessionOnly(session, ai.loomspan.testkit.TestSkillGenerations.empty());
         MissionContext mission = new MissionContext(session, "entry", "mission", null);
         ExecutionBinding child = parent.withMission(mission);
 
@@ -50,14 +50,14 @@ class ExecutionBindingTest
     {
         LoomspanSession first = new LoomspanSession("first", "entry", 3);
         LoomspanSession second = new LoomspanSession("second", "entry", 3);
-        assertThatThrownBy(() -> new ExecutionBinding(first, null, new PhysicalBranchContext(second)))
+        assertThatThrownBy(() -> new ExecutionBinding(first, null, new PhysicalBranchContext(second), ai.loomspan.testkit.TestSkillGenerations.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ExecutionBinding(
                 first, new MissionContext(second, "entry", "mission", null),
-                new PhysicalBranchContext(first)))
+                new PhysicalBranchContext(first), ai.loomspan.testkit.TestSkillGenerations.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
-        ExecutionBindingScope.runWith(ExecutionBinding.sessionOnly(first), () ->
-                assertThatThrownBy(() -> ExecutionBindingScope.runWith(ExecutionBinding.sessionOnly(second), () -> {}))
+        ExecutionBindingScope.runWith(ExecutionBinding.sessionOnly(first, ai.loomspan.testkit.TestSkillGenerations.empty()), () ->
+                assertThatThrownBy(() -> ExecutionBindingScope.runWith(ExecutionBinding.sessionOnly(second, ai.loomspan.testkit.TestSkillGenerations.empty()), () -> {}))
                         .isInstanceOf(IllegalArgumentException.class));
     }
 
@@ -66,7 +66,8 @@ class ExecutionBindingTest
     {
         LoomspanSession session = new LoomspanSession("fork-binding", "entry", 3);
         MissionContext mission = new MissionContext(session, "entry", "mission", null);
-        ExecutionBinding parent = ExecutionBinding.sessionOnly(session).withMission(mission);
+        ExecutionBinding parent = ExecutionBinding.sessionOnly(session,
+                ai.loomspan.testkit.TestSkillGenerations.empty()).withMission(mission);
         ExecutionFrame root = new ExecutionFrame("root", null, OperationType.SKILL,
                 TraceFrameType.ROOT_MISSION, "root", java.util.Map.of(), java.time.Instant.EPOCH);
         parent.branch().push(root);
@@ -75,6 +76,7 @@ class ExecutionBindingTest
 
         assertThat(fork.session()).isSameAs(session);
         assertThat(fork.mission()).isSameAs(mission);
+        assertThat(fork.generation()).isSameAs(parent.generation());
         assertThat(fork.branch()).isNotSameAs(parent.branch());
         assertThat(fork.branch().rootToLeafSnapshot()).containsExactly(root);
         assertThat(fork.branch().localDepth()).isZero();
@@ -84,7 +86,7 @@ class ExecutionBindingTest
     void restoresParentAfterRuntimeCheckedExceptionAndError() throws Exception
     {
         LoomspanSession session = new LoomspanSession("throwables", "entry", 3);
-        ExecutionBinding parent = ExecutionBinding.sessionOnly(session);
+        ExecutionBinding parent = ExecutionBinding.sessionOnly(session, ai.loomspan.testkit.TestSkillGenerations.empty());
         ExecutionBinding child = parent.withMission(new MissionContext(session, "entry", "mission", null));
 
         ExecutionBindingScope.runWith(parent, () ->
@@ -105,7 +107,8 @@ class ExecutionBindingTest
     @Test
     void unwrappedVirtualThreadDoesNotInheritBinding() throws Exception
     {
-        ExecutionBinding binding = ExecutionBinding.sessionOnly(new LoomspanSession("virtual", "entry", 3));
+        ExecutionBinding binding = ExecutionBinding.sessionOnly(new LoomspanSession("virtual", "entry", 3),
+                ai.loomspan.testkit.TestSkillGenerations.empty());
         try (var executor = Executors.newVirtualThreadPerTaskExecutor())
         {
             ExecutionBindingScope.runWith(binding, () ->
@@ -126,7 +129,7 @@ class ExecutionBindingTest
     void wrappedCallableRestoresPreexistingWorkerBinding() throws Exception
     {
         LoomspanSession session = new LoomspanSession("worker", "entry", 3);
-        ExecutionBinding worker = ExecutionBinding.sessionOnly(session);
+        ExecutionBinding worker = ExecutionBinding.sessionOnly(session, ai.loomspan.testkit.TestSkillGenerations.empty());
         ExecutionBinding mission = worker.withMission(new MissionContext(session, "entry", "mission", null));
         try (var executor = Executors.newSingleThreadExecutor())
         {

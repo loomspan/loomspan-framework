@@ -6,7 +6,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanStackOverflowException;
-import ai.loomspan.internal.core.CapabilityRegistry;
 import ai.loomspan.internal.core.ExecutionFrame;
 import ai.loomspan.internal.core.ExecutionPlan;
 import ai.loomspan.internal.core.FrameworkShutdownException;
@@ -45,7 +44,6 @@ import ai.loomspan.internal.runtime.prompt.SkillPromptComposition;
 import ai.loomspan.internal.runtime.state.ExecutionStateService;
 import ai.loomspan.internal.runtime.usage.SessionUsageService;
 import ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration;
-import ai.loomspan.internal.skill.YamlSkillCatalog;
 import ai.loomspan.internal.skill.YamlSkillDefinition;
 import ai.loomspan.internal.vfs.DefaultRefResolver;
 import ai.loomspan.internal.vfs.SessionLocalVirtualFileSystem;
@@ -91,9 +89,6 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
 
     private final PlanningService planningService;
     private final ExecutionStateService executionStateService;
-    @SuppressWarnings("unused")
-    private final CapabilityRegistry capabilityRegistry;
-    private @Nullable YamlSkillCatalog yamlSkillCatalog;
     private final Duration missionTimeout;
     private final ExecutorService missionExecutor;
     private final SessionUsageService sessionUsageService;
@@ -105,100 +100,63 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
 
     public StepLoopMissionExecutionEngine(PlanningService planningService,
             ExecutionStateService executionStateService,
-            CapabilityRegistry capabilityRegistry,
-            YamlSkillCatalog ignoredYamlSkillCatalog,
             Duration missionTimeout,
             ExecutorService missionExecutor,
             SessionUsageService sessionUsageService)
     {
-        this(planningService, executionStateService, capabilityRegistry, missionTimeout, missionExecutor,
+        this(planningService, executionStateService, missionTimeout, missionExecutor,
                 sessionUsageService, DEFAULT_MAX_STEPS);
-        this.yamlSkillCatalog = Objects.requireNonNull(ignoredYamlSkillCatalog, "yamlSkillCatalog must not be null");
     }
 
     public StepLoopMissionExecutionEngine(PlanningService planningService,
             ExecutionStateService executionStateService,
-            CapabilityRegistry capabilityRegistry,
-            YamlSkillCatalog yamlSkillCatalog,
             Duration missionTimeout,
             ExecutorService missionExecutor,
             SessionUsageService sessionUsageService,
             MissionInputMaterializer missionInputMaterializer,
             ObjectMapper schemaMapper)
     {
-        this(planningService, executionStateService, capabilityRegistry, missionTimeout, missionExecutor,
+        this(planningService, executionStateService, missionTimeout, missionExecutor,
                 sessionUsageService, DEFAULT_MAX_STEPS, missionInputMaterializer, schemaMapper);
-        this.yamlSkillCatalog = Objects.requireNonNull(yamlSkillCatalog, "yamlSkillCatalog must not be null");
     }
 
     public StepLoopMissionExecutionEngine(PlanningService planningService,
             ExecutionStateService executionStateService,
-            CapabilityRegistry capabilityRegistry,
-            YamlSkillCatalog ignoredYamlSkillCatalog,
             Duration missionTimeout,
             ExecutorService missionExecutor,
             SessionUsageService sessionUsageService,
             int defaultMaxSteps)
     {
-        this(planningService, executionStateService, capabilityRegistry, missionTimeout, missionExecutor,
-                sessionUsageService, defaultMaxSteps, defaultMaterializer());
-        this.yamlSkillCatalog = Objects.requireNonNull(ignoredYamlSkillCatalog, "yamlSkillCatalog must not be null");
-    }
-
-    public StepLoopMissionExecutionEngine(PlanningService planningService,
-            ExecutionStateService executionStateService,
-            CapabilityRegistry capabilityRegistry,
-            Duration missionTimeout,
-            ExecutorService missionExecutor,
-            SessionUsageService sessionUsageService)
-    {
-        this(planningService, executionStateService, capabilityRegistry, missionTimeout, missionExecutor,
-                sessionUsageService, DEFAULT_MAX_STEPS);
-    }
-
-    public StepLoopMissionExecutionEngine(PlanningService planningService,
-            ExecutionStateService executionStateService,
-            CapabilityRegistry capabilityRegistry,
-            Duration missionTimeout,
-            ExecutorService missionExecutor,
-            SessionUsageService sessionUsageService,
-            int defaultMaxSteps)
-    {
-        this(planningService, executionStateService, capabilityRegistry, missionTimeout, missionExecutor,
+        this(planningService, executionStateService, missionTimeout, missionExecutor,
                 sessionUsageService, defaultMaxSteps, defaultMaterializer());
     }
 
     public StepLoopMissionExecutionEngine(PlanningService planningService,
             ExecutionStateService executionStateService,
-            CapabilityRegistry capabilityRegistry,
-            YamlSkillCatalog ignoredYamlSkillCatalog,
             Duration missionTimeout,
             ExecutorService missionExecutor,
             SessionUsageService sessionUsageService,
             MissionInputMaterializer missionInputMaterializer)
     {
-        this(planningService, executionStateService, capabilityRegistry, missionTimeout, missionExecutor,
+        this(planningService, executionStateService, missionTimeout, missionExecutor,
                 sessionUsageService, DEFAULT_MAX_STEPS, missionInputMaterializer);
-        this.yamlSkillCatalog = Objects.requireNonNull(ignoredYamlSkillCatalog, "yamlSkillCatalog must not be null");
     }
 
     public StepLoopMissionExecutionEngine(PlanningService planningService,
             ExecutionStateService executionStateService,
-            CapabilityRegistry capabilityRegistry,
             Duration missionTimeout,
             ExecutorService missionExecutor,
             SessionUsageService sessionUsageService,
             int defaultMaxSteps,
             MissionInputMaterializer missionInputMaterializer)
     {
-        this(planningService, executionStateService, capabilityRegistry, missionTimeout, missionExecutor,
+        this(planningService, executionStateService, missionTimeout, missionExecutor,
                 sessionUsageService, defaultMaxSteps, missionInputMaterializer,
                 ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree());
     }
 
     public StepLoopMissionExecutionEngine(PlanningService planningService,
             ExecutionStateService executionStateService,
-            CapabilityRegistry capabilityRegistry,
             Duration missionTimeout,
             ExecutorService missionExecutor,
             SessionUsageService sessionUsageService,
@@ -208,8 +166,6 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
     {
         this.planningService = Objects.requireNonNull(planningService, "planningService must not be null");
         this.executionStateService = Objects.requireNonNull(executionStateService, "executionStateService must not be null");
-        this.capabilityRegistry = Objects.requireNonNull(capabilityRegistry, "capabilityRegistry must not be null");
-        this.yamlSkillCatalog = null;
         this.missionTimeout = Objects.requireNonNull(missionTimeout, "missionTimeout must not be null");
         this.missionExecutor = Objects.requireNonNull(missionExecutor, "missionExecutor must not be null");
         this.sessionUsageService = Objects.requireNonNull(sessionUsageService, "sessionUsageService must not be null");

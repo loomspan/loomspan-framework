@@ -36,6 +36,7 @@ This topic does not define the complete pure-YAML `input_schema` language.
 - Typed maps remain typed. Existing string, integer, number, boolean, enum, DTO, required-field, coercion, and closed-object rules apply to each entry value.
 - Planner examples and verbose rules label unconstrained leaves as `any JSON value`. An open generic map is not a no-argument tool.
 - Root invocation and child tool publication use the same reflected contract. Java does not declare a YAML `input_schema`.
+- A root captures its complete skill generation before object conversion and input validation. That captured contract remains authoritative for the admitted invocation and all descendants; a later generation affects only later roots.
 
 Minimal Java skill:
 
@@ -69,5 +70,5 @@ Use a typed map when arbitrary keys are part of the domain but all values share 
 - `SkillInputContractResolverTest` (`src/test/java/ai/loomspan/internal/runtime/input/SkillInputContractResolverTest.java`) protects empty-schema parsing/serialization and the distinction between unconstrained, generic top-level, and strict empty-object contracts.
 - `SkillInputValidatorTest` (`src/test/java/ai/loomspan/internal/runtime/input/SkillInputValidatorTest.java`) protects JSON-kind preservation, immutable recursive normalization, and visible rejection of unsupported values and schema kinds.
 - `StepPromptBuilderTest` (`src/test/java/ai/loomspan/internal/runtime/step/StepPromptBuilderTest.java`) and `StepActionValidatorTest` (`src/test/java/ai/loomspan/internal/runtime/step/StepActionValidatorTest.java`) protect planner guidance and pre-side-effect validation.
-- `YamlSkillCapabilityRegistrarTests` (`src/test/java/ai/loomspan/internal/skill/YamlSkillCapabilityRegistrarTests.java`) protects completed shared registration.
+- `SkillGenerationManagerTest` (`src/test/java/ai/loomspan/internal/skill/SkillGenerationManagerTest.java`) protects complete immutable generation assembly and fixed Java declarations.
 - `LoomspanMethodInputSchemaGenerator` (`src/main/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGenerator.java`), `SkillInputContractResolver` (`src/main/java/ai/loomspan/internal/runtime/input/SkillInputContractResolver.java`), `SkillInputValidator` (`src/main/java/ai/loomspan/internal/runtime/input/SkillInputValidator.java`), and `SkillInputPromptRenderer` (`src/main/java/ai/loomspan/internal/runtime/input/SkillInputPromptRenderer.java`) define the current production path.

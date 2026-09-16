@@ -8,7 +8,6 @@ import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.core.CapabilityMetadata;
-import ai.loomspan.internal.core.InMemoryCapabilityRegistry;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import ai.loomspan.internal.security.DefaultAccessGuard;
@@ -29,20 +28,17 @@ class SkillVisibilityResolverTest {
     void returnsOnlyAllowedYamlSkillsThatPassRbac() {
         YamlSkillCatalog catalog = catalog("classpath:/skills/valid/allowed-child-skill.yaml", "classpath:/skills/valid/allowed-disallowed-child.yaml", "classpath:/skills/valid/allowed-skills-root.yaml");
         catalog.afterPropertiesSet();
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
-        var targets = new ai.loomspan.internal.core.SkillMethodBeanPostProcessor(registry);
-        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver(),
-                new org.springframework.beans.factory.support.StaticListableBeanFactory()).afterSingletonsInstantiated();
-
-        DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(catalog, registry, new DefaultAccessGuard());
-
-        List<CapabilityMetadata> visible = resolver.visibleSkillsFor(
+        SkillGeneration generation = generation(catalog);
+        DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(new DefaultAccessGuard());
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
+        List<CapabilityMetadata> visible = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
+                ai.loomspan.internal.core.ExecutionBinding.sessionOnly(session, generation), () -> resolver.visibleSkillsFor(
                 "rootVisibleSkill",
-                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2),
+                session,
                 UsernamePasswordAuthenticationToken.authenticated(
                         "user",
                         "pw",
-                        AuthorityUtils.createAuthorityList("ROLE_ALLOWED")));
+                        AuthorityUtils.createAuthorityList("ROLE_ALLOWED"))));
 
         assertThat(visible).extracting(CapabilityMetadata::name).containsExactly("allowedVisibleSkill");
     }
@@ -51,20 +47,17 @@ class SkillVisibilityResolverTest {
     void doesNotExposeSkillsOutsideTheParentAllowlist() {
         YamlSkillCatalog catalog = catalog("classpath:/skills/valid/allowed-child-skill.yaml", "classpath:/skills/valid/allowed-disallowed-child.yaml", "classpath:/skills/valid/allowed-skills-root.yaml");
         catalog.afterPropertiesSet();
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
-        var targets = new ai.loomspan.internal.core.SkillMethodBeanPostProcessor(registry);
-        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver(),
-                new org.springframework.beans.factory.support.StaticListableBeanFactory()).afterSingletonsInstantiated();
-
-        DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(catalog, registry, new DefaultAccessGuard());
-
-        List<CapabilityMetadata> visible = resolver.visibleSkillsFor(
+        SkillGeneration generation = generation(catalog);
+        DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(new DefaultAccessGuard());
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
+        List<CapabilityMetadata> visible = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
+                ai.loomspan.internal.core.ExecutionBinding.sessionOnly(session, generation), () -> resolver.visibleSkillsFor(
                 "rootVisibleSkill",
-                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2),
+                session,
                 UsernamePasswordAuthenticationToken.authenticated(
                         "user",
                         "pw",
-                        AuthorityUtils.createAuthorityList("ROLE_ALLOWED")));
+                        AuthorityUtils.createAuthorityList("ROLE_ALLOWED"))));
 
         assertThat(visible).extracting(CapabilityMetadata::name).containsExactly("allowedVisibleSkill");
     }
@@ -73,17 +66,14 @@ class SkillVisibilityResolverTest {
     void hidesProtectedSkillsWhenAuthenticationIsMissing() {
         YamlSkillCatalog catalog = catalog("classpath:/skills/valid/allowed-child-skill.yaml", "classpath:/skills/valid/allowed-disallowed-child.yaml", "classpath:/skills/valid/allowed-skills-root.yaml");
         catalog.afterPropertiesSet();
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
-        var targets = new ai.loomspan.internal.core.SkillMethodBeanPostProcessor(registry);
-        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver(),
-                new org.springframework.beans.factory.support.StaticListableBeanFactory()).afterSingletonsInstantiated();
-
-        DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(catalog, registry, new DefaultAccessGuard());
-
-        List<CapabilityMetadata> visible = resolver.visibleSkillsFor(
+        SkillGeneration generation = generation(catalog);
+        DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(new DefaultAccessGuard());
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
+        List<CapabilityMetadata> visible = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
+                ai.loomspan.internal.core.ExecutionBinding.sessionOnly(session, generation), () -> resolver.visibleSkillsFor(
                 "rootVisibleSkill",
-                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2),
-                null);
+                session,
+                null));
 
         assertThat(visible).isEmpty();
     }
@@ -92,19 +82,17 @@ class SkillVisibilityResolverTest {
     void usesSessionFallbackForProtectedSkillVisibility() {
         YamlSkillCatalog catalog = catalog("classpath:/skills/valid/allowed-child-skill.yaml", "classpath:/skills/valid/allowed-disallowed-child.yaml", "classpath:/skills/valid/allowed-skills-root.yaml");
         catalog.afterPropertiesSet();
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
-        var targets = new ai.loomspan.internal.core.SkillMethodBeanPostProcessor(registry);
-        new YamlSkillCapabilityRegistrar(registry, targets, catalog, new SkillInputContractResolver(),
-                new org.springframework.beans.factory.support.StaticListableBeanFactory()).afterSingletonsInstantiated();
-
-        DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(catalog, registry, new DefaultAccessGuard());
+        SkillGeneration generation = generation(catalog);
+        DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(new DefaultAccessGuard());
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
         session.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
                 "user",
                 "pw",
                 AuthorityUtils.createAuthorityList("ROLE_ALLOWED")));
 
-        List<CapabilityMetadata> visible = resolver.visibleSkillsFor("rootVisibleSkill", session, null);
+        List<CapabilityMetadata> visible = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
+                ai.loomspan.internal.core.ExecutionBinding.sessionOnly(session, generation),
+                () -> resolver.visibleSkillsFor("rootVisibleSkill", session, null));
 
         assertThat(visible).extracting(CapabilityMetadata::name).containsExactly("allowedVisibleSkill");
     }
@@ -128,6 +116,15 @@ class SkillVisibilityResolverTest {
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .build();
         return new YamlSkillCatalog(models, skills, new PathMatchingResourcePatternResolver(), mapper);
+    }
+
+    private static SkillGeneration generation(YamlSkillCatalog catalog)
+    {
+        var manager = new SkillGenerationManager(new ai.loomspan.internal.core.SkillMethodBeanPostProcessor(),
+                () -> catalog, new SkillInputContractResolver(),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory());
+        manager.afterSingletonsInstantiated();
+        return manager.active();
     }
 
 }

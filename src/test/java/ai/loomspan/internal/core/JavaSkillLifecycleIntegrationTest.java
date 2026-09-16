@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 
 class JavaSkillLifecycleIntegrationTest {
     @Test void rootAndNestedJavaShareFramesAndRestoreParentWithoutModelRequests() {
-        var registry = new InMemoryCapabilityRegistry();
+        var registry = new TestCapabilityRegistry();
         var coordinator = new AtomicReference<ExecutionCoordinator>();
         var session = TestLoomspanSessions.withId("java-nested", "javaRoot", 5, null, TracePersistencePolicy.ALWAYS);
         registry.register("javaChild", javaSkill("javaChild", args -> {
@@ -42,7 +42,7 @@ class JavaSkillLifecycleIntegrationTest {
     }
     @Test void failureAndCancellationCloseRootOnceWithNoEvidence() {
         for (RuntimeException failure : List.of(new AccessDeniedException("denied"), new CancellationException("cancelled"))) {
-            var registry = new InMemoryCapabilityRegistry();
+            var registry = new TestCapabilityRegistry();
             registry.register("javaRoot", javaSkill("javaRoot", args -> { throw failure; }));
             var session = TestLoomspanSessions.withId("java-failure-" + failure.getClass().getSimpleName(), "javaRoot", 3);
             assertThatThrownBy(() -> coordinator(registry).execute("javaRoot", "root", session, null)).isSameAs(failure);
@@ -54,11 +54,10 @@ class JavaSkillLifecycleIntegrationTest {
             assertThat(ExecutionBindingScope.current()).isEmpty();
         }
     }
-    private static ExecutionCoordinator coordinator(CapabilityRegistry registry) {
+    private static ExecutionCoordinator coordinator(TestCapabilityRegistry registry) {
         MissionExecutionEngine engine = (s,d,o,i,m,t,p,a) -> { throw new AssertionError("Java dispatched a model engine"); };
+        var generation = registry.generation();
         return new ExecutionCoordinator(
-                mock(YamlSkillCatalog.class),
-                registry,
                 (d,m) -> { throw new AssertionError("Java created a model interaction"); },
                 (n,s,a) -> List.of(),
                 (s,d,c,a) -> List.of(),
@@ -68,7 +67,21 @@ class JavaSkillLifecycleIntegrationTest {
                 new DefaultAccessGuard(),
                 (v,s) -> v,
                 new ScopedAuthentication(null),
-                new ai.loomspan.internal.runtime.MissionWorkExecutor(new DefaultExecutionStateService(Clock.systemUTC()), java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
+                new ai.loomspan.internal.runtime.MissionWorkExecutor(new DefaultExecutionStateService(Clock.systemUTC()), java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()))
+        {
+            @Override public String execute(String name, String objective, LoomspanSession session,
+                    org.springframework.security.core.Authentication authentication) {
+                if (ExecutionBindingScope.current().isPresent()) return super.execute(name, objective, session, authentication);
+                return TestExecutionBindings.callWithGeneration(session, generation,
+                        () -> super.execute(name, objective, session, authentication));
+            }
+            @Override public String execute(String name, String objective, Map<String, Object> input,
+                    LoomspanSession session, org.springframework.security.core.Authentication authentication) {
+                if (ExecutionBindingScope.current().isPresent()) return super.execute(name, objective, input, session, authentication);
+                return TestExecutionBindings.callWithGeneration(session, generation,
+                        () -> super.execute(name, objective, input, session, authentication));
+            }
+        };
     }
     private static CapabilityMetadata javaSkill(String name, CapabilityInvoker invoker) {
         return new CapabilityMetadata(name, name, "Java test", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(),

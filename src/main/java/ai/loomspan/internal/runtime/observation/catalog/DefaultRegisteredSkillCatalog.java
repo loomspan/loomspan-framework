@@ -1,8 +1,7 @@
 package ai.loomspan.internal.runtime.observation.catalog;
 
-import ai.loomspan.internal.skill.YamlSkillCatalog;
-import ai.loomspan.internal.skill.YamlSkillCapabilityRegistrar;
-import ai.loomspan.internal.core.CapabilityRegistry;
+import ai.loomspan.internal.skill.YamlSkillDefinition;
+import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityKind;
 import org.springframework.lang.Nullable;
 
@@ -11,6 +10,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Optional;
@@ -20,21 +20,20 @@ public final class DefaultRegisteredSkillCatalog implements RegisteredSkillCatal
 {
     private final NavigableMap<String, RegisteredSkillEntry> entries;
 
-    public DefaultRegisteredSkillCatalog(CapabilityRegistry registry, YamlSkillCatalog catalog,
-            YamlSkillCapabilityRegistrar registrar)
+    public DefaultRegisteredSkillCatalog(List<CapabilityMetadata> capabilities,
+            Map<String, YamlSkillDefinition> definitions)
     {
-        Objects.requireNonNull(registrar, "registrar must not be null").completeRegistration();
-        Objects.requireNonNull(registry, "registry must not be null");
-        Objects.requireNonNull(catalog, "catalog must not be null");
+        Objects.requireNonNull(capabilities, "capabilities must not be null");
+        Objects.requireNonNull(definitions, "definitions must not be null");
         SkillSourcePathResolver pathResolver = new SkillSourcePathResolver();
         TreeMap<String, RegisteredSkillEntry> built = new TreeMap<>();
-        for (var metadata : registry.getAllCapabilities())
+        for (var metadata : capabilities)
         {
             String name = metadata.name();
             RegisteredSkillEntry entry;
             if (metadata.kind() == CapabilityKind.YAML_SKILL || metadata.kind() == CapabilityKind.REST_SKILL)
             {
-                var definition = Objects.requireNonNull(catalog.getSkill(name), "manifest registration must have a definition");
+                var definition = Objects.requireNonNull(definitions.get(name), "manifest registration must have a definition");
                 entry = new RegisteredSkillEntry(name,
                         metadata.kind().publicKind().name(),
                         pathResolver.resolve(definition.source()),

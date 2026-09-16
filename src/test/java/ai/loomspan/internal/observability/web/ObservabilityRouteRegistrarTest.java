@@ -3,9 +3,9 @@ package ai.loomspan.internal.observability.web;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.autoconfigure.ExecutionTraceProperties;
 import ai.loomspan.internal.observability.ObservabilityActivationCoordinator;
-import ai.loomspan.internal.skill.YamlSkillCatalog;
-import ai.loomspan.internal.core.CapabilityRegistry;
-import ai.loomspan.internal.skill.YamlSkillCapabilityRegistrar;
+import ai.loomspan.internal.skill.SkillGeneration;
+import ai.loomspan.internal.skill.SkillGenerationManager;
+import ai.loomspan.internal.runtime.observation.catalog.RegisteredSkillCatalog;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
@@ -56,12 +56,11 @@ class ObservabilityRouteRegistrarTest
         LoomspanProperties.Observability configuration = properties.getObservability();
         configuration.setEnabled(true);
         configuration.getAuth().setApiKey("0123456789abcdef0123456789abcdef");
-        YamlSkillCatalog yamlSkills = mock(YamlSkillCatalog.class);
-        CapabilityRegistry registry = mock(CapabilityRegistry.class);
-        when(registry.getAllCapabilities()).thenThrow(new IllegalStateException("inspection projection failed"));
+        SkillGenerationManager generations = mock(SkillGenerationManager.class);
+        when(generations.active()).thenThrow(new IllegalStateException("inspection projection failed"));
         var registrar = new ObservabilityRouteRegistrar(
                 null, null, null, new ObservabilityActivationCoordinator(),
-                properties, new ExecutionTraceProperties(), registry, yamlSkills, mock(YamlSkillCapabilityRegistrar.class),
+                properties, new ExecutionTraceProperties(), generations,
                 new ObservabilityDtoMapper(), new ObservabilityJsonCodec());
         long before = traceCatalogThreadCount();
 
@@ -85,8 +84,10 @@ class ObservabilityRouteRegistrarTest
         properties.getObservability().setEnabled(true);
         properties.getObservability().getAuth()
                 .setApiKey("0123456789abcdef0123456789abcdef");
-        YamlSkillCatalog yamlSkills = mock(YamlSkillCatalog.class);
-        when(yamlSkills.getSkills()).thenReturn(List.of());
+        SkillGenerationManager generations = mock(SkillGenerationManager.class);
+        SkillGeneration generation = mock(SkillGeneration.class);
+        when(generation.registeredSkillCatalog()).thenReturn(mock(RegisteredSkillCatalog.class));
+        when(generations.active()).thenReturn(generation);
         ObservabilityActivationCoordinator activation = new ObservabilityActivationCoordinator();
         ObservabilityRouteRegistrar registrar = new ObservabilityRouteRegistrar(
                 mappings,
@@ -95,7 +96,7 @@ class ObservabilityRouteRegistrarTest
                 activation,
                 properties,
                 new ExecutionTraceProperties(),
-                mock(CapabilityRegistry.class), yamlSkills, mock(YamlSkillCapabilityRegistrar.class),
+                generations,
                 new ObservabilityDtoMapper(),
                 new ObservabilityJsonCodec());
 

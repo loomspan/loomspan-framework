@@ -26,7 +26,9 @@ Not every tree needs every level. Java skills can be roots without a model; a si
 
 A YAML manifest's `name` or a Java annotation's `name` is the single callable identity. An omitted or empty Java annotation name uses the canonical method name. Every name MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$`: 1–64 ASCII characters, beginning with a letter or underscore. Names are case-sensitive and are never trimmed, sanitized, normalized, truncated, or aliased. Descriptive lowerCamelCase is recommended, but underscores and uppercase starts are valid.
 
-Use the exact name in `SkillTemplate`, `allowed_skills`, plan targets, evidence expressions, provider tool definitions, metrics, and traces. Duplicate names across Java, REST, and model-backed YAML fail startup and identify both declarations. Relevant lazy Java beans are discovered before the shared registry is completed. Every child reference must resolve after all sources finish registration; authorization filtering does not make missing names valid.
+Use the exact name in `SkillTemplate`, `allowed_skills`, plan targets, evidence expressions, provider tool definitions, metrics, and traces. Duplicate names across Java, REST, and model-backed YAML fail startup and identify both declarations. Relevant lazy Java beans are discovered before the initial complete skill generation is built. Every child reference must resolve within that complete generation; authorization filtering does not make missing names valid.
+
+Each root invocation captures one immutable, complete declaration generation before input conversion or validation. Its input contracts, definitions, local child surface, policies, and execution settings remain coherent for the full nested and parallel invocation tree. A later internal activation can affect only roots captured afterward; it does not rewrite running or admitted work. This is an execution-consistency guarantee, not a public reload, historical-invocation, or retirement API.
 
 Bean names, source paths, and declared method signatures are diagnostic locations, never a second callable identity. Any YAML `mapping` key, including null, empty, or scalar forms, is rejected with annotation-only guidance.
 
@@ -96,6 +98,7 @@ When an LLM-backed YAML skill invokes another LLM-backed YAML skill:
 - the child uses its own model, prompt, allowed skills, plan, and property-level output evidence requirements;
 - the child owns an isolated plan and successful-direct-skill set, and the exact parent mission resumes after the child returns or fails;
 - the parent observes the child capability result, not the child's internal tool surface or evidence ledger.
+- every child and parallel worker uses the exact generation captured by the root, even if a newer generation becomes active.
 
 This isolation is intentional. A parent contract should describe the child capability it invokes rather than coupling itself to the child's internal leaves.
 
@@ -167,7 +170,7 @@ Do not automatically treat repeated business inputs as runtime metadata. Explici
 
 - `SkillTemplate` and `DefaultSkillTemplate` define supported invocation, input validation, and session creation.
 - `SkillMethodBeanPostProcessor` and its focused tests protect exact names, canonical discovery, reflection, final-proxy invocation, and Java policies.
-- `YamlSkillCatalog` validates model-backed manifests and rejects legacy mappings. `YamlSkillCapabilityRegistrar#completeRegistration` finishes discovery and validates cross-source child references.
+- `YamlSkillCatalog` validates model-backed manifests and rejects legacy mappings. `SkillGenerationManager#prepare` assembles and validates a detached complete generation; `ExecutionBinding` carries that exact generation through execution.
 - `DefaultSkillVisibilityResolver` filters the local shared child surface. `CapabilityExecutionRouter` and `ExecutionCoordinator` own dispatch and common isolated mission boundaries.
 - `SupportedSurfaceIntegrationTest` demonstrates application methods called through the supported facade.
 - `DefaultRegisteredSkillCatalogTest`, `ConsoleRestFixtureCorpusTest`, and Console component tests cover all three diagnostic source variants.

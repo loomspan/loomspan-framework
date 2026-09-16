@@ -11,7 +11,7 @@ import ai.loomspan.internal.core.ExecutionBindingScope;
 import ai.loomspan.internal.core.ExecutionCoordinator;
 import ai.loomspan.internal.core.ExecutionFrame;
 import ai.loomspan.internal.core.ExecutionPlan;
-import ai.loomspan.internal.core.InMemoryCapabilityRegistry;
+import ai.loomspan.internal.core.TestCapabilityRegistry;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanStackOverflowException;
 import ai.loomspan.internal.core.MissionContext;
@@ -514,11 +514,11 @@ class ConcurrentGroupedExecutionIntegrationTest
             Duration missionTimeout)
     {
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(definitions);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         capabilities.forEach(capability -> registry.register(capability.name(), capability));
         PlanningService planning = new DefaultPlanningService(state);
         StepLoopMissionExecutionEngine stepEngine = new StepLoopMissionExecutionEngine(
-                planning, state, registry, catalog, missionTimeout, executor, usage);
+                planning, state, missionTimeout, executor, usage);
         DefaultAccessGuard accessGuard = new DefaultAccessGuard();
         CapabilityExecutionRouter router = new CapabilityExecutionRouter( coordinatorProvider(coordinator), accessGuard);
         DefaultCapabilityInvoker invoker = new DefaultCapabilityInvoker(
@@ -530,9 +530,8 @@ class ConcurrentGroupedExecutionIntegrationTest
                     .collect(java.util.stream.Collectors.toSet());
             return capabilities.stream().filter(capability -> allowed.contains(capability.name())).toList();
         });
+        var generation = registry.generation(catalog);
         ExecutionCoordinator runtime = new ExecutionCoordinator(
-                catalog,
-                registry,
                 models,
                 tools,
                 invoker,
@@ -542,7 +541,18 @@ class ConcurrentGroupedExecutionIntegrationTest
                 accessGuard,
                 (value, session) -> value,
                 new ai.loomspan.internal.security.ScopedAuthentication(null),
-                new ai.loomspan.internal.runtime.MissionWorkExecutor(state, missionTimeout, executor, usage));
+                new ai.loomspan.internal.runtime.MissionWorkExecutor(state, missionTimeout, executor, usage))
+        {
+            @Override
+            public String execute(String name, String objective, LoomspanSession session,
+                    Authentication authentication)
+            {
+                if (ExecutionBindingScope.current().isPresent())
+                    return super.execute(name, objective, session, authentication);
+                return ai.loomspan.internal.core.TestExecutionBindings.callWithGeneration(session, generation,
+                        () -> super.execute(name, objective, session, authentication));
+            }
+        };
         coordinator.set(runtime);
         return runtime;
     }

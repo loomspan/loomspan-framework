@@ -30,6 +30,5 @@ REST uses the existing public observation shape and direct mission/tool trace re
 ## Evidence
 
 - `ApplicationApiValueTest` and `LoomspanPublicSurfaceArchitectureTest` protect shape and boundaries.
-- `YamlSkillCapabilityRegistrarTests` protects conditional bean selection and handoff.
+- `SkillGenerationManagerTest` and REST startup tests protect fixed handler selection and generation assembly.
 - `DefaultSkillTemplateTest` and `ExecutionCoordinatorTest` protect facade and lifecycle failures.
-

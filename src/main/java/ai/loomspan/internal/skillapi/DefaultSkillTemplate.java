@@ -6,7 +6,8 @@ import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
 import ai.loomspan.internal.core.CapabilityMetadata;
-import ai.loomspan.internal.core.CapabilityRegistry;
+import ai.loomspan.internal.skill.SkillGeneration;
+import ai.loomspan.internal.skill.SkillGenerationManager;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.runtime.input.SkillInputValidationResult;
 import ai.loomspan.internal.runtime.input.SkillInputValidator;
@@ -33,7 +34,7 @@ public class DefaultSkillTemplate implements SkillTemplate
     {
     };
 
-    private final CapabilityRegistry capabilityRegistry;
+    private final SkillGenerationManager generationManager;
     private final CapabilityExecutionRouter executionRouter;
     private final LoomspanSessionRunner sessionRunner;
     private final ObjectMapper objectMapper;
@@ -42,7 +43,7 @@ public class DefaultSkillTemplate implements SkillTemplate
     private final SkillRoleEvaluator roleEvaluator;
     private final SecurityContextHolderStrategy securityContextStrategy;
 
-    public DefaultSkillTemplate(CapabilityRegistry capabilityRegistry,
+    public DefaultSkillTemplate(SkillGenerationManager generationManager,
             CapabilityExecutionRouter executionRouter,
             LoomspanSessionRunner sessionRunner,
             ObjectMapper objectMapper,
@@ -50,11 +51,11 @@ public class DefaultSkillTemplate implements SkillTemplate
             SkillRoleEvaluator roleEvaluator,
             @Nullable SecurityContextHolderStrategy securityContextStrategy)
     {
-        this(capabilityRegistry, executionRouter, sessionRunner, objectMapper, inputValidator,
+        this(generationManager, executionRouter, sessionRunner, objectMapper, inputValidator,
                 roleEvaluator, securityContextStrategy, new SkillExecutionViewMapper(objectMapper));
     }
 
-    DefaultSkillTemplate(CapabilityRegistry capabilityRegistry,
+    DefaultSkillTemplate(SkillGenerationManager generationManager,
             CapabilityExecutionRouter executionRouter,
             LoomspanSessionRunner sessionRunner,
             ObjectMapper objectMapper,
@@ -63,7 +64,7 @@ public class DefaultSkillTemplate implements SkillTemplate
             @Nullable SecurityContextHolderStrategy securityContextStrategy,
             SkillExecutionViewMapper executionViewMapper)
     {
-        this.capabilityRegistry = Objects.requireNonNull(capabilityRegistry, "capabilityRegistry must not be null");
+        this.generationManager = Objects.requireNonNull(generationManager, "generationManager must not be null");
         this.executionRouter = Objects.requireNonNull(executionRouter, "executionRouter must not be null");
         this.sessionRunner = Objects.requireNonNull(sessionRunner, "sessionRunner must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
@@ -112,13 +113,14 @@ public class DefaultSkillTemplate implements SkillTemplate
 
     PreparedInput prepareObject(String skillName, Object input)
     {
+        SkillGeneration generation = generationManager.active();
         if (input == null)
         {
             throw new SkillInputValidationException("Skill input must not be null.", List.of());
         }
         try
         {
-            return prepareMap(skillName, objectMapper.convertValue(input, MAP_TYPE));
+            return prepareMap(generation, skillName, objectMapper.convertValue(input, MAP_TYPE));
         }
         catch (AccessDeniedException | SkillException ex)
         {
@@ -132,9 +134,14 @@ public class DefaultSkillTemplate implements SkillTemplate
 
     PreparedInput prepareMap(String skillName, Map<String, Object> input)
     {
+        return prepareMap(generationManager.active(), skillName, input);
+    }
+
+    private PreparedInput prepareMap(SkillGeneration generation, String skillName, Map<String, Object> input)
+    {
         try
         {
-            CapabilityMetadata capability = requireSkill(skillName);
+            CapabilityMetadata capability = requireSkill(generation, skillName);
             SkillInputContract contract = capability.inputContract();
             SkillInputValidationResult validation = inputValidator.validate(normalizeNullInput(input, contract), contract);
             if (!validation.valid())
@@ -144,7 +151,7 @@ public class DefaultSkillTemplate implements SkillTemplate
                         .toList();
                 throw new SkillInputValidationException(buildValidationMessage(skillName, validation), issues);
             }
-            return new PreparedInput(capability, validation);
+            return new PreparedInput(generation, capability, validation);
         }
         catch (AccessDeniedException | SkillException ex)
         {
@@ -211,9 +218,9 @@ public class DefaultSkillTemplate implements SkillTemplate
             };
             return admittedRoot == null
                     ? sessionRunner.callWithNewSession(
-                            prepared.capability().name(), authentication, action, completion)
+                            prepared.capability().name(), prepared.generation(), authentication, action, completion)
                     : sessionRunner.callWithAdmittedSession(
-                            prepared.capability().name(), authentication, admittedRoot, action, completion);
+                            prepared.capability().name(), prepared.generation(), authentication, admittedRoot, action, completion);
         }
         catch (LoomspanSessionRunner.CompletionPhaseFailure ex)
         {
@@ -242,16 +249,16 @@ public class DefaultSkillTemplate implements SkillTemplate
         return String.valueOf(result);
     }
 
-    private CapabilityMetadata requireSkill(String skillName)
+    private CapabilityMetadata requireSkill(SkillGeneration generation, String skillName)
     {
-        CapabilityMetadata capability = capabilityRegistry.getCapability(skillName);
+        CapabilityMetadata capability = generation.capability(skillName);
         if (capability == null)
         {
             throw new SkillException("Unknown skill '" + skillName + "'");
         }
         if (!skillName.equals(capability.name()))
         {
-            throw new SkillException("CapabilityRegistry returned skill '" + capability.name()
+            throw new SkillException("Skill generation returned skill '" + capability.name()
                     + "' for requested name '" + skillName + "'");
         }
 
@@ -282,7 +289,8 @@ public class DefaultSkillTemplate implements SkillTemplate
         return "Invalid input for skill '" + skillName + "': " + detail;
     }
 
-    record PreparedInput(CapabilityMetadata capability, SkillInputValidationResult validation)
+    record PreparedInput(SkillGeneration generation, CapabilityMetadata capability,
+            SkillInputValidationResult validation)
     {
     }
 }

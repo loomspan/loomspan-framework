@@ -78,12 +78,14 @@ class NestedSuccessfulSkillBoundaryTest
         DefaultExecutionStateService state = new DefaultExecutionStateService(Clock.fixed(
                 Instant.parse("2026-03-15T12:00:00Z"), ZoneOffset.UTC));
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("nested", "test.entry", 3);
-        ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
+        CapabilityMetadata capability = capability();
+        var generation = ai.loomspan.testkit.TestSkillGenerations.of(capability);
+        ExecutionBinding binding = TestExecutionBindings.missionBinding(session, generation);
         ExecutionBindingScope.runWith(binding,
                 () -> state.recordSuccessfulSkill("classifyIncident", "task-classify", false));
 
         ExecutionCoordinator coordinator = mock(ExecutionCoordinator.class);
-        when(coordinator.execute(eq("investigateNetwork"), any(), any(), eq(session), eq(null)))
+        when(coordinator.execute(any(CapabilityMetadata.class), any(), any(), eq(session), eq(null)))
                 .thenAnswer(invocation ->
                 {
                     return TestExecutionBindings.callWithCurrentSessionMission(() ->
@@ -99,7 +101,6 @@ class NestedSuccessfulSkillBoundaryTest
         RefResolver refs = (value, ignored) -> value;
         CapabilityExecutionRouter router = new CapabilityExecutionRouter( beans.getBeanProvider(ExecutionCoordinator.class), new DefaultAccessGuard());
         PlanningService planning = mock(PlanningService.class);
-        CapabilityMetadata capability = capability();
         when(planning.markToolStarted(eq(session), eq(capability))).thenReturn(Optional.empty());
         BoundCapability callback = new DefaultCapabilityInvoker(router, planning, state)
                 .bind(session, definition(), List.of(capability), null)

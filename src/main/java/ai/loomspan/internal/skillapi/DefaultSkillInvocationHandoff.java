@@ -11,6 +11,8 @@ import org.springframework.security.core.Authentication;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Internal implementation of the application-facing atomic invocation handoff. */
 public final class DefaultSkillInvocationHandoff implements SkillInvocationHandoff
@@ -56,9 +58,8 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
 
     private final class DefaultAdmittedSkillInvocation implements AdmittedSkillInvocation
     {
+        private final AtomicReference<Payload> payload;
         private final String skillName;
-        private final DefaultSkillTemplate.PreparedInput prepared;
-        private final Authentication authentication;
         private final FrameworkExecutionLifecycle.AdmittedRoot root;
 
         private DefaultAdmittedSkillInvocation(String skillName,
@@ -67,9 +68,9 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
                 FrameworkExecutionLifecycle.AdmittedRoot root)
         {
             this.skillName = skillName;
-            this.prepared = prepared;
-            this.authentication = authentication;
+            this.payload = new AtomicReference<>(new Payload(skillName, prepared, authentication));
             this.root = root;
+            root.onPendingTermination(() -> payload.set(null));
         }
 
         @Override
@@ -81,13 +82,22 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
         @Override
         public String invoke(Consumer<SkillExecutionView> observer)
         {
-            return template.invokePrepared(skillName, prepared, observer, authentication, root);
+            Payload claimed = payload.getAndSet(null);
+            if (claimed == null)
+                throw new SkillException("Skill '" + skillName + "' execution failed.",
+                        new RejectedExecutionException("Loomspan invocation admission is no longer executable"));
+            return template.invokePrepared(claimed.skillName(), claimed.prepared(), observer,
+                    claimed.authentication(), root);
         }
 
         @Override
         public void release()
         {
+            payload.set(null);
             root.close();
         }
+
+        private record Payload(String skillName, DefaultSkillTemplate.PreparedInput prepared,
+                Authentication authentication) {}
     }
 }

@@ -33,7 +33,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void registersAnnotatedMethodAsCallableSkill() {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new RegistrationBean(), "registrationBean");
@@ -48,7 +48,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void registersDifferentlyNamedAnnotatedMethodsOnOneBean() {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new MultipleMethodsBean(), "multipleMethodsBean");
@@ -66,7 +66,7 @@ class SkillMethodBeanPostProcessorTest {
             context.register(InheritedSecurity.class);
             context.registerBean(SecuredSubclass.class);
             context.refresh();
-            var registry = new InMemoryCapabilityRegistry();
+            var registry = new TestCapabilityRegistry();
             process(processor(registry), context.getBean(SecuredSubclass.class), "securedSubclass");
             // Spring searches the inherited method's declaring class, not a subclass that does not override it.
             assertThat(registry.getCapability("inherited").accessPolicy())
@@ -92,7 +92,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void rejectsDefaultNamedOverloads() {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
@@ -106,7 +106,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void invokesCapabilityUsingEnvelopeMap() throws JacksonException {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new InvocationBean(), "invocationBean");
@@ -125,7 +125,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void handlesMissingOptionalParameterWithoutCrashing() throws JacksonException {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new OptionalInvocationBean(), "optionalInvocationBean");
@@ -143,7 +143,7 @@ class SkillMethodBeanPostProcessorTest {
     @Test
     void publishesDescriptionsAndBindsUnconstrainedReflectedInputs() throws JacksonException
     {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
         process(processor, new UnconstrainedInvocationBean(), "unconstrainedInvocationBean");
 
@@ -174,7 +174,7 @@ class SkillMethodBeanPostProcessorTest {
     @Test
     void rejectsOptionalPrimitiveParameterDuringSkillDiscovery()
     {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
@@ -191,7 +191,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void returnsTransformedErrorWhenSkillMethodThrowsWrappedBusinessException() {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new ThrowingInvocationBean(), "throwingInvocationBean");
@@ -203,7 +203,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void logsStackTraceButOmitsItFromReturnedPayload(CapturedOutput output) {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new ThrowingInvocationBean(), "throwingInvocationBean");
@@ -221,7 +221,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void readsResourceBackedRefsIntoStringParameters() throws JacksonException {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new RefStringInvocationBean(), "refStringInvocationBean");
@@ -237,7 +237,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void readsResourceBackedRefsIntoByteArrayParameters() throws JacksonException {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new RefBytesInvocationBean(), "refBytesInvocationBean");
@@ -253,7 +253,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void passesResourceBackedRefsThroughResourceAndInputStreamParameters() throws JacksonException {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new RefResourceInvocationBean(), "refResourceInvocationBean");
@@ -277,7 +277,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void publishesRefFriendlyInputSchemasForRefCapableParameters() throws JacksonException {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new RefBytesInvocationBean(), "refBytesInvocationBean");
@@ -297,7 +297,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void materializesNestedResourceLeavesInsideTypedRecordParameters() throws JacksonException {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new NestedRecordInvocationBean(), "nestedRecordInvocationBean");
@@ -318,7 +318,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void materializesResourceLeavesInsideTypedCollectionParameters() throws JacksonException {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new TypedCollectionInvocationBean(), "typedCollectionInvocationBean");
@@ -371,8 +371,9 @@ class SkillMethodBeanPostProcessorTest {
         assertThat(contract.schema().allowsAdditionalProperties()).isFalse();
     }
 
-    private SkillMethodBeanPostProcessor processor(InMemoryCapabilityRegistry registry) {
-        SkillMethodBeanPostProcessor processor = new SkillMethodBeanPostProcessor(registry);
+    private SkillMethodBeanPostProcessor processor(TestCapabilityRegistry registry) {
+        SkillMethodBeanPostProcessor processor = new SkillMethodBeanPostProcessor();
+        registry.bind(processor);
         processor.setBeanFactory(beanFactory);
         return processor;
     }

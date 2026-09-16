@@ -88,7 +88,7 @@ class SkillAdvisorResolverTests {
         CallAdvisor advisor = (CallAdvisor) failingResolver.resolve(definition(true)).getFirst();
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", session ->
+        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() ->
                         advisor.adviseCall(request("Write YAML"), new RecordingChain(List.of("bad", "OK"))))))
                 .isInstanceOf(IllegalStateException.class)

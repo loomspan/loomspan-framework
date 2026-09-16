@@ -78,7 +78,7 @@ class ExecutionCoordinatorLinterIntegrationTest {
         YamlSkillDefinition definition = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, executionConfiguration);
 
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(definition);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityMetadata metadata = new CapabilityMetadata(
                 "yaml:linted",
                 "lintedSkill",
@@ -98,7 +98,8 @@ class ExecutionCoordinatorLinterIntegrationTest {
                 (ignored, mode) -> chatClient, stateService);
         LoomspanSession session = new LoomspanSession("session-1", "lintedSkill", 3);
 
-        String response = coordinator.execute("lintedSkill", "Produce YAML", session, null);
+        String response = TestExecutionBindings.callWithGeneration(session, registry.generation(catalog),
+                () -> coordinator.execute("lintedSkill", "Produce YAML", session, null));
 
         assertThat(response).isEqualTo("OK: corrected");
         assertThat(chatClient.callCount).isEqualTo(2);
@@ -121,7 +122,7 @@ class ExecutionCoordinatorLinterIntegrationTest {
     }
 
     private static ExecutionCoordinator coordinator(StubYamlSkillCatalog catalog,
-                                                    InMemoryCapabilityRegistry registry,
+                                                    TestCapabilityRegistry registry,
                                                     ModelInteractionFactory factory,
                                                     ExecutionStateService stateService) {
         PlanningService planningService = new DefaultPlanningService(stateService);
@@ -139,8 +140,6 @@ class ExecutionCoordinatorLinterIntegrationTest {
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), ForkJoinPool.commonPool(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
         return new ExecutionCoordinator(
-                catalog,
-                registry,
                 factory,
                 toolSurfaceService,
                 toolCallbackFactory,

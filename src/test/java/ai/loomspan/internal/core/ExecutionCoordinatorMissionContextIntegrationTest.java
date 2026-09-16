@@ -41,13 +41,11 @@ class ExecutionCoordinatorMissionContextIntegrationTest
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         YamlSkillCatalog catalog = mock(YamlSkillCatalog.class);
         when(catalog.getSkill("rootSkill")).thenReturn(definition("rootSkill"));
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register("rootSkill", capability("rootSkill"));
         MissionExecutionEngine engine = (session, definition, objective, missionInput, model, tools, planning, authentication) ->
                 "complete";
         ExecutionCoordinator coordinator = new ExecutionCoordinator(
-                catalog,
-                registry,
                 (definition, mode) -> request ->
                 { throw new AssertionError("test engine does not call the model"); },
                 (skillName, session, authentication) -> List.of(),
@@ -65,7 +63,8 @@ class ExecutionCoordinatorMissionContextIntegrationTest
                 linter("rootSkill", LinterOutcomeStatus.RETRYING),
                 output("rootSkill"));
 
-        assertThat(coordinator.execute("rootSkill", "objective", session, null)).isEqualTo("complete");
+        assertThat(TestExecutionBindings.callWithGeneration(session, registry.generation(catalog),
+                () -> coordinator.execute("rootSkill", "objective", session, null))).isEqualTo("complete");
 
         assertThat(session.getExecutionPlanSnapshot()).isNull();
         assertThat(session.getLastLinterOutcome()).isEmpty();
@@ -77,7 +76,7 @@ class ExecutionCoordinatorMissionContextIntegrationTest
     {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         YamlSkillCatalog catalog = mock(YamlSkillCatalog.class);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         for (String name : List.of("rootSkill", "childSkill", "grandchildSkill"))
         {
             when(catalog.getSkill(name)).thenReturn(definition(name));
@@ -140,8 +139,6 @@ class ExecutionCoordinatorMissionContextIntegrationTest
         };
 
         ExecutionCoordinator coordinator = new ExecutionCoordinator(
-                catalog,
-                registry,
                 (definition, mode) -> request ->
                 { throw new AssertionError("test engine does not call the model"); },
                 (skillName, session, authentication) -> List.of(),
@@ -156,7 +153,8 @@ class ExecutionCoordinatorMissionContextIntegrationTest
         coordinatorRef.set(coordinator);
         LoomspanSession session = TestLoomspanSessions.withId("three-level", "rootSkill", 5);
 
-        assertThat(coordinator.execute("rootSkill", "root objective", session, null)).isEqualTo("root complete");
+        assertThat(TestExecutionBindings.callWithGeneration(session, registry.generation(catalog),
+                () -> coordinator.execute("rootSkill", "root objective", session, null))).isEqualTo("root complete");
         assertThat(ExecutionBindingScope.current()).isEmpty();
         assertThat(session.getExecutionPlanSnapshot()).isSameAs(rootPlan);
         assertThat(session.getLastLinterOutcome()).containsSame(laterRootLinter);

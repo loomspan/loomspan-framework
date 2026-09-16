@@ -2280,8 +2280,6 @@ class StepLoopMissionExecutionEngineTest {
         return new StepLoopMissionExecutionEngine(
                 planningService,
                 stateService,
-                mock(ai.loomspan.internal.core.CapabilityRegistry.class),
-                new StubYamlSkillCatalog(definition),
                 missionTimeout,
                 missionExecutor,
                 new NoOpSessionUsageService());

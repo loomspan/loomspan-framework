@@ -11,7 +11,6 @@ import ai.loomspan.internal.runtime.tool.BoundCapability;
 import ai.loomspan.internal.runtime.tool.CapabilityBindingFactory;
 import ai.loomspan.internal.runtime.tool.ToolSurfaceService;
 import ai.loomspan.internal.security.AccessGuard;
-import ai.loomspan.internal.skill.YamlSkillCatalog;
 import ai.loomspan.internal.skill.YamlSkillDefinition;
 import ai.loomspan.internal.skill.YamlSkillManifest;
 import org.springframework.core.io.Resource;
@@ -29,8 +28,6 @@ import java.util.concurrent.CancellationException;
 
 public class ExecutionCoordinator
 {
-    private final YamlSkillCatalog yamlSkillCatalog;
-    private final CapabilityRegistry capabilityRegistry;
     private final ModelInteractionFactory modelInteractionFactory;
     private final ToolSurfaceService toolSurfaceService;
     private final CapabilityBindingFactory capabilityBindingFactory;
@@ -42,9 +39,7 @@ public class ExecutionCoordinator
     private final ai.loomspan.internal.vfs.RefResolver refResolver;
     private final ai.loomspan.internal.security.ScopedAuthentication scopedAuthentication;
 
-    public ExecutionCoordinator(YamlSkillCatalog yamlSkillCatalog,
-            CapabilityRegistry capabilityRegistry,
-            ModelInteractionFactory modelInteractionFactory,
+    public ExecutionCoordinator(ModelInteractionFactory modelInteractionFactory,
             ToolSurfaceService toolSurfaceService,
             CapabilityBindingFactory capabilityBindingFactory,
             MissionExecutionEngine missionExecutionEngine,
@@ -55,8 +50,6 @@ public class ExecutionCoordinator
             ai.loomspan.internal.security.ScopedAuthentication scopedAuthentication,
             MissionWorkExecutor missionWorkExecutor)
     {
-        this.yamlSkillCatalog = Objects.requireNonNull(yamlSkillCatalog, "yamlSkillCatalog must not be null");
-        this.capabilityRegistry = Objects.requireNonNull(capabilityRegistry, "capabilityRegistry must not be null");
         this.modelInteractionFactory = Objects.requireNonNull(modelInteractionFactory, "modelInteractionFactory must not be null");
         this.toolSurfaceService = Objects.requireNonNull(toolSurfaceService, "toolSurfaceService must not be null");
         this.capabilityBindingFactory = Objects.requireNonNull(capabilityBindingFactory, "capabilityBindingFactory must not be null");
@@ -82,13 +75,30 @@ public class ExecutionCoordinator
     {
         Objects.requireNonNull(session, "session must not be null");
         requireNonBlank(objective, "objective");
-        CapabilityMetadata rootCapability = requireCapability(skillName);
-        YamlSkillDefinition definition = rootCapability.kind() == CapabilityKind.YAML_SKILL ? requireYamlSkill(skillName) : null;
-        ExecutionBinding baseBinding = ExecutionBindingScope.current().orElseGet(() -> ExecutionBinding.sessionOnly(session));
+        ExecutionBinding baseBinding = ExecutionBindingScope.requireCurrent();
+        CapabilityMetadata rootCapability = requireCapability(baseBinding, skillName);
+        return execute(rootCapability, objective, missionInput, session, authentication);
+    }
+
+    public String execute(CapabilityMetadata rootCapability,
+            String objective,
+            @Nullable Map<String, Object> missionInput,
+            LoomspanSession session,
+            @Nullable Authentication authentication)
+    {
+        Objects.requireNonNull(rootCapability, "rootCapability must not be null");
+        Objects.requireNonNull(session, "session must not be null");
+        requireNonBlank(objective, "objective");
+        ExecutionBinding baseBinding = ExecutionBindingScope.requireCurrent();
         if (baseBinding.session() != session)
         {
             throw new IllegalArgumentException("Explicit session does not match the current execution binding.");
         }
+        if (!baseBinding.generation().owns(rootCapability))
+            throw new IllegalArgumentException("Capability '" + rootCapability.name()
+                    + "' does not belong to the current skill generation");
+        YamlSkillDefinition definition = rootCapability.kind() == CapabilityKind.YAML_SKILL
+                ? requireYamlSkill(baseBinding, rootCapability.name()) : null;
         MissionContext parentMission = baseBinding.mission();
         boolean topLevelInvocation = parentMission == null;
         if (topLevelInvocation && !rootCapability.name().equals(session.entrySkill()))
@@ -462,9 +472,9 @@ public class ExecutionCoordinator
         return parent == null || parent.isBlank() ? child : parent + "." + child;
     }
 
-    private YamlSkillDefinition requireYamlSkill(String skillName)
+    private YamlSkillDefinition requireYamlSkill(ExecutionBinding binding, String skillName)
     {
-        YamlSkillDefinition definition = yamlSkillCatalog.getSkill(skillName);
+        YamlSkillDefinition definition = binding.generation().definition(skillName);
         if (definition == null)
         {
             throw new IllegalArgumentException("Unknown YAML skill '" + skillName + "'");
@@ -472,16 +482,16 @@ public class ExecutionCoordinator
         return definition;
     }
 
-    private CapabilityMetadata requireCapability(String skillName)
+    private CapabilityMetadata requireCapability(ExecutionBinding binding, String skillName)
     {
-        CapabilityMetadata capability = capabilityRegistry.getCapability(skillName);
+        CapabilityMetadata capability = binding.generation().capability(skillName);
         if (capability == null)
         {
             throw new IllegalArgumentException("Unknown capability '" + skillName + "'");
         }
         if (!skillName.equals(capability.name()))
         {
-            throw new IllegalStateException("CapabilityRegistry returned inconsistent registered skill metadata for '"
+            throw new IllegalStateException("Skill generation returned inconsistent registered skill metadata for '"
                     + skillName + "'");
         }
         return capability;

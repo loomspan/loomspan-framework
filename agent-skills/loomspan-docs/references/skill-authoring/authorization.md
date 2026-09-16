@@ -62,6 +62,8 @@ A YAML parent's `allowed_skills` names the only candidate children. Java, REST, 
 
 The facade captures the trusted caller authentication. Explicit invocation authentication has priority over session fallback. At Java and REST execution boundaries Loomspan installs a fresh SecurityContext on the actual worker thread and restores the exact previous context in finally. Nested calls and parallel workers carry their caller identity without sharing mutable contexts or mutating session authentication for another invocation.
 
+Manifest and Java policies belong to the immutable generation captured by the root, while authentication remains the actual trusted caller identity evaluated at validation, visibility, and execution boundaries. A newer generation may change policy for newly captured roots, but it neither substitutes policy into an older tree nor freezes/bypasses that tree's live caller authorization checks.
+
 Spring authorization and authentication failures remain failures; they are not serialized into successful tool text. Denied business methods do not run and do not earn successful task/evidence credit. Ordinary Java exception-to-text behavior is separate and remains unchanged.
 
 ## Boundaries and evidence

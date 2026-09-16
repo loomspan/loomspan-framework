@@ -64,7 +64,12 @@ public class CapabilityExecutionRouter
         {
             throw new IllegalArgumentException("Skill execution requires the current binding for the explicit session.");
         }
-        return executionCoordinatorProvider.getObject().execute(capability.name(),
+        if (!binding.generation().owns(capability))
+        {
+            throw new IllegalArgumentException("Capability '" + capability.name()
+                    + "' does not belong to the current skill generation");
+        }
+        return executionCoordinatorProvider.getObject().execute(capability,
                 objectiveFor(capability, normalizedInput), normalizedInput, session, authentication);
     }
 

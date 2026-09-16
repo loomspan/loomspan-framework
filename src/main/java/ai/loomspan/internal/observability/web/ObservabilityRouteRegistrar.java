@@ -9,12 +9,9 @@ import ai.loomspan.internal.runtime.observation.InMemoryActiveExecutionRegistry;
 import ai.loomspan.internal.runtime.observation.InMemoryActivityReplayBuffer;
 import ai.loomspan.internal.runtime.observation.LiveActivityProjector;
 import ai.loomspan.internal.runtime.observation.LiveMonitoringAvailability;
-import ai.loomspan.internal.runtime.observation.catalog.DefaultRegisteredSkillCatalog;
 import ai.loomspan.internal.runtime.observation.catalog.InMemoryFinalizedTraceCatalog;
 import ai.loomspan.internal.runtime.trace.ScheduledCompletionGraceRetention;
-import ai.loomspan.internal.skill.YamlSkillCatalog;
-import ai.loomspan.internal.skill.YamlSkillCapabilityRegistrar;
-import ai.loomspan.internal.core.CapabilityRegistry;
+import ai.loomspan.internal.skill.SkillGenerationManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
@@ -39,9 +36,7 @@ public final class ObservabilityRouteRegistrar implements SmartInitializingSingl
     private final ObservabilityActivationCoordinator activation;
     private final LoomspanProperties properties;
     private final ExecutionTraceProperties traceProperties;
-    private final YamlSkillCatalog yamlSkills;
-    private final CapabilityRegistry registry;
-    private final YamlSkillCapabilityRegistrar registrar;
+    private final SkillGenerationManager generations;
     private final ObservabilityDtoMapper dtoMapper;
     private final ObservabilityJsonCodec json;
     private final List<RequestMappingInfo> registered = new ArrayList<>();
@@ -53,9 +48,7 @@ public final class ObservabilityRouteRegistrar implements SmartInitializingSingl
             ObservabilityActivationCoordinator activation,
             LoomspanProperties properties,
             ExecutionTraceProperties traceProperties,
-            CapabilityRegistry registry,
-            YamlSkillCatalog yamlSkills,
-            YamlSkillCapabilityRegistrar registrar,
+            SkillGenerationManager generations,
             ObservabilityDtoMapper dtoMapper,
             ObservabilityJsonCodec json)
     {
@@ -65,9 +58,7 @@ public final class ObservabilityRouteRegistrar implements SmartInitializingSingl
         this.activation = activation;
         this.properties = properties;
         this.traceProperties = traceProperties;
-        this.yamlSkills = yamlSkills;
-        this.registry = registry;
-        this.registrar = registrar;
+        this.generations = generations;
         this.dtoMapper = dtoMapper;
         this.json = json;
     }
@@ -139,7 +130,7 @@ public final class ObservabilityRouteRegistrar implements SmartInitializingSingl
         var active = new InMemoryActiveExecutionRegistry();
         var replay = new InMemoryActivityReplayBuffer();
         var live = new LiveMonitoringAvailability();
-        var skills = new DefaultRegisteredSkillCatalog(registry, yamlSkills, registrar);
+        var skills = generations.active().registeredSkillCatalog();
         UUID instanceId = UUID.randomUUID();
         InMemoryFinalizedTraceCatalog traces = null;
         ScheduledCompletionGraceRetention grace = null;

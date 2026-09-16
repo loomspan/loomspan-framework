@@ -9,9 +9,8 @@ import ai.loomspan.internal.core.CapabilityExecutionRouter;
 import ai.loomspan.internal.core.CapabilityInvoker;
 import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
-import ai.loomspan.internal.core.CapabilityRegistry;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
-import ai.loomspan.internal.core.InMemoryCapabilityRegistry;
+import ai.loomspan.internal.core.TestCapabilityRegistry;
 import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandleFactory;
@@ -57,7 +56,7 @@ class DefaultSkillTemplateTest {
     @Test
     void handoffCapturesPreparedInputAndCallingAuthentication()
     {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityMetadata metadata = yamlSkillMetadata();
         registry.register(metadata.name(), metadata);
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
@@ -70,7 +69,7 @@ class DefaultSkillTemplateTest {
                 ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
                 codecs.canonicalTrace(), lifecycle);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry, router, runner, new ObjectMapper(), new SkillInputValidator(),
+                registry.manager(), router, runner, new ObjectMapper(), new SkillInputValidator(),
                 new SkillRoleEvaluator(null, null), null);
         DefaultSkillInvocationHandoff handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
         var captured = new UsernamePasswordAuthenticationToken(
@@ -91,6 +90,8 @@ class DefaultSkillTemplateTest {
         SecurityContextHolder.getContext().setAuthentication(worker);
 
         assertThat(admitted.invoke()).isEqualTo("ok");
+        assertThat(((AtomicReference<?>) org.springframework.test.util.ReflectionTestUtils
+                .getField(admitted, "payload")).get()).isNull();
         assertThat(observedAuthentication).hasValue(captured);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isSameAs(worker);
         admitted.release();
@@ -103,7 +104,7 @@ class DefaultSkillTemplateTest {
     @Test
     void releasedAndCutOffHandoffsCannotExecute()
     {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register("invoiceParser", yamlSkillMetadata());
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         var context = new StaticApplicationContext();
@@ -115,7 +116,7 @@ class DefaultSkillTemplateTest {
                 ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
                 codecs.canonicalTrace(), lifecycle);
         DefaultSkillInvocationHandoff handoff = new DefaultSkillInvocationHandoff(
-                new DefaultSkillTemplate(registry, router, runner, new ObjectMapper(),
+                new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                         new SkillInputValidator(), new SkillRoleEvaluator(null, null), null), lifecycle);
         var released = handoff.handoff("invoiceParser", Map.of("payload", "hello"));
         released.release();
@@ -124,6 +125,8 @@ class DefaultSkillTemplateTest {
 
         var cutOff = handoff.handoff("invoiceParser", Map.of("payload", "hello"));
         lifecycle.stop();
+        assertThat(((AtomicReference<?>) org.springframework.test.util.ReflectionTestUtils
+                .getField(cutOff, "payload")).get()).isNull();
         assertThatThrownBy(cutOff::invoke).isInstanceOf(SkillException.class);
         verify(router, never()).execute(any(), any(), any(), any());
         lifecycle.destroy();
@@ -136,10 +139,10 @@ class DefaultSkillTemplateTest {
 
     @Test
     void capturesCurrentSecurityContextAuthenticationForRootInvocation() {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry,
+                registry.manager(),
                 router,
                 new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
                 new ObjectMapper(),
@@ -218,19 +221,19 @@ class DefaultSkillTemplateTest {
     @Test
     void validateUsesInvocationPreparationAndCallingAuthenticationWithoutExecution()
     {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         CapabilityMetadata restricted = new CapabilityMetadata(
                 "yaml:invoiceParser", "invoiceParser", "Invoice parser",
                 SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")),
-                noopInvoker(), CapabilityKind.YAML_SKILL,
+                noopInvoker(), CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("invoiceParser", "Invoice parser"),
                 yamlSkillMetadata().inputContract(), null);
         registry.register("invoiceParser", restricted);
         LoomspanSessionRunner sessionRunner = mock(LoomspanSessionRunner.class);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry, router,
+                registry.manager(), router,
                 sessionRunner,
                 new ObjectMapper(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
 
@@ -243,7 +246,7 @@ class DefaultSkillTemplateTest {
         ai.loomspan.internal.core.LoomspanSession existingSession =
                 new ai.loomspan.internal.core.LoomspanSession(4, "existing");
         ai.loomspan.internal.core.ExecutionBinding existingBinding =
-                ai.loomspan.internal.core.ExecutionBinding.sessionOnly(existingSession);
+                ai.loomspan.internal.core.ExecutionBinding.sessionOnly(existingSession, ai.loomspan.testkit.TestSkillGenerations.empty());
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(existingBinding, () -> {
             template.validate("invoiceParser", Map.of("payload", "hello"));
             template.validate("invoiceParser", new InvoiceRequest("hello"));
@@ -286,14 +289,14 @@ class DefaultSkillTemplateTest {
     @Test
     void validatePreservesDistinctNullRulesAndUnknownFailure()
     {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         registry.register("generic", new CapabilityMetadata(
                 "yaml:generic", "generic", "Generic", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(), noopInvoker(),
-                CapabilityKind.YAML_SKILL, CapabilityToolDescriptor.generic("generic", "Generic"), null));
+                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("generic", "Generic"), null));
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry, router, new LoomspanSessionRunner(4), new ObjectMapper(),
+                registry.manager(), router, new LoomspanSessionRunner(4), new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
 
         template.validate("generic", (Map<String, Object>) null);
@@ -326,7 +329,7 @@ class DefaultSkillTemplateTest {
     @Test
     void mapperFailureSkipsObserverAndDoesNotMaskExecutionFailure()
     {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         CapabilityMetadata metadata = yamlSkillMetadata();
         registry.register(metadata.name(), metadata);
@@ -336,7 +339,7 @@ class DefaultSkillTemplateTest {
         SkillExecutionViewMapper mapper = mock(SkillExecutionViewMapper.class);
         when(mapper.map(any(ai.loomspan.internal.core.LoomspanSession.class))).thenThrow(mapperFailure);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry, router, new LoomspanSessionRunner(4), new ObjectMapper(),
+                registry.manager(), router, new LoomspanSessionRunner(4), new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null, mapper);
         AtomicBoolean observerCalled = new AtomicBoolean();
 
@@ -350,13 +353,13 @@ class DefaultSkillTemplateTest {
 
     @Test
     void wrapsSecurityContextLookupFailureWithSafeSkillExceptionAndCause() {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
         IllegalStateException failure = new IllegalStateException("security context unavailable");
         when(strategy.getContext()).thenThrow(failure);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry,
+                registry.manager(),
                 router,
                 new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
                 new ObjectMapper(),
@@ -383,10 +386,10 @@ class DefaultSkillTemplateTest {
 
     @Test
     void rejectsImplementationTargetIdsAsUnknownYamlSkills() {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry,
+                registry.manager(),
                 router,
                 new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
                 new ObjectMapper(),
@@ -405,30 +408,19 @@ class DefaultSkillTemplateTest {
 
     @Test
     void rejectsCustomRegistryMetadataThatDoesNotMatchRequestedYamlName() {
-        CapabilityRegistry registry = mock(CapabilityRegistry.class);
-        CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
-        DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry,
-                router,
-                new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
-                new ObjectMapper(),
-                new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         CapabilityMetadata otherSkill = yamlSkillMetadata();
-        when(registry.getCapability("requested.skill")).thenReturn(otherSkill);
-
-        assertThatThrownBy(() -> template.invoke("requested.skill", Map.of("payload", "hello")))
-                .isInstanceOf(SkillException.class)
-                .hasMessageContaining("invoiceParser")
-                .hasMessageContaining("requested.skill");
-        verify(router, never()).execute(any(), any(), any(), any());
+        assertThatThrownBy(() -> new ai.loomspan.internal.skill.SkillGeneration("candidate",
+                Map.of("requestedSkill", otherSkill), Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("capability key");
     }
 
     @Test
     void skillTemplateNullInputAndObserverLifecycle() {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry,
+                registry.manager(),
                 router,
                 new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
                 new ObjectMapper(),
@@ -439,7 +431,7 @@ class DefaultSkillTemplateTest {
                 "Invoice parser",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 noopInvoker(),
-                CapabilityKind.YAML_SKILL,
+                CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("invoiceParser", "Invoice parser"),
                 new SkillInputContract(
                         SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
@@ -477,10 +469,10 @@ class DefaultSkillTemplateTest {
 
     @Test
     void objectOverloadDelegatesThroughValidatedMapPath() {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry,
+                registry.manager(),
                 router,
                 new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
                 new ObjectMapper(),
@@ -497,10 +489,10 @@ class DefaultSkillTemplateTest {
 
     @Test
     void observerExceptionPropagatesAfterExecutionCompletes() {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry,
+                registry.manager(),
                 router,
                 new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
                 new ObjectMapper(),
@@ -519,10 +511,10 @@ class DefaultSkillTemplateTest {
 
     @Test
     void invalidInputDoesNotInvokeObserver() {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
-                registry,
+                registry.manager(),
                 router,
                 new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
                 new ObjectMapper(),
@@ -545,7 +537,7 @@ class DefaultSkillTemplateTest {
                 "Invoice parser",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 noopInvoker(),
-                CapabilityKind.YAML_SKILL,
+                CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("invoiceParser", "Invoice parser"),
                 new SkillInputContract(
                         SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
@@ -563,10 +555,10 @@ class DefaultSkillTemplateTest {
     }
 
     private DefaultSkillTemplate templateWithRegisteredSkill(CapabilityExecutionRouter router) {
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register("invoiceParser", yamlSkillMetadata());
         return new DefaultSkillTemplate(
-                registry,
+                registry.manager(),
                 router,
                 new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
                 new ObjectMapper(),

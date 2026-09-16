@@ -47,12 +47,12 @@ class CapabilityExecutionRouterTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("childLlmSkill", "child"),
                 null);
-        when(coordinator.execute(eq("childLlmSkill"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap(), eq(session), eq(null)))
+        when(coordinator.execute(eq(capability), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap(), eq(session), eq(null)))
                 .thenReturn("child result");
 
         MissionContext parent = new MissionContext(session, "test.entry", "parent-frame", null);
         Object result = ExecutionBindingScope.supplyWith(
-                new ExecutionBinding(session, parent, new PhysicalBranchContext(session)),
+                new ExecutionBinding(session, parent, new PhysicalBranchContext(session), generation(capability)),
                 () -> router.execute(capability, Map.of("topic", "mars"), session, null));
 
         assertThat(result).isEqualTo("child result");
@@ -115,12 +115,12 @@ class CapabilityExecutionRouterTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("childLlmSkill", "child"),
                 null);
-        when(coordinator.execute(eq("childLlmSkill"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap(), eq(session), eq(null)))
+        when(coordinator.execute(eq(capability), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap(), eq(session), eq(null)))
                 .thenReturn("child result");
 
         MissionContext parent = new MissionContext(session, "test.entry", "parent-frame", null);
         Object result = ExecutionBindingScope.supplyWith(
-                new ExecutionBinding(session, parent, new PhysicalBranchContext(session)),
+                new ExecutionBinding(session, parent, new PhysicalBranchContext(session), generation(capability)),
                 () -> router.execute(capability, Map.of("topic", "mars"), session, null));
 
         assertThat(result).isEqualTo("child result");
@@ -146,7 +146,7 @@ class CapabilityExecutionRouterTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("childLlmSkill", "child"),
                 null);
-        CapabilityRegistry capabilityRegistry = mock(CapabilityRegistry.class);
+        TestCapabilityRegistry capabilityRegistry = mock(TestCapabilityRegistry.class);
         when(capabilityRegistry.getCapability("childLlmSkill")).thenReturn(capability);
 
         ai.loomspan.internal.skill.YamlSkillManifest manifest = new ai.loomspan.internal.skill.YamlSkillManifest();
@@ -174,8 +174,6 @@ class CapabilityExecutionRouterTest {
             return "child result";
         };
         ExecutionCoordinator coordinator = new ExecutionCoordinator(
-                catalog,
-                capabilityRegistry,
                 chatClientFactory,
                 (skillName, session, authentication) -> java.util.List.of(),
                 (session, skillDefinition, capabilities, authentication) -> java.util.List.of(),
@@ -194,7 +192,7 @@ class CapabilityExecutionRouterTest {
         MissionContext parent = new MissionContext(session, "test.entry", "parent-frame", null);
         parent.recordSuccessfulDirectSkill("parsed_invoice");
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
-        Object result = ExecutionBindingScope.supplyWith(new ExecutionBinding(session, parent, branch), () -> {
+        Object result = ExecutionBindingScope.supplyWith(new ExecutionBinding(session, parent, branch, generation(capability)), () -> {
             ExecutionFrame parentFrame = stateService.openMissionFrame(session, "parent.visible.skill", Map.of("objective", "parent"));
             try {
                 return router.execute(capability, Map.of("topic", "mars"), session, null);
@@ -240,13 +238,13 @@ class CapabilityExecutionRouterTest {
                         }
                         """),
                 null);
-        when(coordinator.execute(eq("childLlmSkill"), eq("Execute skill 'childLlmSkill' using the provided mission input object."),
+        when(coordinator.execute(eq(capability), eq("Execute skill 'childLlmSkill' using the provided mission input object."),
                 eq(Map.of("invoiceId", "INV-7")), eq(session), eq(null)))
                 .thenReturn("child result");
 
         MissionContext parent = new MissionContext(session, "test.entry", "parent-frame", null);
         Object result = ExecutionBindingScope.supplyWith(
-                new ExecutionBinding(session, parent, new PhysicalBranchContext(session)),
+                new ExecutionBinding(session, parent, new PhysicalBranchContext(session), generation(capability)),
                 () -> router.execute(capability, Map.of("invoiceId", "INV-7"), session, null));
 
         assertThat(result).isEqualTo("child result");
@@ -298,7 +296,7 @@ class CapabilityExecutionRouterTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         CapabilityExecutionRouter router = javaRouter(capability, refResolver);
-        Object result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session),
+        Object result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session, generation(capability)),
                 () -> router.execute(capability, Map.of("payload", payload), session, null));
 
         assertThat(result).isEqualTo("binary-result");
@@ -343,7 +341,7 @@ class CapabilityExecutionRouterTest {
                 "options", List.of(Map.of("identifier", "ref://artifacts/missing-option.txt")));
 
         CapabilityExecutionRouter router = javaRouter(capability, refResolver);
-        Object result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session),
+        Object result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session, generation(capability)),
                 () -> router.execute(capability, input, session, null));
 
         assertThat(result).isEqualTo("unchanged");
@@ -352,11 +350,9 @@ class CapabilityExecutionRouterTest {
 
     private static CapabilityExecutionRouter javaRouter(CapabilityMetadata capability, RefResolver refResolver)
     {
-        CapabilityRegistry registry = mock(CapabilityRegistry.class);
+        TestCapabilityRegistry registry = mock(TestCapabilityRegistry.class);
         when(registry.getCapability(capability.name())).thenReturn(capability);
         var coordinator = new ExecutionCoordinator(
-                mock(ai.loomspan.internal.skill.YamlSkillCatalog.class),
-                registry,
                 (definition, mode) -> { throw new AssertionError("Java must not create a model interaction"); },
                 (name, session, authentication) -> List.of(),
                 (session, definition, capabilities, authentication) -> List.of(),
@@ -370,5 +366,22 @@ class CapabilityExecutionRouterTest {
         return new CapabilityExecutionRouter(
                 new StaticListableBeanFactory(Map.of("executionCoordinator", coordinator)).getBeanProvider(ExecutionCoordinator.class),
                 new DefaultAccessGuard());
+    }
+
+    private static ai.loomspan.internal.skill.SkillGeneration generation(CapabilityMetadata capability)
+    {
+        if (capability.kind() != CapabilityKind.YAML_SKILL)
+            return ai.loomspan.testkit.TestSkillGenerations.of(capability);
+        var manifest = new ai.loomspan.internal.skill.YamlSkillManifest();
+        manifest.setName(capability.name());
+        manifest.setDescription(capability.description());
+        manifest.setModel("gpt-5");
+        var definition = new ai.loomspan.internal.skill.YamlSkillDefinition(
+                new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest,
+                new ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration(
+                        "gpt-5", "test-connection", ai.loomspan.autoconfigure.AiDriver.OPENAI,
+                        "openai/gpt-5", "medium"));
+        return ai.loomspan.testkit.TestSkillGenerations.of(
+                Map.of(capability.name(), capability), Map.of(capability.name(), definition));
     }
 }

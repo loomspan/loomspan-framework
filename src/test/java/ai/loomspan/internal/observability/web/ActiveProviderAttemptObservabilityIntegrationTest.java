@@ -60,7 +60,7 @@ class ActiveProviderAttemptObservabilityIntegrationTest
         DefaultExecutionObservationHandleFactory observation = new DefaultExecutionObservationHandleFactory();
         LoomspanSession session = TestLoomspanSessions.withObservation(
                 "active-provider-attempt", "test.entry", 4, CLOCK, observation);
-        var binding = ExecutionBinding.sessionOnly(session).withMission(
+        var binding = ExecutionBinding.sessionOnly(session, ai.loomspan.testkit.TestSkillGenerations.empty()).withMission(
                 new MissionContext(session, "test.entry", "mission-frame-active-provider-attempt", null));
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> {
             stateService.openMissionFrame(session, "test.entry", Map.of());

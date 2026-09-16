@@ -48,7 +48,7 @@ class EvidenceContractAdvisorAdditionalTest
                 "{\"result\":\"network issue\"}",
                 "{\"result\":\"network issue\"}"));
 
-        new LoomspanSessionRunner(3).callWithNewSession("test.entry", session ->
+        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session ->
         {
             return TestExecutionBindings.callWithCurrentSessionMission(() -> {
                 ExecutionBindingScope.requireCurrent().requireMission().recordSuccessfulDirectSkill("classifyIncident");

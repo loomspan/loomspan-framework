@@ -1660,7 +1660,8 @@ class ConsoleTraceFixtureCorpusTest
         return new ExecutionBinding(
                 session,
                 new MissionContext(session, skillName, missionFrameId, null),
-                branch);
+                branch,
+                ai.loomspan.testkit.TestSkillGenerations.empty());
     }
 
     private static YamlSkillDefinition runtimeFixtureDefinition()

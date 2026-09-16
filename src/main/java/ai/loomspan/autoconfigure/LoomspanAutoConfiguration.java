@@ -1,13 +1,11 @@
 package ai.loomspan.autoconfigure;
 
 import ai.loomspan.internal.core.LoomspanExceptionTransformer;
-import ai.loomspan.internal.core.CapabilityRegistry;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
 import ai.loomspan.internal.core.DefaultLoomspanExceptionTransformer;
 import ai.loomspan.internal.core.ExecutionCoordinator;
 import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
-import ai.loomspan.internal.core.InMemoryCapabilityRegistry;
 import ai.loomspan.internal.core.SkillMethodBeanPostProcessor;
 import ai.loomspan.internal.runtime.DefaultMissionExecutionEngine;
 import ai.loomspan.internal.runtime.MissionExecutionEngine;
@@ -34,8 +32,8 @@ import ai.loomspan.internal.security.DefaultAccessGuard;
 import ai.loomspan.internal.security.SkillRoleEvaluator;
 import ai.loomspan.internal.skill.DefaultSkillVisibilityResolver;
 import ai.loomspan.internal.skill.SkillVisibilityResolver;
-import ai.loomspan.internal.skill.YamlSkillCapabilityRegistrar;
 import ai.loomspan.internal.skill.YamlSkillCatalog;
+import ai.loomspan.internal.skill.SkillGenerationManager;
 import ai.loomspan.internal.skillapi.DefaultSkillTemplate;
 import ai.loomspan.internal.skillapi.DefaultSkillInvocationHandoff;
 import ai.loomspan.internal.skillapi.DefaultSkillCatalog;
@@ -64,6 +62,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Paths;
 import java.time.Clock;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -78,14 +77,6 @@ public class LoomspanAutoConfiguration
     private static final Logger LOGGER = LoggerFactory.getLogger(LoomspanAutoConfiguration.class);
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    CapabilityRegistry capabilityRegistry()
-    {
-        return new InMemoryCapabilityRegistry();
-    }
-
-
-    @Bean
-    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     LoomspanExceptionTransformer LoomspanExceptionTransformer()
     {
         return new DefaultLoomspanExceptionTransformer();
@@ -94,13 +85,11 @@ public class LoomspanAutoConfiguration
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     static SkillMethodBeanPostProcessor skillMethodBeanPostProcessor(
-            CapabilityRegistry capabilityRegistry,
             LoomspanJacksonCodecs codecs,
             LoomspanExceptionTransformer LoomspanExceptionTransformer,
             SkillInputContractResolver skillInputContractResolver)
     {
         return SkillMethodBeanPostProcessor.create(
-                capabilityRegistry,
                 codecs.applicationConversion(),
                 codecs.schemaTree(),
                 LoomspanExceptionTransformer,
@@ -170,27 +159,48 @@ public class LoomspanAutoConfiguration
 
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    YamlSkillCatalog yamlSkillCatalog(LoomspanProperties properties, LoomspanJacksonCodecs codecs)
-    {
-        // The catalog is the YAML discovery/loading boundary that downstream runtime beans build on.
-        return new YamlSkillCatalog(properties, new org.springframework.core.io.support.PathMatchingResourcePatternResolver(),
-                codecs.skillYaml());
-    }
-
-    @Bean
-    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    YamlSkillCapabilityRegistrar yamlSkillCapabilityRegistrar(CapabilityRegistry capabilityRegistry,
+    SkillGenerationManager skillGenerationManager(LoomspanProperties properties,
+            LoomspanJacksonCodecs codecs,
             SkillMethodBeanPostProcessor skillMethodBeanPostProcessor,
-            YamlSkillCatalog yamlSkillCatalog,
             SkillInputContractResolver skillInputContractResolver,
             org.springframework.beans.factory.ListableBeanFactory beanFactory)
     {
-        return new YamlSkillCapabilityRegistrar(
-                capabilityRegistry,
-                skillMethodBeanPostProcessor,
-                yamlSkillCatalog,
-                skillInputContractResolver,
-                beanFactory);
+        LoomspanProperties fixedSkillLoadingProperties = skillLoadingPropertiesSnapshot(properties);
+        return new SkillGenerationManager(skillMethodBeanPostProcessor,
+                () -> new YamlSkillCatalog(fixedSkillLoadingProperties,
+                        new org.springframework.core.io.support.PathMatchingResourcePatternResolver(),
+                        codecs.skillYaml()),
+                skillInputContractResolver, beanFactory);
+    }
+
+    static LoomspanProperties skillLoadingPropertiesSnapshot(LoomspanProperties source)
+    {
+        Objects.requireNonNull(source, "source must not be null");
+        LoomspanProperties snapshot = new LoomspanProperties();
+        LoomspanProperties.Skills skills = new LoomspanProperties.Skills();
+        skills.setLocations(source.getSkills().getLocations());
+        snapshot.setSkills(skills);
+
+        java.util.LinkedHashMap<String, LoomspanProperties.ConnectionProperties> connections =
+                new java.util.LinkedHashMap<>();
+        source.getConnections().forEach((name, configured) -> {
+            LoomspanProperties.ConnectionProperties connection = new LoomspanProperties.ConnectionProperties();
+            connection.setDriver(configured.getDriver());
+            connections.put(name, connection);
+        });
+        snapshot.setConnections(connections);
+
+        java.util.LinkedHashMap<String, LoomspanProperties.ModelCatalogEntry> models =
+                new java.util.LinkedHashMap<>();
+        source.getModels().forEach((name, configured) -> {
+            LoomspanProperties.ModelCatalogEntry model = new LoomspanProperties.ModelCatalogEntry();
+            model.setConnection(configured.getConnection());
+            model.setProviderModel(configured.getProviderModel());
+            model.setThinkingLevels(configured.getThinkingLevels());
+            models.put(name, model);
+        });
+        snapshot.setModels(models);
+        return snapshot;
     }
 
     @Bean
@@ -209,10 +219,9 @@ public class LoomspanAutoConfiguration
 
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    SkillCatalog skillCatalog(CapabilityRegistry capabilityRegistry,
-            YamlSkillCapabilityRegistrar yamlSkillCapabilityRegistrar)
+    SkillCatalog skillCatalog(SkillGenerationManager generationManager)
     {
-        return new DefaultSkillCatalog(capabilityRegistry, yamlSkillCapabilityRegistrar);
+        return generationManager.active().skillCatalog();
     }
 
     @Bean
@@ -233,11 +242,9 @@ public class LoomspanAutoConfiguration
 
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    SkillVisibilityResolver skillVisibilityResolver(YamlSkillCatalog yamlSkillCatalog,
-            CapabilityRegistry capabilityRegistry,
-            AccessGuard accessGuard)
+    SkillVisibilityResolver skillVisibilityResolver(AccessGuard accessGuard)
     {
-        return new DefaultSkillVisibilityResolver(yamlSkillCatalog, capabilityRegistry, accessGuard);
+        return new DefaultSkillVisibilityResolver(accessGuard);
     }
 
     @Bean
@@ -280,7 +287,7 @@ public class LoomspanAutoConfiguration
 
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    DefaultSkillTemplate skillTemplate(CapabilityRegistry capabilityRegistry,
+    DefaultSkillTemplate skillTemplate(SkillGenerationManager generationManager,
             CapabilityExecutionRouter capabilityExecutionRouter,
             LoomspanSessionRunner LoomspanSessionRunner,
             LoomspanJacksonCodecs codecs,
@@ -289,7 +296,7 @@ public class LoomspanAutoConfiguration
             ObjectProvider<org.springframework.security.core.context.SecurityContextHolderStrategy> securityContextStrategy)
     {
         return new DefaultSkillTemplate(
-                capabilityRegistry,
+                generationManager,
                 capabilityExecutionRouter,
                 LoomspanSessionRunner,
                 codecs.applicationConversion(),
@@ -414,8 +421,6 @@ public class LoomspanAutoConfiguration
     ai.loomspan.internal.runtime.step.StepLoopMissionExecutionEngine stepLoopMissionExecutionEngine(
             PlanningService planningService,
             ExecutionStateService executionStateService,
-            CapabilityRegistry capabilityRegistry,
-            YamlSkillCatalog yamlSkillCatalog,
             LoomspanProperties properties,
             SessionUsageService sessionUsageService,
             MissionInputMaterializer missionInputMaterializer,
@@ -425,8 +430,6 @@ public class LoomspanAutoConfiguration
         return new ai.loomspan.internal.runtime.step.StepLoopMissionExecutionEngine(
                 planningService,
                 executionStateService,
-                capabilityRegistry,
-                yamlSkillCatalog,
                 properties.getSession().getMissionTimeout(),
                 LoomspanMissionExecutor,
                 sessionUsageService,
@@ -436,9 +439,7 @@ public class LoomspanAutoConfiguration
 
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    ExecutionCoordinator executionCoordinator(YamlSkillCatalog yamlSkillCatalog,
-            CapabilityRegistry capabilityRegistry,
-            ai.loomspan.internal.model.ModelInteractionFactory modelInteractionFactory,
+    ExecutionCoordinator executionCoordinator(ai.loomspan.internal.model.ModelInteractionFactory modelInteractionFactory,
             ToolSurfaceService toolSurfaceService,
             ai.loomspan.internal.runtime.tool.CapabilityBindingFactory capabilityBindingFactory,
             MissionExecutionEngine missionExecutionEngine,
@@ -449,8 +450,6 @@ public class LoomspanAutoConfiguration
             ObjectProvider<org.springframework.security.core.context.SecurityContextHolderStrategy> strategy)
     {
         return new ExecutionCoordinator(
-                yamlSkillCatalog,
-                capabilityRegistry,
                 modelInteractionFactory,
                 toolSurfaceService,
                 capabilityBindingFactory,

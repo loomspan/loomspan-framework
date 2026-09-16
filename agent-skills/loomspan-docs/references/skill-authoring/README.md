@@ -53,7 +53,7 @@ Do not load every document by default. Start with the routing entry most relevan
 
 | Topic | Coverage | Notes |
 | --- | --- | --- |
-| Skill-tree mental model | Initial, source-verified | Shared Java/YAML identity, complete registration, root invocation, local visibility, lifecycle, and nesting |
+| Skill-tree mental model | Initial, source-verified | Shared Java/YAML identity, immutable complete generations, root capture, local visibility, lifecycle, and nesting |
 | Shared skill identity | Source-verified | Exact `name` format, case sensitivity, no-rewrite policy, propagation, duplicates across sources, and no diagnostic-location aliases |
 | Evidence contracts | Source-verified | Immediate-root property annotations, strict scalar/placement rules, Boolean direct-child expressions, planning/final truth sets, metadata isolation, enforcement, and nested mission isolation |
 | Source verification | Initial | How an LLM should use guide, tests, fixtures, samples, and production code together |

@@ -1,6 +1,7 @@
 package ai.loomspan.internal.core;
 
 import org.springframework.lang.Nullable;
+import ai.loomspan.internal.skill.SkillGeneration;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -10,12 +11,14 @@ import java.util.function.Supplier;
 public record ExecutionBinding(
         LoomspanSession session,
         @Nullable MissionContext mission,
-        PhysicalBranchContext branch)
+        PhysicalBranchContext branch,
+        SkillGeneration generation)
 {
     public ExecutionBinding
     {
         Objects.requireNonNull(session, "session must not be null");
         Objects.requireNonNull(branch, "branch must not be null");
+        Objects.requireNonNull(generation, "generation must not be null");
         if (branch.session() != session)
         {
             throw new IllegalArgumentException("Physical branch belongs to a different session.");
@@ -26,19 +29,19 @@ public record ExecutionBinding(
         }
     }
 
-    public static ExecutionBinding sessionOnly(LoomspanSession session)
+    public static ExecutionBinding sessionOnly(LoomspanSession session, SkillGeneration generation)
     {
-        return new ExecutionBinding(session, null, new PhysicalBranchContext(session));
+        return new ExecutionBinding(session, null, new PhysicalBranchContext(session), generation);
     }
 
     public ExecutionBinding withMission(MissionContext nextMission)
     {
-        return new ExecutionBinding(session, Objects.requireNonNull(nextMission, "mission must not be null"), branch);
+        return new ExecutionBinding(session, Objects.requireNonNull(nextMission, "mission must not be null"), branch, generation);
     }
 
     public ExecutionBinding forkBranch()
     {
-        return new ExecutionBinding(session, mission, branch.fork());
+        return new ExecutionBinding(session, mission, branch.fork(), generation);
     }
 
     public Optional<MissionContext> currentMission()

@@ -423,7 +423,7 @@ class OutputSchemaCallAdvisorTest {
         RecordingChain chain = new RecordingChain(List.of("bad-json", "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        runner.callWithNewSession("test.entry", session ->
+        runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() -> {
             ChatClientResponse response = advisor.adviseCall(request("Extract invoice"), chain);
 
@@ -493,7 +493,7 @@ class OutputSchemaCallAdvisorTest {
         RecordingChain chain = new RecordingChain(List.of("bad-json", "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        runner.callWithNewSession("test.entry", session ->
+        runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() -> {
             var frame = stateService.openFrame(session, TraceFrameType.MODEL_CALL, "outputSchemaSkill#model", Map.of());
 
@@ -543,7 +543,7 @@ class OutputSchemaCallAdvisorTest {
         RecordingChain chain = new RecordingChain(List.of("{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", session -> advisor.adviseCall(request("Extract invoice"), chain)))
+        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session -> advisor.adviseCall(request("Extract invoice"), chain)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("boom");
     }

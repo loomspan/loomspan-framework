@@ -160,10 +160,9 @@ class DefaultCapabilityInvokerTest {
                 ? "resolved-content"
                 : value;
         var metadata = capability();
-        var registry = new ai.loomspan.internal.core.InMemoryCapabilityRegistry();
+        var registry = new ai.loomspan.internal.core.TestCapabilityRegistry();
         registry.register(metadata.name(), metadata);
         var coordinator = new ai.loomspan.internal.core.ExecutionCoordinator(
-                mock(ai.loomspan.internal.skill.YamlSkillCatalog.class), registry,
                 (definition, mode) -> { throw new AssertionError("Java must not create a model interaction"); },
                 (name, session, authentication) -> List.of(),
                 (session, definition, capabilities, authentication) -> List.of(),
@@ -179,8 +178,10 @@ class DefaultCapabilityInvokerTest {
         DefaultCapabilityInvoker factory = new DefaultCapabilityInvoker(router, planningService, stateService);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
 
-        BoundCapability callback = factory.bind(session, definitionWithEvidenceContract(), List.of(capability()), null).getFirst();
-        Object result = invoke(session, callback, Map.of("value", "ref://artifacts/input.txt"), null);
+        BoundCapability callback = factory.bind(session, definitionWithEvidenceContract(), List.of(metadata), null).getFirst();
+        Object result = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
+                ai.loomspan.internal.core.TestExecutionBindings.missionBinding(session, registry.generation()),
+                () -> callback.invoke(Map.of("value", "ref://artifacts/input.txt"), null));
 
         assertThat(result).isEqualTo("child:resolved-content");
     }

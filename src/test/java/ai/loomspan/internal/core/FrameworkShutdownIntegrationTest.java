@@ -53,13 +53,13 @@ class FrameworkShutdownIntegrationTest
         var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
                 new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         CapabilityMetadata metadata = new CapabilityMetadata("test:root", "root", "Root",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
                 CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("root", "Root"), null);
         registry.register("root", metadata);
-        var template = new DefaultSkillTemplate(registry, router, runner, new ObjectMapper(),
+        var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
         org.mockito.Mockito.when(router.execute(any(), any(), any(), any())).thenReturn("ok");
@@ -135,7 +135,7 @@ class FrameworkShutdownIntegrationTest
 
         context.publishEvent(new ContextClosedEvent(context));
 
-        assertThatThrownBy(() -> runner.callWithNewSession("late", session -> {
+        assertThatThrownBy(() -> runner.callWithNewSession("late", ai.loomspan.testkit.TestSkillGenerations.empty(), session -> {
             actionCalled.set(true);
             return "unreachable";
         })).isInstanceOf(RejectedExecutionException.class);
@@ -157,12 +157,12 @@ class FrameworkShutdownIntegrationTest
         var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
                 new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         registry.register("root", new CapabilityMetadata("test:root", "root", "Root",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
                 CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("root", "Root"), null));
-        var template = new DefaultSkillTemplate(registry, router, runner, new ObjectMapper(),
+        var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         context.addApplicationListener(lifecycle);
         context.refresh();
@@ -319,14 +319,14 @@ class FrameworkShutdownIntegrationTest
         var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
                 new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
-        CapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityMetadata metadata = new CapabilityMetadata("test:root", "root", "Root",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
                 CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("root", "Root"), null);
         registry.register("root", metadata);
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         org.mockito.Mockito.when(router.execute(any(), any(), any(), any())).thenReturn("ok");
-        var template = new DefaultSkillTemplate(registry, router, runner, new ObjectMapper(),
+        var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
         var hostGate = new ApplicationDispatchGate(handoff);

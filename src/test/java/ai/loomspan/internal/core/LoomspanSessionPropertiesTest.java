@@ -66,7 +66,7 @@ class LoomspanSessionPropertiesTest {
                     assertThat(properties.getQuotas().getMaxModelCalls()).isEqualTo(5);
                     assertThat(properties.getQuotas().getMaxUsageUnits()).isEqualTo(1234);
                     assertThat(executionTraceProperties.getPersistence()).isEqualTo(TracePersistencePolicy.ALWAYS);
-                    assertThat(runner.callWithNewSession("test.entry", LoomspanSession::getMaxDepth)).isEqualTo(3);
+                    assertThat(runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), LoomspanSession::getMaxDepth)).isEqualTo(3);
                 });
     }
 

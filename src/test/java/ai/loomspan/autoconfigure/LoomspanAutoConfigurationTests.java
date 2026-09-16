@@ -9,7 +9,6 @@ import ai.loomspan.internal.springai.SpringAiModelInteractionFactory;
 import ai.loomspan.internal.core.LoomspanExceptionTransformer;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.CapabilityMetadata;
-import ai.loomspan.internal.core.CapabilityRegistry;
 import ai.loomspan.internal.core.ExecutionCoordinator;
 import ai.loomspan.internal.core.SkillMethodBeanPostProcessor;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
@@ -21,6 +20,7 @@ import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import ai.loomspan.internal.skill.SkillVisibilityResolver;
 import ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration;
 import ai.loomspan.internal.skill.YamlSkillCatalog;
+import ai.loomspan.internal.skill.SkillGenerationManager;
 import ai.loomspan.api.SkillTemplate;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.internal.skillapi.DefaultSkillTemplate;
@@ -55,6 +55,34 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class LoomspanAutoConfigurationTests {
+
+    @Test
+    void generationLoadingConfigurationIsFixedAtManagerConstruction()
+    {
+        LoomspanProperties source = new LoomspanProperties();
+        LoomspanProperties.Skills skills = new LoomspanProperties.Skills();
+        skills.setLocations(List.of("file:initial/*.yaml"));
+        source.setSkills(skills);
+        LoomspanProperties.ConnectionProperties connection = new LoomspanProperties.ConnectionProperties();
+        connection.setDriver(AiDriver.OPENAI);
+        source.setConnections(Map.of("primary", connection));
+        LoomspanProperties.ModelCatalogEntry model = new LoomspanProperties.ModelCatalogEntry();
+        model.setConnection("primary");
+        model.setProviderModel("initial-model");
+        model.setThinkingLevels(java.util.Set.of("medium"));
+        source.setModels(Map.of("planner", model));
+
+        LoomspanProperties snapshot = LoomspanAutoConfiguration.skillLoadingPropertiesSnapshot(source);
+        skills.setLocations(List.of("file:replacement/*.yaml"));
+        connection.setDriver(AiDriver.ANTHROPIC);
+        model.setProviderModel("replacement-model");
+        model.setThinkingLevels(java.util.Set.of("high"));
+
+        assertThat(snapshot.getSkills().getLocations()).containsExactly("file:initial/*.yaml");
+        assertThat(snapshot.getConnections().get("primary").getDriver()).isEqualTo(AiDriver.OPENAI);
+        assertThat(snapshot.getModels().get("planner").getProviderModel()).isEqualTo("initial-model");
+        assertThat(snapshot.getModels().get("planner").getThinkingLevels()).containsExactly("medium");
+    }
 
     private final ApplicationContextRunner modelFreeContextRunner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(
@@ -122,9 +150,9 @@ class LoomspanAutoConfigurationTests {
                     assertThat(context).hasSingleBean(LoomspanSessionRunner.class);
                     assertThat(context).hasSingleBean(LoomspanExceptionTransformer.class);
                     assertThat(context).hasSingleBean(ExecutionTraceProperties.class);
-                    assertThat(context).hasSingleBean(CapabilityRegistry.class);
+                    assertThat(context).hasSingleBean(SkillGenerationManager.class);
                     assertThat(context).hasSingleBean(LoomspanProperties.class);
-                    assertThat(context).hasSingleBean(YamlSkillCatalog.class);
+                    assertThat(context).doesNotHaveBean(YamlSkillCatalog.class);
                     assertThat(context).hasSingleBean(SkillVisibilityResolver.class);
                     assertThat(context).hasSingleBean(VirtualFileSystem.class);
                     assertThat(context).hasSingleBean(RefResolver.class);
@@ -146,7 +174,6 @@ class LoomspanAutoConfigurationTests {
                 {
                     LoomspanJacksonCodecs codecs = context.getBean(LoomspanJacksonCodecs.class);
                     LoomspanSessionRunner sessionRunner = context.getBean(LoomspanSessionRunner.class);
-                    YamlSkillCatalog skillCatalog = context.getBean(YamlSkillCatalog.class);
                     SkillInputContractResolver inputContractResolver =
                             context.getBean(SkillInputContractResolver.class);
                     DefaultSkillTemplate skillTemplate = (DefaultSkillTemplate) context.getBean(SkillTemplate.class);
@@ -158,8 +185,6 @@ class LoomspanAutoConfigurationTests {
 
                     assertThat(ReflectionTestUtils.getField(sessionRunner, "canonicalTraceMapper"))
                             .isSameAs(codecs.canonicalTrace());
-                    assertThat(ReflectionTestUtils.getField(skillCatalog, "yamlObjectMapper"))
-                            .isSameAs(codecs.skillYaml());
                     assertThat(ReflectionTestUtils.getField(inputContractResolver, "objectMapper"))
                             .isSameAs(codecs.applicationConversion());
                     assertThat(ReflectionTestUtils.getField(skillTemplate, "objectMapper"))
@@ -222,10 +247,10 @@ class LoomspanAutoConfigurationTests {
                 .run(context -> {
                     SkillInputContractResolver resolver = context.getBean(SkillInputContractResolver.class);
                     SkillMethodBeanPostProcessor beanPostProcessor = context.getBean(SkillMethodBeanPostProcessor.class);
-                    Object registrar = context.getBean("yamlSkillCapabilityRegistrar");
+                    SkillGenerationManager manager = context.getBean(SkillGenerationManager.class);
 
                     assertThat(ReflectionTestUtils.getField(beanPostProcessor, "inputContractResolver")).isSameAs(resolver);
-                    assertThat(ReflectionTestUtils.getField(registrar, "inputs")).isSameAs(resolver);
+                    assertThat(ReflectionTestUtils.getField(manager, "inputs")).isSameAs(resolver);
                 });
     }
 
@@ -236,13 +261,13 @@ class LoomspanAutoConfigurationTests {
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/none/*.yaml")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
-                    assertThat(context).hasSingleBean(YamlSkillCatalog.class);
-                    assertThat(context).hasSingleBean(CapabilityRegistry.class);
+                    assertThat(context).doesNotHaveBean(YamlSkillCatalog.class);
+                    assertThat(context).hasSingleBean(SkillGenerationManager.class);
                     assertThat(context).hasSingleBean(SkillTemplate.class);
                     assertThat(context.getBeansOfType(ChatModel.class)).isEmpty();
 
-                    CapabilityMetadata metadata = context.getBean(CapabilityRegistry.class)
-                            .getCapability("deterministicTarget");
+                    CapabilityMetadata metadata = context.getBean(SkillGenerationManager.class)
+                            .active().capability("deterministicTarget");
                     assertThat(metadata.skillExecution().configured()).isFalse();
                     assertThat(context.getBean(SkillTemplate.class)
                             .invoke("deterministicTarget", Map.of("input", "alpha")))
@@ -345,8 +370,8 @@ class LoomspanAutoConfigurationTests {
         contextRunner
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/default-thinking-skill.yaml")
                 .run(context -> {
-                    CapabilityRegistry capabilityRegistry = context.getBean(CapabilityRegistry.class);
-                    CapabilityMetadata metadata = capabilityRegistry.getCapability("thinkingDefaultSkill");
+                    SkillGenerationManager generations = context.getBean(SkillGenerationManager.class);
+                    CapabilityMetadata metadata = generations.active().capability("thinkingDefaultSkill");
 
                     assertThat(metadata).isNotNull();
                     assertThat(metadata.skillExecution().configured()).isTrue();
@@ -363,9 +388,9 @@ class LoomspanAutoConfigurationTests {
                 .withUserConfiguration(MappedSkillTargetConfiguration.class)
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/none/*.yaml")
                 .run(context -> {
-                    CapabilityRegistry capabilityRegistry = context.getBean(CapabilityRegistry.class);
-                    assertThat(capabilityRegistry.getCapability("deterministicTarget")).isNotNull();
-                    assertThat(capabilityRegistry.getCapability("targetBean#deterministicTarget")).isNull();
+                    SkillGenerationManager generations = context.getBean(SkillGenerationManager.class);
+                    assertThat(generations.active().capability("deterministicTarget")).isNotNull();
+                    assertThat(generations.active().capability("targetBean#deterministicTarget")).isNull();
                 });
     }
 

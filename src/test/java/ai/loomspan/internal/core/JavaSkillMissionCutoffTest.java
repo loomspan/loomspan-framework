@@ -30,7 +30,7 @@ class JavaSkillMissionCutoffTest
     {
         var session = TestLoomspanSessions.withId("java-framework-race", "javaRoot", 3);
         var mission = new MissionContext(session, "javaRoot", "frame", null);
-        var binding = new ExecutionBinding(session, mission, new PhysicalBranchContext(session));
+        var binding = new ExecutionBinding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
         mission.lifecycle().frameworkCutoff(System.nanoTime());
         var state = new DefaultExecutionStateService(Clock.systemUTC());
         var executor = new InlineExecutor();
@@ -47,7 +47,7 @@ class JavaSkillMissionCutoffTest
     {
         var session = TestLoomspanSessions.withId("java-application-failure-race", "javaRoot", 3);
         var mission = new MissionContext(session, "javaRoot", "frame", null);
-        var binding = new ExecutionBinding(session, mission, new PhysicalBranchContext(session));
+        var binding = new ExecutionBinding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
         var state = new DefaultExecutionStateService(Clock.systemUTC());
         var executor = new InlineExecutor(() -> mission.lifecycle().frameworkCutoff(System.nanoTime()));
         var workExecutor = new MissionWorkExecutor(
@@ -143,17 +143,27 @@ class JavaSkillMissionCutoffTest
 
     private static ExecutionCoordinator coordinator(ExecutorService executor, CapabilityInvoker invoker)
     {
-        var registry = new InMemoryCapabilityRegistry();
+        var registry = new TestCapabilityRegistry();
         registry.register("javaRoot", new CapabilityMetadata("javaRoot", "javaRoot", "Java work",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), invoker, CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("javaRoot", "Java work"), new SkillSource(null, "bean", "work()")));
         var state = new DefaultExecutionStateService(Clock.systemUTC());
         MissionExecutionEngine noModel = (s,d,o,i,m,t,p,a) -> { throw new AssertionError("Java dispatched model work"); };
-        return new ExecutionCoordinator(mock(YamlSkillCatalog.class), registry,
+        var generation = registry.generation();
+        return new ExecutionCoordinator(
                 (d,m) -> { throw new AssertionError("Java requested a model"); },
                 (n,s,a) -> List.of(), (s,d,c,a) -> List.of(), noModel, noModel, state,
                 new DefaultAccessGuard(), (v,s) -> v, new ScopedAuthentication(null),
-                new MissionWorkExecutor(state, Duration.ofSeconds(5), executor, new NoOpSessionUsageService()));
+                new MissionWorkExecutor(state, Duration.ofSeconds(5), executor, new NoOpSessionUsageService()))
+        {
+            @Override
+            public String execute(String skillName, String objective, LoomspanSession session,
+                    org.springframework.security.core.Authentication authentication)
+            {
+                return TestExecutionBindings.callWithGeneration(session, generation,
+                        () -> super.execute(skillName, objective, session, authentication));
+            }
+        };
     }
 
     private static void assertClosedOnce(List<TraceRecord> records)

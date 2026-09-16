@@ -44,7 +44,7 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
 {
     private static final Logger log = LoggerFactory.getLogger(SkillMethodBeanPostProcessor.class);
 
-    private final CapabilityRegistry capabilityRegistry;
+    private final Map<String, CapabilityMetadata> capabilitiesByName = new LinkedHashMap<>();
     private final ObjectMapper objectMapper;
     private final LoomspanExceptionTransformer LoomspanExceptionTransformer;
     private final SkillInputContractResolver inputContractResolver;
@@ -52,11 +52,13 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
     private final Set<String> processedBeanNames = ConcurrentHashMap.newKeySet();
     private BeanFactory beanFactory;
     private final List<Declaration> declarations = new ArrayList<>();
+    private boolean discoveryComplete;
     private record Declaration(String beanName, Method method, Method contractMethod,
             ai.loomspan.internal.security.SkillAccessPolicy policy) {}
 
-    public void completeDiscovery()
+    public synchronized void completeDiscovery()
     {
+        if (discoveryComplete) return;
         if (beanFactory instanceof org.springframework.beans.factory.config.ConfigurableListableBeanFactory factory)
         {
             for (String name : factory.getBeanDefinitionNames())
@@ -88,63 +90,61 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
                         declaration.policy(), declaration.beanName());
             }
         }
+        discoveryComplete = true;
+    }
+
+    public synchronized List<CapabilityMetadata> capabilities()
+    {
+        completeDiscovery();
+        return List.copyOf(capabilitiesByName.values());
     }
 
 
-    public SkillMethodBeanPostProcessor(CapabilityRegistry capabilityRegistry)
+    public SkillMethodBeanPostProcessor()
     {
-        this(capabilityRegistry,
-                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion(),
+        this(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion(),
                 new DefaultLoomspanExceptionTransformer(), new SkillInputContractResolver());
     }
 
-    public static SkillMethodBeanPostProcessor create(CapabilityRegistry capabilityRegistry,
-            LoomspanExceptionTransformer LoomspanExceptionTransformer)
+    public static SkillMethodBeanPostProcessor create(LoomspanExceptionTransformer LoomspanExceptionTransformer)
     {
         return new SkillMethodBeanPostProcessor(
-                capabilityRegistry,
                 ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion(),
                 LoomspanExceptionTransformer,
                 new SkillInputContractResolver());
     }
 
-    public static SkillMethodBeanPostProcessor create(CapabilityRegistry capabilityRegistry,
-            ObjectMapper objectMapper,
+    public static SkillMethodBeanPostProcessor create(ObjectMapper objectMapper,
             LoomspanExceptionTransformer LoomspanExceptionTransformer,
             SkillInputContractResolver inputContractResolver)
     {
         return new SkillMethodBeanPostProcessor(
-                capabilityRegistry,
                 objectMapper,
                 LoomspanExceptionTransformer,
                 inputContractResolver);
     }
 
-    public static SkillMethodBeanPostProcessor create(CapabilityRegistry capabilityRegistry,
-            ObjectMapper applicationMapper,
+    public static SkillMethodBeanPostProcessor create(ObjectMapper applicationMapper,
             ObjectMapper schemaMapper,
             LoomspanExceptionTransformer LoomspanExceptionTransformer,
             SkillInputContractResolver inputContractResolver)
     {
-        return new SkillMethodBeanPostProcessor(capabilityRegistry, applicationMapper, schemaMapper,
+        return new SkillMethodBeanPostProcessor(applicationMapper, schemaMapper,
                 LoomspanExceptionTransformer, inputContractResolver);
     }
 
-    SkillMethodBeanPostProcessor(CapabilityRegistry capabilityRegistry,
-            ObjectMapper objectMapper,
+    SkillMethodBeanPostProcessor(ObjectMapper objectMapper,
             LoomspanExceptionTransformer LoomspanExceptionTransformer,
             SkillInputContractResolver inputContractResolver)
     {
-        this(capabilityRegistry, objectMapper, objectMapper, LoomspanExceptionTransformer, inputContractResolver);
+        this(objectMapper, objectMapper, LoomspanExceptionTransformer, inputContractResolver);
     }
 
-    private SkillMethodBeanPostProcessor(CapabilityRegistry capabilityRegistry,
-            ObjectMapper objectMapper,
+    private SkillMethodBeanPostProcessor(ObjectMapper objectMapper,
             ObjectMapper schemaMapper,
             LoomspanExceptionTransformer LoomspanExceptionTransformer,
             SkillInputContractResolver inputContractResolver)
     {
-        this.capabilityRegistry = Objects.requireNonNull(capabilityRegistry, "capabilityRegistry must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.LoomspanExceptionTransformer = Objects.requireNonNull(LoomspanExceptionTransformer, "LoomspanExceptionTransformer must not be null");
         this.inputContractResolver = Objects.requireNonNull(inputContractResolver, "inputContractResolver must not be null");
@@ -205,6 +205,11 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
         String capabilityDescription = annotation.description().isBlank() ? method.getName() : annotation.description();
         String inputSchema = buildInputSchema(method, contractMethod);
         String name = annotation.name().isEmpty() ? method.getName() : annotation.name();
+        if (!name.matches("^[A-Za-z_][A-Za-z0-9_]{0,63}$"))
+        {
+            throw new IllegalArgumentException("Invalid skill name '" + name
+                    + "': use 1-64 ASCII letters, digits or underscores, starting with a letter or underscore");
+        }
         String location = beanName + "#" + method.toGenericString();
         CapabilityInvoker invoker = arguments -> invokeSkillMethod(beanName, method, contractMethod, name, arguments);
         var policy = new ai.loomspan.internal.security.SkillAccessPolicyResolver()
@@ -214,7 +219,13 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
                 new CapabilityToolDescriptor(name, capabilityDescription, inputSchema),
                 inputContractResolver.resolveJavaCapability(inputSchema),
                 new SkillSource(null, beanName, method.toGenericString()));
-        capabilityRegistry.register(name, metadata);
+        CapabilityMetadata existing = capabilitiesByName.putIfAbsent(name, metadata);
+        if (existing != null)
+        {
+            throw new CapabilityCollisionException("Capability with name '" + name
+                    + "' is already registered at " + existing.id()
+                    + "; conflicting declaration at " + metadata.id());
+        }
         declarations.add(new Declaration(beanName, method, contractMethod, policy));
     }
 

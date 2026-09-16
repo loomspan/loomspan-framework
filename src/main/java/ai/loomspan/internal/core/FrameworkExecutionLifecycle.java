@@ -71,19 +71,35 @@ public final class FrameworkExecutionLifecycle
             if (cutoff.get() || !activeRoots.contains(root) || root.state != RootState.PENDING)
                 return false;
             root.state = RootState.EXECUTING;
+            root.pendingTermination = null;
             return true;
         }
     }
 
     private void releasePending(AdmittedRoot root)
     {
+        Runnable pendingTermination;
         synchronized (monitor)
         {
             if (root.state != RootState.PENDING) return;
             root.state = RootState.RELEASED;
             activeRoots.remove(root);
+            pendingTermination = root.pendingTermination;
+            root.pendingTermination = null;
             monitor.notifyAll();
         }
+        if (pendingTermination != null) pendingTermination.run();
+    }
+
+    private void onPendingTermination(AdmittedRoot root, Runnable action)
+    {
+        boolean runNow;
+        synchronized (monitor)
+        {
+            runNow = root.state != RootState.PENDING;
+            if (!runNow) root.pendingTermination = action;
+        }
+        if (runNow) action.run();
     }
 
     private void completeExecution(AdmittedRoot root)
@@ -202,12 +218,14 @@ public final class FrameworkExecutionLifecycle
     private void publishCutoff()
     {
         List<AdmittedRoot> roots = List.of();
+        List<Runnable> pendingTerminations = List.of();
         long deadline = deadlineNanos.get();
         if (cutoff.compareAndSet(false, true))
         {
             synchronized (monitor)
             {
                 roots = new ArrayList<>(activeRoots);
+                pendingTerminations = new ArrayList<>();
                 for (AdmittedRoot root : roots)
                 {
                     root.recordCutoff(deadline);
@@ -215,10 +233,16 @@ public final class FrameworkExecutionLifecycle
                     {
                         root.state = RootState.CUT_OFF;
                         activeRoots.remove(root);
+                        if (root.pendingTermination != null)
+                        {
+                            pendingTerminations.add(root.pendingTermination);
+                            root.pendingTermination = null;
+                        }
                     }
                 }
                 monitor.notifyAll();
             }
+            pendingTerminations.forEach(Runnable::run);
             for (AdmittedRoot root : roots) root.signalCutoff(deadline);
         }
         executor.shutdownNow();
@@ -265,6 +289,7 @@ public final class FrameworkExecutionLifecycle
         private final AtomicBoolean cutOff = new AtomicBoolean();
         private volatile long cutoffDeadlineNanos = Long.MAX_VALUE;
         private RootState state = RootState.PENDING;
+        private Runnable pendingTermination;
 
         private AdmittedRoot(FrameworkExecutionLifecycle owner) { this.owner = owner; }
 
@@ -281,6 +306,12 @@ public final class FrameworkExecutionLifecycle
         public boolean claimExecution() { return owner.claim(this); }
 
         public void completeExecution() { owner.completeExecution(this); }
+
+        /** Registers cleanup owned by a pending handoff; runs on release or shutdown cutoff. */
+        public void onPendingTermination(Runnable action)
+        {
+            owner.onPendingTermination(this, Objects.requireNonNull(action, "action must not be null"));
+        }
 
         private void recordCutoff(long deadline)
         {

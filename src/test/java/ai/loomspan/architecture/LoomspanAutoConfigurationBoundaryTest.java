@@ -28,9 +28,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 class LoomspanAutoConfigurationBoundaryTest
 {
     private static final Set<String> CORE_BEAN_FACTORIES = Set.of(
-            "capabilityRegistry", "LoomspanExceptionTransformer",
-            "skillMethodBeanPostProcessor", "LoomspanSessionRunner", "yamlSkillCatalog",
-            "yamlSkillCapabilityRegistrar", "skillInputContractResolver", "skillInputValidator",
+            "LoomspanExceptionTransformer",
+            "skillMethodBeanPostProcessor", "LoomspanSessionRunner", "skillGenerationManager",
+            "skillInputContractResolver", "skillInputValidator",
             "skillCatalog", "skillRoleEvaluator", "accessGuard", "skillVisibilityResolver", "virtualFileSystem", "refResolver",
             "missionInputMaterializer", "capabilityExecutionRouter", "missionWorkExecutor",
             "skillTemplate", "skillInvocationHandoff", "modelUsageExtractor", "usageMetricsRecorder",

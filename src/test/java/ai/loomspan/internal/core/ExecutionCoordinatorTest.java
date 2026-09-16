@@ -70,7 +70,7 @@ class ExecutionCoordinatorTest {
                     return "resolved";
                 }, CapabilityKind.REST_SKILL,
                 CapabilityToolDescriptor.generic("restLookup", "REST lookup"), null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rest.name(), rest);
         ExecutionStateService state = fixedStateService();
         ExecutionCoordinator coordinator = coordinator(
@@ -127,7 +127,7 @@ class ExecutionCoordinatorTest {
                 arguments -> "child", CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register(childMetadata.name(), childMetadata);
 
@@ -196,7 +196,7 @@ class ExecutionCoordinatorTest {
                 arguments -> "child", CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register(childMetadata.name(), childMetadata);
 
@@ -262,7 +262,7 @@ class ExecutionCoordinatorTest {
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register(childMetadata.name(), childMetadata);
 
@@ -364,7 +364,7 @@ class ExecutionCoordinatorTest {
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register(childMetadata.name(), childMetadata);
 
@@ -421,7 +421,7 @@ class ExecutionCoordinatorTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
                 null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
         FakeCoordinatorChatClient defaultChatClient = new FakeCoordinatorChatClient(null, "unused", null, false);
@@ -436,9 +436,7 @@ class ExecutionCoordinatorTest {
             return "step loop complete";
         };
 
-        ExecutionCoordinator coordinator = new ExecutionCoordinator(
-                catalog,
-                registry,
+        ExecutionCoordinator coordinator = new GenerationBoundCoordinator(registry.generation(catalog),
                 factory,
                 new DefaultToolSurfaceService((currentSkillName, sessionState, authentication) -> List.of()),
                 (session, definition, capabilities, authentication) -> List.of(),
@@ -477,7 +475,7 @@ class ExecutionCoordinatorTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
                 null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
         FakeCoordinatorChatClient defaultChatClient = new FakeCoordinatorChatClient(null, "unused", null, false);
@@ -492,9 +490,7 @@ class ExecutionCoordinatorTest {
             throw new AssertionError("Step loop should not be selected without explicit planning_mode: true");
         };
 
-        ExecutionCoordinator coordinator = new ExecutionCoordinator(
-                catalog,
-                registry,
+        ExecutionCoordinator coordinator = new GenerationBoundCoordinator(registry.generation(catalog),
                 factory,
                 new DefaultToolSurfaceService((currentSkillName, sessionState, authentication) -> List.of()),
                 (session, definition, capabilities, authentication) -> List.of(),
@@ -533,7 +529,7 @@ class ExecutionCoordinatorTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
                 null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
         ExecutionStateService stateService = fixedStateService();
@@ -556,7 +552,8 @@ class ExecutionCoordinatorTest {
         LoomspanSession session = new LoomspanSession("session-nested", "top.entry", 3);
         MissionContext parent = new MissionContext(session, "top.entry", "parent-frame", null);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
-        String response = ExecutionBindingScope.supplyWith(new ExecutionBinding(session, parent, branch), () -> {
+        String response = ExecutionBindingScope.supplyWith(new ExecutionBinding(session, parent, branch,
+                registry.generation(catalog)), () -> {
             ExecutionFrame parentFrame = stateService.openMissionFrame(session, "parent.visible.skill", Map.of("objective", "parent"));
             stateService.recordSuccessfulSkill("invoiceParser", "task-1", false);
             try {
@@ -594,7 +591,7 @@ class ExecutionCoordinatorTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
                 null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
         ModelInteractionFactory factory = new ModelInteractionFactory() {
@@ -605,9 +602,7 @@ class ExecutionCoordinatorTest {
             }
         };
 
-        ExecutionCoordinator coordinator = new ExecutionCoordinator(
-                catalog,
-                registry,
+        ExecutionCoordinator coordinator = new GenerationBoundCoordinator(registry.generation(catalog),
                 factory,
                 new DefaultToolSurfaceService((currentSkillName, sessionState, authentication) -> List.of()),
                 (session, definition, capabilities, authentication) -> List.of(),
@@ -644,7 +639,7 @@ class ExecutionCoordinatorTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
                 null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
         MissionExecutionEngine failingMissionExecutionEngine = (session, definition, objective, missionInput, chatClient, visibleTools, planningEnabled, authentication) -> {
@@ -698,7 +693,7 @@ class ExecutionCoordinatorTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
                 null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
         ExecutionCoordinator coordinator = coordinator(
@@ -742,7 +737,7 @@ class ExecutionCoordinatorTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
                 null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
         ExecutionCoordinator coordinator = coordinator(
@@ -795,7 +790,7 @@ class ExecutionCoordinatorTest {
                 CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
                 null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
         ExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK) {
@@ -876,7 +871,7 @@ class ExecutionCoordinatorTest {
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register(childMetadata.name(), childMetadata);
 
@@ -946,7 +941,7 @@ class ExecutionCoordinatorTest {
                 }, CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register(childMetadata.name(), childMetadata);
 
@@ -1035,7 +1030,7 @@ class ExecutionCoordinatorTest {
                 arguments -> "analysis:" + arguments.get("topic"), CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("marsAnalyzer", "mars analyzer"), null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register(childMetadata.name(), childMetadata);
         registry.register(marsAnalyzerMetadata.name(), marsAnalyzerMetadata);
@@ -1150,7 +1145,7 @@ class ExecutionCoordinatorTest {
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register(childMetadata.name(), childMetadata);
 
@@ -1231,7 +1226,7 @@ class ExecutionCoordinatorTest {
                 arguments -> "analysis:" + arguments.get("topic"), CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("marsAnalyzer", "mars analyzer"), null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register(childMetadata.name(), childMetadata);
         registry.register(marsAnalyzerMetadata.name(), marsAnalyzerMetadata);
@@ -1272,9 +1267,7 @@ class ExecutionCoordinatorTest {
                 planningService,
                 stateService);
         MissionExecutionEngine missionExecutionEngine = missionExecutionEngine(planningService, stateService);
-        coordinatorHolder[0] = new ExecutionCoordinator(
-                catalog,
-                registry,
+        coordinatorHolder[0] = new GenerationBoundCoordinator(registry.generation(catalog),
                 factory,
                 toolSurfaceService,
                 toolCallbackFactory,
@@ -1329,7 +1322,7 @@ class ExecutionCoordinatorTest {
                 CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
                 null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -1391,7 +1384,7 @@ class ExecutionCoordinatorTest {
                 ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root", CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("rootVisibleSkill", "root"), null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
         var context = new StaticApplicationContext();
@@ -1510,7 +1503,7 @@ class ExecutionCoordinatorTest {
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
 
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register(childMetadata.name(), childMetadata);
 
@@ -1582,7 +1575,7 @@ class ExecutionCoordinatorTest {
     }
 
     private static ExecutionCoordinator coordinator(StubYamlSkillCatalog catalog,
-                                                    InMemoryCapabilityRegistry registry,
+                                                    TestCapabilityRegistry registry,
                                                     SkillVisibilityResolver visibilityResolver,
                                                     ModelInteractionFactory factory,
                                                     RefResolver refResolver,
@@ -1591,7 +1584,7 @@ class ExecutionCoordinatorTest {
     }
 
     private static ExecutionCoordinator coordinator(StubYamlSkillCatalog catalog,
-                                                    InMemoryCapabilityRegistry registry,
+                                                    TestCapabilityRegistry registry,
                                                     SkillVisibilityResolver visibilityResolver,
                                                     ModelInteractionFactory factory,
                                                     RefResolver refResolver,
@@ -1614,7 +1607,7 @@ class ExecutionCoordinatorTest {
     }
 
     private static ExecutionCoordinator coordinator(StubYamlSkillCatalog catalog,
-                                                    InMemoryCapabilityRegistry registry,
+                                                    TestCapabilityRegistry registry,
                                                     SkillVisibilityResolver visibilityResolver,
                                                     ModelInteractionFactory factory,
                                                     RefResolver refResolver,
@@ -1636,7 +1629,7 @@ class ExecutionCoordinatorTest {
     }
 
     private static ExecutionCoordinator coordinator(StubYamlSkillCatalog catalog,
-                                                    InMemoryCapabilityRegistry registry,
+                                                    TestCapabilityRegistry registry,
                                                     SkillVisibilityResolver visibilityResolver,
                                                     ModelInteractionFactory factory,
                                                     RefResolver refResolver,
@@ -1653,9 +1646,7 @@ class ExecutionCoordinatorTest {
                 ? (session, definition, capabilities, authentication) -> delegate.bind(session, definition, capabilities, null)
                 : delegate;
         AccessGuard accessGuard = new DefaultAccessGuard();
-        holder[0] = new ExecutionCoordinator(
-                catalog,
-                registry,
+        holder[0] = new GenerationBoundCoordinator(registry.generation(catalog),
                 factory,
                 toolSurfaceService,
                 toolCallbackFactory,
@@ -1667,6 +1658,45 @@ class ExecutionCoordinatorTest {
                 new ai.loomspan.internal.security.ScopedAuthentication(null),
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
         return holder[0];
+    }
+
+    private static final class GenerationBoundCoordinator extends ExecutionCoordinator
+    {
+        private final ai.loomspan.internal.skill.SkillGeneration generation;
+
+        private GenerationBoundCoordinator(ai.loomspan.internal.skill.SkillGeneration generation,
+                ModelInteractionFactory modelInteractionFactory, ToolSurfaceService toolSurfaceService,
+                CapabilityBindingFactory capabilityBindingFactory, MissionExecutionEngine missionExecutionEngine,
+                MissionExecutionEngine stepLoopMissionExecutionEngine, ExecutionStateService executionStateService,
+                AccessGuard accessGuard, RefResolver refResolver,
+                ai.loomspan.internal.security.ScopedAuthentication scopedAuthentication,
+                ai.loomspan.internal.runtime.MissionWorkExecutor missionWorkExecutor)
+        {
+            super(modelInteractionFactory, toolSurfaceService, capabilityBindingFactory, missionExecutionEngine,
+                    stepLoopMissionExecutionEngine, executionStateService, accessGuard, refResolver,
+                    scopedAuthentication, missionWorkExecutor);
+            this.generation = generation;
+        }
+
+        @Override
+        public String execute(String skillName, String objective, LoomspanSession session,
+                @Nullable org.springframework.security.core.Authentication authentication)
+        {
+            if (ExecutionBindingScope.current().isPresent())
+                return super.execute(skillName, objective, session, authentication);
+            return TestExecutionBindings.callWithGeneration(session, generation,
+                    () -> super.execute(skillName, objective, session, authentication));
+        }
+
+        @Override
+        public String execute(String skillName, String objective, @Nullable Map<String, Object> missionInput,
+                LoomspanSession session, @Nullable org.springframework.security.core.Authentication authentication)
+        {
+            if (ExecutionBindingScope.current().isPresent())
+                return super.execute(skillName, objective, missionInput, session, authentication);
+            return TestExecutionBindings.callWithGeneration(session, generation,
+                    () -> super.execute(skillName, objective, missionInput, session, authentication));
+        }
     }
 
     private static CapabilityBindingFactory toolCallbackFactory(RefResolver refResolver,

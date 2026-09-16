@@ -44,6 +44,8 @@ loomspan:
 
 The YAML skill declares `model: summarizer` or `model: planner`; it does not declare the driver or endpoint.
 
+The resolved per-skill execution configuration belongs to the complete generation captured by a root invocation. Nested and parallel work in that tree keeps the same resolved configuration even if a newer generation is internally activated; newly captured roots use the newer configuration. Named connection runtime objects remain application/Spring dependencies rather than per-generation copies.
+
 ## Connection rules
 
 | Driver | Required mode | Optional connection settings |

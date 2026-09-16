@@ -72,6 +72,8 @@ The coordinator partitions the accepted plan once, visits execution units in tas
 
 Workers use isolated branches and cannot mutate parent plan, evidence, summary, last-result, or retained diagnostics before join. Successful siblings still contribute their results when another member fails. If multiple members fail, the earliest failure in task-list order is primary. Later units and final synthesis begin only after a successful full join and observe sequential-equivalent evidence, summary, last result, and diagnostics.
 
+Every worker branch, nested planner, and later unit also carries the exact immutable skill generation captured by the root. Definitions, visible child capabilities, policies, schemas, and execution settings cannot switch generation mid-plan; a newly active generation applies only to independently captured roots.
+
 Mission-wide cleanup is logical rather than transactional. During its bounded
 grace, already-started workers may finish and publish ordinary Loomspan facts.
 At cutoff, Loomspan closes remaining logical branch frames and rejects later

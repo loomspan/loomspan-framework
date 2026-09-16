@@ -5,6 +5,7 @@ import java.util.concurrent.Callable;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import ai.loomspan.internal.skill.SkillGeneration;
 
 /** Test-only construction of a complete mission binding. */
 public final class TestExecutionBindings
@@ -13,13 +14,18 @@ public final class TestExecutionBindings
 
     public static ExecutionBinding missionBinding(LoomspanSession session)
     {
+        return missionBinding(session, ai.loomspan.testkit.TestSkillGenerations.empty());
+    }
+
+    public static ExecutionBinding missionBinding(LoomspanSession session, SkillGeneration generation)
+    {
         Objects.requireNonNull(session, "session must not be null");
         String missionFrameId = "mission-frame-" + UUID.randomUUID();
         MissionContext mission = new MissionContext(session, session.entrySkill(), missionFrameId, null);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         branch.push(new ExecutionFrame(missionFrameId, null, OperationType.CAPABILITY,
                 TraceFrameType.ROOT_MISSION, session.entrySkill(), Map.of(), Instant.now()));
-        return new ExecutionBinding(session, mission, branch);
+        return new ExecutionBinding(session, mission, branch, generation);
     }
 
     public static <T> T callWithSession(LoomspanSession session, Callable<T> action)
@@ -27,6 +33,23 @@ public final class TestExecutionBindings
         try
         {
             return ExecutionBindingScope.callWith(missionBinding(session), action);
+        }
+        catch (RuntimeException | Error ex)
+        {
+            throw ex;
+        }
+        catch (Exception ex)
+        {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    public static <T> T callWithGeneration(LoomspanSession session, SkillGeneration generation,
+            Callable<T> action)
+    {
+        try
+        {
+            return ExecutionBindingScope.callWith(ExecutionBinding.sessionOnly(session, generation), action);
         }
         catch (RuntimeException | Error ex)
         {

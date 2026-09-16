@@ -70,8 +70,9 @@ class SkillMethodTargetDiscoveryIntegrationTests
     void acceptsExplicitlyNamedOverloadsAfterProxyCanonicalization()
     {
         OverloadedConcreteSkill proxy = classProxy(new OverloadedConcreteSkill(), new AtomicInteger());
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
-        SkillMethodBeanPostProcessor processor = new SkillMethodBeanPostProcessor(registry);
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        SkillMethodBeanPostProcessor processor = new SkillMethodBeanPostProcessor();
+        registry.bind(processor);
         StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
         beanFactory.addBean("overloadedSkill", proxy);
         processor.setBeanFactory(beanFactory);
@@ -100,8 +101,9 @@ class SkillMethodTargetDiscoveryIntegrationTests
     void rejectsConflictingAnnotatedInterfaceContracts()
     {
         Object proxy = jdkProxy(new ConflictingContractSkillImpl(), null);
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
-        SkillMethodBeanPostProcessor processor = new SkillMethodBeanPostProcessor(registry);
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        SkillMethodBeanPostProcessor processor = new SkillMethodBeanPostProcessor();
+        registry.bind(processor);
         StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
         beanFactory.addBean("conflictingContractSkill", proxy);
         processor.setBeanFactory(beanFactory);
@@ -155,8 +157,9 @@ class SkillMethodTargetDiscoveryIntegrationTests
 
     private TestHarness process(Object bean, String beanName)
     {
-        InMemoryCapabilityRegistry registry = new InMemoryCapabilityRegistry();
-        SkillMethodBeanPostProcessor processor = new SkillMethodBeanPostProcessor(registry);
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        SkillMethodBeanPostProcessor processor = new SkillMethodBeanPostProcessor();
+        registry.bind(processor);
         StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
         beanFactory.addBean(beanName, bean);
         processor.setBeanFactory(beanFactory);
@@ -323,7 +326,7 @@ class SkillMethodTargetDiscoveryIntegrationTests
         }
     }
 
-    private record TestHarness(InMemoryCapabilityRegistry registry)
+    private record TestHarness(TestCapabilityRegistry registry)
     {
     }
 }

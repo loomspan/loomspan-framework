@@ -28,12 +28,12 @@ class ExecutionStateServiceTest
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
         ExecutionPlan plan = new ExecutionPlan("plan", "entry", CLOCK.instant(), List.of());
 
-        ExecutionBindingScope.runWith(new ExecutionBinding(session, parent, branch), () -> {
+        ExecutionBindingScope.runWith(new ExecutionBinding(session, parent, branch, ai.loomspan.testkit.TestSkillGenerations.empty()), () -> {
             ExecutionFrame root = state.openMissionFrame(session, "entry", Map.of());
             try {
                 state.storePlan(plan);
                 state.recordSuccessfulSkill("direct", null, true);
-                ExecutionBindingScope.runWith(new ExecutionBinding(session, child, branch), () -> {
+                ExecutionBindingScope.runWith(new ExecutionBinding(session, child, branch, ai.loomspan.testkit.TestSkillGenerations.empty()), () -> {
                     assertThat(state.currentPlan()).isEmpty();
                     assertThat(state.currentSuccessfulSkills()).isEmpty();
                 });
@@ -51,7 +51,7 @@ class ExecutionStateServiceTest
         MissionContext mission = new MissionContext(session, "entry", "mission", null);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
-        ExecutionBindingScope.runWith(new ExecutionBinding(session, mission, branch), () -> {
+        ExecutionBindingScope.runWith(new ExecutionBinding(session, mission, branch, ai.loomspan.testkit.TestSkillGenerations.empty()), () -> {
             ExecutionFrame root = state.openMissionFrame(session, "entry", Map.of());
             ExecutionFrame child = state.openFrame(session, TraceFrameType.MODEL_CALL, "model", Map.of());
             assertThat(child.parentFrameId()).isEqualTo(root.frameId());
@@ -72,7 +72,7 @@ class ExecutionStateServiceTest
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
         LinterOutcome outcome = new LinterOutcome("entry", "regex", 1, 0, 1,
                 LinterOutcomeStatus.PASSED, "ok");
-        ExecutionBindingScope.runWith(new ExecutionBinding(session, mission, branch), () -> {
+        ExecutionBindingScope.runWith(new ExecutionBinding(session, mission, branch, ai.loomspan.testkit.TestSkillGenerations.empty()), () -> {
             ExecutionFrame root = state.openMissionFrame(session, "entry", Map.of());
             state.recordLinterOutcome(session, outcome);
             assertThat(mission.lastLinterOutcome()).contains(outcome);
@@ -85,7 +85,7 @@ class ExecutionStateServiceTest
     {
         LoomspanSession session = new LoomspanSession(4, "entry");
         MissionContext mission = new MissionContext(session, "entry", "mission", null);
-        ExecutionBinding parent = new ExecutionBinding(session, mission, new PhysicalBranchContext(session));
+        ExecutionBinding parent = new ExecutionBinding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
         LinterOutcome outcome = new LinterOutcome("entry", "regex", 1, 0, 1,
                 LinterOutcomeStatus.PASSED, "worker-only");
@@ -152,11 +152,11 @@ class ExecutionStateServiceTest
         MissionContext child = new MissionContext(session, "child", "child-frame", parent);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
-        ExecutionBinding parentBinding = new ExecutionBinding(session, parent, branch);
+        ExecutionBinding parentBinding = new ExecutionBinding(session, parent, branch, ai.loomspan.testkit.TestSkillGenerations.empty());
 
         ExecutionBindingScope.runWith(parentBinding, () -> {
             state.openMissionFrame(session, "entry", Map.of());
-            ExecutionBinding childBinding = new ExecutionBinding(session, child, branch);
+            ExecutionBinding childBinding = new ExecutionBinding(session, child, branch, ai.loomspan.testkit.TestSkillGenerations.empty());
             ExecutionBindingScope.runWith(childBinding, () -> {
                 ExecutionFrame childFrame = state.openMissionFrame(session, "child", Map.of());
                 ExecutionPlan original = new ExecutionPlan("child-original", "child", CLOCK.instant(), List.of());

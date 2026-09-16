@@ -82,7 +82,7 @@ class EvidenceContractTests {
                 "{\"vendorName\":\"Acme\"}",
                 "{}"));
 
-        new LoomspanSessionRunner(3).callWithNewSession("test.entry", session ->
+        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() -> {
             ChatClientResponse response = advisor.adviseCall(
                     request("Return JSON", "SKILL_PROMPT_SENTINEL\n\nBase instructions."),

@@ -11,7 +11,7 @@ import ai.loomspan.internal.observability.web.ObservabilityProblemMapper;
 import ai.loomspan.internal.observability.web.ObservabilityRestController;
 import ai.loomspan.internal.observability.web.ObservabilityRouteCollisionDetector;
 import ai.loomspan.internal.observability.web.ObservabilityRouteRegistrar;
-import ai.loomspan.internal.skill.YamlSkillCatalog;
+import ai.loomspan.internal.skill.SkillGenerationManager;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
@@ -101,15 +101,13 @@ public class LoomspanObservabilityWebAutoConfiguration
             ObservabilityActivationCoordinator activation,
             LoomspanProperties properties,
             ExecutionTraceProperties traceProperties,
-            YamlSkillCatalog yamlSkills,
-            ai.loomspan.internal.core.CapabilityRegistry registry,
-            ai.loomspan.internal.skill.YamlSkillCapabilityRegistrar registrar,
+            SkillGenerationManager generations,
             ObservabilityDtoMapper mapper,
             ObservabilityJsonCodec json)
     {
         return new ObservabilityRouteRegistrar(
                 mappings.getIfAvailable(), controller, collisions, activation, properties, traceProperties,
-                registry, yamlSkills, registrar, mapper, json);
+                generations, mapper, json);
     }
 
     @Bean

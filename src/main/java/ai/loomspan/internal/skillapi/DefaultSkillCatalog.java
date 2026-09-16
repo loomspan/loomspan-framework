@@ -2,8 +2,7 @@ package ai.loomspan.internal.skillapi;
 
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillDescriptor;
-import ai.loomspan.internal.core.CapabilityRegistry;
-import ai.loomspan.internal.skill.YamlSkillCapabilityRegistrar;
+import ai.loomspan.internal.core.CapabilityMetadata;
 
 import java.util.Collections;
 import java.util.List;
@@ -17,12 +16,11 @@ public final class DefaultSkillCatalog implements SkillCatalog
     private final NavigableMap<String, SkillDescriptor> entries;
     private final List<SkillDescriptor> skills;
 
-    public DefaultSkillCatalog(CapabilityRegistry registry, YamlSkillCapabilityRegistrar registrar)
+    public DefaultSkillCatalog(List<CapabilityMetadata> capabilities)
     {
-        Objects.requireNonNull(registrar, "registrar must not be null").completeRegistration();
-        Objects.requireNonNull(registry, "registry must not be null");
+        Objects.requireNonNull(capabilities, "capabilities must not be null");
         TreeMap<String, SkillDescriptor> built = new TreeMap<>();
-        for (var metadata : registry.getAllCapabilities())
+        for (var metadata : capabilities)
         {
             SkillDescriptor descriptor = new SkillDescriptor(metadata.name(), metadata.description(),
                     metadata.kind().publicKind(), metadata.tool().inputSchema());

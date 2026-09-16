@@ -4,9 +4,6 @@ import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.runtime.evidence.EvidenceContract;
 import ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration;
 import ai.loomspan.internal.skill.YamlSkillDefinition;
-import ai.loomspan.internal.skill.YamlSkillCatalog;
-import ai.loomspan.internal.skill.YamlSkillCapabilityRegistrar;
-import ai.loomspan.internal.core.CapabilityRegistry;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.SkillSource;
@@ -21,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -94,10 +92,8 @@ class DefaultRegisteredSkillCatalogTest
 
     private DefaultRegisteredSkillCatalog catalog(List<YamlSkillDefinition> definitions, boolean includeJava)
     {
-        CapabilityRegistry registry = mock(CapabilityRegistry.class);
-        YamlSkillCatalog yaml = mock(YamlSkillCatalog.class);
-        YamlSkillCapabilityRegistrar registrar = mock(YamlSkillCapabilityRegistrar.class);
         var entries = new java.util.ArrayList<CapabilityMetadata>();
+        var definitionsByName = new java.util.LinkedHashMap<String, YamlSkillDefinition>();
         for (var definition : definitions)
         {
             var metadata = mock(CapabilityMetadata.class);
@@ -105,7 +101,7 @@ class DefaultRegisteredSkillCatalogTest
             when(metadata.kind()).thenReturn(definition.rest()
                     ? CapabilityKind.REST_SKILL
                     : CapabilityKind.YAML_SKILL);
-            when(yaml.getSkill(metadata.name())).thenReturn(definition);
+            definitionsByName.put(metadata.name(), definition);
             entries.add(metadata);
         }
         if (includeJava)
@@ -116,12 +112,7 @@ class DefaultRegisteredSkillCatalogTest
             when(metadata.source()).thenReturn(new SkillSource(null, "lookupBean", "example.Lookup.lookup(java.lang.String)"));
             entries.add(metadata);
         }
-        when(registry.getAllCapabilities()).thenReturn(entries);
-        var result = new DefaultRegisteredSkillCatalog(registry, yaml, registrar);
-        var order = inOrder(registrar, registry);
-        order.verify(registrar).completeRegistration();
-        order.verify(registry).getAllCapabilities();
-        return result;
+        return new DefaultRegisteredSkillCatalog(entries, definitionsByName);
     }
 
     private YamlSkillDefinition definition(String name, String yaml) throws Exception
