@@ -15,7 +15,10 @@ import (
 )
 
 const maxRequestBody = 1 << 20
-const requestTimeout = 10 * time.Second
+// A maximum-size trace range produces both structured content and a complete
+// text fallback. Framing and validating that response can exceed ten seconds
+// on slower supported macOS runners.
+const requestTimeout = 30 * time.Second
 
 type authenticator interface {
 	Snapshot() mcpcredential.Snapshot
