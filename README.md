@@ -54,7 +54,7 @@ Add the starter to your application:
 <dependency>
     <groupId>ai.loomspan</groupId>
     <artifactId>loomspan-spring-boot-starter</artifactId>
-    <version>1.0.0-beta.4</version>
+    <version>1.0.0-beta.5-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -252,9 +252,9 @@ Skill versions with one command:
 
 ```bash
 python scripts/loomspan_version.py check
-python scripts/loomspan_version.py set 1.0.0-beta.4
+python scripts/loomspan_version.py set 1.0.0-beta.5-SNAPSHOT
 # Review, test, and commit the release version.
-python scripts/loomspan_version.py tag 1.0.0-beta.4
+python scripts/loomspan_version.py tag 1.0.0-beta.5-SNAPSHOT
 ```
 
 `set` requires a clean worktree and replaces the exact current version in all
@@ -269,34 +269,34 @@ bootstrap version list to update.
 
 Keep the project on the next anticipated beta version with `-SNAPSHOT` during
 normal development. Remove that suffix when preparing the beta release. The
-current development version is `1.0.0-beta.4`. The beta 4 release transition is:
+current development version is `1.0.0-beta.5-SNAPSHOT`. The beta 4 release transition is:
 
 ```text
-development: 1.0.0-beta.4
-release: 1.0.0-beta.4
-tag: v1.0.0-beta.4
+development: 1.0.0-beta.5-SNAPSHOT
+release: 1.0.0-beta.5-SNAPSHOT
+tag: v1.0.0-beta.5-SNAPSHOT
 then begin the next development snapshot
 ```
 
 Starting from a clean development snapshot worktree, prepare the release.
-If the version is already `1.0.0-beta.4`, skip the `set` command. Pushing
+If the version is already `1.0.0-beta.5-SNAPSHOT`, skip the `set` command. Pushing
 the tag below starts the Console release and automatic Maven Central publication:
 
 ```bash
 python scripts/loomspan_version.py check
-python scripts/loomspan_version.py set 1.0.0-beta.4
+python scripts/loomspan_version.py set 1.0.0-beta.5-SNAPSHOT
 
 # Review and run the appropriate tests before committing.
 git add .
-git commit -m "Release 1.0.0-beta.4"
+git commit -m "Release 1.0.0-beta.5-SNAPSHOT"
 git push origin main
 
 # Before tagging, run Console Release and Maven Central Release manually
 # against main in GitHub Actions. Both manual runs only validate.
 # Require both runs and Console CI to pass on this exact commit.
 
-python scripts/loomspan_version.py tag 1.0.0-beta.4
-git push origin main v1.0.0-beta.4
+python scripts/loomspan_version.py tag 1.0.0-beta.5-SNAPSHOT
+git push origin main v1.0.0-beta.5-SNAPSHOT
 ```
 
 The Console preflight must pass native packaging and archive smoke checks on
@@ -325,10 +325,10 @@ SNAPSHOT from `main` only when the root POM and version-coupled skill metadata
 on `main` declare that exact SNAPSHOT version.
 
 For beta 4 compatibility and migration details, read
-[`docs/releases/1.0.0-beta.4.md`](docs/releases/1.0.0-beta.4.md). Local preparation,
+[`docs/releases/1.0.0-beta.5-SNAPSHOT.md`](docs/releases/1.0.0-beta.5-SNAPSHOT.md). Local preparation,
 the external Sidecar SC5 gate, and final validation-only workflow evidence are
 tracked separately in
-[`ai/thoughts/release-readiness/1.0.0-beta.4.md`](ai/thoughts/release-readiness/1.0.0-beta.4.md).
+[`ai/thoughts/release-readiness/1.0.0-beta.5-SNAPSHOT.md`](ai/thoughts/release-readiness/1.0.0-beta.5-SNAPSHOT.md).
 That readiness record does not authorize tagging or publication.
 
 ### Maven Central releases
