@@ -21,6 +21,7 @@ public record ActiveExecutionSnapshot(
         Instant startedAt,
         Instant updatedAt,
         String entrySkill,
+        String generationId,
         String phase,
         String summary,
         List<ActiveBranch> activeBranches,
@@ -42,6 +43,7 @@ public record ActiveExecutionSnapshot(
         Objects.requireNonNull(startedAt, "startedAt must not be null");
         Objects.requireNonNull(updatedAt, "updatedAt must not be null");
         entrySkill = requireNonBlank(entrySkill, "entrySkill");
+        generationId = requireNonBlank(generationId, "generationId");
         phase = ExecutionObservationLimits.truncate(requireNonBlank(phase, "phase"),
                 ExecutionObservationLimits.TEXT_CODE_POINTS);
         summary = ExecutionObservationLimits.truncate(summary, ExecutionObservationLimits.SUMMARY_CODE_POINTS);
@@ -53,7 +55,7 @@ public record ActiveExecutionSnapshot(
     ActiveExecutionSnapshot withRegistryOrdinal(long ordinal)
     {
         return new ActiveExecutionSnapshot(
-                sessionId, traceId, ordinal, lastCanonicalSequence, startedAt, updatedAt, entrySkill,
+                sessionId, traceId, ordinal, lastCanonicalSequence, startedAt, updatedAt, entrySkill, generationId,
                 phase, summary, activeBranches, usage, outcome);
     }
 

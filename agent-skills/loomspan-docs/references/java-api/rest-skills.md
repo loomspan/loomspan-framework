@@ -19,7 +19,7 @@ RestSkillHandler restSkills() {
 
 If REST manifests exist, the application MUST expose exactly one handler bean. That handler serves every REST declaration and selects behavior by `invocation.skillName()` when needed. Per-skill handlers, framework-owned HTTP clients, routing manifest fields, retries, response mapping, and token exchange are not supported by this contract.
 
-`RestSkillInvocation(String skillName, Map<String,Object> input)` rejects null components. Loomspan validates and reference-resolves input before construction, then recursively copies and makes map/list containers unmodifiable. Null values and non-container leaf identity are preserved, including Spring `Resource` handles; the bytes behind a Resource are outside the immutability promise. Direct application construction has the same snapshot behavior.
+`RestSkillInvocation(String skillName, Map<String,Object> input, String generationId)` rejects null components and blank generation IDs. Loomspan validates and reference-resolves input before construction, then recursively copies and makes map/list containers unmodifiable. Null values and non-container leaf identity are preserved, including Spring `Resource` handles; the bytes behind a Resource are outside the immutability promise. `generationId()` is trusted runtime metadata from the captured invocation tree, never model input or a current-active lookup. The fixed handler can use it to select configuration staged before publication; see [skill-reload.md](skill-reload.md).
 
 The captured caller `Authentication` is available through `SecurityContextHolder` on the actual handler thread and the previous context is restored. Authentication, trace/session identifiers, and descriptions are not invocation components.
 

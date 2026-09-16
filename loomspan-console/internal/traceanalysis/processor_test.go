@@ -55,7 +55,7 @@ func (w *fakeComponentWriter) Close() error {
 
 // minimalValidTrace is a single-attempt success trace matching the Java fixture
 // corpus format. It is the smallest artifact the Phase 3 processor accepts.
-const minimalValidTrace = `{"traceId":"trace-t","sessionId":"session-t","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/t.ndjson","consoleCompatibilityVersion":"development"},"data":{"sessionId":"session-t"}}
+const minimalValidTrace = `{"traceId":"trace-t","sessionId":"session-t","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/t.ndjson","consoleCompatibilityVersion":"development","generationId":"generation-test"},"data":{"sessionId":"session-t"}}
 {"traceId":"trace-t","sessionId":"session-t","sequence":2,"timestamp":1784894400.000000000,"recordType":"MODEL_THOUGHT_CAPTURED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1},"data":{"messages":["user"]}}
 {"traceId":"trace-t","sessionId":"session-t","sequence":3,"timestamp":1784894400.000000000,"recordType":"MODEL_REQUEST_SENT","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1},"data":{"messages":["user"]}}
 {"traceId":"trace-t","sessionId":"session-t","sequence":4,"timestamp":1784894400.000000000,"recordType":"MODEL_RESPONSE_RECEIVED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1,"usage":{"promptUnits":10,"completionUnits":4,"totalUnits":14,"precision":"EXACT"}},"data":{"content":"fixture response"}}
@@ -113,6 +113,17 @@ func TestProcessorValidTraceWritesBundle(t *testing.T) {
 
 func TestProcessorRejectsTraceWithoutCompatibilityMarker(t *testing.T) {
 	raw := strings.Replace(minimalValidTrace, `,"consoleCompatibilityVersion":"development"`, "", 1)
+	_, domain := New().Process(artifact.ProcessRequest{
+		Context: context.Background(), Metadata: artifact.TraceMetadata{TraceID: "trace-t"},
+		Raw: strings.NewReader(raw), Sink: &fakeSink{},
+	})
+	if domain == nil || domain.Code != consolecore.CodeInvalidArtifact {
+		t.Fatalf("expected INVALID_ARTIFACT, got %v", domain)
+	}
+}
+
+func TestProcessorRejectsTraceWithoutGenerationID(t *testing.T) {
+	raw := strings.Replace(minimalValidTrace, `,"generationId":"generation-test"`, "", 1)
 	_, domain := New().Process(artifact.ProcessRequest{
 		Context: context.Background(), Metadata: artifact.TraceMetadata{TraceID: "trace-t"},
 		Raw: strings.NewReader(raw), Sink: &fakeSink{},
@@ -309,7 +320,7 @@ func TestProcessorErrorPathDoesNotLeakValidatorGoroutines(t *testing.T) {
 	// Envelope declares a 2-chunk JSON payload, but only the first chunk
 	// arrives before a malformed record aborts the parse. The validator
 	// goroutine is started and must be cleaned up by the error path.
-	raw := `{"traceId":"t","sessionId":"s","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"consoleCompatibilityVersion":"development"},"data":null}` + "\n" +
+	raw := `{"traceId":"t","sessionId":"s","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"consoleCompatibilityVersion":"development","generationId":"generation-test"},"data":null}` + "\n" +
 		`{"traceId":"t","sessionId":"s","sequence":2,"timestamp":1784894400.000000000,"recordType":"STEP_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"payloadChunked":true,"payloadId":"p1","contentType":"application/json","chunkCount":2},"data":null}` + "\n" +
 		`{"traceId":"t","sessionId":"s","sequence":3,"timestamp":1784894400.000000000,"recordType":"PAYLOAD_CHUNK_APPENDED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"payloadId":"p1","chunkIndex":0,"chunkCount":2,"contentType":"application/json"},"data":"{\"a\":"}` + "\n" +
 		`{not-json}` + "\n"

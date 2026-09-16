@@ -49,7 +49,7 @@ public final class TestLoomspanSessions {
         return new LoomspanSession(
                 sessionId, entrySkill, 8, null, null, null, null, null,
                 TracePersistencePolicy.ALWAYS, clock, NoOpExecutionObservationHandleFactory.INSTANCE,
-                (ignoredSessionId, ignoredEntrySkill, ignoredPolicy, ignoredClock, ignoredObservation) -> traceHandle,
+                (ignoredSessionId, ignoredEntrySkill, ignoredGenerationId, ignoredPolicy, ignoredClock, ignoredObservation) -> traceHandle,
                 failureIdSupplier);
     }
 

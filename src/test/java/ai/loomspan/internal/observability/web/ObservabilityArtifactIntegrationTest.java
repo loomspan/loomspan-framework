@@ -120,7 +120,7 @@ class ObservabilityArtifactIntegrationTest
     private void publish(String traceId, Path path) throws Exception
     {
         activation.runtime().orElseThrow().traces().publish(new FinalizedTraceArtifact(
-                traceId, "session-" + traceId, "test.entry", TraceOutcome.SUCCEEDED, Instant.now(),
+                traceId, "session-" + traceId, "test.entry", "generation-test", TraceOutcome.SUCCEEDED, Instant.now(),
                 path, Files.size(path), TracePersistencePolicy.ALWAYS, null));
     }
 

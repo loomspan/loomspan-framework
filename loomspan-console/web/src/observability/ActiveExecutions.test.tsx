@@ -34,6 +34,7 @@ const execution: ActiveExecution = {
   updatedAt: "2026-07-27T10:05:00Z",
   elapsedMillis: 300000,
   entrySkill: "CheckDns",
+  generationId: "generation-fixture",
   status: "RUNNING",
   phase: "EXECUTING",
   summary: "Checking DNS records",

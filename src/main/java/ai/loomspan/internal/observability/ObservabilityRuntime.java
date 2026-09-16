@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 public final class ObservabilityRuntime implements AutoCloseable
 {
@@ -28,7 +29,7 @@ public final class ObservabilityRuntime implements AutoCloseable
     private final ActiveExecutionRegistry activeExecutions;
     private final ActivityReplayBuffer replayBuffer;
     private final LiveMonitoringAvailability liveMonitoring;
-    private final RegisteredSkillCatalog skills;
+    private final Supplier<RegisteredSkillCatalog> skills;
     private final FinalizedTraceCatalog traces;
     private final LoomspanProperties.Observability configuration;
     private final LoomspanProperties.Session.Quotas quotas;
@@ -45,7 +46,7 @@ public final class ObservabilityRuntime implements AutoCloseable
             ActiveExecutionRegistry activeExecutions,
             ActivityReplayBuffer replayBuffer,
             LiveMonitoringAvailability liveMonitoring,
-            RegisteredSkillCatalog skills,
+            Supplier<RegisteredSkillCatalog> skills,
             FinalizedTraceCatalog traces,
             LoomspanProperties.Observability configuration,
             LoomspanProperties.Session.Quotas quotas,
@@ -78,7 +79,7 @@ public final class ObservabilityRuntime implements AutoCloseable
     public ActiveExecutionRegistry activeExecutions() { return activeExecutions; }
     public ActivityReplayBuffer replayBuffer() { return replayBuffer; }
     public LiveMonitoringAvailability liveMonitoring() { return liveMonitoring; }
-    public RegisteredSkillCatalog skills() { return skills; }
+    public RegisteredSkillCatalog skills() { return skills.get(); }
     public FinalizedTraceCatalog traces() { return traces; }
     public LoomspanProperties.Observability configuration() { return configuration; }
     public LoomspanProperties.Session.Quotas quotas() { return quotas; }

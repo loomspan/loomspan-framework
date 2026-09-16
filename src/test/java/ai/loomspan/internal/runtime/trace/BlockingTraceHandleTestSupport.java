@@ -20,7 +20,7 @@ public final class BlockingTraceHandleTestSupport
     private final CountDownLatch releaseCompletionAppend = new CountDownLatch(1);
     private final AtomicInteger ids = new AtomicInteger();
 
-    public ExecutionTraceHandle create(String sessionId, String entrySkill,
+    public ExecutionTraceHandle create(String sessionId, String entrySkill, String generationId,
             TracePersistencePolicy persistencePolicy, Clock clock,
             ExecutionObservationHandle observationHandle)
     {

@@ -115,6 +115,33 @@ func TestAcquireReturnsSameHandleForAlreadyInstalledTrace(t *testing.T) {
 	}
 }
 
+func TestAcquireRetainsProcessorValidatedGenerationID(t *testing.T) {
+	data := []byte("trace bytes")
+	loader := newFakeLoader(testTraceMetadata("trace-1", int64(len(data))))
+	processor := newFakeProcessor()
+	validated := testTraceMetadata("trace-1", int64(len(data)))
+	validated.GenerationID = "generation-from-trace"
+	processor.metadata = &validated
+	svc := newTestServiceWithProcessor(t, Config{MaxBytes: 1 << 20, IdleTTL: time.Hour},
+		loader, newFakeOpener(data, int64(len(data))), &manualTimerFactory{},
+		newManualClock(time.UnixMilli(1_000_000)), nil, processor)
+	scope, cancelScope := testScope("scope-1")
+	defer cancelScope()
+	svc.ActivateActivity(scope)
+
+	acquired := acquireSync(t, svc, context.Background(), scope, "trace-1")
+	if acquired.Metadata.GenerationID != validated.GenerationID {
+		t.Fatalf("acquired generation ID = %q, want %q", acquired.Metadata.GenerationID, validated.GenerationID)
+	}
+	lookup, domain := svc.Lookup(evidence.ForTarget(scope.ID), "trace-1")
+	if domain != nil {
+		t.Fatalf("lookup failed: %v", domain)
+	}
+	if lookup.Metadata.GenerationID != validated.GenerationID {
+		t.Fatalf("cached generation ID = %q, want %q", lookup.Metadata.GenerationID, validated.GenerationID)
+	}
+}
+
 func TestAcquireTimestampIsImmutableOnReuseAndRenewedAfterRemoval(t *testing.T) {
 	data := []byte("test artifact bytes")
 	loader := newFakeLoader(testTraceMetadata("trace-1", int64(len(data))))

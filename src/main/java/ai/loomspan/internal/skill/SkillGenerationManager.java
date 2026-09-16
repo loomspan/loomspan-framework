@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -30,6 +31,9 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
     private final SkillInputContractResolver inputs;
     private final ListableBeanFactory beans;
     private final AtomicReference<SkillGeneration> active = new AtomicReference<>();
+    // A counter guarantees no reuse within this manager; the namespace avoids coupling to another instance.
+    private final String generationNamespace = UUID.randomUUID().toString();
+    private final AtomicLong issuedGenerationIds = new AtomicLong();
     private volatile List<CapabilityMetadata> fixedJavaCapabilities;
     private volatile List<String> fixedRestHandlerBeanNames;
     private volatile RestSkillHandler fixedRestHandler;
@@ -66,6 +70,9 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
     public SkillGeneration prepare()
     {
         initializeFixedDependencies();
+        long ordinal = issuedGenerationIds.incrementAndGet();
+        if (ordinal <= 0) throw new IllegalStateException("Skill generation ID space exhausted");
+        String generationId = generationNamespace + "-" + ordinal;
         YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
         catalog.afterPropertiesSet();
         List<YamlSkillDefinition> definitions = catalog.getSkills();
@@ -89,7 +96,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
                     rest ? SkillExecutionDescriptor.none()
                             : SkillExecutionDescriptor.from(definition.requireExecutionConfiguration()),
                     SkillAccessPolicy.yamlRoles(definition.rbacRoles()),
-                    rest ? arguments -> invokeRest(handler, name, arguments)
+                    rest ? arguments -> invokeRest(handler, name, generationId, arguments)
                             : arguments -> { throw new IllegalStateException("YAML skills require model execution"); },
                     rest ? CapabilityKind.REST_SKILL : CapabilityKind.YAML_SKILL,
                     new CapabilityToolDescriptor(name, description, inputs.toJsonSchema(contract)),
@@ -102,7 +109,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
                     throw new IllegalStateException("Unknown child skill '" + child + "' in allowed_skills of '"
                             + definition.manifest().getName() + "' at " + definition.resource().getDescription());
 
-        return new SkillGeneration(UUID.randomUUID().toString(), capabilities, definitionsByName);
+        return new SkillGeneration(generationId, capabilities, definitionsByName);
     }
 
     public void activate(SkillGeneration candidate)
@@ -144,9 +151,10 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
                     + "; conflicting declaration at " + metadata.id());
     }
 
-    private static String invokeRest(RestSkillHandler handler, String name, Map<String, Object> arguments)
+    private static String invokeRest(RestSkillHandler handler, String name, String generationId,
+            Map<String, Object> arguments)
     {
-        String result = handler.handle(new RestSkillInvocation(name, arguments));
+        String result = handler.handle(new RestSkillInvocation(name, arguments, generationId));
         if (result == null) throw new IllegalStateException("REST skill '" + name + "' handler returned null");
         return result;
     }

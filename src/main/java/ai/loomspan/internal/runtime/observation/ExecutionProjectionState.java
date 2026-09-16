@@ -23,6 +23,7 @@ final class ExecutionProjectionState
     String traceId;
     Instant startedAt;
     final String entrySkill;
+    String generationId;
     String phase = "STARTING";
     String summary = "Execution started";
     SessionUsageSnapshot usage = SessionUsageSnapshot.empty();

@@ -8,12 +8,14 @@ import java.util.Map;
 import java.util.Objects;
 
 /** Immutable application handoff for one REST skill invocation. */
-public record RestSkillInvocation(String skillName, Map<String, Object> input)
+public record RestSkillInvocation(String skillName, Map<String, Object> input, String generationId)
 {
     public RestSkillInvocation
     {
         Objects.requireNonNull(skillName, "skillName must not be null");
         Objects.requireNonNull(input, "input must not be null");
+        Objects.requireNonNull(generationId, "generationId must not be null");
+        if (generationId.isBlank()) throw new IllegalArgumentException("generationId must not be blank");
         input = freezeInputMap(input);
     }
 

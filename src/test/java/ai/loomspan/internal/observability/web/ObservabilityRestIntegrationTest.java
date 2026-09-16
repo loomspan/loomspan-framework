@@ -215,11 +215,11 @@ class ObservabilityRestIntegrationTest
         Instant now = Instant.now(runtime.clock());
         runtime.activeExecutions().replace(new ActiveExecutionSnapshot(
                 "session-live", "trace-live", 0, 1, now.minusSeconds(2), now,
-                "CheckDns", "RUNNING", "Checking DNS", List.of(),
+                "CheckDns", "generation-test", "RUNNING", "Checking DNS", List.of(),
                 SessionUsageSnapshot.empty(), null));
         Path artifact = Files.writeString(temporaryDirectory.resolve("trace.ndjson"), "{}\n");
         runtime.traces().publish(new FinalizedTraceArtifact(
-                "trace-final", "session-final", "test.entry", TraceOutcome.SUCCEEDED, now, artifact,
+                "trace-final", "session-final", "test.entry", "generation-test", TraceOutcome.SUCCEEDED, now, artifact,
                 Files.size(artifact), TracePersistencePolicy.ALWAYS, now.plusSeconds(300)));
 
         mvc.perform(get(ObservabilityApiPaths.ACTIVE)
@@ -273,7 +273,7 @@ class ObservabilityRestIntegrationTest
             runtime.activeExecutions().replace(activeSnapshot("session-4", now));
             runtime.activeExecutions().replace(new ActiveExecutionSnapshot(
                     "session-2", "trace-session-2", 0, 2, now.minusSeconds(2), now.plusMillis(1),
-                    "CheckDns", "RUNNING", "Checking DNS", List.of(),
+                    "CheckDns", "generation-test", "RUNNING", "Checking DNS", List.of(),
                     SessionUsageSnapshot.empty(), null));
             runtime.activeExecutions().remove("session-1");
             String secondBody = mvc.perform(get(ObservabilityApiPaths.ACTIVE)
@@ -343,7 +343,7 @@ class ObservabilityRestIntegrationTest
     {
         return new ActiveExecutionSnapshot(
                 sessionId, "trace-" + sessionId, 0, 1, now.minusSeconds(2), now,
-                "CheckDns", "RUNNING", "Checking DNS", List.of(),
+                "CheckDns", "generation-test", "RUNNING", "Checking DNS", List.of(),
                 SessionUsageSnapshot.empty(), null);
     }
 

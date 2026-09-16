@@ -61,6 +61,7 @@ const trace: Trace = {
   traceId: "trace-1",
   sessionId: "session-1",
   entrySkill: "CheckDns",
+  generationId: "generation-fixture",
   outcome: "SUCCEEDED",
   finalizedAt: "2026-07-27T10:10:00Z",
   sizeBytes: 4096,

@@ -72,7 +72,7 @@ class ObservabilityRuntimeTest
                 UUID.randomUUID(), Clock.systemUTC(), mock(ExecutionObservationHandleFactory.class),
                 activity, artifact, retention, mock(ActiveExecutionRegistry.class),
                 mock(ActivityReplayBuffer.class), new LiveMonitoringAvailability(),
-                mock(RegisteredSkillCatalog.class), traces, new LoomspanProperties.Observability(),
+                () -> mock(RegisteredSkillCatalog.class), traces, new LoomspanProperties.Observability(),
                 new LoomspanProperties.Session.Quotas(), TracePersistencePolicy.ONERROR);
     }
 }

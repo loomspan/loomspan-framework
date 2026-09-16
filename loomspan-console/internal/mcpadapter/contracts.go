@@ -98,6 +98,7 @@ type executionDetailDTO struct {
 	UpdatedAt             time.Time                      `json:"updatedAt"`
 	ElapsedMillis         int64                          `json:"elapsedMillis"`
 	EntrySkill            string                         `json:"entrySkill"`
+	GenerationID          string                         `json:"generationId"`
 	Status                string                         `json:"status"`
 	Phase                 string                         `json:"phase"`
 	ActiveBranches        []activeBranchDTO              `json:"activeBranches"`
@@ -281,7 +282,7 @@ func mapExecutionDetail(source observability.ActiveExecution) executionDetailDTO
 		SessionID: source.SessionID, TraceID: source.TraceID,
 		LastCanonicalSequence: source.LastCanonicalSequence,
 		StartedAt:             source.StartedAt, UpdatedAt: source.UpdatedAt,
-		ElapsedMillis: source.ElapsedMillis, EntrySkill: source.EntrySkill,
+		ElapsedMillis: source.ElapsedMillis, EntrySkill: source.EntrySkill, GenerationID: source.GenerationID,
 		Status: source.Status, Phase: source.Phase, ActiveBranches: branches,
 		Usage: source.Usage, ConfiguredLimits: source.ConfiguredLimits,
 	}

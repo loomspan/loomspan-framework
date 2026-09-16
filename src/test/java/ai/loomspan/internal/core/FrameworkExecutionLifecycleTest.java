@@ -28,6 +28,62 @@ class FrameworkExecutionLifecycleTest
 {
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
+    void updateActivationGateAndShutdownClosureHaveOneOrdering() throws Exception
+    {
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(1), executor);
+        var activationEntered = new CountDownLatch(1);
+        var releaseActivation = new CountDownLatch(1);
+        var closureStarted = new CountDownLatch(1);
+        var activated = new AtomicBoolean();
+        var closureCompleted = new AtomicBoolean();
+        var activationFailure = new AtomicReference<Throwable>();
+        Thread publisher = Thread.ofVirtual().start(() -> {
+            try
+            {
+                lifecycle.whileAdmissionOpen(() -> {
+                    activationEntered.countDown();
+                    try { releaseActivation.await(); }
+                    catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new AssertionError(ex); }
+                    activated.set(true);
+                });
+            }
+            catch (Throwable ex) { activationFailure.set(ex); }
+        });
+        try
+        {
+            assertThat(activationEntered.await(1, TimeUnit.SECONDS)).isTrue();
+            Thread closer = Thread.ofVirtual().start(() -> {
+                closureStarted.countDown();
+                lifecycle.closeAdmission();
+                closureCompleted.set(true);
+            });
+            assertThat(closureStarted.await(1, TimeUnit.SECONDS)).isTrue();
+            long waitDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+            while (closer.getState() != Thread.State.BLOCKED && System.nanoTime() < waitDeadline)
+                Thread.onSpinWait();
+            assertThat(closer.getState()).isEqualTo(Thread.State.BLOCKED);
+            assertThat(closureCompleted).isFalse();
+            releaseActivation.countDown();
+            publisher.join(Duration.ofSeconds(1));
+            closer.join(Duration.ofSeconds(1));
+            assertThat(activationFailure.get()).isNull();
+            assertThat(activated).isTrue();
+            assertThat(closureCompleted).isTrue();
+            assertThatThrownBy(() -> lifecycle.whileAdmissionOpen(() -> activated.set(false)))
+                    .isInstanceOf(RejectedExecutionException.class);
+            assertThat(activated).isTrue();
+        }
+        finally
+        {
+            releaseActivation.countDown();
+            lifecycle.destroy();
+        }
+    }
+
+    @Test
+    @Timeout(value = 3, unit = TimeUnit.SECONDS)
     void actualTraceCompletionWriteRemainsUnderRootUntilReleased() throws Exception
     {
         var context = new StaticApplicationContext();

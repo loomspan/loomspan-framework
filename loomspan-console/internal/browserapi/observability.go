@@ -271,6 +271,7 @@ func (router *Router) cachedTrace(ctx context.Context, scope target.ScopeID, tra
 		TraceID:                   lookup.Metadata.TraceID,
 		SessionID:                 lookup.Metadata.SessionID,
 		EntrySkill:                lookup.Metadata.EntrySkill,
+		GenerationID:              lookup.Metadata.GenerationID,
 		Outcome:                   lookup.Metadata.Outcome,
 		FinalizedAt:               lookup.Metadata.FinalizedAt,
 		SizeBytes:                 lookup.Metadata.SizeBytes,

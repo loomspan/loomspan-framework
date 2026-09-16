@@ -88,6 +88,10 @@ export function CurrentExecutionSummary({
               <dt>Entry skill</dt>
               <dd>{execution.entrySkill}</dd>
             </div>
+            <div className="summary-fact identifier">
+              <dt>Generation</dt>
+              <dd>{execution.generationId}</dd>
+            </div>
             <div className="summary-fact">
               <dt>Phase</dt>
               <dd>{execution.phase}</dd>

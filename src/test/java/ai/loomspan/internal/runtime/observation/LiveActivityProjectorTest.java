@@ -55,7 +55,7 @@ class LiveActivityProjectorTest
         expected.path("activeBranchPrefixes").forEach(prefix ->
                 prefixes.put(prefix.path("sequence").longValue(), prefix.path("branches")));
 
-        ExecutionProjectionState state = new ExecutionProjectionState(
+        ExecutionProjectionState state = state(
                 "session-canonical-concurrent-contract", "test.entry");
         LiveActivityProjector projector = new LiveActivityProjector();
         for (String line : Files.readAllLines(root.resolve("traces/canonical-concurrent-contract.ndjson")))
@@ -90,7 +90,7 @@ class LiveActivityProjectorTest
 
         for (TraceRecordType type : TraceRecordType.values())
         {
-            ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+            ExecutionProjectionState state = state("session", "route");
             TraceFrameType frameType = type == TraceRecordType.FRAME_OPENED
                     || type == TraceRecordType.FRAME_CLOSED
                     ? TraceFrameType.SKILL_EXECUTION
@@ -109,14 +109,14 @@ class LiveActivityProjectorTest
                 projector.project(state, frame(TraceRecordType.FRAME_OPENED, 2, "skill", "root",
                         TraceFrameType.SKILL_EXECUTION, "nested", null));
                 projection = type == TraceRecordType.FRAME_OPENED
-                        ? projector.project(new ExecutionProjectionState("session", "route"),
+                        ? projector.project(state("session", "route"),
                                 frame(TraceRecordType.FRAME_OPENED, 1, "root", null,
                                         TraceFrameType.ROOT_MISSION, "route", null))
                         : projector.project(state, frame(TraceRecordType.FRAME_CLOSED, 3, "skill", "root",
                                 TraceFrameType.SKILL_EXECUTION, "nested", null));
                 if (type == TraceRecordType.FRAME_OPENED)
                 {
-                    state = new ExecutionProjectionState("session", "route");
+                    state = state("session", "route");
                     projector.project(state, frame(TraceRecordType.FRAME_OPENED, 1, "root", null,
                             TraceFrameType.ROOT_MISSION, "route", null));
                     projection = projector.project(state, frame(TraceRecordType.FRAME_OPENED, 2, "skill", "root",
@@ -151,7 +151,7 @@ class LiveActivityProjectorTest
     void projectsFailedStepWithExactErrorSummaryAndFailureIdentity()
     {
         ExecutionActivity activity = new LiveActivityProjector().project(
-                new ExecutionProjectionState("session", "route"),
+                state("session", "route"),
                 record(TraceRecordType.STEP_FAILED, 1, TraceFrameType.STEP_EXECUTION,
                         Map.of("failureId", "failure-step", "stepNumber", 1), null)).activity();
 
@@ -164,7 +164,7 @@ class LiveActivityProjectorTest
     void projectsEnrichedPlanCreationMetadataAsBoundedNeutralFacts()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
 
         ExecutionActivity activity = projector.project(state, record(
                 TraceRecordType.PLAN_CREATED,
@@ -191,7 +191,7 @@ class LiveActivityProjectorTest
     void frameVisibilityIsLimitedToSkillExecutionButAllFramesUpdatePath()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
 
         LiveActivityProjector.Projection root = projector.project(state,
                 frame(TraceRecordType.FRAME_OPENED, 1, "root", null,
@@ -211,7 +211,7 @@ class LiveActivityProjectorTest
     void projectsEveryOpenLeafAsCompleteBranchInLeafOpenSequenceOrder()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         projector.project(state, frame(TraceRecordType.FRAME_OPENED, 1, "root", null,
                 TraceFrameType.ROOT_MISSION, "route", null));
         projector.project(state, frame(TraceRecordType.FRAME_OPENED, 2, "step-a", "root",
@@ -244,14 +244,14 @@ class LiveActivityProjectorTest
     void rejectsNonStepAndDuplicateExplicitAssignments()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         projector.project(state, frame(TraceRecordType.FRAME_OPENED, 1, "root", null,
                 TraceFrameType.ROOT_MISSION, "route", null));
         assertThatThrownBy(() -> projector.project(state, frame(TraceRecordType.FRAME_OPENED, 2, "model", "root",
                 TraceFrameType.MODEL_CALL, "model", assignment("task-a", 1, null, false))))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only on a step execution frame");
 
-        ExecutionProjectionState duplicateState = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState duplicateState = state("session", "route");
         projector.project(duplicateState, frame(TraceRecordType.FRAME_OPENED, 1, "root", null,
                 TraceFrameType.ROOT_MISSION, "route", null));
         projector.project(duplicateState, frame(TraceRecordType.FRAME_OPENED, 2, "step-a", "root",
@@ -265,7 +265,7 @@ class LiveActivityProjectorTest
     void nestedAssignmentShadowsItsAssignedAncestorForDescendants()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         projector.project(state, frame(TraceRecordType.FRAME_OPENED, 1, "root", null,
                 TraceFrameType.ROOT_MISSION, "route", null));
         projector.project(state, frame(TraceRecordType.FRAME_OPENED, 2, "outer-step", "root",
@@ -289,7 +289,7 @@ class LiveActivityProjectorTest
     void closingLeavesRemovesOnlyThatBranchAndRestoresTheOpenParentLeaf()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         projector.project(state, frame(TraceRecordType.FRAME_OPENED, 1, "root", null,
                 TraceFrameType.ROOT_MISSION, "route", null));
         projector.project(state, frame(TraceRecordType.FRAME_OPENED, 2, "a", "root",
@@ -324,7 +324,7 @@ class LiveActivityProjectorTest
     void treatsPlanAndStepIdentityWithoutAssignedTaskAsANonTaskBranch()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         projector.project(state, frame(TraceRecordType.FRAME_OPENED, 1, "root", null,
                 TraceFrameType.ROOT_MISSION, "route", null));
         var finalSynthesis = tools.jackson.databind.node.JsonNodeFactory.instance.objectNode();
@@ -352,7 +352,7 @@ class LiveActivityProjectorTest
     {
         LiveActivityProjector projector = new LiveActivityProjector();
         String route = "\uD83D\uDE00".repeat(300);
-        ExecutionProjectionState state = new ExecutionProjectionState("session", route);
+        ExecutionProjectionState state = state("session", route);
         LiveActivityProjector.Projection projection = null;
 
         for (int index = 0; index < 70; index++)
@@ -381,7 +381,7 @@ class LiveActivityProjectorTest
     void terminalUsageReplacesDerivedCountsAndCompletionIsHeld()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         projector.project(state, record(
                 TraceRecordType.TOOL_CALL_STARTED, 1, null, Map.of("capabilityName", "tool"), null));
         SessionUsageSnapshot terminal = new SessionUsageSnapshot(4, 5, 6, 7, 0, 8, 9, 17, 1, 2, 4);
@@ -425,7 +425,7 @@ class LiveActivityProjectorTest
     void projectsParentIdentityAndTruthfulExecutionStatus()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         TraceRecord nested = new TraceRecord(
                 "trace", "session", 1, Instant.parse("2026-07-24T12:00:00Z"),
                 TraceRecordType.TOOL_CALL_STARTED, "child-frame", "parent-frame",
@@ -441,7 +441,7 @@ class LiveActivityProjectorTest
     void derivesCountsAndNormalizedModelUsageFromCanonicalFacts()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         projector.project(state, record(
                 TraceRecordType.FRAME_OPENED, 1, TraceFrameType.ROOT_MISSION, Map.of(), null));
         projector.project(state, record(
@@ -467,7 +467,7 @@ class LiveActivityProjectorTest
     void toolStartActivityExcludesArgumentsAndCountsOnce()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         LiveActivityProjector.Projection projection = projector.project(state, record(
                 TraceRecordType.TOOL_CALL_STARTED,
                 1,
@@ -517,7 +517,7 @@ class LiveActivityProjectorTest
     void providerRetryActivityContainsOnlyBoundedNeutralFacts()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         LiveActivityProjector.Projection projection = projector.project(state, record(
                 TraceRecordType.MODEL_ATTEMPT_FAILED, 1, null,
                 Map.of("providerAttemptNumber", 2, "attemptReason", "PROVIDER_RETRY",
@@ -539,7 +539,7 @@ class LiveActivityProjectorTest
     void doesNotTruncateManySimultaneousBranchesAndEnforcesDetailByteBoundaries()
     {
         LiveActivityProjector projector = new LiveActivityProjector();
-        ExecutionProjectionState state = new ExecutionProjectionState("session", "route");
+        ExecutionProjectionState state = state("session", "route");
         projector.project(state, frame(TraceRecordType.FRAME_OPENED, 1, "root", null,
                 TraceFrameType.ROOT_MISSION, "route", null));
         LiveActivityProjector.Projection projection = null;
@@ -574,6 +574,13 @@ class LiveActivityProjectorTest
                 .hasMessageContaining("byte limit");
     }
 
+    private static ExecutionProjectionState state(String sessionId, String entrySkill)
+    {
+        ExecutionProjectionState state = new ExecutionProjectionState(sessionId, entrySkill);
+        state.generationId = "generation-test";
+        return state;
+    }
+
     private TraceRecord record(
             TraceRecordType type,
             long sequence,
@@ -581,10 +588,14 @@ class LiveActivityProjectorTest
             Map<String, Object> metadata,
             StringNode data)
     {
+        Map<String, Object> details = new LinkedHashMap<>(metadata);
+        if (type == TraceRecordType.TRACE_STARTED) details.put("generationId", "generation-test");
         return new TraceRecord(
                 "trace", "session", sequence, Instant.parse("2026-07-24T12:00:00Z"), type,
                 frameType == null ? null : "frame-" + sequence, null, frameType,
-                frameType == null ? null : "route", "thread", metadata, data);
+                frameType == null ? null : "route", "thread",
+                details,
+                data);
     }
 
     private TraceRecord frame(TraceRecordType type, long sequence, String frameId, String parentFrameId,

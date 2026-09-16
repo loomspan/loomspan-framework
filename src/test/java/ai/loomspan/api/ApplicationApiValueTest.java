@@ -27,7 +27,7 @@ class ApplicationApiValueTest
                         List.of("inputSchema", String.class));
         assertThat(SkillCatalog.class.getDeclaredMethods())
                 .extracting(java.lang.reflect.Method::getName)
-                .containsExactlyInAnyOrder("skills", "skill");
+                .containsExactlyInAnyOrder("generationId", "skills", "skill");
         var skillsMethod = SkillCatalog.class.getMethod("skills");
         assertThat(skillsMethod.getParameterTypes()).isEmpty();
         assertThat(skillsMethod.getReturnType()).isEqualTo(List.class);
@@ -79,7 +79,8 @@ class ApplicationApiValueTest
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("nested", nested);
 
-        RestSkillInvocation invocation = new RestSkillInvocation("lookup", input);
+        RestSkillInvocation invocation = new RestSkillInvocation("lookup", input, "generation-a");
+        assertThat(invocation.generationId()).isEqualTo("generation-a");
         values.add("late");
         nonStringKeyedValues.add("late");
         nonStringKeyed.put(8, "late");
@@ -97,8 +98,9 @@ class ApplicationApiValueTest
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> ((Map<Object, Object>) copiedNested.get("nonStringKeyed")).put(8, "x"))
                 .isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> new RestSkillInvocation(null, Map.of())).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new RestSkillInvocation("lookup", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new RestSkillInvocation(null, Map.of(), "generation-a")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new RestSkillInvocation("lookup", null, "generation-a")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new RestSkillInvocation("lookup", Map.of(), null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
@@ -106,7 +108,7 @@ class ApplicationApiValueTest
     {
         assertThat(RestSkillInvocation.class.getRecordComponents())
                 .extracting(component -> component.getName())
-                .containsExactly("skillName", "input");
+                .containsExactly("skillName", "input", "generationId");
         assertThat(RestSkillHandler.class.getDeclaredMethods())
                 .singleElement()
                 .satisfies(method -> {

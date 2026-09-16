@@ -7,12 +7,12 @@ coverage: source-verified
 
 # Catalog Discovery and Root Pre-Checks
 
-Inject `SkillCatalog` to read one eager startup snapshot. `skills()` is immutable and
+Inject `SkillCatalog` to read one eager startup snapshot. Its `generationId()` is the opaque process-local identity of that generation. `skills()` is immutable and
 sorted by exact registered name; `skill(name)` performs exact lookup and returns empty
 when absent. Every registered YAML, Java, and REST skill is included even when restricted.
 Each `SkillDescriptor` contains only `name`, `description`, `SkillKind`, and the exact
 registered JSON input-schema string shown to models. The catalog has no refresh or
-replacement contract and discovery is not authorization.
+replacement contract and discovery is not authorization. For current discovery after publication, call `SkillReloader.snapshot()`; the injected catalog never changes. See [skill-reload.md](skill-reload.md).
 
 Use `SkillTemplate.validate(name, map)` or `validate(name, object)` before asynchronous
 dispatch. Both perform the same exact lookup, conversion, contract validation, safe error

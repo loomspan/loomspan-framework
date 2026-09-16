@@ -154,6 +154,7 @@ func appendExecutionText(writer *lineWriter, prefix string, execution executionD
 	writer.time(prefix+"updatedAt", execution.UpdatedAt)
 	writer.integer(prefix+"elapsedMillis", execution.ElapsedMillis)
 	writer.quoted(prefix+"entrySkill", execution.EntrySkill)
+	writer.quoted(prefix+"generationId", execution.GenerationID)
 	writer.quoted(prefix+"status", execution.Status)
 	writer.quoted(prefix+"phase", execution.Phase)
 	writer.integer(prefix+"activeBranches.count", int64(len(execution.ActiveBranches)))

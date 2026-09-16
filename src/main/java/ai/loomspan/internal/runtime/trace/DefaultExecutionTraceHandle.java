@@ -40,6 +40,7 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
     private final String traceId;
     private final String sessionId;
     private final String entrySkill;
+    private final String generationId;
     private final Path tracePath;
     private final TracePersistencePolicy persistencePolicy;
     private final Clock clock;
@@ -220,9 +221,37 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
             CompletionGraceRetention completionGraceRetention,
             @Nullable ObjectMapper canonicalTraceMapper)
     {
+        this(traceId, sessionId, entrySkill, traceId, tracePath, persistencePolicy,
+                errored, completed, clock, startingSequence, initialized, idSupplier, threadName,
+                tracePathMetadata, observationHandle, configuredLimits, writer, completionGraceRetention,
+                canonicalTraceMapper);
+    }
+
+    private DefaultExecutionTraceHandle(
+            String traceId,
+            String sessionId,
+            String entrySkill,
+            String generationId,
+            Path tracePath,
+            TracePersistencePolicy persistencePolicy,
+            boolean errored,
+            boolean completed,
+            Clock clock,
+            long startingSequence,
+            boolean initialized,
+            Supplier<String> idSupplier,
+            @Nullable String threadName,
+            @Nullable String tracePathMetadata,
+            ExecutionObservationHandle observationHandle,
+            @Nullable ConfiguredLimitsSnapshot configuredLimits,
+            @Nullable TraceRecordWriter writer,
+            CompletionGraceRetention completionGraceRetention,
+            @Nullable ObjectMapper canonicalTraceMapper)
+    {
         this.traceId = requireNonBlank(traceId, "traceId");
         this.sessionId = requireNonBlank(sessionId, "sessionId");
         this.entrySkill = requireNonBlank(entrySkill, "entrySkill");
+        this.generationId = requireNonBlank(generationId, "generationId");
         this.tracePath = tracePath == null ? defaultPath(this.sessionId, this.traceId) : tracePath;
         this.persistencePolicy = persistencePolicy == null ? TracePersistencePolicy.NEVER : persistencePolicy;
         this.errored = errored;
@@ -255,6 +284,75 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
         this(newTraceId(), sessionId, entrySkill, null, persistencePolicy, false, false, clock, 0L, false,
                 DefaultExecutionTraceHandle::newTraceId, null, null, observationHandle, null, null,
                 completionGraceRetention);
+        resetTraceFile();
+        initialize();
+    }
+
+    public DefaultExecutionTraceHandle(
+            String sessionId,
+            String entrySkill,
+            String generationId,
+            TracePersistencePolicy persistencePolicy,
+            Clock clock,
+            ExecutionObservationHandle observationHandle)
+    {
+        this(newTraceId(), sessionId, entrySkill, generationId, null, persistencePolicy, false, false,
+                clock, 0L, false, DefaultExecutionTraceHandle::newTraceId, null, null,
+                observationHandle, null, null, ImmediateCompletionRetention.INSTANCE, null);
+        resetTraceFile();
+        initialize();
+    }
+
+    public DefaultExecutionTraceHandle(
+            String sessionId,
+            String entrySkill,
+            String generationId,
+            TracePersistencePolicy persistencePolicy,
+            Clock clock,
+            ExecutionObservationHandle observationHandle,
+            CompletionGraceRetention completionGraceRetention)
+    {
+        this(newTraceId(), sessionId, entrySkill, generationId, null, persistencePolicy, false, false,
+                clock, 0L, false, DefaultExecutionTraceHandle::newTraceId, null, null,
+                observationHandle, null, null, completionGraceRetention, null);
+        resetTraceFile();
+        initialize();
+    }
+
+    public DefaultExecutionTraceHandle(
+            String sessionId,
+            String entrySkill,
+            String generationId,
+            TracePersistencePolicy persistencePolicy,
+            Clock clock,
+            ExecutionObservationHandle observationHandle,
+            CompletionGraceRetention completionGraceRetention,
+            ConfiguredLimitsSnapshot configuredLimits,
+            ObjectMapper canonicalTraceMapper)
+    {
+        this(newTraceId(), sessionId, entrySkill, generationId, null, persistencePolicy, false, false,
+                clock, 0L, false, DefaultExecutionTraceHandle::newTraceId, null, null,
+                observationHandle, Objects.requireNonNull(configuredLimits, "configuredLimits must not be null"),
+                null, completionGraceRetention,
+                Objects.requireNonNull(canonicalTraceMapper, "canonicalTraceMapper must not be null"));
+        resetTraceFile();
+        initialize();
+    }
+
+    public DefaultExecutionTraceHandle(
+            String sessionId,
+            String entrySkill,
+            String generationId,
+            TracePersistencePolicy persistencePolicy,
+            Clock clock,
+            ExecutionObservationHandle observationHandle,
+            CompletionGraceRetention completionGraceRetention,
+            ConfiguredLimitsSnapshot configuredLimits)
+    {
+        this(newTraceId(), sessionId, entrySkill, generationId, null, persistencePolicy, false, false,
+                clock, 0L, false, DefaultExecutionTraceHandle::newTraceId, null, null,
+                observationHandle, Objects.requireNonNull(configuredLimits, "configuredLimits must not be null"),
+                null, completionGraceRetention, null);
         resetTraceFile();
         initialize();
     }
@@ -305,6 +403,7 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
                 metadata.put("tracePath", tracePathMetadata);
                 metadata.put("consoleCompatibilityVersion", LoomspanReleaseVersion.load());
                 metadata.put("entrySkill", entrySkill);
+                metadata.put("generationId", generationId);
                 if (configuredLimits != null)
                 {
                     metadata.put("configuredLimits", configuredLimits.asMetadata());
@@ -415,6 +514,7 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
                 traceId,
                 sessionId,
                 entrySkill,
+                generationId,
                 completion.outcome(),
                 finalizedAt,
                 tracePath,

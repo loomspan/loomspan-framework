@@ -374,7 +374,7 @@ class LoomspanSessionRunnerTest {
                 TracePersistencePolicy.ALWAYS,
                 Clock.systemUTC(),
                 (sessionId, entrySkill) -> mock(ExecutionObservationHandle.class),
-                (sessionId, entrySkill, policy, clock, observation) -> handle);
+                (sessionId, entrySkill, generationId, policy, clock, observation) -> handle);
         IllegalStateException applicationFailure = new IllegalStateException("application failed");
 
         IllegalStateException delivered = assertThrows(IllegalStateException.class,
@@ -425,11 +425,11 @@ class LoomspanSessionRunnerTest {
         DefaultExecutionObservationHandleFactory observation =
                 new DefaultExecutionObservationHandleFactory();
         Clock clock = Clock.fixed(Instant.parse("2026-07-24T12:00:00Z"), ZoneOffset.UTC);
-        InternalExecutionTraceHandleFactory failingFactory = (sessionId, entrySkill, policy, ignoredClock, handle) -> {
+        InternalExecutionTraceHandleFactory failingFactory = (sessionId, entrySkill, generationId, policy, ignoredClock, handle) -> {
             handle.recordAppended(new TraceRecord(
                     "trace-construction", sessionId, 1L, clock.instant(),
                     TraceRecordType.TRACE_STARTED, null, null, null, null,
-                    "thread", Map.of(), null));
+                    "thread", Map.of("generationId", generationId), null));
             throw new IllegalStateException("trace construction failed");
         };
         LoomspanSessionRunner runner = new LoomspanSessionRunner(
@@ -463,7 +463,7 @@ class LoomspanSessionRunnerTest {
         DefaultExecutionObservationHandleFactory observation =
                 new DefaultExecutionObservationHandleFactory();
         AtomicReference<Path> tracePath = new AtomicReference<>();
-        InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, policy, clock, handle) -> {
+        InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, generationId, policy, clock, handle) -> {
             ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle delegate =
                     new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
                             sessionId, entrySkill, TracePersistencePolicy.ALWAYS, clock, handle);
@@ -505,7 +505,7 @@ class LoomspanSessionRunnerTest {
                 new DefaultExecutionObservationHandleFactory();
         AtomicReference<Path> tracePath = new AtomicReference<>();
         SecurityException failure = new SecurityException("retention access denied");
-        InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, policy, clock, handle) -> {
+        InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, generationId, policy, clock, handle) -> {
             ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle delegate =
                     new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
                             sessionId, entrySkill, TracePersistencePolicy.ALWAYS, clock, handle);
@@ -534,7 +534,7 @@ class LoomspanSessionRunnerTest {
         DefaultExecutionObservationHandleFactory observation =
                 new DefaultExecutionObservationHandleFactory();
         AtomicReference<Path> tracePath = new AtomicReference<>();
-        InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, policy, clock, handle) -> {
+        InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, generationId, policy, clock, handle) -> {
             ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle delegate =
                     new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
                             sessionId, entrySkill, TracePersistencePolicy.ALWAYS, clock, handle);

@@ -10,6 +10,9 @@ import java.util.Optional;
  */
 public interface SkillCatalog
 {
+    /** Opaque process-local identity of this immutable generation. */
+    String generationId();
+
     List<SkillDescriptor> skills();
 
     Optional<SkillDescriptor> skill(String name);

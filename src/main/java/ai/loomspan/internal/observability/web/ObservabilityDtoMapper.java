@@ -37,7 +37,7 @@ public final class ObservabilityDtoMapper
         }
         return new ObservabilityDtos.ActiveExecution(
                 source.sessionId(), source.traceId(), source.lastCanonicalSequence(), source.startedAt(),
-                source.updatedAt(), elapsed, source.entrySkill(), "ACTIVE", source.phase(), source.summary(),
+                source.updatedAt(), elapsed, source.entrySkill(), source.generationId(), "ACTIVE", source.phase(), source.summary(),
                 source.activeBranches().stream().map(branch -> new ObservabilityDtos.ActiveBranch(
                         branch.planId(), branch.taskId(), branch.stepNumber(), branch.parallelGroup(),
                         branch.effectiveConcurrency(), branch.path().stream().map(entry ->
@@ -58,7 +58,8 @@ public final class ObservabilityDtoMapper
     public ObservabilityDtos.Trace trace(FinalizedTraceCatalogEntry source)
     {
         return new ObservabilityDtos.Trace(
-                source.traceId(), source.sessionId(), source.entrySkill(), source.outcome(), source.finalizedAt(), source.sizeBytes(),
+                source.traceId(), source.sessionId(), source.entrySkill(), source.artifact().generationId(),
+                source.outcome(), source.finalizedAt(), source.sizeBytes(),
                 source.persistencePolicy(), source.applicationTraceExpiresAt());
     }
 

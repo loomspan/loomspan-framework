@@ -50,7 +50,9 @@ public class LoomspanSessionRunner
             ExecutionObservationHandleFactory observationHandleFactory)
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
-                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle::new);
+                (sessionId, entrySkill, generationId, policy, handleClock, observationHandle) ->
+                        new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                                sessionId, entrySkill, generationId, policy, handleClock, observationHandle));
     }
 
     public LoomspanSessionRunner(
@@ -61,10 +63,11 @@ public class LoomspanSessionRunner
             CompletionGraceRetention completionGraceRetention)
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
-                (sessionId, entrySkill, policy, handleClock, observationHandle) ->
+                (sessionId, entrySkill, generationId, policy, handleClock, observationHandle) ->
                         new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
                                 sessionId,
                                 entrySkill,
+                                generationId,
                                 policy,
                                 handleClock,
                                 observationHandle,
@@ -82,10 +85,11 @@ public class LoomspanSessionRunner
             LoomspanProperties.Session.Quotas quotas)
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
-                (sessionId, entrySkill, policy, handleClock, observationHandle) ->
+                (sessionId, entrySkill, generationId, policy, handleClock, observationHandle) ->
                         new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
                                 sessionId,
                                 entrySkill,
+                                generationId,
                                 policy,
                                 handleClock,
                                 observationHandle,
@@ -105,9 +109,9 @@ public class LoomspanSessionRunner
             ObjectMapper canonicalTraceMapper)
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
-                (sessionId, entrySkill, policy, handleClock, observationHandle) ->
+                (sessionId, entrySkill, generationId, policy, handleClock, observationHandle) ->
                         new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
-                                sessionId, entrySkill, policy, handleClock, observationHandle,
+                                sessionId, entrySkill, generationId, policy, handleClock, observationHandle,
                                 Objects.requireNonNull(completionGraceRetention,
                                         "completionGraceRetention must not be null"),
                                 ConfiguredLimitsSnapshot.from(quotas),
@@ -187,9 +191,9 @@ public class LoomspanSessionRunner
             FrameworkExecutionLifecycle frameworkLifecycle)
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
-                (sessionId, entrySkill, policy, handleClock, observationHandle) ->
+                (sessionId, entrySkill, generationId, policy, handleClock, observationHandle) ->
                         new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
-                                sessionId, entrySkill, policy, handleClock, observationHandle,
+                                sessionId, entrySkill, generationId, policy, handleClock, observationHandle,
                                 Objects.requireNonNull(completionGraceRetention,
                                         "completionGraceRetention must not be null"),
                                 ConfiguredLimitsSnapshot.from(quotas),
@@ -265,6 +269,7 @@ public class LoomspanSessionRunner
             LoomspanSession session = new LoomspanSession(
                 UUID.randomUUID().toString(),
                 entrySkill,
+                generation.id(),
                 maxDepth,
                 null,
                 null,

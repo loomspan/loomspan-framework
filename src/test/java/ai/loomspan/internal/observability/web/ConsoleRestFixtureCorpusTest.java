@@ -126,7 +126,7 @@ class ConsoleRestFixtureCorpusTest
         }
         new ActiveExecutionSnapshot("session-live", "trace-live", 1, 7,
                 Instant.parse("2026-07-25T11:59:55Z"), Instant.parse("2026-07-25T11:59:59Z"),
-                "planner", "RUNNING", "Executing", branches, SessionUsageSnapshot.empty(), null);
+                "planner", "generation-fixture", "RUNNING", "Executing", branches, SessionUsageSnapshot.empty(), null);
     }
 
     private static String nullableText(ObjectNode node, String field)
@@ -144,10 +144,10 @@ class ConsoleRestFixtureCorpusTest
         var limits = new ObservabilityDtos.QuotaLimits(64, 128, 32, 64, 192, 200000);
         var active = new ObservabilityDtos.ActiveExecution(
                 "session-1", "trace-1", 7, Instant.parse("2026-07-25T11:59:55Z"),
-                Instant.parse("2026-07-25T11:59:59Z"), 5000, "CheckDns", "ACTIVE",
+                Instant.parse("2026-07-25T11:59:59Z"), 5000, "CheckDns", "generation-fixture", "ACTIVE",
                 "RUNNING", "Checking DNS", List.of(), usage, limits);
         var trace = new ObservabilityDtos.Trace(
-                "trace-1", "session-1", "CheckDns", TraceOutcome.SUCCEEDED, OBSERVED, 128,
+                "trace-1", "session-1", "CheckDns", "generation-fixture", TraceOutcome.SUCCEEDED, OBSERVED, 128,
                 TracePersistencePolicy.ONERROR, Instant.parse("2026-07-25T12:15:00Z"));
 
         result.put("instance-status.json", new ObservabilityDtos.InstanceStatus(
@@ -227,7 +227,7 @@ class ConsoleRestFixtureCorpusTest
     {
         return new ObservabilityDtos.ActiveExecution("session-live", "trace-live", 7,
                 Instant.parse("2026-07-25T11:59:55Z"), Instant.parse("2026-07-25T11:59:59Z"),
-                5000, "planner", "ACTIVE", "RUNNING", "Executing", branches, usage, limits);
+                5000, "planner", "generation-fixture", "ACTIVE", "RUNNING", "Executing", branches, usage, limits);
     }
 
     private static ObjectNode mutate(ObjectNode base, java.util.function.Consumer<ObjectNode> mutation)

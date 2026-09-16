@@ -49,7 +49,7 @@ public final class SkillGeneration
         }
         List<CapabilityMetadata> ordered = this.capabilities.values().stream()
                 .sorted(java.util.Comparator.comparing(CapabilityMetadata::name)).toList();
-        this.skillCatalog = skillCatalog == null ? new DefaultSkillCatalog(ordered) : skillCatalog;
+        this.skillCatalog = skillCatalog == null ? new DefaultSkillCatalog(id, ordered) : skillCatalog;
         this.registeredSkillCatalog = registeredSkillCatalog == null
                 ? new DefaultRegisteredSkillCatalog(ordered, this.definitions)
                 : registeredSkillCatalog;

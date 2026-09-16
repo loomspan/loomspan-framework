@@ -9,7 +9,7 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the fifteen types in the closed
+Application code MAY depend on the eighteen types in the closed
 `ai.loomspan.api` allowlist:
 
 | Type | Supported purpose |
@@ -17,7 +17,9 @@ Application code MAY depend on the fifteen types in the closed
 | `SkillTemplate` | Validate or invoke a named Java, REST, or model-backed YAML skill |
 | `SkillInvocationHandoff` | Atomically transfer a prepared root invocation to framework ownership |
 | `AdmittedSkillInvocation` | Execute once or release an already-admitted root invocation |
-| `SkillCatalog` | Discover the immutable startup snapshot of registered skills |
+| `SkillReloader` | Prepare, publish, or snapshot a complete skill generation |
+| `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog before publication |
+| `SkillCatalog` | Discover an immutable startup, prepared-candidate, or current snapshot of registered skills |
 | `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
 | `SkillKind` | Distinguish YAML, Java, and REST registrations |
 | `SkillExecutionView` | Observe the completed invocation session |
@@ -25,16 +27,26 @@ Application code MAY depend on the fifteen types in the closed
 | `SkillMethod` | Mark an application bean method as a directly callable Java skill |
 | `SkillParam` | Describe and declare requiredness for a Java skill parameter |
 | `SkillException` | Catch a safe Loomspan facade failure |
+| `SkillReloadException` | Catch an operational preparation or publication failure |
 | `SkillInputValidationException` | Distinguish invalid caller input |
 | `SkillInputValidationIssue` | Inspect structured validation issues |
 | `RestSkillHandler` | Implement every YAML-declared REST leaf through the sole supported SPI |
-| `RestSkillInvocation` | Receive the exact skill name and immutable validated/resolved input snapshot |
+| `RestSkillInvocation` | Receive the exact skill name, immutable validated/resolved input, and captured generation ID |
 
 Changes to these types are compatibility-sensitive. Application code SHOULD
 still use the narrowest type needed: inject or mock `SkillTemplate`, use the
 annotations on application-owned beans, and consume the public value records.
 
 ## Compatibility Changes in This Revision
+
+Two-stage updates deliberately add `SkillReloader`, `PreparedSkillUpdate`, and
+`SkillReloadException` to the supported API. `SkillCatalog` now requires
+`generationId()`, and `RestSkillInvocation` is a three-component record with
+`generationId` alongside name and input. Existing application implementations
+of `SkillCatalog` and direct two-argument `RestSkillInvocation` construction
+must be updated and recompiled; there is no compatibility method or constructor.
+The ID is process-local and supplied by Loomspan for handler calls, not inferred
+from business input or the current active catalog. See [two-stage skill updates](skill-reload.md).
 
 The handoff facade and handle are additive and leave every `SkillTemplate`
 signature unchanged. The three catalog types are additive. The two `SkillTemplate.validate`
@@ -90,7 +102,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the `api` package has exactly the fifteen allowlisted public top-level types;
+- the `api` package has exactly the eighteen allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

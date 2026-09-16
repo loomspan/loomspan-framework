@@ -75,6 +75,13 @@ public class LiveActivityProjector
     private void updateState(ExecutionProjectionState state, TraceRecord record)
     {
         TraceRecordType type = record.recordType();
+        if (type == TraceRecordType.TRACE_STARTED)
+        {
+            Object generationId = record.metadata() == null ? null : record.metadata().get("generationId");
+            if (!(generationId instanceof String id) || id.isBlank())
+                throw new IllegalArgumentException("TRACE_STARTED requires generationId");
+            state.generationId = id;
+        }
         if (type == TraceRecordType.FRAME_OPENED)
         {
             if (record.frameType() == TraceFrameType.ROOT_MISSION && state.frames.isEmpty()
@@ -194,6 +201,7 @@ public class LiveActivityProjector
                 state.startedAt,
                 record.timestamp(),
                 state.entrySkill,
+                state.generationId,
                 state.phase,
                 state.summary,
                 state.activeBranches(),

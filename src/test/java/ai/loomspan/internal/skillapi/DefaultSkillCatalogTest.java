@@ -25,7 +25,9 @@ class DefaultSkillCatalogTest
                 metadata("Alpha", CapabilityKind.YAML_SKILL, yamlSchema, SkillAccessPolicy.yamlRoles(java.util.Set.of("ADMIN"))),
                 metadata("restLeaf", CapabilityKind.REST_SKILL, restSchema, SkillAccessPolicy.denied()));
 
-        DefaultSkillCatalog catalog = new DefaultSkillCatalog(capabilities);
+        DefaultSkillCatalog catalog = new DefaultSkillCatalog("test-generation", capabilities);
+
+        assertThat(catalog.generationId()).isEqualTo("test-generation");
 
         assertThat(catalog.skills()).extracting(descriptor -> descriptor.name())
                 .containsExactly("Alpha", "beta", "restLeaf");
@@ -46,7 +48,7 @@ class DefaultSkillCatalogTest
                 metadata("same", CapabilityKind.YAML_SKILL, "{}", SkillAccessPolicy.unrestricted()),
                 metadata("same", CapabilityKind.JAVA_SKILL, "{}", SkillAccessPolicy.unrestricted()));
 
-        assertThatThrownBy(() -> new DefaultSkillCatalog(capabilities))
+        assertThatThrownBy(() -> new DefaultSkillCatalog("test-generation", capabilities))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Duplicate registered skill name 'same'");
     }

@@ -205,7 +205,7 @@ class LoomspanSessionTest {
                     observationEntry.set(entrySkill);
                     return observation;
                 },
-                (sessionId, entrySkill, policy, clock, handle) -> {
+                (sessionId, entrySkill, generationId, policy, clock, handle) -> {
                     traceEntry.set(entrySkill);
                     return mock(ExecutionTraceHandle.class);
                 });
@@ -226,7 +226,7 @@ class LoomspanSessionTest {
                     factoryCalls.incrementAndGet();
                     return mock(ExecutionObservationHandle.class);
                 },
-                (sessionId, entrySkill, policy, clock, handle) -> {
+                (sessionId, entrySkill, generationId, policy, clock, handle) -> {
                     factoryCalls.incrementAndGet();
                     return mock(ExecutionTraceHandle.class);
                 }))

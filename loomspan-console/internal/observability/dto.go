@@ -86,6 +86,7 @@ type ActiveExecution struct {
 	UpdatedAt             time.Time        `json:"updatedAt"`
 	ElapsedMillis         int64            `json:"elapsedMillis"`
 	EntrySkill            string           `json:"entrySkill"`
+	GenerationID          string           `json:"generationId"`
 	Status                string           `json:"status"`
 	Phase                 string           `json:"phase"`
 	Summary               string           `json:"summary"`
@@ -99,6 +100,7 @@ type Trace struct {
 	TraceID                   string    `json:"traceId"`
 	SessionID                 string    `json:"sessionId"`
 	EntrySkill                string    `json:"entrySkill"`
+	GenerationID              string    `json:"generationId"`
 	Outcome                   string    `json:"outcome"`
 	FinalizedAt               time.Time `json:"finalizedAt"`
 	SizeBytes                 int64     `json:"sizeBytes"`

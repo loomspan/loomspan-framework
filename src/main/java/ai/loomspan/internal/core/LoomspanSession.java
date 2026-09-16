@@ -230,6 +230,28 @@ public final class LoomspanSession
             Supplier<String> failureIdSupplier,
             ObjectMapper canonicalTraceMapper)
     {
+        this(sessionId, entrySkill, java.util.UUID.randomUUID().toString(), maxDepth, executionPlan,
+                lastLinterOutcome, lastOutputSchemaOutcome, sessionUsage, authentication, persistencePolicy,
+                clock, observationHandleFactory, traceHandleFactory, failureIdSupplier, canonicalTraceMapper);
+    }
+
+    LoomspanSession(
+            String sessionId,
+            String entrySkill,
+            String generationId,
+            int maxDepth,
+            ExecutionPlan executionPlan,
+            @Nullable LinterOutcome lastLinterOutcome,
+            @Nullable OutputSchemaOutcome lastOutputSchemaOutcome,
+            @Nullable SessionUsageSnapshot sessionUsage,
+            @Nullable Authentication authentication,
+            TracePersistencePolicy persistencePolicy,
+            Clock clock,
+            ExecutionObservationHandleFactory observationHandleFactory,
+            InternalExecutionTraceHandleFactory traceHandleFactory,
+            Supplier<String> failureIdSupplier,
+            ObjectMapper canonicalTraceMapper)
+    {
         this.sessionId = requireNonBlank(sessionId, "sessionId");
         this.entrySkill = EntrySkillIdentity.normalize(entrySkill);
         if (maxDepth <= 0)
@@ -254,7 +276,8 @@ public final class LoomspanSession
         try
         {
             traceHandle = Objects.requireNonNull(traceHandleFactory, "traceHandleFactory must not be null").create(
-                    this.sessionId, this.entrySkill, persistencePolicy, this.clock, this.executionObservationHandle);
+                    this.sessionId, this.entrySkill, generationId, persistencePolicy, this.clock,
+                    this.executionObservationHandle);
         }
         catch (RuntimeException | Error ex)
         {

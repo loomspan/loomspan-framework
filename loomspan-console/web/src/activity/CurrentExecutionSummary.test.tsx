@@ -12,6 +12,7 @@ const execution: ActiveExecution = {
   updatedAt: "2026-07-25T12:05:00Z",
   elapsedMillis: 305_000,
   entrySkill: "entry",
+  generationId: "generation-fixture",
   status: "ACTIVE",
   phase: "EXECUTING",
   summary: "Authoritative snapshot summary",

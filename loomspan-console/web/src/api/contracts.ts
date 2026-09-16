@@ -184,6 +184,7 @@ export type ActiveExecution = {
   updatedAt: string;
   elapsedMillis: number;
   entrySkill: string;
+  generationId: string;
   status: string;
   phase: string;
   summary: string;
@@ -197,6 +198,7 @@ export type Trace = {
   traceId: string;
   sessionId: string;
   entrySkill: string;
+  generationId: string;
   outcome: string;
   finalizedAt: string;
   sizeBytes: number;

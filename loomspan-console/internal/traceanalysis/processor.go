@@ -119,6 +119,7 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 	var completionRec *Record
 	var configuredLimits *ConfiguredLimits
 	var entrySkill string
+	var generationID string
 	var lastSeq int64
 	var sawStart bool
 
@@ -153,6 +154,8 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 				return invalidityError(CategoryUnsupportedValue, scopeID)
 			}
 			entrySkill, _ = extractEntrySkill(rec)
+			generationID, valid = extractGenerationID(rec)
+			if !valid { return invalidityError(CategoryUnsupportedValue, scopeID) }
 		}
 
 		// Record-address index row.
@@ -449,7 +452,7 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 		ComponentSizes: sizes,
 		Metadata: artifact.TraceMetadata{
 			TraceID: validator.traceID, SessionID: validator.sessionID,
-			EntrySkill: entrySkill,
+			EntrySkill: entrySkill, GenerationID: generationID,
 			Outcome:    string(outcome), FinalizedAt: completionRec.Timestamp,
 			PersistencePolicy: completionRec.metadataStringOrEmpty("persistencePolicy"),
 		},
@@ -495,6 +498,16 @@ func extractEntrySkill(rec *Record) (string, bool) {
 	if json.Unmarshal(raw, &value) != nil || strings.TrimSpace(value) == "" {
 		return "", false
 	}
+	return value, true
+}
+
+func extractGenerationID(rec *Record) (string, bool) {
+	fields, ok := decodeUniqueObject(rec.Metadata)
+	if !ok { return "", false }
+	raw, ok := fields["generationId"]
+	if !ok || bytes.Equal(raw, nullBytes) { return "", false }
+	var value string
+	if json.Unmarshal(raw, &value) != nil || strings.TrimSpace(value) == "" { return "", false }
 	return value, true
 }
 

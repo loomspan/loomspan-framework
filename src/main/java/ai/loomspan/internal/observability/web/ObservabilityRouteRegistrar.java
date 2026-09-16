@@ -130,7 +130,10 @@ public final class ObservabilityRouteRegistrar implements SmartInitializingSingl
         var active = new InMemoryActiveExecutionRegistry();
         var replay = new InMemoryActivityReplayBuffer();
         var live = new LiveMonitoringAvailability();
-        var skills = generations.active().registeredSkillCatalog();
+        java.util.function.Supplier<ai.loomspan.internal.runtime.observation.catalog.RegisteredSkillCatalog> skills =
+                () -> generations.active().registeredSkillCatalog();
+        // Fail activation promptly if the initial inspection projection is unavailable.
+        skills.get();
         UUID instanceId = UUID.randomUUID();
         InMemoryFinalizedTraceCatalog traces = null;
         ScheduledCompletionGraceRetention grace = null;

@@ -26,7 +26,7 @@ class ObservabilityDtoMapperTest
     {
         Instant started = Instant.parse("2026-07-25T12:00:00Z");
         ActiveExecutionSnapshot snapshot = new ActiveExecutionSnapshot(
-                "session", "trace", 7, 9, started, started, "entry", "RUNNING", "working",
+                "session", "trace", 7, 9, started, started, "entry", "generation-test", "RUNNING", "working",
                 List.of(new ActiveExecutionSnapshot.ActiveBranch(null, null, null, null, null, List.of(
                         new ActiveExecutionSnapshot.FramePathEntry("root", TraceFrameType.ROOT_MISSION, "entry"),
                         new ActiveExecutionSnapshot.FramePathEntry("frame", TraceFrameType.SKILL_EXECUTION, "entry")))),
@@ -52,7 +52,7 @@ class ObservabilityDtoMapperTest
     {
         Instant observedAt = Instant.parse("2026-08-21T12:00:00Z");
         ActiveExecutionSnapshot snapshot = new ActiveExecutionSnapshot(
-                "session", "trace", 7, 9, observedAt, observedAt, "entry", "RUNNING", "sending",
+                "session", "trace", 7, 9, observedAt, observedAt, "entry", "generation-test", "RUNNING", "sending",
                 List.of(),
                 new SessionUsageSnapshot(0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0), null);
         LoomspanProperties.Session.Quotas quotas = new LoomspanProperties.Session.Quotas();

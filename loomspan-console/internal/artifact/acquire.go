@@ -210,6 +210,7 @@ func (service *Service) installStream(entry *entry, stream inputStream, metadata
 	validatedMetadata := metadata
 	validatedMetadata.TraceID = processResult.Metadata.TraceID
 	validatedMetadata.SessionID = processResult.Metadata.SessionID
+	validatedMetadata.GenerationID = processResult.Metadata.GenerationID
 	// Target acquisition retains the catalog's source fact. A target-free
 	// import has no catalog metadata, so its entry skill comes only from the
 	// validated TRACE_STARTED record published by the processor.

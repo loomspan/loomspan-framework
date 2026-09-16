@@ -34,8 +34,9 @@ public final class TestSkillGenerations
     private static SkillGeneration testGeneration(Map<String, CapabilityMetadata> capabilities,
             Map<String, YamlSkillDefinition> definitions)
     {
-        return new SkillGeneration(UUID.randomUUID().toString(), capabilities, definitions,
-                new DefaultSkillCatalog(capabilities.values().stream().toList()),
+        String id = UUID.randomUUID().toString();
+        return new SkillGeneration(id, capabilities, definitions,
+                new DefaultSkillCatalog(id, capabilities.values().stream().toList()),
                 new DefaultRegisteredSkillCatalog(java.util.List.of(), Map.of()));
     }
 }

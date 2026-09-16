@@ -116,7 +116,7 @@ class InMemoryActiveExecutionRegistryTest
     {
         Instant now = Instant.parse("2026-07-24T12:00:00Z");
         return new ActiveExecutionSnapshot(
-                sessionId, "trace-" + sessionId, 0, sequence, now, now, "entry", "RUNNING", "summary",
+                sessionId, "trace-" + sessionId, 0, sequence, now, now, "entry", "generation-test", "RUNNING", "summary",
                 List.of(), SessionUsageSnapshot.empty(), null);
     }
 }

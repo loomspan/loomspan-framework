@@ -34,6 +34,7 @@ import ai.loomspan.internal.skill.DefaultSkillVisibilityResolver;
 import ai.loomspan.internal.skill.SkillVisibilityResolver;
 import ai.loomspan.internal.skill.YamlSkillCatalog;
 import ai.loomspan.internal.skill.SkillGenerationManager;
+import ai.loomspan.internal.skill.DefaultSkillReloader;
 import ai.loomspan.internal.skillapi.DefaultSkillTemplate;
 import ai.loomspan.internal.skillapi.DefaultSkillInvocationHandoff;
 import ai.loomspan.internal.skillapi.DefaultSkillCatalog;
@@ -41,6 +42,7 @@ import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import ai.loomspan.api.SkillTemplate;
 import ai.loomspan.api.SkillInvocationHandoff;
 import ai.loomspan.api.SkillCatalog;
+import ai.loomspan.api.SkillReloader;
 import ai.loomspan.internal.vfs.DefaultRefResolver;
 import ai.loomspan.internal.vfs.RefResolver;
 import ai.loomspan.internal.vfs.SessionLocalVirtualFileSystem;
@@ -222,6 +224,14 @@ public class LoomspanAutoConfiguration
     SkillCatalog skillCatalog(SkillGenerationManager generationManager)
     {
         return generationManager.active().skillCatalog();
+    }
+
+    @Bean
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    SkillReloader skillReloader(SkillGenerationManager generationManager,
+            FrameworkExecutionLifecycle frameworkExecutionLifecycle)
+    {
+        return new DefaultSkillReloader(generationManager, frameworkExecutionLifecycle);
     }
 
     @Bean

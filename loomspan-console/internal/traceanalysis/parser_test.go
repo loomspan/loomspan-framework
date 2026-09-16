@@ -29,7 +29,7 @@ func collectRecords(t *testing.T, raw string) ([]*Record, *consolecore.Error) {
 // validLine builds a minimal valid TraceRecord line with the given sequence.
 func validLine(seq int) string {
 	return `{"traceId":"t","sessionId":"s","sequence":` + itoa(seq) +
-		`,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"consoleCompatibilityVersion":"development"},"data":null}`
+		`,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"consoleCompatibilityVersion":"development","generationId":"generation-test"},"data":null}`
 }
 
 // itoa converts an int to a string without importing strconv at the test top.
@@ -405,7 +405,7 @@ func TestParserRejectsIdentitySequenceTimestampEnumAndIntegerContradictions(t *t
 		// accepts both records; the validator (run by the processor) rejects
 		// the non-monotonic sequence.
 		raw := validLine(2) + "\n" +
-			`{"traceId":"t","sessionId":"s","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{},"data":null}` + "\n" +
+			`{"traceId":"t","sessionId":"s","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"generationId":"generation-test"},"data":null}` + "\n" +
 			completionRecord(3, "SUCCEEDED", 0, 0, 0, "") + "\n"
 		_, cat, ok := processTrace(t, raw)
 		if ok {

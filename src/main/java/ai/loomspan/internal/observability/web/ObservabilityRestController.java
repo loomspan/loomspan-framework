@@ -7,6 +7,7 @@ import ai.loomspan.internal.observability.web.dto.ObservabilityDtos;
 import ai.loomspan.internal.runtime.observation.ActiveExecutionSnapshot;
 import ai.loomspan.internal.runtime.observation.catalog.FinalizedTraceCatalogEntry;
 import ai.loomspan.internal.runtime.observation.catalog.RegisteredSkillEntry;
+import ai.loomspan.internal.runtime.observation.catalog.RegisteredSkillCatalog;
 import ai.loomspan.internal.runtime.observation.catalog.TraceCatalogSlice;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -56,9 +57,10 @@ public final class ObservabilityRestController
         validateNoQuery(request);
         ObservabilityRuntime runtime = runtime();
         Instant observedAt = Instant.now(runtime.clock());
+        RegisteredSkillCatalog skills = runtime.skills();
         return json(pages.writeObject(new ObservabilityDtos.InstanceStatus(
                 runtime.instanceId().toString(), releaseVersion, observedAt, runtime.liveMonitoring().isAvailable(),
-                runtime.skills().registeredSkillCount(), runtime.activeExecutions().activeCount(),
+                skills.registeredSkillCount(), runtime.activeExecutions().activeCount(),
                 runtime.traces().catalogedTraceCount(), runtime.tracePersistencePolicy(),
                 runtime.configuration().getCompletionGraceTtl(),
                 runtime.configuration().getTraceCatalogMetadataTtl())));
@@ -69,17 +71,18 @@ public final class ObservabilityRestController
         require(ObservabilityAccessService.Operation.SKILL_READ);
         validateQuery(request);
         ObservabilityRuntime runtime = runtime();
+        RegisteredSkillCatalog skills = runtime.skills();
         int pageSize = pages.pageSize(single(request, "pageSize"));
         String encoded = single(request, "cursor");
         ObservabilityCursorCodec.Cursor cursor = encoded == null
                 ? ObservabilityCursorCodec.Cursor.initial(runtime.instanceId(), "skills", 0)
                 : cursors.decode(encoded, runtime.instanceId(), "skills");
         if (encoded != null && (cursor.afterName() == null
-                || runtime.skills().find(cursor.afterName()).isEmpty()))
+                || skills.find(cursor.afterName()).isEmpty()))
         {
             throw invalidCursor();
         }
-        List<RegisteredSkillEntry.Summary> source = runtime.skills().listAfter(cursor.afterName(), pageSize + 1);
+        List<RegisteredSkillEntry.Summary> source = skills.listAfter(cursor.afterName(), pageSize + 1);
         List<ObservabilityDtos.SkillSummary> items = source.stream().map(mapper::skill).toList();
         Instant observedAt = Instant.now(runtime.clock());
         byte[] body = pages.write(items, pageSize, emitted ->
@@ -96,8 +99,9 @@ public final class ObservabilityRestController
     {
         require(ObservabilityAccessService.Operation.SKILL_READ);
         validateNoQuery(request);
+        RegisteredSkillCatalog skills = runtime().skills();
         return json(pages.writeObject(mapper.skill(
-                runtime().skills().find(registeredName).orElseThrow(ObservabilityRestController::notFound))));
+                skills.find(registeredName).orElseThrow(ObservabilityRestController::notFound))));
     }
 
     public ResponseEntity<byte[]> active(HttpServletRequest request)

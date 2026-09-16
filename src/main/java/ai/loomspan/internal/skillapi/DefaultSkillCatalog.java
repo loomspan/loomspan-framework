@@ -13,11 +13,14 @@ import java.util.TreeMap;
 
 public final class DefaultSkillCatalog implements SkillCatalog
 {
+    private final String generationId;
     private final NavigableMap<String, SkillDescriptor> entries;
     private final List<SkillDescriptor> skills;
 
-    public DefaultSkillCatalog(List<CapabilityMetadata> capabilities)
+    public DefaultSkillCatalog(String generationId, List<CapabilityMetadata> capabilities)
     {
+        this.generationId = Objects.requireNonNull(generationId, "generationId must not be null");
+        if (generationId.isBlank()) throw new IllegalArgumentException("generationId must not be blank");
         Objects.requireNonNull(capabilities, "capabilities must not be null");
         TreeMap<String, SkillDescriptor> built = new TreeMap<>();
         for (var metadata : capabilities)
@@ -32,6 +35,9 @@ public final class DefaultSkillCatalog implements SkillCatalog
         this.entries = Collections.unmodifiableNavigableMap(built);
         this.skills = List.copyOf(built.values());
     }
+
+    @Override
+    public String generationId() { return generationId; }
 
     @Override
     public List<SkillDescriptor> skills()

@@ -64,6 +64,18 @@ public final class FrameworkExecutionLifecycle
         }
     }
 
+    /** Executes a short publication action under the same monitor as shutdown admission closure. */
+    public void whileAdmissionOpen(Runnable action)
+    {
+        Objects.requireNonNull(action, "action must not be null");
+        synchronized (monitor)
+        {
+            if (admissionClosed.get())
+                throw new RejectedExecutionException("Loomspan framework is shutting down; skill updates are not accepted");
+            action.run();
+        }
+    }
+
     private boolean claim(AdmittedRoot root)
     {
         synchronized (monitor)

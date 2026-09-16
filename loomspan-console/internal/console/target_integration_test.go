@@ -165,7 +165,7 @@ func TestArtifactServiceAcquiresAndUsesThroughTargetScope(t *testing.T) {
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1") {
 			response.Header().Set("Content-Type", "application/json")
-			_, _ = response.Write([]byte(`{"targetScopeId":"scope-1","traceId":"trace-1","sessionId":"session-1","entrySkill":"CheckDns","outcome":"SUCCEEDED","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":` + fmt.Sprintf("%d", len(data)) + `,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-07-26T12:00:00Z"}`))
+			_, _ = response.Write([]byte(`{"targetScopeId":"scope-1","traceId":"trace-1","sessionId":"session-1","entrySkill":"CheckDns","generationId":"generation-test","outcome":"SUCCEEDED","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":` + fmt.Sprintf("%d", len(data)) + `,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-07-26T12:00:00Z"}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1/artifact") {
@@ -303,7 +303,7 @@ func parseTraceJSON(data []byte) (traceJSON, error) {
 // snapshot. Used by target-scope integration tests that wire the production
 // processor.
 func validNDJSONArtifact() []byte {
-	return []byte(`{"traceId":"trace-1","sessionId":"session-1","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"consoleCompatibilityVersion":"development"},"data":null}` + "\n" +
+	return []byte(`{"traceId":"trace-1","sessionId":"session-1","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"consoleCompatibilityVersion":"development","generationId":"generation-test"},"data":null}` + "\n" +
 		`{"traceId":"trace-1","sessionId":"session-1","sequence":2,"timestamp":1784894400.000000000,"recordType":"TRACE_COMPLETED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"outcome":"SUCCEEDED","sessionUsageSnapshot":{"promptUnits":0,"completionUnits":0,"totalUnits":0},"errored":false,"persistencePolicy":"ALWAYS"},"data":null}` + "\n")
 }
 
@@ -325,7 +325,7 @@ func TestArtifactScopeRotationDuringMetadataFetchReturnsTargetChanged(t *testing
 			close(traceLoaded)
 			<-metadataReleased
 			response.Header().Set("Content-Type", "application/json")
-			_, _ = response.Write([]byte(`{"targetScopeId":"scope-1","traceId":"trace-1","sessionId":"session-1","entrySkill":"CheckDns","outcome":"SUCCEEDED","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":` + fmt.Sprintf("%d", len(data)) + `,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-07-26T12:00:00Z"}`))
+			_, _ = response.Write([]byte(`{"targetScopeId":"scope-1","traceId":"trace-1","sessionId":"session-1","entrySkill":"CheckDns","generationId":"generation-test","outcome":"SUCCEEDED","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":` + fmt.Sprintf("%d", len(data)) + `,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-07-26T12:00:00Z"}`))
 			return
 		}
 		response.WriteHeader(http.StatusNotFound)
@@ -453,7 +453,7 @@ func TestArtifactScopeRotationDuringLeaseUseReturnsTargetChanged(t *testing.T) {
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1") && !strings.HasSuffix(request.URL.Path, "/artifact") {
 			response.Header().Set("Content-Type", "application/json")
-			_, _ = response.Write([]byte(`{"targetScopeId":"scope-1","traceId":"trace-1","sessionId":"session-1","entrySkill":"CheckDns","outcome":"SUCCEEDED","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":` + fmt.Sprintf("%d", len(data)) + `,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-07-26T12:00:00Z"}`))
+			_, _ = response.Write([]byte(`{"targetScopeId":"scope-1","traceId":"trace-1","sessionId":"session-1","entrySkill":"CheckDns","generationId":"generation-test","outcome":"SUCCEEDED","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":` + fmt.Sprintf("%d", len(data)) + `,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-07-26T12:00:00Z"}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1/artifact") {

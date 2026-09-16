@@ -215,7 +215,7 @@ func compactExecutionDetailSchema() *jsonschema.Schema {
 	required := []string{"sessionId", "traceId", "activeBranches"}
 	return compactObject(required, map[string]*jsonschema.Schema{
 		"sessionId": unspecified(), "traceId": unspecified(), "lastCanonicalSequence": unspecified(),
-		"startedAt": unspecified(), "updatedAt": unspecified(), "elapsedMillis": unspecified(), "entrySkill": unspecified(),
+		"startedAt": unspecified(), "updatedAt": unspecified(), "elapsedMillis": unspecified(), "entrySkill": unspecified(), "generationId": unspecified(),
 		"status": unspecified(), "phase": unspecified(), "activeBranches": compactArray(branch),
 		"usage": compactObject(nil, usageProperties, false), "configuredLimits": compactObject(nil, limitProperties, false),
 	}, false)

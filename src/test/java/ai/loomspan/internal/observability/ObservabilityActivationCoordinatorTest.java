@@ -38,7 +38,7 @@ class ObservabilityActivationCoordinatorTest
                 mock(ActiveExecutionRegistry.class),
                 mock(ActivityReplayBuffer.class),
                 new LiveMonitoringAvailability(),
-                mock(RegisteredSkillCatalog.class),
+                () -> mock(RegisteredSkillCatalog.class),
                 traces,
                 new LoomspanProperties.Observability(),
                 new LoomspanProperties.Session.Quotas(),
