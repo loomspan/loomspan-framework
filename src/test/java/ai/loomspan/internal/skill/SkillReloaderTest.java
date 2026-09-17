@@ -12,6 +12,7 @@ import org.springframework.context.ApplicationContext;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,6 +28,146 @@ import static org.mockito.Mockito.when;
 
 class SkillReloaderTest
 {
+    @Test
+    void unusedPublishedGenerationsRetireOnceAndRejectedCandidatesDoNot()
+    {
+        SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);
+        manager.afterSingletonsInstantiated();
+        DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle());
+        List<String> retired = new CopyOnWriteArrayList<>();
+        reloader.onGenerationRetired(retired::add);
+        String initial = reloader.snapshot().generationId();
+        PreparedSkillUpdate first = reloader.prepare();
+        PreparedSkillUpdate stale = reloader.prepare();
+        assertThat(retired).isEmpty();
+
+        reloader.publish(first);
+        assertThat(retired).containsExactly(initial);
+        List<String> late = new CopyOnWriteArrayList<>();
+        reloader.onGenerationRetired(late::add);
+        assertThat(late).isEmpty();
+        assertThatThrownBy(() -> reloader.publish(first)).isInstanceOf(SkillReloadException.class);
+        assertThatThrownBy(() -> reloader.publish(stale)).isInstanceOf(SkillReloadException.class);
+        assertThat(retired).containsExactly(initial);
+
+        PreparedSkillUpdate second = reloader.prepare();
+        reloader.publish(second);
+        assertThat(retired).containsExactly(initial, first.generationId());
+        assertThat(late).containsExactly(first.generationId());
+        assertThat(retired).doesNotContain(stale.generationId(), second.generationId());
+    }
+
+    @Test
+    void listenerFailureAndCloseCannotChangePublicationOrOtherDelivery() throws Exception
+    {
+        SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);
+        manager.afterSingletonsInstantiated();
+        DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle());
+        List<String> delivered = new CopyOnWriteArrayList<>();
+        reloader.onGenerationRetired(id -> {
+            assertThat(reloader.snapshot().generationId()).isNotEqualTo(id);
+            try { reloader.onGenerationRetired(ignored -> { }).close(); }
+            catch (Exception ex) { throw new AssertionError(ex); }
+            throw new IllegalStateException("listener failed");
+        });
+        AutoCloseable removable = reloader.onGenerationRetired(delivered::add);
+        String initial = reloader.snapshot().generationId();
+        PreparedSkillUpdate first = reloader.prepare();
+        reloader.publish(first);
+        assertThat(delivered).containsExactly(initial);
+        removable.close();
+        PreparedSkillUpdate second = reloader.prepare();
+        reloader.publish(second);
+        assertThat(delivered).containsExactly(initial);
+        assertThat(reloader.snapshot().generationId()).isEqualTo(second.generationId());
+    }
+
+    @Test
+    void closingRegistrationDoesNotWaitForAlreadySelectedCallback() throws Exception
+    {
+        SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);
+        manager.afterSingletonsInstantiated();
+        DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle());
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        List<String> delivered = new CopyOnWriteArrayList<>();
+        AutoCloseable registration = reloader.onGenerationRetired(id -> {
+            entered.countDown();
+            await(release);
+            delivered.add(id);
+        });
+        String initial = reloader.snapshot().generationId();
+        PreparedSkillUpdate first = reloader.prepare();
+        Thread publisher = Thread.ofVirtual().start(() -> reloader.publish(first));
+        try
+        {
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+            registration.close();
+            release.countDown();
+            publisher.join(Duration.ofSeconds(5));
+            assertThat(publisher.isAlive()).isFalse();
+            assertThat(delivered).containsExactly(initial);
+            reloader.publish(reloader.prepare());
+            assertThat(delivered).containsExactly(initial);
+        }
+        finally
+        {
+            release.countDown();
+            publisher.join(Duration.ofSeconds(5));
+        }
+    }
+
+    @Test
+    void shutdownDoesNotWaitForAnAlreadyRunningListener() throws Exception
+    {
+        SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);
+        manager.afterSingletonsInstantiated();
+        ExecutorService workers = Executors.newSingleThreadExecutor();
+        FrameworkExecutionLifecycle lifecycle = new FrameworkExecutionLifecycle(
+                mock(ApplicationContext.class), Duration.ofMillis(100), workers);
+        DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle);
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        reloader.onGenerationRetired(id -> {
+            entered.countDown();
+            await(release);
+        });
+        PreparedSkillUpdate update = reloader.prepare();
+        Thread publisher = Thread.ofVirtual().start(() -> reloader.publish(update));
+        try
+        {
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+            Thread stopper = Thread.ofVirtual().start(lifecycle::stop);
+            stopper.join(Duration.ofSeconds(2));
+            assertThat(stopper.isAlive()).isFalse();
+            assertThat(publisher.isAlive()).isTrue();
+        }
+        finally
+        {
+            release.countDown();
+            publisher.join(Duration.ofSeconds(5));
+            lifecycle.destroy();
+        }
+    }
+
+    @Test
+    void shutdownWithOutstandingOwnerDoesNotInventSafeRetirement()
+    {
+        SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);
+        manager.afterSingletonsInstantiated();
+        FrameworkExecutionLifecycle lifecycle = lifecycle();
+        DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle);
+        List<String> retired = new CopyOnWriteArrayList<>();
+        reloader.onGenerationRetired(retired::add);
+        var captured = manager.capture();
+        reloader.publish(reloader.prepare());
+        assertThat(retired).isEmpty();
+        lifecycle.closeAdmission();
+        assertThat(retired).isEmpty();
+        captured.lease().close();
+        assertThat(retired).isEmpty();
+    }
+
     @Test
     void suppliedCandidatesUseTheSameOwnerBaseOneShotAndShutdownChecks()
     {

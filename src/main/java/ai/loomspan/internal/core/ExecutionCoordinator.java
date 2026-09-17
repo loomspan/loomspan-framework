@@ -108,9 +108,16 @@ public class ExecutionCoordinator
 
         MissionContext mission = new MissionContext(session, rootCapability.name(), UUID.randomUUID().toString(), parentMission);
         ExecutionBinding missionBinding = baseBinding.withMission(mission);
-        return ExecutionBindingScope.supplyWith(missionBinding, () -> executeBound(
-                definition, rootCapability, objective, missionInput, session, authentication,
-                mission, parentMission, topLevelInvocation));
+        try
+        {
+            return ExecutionBindingScope.supplyWith(missionBinding, () -> executeBound(
+                    definition, rootCapability, objective, missionInput, session, authentication,
+                    mission, parentMission, topLevelInvocation));
+        }
+        finally
+        {
+            mission.lifecycle().closeNow();
+        }
     }
 
     private String executeBound(YamlSkillDefinition definition,
@@ -217,7 +224,6 @@ public class ExecutionCoordinator
                 else
                 {
                     executionStateService.closeFrame(session, frame, closeMetadata(failure, terminalFailureId));
-                    mission.lifecycle().closeNow();
                 }
             }
             catch (RuntimeException ex)
@@ -235,6 +241,10 @@ public class ExecutionCoordinator
                         // Canonical failure recording must not mutate the application exception.
                     }
                 }
+            }
+            finally
+            {
+                mission.lifecycle().closeNow();
             }
             if (topLevelInvocation)
             {

@@ -231,17 +231,44 @@ public class LoomspanSessionRunner
             @Nullable Authentication authentication,
             Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
     {
-        return executeRoot(entrySkill, authentication, generation, action, completion);
+        return executeRoot(entrySkill, authentication, generation, null, action, completion);
+    }
+
+    public <T, R> R callWithNewSession(String entrySkill, SkillGeneration generation,
+            @Nullable Authentication authentication, AutoCloseable generationOwner,
+            Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
+    {
+        return executeRoot(entrySkill, authentication, generation, generationOwner, action, completion);
     }
 
     private <T, R> R executeRoot(String entrySkill, @Nullable Authentication authentication,
             SkillGeneration generation, Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
     {
+        return executeRoot(entrySkill, authentication, generation, null, action, completion);
+    }
+
+    private <T, R> R executeRoot(String entrySkill, @Nullable Authentication authentication,
+            SkillGeneration generation, @Nullable AutoCloseable generationOwner,
+            Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
+    {
         Objects.requireNonNull(action, "action must not be null");
         Objects.requireNonNull(completion, "completion must not be null");
-        FrameworkExecutionLifecycle.AdmittedRoot root = frameworkLifecycle == null
-                ? null : frameworkLifecycle.admitRoot();
-        return executeAdmittedRoot(entrySkill, authentication, generation, root, action, completion);
+        FrameworkExecutionLifecycle.AdmittedRoot root;
+        try { root = frameworkLifecycle == null ? null : frameworkLifecycle.admitRoot(generationOwner); }
+        catch (RuntimeException | Error ex)
+        {
+            closeOwner(generationOwner);
+            throw ex;
+        }
+        try { return executeAdmittedRoot(entrySkill, authentication, generation, root, action, completion); }
+        finally { if (root == null) closeOwner(generationOwner); }
+    }
+
+    private static void closeOwner(@Nullable AutoCloseable owner)
+    {
+        if (owner == null) return;
+        try { owner.close(); }
+        catch (Exception ex) { throw new IllegalStateException("Generation ownership release failed", ex); }
     }
 
     public <T, R> R callWithAdmittedSession(String entrySkill, SkillGeneration generation,

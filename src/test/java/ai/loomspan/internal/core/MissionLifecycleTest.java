@@ -22,6 +22,27 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class MissionLifecycleTest
 {
     @Test
+    void physicalCompletionWaitsForEveryStartedParallelTask()
+    {
+        ExecutionBinding binding = binding("parallel-retirement", null);
+        MissionLifecycle lifecycle = binding.requireMission().lifecycle();
+        AtomicInteger completions = new AtomicInteger();
+        lifecycle.onPhysicalCompletion(completions::incrementAndGet);
+        List<MissionLifecycle.AdmittedTask> tasks = lifecycle.admitUnit(binding,
+                List.of(assignment("first", 1), assignment("second", 2)), () -> { });
+        assertThat(lifecycle.taskStarted(tasks.get(0), binding)).isTrue();
+        assertThat(lifecycle.taskStarted(tasks.get(1), binding)).isTrue();
+        lifecycle.closeNow();
+        assertThat(completions).hasValue(0);
+        lifecycle.taskReturned(tasks.get(0));
+        assertThat(completions).hasValue(0);
+        lifecycle.taskReturned(tasks.get(1));
+        assertThat(completions).hasValue(1);
+        lifecycle.closeNow();
+        assertThat(completions).hasValue(1);
+    }
+
+    @Test
     void startsOpenAndClosesMonotonicallyExactlyOnce()
     {
         ExecutionBinding binding = binding("monotonic", null);

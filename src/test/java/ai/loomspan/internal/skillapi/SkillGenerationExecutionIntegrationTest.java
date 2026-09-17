@@ -20,6 +20,7 @@ import ai.loomspan.internal.security.DefaultAccessGuard;
 import ai.loomspan.internal.security.SkillAccessPolicy;
 import ai.loomspan.internal.security.SkillRoleEvaluator;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
+import ai.loomspan.internal.skill.SkillGenerationManager;
 import ai.loomspan.testkit.TestSkillGenerations;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -34,6 +35,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,13 +60,17 @@ class SkillGenerationExecutionIntegrationTest
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(oldCapability.name(), oldCapability);
         var generations = registry.manager();
+        var retired = new CopyOnWriteArrayList<String>();
+        generations.onGenerationRetired(retired::add);
+        String oldId = generations.active().id();
         var replacementGeneration = TestSkillGenerations.of(replacementCapability);
         ObjectMapper mapper = new ObjectMapper()
         {
             @Override
             public <T> T convertValue(Object fromValue, TypeReference<T> toValueTypeRef)
             {
-                generations.activate(replacementGeneration);
+                SkillGenerationManager.dispatch(generations.activateAndSelect(replacementGeneration));
+                assertThat(retired).isEmpty();
                 return (T) Map.of("payload", "hello");
             }
         };
@@ -73,8 +79,11 @@ class SkillGenerationExecutionIntegrationTest
                 new SkillRoleEvaluator(null, null), null);
 
         template.validate("invoiceParser", new Object());
+        assertThat(retired).containsExactly(oldId);
         assertThatThrownBy(() -> template.validate("invoiceParser", Map.of("payload", "hello")))
                 .isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
+        generations.activate(TestSkillGenerations.empty());
+        assertThat(retired).containsExactly(oldId, replacementGeneration.id());
     }
 
     @Test

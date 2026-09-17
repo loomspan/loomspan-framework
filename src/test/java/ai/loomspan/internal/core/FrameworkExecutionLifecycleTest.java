@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -26,6 +27,59 @@ import ai.loomspan.internal.runtime.trace.BlockingTraceHandleTestSupport;
 
 class FrameworkExecutionLifecycleTest
 {
+    @Test
+    void nestedPhysicalWorkRetainsRootOwnershipAfterLogicalCompletionAndCutoff() throws Exception
+    {
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(1), executor);
+        var manager = new TestCapabilityRegistry().manager();
+        var retired = new CopyOnWriteArrayList<String>();
+        manager.onGenerationRetired(retired::add);
+        var captured = manager.capture();
+        String oldId = captured.generation().id();
+        var root = lifecycle.admitRoot(captured.lease());
+        var session = new LoomspanSession("retirement", "entry", 8);
+        session.attachAdmittedRoot(root);
+        var parent = new MissionContext(session, "parent", "parent", null);
+        var child = new MissionContext(session, "child", "child", parent);
+        assertThat(root.claimExecution()).isTrue();
+        parent.lifecycle().markOwningStarted();
+        var started = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        Thread physicalWorker = Thread.ofVirtual().start(() -> {
+            child.lifecycle().markOwningStarted();
+            started.countDown();
+            try
+            {
+                while (release.getCount() != 0)
+                    try { release.await(); }
+                    catch (InterruptedException ignored) { /* Uncooperative physical work. */ }
+            }
+            finally { child.lifecycle().owningReturned(); }
+        });
+        assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
+        manager.activate(ai.loomspan.testkit.TestSkillGenerations.empty());
+        assertThat(retired).isEmpty();
+
+        parent.lifecycle().closeNow();
+        child.lifecycle().frameworkCutoff(System.nanoTime());
+        child.lifecycle().closeNow();
+        root.completeExecution();
+        assertThat(retired).isEmpty();
+        parent.lifecycle().owningReturned();
+        assertThat(retired).isEmpty();
+        physicalWorker.interrupt();
+        assertThat(retired).isEmpty();
+        release.countDown();
+        physicalWorker.join(Duration.ofSeconds(2));
+        assertThat(physicalWorker.isAlive()).isFalse();
+        assertThat(retired).containsExactly(oldId);
+        root.completeExecution();
+        assertThat(retired).containsExactly(oldId);
+        lifecycle.destroy();
+    }
+
     @Test
     @Timeout(value = 3, unit = TimeUnit.SECONDS)
     void updateActivationGateAndShutdownClosureHaveOneOrdering() throws Exception

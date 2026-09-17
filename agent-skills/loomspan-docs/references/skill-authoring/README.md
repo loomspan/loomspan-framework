@@ -58,7 +58,7 @@ Do not load every document by default. Start with the routing entry most relevan
 | Evidence contracts | Source-verified | Immediate-root property annotations, strict scalar/placement rules, Boolean direct-child expressions, planning/final truth sets, metadata isolation, enforcement, and nested mission isolation |
 | Source verification | Initial | How an LLM should use guide, tests, fixtures, samples, and production code together |
 | Skill-design review | Initial | Cross-cutting questions; not a manifest validator |
-| REST YAML manifest | Source-verified | Exact declaration matrix, direct execution, roles, fixed handler rule, captured generation identity, file-derived or supplied labels, and diagnostics |
+| REST YAML manifest | Source-verified | Exact declaration matrix, direct execution, roles, fixed handler rule, captured generation identity, safe retirement routing, file-derived or supplied labels, and diagnostics |
 | Input contracts | Initial, source-verified | Reflected Java `Object`, generic and typed maps, DTOs, arrays, requiredness boundaries, shared root/child reflected contracts, validation, and planner guidance; complete pure-YAML schema syntax remains undocumented |
 | Output contracts | Source-verified | Supported `output_schema` vocabulary, normalization, validation, retries, model guidance, and current limitations |
 | Prompts | Focused, source-verified | Recursive output-contract guidance is covered; general private prompt composition still needs a dedicated topic |

@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.ArrayList;
 import java.util.function.Supplier;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Consumer;
 
 /** Framework-owned publication coordinator. Candidate ownership is carried by identity, not a registry. */
 public final class DefaultSkillReloader implements SkillReloader
@@ -26,6 +27,7 @@ public final class DefaultSkillReloader implements SkillReloader
     {
         this.generations = Objects.requireNonNull(generations, "generations must not be null");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle must not be null");
+        generations.deliveryEnabled(lifecycle::isAdmissionOpen);
     }
 
     @Override
@@ -60,6 +62,7 @@ public final class DefaultSkillReloader implements SkillReloader
     public void publish(PreparedSkillUpdate update)
     {
         Objects.requireNonNull(update, "update must not be null");
+        SkillGenerationManager.Retirement[] retirement = new SkillGenerationManager.Retirement[1];
         synchronized (publicationLock)
         {
             if (!(update instanceof Candidate candidate) || candidate.owner != owner)
@@ -71,7 +74,7 @@ public final class DefaultSkillReloader implements SkillReloader
                         throw new SkillReloadException("Skill update was already published");
                     if (!generations.active().id().equals(candidate.baseId))
                         throw new SkillReloadException("Skill update is stale; active generation changed since preparation");
-                    generations.activate(candidate.generation);
+                    retirement[0] = generations.activateAndSelect(candidate.generation);
                     candidate.published = true;
                 });
             }
@@ -80,6 +83,13 @@ public final class DefaultSkillReloader implements SkillReloader
                 throw new SkillReloadException("Cannot publish skill update after shutdown began", ex);
             }
         }
+        SkillGenerationManager.dispatch(retirement[0]);
+    }
+
+    @Override
+    public AutoCloseable onGenerationRetired(Consumer<String> listener)
+    {
+        return generations.onGenerationRetired(listener);
     }
 
     @Override

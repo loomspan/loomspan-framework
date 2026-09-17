@@ -113,34 +113,40 @@ public class DefaultSkillTemplate implements SkillTemplate
 
     PreparedInput prepareObject(String skillName, Object input)
     {
-        SkillGeneration generation = generationManager.active();
-        if (input == null)
-        {
-            throw new SkillInputValidationException("Skill input must not be null.", List.of());
-        }
+        SkillGenerationManager.Capture captured = generationManager.capture();
         try
         {
-            return prepareMap(generation, skillName, objectMapper.convertValue(input, MAP_TYPE));
+            if (input == null)
+                throw new SkillInputValidationException("Skill input must not be null.", List.of());
+            return prepareMap(captured, skillName, objectMapper.convertValue(input, MAP_TYPE));
         }
         catch (AccessDeniedException | SkillException ex)
         {
+            captured.lease().close();
             throw ex;
         }
         catch (RuntimeException ex)
         {
+            captured.lease().close();
             throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+        }
+        catch (Error ex)
+        {
+            captured.lease().close();
+            throw ex;
         }
     }
 
     PreparedInput prepareMap(String skillName, Map<String, Object> input)
     {
-        return prepareMap(generationManager.active(), skillName, input);
+        return prepareMap(generationManager.capture(), skillName, input);
     }
 
-    private PreparedInput prepareMap(SkillGeneration generation, String skillName, Map<String, Object> input)
+    private PreparedInput prepareMap(SkillGenerationManager.Capture captured, String skillName, Map<String, Object> input)
     {
         try
         {
+            SkillGeneration generation = captured.generation();
             CapabilityMetadata capability = requireSkill(generation, skillName);
             SkillInputContract contract = capability.inputContract();
             SkillInputValidationResult validation = inputValidator.validate(normalizeNullInput(input, contract), contract);
@@ -151,15 +157,22 @@ public class DefaultSkillTemplate implements SkillTemplate
                         .toList();
                 throw new SkillInputValidationException(buildValidationMessage(skillName, validation), issues);
             }
-            return new PreparedInput(generation, capability, validation);
+            return new PreparedInput(generation, capability, validation, captured.lease());
         }
         catch (AccessDeniedException | SkillException ex)
         {
+            captured.lease().close();
             throw ex;
         }
         catch (RuntimeException ex)
         {
+            captured.lease().close();
             throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+        }
+        catch (Error ex)
+        {
+            captured.lease().close();
+            throw ex;
         }
     }
 
@@ -178,6 +191,7 @@ public class DefaultSkillTemplate implements SkillTemplate
         {
             throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
         }
+        finally { prepared.lease().close(); }
     }
 
     private String invokePrepared(String skillName, PreparedInput prepared, Consumer<SkillExecutionView> observer)
@@ -195,11 +209,18 @@ public class DefaultSkillTemplate implements SkillTemplate
         }
         catch (AccessDeniedException | SkillException ex)
         {
+            prepared.lease().close();
             throw ex;
         }
         catch (RuntimeException ex)
         {
+            prepared.lease().close();
             throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+        }
+        catch (Error ex)
+        {
+            prepared.lease().close();
+            throw ex;
         }
         return invokePrepared(skillName, prepared, observer, authentication, admittedRoot);
     }
@@ -218,7 +239,8 @@ public class DefaultSkillTemplate implements SkillTemplate
             };
             return admittedRoot == null
                     ? sessionRunner.callWithNewSession(
-                            prepared.capability().name(), prepared.generation(), authentication, action, completion)
+                            prepared.capability().name(), prepared.generation(), authentication,
+                            prepared.lease(), action, completion)
                     : sessionRunner.callWithAdmittedSession(
                             prepared.capability().name(), prepared.generation(), authentication, admittedRoot, action, completion);
         }
@@ -290,7 +312,7 @@ public class DefaultSkillTemplate implements SkillTemplate
     }
 
     record PreparedInput(SkillGeneration generation, CapabilityMetadata capability,
-            SkillInputValidationResult validation)
+            SkillInputValidationResult validation, SkillGenerationManager.OwnerLease lease)
     {
     }
 }

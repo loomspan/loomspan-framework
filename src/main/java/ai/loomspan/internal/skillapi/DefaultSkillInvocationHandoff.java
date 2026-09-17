@@ -44,15 +44,22 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
         {
             Authentication authentication = template.currentAuthentication();
             return new DefaultAdmittedSkillInvocation(
-                    skillName, prepared, authentication, lifecycle.admitRoot());
+                    skillName, prepared, authentication, lifecycle.admitRoot(prepared.lease()));
         }
         catch (AccessDeniedException | SkillException ex)
         {
+            prepared.lease().close();
             throw ex;
         }
         catch (RuntimeException ex)
         {
+            prepared.lease().close();
             throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+        }
+        catch (Error ex)
+        {
+            prepared.lease().close();
+            throw ex;
         }
     }
 

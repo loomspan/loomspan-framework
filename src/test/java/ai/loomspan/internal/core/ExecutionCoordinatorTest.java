@@ -55,6 +55,56 @@ class ExecutionCoordinatorTest {
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-03-15T12:00:00Z"), ZoneOffset.UTC);
 
     @Test
+    void failedMissionFrameOpenReleasesRetiredGeneration()
+    {
+        CapabilityMetadata rest = new CapabilityMetadata(
+                "rest:lookup", "restLookup", "REST lookup", SkillExecutionDescriptor.none(),
+                ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
+                arguments -> "unused", CapabilityKind.REST_SKILL,
+                CapabilityToolDescriptor.generic("restLookup", "REST lookup"), null);
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        registry.register(rest.name(), rest);
+        var generations = registry.manager();
+        var retired = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        generations.onGenerationRetired(retired::add);
+        var captured = generations.capture();
+        var lifecycle = new FrameworkExecutionLifecycle(new StaticApplicationContext(),
+                Duration.ofSeconds(1), Executors.newSingleThreadExecutor());
+        var root = lifecycle.admitRoot(captured.lease());
+        var session = new LoomspanSession("failed-frame", "restLookup", 3);
+        session.attachAdmittedRoot(root);
+        assertThat(root.claimExecution()).isTrue();
+        generations.activate(ai.loomspan.testkit.TestSkillGenerations.empty());
+        assertThat(retired).isEmpty();
+
+        ExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK)
+        {
+            @Override
+            public ExecutionFrame openMissionFrame(LoomspanSession session, String route,
+                    Map<String, Object> parameters)
+            {
+                throw new IllegalStateException("frame-open-failed");
+            }
+        };
+        ExecutionCoordinator coordinator = coordinator(new StubYamlSkillCatalog(), registry,
+                (currentSkillName, sessionState, authentication) -> List.of(),
+                (definition, mode) -> { throw new AssertionError("REST must not create a model interaction"); },
+                (value, currentSession) -> value, null, state, fixedPlanningService(state),
+                (currentSession, definition, objective, missionInput, model, tools, planning, authentication) -> {
+                    throw new AssertionError("REST must not enter a model execution engine");
+                }, null);
+
+        try
+        {
+            assertThatThrownBy(() -> coordinator.execute("restLookup", "lookup", session, null))
+                    .isInstanceOf(IllegalStateException.class).hasMessage("frame-open-failed");
+            root.completeExecution();
+            assertThat(retired).containsExactly(captured.generation().id());
+        }
+        finally { lifecycle.destroy(); }
+    }
+
+    @Test
     void executesRestOnTheDirectWorkerWithResolvedInputAndNoModelAttempt()
     {
         var resolved = new ByteArrayResource(new byte[] {1, 2, 3});

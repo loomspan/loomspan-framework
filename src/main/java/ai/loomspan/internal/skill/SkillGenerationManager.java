@@ -13,25 +13,37 @@ import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import ai.loomspan.internal.security.SkillAccessPolicy;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.HashMap;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 
 /** Prepares detached complete skill generations and atomically owns the active one. */
 public final class SkillGenerationManager implements SmartInitializingSingleton
 {
+    private static final Logger log = LoggerFactory.getLogger(SkillGenerationManager.class);
     private final SkillMethodBeanPostProcessor javaSkills;
     private final Supplier<YamlSkillCatalog> yamlCatalogFactory;
     private final SkillInputContractResolver inputs;
     private final ListableBeanFactory beans;
     private final AtomicReference<SkillGeneration> active = new AtomicReference<>();
+    private final Object generationMonitor = new Object();
+    private final Map<String, PublishedGeneration> published = new HashMap<>();
+    private final List<Registration> retirementListeners = new ArrayList<>();
+    private volatile BooleanSupplier deliveryEnabled = () -> true;
     // A counter guarantees no reuse within this manager; the namespace avoids coupling to another instance.
     private final String generationNamespace = UUID.randomUUID().toString();
     private final AtomicLong issuedGenerationIds = new AtomicLong();
@@ -128,8 +140,110 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
 
     public void activate(SkillGeneration candidate)
     {
-        active.set(Objects.requireNonNull(candidate, "candidate must not be null"));
+        dispatch(activateAndSelect(candidate));
     }
+
+    /** The caller dispatches the returned notification only after leaving publication locks. */
+    public Retirement activateAndSelect(SkillGeneration candidate)
+    {
+        Objects.requireNonNull(candidate, "candidate must not be null");
+        synchronized (generationMonitor)
+        {
+            SkillGeneration previous = active.getAndSet(candidate);
+            published.put(candidate.id(), new PublishedGeneration(candidate.id()));
+            if (previous == null) return null;
+            PublishedGeneration old = published.get(previous.id());
+            old.superseded = true;
+            return selectIfRetired(old);
+        }
+    }
+
+    public Capture capture()
+    {
+        active();
+        synchronized (generationMonitor)
+        {
+            SkillGeneration generation = active.get();
+            PublishedGeneration state = published.get(generation.id());
+            state.owners++;
+            return new Capture(generation, new OwnerLease(state));
+        }
+    }
+
+    public void deliveryEnabled(BooleanSupplier condition)
+    {
+        deliveryEnabled = Objects.requireNonNull(condition, "condition must not be null");
+    }
+
+    public AutoCloseable onGenerationRetired(Consumer<String> listener)
+    {
+        Objects.requireNonNull(listener, "listener must not be null");
+        Registration registration = new Registration(listener);
+        synchronized (generationMonitor) { retirementListeners.add(registration); }
+        return () -> {
+            if (registration.closed.compareAndSet(false, true))
+                synchronized (generationMonitor) { retirementListeners.remove(registration); }
+        };
+    }
+
+    private Retirement selectIfRetired(PublishedGeneration state)
+    {
+        if (!state.superseded || state.owners != 0) return null;
+        published.remove(state.id);
+        if (!deliveryEnabled.getAsBoolean()) return null;
+        return new Retirement(state.id, retirementListeners.stream().map(entry -> entry.listener).toList());
+    }
+
+    public static void dispatch(Retirement retirement)
+    {
+        if (retirement == null) return;
+        for (Consumer<String> listener : retirement.listeners)
+        {
+            try { listener.accept(retirement.id); }
+            catch (Throwable failure) { log.warn("Skill generation retirement listener failed for {}", retirement.id, failure); }
+        }
+    }
+
+    private static final class PublishedGeneration
+    {
+        private final String id;
+        private int owners;
+        private boolean superseded;
+
+        private PublishedGeneration(String id) { this.id = id; }
+    }
+
+    private static final class Registration
+    {
+        private final Consumer<String> listener;
+        private final AtomicBoolean closed = new AtomicBoolean();
+
+        private Registration(Consumer<String> listener) { this.listener = listener; }
+    }
+
+    public record Capture(SkillGeneration generation, OwnerLease lease) {}
+
+    public final class OwnerLease implements AutoCloseable
+    {
+        private final PublishedGeneration state;
+        private final AtomicBoolean closed = new AtomicBoolean();
+
+        private OwnerLease(PublishedGeneration state) { this.state = state; }
+
+        @Override public void close()
+        {
+            if (!closed.compareAndSet(false, true)) return;
+            Retirement retirement;
+            synchronized (generationMonitor)
+            {
+                state.owners--;
+                retirement = selectIfRetired(state);
+            }
+            dispatch(retirement);
+        }
+    }
+
+    public record Retirement(String id, List<Consumer<String>> listeners) {}
 
     private synchronized void initializeFixedDependencies()
     {

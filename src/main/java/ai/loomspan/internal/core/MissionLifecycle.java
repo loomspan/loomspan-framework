@@ -48,6 +48,36 @@ public final class MissionLifecycle
     private boolean owningReturned;
     private @Nullable Cutoff cutoff;
     private boolean cleanupClaimed;
+    private @Nullable Runnable physicalCompletion;
+    private boolean physicalCompletionSent;
+
+    void onPhysicalCompletion(Runnable action)
+    {
+        Runnable ready;
+        lock.lock();
+        try
+        {
+            physicalCompletion = Objects.requireNonNull(action, "action must not be null");
+            ready = takePhysicalCompletionLocked();
+        }
+        finally { lock.unlock(); }
+        if (ready != null) ready.run();
+    }
+
+    boolean physicallyComplete()
+    {
+        lock.lock();
+        try { return state == State.CLOSED && allPhysicalWorkReturnedLocked(); }
+        finally { lock.unlock(); }
+    }
+
+    private @Nullable Runnable takePhysicalCompletionLocked()
+    {
+        if (physicalCompletionSent || physicalCompletion == null || state != State.CLOSED
+                || !allPhysicalWorkReturnedLocked()) return null;
+        physicalCompletionSent = true;
+        return physicalCompletion;
+    }
 
     MissionLifecycle(MissionContext mission)
     {
@@ -93,13 +123,16 @@ public final class MissionLifecycle
 
     public void owningReturned()
     {
+        Runnable ready;
         lock.lock();
         try
         {
             owningReturned = true;
             changed.signalAll();
+            ready = takePhysicalCompletionLocked();
         }
         finally { lock.unlock(); }
+        if (ready != null) ready.run();
     }
 
     public List<AdmittedTask> admitUnit(ExecutionBinding binding, List<AssignedTaskExecution> assignments,
@@ -171,13 +204,16 @@ public final class MissionLifecycle
 
     public void taskReturned(AdmittedTask task)
     {
+        Runnable ready;
         lock.lock();
         try
         {
             requireOwned(task).returned = true;
             changed.signalAll();
+            ready = takePhysicalCompletionLocked();
         }
         finally { lock.unlock(); }
+        if (ready != null) ready.run();
     }
 
     public PrimaryCancellation beginCancellation(ExecutionBinding binding, Throwable cause, Supplier<String> failureRecorder)
@@ -232,21 +268,30 @@ public final class MissionLifecycle
     /** Close immediately for normal completion or rejected submission with no started work. */
     public Cutoff closeNow()
     {
+        Cutoff result;
+        Runnable ready;
         lock.lock();
-        try { return closeLocked(); }
+        try
+        {
+            result = closeLocked();
+            ready = takePhysicalCompletionLocked();
+        }
         finally { lock.unlock(); }
+        if (ready != null) ready.run();
+        return result;
     }
 
     /** Waits uninterruptibly using only the first cancellation signal's remaining grace. */
     public Cutoff awaitCutoff()
     {
         boolean interrupted = false;
+        Cutoff result;
+        Runnable ready;
         lock.lock();
         try
         {
-            if (cutoff != null) return cutoff;
-            if (state == State.OPEN) return closeLocked();
-            while (!allPhysicalWorkReturnedLocked())
+            if (cutoff == null && state == State.OPEN) closeLocked();
+            while (cutoff == null && !allPhysicalWorkReturnedLocked())
             {
                 long remaining = Math.min(deadlineNanos, frameworkDeadlineNanos) - nanoTime.getAsLong();
                 if (remaining <= 0) break;
@@ -256,13 +301,16 @@ public final class MissionLifecycle
                 try { changed.awaitNanos(Math.min(remaining, FRAMEWORK_DEADLINE_RECHECK_NANOS)); }
                 catch (InterruptedException ex) { interrupted = true; }
             }
-            return closeLocked();
+            result = closeLocked();
+            ready = takePhysicalCompletionLocked();
         }
         finally
         {
             lock.unlock();
             if (interrupted) Thread.currentThread().interrupt();
         }
+        if (ready != null) ready.run();
+        return result;
     }
 
     public Optional<PrimaryCancellation> primaryCancellation()

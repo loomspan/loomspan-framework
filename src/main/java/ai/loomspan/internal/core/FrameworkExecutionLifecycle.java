@@ -54,15 +54,22 @@ public final class FrameworkExecutionLifecycle
 
     public AdmittedRoot admitRoot()
     {
+        return admitRoot(null);
+    }
+
+    public AdmittedRoot admitRoot(AutoCloseable generationOwner)
+    {
         synchronized (monitor)
         {
             if (admissionClosed.get())
                 throw new RejectedExecutionException("Loomspan framework is shutting down; new root work is not accepted");
-            AdmittedRoot root = new AdmittedRoot(this);
+            AdmittedRoot root = new AdmittedRoot(this, generationOwner);
             activeRoots.add(root);
             return root;
         }
     }
+
+    public boolean isAdmissionOpen() { return !admissionClosed.get(); }
 
     /** Executes a short publication action under the same monitor as shutdown admission closure. */
     public void whileAdmissionOpen(Runnable action)
@@ -101,6 +108,7 @@ public final class FrameworkExecutionLifecycle
             monitor.notifyAll();
         }
         if (pendingTermination != null) pendingTermination.run();
+        root.releaseGenerationIfSafe();
     }
 
     private void onPendingTermination(AdmittedRoot root, Runnable action)
@@ -123,6 +131,7 @@ public final class FrameworkExecutionLifecycle
             activeRoots.remove(root);
             monitor.notifyAll();
         }
+        root.releaseGenerationIfSafe();
     }
 
     /** Closes admission and establishes the deadline exactly once; it never waits. */
@@ -255,6 +264,7 @@ public final class FrameworkExecutionLifecycle
                 monitor.notifyAll();
             }
             pendingTerminations.forEach(Runnable::run);
+            for (AdmittedRoot root : roots) root.releaseGenerationIfSafe();
             for (AdmittedRoot root : roots) root.signalCutoff(deadline);
         }
         executor.shutdownNow();
@@ -297,17 +307,24 @@ public final class FrameworkExecutionLifecycle
     public static final class AdmittedRoot implements AutoCloseable
     {
         private final FrameworkExecutionLifecycle owner;
+        private final AutoCloseable generationOwner;
         private final Set<MissionLifecycle> missions = ConcurrentHashMap.newKeySet();
         private final AtomicBoolean cutOff = new AtomicBoolean();
         private volatile long cutoffDeadlineNanos = Long.MAX_VALUE;
-        private RootState state = RootState.PENDING;
+        private volatile RootState state = RootState.PENDING;
         private Runnable pendingTermination;
+        private boolean generationReleased;
 
-        private AdmittedRoot(FrameworkExecutionLifecycle owner) { this.owner = owner; }
+        private AdmittedRoot(FrameworkExecutionLifecycle owner, AutoCloseable generationOwner)
+        {
+            this.owner = owner;
+            this.generationOwner = generationOwner;
+        }
 
         synchronized void register(MissionLifecycle mission)
         {
             missions.add(mission);
+            mission.onPhysicalCompletion(this::releaseGenerationIfSafe);
             mission.frameworkDeadline(cutoffDeadlineNanos);
             if (cutOff.get()) mission.frameworkCutoff(cutoffDeadlineNanos);
         }
@@ -318,6 +335,21 @@ public final class FrameworkExecutionLifecycle
         public boolean claimExecution() { return owner.claim(this); }
 
         public void completeExecution() { owner.completeExecution(this); }
+
+        private void releaseGenerationIfSafe()
+        {
+            AutoCloseable releasing;
+            synchronized (this)
+            {
+                if (generationReleased || generationOwner == null || state == RootState.PENDING
+                        || state == RootState.EXECUTING
+                        || missions.stream().anyMatch(mission -> !mission.physicallyComplete())) return;
+                generationReleased = true;
+                releasing = generationOwner;
+            }
+            try { releasing.close(); }
+            catch (Exception ex) { throw new IllegalStateException("Generation ownership release failed", ex); }
+        }
 
         /** Registers cleanup owned by a pending handoff; runs on release or shutdown cutoff. */
         public void onPendingTermination(Runnable action)

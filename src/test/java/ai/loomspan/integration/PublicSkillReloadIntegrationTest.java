@@ -24,12 +24,70 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PublicSkillReloadIntegrationTest
 {
+    @Test
+    void retirementWaitsForPendingOldGenerationThenCleansUpAfterRelease(@TempDir Path directory)
+    {
+        String yaml = "name: leaf\ndescription: REST leaf\nrest: true\n";
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(
+                        ConfigurationPropertiesAutoConfiguration.class,
+                        ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
+                        LoomspanAutoConfiguration.class,
+                        ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
+                .withUserConfiguration(RestConfiguration.class)
+                .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    SkillReloader reloader = context.getBean(SkillReloader.class);
+                    SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
+                    List<String> retired = new CopyOnWriteArrayList<>();
+                    try (AutoCloseable registration = reloader.onGenerationRetired(id -> {
+                        retired.add(id);
+                        RestConfiguration.config.remove(id);
+                    }))
+                    {
+                        String initial = reloader.snapshot().generationId();
+                        RestConfiguration.config.put(initial, "initial");
+                        PreparedSkillUpdate first = reloader.prepare(List.of(new SkillDocument("A", yaml)));
+                        RestConfiguration.config.put(first.generationId(), "A");
+                        reloader.publish(first);
+                        assertThat(retired).containsExactly(initial);
+                        var pending = handoff.handoff("leaf", Map.of("message", "old"));
+                        PreparedSkillUpdate second = reloader.prepare(List.of(new SkillDocument("B", yaml)));
+                        RestConfiguration.config.put(second.generationId(), "B");
+                        reloader.publish(second);
+                        assertThat(retired).doesNotContain(first.generationId());
+                        assertThat(RestConfiguration.config).containsKey(first.generationId());
+                        pending.release();
+                        assertThat(retired).containsExactly(initial, first.generationId());
+                        assertThat(RestConfiguration.config).containsKey(second.generationId());
+                        var invokedPending = handoff.handoff("leaf", Map.of("message", "older"));
+                        PreparedSkillUpdate third = reloader.prepare(List.of(new SkillDocument("C", yaml)));
+                        RestConfiguration.config.put(third.generationId(), "C");
+                        reloader.publish(third);
+                        assertThat(retired).doesNotContain(second.generationId());
+                        assertThat(invokedPending.invoke()).isEqualTo("B:older");
+                        assertThat(retired).containsExactly(initial, first.generationId(), second.generationId());
+                        assertThat(RestConfiguration.config).containsKey(third.generationId());
+                        var failingPending = handoff.handoff("leaf", Map.of("message", "fail"));
+                        PreparedSkillUpdate fourth = reloader.prepare(List.of(new SkillDocument("D", yaml)));
+                        RestConfiguration.config.put(fourth.generationId(), "D");
+                        reloader.publish(fourth);
+                        assertThatThrownBy(failingPending::invoke).isInstanceOf(ai.loomspan.api.SkillException.class);
+                        assertThat(retired).containsExactly(initial, first.generationId(),
+                                second.generationId(), third.generationId());
+                    }
+                });
+        RestConfiguration.config.clear();
+    }
+
     @Test
     void invokesSuppliedModelSkillThroughSupportedApi(@TempDir Path directory) throws Exception
     {
@@ -245,7 +303,11 @@ class PublicSkillReloadIntegrationTest
         @Bean
         RestSkillHandler handler()
         {
-            return invocation -> config.get(invocation.generationId()) + ":" + invocation.input().get("message");
+            return invocation -> {
+                if ("fail".equals(invocation.input().get("message")))
+                    throw new IllegalStateException("handler failed");
+                return config.get(invocation.generationId()) + ":" + invocation.input().get("message");
+            };
         }
     }
 }
