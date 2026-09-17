@@ -162,7 +162,7 @@ class ConsoleRestFixtureCorpusTest
         result.put("skill-java-detail.json", new ObservabilityDtos.SkillDetail(
                 "LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", null));
         result.put("skill-rest-detail.json", new ObservabilityDtos.SkillDetail(
-                "FetchDns", "REST", "classpath:/skills/fetch-dns.yaml", null, null,
+                "FetchDns", "REST", "opaque label", null, null,
                 "# REST DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application handler\r\nrest: true\r\n"));
         result.put("active-executions-page.json",
                 new ObservabilityDtos.ActivePage(List.of(active), false, null, OBSERVED, "9"));

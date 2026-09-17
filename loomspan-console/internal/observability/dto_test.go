@@ -56,8 +56,11 @@ func TestRestSkillDetailDecodesFromFixture(t *testing.T) {
 	if err := json.Unmarshal(readFixture(t, "skill-rest-detail.json"), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.Source != "REST" || detail.SourcePath == "" || !strings.Contains(detail.Yaml, "rest: true") {
+	if detail.Source != "REST" || detail.SourcePath != "opaque label" || !strings.Contains(detail.Yaml, "rest: true") {
 		t.Fatalf("unexpected REST detail: %#v", detail)
+	}
+	if err := validateSkillDetail(detail, "FetchDns"); err != nil {
+		t.Fatal(err)
 	}
 }
 

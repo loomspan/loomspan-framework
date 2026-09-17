@@ -98,15 +98,17 @@ test("skill detail sourcePath is not a clickable link", async () => {
   vi.mocked(getSkillDetail).mockResolvedValue({
     targetScopeId: "scope-1",
     registeredName: "CheckDns",
-    source: "YAML", sourcePath: "/skills/check_dns.yaml",
+    source: "YAML", sourcePath: "opaque <label>",
     yaml: "name: CheckDns",
   });
   render(<SkillDetailView />);
   await vi.waitFor(() => {
-    expect(screen.getByText("/skills/check_dns.yaml")).toBeInTheDocument();
+    expect(screen.getByText("opaque <label>")).toBeInTheDocument();
   });
-  const sourcePathElement = screen.getByText("/skills/check_dns.yaml");
+  const sourcePathElement = screen.getByText("opaque <label>");
   expect(sourcePathElement.tagName).not.toBe("A");
+  expect(sourcePathElement.innerHTML).not.toContain("<label>");
+  expect(screen.getByText("Source label")).toBeInTheDocument();
 });
 
 test("REST skill detail shows distinct label, path, and unchanged manifest", async () => {
@@ -135,5 +137,5 @@ test("Java skill details show bean and declared method without YAML content", as
   expect(screen.getByText("example.Dns.lookup()").closest("div")).toHaveClass("skill-detail-method");
   expect(screen.getByText("example.Dns.lookup()").closest("dl")).toHaveClass("java-skill-detail-facts");
   expect(screen.queryByText("Skill YAML")).not.toBeInTheDocument();
-  expect(screen.queryByText("Source path")).not.toBeInTheDocument();
+  expect(screen.queryByText("Source label")).not.toBeInTheDocument();
 });

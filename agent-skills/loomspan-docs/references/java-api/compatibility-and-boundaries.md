@@ -9,7 +9,7 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the eighteen types in the closed
+Application code MAY depend on the nineteen types in the closed
 `ai.loomspan.api` allowlist:
 
 | Type | Supported purpose |
@@ -18,6 +18,7 @@ Application code MAY depend on the eighteen types in the closed
 | `SkillInvocationHandoff` | Atomically transfer a prepared root invocation to framework ownership |
 | `AdmittedSkillInvocation` | Execute once or release an already-admitted root invocation |
 | `SkillReloader` | Prepare, publish, or snapshot a complete skill generation |
+| `SkillDocument` | Supply one in-memory YAML document and a diagnostic source label |
 | `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog before publication |
 | `SkillCatalog` | Discover an immutable startup, prepared-candidate, or current snapshot of registered skills |
 | `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
@@ -47,6 +48,14 @@ of `SkillCatalog` and direct two-argument `RestSkillInvocation` construction
 must be updated and recompiled; there is no compatibility method or constructor.
 The ID is process-local and supplied by Loomspan for handler calls, not inferred
 from business input or the current active catalog. See [two-stage skill updates](skill-reload.md).
+
+`SkillDocument` and `SkillReloader.prepare(Collection<SkillDocument>)` add an
+application-supplied complete YAML set. The no-argument method and configured
+startup remain. The new overload is abstract: application implementations of
+`SkillReloader` must implement it when recompiling. This does not create a
+supported bean-replacement SPI. Supplied source names are arbitrary diagnostic
+labels in the existing `sourcePath` inspection field; the JSON shape and exact
+framework/Console version check are unchanged.
 
 The handoff facade and handle are additive and leave every `SkillTemplate`
 signature unchanged. The three catalog types are additive. The two `SkillTemplate.validate`
@@ -102,7 +111,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the `api` package has exactly the eighteen allowlisted public top-level types;
+- the `api` package has exactly the nineteen allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

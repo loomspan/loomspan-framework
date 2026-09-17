@@ -33,6 +33,10 @@ public final class SkillSourcePathResolver
     public String resolve(YamlSkillSource source)
     {
         Objects.requireNonNull(source, "source must not be null");
+        if (source.suppliedLabel() != null)
+        {
+            return source.suppliedLabel();
+        }
         String location = source.locationPattern();
         int patternIndex = firstPatternIndex(location);
         if (patternIndex < 0)

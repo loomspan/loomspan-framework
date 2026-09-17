@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
@@ -16,6 +17,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SkillSourcePathResolverTest
 {
+    @ParameterizedTest
+    @ValueSource(strings = {"opaque label", "support/triage.yaml", "scheme:value <untrusted>"})
+    void suppliedLabelIsReturnedVerbatimWithoutPathInterpretation(String label)
+    {
+        YamlSkillSource source = new YamlSkillSource(new ByteArrayResource(new byte[0], label),
+                new byte[0], label);
+        assertThat(new SkillSourcePathResolver().resolve(source)).isEqualTo(label);
+    }
+
     @TempDir
     Path tempDir;
 

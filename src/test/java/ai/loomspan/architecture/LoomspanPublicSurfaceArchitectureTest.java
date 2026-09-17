@@ -37,6 +37,7 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.api.SkillException",
             "ai.loomspan.api.SkillReloadException",
             "ai.loomspan.api.SkillReloader",
+            "ai.loomspan.api.SkillDocument",
             "ai.loomspan.api.PreparedSkillUpdate",
             "ai.loomspan.api.SkillInputValidationException",
             "ai.loomspan.api.SkillInputValidationIssue",
@@ -288,7 +289,7 @@ class LoomspanPublicSurfaceArchitectureTest
             .collect(Collectors.toSet());
 
     @Test
-    void apiPackageContainsExactlyFifteenApprovedPublicTypes()
+    void apiPackageContainsExactlyNineteenApprovedPublicTypes()
     {
         assertThat(publicTopLevelTypesIn("ai.loomspan.api"))
                 .containsExactlyInAnyOrderElementsOf(API_TYPES);

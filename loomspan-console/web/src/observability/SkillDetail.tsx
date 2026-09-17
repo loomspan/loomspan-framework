@@ -73,7 +73,7 @@ export function SkillDetailView() {
               <div><dt>Bean</dt><dd><code>{detail.beanName}</code></dd></div>
               <div className="skill-detail-method"><dt>Method</dt><dd><code>{formatJavaSkillMethod(detail.method)}</code></dd></div>
             </> : <div>
-              <dt>Source path</dt>
+              <dt>Source label</dt>
               <dd><code className="source-path">{detail.sourcePath}</code></dd>
             </div>}
           </dl>

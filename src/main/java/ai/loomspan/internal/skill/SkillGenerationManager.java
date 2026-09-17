@@ -2,6 +2,7 @@ package ai.loomspan.internal.skill;
 
 import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.RestSkillInvocation;
+import ai.loomspan.api.SkillDocument;
 import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
@@ -70,11 +71,24 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
     public SkillGeneration prepare()
     {
         initializeFixedDependencies();
+        YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
+        catalog.afterPropertiesSet();
+        return prepareCatalog(catalog);
+    }
+
+    public SkillGeneration prepare(List<SkillDocument> documents)
+    {
+        initializeFixedDependencies();
+        YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
+        catalog.loadSupplied(documents);
+        return prepareCatalog(catalog);
+    }
+
+    private SkillGeneration prepareCatalog(YamlSkillCatalog catalog)
+    {
         long ordinal = issuedGenerationIds.incrementAndGet();
         if (ordinal <= 0) throw new IllegalStateException("Skill generation ID space exhausted");
         String generationId = generationNamespace + "-" + ordinal;
-        YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
-        catalog.afterPropertiesSet();
         List<YamlSkillDefinition> definitions = catalog.getSkills();
         LinkedHashMap<String, CapabilityMetadata> capabilities = new LinkedHashMap<>();
         for (CapabilityMetadata metadata : fixedJavaCapabilities) putCapability(capabilities, metadata);
@@ -91,7 +105,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
             boolean rest = definition.rest();
             RestSkillHandler handler = restHandler;
             CapabilityMetadata metadata = new CapabilityMetadata(
-                    (rest ? "rest:" : "yaml:") + definition.resource().getDescription(),
+                    (rest ? "rest:" : "yaml:") + definition.source().diagnosticName(),
                     name, description,
                     rest ? SkillExecutionDescriptor.none()
                             : SkillExecutionDescriptor.from(definition.requireExecutionConfiguration()),
@@ -100,14 +114,14 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
                             : arguments -> { throw new IllegalStateException("YAML skills require model execution"); },
                     rest ? CapabilityKind.REST_SKILL : CapabilityKind.YAML_SKILL,
                     new CapabilityToolDescriptor(name, description, inputs.toJsonSchema(contract)),
-                    contract, new SkillSource(definition.resource().getDescription(), null, null));
+                    contract, new SkillSource(definition.source().diagnosticName(), null, null));
             putCapability(capabilities, metadata);
         }
         for (YamlSkillDefinition definition : definitions)
             for (String child : definition.allowedSkills())
                 if (!capabilities.containsKey(child))
                     throw new IllegalStateException("Unknown child skill '" + child + "' in allowed_skills of '"
-                            + definition.manifest().getName() + "' at " + definition.resource().getDescription());
+                            + definition.manifest().getName() + "' at " + definition.source().diagnosticName());
 
         return new SkillGeneration(generationId, capabilities, definitionsByName);
     }
@@ -130,7 +144,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
     {
         if (fixedRestHandlerBeanNames.isEmpty())
         {
-            String resources = definitions.stream().map(definition -> definition.resource().getDescription())
+            String resources = definitions.stream().map(definition -> definition.source().diagnosticName())
                     .sorted().reduce((left, right) -> left + ", " + right).orElseThrow();
             throw new IllegalStateException("REST skill manifests require exactly one RestSkillHandler bean; found none for " + resources);
         }

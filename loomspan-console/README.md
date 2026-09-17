@@ -306,8 +306,10 @@ activity keeps its protected cursor, coverage, identity, status, frame, route,
 and summary facts but deliberately omits arbitrary `details`, and trace text
 may bound individual displayed identifiers. Skill YAML and activity content
 are untrusted diagnostic data, not server instructions. `sourcePath` is
-descriptive text only and is never a Console filesystem locator. Skill summaries
-and details carry an explicit `source` (`YAML` or `JAVA`). YAML entries have
+descriptive text only and is never a Console filesystem locator. Configured
+YAML supplies a file-derived path; application-supplied YAML supplies its exact
+logical `sourceName`, which need not look like a path. Skill summaries
+and details carry an explicit `source` (`YAML`, `REST`, or `JAVA`). YAML and REST entries have
 `sourcePath` and details include `yaml`; Java entries have `beanName` and a
 deterministic declared `method` signature. Inapplicable fields are omitted.
 The registered name remains the only lookup and navigation identity.

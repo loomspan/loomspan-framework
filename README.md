@@ -186,7 +186,7 @@ try {
 
 Authentication must be installed before `handoff`; execution authorizes with that captured identity and restores the worker's prior security context. Exactly one execution, release, or framework cutoff wins. Mission timeout accounting begins when ordinary mission work is submitted, while the single framework shutdown deadline may already be running; a pending handle may start within its remainder and is invalidated at cutoff. Observer delivery remains inside root ownership.
 
-The supported starter Java API is closed to these eighteen types in `ai.loomspan.api`: `SkillTemplate`, `SkillInvocationHandoff`, `AdmittedSkillInvocation`, `SkillReloader`, `PreparedSkillUpdate`, `SkillCatalog`, `SkillDescriptor`, `SkillKind`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `RestSkillHandler`, `RestSkillInvocation`, `SkillException`, `SkillReloadException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. `RestSkillHandler` is the sole supported SPI; it does not make any framework bean replaceable. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API.
+The supported starter Java API is closed to these nineteen types in `ai.loomspan.api`: `SkillTemplate`, `SkillInvocationHandoff`, `AdmittedSkillInvocation`, `SkillReloader`, `SkillDocument`, `PreparedSkillUpdate`, `SkillCatalog`, `SkillDescriptor`, `SkillKind`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `RestSkillHandler`, `RestSkillInvocation`, `SkillException`, `SkillReloadException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. `RestSkillHandler` is the sole supported SPI; it does not make any framework bean replaceable. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API.
 
 The installable [Java API knowledge set](agent-skills/loomspan-docs/references/java-api/README.md)
 provides LLM-oriented routing and source-verified guidance for this surface.
@@ -214,6 +214,18 @@ SkillCatalog current = reloader.snapshot(); // current.generationId() == candida
 ```
 
 `prepare()` synchronously reads and validates the complete YAML set against fixed Java declarations, model connections, and handler beans, then freezes it without activation. The application must finish file publication and prevent writes until prepare returns; Loomspan does not provide a multi-file transaction. Changes or deletion after prepare do not alter that candidate. Every successful prepare gets a fresh process-local ID, even for identical YAML; an empty YAML set deletes all YAML skills while retaining Java declarations. `publish` does not reread files. It rejects foreign, stale, repeated, or shutdown-time candidates with `SkillReloadException`; failed preparation leaves the active generation unchanged. A stale candidate must be prepared afresh. `snapshot()` performs no filesystem reads, and old catalog objects stay unchanged. Publication is not a safe-deletion signal: the application must retain configuration for any admitted or running old work and choose its own cleanup policy. Loomspan exposes no historical invocation or external-artifact retirement API.
+
+Applications that hold YAML in memory can prepare the complete replacement set with `reloader.prepare(Collection<SkillDocument>)`. Each `SkillDocument(sourceName, yaml)` has a nonblank, exact-unique source name and non-null YAML text. The source name is an arbitrary diagnostic label, not a file location or the callable skill name; YAML `name` remains the exact invocation identity. Preparation copies the collection, validates every document through the same manifest rules as configured files, and freezes its UTF-8 YAML. An empty collection removes all YAML and REST declarations while retaining fixed Java skills. A later no-argument `prepare()` still reads the configured locations. The overload does not read the supplied labels as paths or write files.
+
+On restart, the application can load its own durable `List<SkillDocument>`, let Loomspan start normally from configured locations, then call `prepare(savedDocuments)`, stage REST configuration under the new candidate ID, and publish before opening its traffic gate. Generation IDs are process-local; durable snapshots and readiness sequencing belong to the application. Loomspan intentionally has no startup loading switch, deferred activation mode, or framework traffic gate.
+
+```java
+List<SkillDocument> savedDocuments = snapshotStore.loadDocuments();
+PreparedSkillUpdate restored = reloader.prepare(savedDocuments);
+configurationStore.stage(restored.generationId(), snapshotStore.loadRestConfiguration());
+reloader.publish(restored);
+trafficGate.open();
+```
 
 For integration testing, configure a real or local protocol-compatible named connection and invoke the YAML skill through `SkillTemplate`. Loomspan's supported-surface integration test follows this pattern: it supplies a local OpenAI-compatible endpoint through `loomspan.connections`, invokes an LLM-backed YAML skill that calls both an annotation-defined Java leaf and an application-handled REST leaf, directly invokes the REST leaf, and observes only public API values. Tests should not replace internal resolvers, coordinators, model factories, registries, or virtual-file-system beans.
 
@@ -487,7 +499,7 @@ If any REST manifests exist, startup requires exactly one application `RestSkill
 
 The handler receives one `RestSkillInvocation` containing `skillName()`, `input()`, and the trusted captured `generationId()` after input validation and reference resolution. Its map/list containers are recursively copied into immutable snapshots; null values and non-container leaf identity are preserved, including resolved Spring `Resource` handles, but bytes behind a `Resource` are outside the immutability promise. Caller authentication is scoped through `SecurityContextHolder` on the actual handler thread and the previous context is restored; identity and session data are not SPI arguments. The handler is called once. A null result fails, an empty string succeeds, `AccessDeniedException` and existing `SkillException` failures retain their facade behavior, other runtime failures become safe `SkillException` failures, and JVM `Error` is not caught. Unlike annotation-defined Java skill failures, REST failures do not use the Java exception-to-text adapter.
 
-REST input, result, error, and observation data receive no new comprehensive sanitization guarantee. Console identifies these declarations as `REST` and shows their YAML resource path/text under the exact matching framework/Console version policy.
+REST input, result, error, and observation data receive no new comprehensive sanitization guarantee. Console identifies these declarations as `REST` and shows their source label and YAML text under the exact matching framework/Console version policy. Configured files produce descriptive paths; supplied documents produce their logical labels.
 
 ### Annotation-defined Java skills
 
@@ -532,7 +544,7 @@ Use Spring's `EnableMethodSecurity` and `jakarta.annotation.security` annotation
 
 Class/method/interface policy resolution follows Spring's unique annotation scanner. Missing or disabled JSR-250, unrelated proxies, and secured declarations without applicable advice fail startup. Caller authentication is propagated to the Java proxy in a fresh context and the exact previous context is restored after success or failure. Local allowlists remain mandatory even for `@PermitAll`, and Spring denials cannot become successful tool text. See [authorization](agent-skills/loomspan-docs/references/skill-authoring/authorization.md) for precise inheritance rules and scope boundaries.
 
-Console displays the declared source as YAML, REST, or Java. YAML and REST details contain resource path and YAML text; Java details contain bean and declared method. Links and pagination use the registered skill name.
+Console displays the declared source as YAML, REST, or Java. YAML and REST details contain a descriptive source label and YAML text; Java details contain bean and declared method. File-derived labels are paths; application-supplied labels are arbitrary text. Links and pagination use the registered skill name.
 
 ## Operations and limits
 

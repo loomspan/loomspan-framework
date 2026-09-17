@@ -41,7 +41,7 @@ YAML `rbac_roles` applies normally. The captured caller authentication is instal
 
 When REST manifests exist, the application MUST provide exactly one `RestSkillHandler` bean. See [REST handler SPI](../java-api/rest-skills.md). With no REST manifests, handler beans are unused and do not trigger cardinality validation.
 
-Console lists the kind as `REST` and shows the YAML resource path and unchanged manifest text. It does not reveal handler internals or infer an endpoint. Framework and Console diagnostics require the exact coordinated project version; dual `development` versions only attempt ordinary complete validation.
+Console lists the kind as `REST` and shows the source label and unchanged manifest text. For configured YAML, the label is derived from the resource path; for application-supplied YAML, it is the exact `SkillDocument.sourceName` and may be arbitrary nonblank text. The label is diagnostic only; manifest `name` remains the callable identity. The inspection wire field remains `sourcePath`. Console does not reveal handler internals or infer an endpoint. Framework and Console diagnostics require the exact coordinated project version; dual `development` versions only attempt ordinary complete validation.
 
 ## Evidence
 

@@ -30,7 +30,7 @@ Use the exact name in `SkillTemplate`, `allowed_skills`, plan targets, evidence 
 
 Each root invocation captures one immutable, complete declaration generation before input conversion or validation. Its input contracts, definitions, local child surface, policies, and execution settings remain coherent for the full nested and parallel invocation tree. An application can prepare and publish a complete new generation through the public `SkillReloader`; publication affects only roots captured afterward, not running or admitted work. Skill YAML syntax does not change. There is no historical-invocation or retirement API; see [two-stage application updates](../java-api/skill-reload.md).
 
-Bean names, source paths, and declared method signatures are diagnostic locations, never a second callable identity. Any YAML `mapping` key, including null, empty, or scalar forms, is rejected with annotation-only guidance.
+Bean names, YAML source labels, and declared method signatures are diagnostic locations, never a second callable identity. File-loaded YAML has a file-derived label; application-supplied `SkillDocument` YAML has its exact arbitrary `sourceName` label, which need not resemble a path or have an extension. Neither changes manifest `name` or `allowed_skills` resolution. The inspection wire field remains named `sourcePath`. Any YAML `mapping` key, including null, empty, or scalar forms, is rejected with annotation-only guidance.
 
 ## Capability types
 
@@ -63,7 +63,7 @@ Optional primitive parameters are invalid because omission binds null; use refer
 
 Java roots and children participate in the common skill mission lifecycle. Java executes without a framework model request and shares bounded mission timeout, interruption, and late-write cutoff handling. A successful child contributes its exact name at the parent tool boundary; a denial or failure contributes no success. The parent mission resumes on every exit.
 
-Console's catalog shows `YAML`, `REST`, or `Java` explicitly. YAML and REST details show the source resource and original YAML; Java details show the bean and deterministic declared method signature. Pagination and links use only the registered name.
+Console's catalog shows `YAML`, `REST`, or `Java` explicitly. YAML and REST details show the source label and original YAML; Java details show the bean and deterministic declared method signature. Pagination and links use only the registered name.
 
 ## Root, Planner, Specialist, and Leaf Are Roles
 

@@ -3,6 +3,8 @@ package ai.loomspan.internal.skill;
 import ai.loomspan.autoconfigure.LoomspanAutoConfiguration;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.api.SkillMethod;
+import ai.loomspan.api.SkillDocument;
+import ai.loomspan.autoconfigure.LoomspanProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -30,6 +32,48 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(OutputCaptureExtension.class)
 class YamlSkillCatalogTests {
+
+    @Test
+    void suppliedDocumentsValidateIdentityAndReuseManifestRules() {
+        String valid = "name: one\ndescription: REST one\nrest: true\nrbac_roles: [READER]\n";
+        YamlSkillCatalog catalog = new YamlSkillCatalog(new LoomspanProperties());
+        catalog.loadSupplied(List.of(new SkillDocument("opaque label", valid),
+                new SkillDocument("SCHEME:untrusted", valid.replace("one", "two"))));
+        assertThat(catalog.getSkills()).extracting(definition -> definition.source().suppliedLabel())
+                .containsExactly("opaque label", "SCHEME:untrusted");
+        assertThat(catalog.getSkill("one").source().bytes()).isEqualTo(valid.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(catalog.getSkill("one").rbacRoles()).containsExactly("READER");
+
+        assertThatThrownBy(() -> catalog.loadSupplied(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> catalog.loadSupplied(java.util.Arrays.asList((SkillDocument) null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("null");
+        assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument(null, valid))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("sourceName");
+        assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("  ", valid))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("sourceName");
+        assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("label", null))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("yaml");
+        assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("same", valid),
+                new SkillDocument("same", valid.replace("one", "two")))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("duplicate");
+        assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("first", valid),
+                new SkillDocument("second", valid))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("duplicate skill name");
+        assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("opaque label", "invalid: ["))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("opaque label");
+        assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("rest source", valid + "model: model\n"))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("rest source")
+                .hasMessageContaining("field 'model'");
+        assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("model source", """
+                name: modelSkill
+                description: Model skill
+                model: missing
+                """))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("model source")
+                .hasMessageContaining("unknown model");
+        catalog.loadSupplied(List.of(new SkillDocument("corrected", valid)));
+        assertThat(catalog.getSkill("one")).isNotNull();
+    }
 
     @TempDir
     Path temporaryManifests;

@@ -3,6 +3,7 @@ package ai.loomspan.internal.skill;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.api.RestSkillHandler;
+import ai.loomspan.api.SkillDocument;
 import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
@@ -34,6 +35,45 @@ import static org.mockito.Mockito.when;
 
 class SkillGenerationManagerTest
 {
+    @Test
+    void suppliedSetIsFrozenAndCanAlternateWithConfiguredDiscovery(@TempDir Path directory) throws Exception
+    {
+        String configuredYaml = "name: configured\ndescription: configured\nmodel: model\n";
+        Path file = directory.resolve("configured.yaml");
+        Files.writeString(file, configuredYaml);
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));
+        SkillGenerationManager manager = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
+        String suppliedYaml = "name: supplied\ndescription: supplied\nmodel: model\n";
+        java.util.ArrayList<SkillDocument> caller = new java.util.ArrayList<>();
+        caller.add(new SkillDocument("opaque label", suppliedYaml));
+        SkillGeneration supplied = manager.prepare(caller);
+        caller.clear();
+        Files.delete(file);
+        manager.activate(supplied);
+        assertThat(supplied.skillCatalog().skill("supplied")).isPresent();
+        assertThat(supplied.skillCatalog().skill("configured")).isEmpty();
+        assertThat(supplied.registeredSkillCatalog().find("supplied")).get()
+                .satisfies(entry -> {
+                    assertThat(entry.sourcePath()).isEqualTo("opaque label");
+                    assertThat(entry.yaml()).isEqualTo(suppliedYaml);
+                });
+        SkillGeneration empty = manager.prepare(List.of());
+        assertThat(empty.capabilities()).extracting(CapabilityMetadata::name).containsExactly("fixedJava");
+        assertThat(manager.prepare(List.of(new SkillDocument("opaque label", suppliedYaml))).id())
+                .isNotEqualTo(supplied.id());
+        assertThatThrownBy(() -> manager.prepare(List.of(new SkillDocument("orphan label", """
+                name: orphan
+                description: orphan
+                model: model
+                allowed_skills:
+                  - name: missingChild
+                """))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("missingChild")
+                .hasMessageContaining("orphan label");
+        assertThat(manager.prepare().definitions()).isEmpty();
+    }
+
     @Test
     void preparationsAreFreshImmutableCompleteGenerations()
     {

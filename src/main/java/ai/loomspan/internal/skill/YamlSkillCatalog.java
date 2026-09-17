@@ -6,12 +6,14 @@ import tools.jackson.databind.DatabindException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import tools.jackson.dataformat.yaml.YAMLMapper;
+import ai.loomspan.api.SkillDocument;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.runtime.evidence.EvidenceContract;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.util.StringUtils;
@@ -23,11 +25,13 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -59,7 +63,7 @@ public class YamlSkillCatalog implements InitializingBean
     private final ResourcePatternResolver resourcePatternResolver;
     private final ObjectMapper yamlObjectMapper;
     private final Map<String, YamlSkillDefinition> skillsByName = new LinkedHashMap<>();
-    private final Map<Resource, String> diagnosticSkillNames = new LinkedHashMap<>();
+    private final Map<Resource, String> diagnosticSkillNames = new IdentityHashMap<>();
 
     public YamlSkillCatalog(LoomspanProperties properties)
     {
@@ -106,12 +110,51 @@ public class YamlSkillCatalog implements InitializingBean
         {
             Resource resource = discovered.resource();
             YamlSkillDefinition definition = loadDefinition(discovered);
-            YamlSkillDefinition previous = skillsByName.putIfAbsent(definition.manifest().getName(), definition);
-            if (previous != null)
+            addDefinition(resource, definition);
+        }
+    }
+
+    /** Initializes this catalog from a complete application-supplied YAML set. */
+    public void loadSupplied(List<SkillDocument> documents)
+    {
+        Objects.requireNonNull(documents, "documents must not be null");
+        skillsByName.clear();
+        diagnosticSkillNames.clear();
+        Set<String> names = new LinkedHashSet<>();
+        for (SkillDocument document : documents)
+        {
+            if (document == null) throw new IllegalArgumentException("skill documents must not contain null");
+            String label = document.sourceName();
+            if (label == null || label.isBlank())
+                throw new IllegalArgumentException("skill document sourceName must not be blank");
+            if (document.yaml() == null)
+                throw new IllegalArgumentException("skill document yaml must not be null for '" + label + "'");
+            if (!names.add(label))
+                throw new IllegalArgumentException("duplicate skill document sourceName '" + label + "'");
+        }
+        for (SkillDocument document : documents)
+        {
+            byte[] bytes = document.yaml().getBytes(StandardCharsets.UTF_8);
+            Resource resource = new ByteArrayResource(bytes, document.sourceName());
+            YamlSkillSource source = new YamlSkillSource(resource, bytes, document.sourceName());
+            try
             {
-                throw invalidSkill(resource, "name", "duplicate skill name '" + definition.manifest().getName() + "'; first declared in " + describe(previous.resource()));
+                addDefinition(resource, loadDefinition(resource, source, bytes));
+            }
+            catch (RuntimeException ex)
+            {
+                if (ex instanceof IllegalStateException) throw ex;
+                throw new IllegalStateException("Invalid YAML skill in '" + document.sourceName() + "'", ex);
             }
         }
+    }
+
+    private void addDefinition(Resource resource, YamlSkillDefinition definition)
+    {
+        YamlSkillDefinition previous = skillsByName.putIfAbsent(definition.manifest().getName(), definition);
+        if (previous != null)
+            throw invalidSkill(resource, "name", "duplicate skill name '" + definition.manifest().getName()
+                    + "'; first declared in " + describe(previous.resource()));
     }
 
     /**
@@ -173,8 +216,13 @@ public class YamlSkillCatalog implements InitializingBean
         {
             throw new IllegalStateException("Failed to read YAML skill from " + describe(resource), ex);
         }
-        YamlSkillManifest manifest = readManifest(resource, bytes);
         YamlSkillSource source = new YamlSkillSource(resource, discovered.locationPattern(), bytes);
+        return loadDefinition(resource, source, bytes);
+    }
+
+    private YamlSkillDefinition loadDefinition(Resource resource, YamlSkillSource source, byte[] bytes)
+    {
+        YamlSkillManifest manifest = readManifest(resource, bytes);
         validateRequiredField(resource, "name", manifest.getName());
         validateRequiredField(resource, "description", manifest.getDescription());
 

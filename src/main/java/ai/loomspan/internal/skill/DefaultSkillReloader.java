@@ -4,9 +4,13 @@ import ai.loomspan.api.PreparedSkillUpdate;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillReloadException;
 import ai.loomspan.api.SkillReloader;
+import ai.loomspan.api.SkillDocument;
 import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
 
 import java.util.Objects;
+import java.util.Collection;
+import java.util.ArrayList;
+import java.util.function.Supplier;
 import java.util.concurrent.RejectedExecutionException;
 
 /** Framework-owned publication coordinator. Candidate ownership is carried by identity, not a registry. */
@@ -27,11 +31,25 @@ public final class DefaultSkillReloader implements SkillReloader
     @Override
     public PreparedSkillUpdate prepare()
     {
+        return prepareWith(generations::prepare);
+    }
+
+    @Override
+    public PreparedSkillUpdate prepare(Collection<SkillDocument> documents)
+    {
+        return prepareWith(() -> {
+            Objects.requireNonNull(documents, "documents must not be null");
+            return generations.prepare(new ArrayList<>(documents));
+        });
+    }
+
+    private PreparedSkillUpdate prepareWith(Supplier<SkillGeneration> preparation)
+    {
         synchronized (preparationLock)
         {
             String baseId = readWhileOpen();
             final SkillGeneration candidate;
-            try { candidate = generations.prepare(); }
+            try { candidate = preparation.get(); }
             catch (RuntimeException ex) { throw new SkillReloadException("Failed to prepare skill generation", ex); }
             checkOpen();
             return new Candidate(owner, baseId, candidate);

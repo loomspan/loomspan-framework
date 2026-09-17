@@ -2,6 +2,7 @@ package ai.loomspan.internal.skill;
 
 import ai.loomspan.api.PreparedSkillUpdate;
 import ai.loomspan.api.SkillReloadException;
+import ai.loomspan.api.SkillDocument;
 import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
 import ai.loomspan.internal.core.SkillMethodBeanPostProcessor;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
@@ -26,6 +27,26 @@ import static org.mockito.Mockito.when;
 
 class SkillReloaderTest
 {
+    @Test
+    void suppliedCandidatesUseTheSameOwnerBaseOneShotAndShutdownChecks()
+    {
+        SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);
+        manager.afterSingletonsInstantiated();
+        FrameworkExecutionLifecycle lifecycle = lifecycle();
+        DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle);
+        DefaultSkillReloader foreign = new DefaultSkillReloader(manager, lifecycle);
+        List<SkillDocument> documents = List.of(new SkillDocument("label", "name: skill\n"));
+        PreparedSkillUpdate first = reloader.prepare(documents);
+        PreparedSkillUpdate competing = reloader.prepare();
+        assertThatThrownBy(() -> foreign.publish(first)).isInstanceOf(SkillReloadException.class);
+        reloader.publish(first);
+        assertThatThrownBy(() -> reloader.publish(first)).isInstanceOf(SkillReloadException.class);
+        assertThatThrownBy(() -> reloader.publish(competing)).isInstanceOf(SkillReloadException.class)
+                .hasMessageContaining("stale");
+        lifecycle.closeAdmission();
+        assertThatThrownBy(() -> reloader.prepare(documents)).isInstanceOf(SkillReloadException.class);
+    }
+
     @Test
     void prepareIsDetachedAndPublicationChecksBaseOwnerAndOneShot()
     {
@@ -81,7 +102,7 @@ class SkillReloaderTest
         ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
         try
         {
-            var pending = workers.submit(reloader::prepare);
+            var pending = workers.submit(() -> reloader.prepare(List.of(new SkillDocument("slow supplied", "name: skill\n"))));
             assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
             assertThat(reloader.snapshot().generationId()).isNotEqualTo(ready.generationId());
             reloader.publish(ready);
@@ -120,7 +141,7 @@ class SkillReloaderTest
         ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
         try
         {
-            Future<PreparedSkillUpdate> first = workers.submit(reloader::prepare);
+            Future<PreparedSkillUpdate> first = workers.submit(() -> reloader.prepare());
             assertThat(firstReadEntered.await(5, TimeUnit.SECONDS)).isTrue();
             CountDownLatch secondStarted = new CountDownLatch(1);
             AtomicReference<Thread> secondWorker = new AtomicReference<>();
@@ -195,7 +216,7 @@ class SkillReloaderTest
         ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
         try
         {
-            var pending = workers.submit(reloader::prepare);
+            var pending = workers.submit(() -> reloader.prepare());
             assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
             lifecycle.closeAdmission();
             proceed.countDown();

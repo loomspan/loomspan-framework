@@ -1,1 +1,1 @@
-{"registeredName":"FetchDns","source":"REST","sourcePath":"classpath:/skills/fetch-dns.yaml","yaml":"# REST DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application handler\r\nrest: true\r\n"}
+{"registeredName":"FetchDns","source":"REST","sourcePath":"opaque label","yaml":"# REST DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application handler\r\nrest: true\r\n"}
