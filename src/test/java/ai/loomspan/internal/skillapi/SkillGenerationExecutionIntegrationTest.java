@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -116,12 +117,15 @@ class SkillGenerationExecutionIntegrationTest
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         var admitted = new DefaultSkillInvocationHandoff(template, lifecycle)
                 .handoff("invoiceParser", Map.of("payload", "hello"));
+        assertThat(admitted.generationId()).isEqualTo(oldGeneration.id()).isNotBlank();
 
         generations.activate(replacementGeneration);
+        assertThat(admitted.generationId()).isEqualTo(oldGeneration.id());
 
         try
         {
             assertThat(admitted.invoke()).isEqualTo("old-result");
+            assertThat(admitted.generationId()).isEqualTo(oldGeneration.id());
             assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of("payload", "hello")))
                     .isInstanceOf(AccessDeniedException.class);
             verify(coordinator).execute(eq(oldCapability), any(), any(), any(), eq(null));
@@ -132,6 +136,64 @@ class SkillGenerationExecutionIntegrationTest
             lifecycle.destroy();
         }
     }
+
+    @Test
+    void objectHandoffKeepsCapturedIdWhenConversionPublishesReplacement()
+    {
+        CapabilityMetadata oldCapability = capability("old", SkillAccessPolicy.unrestricted(), "payload");
+        CapabilityMetadata replacementCapability = capability("replacement", SkillAccessPolicy.unrestricted(), "replacementPayload");
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        registry.register(oldCapability.name(), oldCapability);
+        var generations = registry.manager();
+        String oldId = generations.active().id();
+        var replacement = TestSkillGenerations.of(replacementCapability);
+        AtomicBoolean published = new AtomicBoolean();
+        ObjectMapper mapper = new ObjectMapper()
+        {
+            @Override
+            public <T> T convertValue(Object fromValue, TypeReference<T> toValueTypeRef)
+            {
+                if (published.compareAndSet(false, true))
+                    SkillGenerationManager.dispatch(generations.activateAndSelect(replacement));
+                return super.convertValue(fromValue, toValueTypeRef);
+            }
+        };
+        ExecutionCoordinator coordinator = mock(ExecutionCoordinator.class);
+        when(coordinator.execute(eq(oldCapability), any(), any(), any(), eq(null))).thenReturn("old-result");
+        when(coordinator.execute(eq(replacementCapability), any(), any(), any(), eq(null)))
+                .thenReturn("replacement-result");
+        var provider = new StaticListableBeanFactory(Map.of("executionCoordinator", coordinator))
+                .getBeanProvider(ExecutionCoordinator.class);
+        var context = new StaticApplicationContext();
+        var executor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(2), executor);
+        var codecs = LoomspanJacksonCodecs.defaults();
+        var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.NEVER,
+                Clock.fixed(Instant.parse("2026-09-15T12:00:00Z"), ZoneOffset.UTC),
+                NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+        var template = new DefaultSkillTemplate(generations,
+                new CapabilityExecutionRouter(provider, new DefaultAccessGuard()), runner, mapper,
+                new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
+        var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
+        try
+        {
+            var old = handoff.handoff("invoiceParser", new OldInput("hello"));
+            assertThat(generations.active().id()).isEqualTo(replacement.id());
+            assertThat(old.generationId()).isEqualTo(oldId).isNotBlank();
+            var current = handoff.handoff("invoiceParser", Map.of("replacementPayload", "new"));
+            assertThat(current.generationId()).isEqualTo(replacement.id());
+            assertThat(old.invoke()).isEqualTo("old-result");
+            assertThat(current.invoke()).isEqualTo("replacement-result");
+            assertThat(old.generationId()).isEqualTo(oldId);
+        }
+        finally
+        {
+            lifecycle.destroy();
+        }
+    }
+
+    private record OldInput(String payload) {}
 
     private static CapabilityMetadata capability(String id, SkillAccessPolicy policy)
     {

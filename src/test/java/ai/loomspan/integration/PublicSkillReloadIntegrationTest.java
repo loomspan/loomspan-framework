@@ -3,6 +3,7 @@ package ai.loomspan.integration;
 import ai.loomspan.api.PreparedSkillUpdate;
 import ai.loomspan.api.SkillInvocationHandoff;
 import ai.loomspan.api.RestSkillHandler;
+import ai.loomspan.api.RestSkillInvocation;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillReloadException;
 import ai.loomspan.api.SkillReloader;
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -60,27 +62,39 @@ class PublicSkillReloadIntegrationTest
                         reloader.publish(first);
                         assertThat(retired).containsExactly(initial);
                         var pending = handoff.handoff("leaf", Map.of("message", "old"));
+                        assertThat(pending.generationId()).isEqualTo(first.generationId()).isNotBlank();
                         PreparedSkillUpdate second = reloader.prepare(List.of(new SkillDocument("B", yaml)));
                         RestConfiguration.config.put(second.generationId(), "B");
                         reloader.publish(second);
                         assertThat(retired).doesNotContain(first.generationId());
                         assertThat(RestConfiguration.config).containsKey(first.generationId());
+                        assertThat(pending.generationId()).isEqualTo(first.generationId());
                         pending.release();
                         assertThat(retired).containsExactly(initial, first.generationId());
+                        assertThat(pending.generationId()).isEqualTo(first.generationId());
+                        assertThat(RestConfiguration.config).doesNotContainKey(first.generationId());
                         assertThat(RestConfiguration.config).containsKey(second.generationId());
                         var invokedPending = handoff.handoff("leaf", Map.of("message", "older"));
+                        assertThat(invokedPending.generationId()).isEqualTo(second.generationId());
                         PreparedSkillUpdate third = reloader.prepare(List.of(new SkillDocument("C", yaml)));
                         RestConfiguration.config.put(third.generationId(), "C");
                         reloader.publish(third);
                         assertThat(retired).doesNotContain(second.generationId());
                         assertThat(invokedPending.invoke()).isEqualTo("B:older");
+                        assertThat(RestConfiguration.lastInvocation.get().generationId())
+                                .isEqualTo(invokedPending.generationId());
                         assertThat(retired).containsExactly(initial, first.generationId(), second.generationId());
+                        assertThat(invokedPending.generationId()).isEqualTo(second.generationId());
                         assertThat(RestConfiguration.config).containsKey(third.generationId());
                         var failingPending = handoff.handoff("leaf", Map.of("message", "fail"));
+                        assertThat(failingPending.generationId()).isEqualTo(third.generationId());
                         PreparedSkillUpdate fourth = reloader.prepare(List.of(new SkillDocument("D", yaml)));
                         RestConfiguration.config.put(fourth.generationId(), "D");
                         reloader.publish(fourth);
                         assertThatThrownBy(failingPending::invoke).isInstanceOf(ai.loomspan.api.SkillException.class);
+                        assertThat(RestConfiguration.lastInvocation.get().generationId())
+                                .isEqualTo(failingPending.generationId());
+                        assertThat(failingPending.generationId()).isEqualTo(third.generationId());
                         assertThat(retired).containsExactly(initial, first.generationId(),
                                 second.generationId(), third.generationId());
                     }
@@ -254,7 +268,8 @@ class PublicSkillReloadIntegrationTest
                     assertThat(template.invoke("reloadLeaf", Map.of("message", "hello"))).isEqualTo("A:hello");
                     assertThat(template.invoke("reloadLeaf", Map.of("message", "trusted", "generationId", "spoofed")))
                             .isEqualTo("A:trusted");
-                    var admittedOld = handoff.handoff("reloadLeaf", Map.of("message", "delayed"));
+                    var admittedOld = handoff.handoff("reloadLeaf", Map.of("message", "delayed", "generationId", "spoofed"));
+                    assertThat(admittedOld.generationId()).isEqualTo(initial).isNotBlank();
 
                     PreparedSkillUpdate candidate = reloader.prepare();
                     assertThat(candidate.generationId()).isNotEqualTo(initial);
@@ -267,7 +282,14 @@ class PublicSkillReloadIntegrationTest
                     assertThat(startup.generationId()).isEqualTo(initial);
                     assertThat(startup.skill("reloadLeaf")).isPresent();
                     assertThat(reloader.snapshot().generationId()).isEqualTo(candidate.generationId());
+                    assertThat(admittedOld.generationId()).isEqualTo(initial);
                     assertThat(admittedOld.invoke()).isEqualTo("A:delayed");
+                    assertThat(RestConfiguration.lastInvocation.get().generationId()).isEqualTo(initial);
+                    var admittedNew = handoff.handoff("reloadLeaf", new ReloadRequest("new"));
+                    assertThat(admittedNew.generationId()).isEqualTo(candidate.generationId());
+                    assertThat(admittedNew.invoke()).isEqualTo("B:new");
+                    assertThat(RestConfiguration.lastInvocation.get().generationId())
+                            .isEqualTo(admittedNew.generationId());
                     assertThat(template.invoke("reloadLeaf", Map.of("message", "world"))).isEqualTo("B:world");
                     assertThatThrownBy(() -> reloader.publish(candidate)).isInstanceOf(SkillReloadException.class);
                     assertThatThrownBy(reloader::prepare).isInstanceOf(SkillReloadException.class);
@@ -299,15 +321,19 @@ class PublicSkillReloadIntegrationTest
     static class RestConfiguration
     {
         static final Map<String, String> config = new ConcurrentHashMap<>();
+        static final AtomicReference<RestSkillInvocation> lastInvocation = new AtomicReference<>();
 
         @Bean
         RestSkillHandler handler()
         {
             return invocation -> {
+                lastInvocation.set(invocation);
                 if ("fail".equals(invocation.input().get("message")))
                     throw new IllegalStateException("handler failed");
                 return config.get(invocation.generationId()) + ":" + invocation.input().get("message");
             };
         }
     }
+
+    private record ReloadRequest(String message) {}
 }

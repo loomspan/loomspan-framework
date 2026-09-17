@@ -12,6 +12,17 @@ import java.util.function.Consumer;
 public interface AdmittedSkillInvocation
 {
     /**
+     * Returns the nonblank, process-local ID of the generation captured during preparation,
+     * before input conversion and validation. The ID remains available after execution,
+     * failure, release, or framework cutoff, even if a newer generation is published.
+     * Reading it has no admission or ownership side effects and does not guarantee that an
+     * application-owned mapping for this ID is still available.
+     *
+     * @return the captured generation ID
+     */
+    String generationId();
+
+    /**
      * Executes the admitted invocation on the calling thread.
      *
      * @return the skill result as text

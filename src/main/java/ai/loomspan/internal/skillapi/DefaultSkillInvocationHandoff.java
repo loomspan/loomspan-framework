@@ -66,6 +66,7 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
     private final class DefaultAdmittedSkillInvocation implements AdmittedSkillInvocation
     {
         private final AtomicReference<Payload> payload;
+        private final String generationId;
         private final String skillName;
         private final FrameworkExecutionLifecycle.AdmittedRoot root;
 
@@ -75,9 +76,16 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
                 FrameworkExecutionLifecycle.AdmittedRoot root)
         {
             this.skillName = skillName;
+            this.generationId = prepared.generation().id();
             this.payload = new AtomicReference<>(new Payload(skillName, prepared, authentication));
             this.root = root;
             root.onPendingTermination(() -> payload.set(null));
+        }
+
+        @Override
+        public String generationId()
+        {
+            return generationId;
         }
 
         @Override

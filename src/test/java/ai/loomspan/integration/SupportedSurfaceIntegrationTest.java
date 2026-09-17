@@ -128,8 +128,11 @@ class SupportedSurfaceIntegrationTest
                             skills.validate("supportedJavaLeaf", new DirectRequest("precheck"));
                             skills.validate("supportedRestLeaf", new DirectRequest("precheck"));
                             var admitted = handoff.handoff("supportedRestLeaf", new DirectRequest("handed-off"));
+                            assertThat(admitted.generationId()).isEqualTo(catalog.generationId());
                             SecurityContextHolder.clearContext();
                             assertThat(admitted.invoke()).isEqualTo("REST: handed-off");
+                            assertThat(SupportedSkillConfiguration.lastInvocation.get().generationId())
+                                    .isEqualTo(admitted.generationId());
                             admitted.release();
                             assertThat(SupportedSkillConfiguration.handlerAuthentication)
                                     .hasValue("supported-caller");
@@ -137,8 +140,11 @@ class SupportedSurfaceIntegrationTest
                             var admittedRoot = handoff.handoff(
                                     "supportedSurfaceSkill",
                                     Map.of("message", "hello through the public API"));
+                            assertThat(admittedRoot.generationId()).isEqualTo(catalog.generationId());
                             assertThat(admittedRoot.invoke(observed::set))
                                     .isEqualTo("supported surface response");
+                            assertThat(SupportedSkillConfiguration.lastInvocation.get().generationId())
+                                    .isEqualTo(admittedRoot.generationId());
                             admittedRoot.release();
 
                             assertThat(observed.get()).isNotNull();

@@ -57,6 +57,7 @@ class ApplicationApiValueTest
         assertThat(AdmittedSkillInvocation.class.getDeclaredMethods())
                 .extracting(method -> List.of(method.getName(), method.getReturnType(), List.of(method.getParameterTypes())))
                 .containsExactlyInAnyOrder(
+                        List.of("generationId", String.class, List.of()),
                         List.of("invoke", String.class, List.of()),
                         List.of("invoke", String.class, List.of(java.util.function.Consumer.class)),
                         List.of("release", void.class, List.of()));

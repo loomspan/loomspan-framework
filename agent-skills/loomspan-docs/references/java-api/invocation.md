@@ -120,14 +120,17 @@ synchronized (dispatchGate) {
     SecurityContextHolder.getContext().setAuthentication(authentication);
     admitted = handoff.handoff("duplicateInvoiceChecker", input);
 }
-boolean invoked = false;
 try {
-    invoked = true;
+    String snapshotId = snapshotByGeneration.get(admitted.generationId());
+    if (snapshotId == null) throw new IllegalStateException("Missing snapshot mapping");
+    invocationRecords.record(snapshotId, admitted.generationId());
     admitted.invoke(observer);
 } finally {
-    if (!invoked) admitted.release();
+    admitted.release();
 }
 ```
+
+`generationId()` returns the nonblank, process-local ID captured during preparation, before object conversion and input validation. A newer generation may be active when handoff returns, but this handle and its nested REST work use the captured ID. The ID remains stable after execution, failure, release, retirement, or cutoff; concurrent reads do not claim or extend the admission. It is not a durable snapshot identifier. Stage and retain the application-owned generation-to-snapshot mapping according to application policy before admitting traffic, and record correlation before invocation. A missing mapping must be handled explicitly because cleanup can remove it after ownership ends, including cutoff, while the handle still exposes the ID. `release()` in `finally` covers lookup and recording failures and is harmless after invocation claims the admission.
 
 The handle is single-use. Exactly one invocation, explicit idempotent release,
 or framework cutoff can win; a losing invocation fails as `SkillException`
@@ -152,6 +155,8 @@ the real facade; see [compatibility-and-boundaries.md](compatibility-and-boundar
   supported ownership-transfer and single-use handle signatures.
 - `DefaultSkillTemplateTest#handoffCapturesPreparedInputAndCallingAuthentication`
   protects captured identity, execution, and worker-context restoration.
+- `SkillGenerationExecutionIntegrationTest#objectHandoffKeepsCapturedIdWhenConversionPublishesReplacement`
+  protects capture timing across object conversion and publication.
 - `DefaultSkillTemplateTest#objectOverloadDelegatesThroughValidatedMapPath`
   protects object normalization followed by map validation.
 - `DefaultSkillTemplateTest#skillTemplateNullInputAndObserverLifecycle`

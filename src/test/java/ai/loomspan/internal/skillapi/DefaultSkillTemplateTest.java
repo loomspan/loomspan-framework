@@ -41,6 +41,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.time.Duration;
 import java.util.concurrent.Executors;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -86,15 +88,19 @@ class DefaultSkillTemplateTest {
         Map<String, Object> mutableInput = new LinkedHashMap<>();
         mutableInput.put("payload", "hello");
         var admitted = handoff.handoff("invoiceParser", mutableInput);
+        String generationId = admitted.generationId();
+        assertThat(generationId).isEqualTo(registry.manager().active().id()).isNotBlank();
         mutableInput.clear();
         SecurityContextHolder.getContext().setAuthentication(worker);
 
         assertThat(admitted.invoke()).isEqualTo("ok");
+        assertThat(admitted.generationId()).isEqualTo(generationId);
         assertThat(((AtomicReference<?>) org.springframework.test.util.ReflectionTestUtils
                 .getField(admitted, "payload")).get()).isNull();
         assertThat(observedAuthentication).hasValue(captured);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isSameAs(worker);
         admitted.release();
+        assertThat(admitted.generationId()).isEqualTo(generationId);
         assertThatThrownBy(admitted::invoke)
                 .isInstanceOf(SkillException.class)
                 .hasMessage("Skill 'invoiceParser' execution failed.");
@@ -119,17 +125,77 @@ class DefaultSkillTemplateTest {
                 new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                         new SkillInputValidator(), new SkillRoleEvaluator(null, null), null), lifecycle);
         var released = handoff.handoff("invoiceParser", Map.of("payload", "hello"));
+        String generationId = released.generationId();
+        assertThat(generationId).isNotBlank();
         released.release();
         released.release();
+        assertThat(released.generationId()).isEqualTo(generationId);
         assertThatThrownBy(released::invoke).isInstanceOf(SkillException.class);
 
         var cutOff = handoff.handoff("invoiceParser", Map.of("payload", "hello"));
+        assertThat(cutOff.generationId()).isEqualTo(generationId);
         lifecycle.stop();
         assertThat(((AtomicReference<?>) org.springframework.test.util.ReflectionTestUtils
                 .getField(cutOff, "payload")).get()).isNull();
         assertThatThrownBy(cutOff::invoke).isInstanceOf(SkillException.class);
+        assertThat(cutOff.generationId()).isEqualTo(generationId);
         verify(router, never()).execute(any(), any(), any(), any());
         lifecycle.destroy();
+    }
+
+    @Test
+    void concurrentIdReadsDoNotClaimOrChangeAnExecutingAdmission() throws Exception
+    {
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        CapabilityMetadata metadata = yamlSkillMetadata();
+        registry.register(metadata.name(), metadata);
+        CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
+        CountDownLatch executing = new CountDownLatch(1);
+        CountDownLatch finish = new CountDownLatch(1);
+        when(router.execute(eq(metadata), any(), any(), eq(null))).thenAnswer(invocation -> {
+            executing.countDown();
+            assertThat(finish.await(2, TimeUnit.SECONDS)).isTrue();
+            return "ok";
+        });
+        var context = new StaticApplicationContext();
+        var lifecycleExecutor = Executors.newSingleThreadExecutor();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(2), lifecycleExecutor);
+        var codecs = LoomspanJacksonCodecs.defaults();
+        var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.NEVER,
+                fixedClock(), NoOpExecutionObservationHandleFactory.INSTANCE,
+                ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
+                codecs.canonicalTrace(), lifecycle);
+        var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
+                new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
+        var admitted = new DefaultSkillInvocationHandoff(template, lifecycle)
+                .handoff("invoiceParser", Map.of("payload", "hello"));
+        String id = admitted.generationId();
+        try (var readers = Executors.newVirtualThreadPerTaskExecutor())
+        {
+            var pendingReads = java.util.stream.IntStream.range(0, 8)
+                    .mapToObj(index -> readers.submit(() -> {
+                        for (int i = 0; i < 1000; i++)
+                            assertThat(admitted.generationId()).isEqualTo(id);
+                        return admitted.generationId();
+                    })).toList();
+            for (var read : pendingReads)
+                assertThat(read.get(2, TimeUnit.SECONDS)).isEqualTo(id);
+            var invocation = readers.submit(() -> admitted.invoke());
+            assertThat(executing.await(2, TimeUnit.SECONDS)).isTrue();
+            var executingReads = java.util.stream.IntStream.range(0, 8)
+                    .mapToObj(index -> readers.submit(admitted::generationId)).toList();
+            for (var read : executingReads)
+                assertThat(read.get(2, TimeUnit.SECONDS)).isEqualTo(id);
+            finish.countDown();
+            assertThat(invocation.get(2, TimeUnit.SECONDS)).isEqualTo("ok");
+            assertThat(admitted.generationId()).isEqualTo(id);
+            assertThatThrownBy(admitted::invoke).isInstanceOf(SkillException.class);
+        }
+        finally
+        {
+            finish.countDown();
+            lifecycle.destroy();
+        }
     }
 
     @AfterEach

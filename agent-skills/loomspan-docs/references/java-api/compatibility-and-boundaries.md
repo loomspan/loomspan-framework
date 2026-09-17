@@ -16,7 +16,7 @@ Application code MAY depend on the nineteen types in the closed
 | --- | --- |
 | `SkillTemplate` | Validate or invoke a named Java, REST, or model-backed YAML skill |
 | `SkillInvocationHandoff` | Atomically transfer a prepared root invocation to framework ownership |
-| `AdmittedSkillInvocation` | Execute once or release an already-admitted root invocation |
+| `AdmittedSkillInvocation` | Read the captured generation ID, execute once, or release an already-admitted root invocation |
 | `SkillReloader` | Prepare, publish, or snapshot a complete skill generation |
 | `SkillDocument` | Supply one in-memory YAML document and a diagnostic source label |
 | `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog before publication |
@@ -63,6 +63,8 @@ methods are an intentional pre-1.0 source- and binary-sensitive interface
 change: application implementations and hand-written fakes or mocks of
 `SkillTemplate` MUST add both methods and recompile. There is no default-method
 compatibility shim.
+
+`AdmittedSkillInvocation` now requires the abstract `String generationId()` method. Handwritten implementations and fakes must supply the captured process-local ID and recompile; there is no default method or fabricated fallback. Reading the ID does not retain admission ownership or guarantee an application-owned durable snapshot mapping.
 
 Observers passed to `SkillTemplate.invoke` now receive a callback for mappable
 post-session failures as well as successes. Applications upgrading from the

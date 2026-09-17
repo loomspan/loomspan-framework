@@ -64,6 +64,8 @@ class FrameworkShutdownIntegrationTest
         var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
         org.mockito.Mockito.when(router.execute(any(), any(), any(), any())).thenReturn("ok");
         var admitted = handoff.handoff("root", Map.of());
+        String generationId = admitted.generationId();
+        assertThat(generationId).isEqualTo(registry.manager().active().id());
         assertThat(lifecycle.activeRootCount()).isOne();
 
         Thread stopper = Thread.ofVirtual().start(lifecycle::stop);
@@ -72,6 +74,7 @@ class FrameworkShutdownIntegrationTest
             Thread.onSpinWait();
 
         assertThat(admitted.invoke()).isEqualTo("ok");
+        assertThat(admitted.generationId()).isEqualTo(generationId);
         stopper.join(Duration.ofSeconds(1));
         assertThat(stopper.isAlive()).isFalse();
         assertThat(lifecycle.activeRootCount()).isZero();
