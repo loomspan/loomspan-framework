@@ -5,6 +5,8 @@ import ai.loomspan.api.RestSkillInvocation;
 import ai.loomspan.api.SkillDocument;
 import ai.loomspan.api.SkillValidationIssue;
 import ai.loomspan.api.SkillValidationResult;
+import ai.loomspan.api.SkillKind;
+import ai.loomspan.api.ValidatedSkill;
 import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
@@ -21,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,14 +104,14 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
     {
         requireInitialized();
         YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
-        return check(catalog.checkedConfigured(false)).result();
+        return validationResult(check(catalog.checkedConfigured(false)));
     }
 
     public SkillValidationResult validate(List<SkillDocument> documents)
     {
         requireInitialized();
         YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
-        return check(catalog.checkedSupplied(documents, false)).result();
+        return validationResult(check(catalog.checkedSupplied(documents, false)));
     }
 
     private void requireInitialized()
@@ -118,13 +121,28 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
     }
 
     private record CheckedSet(List<YamlSkillDefinition> definitions,
-            Map<YamlSkillDefinition, SkillInputContract> contracts, SkillValidationResult result)
+            Map<YamlSkillDefinition, SkillInputContract> contracts, List<SkillValidationIssue> issues)
     {
         void requireValid()
         {
-            result.issues().stream().filter(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR)
+            issues.stream().filter(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR)
                     .findFirst().ifPresent(issue -> { throw new IllegalStateException(issue.message()); });
         }
+    }
+
+    private SkillValidationResult validationResult(CheckedSet checked)
+    {
+        List<SkillValidationIssue> issues = checked.issues();
+        if (issues.stream().anyMatch(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR))
+            return new SkillValidationResult(issues, List.of());
+        List<ValidatedSkill> skills = new ArrayList<>();
+        for (CapabilityMetadata javaCapability : fixedJavaCapabilities)
+            skills.add(new ValidatedSkill(javaCapability.name(), javaCapability.kind().publicKind()));
+        for (YamlSkillDefinition definition : checked.definitions())
+            skills.add(new ValidatedSkill(definition.manifest().getName(),
+                    definition.rest() ? SkillKind.REST : SkillKind.YAML));
+        skills.sort(Comparator.comparing(ValidatedSkill::name));
+        return new SkillValidationResult(issues, skills);
     }
 
     private CheckedSet check(YamlSkillCatalog.CheckedDocuments documents)
@@ -169,7 +187,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
                     issues.add(error(definition, "allowed_skills", "Unknown child skill '" + child
                             + "' in allowed_skills of '" + definition.manifest().getName() + "' at "
                             + definition.source().diagnosticName()));
-        return new CheckedSet(documents.definitions(), Map.copyOf(contracts), new SkillValidationResult(issues));
+        return new CheckedSet(documents.definitions(), Map.copyOf(contracts), List.copyOf(issues));
     }
 
     private static SkillValidationIssue error(YamlSkillDefinition definition, String path, String message)

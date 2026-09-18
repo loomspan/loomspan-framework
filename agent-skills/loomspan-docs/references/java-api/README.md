@@ -31,6 +31,9 @@ The allowlist currently contains only:
 - `AdmittedSkillInvocation`
 - `SkillReloader`
 - `SkillDocument`
+- `SkillValidationResult`
+- `SkillValidationIssue`
+- `ValidatedSkill`
 - `PreparedSkillUpdate`
 - `SkillCatalog`
 - `SkillDescriptor`
@@ -46,7 +49,7 @@ The allowlist currently contains only:
 - `RestSkillHandler`
 - `RestSkillInvocation`
 
-All nineteen are public top-level types in `ai.loomspan.api`. A Java
+All twenty-two are public top-level types in `ai.loomspan.api`. A Java
 `public` modifier does not make any other Loomspan type supported API. Read
 [compatibility-and-boundaries.md](compatibility-and-boundaries.md) before
 advising an application to depend on another Loomspan type.
@@ -70,6 +73,7 @@ when exact source inspection is required.
 | Determine whether a Loomspan type or extension point is supported | [compatibility-and-boundaries.md](compatibility-and-boundaries.md) | The relevant API topic below |
 | Invoke or atomically hand off a Java, REST, or model-backed YAML skill from application code | [invocation.md](invocation.md) | [observation-and-errors.md](observation-and-errors.md) when observing or handling failures |
 | Discover skills or pre-check a root request | [catalog-and-validation.md](catalog-and-validation.md) | [invocation.md](invocation.md) for execution-time guarantees |
+| Validate a proposed complete skill set and inspect candidate names/kinds | [skill-reload.md](skill-reload.md) | [draft validation workflow](../skill-authoring/validation-workflow.md) for authoring feedback |
 | Prepare, publish, and retire complete skill generations from files or application-supplied documents | [skill-reload.md](skill-reload.md) | [rest-skills.md](rest-skills.md) for generation-keyed configuration |
 | Declare an application method as a skill | [java-skills.md](java-skills.md) | [reflected input contracts](../skill-authoring/input-contracts.md) for complete input-shape guidance |
 | Implement application REST leaves | [rest-skills.md](rest-skills.md) | [REST manifests](../skill-authoring/rest-skills.md) |
@@ -85,9 +89,9 @@ relevant topic set.
 
 | Topic | Coverage | Notes |
 | --- | --- | --- |
-| Supported public types | Source-verified | Exact nineteen-type allowlist and package boundaries |
+| Supported public types | Source-verified | Exact twenty-two-type allowlist and package boundaries |
 | Catalog and pre-checks | Source-verified | Eager unfiltered snapshot, exact schemas, both validation overloads, authorization, and no-reservation limits |
-| Two-stage skill updates | Source-verified | Frozen candidate, process-local generation ID, one-shot publication, safe retirement callback, and application-owned readiness and cleanup |
+| Two-stage skill updates | Source-verified | Complete immutable candidate metadata after successful validation, frozen candidate, process-local generation ID, one-shot publication, safe retirement callback, and application-owned readiness and cleanup |
 | Skill invocation | Source-verified | Direct invocation plus atomic single-use handoff with captured generation ID, input normalization and validation, result, session, security context, and observer timing |
 | Java skill annotations | Source-verified | Exact shared names, direct root/child invocation, proxy constraints, and supported application usage; detailed reflected input shapes live in `skill-authoring` |
 | Execution observations | Source-verified | Immutable view/event values, normalization, detail-value constraints, and trust boundary |

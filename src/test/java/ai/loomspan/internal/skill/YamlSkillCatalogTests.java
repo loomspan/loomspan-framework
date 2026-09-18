@@ -41,7 +41,7 @@ class YamlSkillCatalogTests {
                 new SkillDocument("bad YAML", "invalid: ["),
                 new SkillDocument("bad REST", "name: broken\ndescription: broken\nrest: true\nmodel: missing\n"),
                 new SkillDocument("good", "name: good\ndescription: good\nrest: true\n")), false);
-        assertThat(checked.result().valid()).isFalse();
+        assertThat(checked.issues()).anyMatch(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR);
         assertThat(checked.issues()).extracting(issue -> issue.sourceName())
                 .containsExactly("bad YAML", "bad REST");
         assertThat(checked.issues().get(1).skillName()).isEqualTo("broken");
@@ -64,10 +64,9 @@ class YamlSkillCatalogTests {
         model.setThinkingLevels(java.util.Set.of("medium"));
         properties.setModels(Map.of("gpt-5", model));
         YamlSkillCatalog catalog = new YamlSkillCatalog(properties);
-        var first = catalog.checkedSupplied(List.of(new SkillDocument("draft", yaml)), false).result();
-        var second = catalog.checkedSupplied(List.of(new SkillDocument("draft", yaml)), false).result();
-        assertThat(first.valid()).isTrue();
-        assertThat(first.issues()).isNotEmpty().allSatisfy(issue -> {
+        var first = catalog.checkedSupplied(List.of(new SkillDocument("draft", yaml)), false).issues();
+        var second = catalog.checkedSupplied(List.of(new SkillDocument("draft", yaml)), false).issues();
+        assertThat(first).isNotEmpty().allSatisfy(issue -> {
             assertThat(issue.severity()).isEqualTo(SkillValidationIssue.Severity.WARNING);
             assertThat(issue.sourceName()).isEqualTo("draft");
             assertThat(issue.skillName()).isEqualTo("outputSchemaComplexSkill");

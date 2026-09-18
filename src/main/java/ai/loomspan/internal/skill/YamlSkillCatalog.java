@@ -9,7 +9,6 @@ import tools.jackson.dataformat.yaml.YAMLMapper;
 import tools.jackson.dataformat.yaml.JacksonYAMLParseException;
 import ai.loomspan.api.SkillDocument;
 import ai.loomspan.api.SkillValidationIssue;
-import ai.loomspan.api.SkillValidationResult;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.runtime.evidence.EvidenceContract;
 import org.slf4j.Logger;
@@ -79,7 +78,6 @@ public class YamlSkillCatalog implements InitializingBean
             definitions = List.copyOf(definitions);
             issues = List.copyOf(issues);
         }
-        public SkillValidationResult result() { return new SkillValidationResult(issues); }
         public void requireValid()
         {
             issues.stream().filter(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR)

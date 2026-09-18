@@ -9,7 +9,7 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the nineteen types in the closed
+Application code MAY depend on the twenty-two types in the closed
 `ai.loomspan.api` allowlist:
 
 | Type | Supported purpose |
@@ -19,6 +19,9 @@ Application code MAY depend on the nineteen types in the closed
 | `AdmittedSkillInvocation` | Read the captured generation ID, execute once, or release an already-admitted root invocation |
 | `SkillReloader` | Prepare, publish, or snapshot a complete skill generation |
 | `SkillDocument` | Supply one in-memory YAML document and a diagnostic source label |
+| `SkillValidationResult` | Inspect issues and complete candidate names/kinds after successful validation |
+| `SkillValidationIssue` | Inspect structured draft diagnostics |
+| `ValidatedSkill` | Read an exact proposed callable name and public kind |
 | `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog before publication |
 | `SkillCatalog` | Discover an immutable startup, prepared-candidate, or current snapshot of registered skills |
 | `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
@@ -39,6 +42,12 @@ still use the narrowest type needed: inject or mock `SkillTemplate`, use the
 annotations on application-owned beans, and consume the public value records.
 
 ## Compatibility Changes in This Revision
+
+`SkillValidationResult` now has two record components, `issues` and `skills`.
+Direct constructors and record-pattern users must adopt the two-component shape
+and recompile; the former one-argument constructor is removed. The new
+`ValidatedSkill` record supplies immutable candidate name/kind metadata. See
+[two-stage skill updates](skill-reload.md) for the valid-first contract.
 
 Two-stage updates deliberately add `SkillReloader`, `PreparedSkillUpdate`, and
 `SkillReloadException` to the supported API. `SkillCatalog` now requires
@@ -113,7 +122,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the `api` package has exactly the nineteen allowlisted public top-level types;
+- the `api` package has exactly the twenty-two allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

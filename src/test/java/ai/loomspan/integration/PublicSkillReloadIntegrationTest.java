@@ -8,6 +8,9 @@ import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillReloadException;
 import ai.loomspan.api.SkillReloader;
 import ai.loomspan.api.SkillDocument;
+import ai.loomspan.api.SkillKind;
+import ai.loomspan.api.SkillValidationResult;
+import ai.loomspan.api.ValidatedSkill;
 import ai.loomspan.api.SkillTemplate;
 import ai.loomspan.autoconfigure.LoomspanAutoConfiguration;
 import okhttp3.mockwebserver.MockResponse;
@@ -51,13 +54,25 @@ class PublicSkillReloadIntegrationTest
                     assertThat(context).hasNotFailed();
                     SkillReloader reloader = context.getBean(SkillReloader.class);
                     String initial = reloader.snapshot().generationId();
-                    assertThat(reloader.validate().valid()).isTrue();
+                    SkillValidationResult configuredFeedback = reloader.validate();
+                    assertThat(configuredFeedback.valid()).isTrue();
+                    assertThat(configuredFeedback.skills().stream()
+                            .filter(skill -> skill.kind() == SkillKind.REST)
+                            .map(ValidatedSkill::name).toList()).containsExactly("configured");
                     String supplied = "name: supplied\ndescription: supplied\nrest: true\n";
                     var documents = List.of(new SkillDocument(directory.resolve("absent.yaml").toString(), supplied));
-                    assertThat(reloader.validate(documents).valid()).isTrue();
+                    SkillValidationResult proposed = reloader.validate(documents);
+                    assertThat(proposed.valid()).isTrue();
+                    List<String> proposedRestNames = proposed.skills().stream()
+                            .filter(skill -> skill.kind() == SkillKind.REST)
+                            .map(ValidatedSkill::name).toList();
+                    assertThat(proposedRestNames).containsExactly("supplied");
                     assertThat(Files.exists(directory.resolve("absent.yaml"))).isFalse();
                     assertThat(reloader.snapshot().generationId()).isEqualTo(initial);
+                    assertThat(reloader.snapshot().skill("configured")).isPresent();
+                    assertThat(reloader.snapshot().skill("supplied")).isEmpty();
                     PreparedSkillUpdate candidate = reloader.prepare(documents);
+                    assertThat(candidate.snapshot().skill("supplied")).isPresent();
                     try { Files.writeString(configured, "name: broken\ndescription: broken\nrest: true\nmodel: forbidden\n"); }
                     catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
                     assertThat(reloader.validate().valid()).isFalse();

@@ -69,7 +69,7 @@ Do not load every document by default. Start with the routing entry most relevan
 | Model selection and connections | Initial, source-verified | Framework model aliases, named connections, drivers, thinking levels, migration, and diagnostics |
 | Execution limits and quotas | Foundational | Trace guidance covers model-attempt and usage quota effects plus run-start diagnostic comparison; complete limit configuration remains undocumented |
 | Traces and debugging | Source-verified | Thirteen-tool discovery, current runtime status, visible complete live branches with exact snapshot simultaneity, authoritative MCP whole-plan queries, assignment-aware canonical timeline rows, admission/join events plus accepted-order plan projections, inline same-plan status/note comparisons with exact nullable values and explicit bounded/unavailable evidence, exact nullable observed-overlap semantics, independent finalized/acquired/imported discovery, compact/detailed frames and records, descriptor/inline/exact semantic reads, lossless byte-budgeted traversal, usage/failures, deliberate raw forensics, and current-run/transport limitations |
-| Testing skill trees | Focused validation workflow | [validation-workflow.md](validation-workflow.md) covers complete-set authoring checks; runtime execution testing remains undocumented |
+| Testing skill trees | Focused validation workflow | [validation-workflow.md](validation-workflow.md) covers complete-set checks and candidate name/kind metadata; runtime execution testing remains undocumented |
 
 ## Normative Language
 

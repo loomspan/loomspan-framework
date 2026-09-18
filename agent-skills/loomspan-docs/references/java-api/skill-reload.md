@@ -7,7 +7,20 @@ coverage: source-verified
 
 # Two-stage skill updates
 
-For editor feedback, call `reloader.validate()` to reread configured resources or `reloader.validate(completeDocuments)` to check an in-memory complete replacement set. The result's `valid()` is false for any `ERROR`; `issues()` provides severity, source name, optional skill name and field path, and message. Warnings alone permit preparation. Supplied source labels are diagnostics, never paths. An empty collection proposes removal of YAML and REST skills while fixed Java skills remain. Repeated validation does not allocate an ID, create a candidate, activate a generation, instantiate a REST handler, change fixed caches, or notify retirement listeners. Validation does not invoke skills or models or test external connectivity. Correct the draft, then `prepare` current input, stage resources, and `publish`; validation does not guarantee or authorize these later lifecycle steps. See [draft validation workflow](../skill-authoring/validation-workflow.md).
+For editor feedback, call `reloader.validate()` to reread configured resources or `reloader.validate(completeDocuments)` to check an in-memory complete replacement set. Check the result's `valid()` before treating `skills()` as a complete candidate: any `ERROR` makes it false and leaves metadata empty, while warnings retain complete metadata. Empty metadata can also mean a valid empty candidate. `issues()` provides severity, source name, optional skill name and field path, and message. Each immutable `ValidatedSkill` has an exact callable `name()` and `SkillKind` of `JAVA`, `YAML`, or `REST`. Successful results include fixed Java and the entire proposed YAML/REST set, sorted by exact case-sensitive name; both result lists are immutable and detached from later operations. Supplied source labels are diagnostics, never paths. An empty collection proposes removal of YAML and REST skills while fixed Java skills remain.
+
+```java
+SkillValidationResult feedback = reloader.validate(completeDocuments);
+if (feedback.valid()) {
+    List<String> restNames = feedback.skills().stream()
+            .filter(skill -> skill.kind() == SkillKind.REST)
+            .map(ValidatedSkill::name)
+            .toList();
+    // Compare restNames with application-owned routes before preparation.
+}
+```
+
+Repeated validation does not allocate an ID, create a candidate, activate a generation, instantiate a REST handler, change fixed caches, or notify retirement listeners. Validation does not invoke skills or models or test external connectivity. Correct the draft, then `prepare` current input, stage resources using `update.snapshot()` as the authoritative description of the frozen candidate, and `publish`; validation does not guarantee or authorize these later lifecycle steps. See [draft validation workflow](../skill-authoring/validation-workflow.md).
 
 Inject the framework-provided `SkillReloader`. Register retirement notification, read `snapshot().generationId()`, and stage matching application-owned REST configuration before opening your traffic gate. The initially injected `SkillCatalog` is a permanent startup snapshot; call `reloader.snapshot()` for current discovery. Catalog lookup is unfiltered and does not authorize an invocation.
 

@@ -38,6 +38,7 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.api.SkillReloadException",
             "ai.loomspan.api.SkillReloader",
             "ai.loomspan.api.SkillValidationResult",
+            "ai.loomspan.api.ValidatedSkill",
             "ai.loomspan.api.SkillValidationIssue",
             "ai.loomspan.api.SkillDocument",
             "ai.loomspan.api.PreparedSkillUpdate",

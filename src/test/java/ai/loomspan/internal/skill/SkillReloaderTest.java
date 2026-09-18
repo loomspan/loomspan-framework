@@ -5,6 +5,8 @@ import ai.loomspan.api.SkillReloadException;
 import ai.loomspan.api.SkillDocument;
 import ai.loomspan.api.SkillValidationIssue;
 import ai.loomspan.api.SkillValidationResult;
+import ai.loomspan.api.SkillKind;
+import ai.loomspan.api.ValidatedSkill;
 import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
 import ai.loomspan.internal.core.SkillMethodBeanPostProcessor;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
@@ -36,13 +38,26 @@ class SkillReloaderTest
         java.util.ArrayList<SkillValidationIssue> mutable = new java.util.ArrayList<>();
         mutable.add(new SkillValidationIssue(SkillValidationIssue.Severity.WARNING, "draft", null,
                 "output_schema", "review complexity"));
-        SkillValidationResult feedback = new SkillValidationResult(mutable);
+        java.util.ArrayList<ValidatedSkill> mutableSkills = new java.util.ArrayList<>();
+        mutableSkills.add(new ValidatedSkill("draft", SkillKind.REST));
+        SkillValidationResult feedback = new SkillValidationResult(mutable, mutableSkills);
         mutable.clear();
+        mutableSkills.clear();
         assertThat(feedback.valid()).isTrue();
         assertThat(feedback.issues()).hasSize(1);
+        assertThat(feedback.skills()).containsExactly(new ValidatedSkill("draft", SkillKind.REST));
         assertThatThrownBy(() -> feedback.issues().clear()).isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> feedback.skills().clear()).isInstanceOf(UnsupportedOperationException.class);
         assertThat(new SkillValidationResult(List.of(new SkillValidationIssue(
-                SkillValidationIssue.Severity.ERROR, "draft", null, null, "bad"))).valid()).isFalse();
+                SkillValidationIssue.Severity.ERROR, "draft", null, null, "bad")), List.of()).valid()).isFalse();
+        assertThatThrownBy(() -> new SkillValidationResult(List.of(new SkillValidationIssue(
+                SkillValidationIssue.Severity.ERROR, "draft", null, null, "bad")),
+                List.of(new ValidatedSkill("draft", SkillKind.REST))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ValidatedSkill(" ", SkillKind.REST))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ValidatedSkill("draft", null))
+                .isInstanceOf(NullPointerException.class);
 
         SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);
         manager.afterSingletonsInstantiated();
