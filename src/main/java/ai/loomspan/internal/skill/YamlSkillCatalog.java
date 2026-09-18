@@ -6,7 +6,10 @@ import tools.jackson.databind.DatabindException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import tools.jackson.dataformat.yaml.YAMLMapper;
+import tools.jackson.dataformat.yaml.JacksonYAMLParseException;
 import ai.loomspan.api.SkillDocument;
+import ai.loomspan.api.SkillValidationIssue;
+import ai.loomspan.api.SkillValidationResult;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.runtime.evidence.EvidenceContract;
 import org.slf4j.Logger;
@@ -34,6 +37,7 @@ import java.util.Set;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import java.util.function.Consumer;
 
 public class YamlSkillCatalog implements InitializingBean
 {
@@ -64,6 +68,24 @@ public class YamlSkillCatalog implements InitializingBean
     private final ObjectMapper yamlObjectMapper;
     private final Map<String, YamlSkillDefinition> skillsByName = new LinkedHashMap<>();
     private final Map<Resource, String> diagnosticSkillNames = new IdentityHashMap<>();
+    private final Map<Resource, String> diagnosticSources = new IdentityHashMap<>();
+    private Consumer<SkillValidationIssue> warnings = issue -> log.warn(issue.message());
+    private boolean logAuthoringWarnings;
+
+    record CheckedDocuments(List<YamlSkillDefinition> definitions, List<SkillValidationIssue> issues)
+    {
+        public CheckedDocuments
+        {
+            definitions = List.copyOf(definitions);
+            issues = List.copyOf(issues);
+        }
+        public SkillValidationResult result() { return new SkillValidationResult(issues); }
+        public void requireValid()
+        {
+            issues.stream().filter(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR)
+                    .findFirst().ifPresent(issue -> { throw new IllegalStateException(issue.message()); });
+        }
+    }
 
     public YamlSkillCatalog(LoomspanProperties properties)
     {
@@ -104,49 +126,117 @@ public class YamlSkillCatalog implements InitializingBean
     @Override
     public void afterPropertiesSet()
     {
-        skillsByName.clear();
-        diagnosticSkillNames.clear();
-        for (DiscoveredYamlSkillResource discovered : discoverResources())
-        {
-            Resource resource = discovered.resource();
-            YamlSkillDefinition definition = loadDefinition(discovered);
-            addDefinition(resource, definition);
-        }
+        checkedConfigured(true).requireValid();
     }
 
     /** Initializes this catalog from a complete application-supplied YAML set. */
     public void loadSupplied(List<SkillDocument> documents)
     {
+        CheckedDocuments checked = checkedSupplied(documents, true);
+        checked.issues().stream().filter(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR)
+                .findFirst().ifPresent(issue -> {
+                    if (issue.message().startsWith("skill document") || issue.message().startsWith("duplicate skill document"))
+                        throw new IllegalArgumentException(issue.message());
+                    throw new IllegalStateException(issue.message());
+                });
+    }
+
+    CheckedDocuments checkedConfigured(boolean logWarnings)
+    {
+        reset(logWarnings);
+        List<SkillValidationIssue> issues = new ArrayList<>();
+        List<DiscoveredYamlSkillResource> resources;
+        try { resources = discoverResources(); }
+        catch (DiscoveryException ex)
+        {
+            issues.add(error("<configured-resources>", null, null, ex.getMessage()));
+            return checked(issues);
+        }
+        for (DiscoveredYamlSkillResource discovered : resources)
+        {
+            Resource resource = discovered.resource();
+            diagnosticSources.put(resource, describe(resource));
+            collect(resource, () -> loadDefinition(discovered), issues);
+        }
+        return checked(issues);
+    }
+
+    CheckedDocuments checkedSupplied(List<SkillDocument> documents, boolean logWarnings)
+    {
         Objects.requireNonNull(documents, "documents must not be null");
-        skillsByName.clear();
-        diagnosticSkillNames.clear();
-        Set<String> names = new LinkedHashSet<>();
+        reset(logWarnings);
+        List<SkillValidationIssue> issues = new ArrayList<>();
+        Set<String> labels = new LinkedHashSet<>();
         for (SkillDocument document : documents)
         {
-            if (document == null) throw new IllegalArgumentException("skill documents must not contain null");
+            if (document == null)
+            {
+                issues.add(error("<documents>", null, null, "skill documents must not contain null"));
+                continue;
+            }
             String label = document.sourceName();
             if (label == null || label.isBlank())
-                throw new IllegalArgumentException("skill document sourceName must not be blank");
+            {
+                issues.add(error("<documents>", null, "sourceName", "skill document sourceName must not be blank"));
+                continue;
+            }
+            if (!labels.add(label))
+            {
+                issues.add(error(label, null, "sourceName", "duplicate skill document sourceName '" + label + "'"));
+                continue;
+            }
             if (document.yaml() == null)
-                throw new IllegalArgumentException("skill document yaml must not be null for '" + label + "'");
-            if (!names.add(label))
-                throw new IllegalArgumentException("duplicate skill document sourceName '" + label + "'");
-        }
-        for (SkillDocument document : documents)
-        {
+            {
+                issues.add(error(label, null, "yaml", "skill document yaml must not be null for '" + label + "'"));
+                continue;
+            }
             byte[] bytes = document.yaml().getBytes(StandardCharsets.UTF_8);
-            Resource resource = new ByteArrayResource(bytes, document.sourceName());
-            YamlSkillSource source = new YamlSkillSource(resource, bytes, document.sourceName());
-            try
-            {
-                addDefinition(resource, loadDefinition(resource, source, bytes));
-            }
-            catch (RuntimeException ex)
-            {
-                if (ex instanceof IllegalStateException) throw ex;
-                throw new IllegalStateException("Invalid YAML skill in '" + document.sourceName() + "'", ex);
-            }
+            Resource resource = new ByteArrayResource(bytes, label);
+            diagnosticSources.put(resource, label);
+            YamlSkillSource source = new YamlSkillSource(resource, bytes, label);
+            collect(resource, () -> loadDefinition(resource, source, bytes), issues);
         }
+        return checked(issues);
+    }
+
+    private void reset(boolean logWarnings)
+    {
+        skillsByName.clear();
+        diagnosticSkillNames.clear();
+        diagnosticSources.clear();
+        logAuthoringWarnings = logWarnings;
+    }
+
+    private CheckedDocuments checked(List<SkillValidationIssue> issues)
+    {
+        return new CheckedDocuments(getSkills(), issues);
+    }
+
+    private void collect(Resource resource, java.util.function.Supplier<YamlSkillDefinition> loader,
+            List<SkillValidationIssue> issues)
+    {
+        warnings = issue -> {
+            issues.add(issue);
+            if (logAuthoringWarnings) log.warn(issue.message());
+        };
+        try { addDefinition(resource, loader.get()); }
+        catch (AuthoringException ex)
+        { issues.add(error(ex.source, ex.skill, ex.path, ex.getMessage())); }
+        catch (JacksonYAMLParseException ex)
+        { issues.add(error(diagnosticSource(resource), diagnosticSkillNames.get(resource), "manifest",
+                "Invalid YAML skill in '" + diagnosticSource(resource) + "': malformed YAML")); }
+        catch (DocumentReadException ex)
+        { issues.add(error(diagnosticSource(resource), diagnosticSkillNames.get(resource), null, ex.getMessage())); }
+    }
+
+    private static SkillValidationIssue error(String source, String skill, String path, String message)
+    {
+        return new SkillValidationIssue(SkillValidationIssue.Severity.ERROR, source, skill, path, message);
+    }
+
+    private String diagnosticSource(Resource resource)
+    {
+        return diagnosticSources.getOrDefault(resource, describe(resource));
     }
 
     private void addDefinition(Resource resource, YamlSkillDefinition definition)
@@ -196,7 +286,7 @@ public class YamlSkillCatalog implements InitializingBean
             }
             catch (IOException ex)
             {
-                throw new IllegalStateException("Failed to discover YAML skills from " + location, ex);
+                throw new DiscoveryException("Failed to discover YAML skills from " + location, ex);
             }
         }
 
@@ -214,7 +304,7 @@ public class YamlSkillCatalog implements InitializingBean
         }
         catch (IOException ex)
         {
-            throw new IllegalStateException("Failed to read YAML skill from " + describe(resource), ex);
+            throw new DocumentReadException("Failed to read YAML skill from " + describe(resource), ex);
         }
         YamlSkillSource source = new YamlSkillSource(resource, discovered.locationPattern(), bytes);
         return loadDefinition(resource, source, bytes);
@@ -348,7 +438,7 @@ public class YamlSkillCatalog implements InitializingBean
         }
         catch (IOException ex)
         {
-            throw new IllegalStateException("Failed to read YAML skill from " + describe(resource), ex);
+            throw new DocumentReadException("Failed to read YAML skill from " + describe(resource), ex);
         }
     }
 
@@ -1025,24 +1115,32 @@ public class YamlSkillCatalog implements InitializingBean
     {
         if (depth > OUTPUT_SCHEMA_WARNING_DEPTH)
         {
-            log.warn("YAML skill '{}' output_schema at '{}' exceeds recommended nesting depth {}",
-                    describe(resource), fieldPath, OUTPUT_SCHEMA_WARNING_DEPTH);
+            warning(resource, fieldPath, "YAML skill '" + describe(resource) + "' output_schema at '"
+                    + fieldPath + "' exceeds recommended nesting depth " + OUTPUT_SCHEMA_WARNING_DEPTH);
         }
         if (schema.getProperties().size() > OUTPUT_SCHEMA_WARNING_PROPERTIES)
         {
-            log.warn("YAML skill '{}' output_schema at '{}' defines {} properties; recommended maximum is {}",
-                    describe(resource), fieldPath, schema.getProperties().size(), OUTPUT_SCHEMA_WARNING_PROPERTIES);
+            warning(resource, fieldPath, "YAML skill '" + describe(resource) + "' output_schema at '"
+                    + fieldPath + "' defines " + schema.getProperties().size() + " properties; recommended maximum is "
+                    + OUTPUT_SCHEMA_WARNING_PROPERTIES);
         }
         if (schema.getRequired().size() > OUTPUT_SCHEMA_WARNING_REQUIRED)
         {
-            log.warn("YAML skill '{}' output_schema at '{}' defines {} required fields; recommended maximum is {}",
-                    describe(resource), fieldPath, schema.getRequired().size(), OUTPUT_SCHEMA_WARNING_REQUIRED);
+            warning(resource, fieldPath, "YAML skill '" + describe(resource) + "' output_schema at '"
+                    + fieldPath + "' defines " + schema.getRequired().size() + " required fields; recommended maximum is "
+                    + OUTPUT_SCHEMA_WARNING_REQUIRED);
         }
         if ("array".equals(schema.getType()) && schema.getItems() != null && "object".equals(schema.getItems().getType()))
         {
-            log.warn("YAML skill '{}' output_schema at '{}' uses arrays of objects; keep item objects shallow for best model reliability",
-                    describe(resource), fieldPath);
+            warning(resource, fieldPath, "YAML skill '" + describe(resource) + "' output_schema at '"
+                    + fieldPath + "' uses arrays of objects; keep item objects shallow for best model reliability");
         }
+    }
+
+    private void warning(Resource resource, String path, String message)
+    {
+        warnings.accept(new SkillValidationIssue(SkillValidationIssue.Severity.WARNING,
+                diagnosticSource(resource), diagnosticSkillNames.get(resource), path, message));
     }
 
     private void validateRegexLinter(Resource resource, YamlSkillManifest.RegexManifest regex)
@@ -1064,19 +1162,20 @@ public class YamlSkillCatalog implements InitializingBean
         }
     }
 
-    private IllegalStateException invalidSkill(Resource resource, String fieldName, String detail)
+    private AuthoringException invalidSkill(Resource resource, String fieldName, String detail)
     {
         String skillName = diagnosticSkillNames.get(resource);
         if (StringUtils.hasText(skillName))
         {
             return invalidNamedSkill(resource, skillName, fieldName, detail);
         }
-        return new IllegalStateException("Invalid YAML skill '" + describe(resource) + "' for field '" + fieldName + "': " + detail);
+        return new AuthoringException(diagnosticSource(resource), null, fieldName,
+                "Invalid YAML skill '" + describe(resource) + "' for field '" + fieldName + "': " + detail);
     }
 
 
 
-    private IllegalStateException invalidNamedSkill(Resource resource,
+    private AuthoringException invalidNamedSkill(Resource resource,
             YamlSkillManifest manifest,
             String fieldName,
             String detail)
@@ -1084,13 +1183,39 @@ public class YamlSkillCatalog implements InitializingBean
         return invalidNamedSkill(resource, manifest.getName(), fieldName, detail);
     }
 
-    private IllegalStateException invalidNamedSkill(Resource resource,
+    private AuthoringException invalidNamedSkill(Resource resource,
             String skillName,
             String fieldName,
             String detail)
     {
-        return new IllegalStateException("Invalid YAML skill '" + skillName + "' in '" + describe(resource)
-                + "' for field '" + fieldName + "': " + detail);
+        return new AuthoringException(diagnosticSource(resource), skillName, fieldName,
+                "Invalid YAML skill '" + skillName + "' in '" + describe(resource)
+                        + "' for field '" + fieldName + "': " + detail);
+    }
+
+    private static final class AuthoringException extends IllegalStateException
+    {
+        private final String source;
+        private final String skill;
+        private final String path;
+
+        private AuthoringException(String source, String skill, String path, String message)
+        {
+            super(message);
+            this.source = source;
+            this.skill = skill;
+            this.path = path;
+        }
+    }
+
+    private static final class DiscoveryException extends IllegalStateException
+    {
+        private DiscoveryException(String message, IOException cause) { super(message, cause); }
+    }
+
+    private static final class DocumentReadException extends IllegalStateException
+    {
+        private DocumentReadException(String message, IOException cause) { super(message, cause); }
     }
 
     private String toFieldPath(UnrecognizedPropertyException ex)

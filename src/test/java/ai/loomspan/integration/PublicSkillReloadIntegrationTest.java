@@ -34,6 +34,42 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PublicSkillReloadIntegrationTest
 {
     @Test
+    void publicValidationRereadsConfiguredResourcesAndKeepsSuppliedInputIsolated(@TempDir Path directory)
+            throws Exception
+    {
+        Path configured = directory.resolve("configured.yaml");
+        Files.writeString(configured, "name: configured\ndescription: configured\nrest: true\n");
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(
+                        ConfigurationPropertiesAutoConfiguration.class,
+                        ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
+                        LoomspanAutoConfiguration.class,
+                        ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
+                .withUserConfiguration(RestConfiguration.class)
+                .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    SkillReloader reloader = context.getBean(SkillReloader.class);
+                    String initial = reloader.snapshot().generationId();
+                    assertThat(reloader.validate().valid()).isTrue();
+                    String supplied = "name: supplied\ndescription: supplied\nrest: true\n";
+                    var documents = List.of(new SkillDocument(directory.resolve("absent.yaml").toString(), supplied));
+                    assertThat(reloader.validate(documents).valid()).isTrue();
+                    assertThat(Files.exists(directory.resolve("absent.yaml"))).isFalse();
+                    assertThat(reloader.snapshot().generationId()).isEqualTo(initial);
+                    PreparedSkillUpdate candidate = reloader.prepare(documents);
+                    try { Files.writeString(configured, "name: broken\ndescription: broken\nrest: true\nmodel: forbidden\n"); }
+                    catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
+                    assertThat(reloader.validate().valid()).isFalse();
+                    assertThat(reloader.validate(documents).valid()).isTrue();
+                    assertThatThrownBy(reloader::prepare).isInstanceOf(SkillReloadException.class);
+                    reloader.publish(candidate);
+                    assertThat(reloader.snapshot().skill("supplied")).isPresent();
+                    assertThat(reloader.snapshot().skill("broken")).isEmpty();
+                });
+        assertThat(Files.readString(configured)).contains("model: forbidden");
+    }
+    @Test
     void retirementWaitsForPendingOldGenerationThenCleansUpAfterRelease(@TempDir Path directory)
     {
         String yaml = "name: leaf\ndescription: REST leaf\nrest: true\n";

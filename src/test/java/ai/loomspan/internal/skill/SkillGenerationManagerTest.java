@@ -4,6 +4,7 @@ import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.SkillDocument;
+import ai.loomspan.api.SkillValidationIssue;
 import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
@@ -35,6 +36,111 @@ import static org.mockito.Mockito.when;
 
 class SkillGenerationManagerTest
 {
+    @Test
+    void validationIsRepeatableAndLeavesIdsHandlersAndFixedSnapshotUntouched(@TempDir Path directory)
+    {
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));
+        AtomicInteger handlers = new AtomicInteger();
+        DefaultListableBeanFactory beans = new DefaultListableBeanFactory();
+        RootBeanDefinition handler = new RootBeanDefinition(RestSkillHandler.class);
+        handler.setScope(BeanDefinition.SCOPE_PROTOTYPE);
+        handler.setInstanceSupplier(() -> {
+            handlers.incrementAndGet();
+            return (RestSkillHandler) invocation -> "ok";
+        });
+        beans.registerBeanDefinition("handler", handler);
+        SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), beans);
+        assertThatThrownBy(manager::validate).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("startup");
+        manager.afterSingletonsInstantiated();
+        String activeId = manager.active().id();
+        List<SkillDocument> proposed = List.of(new SkillDocument("draft", "name: restSkill\ndescription: rest\nrest: true\n"));
+        var first = manager.validate(proposed);
+        var second = manager.validate(proposed);
+        assertThat(first.valid()).isTrue();
+        assertThat(second).isEqualTo(first);
+        assertThat(manager.validate(List.of(new SkillDocument("bad", "invalid: ["))).valid()).isFalse();
+        assertThat(handlers).hasValue(0);
+        assertThat(manager.active().id()).isEqualTo(activeId);
+        assertThat(manager.prepare(proposed).id()).endsWith("-2");
+        assertThat(handlers).hasValue(1);
+        verify(javaSkills).capabilities();
+    }
+
+    @Test
+    void validationMatchesPreparationForConflictsAndReferences(@TempDir Path directory)
+    {
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));
+        SkillGenerationManager manager = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
+        manager.afterSingletonsInstantiated();
+        List<SkillDocument> conflict = List.of(new SkillDocument("conflict", "name: fixedJava\ndescription: conflict\nmodel: model\n"));
+        assertThat(manager.validate(conflict).issues()).anySatisfy(issue -> {
+            assertThat(issue.severity()).isEqualTo(SkillValidationIssue.Severity.ERROR);
+            assertThat(issue.fieldPath()).isEqualTo("name");
+        });
+        assertThatThrownBy(() -> manager.prepare(conflict)).hasMessageContaining("already registered");
+        List<SkillDocument> missing = List.of(new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: missing\n"));
+        assertThat(manager.validate(missing).issues()).extracting(issue -> issue.fieldPath())
+                .contains("allowed_skills");
+        assertThatThrownBy(() -> manager.prepare(missing)).hasMessageContaining("Unknown child skill");
+        assertThat(manager.validate(List.of()).valid()).isTrue();
+        assertThat(manager.prepare(List.of()).capabilities()).extracting(CapabilityMetadata::name)
+                .containsExactly("fixedJava");
+    }
+
+    @Test
+    void restHandlerDeclarationChecksAreAdvisoryAndDoNotConstructBeans(@TempDir Path directory)
+    {
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of());
+        List<SkillDocument> rest = List.of(new SkillDocument("REST draft",
+                "name: leaf\ndescription: leaf\nrest: true\n"));
+        SkillGenerationManager none = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
+        none.afterSingletonsInstantiated();
+        assertThat(none.validate(rest).issues()).anySatisfy(issue ->
+                assertThat(issue.message()).contains("found none"));
+        assertThatThrownBy(() -> none.prepare(rest)).hasMessageContaining("found none");
+        assertThat(none.validate(List.of()).valid()).isTrue();
+
+        DefaultListableBeanFactory beans = new DefaultListableBeanFactory();
+        AtomicInteger constructions = new AtomicInteger();
+        for (String name : List.of("first", "second"))
+        {
+            RootBeanDefinition handler = new RootBeanDefinition(RestSkillHandler.class);
+            handler.setScope(BeanDefinition.SCOPE_PROTOTYPE);
+            handler.setInstanceSupplier(() -> {
+                constructions.incrementAndGet();
+                return (RestSkillHandler) invocation -> "ok";
+            });
+            beans.registerBeanDefinition(name, handler);
+        }
+        SkillGenerationManager multiple = new SkillGenerationManager(javaSkills,
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), beans);
+        multiple.afterSingletonsInstantiated();
+        assertThat(multiple.validate(rest).issues()).anySatisfy(issue ->
+                assertThat(issue.message()).contains("first, second"));
+        assertThatThrownBy(() -> multiple.prepare(rest)).hasMessageContaining("first, second");
+        assertThat(constructions).hasValue(0);
+        assertThat(multiple.validate(List.of()).valid()).isTrue();
+    }
+
+    @Test
+    void failedNamedDocumentSuppressesOnlyDependentChildNoise(@TempDir Path directory)
+    {
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of());
+        SkillGenerationManager manager = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
+        manager.afterSingletonsInstantiated();
+        var result = manager.validate(List.of(
+                new SkillDocument("bad", "name: couldExist\ndescription: bad\nrest: true\nmodel: forbidden\n"),
+                new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: couldExist\n  - name: certainlyMissing\n")));
+        assertThat(result.issues()).extracting(issue -> issue.message())
+                .anySatisfy(message -> assertThat(message).contains("certainlyMissing"))
+                .noneSatisfy(message -> assertThat(message).contains("Unknown child skill 'couldExist'"));
+    }
     @Test
     void suppliedSetIsFrozenAndCanAlternateWithConfiguredDiscovery(@TempDir Path directory) throws Exception
     {
@@ -252,7 +358,8 @@ class SkillGenerationManagerTest
     private static YamlSkillCatalog catalog(YamlSkillDefinition... definitions)
     {
         YamlSkillCatalog catalog = mock(YamlSkillCatalog.class);
-        when(catalog.getSkills()).thenReturn(List.of(definitions));
+        when(catalog.checkedConfigured(true)).thenReturn(
+                new YamlSkillCatalog.CheckedDocuments(List.of(definitions), List.of()));
         return catalog;
     }
 

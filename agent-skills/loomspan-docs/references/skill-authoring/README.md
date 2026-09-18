@@ -45,6 +45,7 @@ Read [source-verification.md](source-verification.md) before performing a source
 | Configure planning concurrency or diagnose task grouping/dependencies | [planning-concurrency.md](planning-concurrency.md) | [planning-task-constraints.md](planning-task-constraints.md) when child task counts are also constrained |
 | Select a model or configure its connection | [model-selection-and-connections.md](model-selection-and-connections.md) | [mental-model.md](mental-model.md) |
 | Diagnose retries, usage, terminal failures, or a nested runtime path with the packaged Agent Skill | [traces-and-debugging.md](traces-and-debugging.md) | The relevant validation or evidence topic |
+| Validate a complete draft YAML skill set before staging | [validation-workflow.md](validation-workflow.md) | [Java skill reload API](../java-api/skill-reload.md) for application integration |
 | Resolve ambiguity or an edge case | [source-verification.md](source-verification.md) | The topic's implementation anchors |
 
 Do not load every document by default. Start with the routing entry most relevant to the developer's goal and expand only when the task crosses another documented concern.
@@ -68,7 +69,7 @@ Do not load every document by default. Start with the routing entry most relevan
 | Model selection and connections | Initial, source-verified | Framework model aliases, named connections, drivers, thinking levels, migration, and diagnostics |
 | Execution limits and quotas | Foundational | Trace guidance covers model-attempt and usage quota effects plus run-start diagnostic comparison; complete limit configuration remains undocumented |
 | Traces and debugging | Source-verified | Thirteen-tool discovery, current runtime status, visible complete live branches with exact snapshot simultaneity, authoritative MCP whole-plan queries, assignment-aware canonical timeline rows, admission/join events plus accepted-order plan projections, inline same-plan status/note comparisons with exact nullable values and explicit bounded/unavailable evidence, exact nullable observed-overlap semantics, independent finalized/acquired/imported discovery, compact/detailed frames and records, descriptor/inline/exact semantic reads, lossless byte-budgeted traversal, usage/failures, deliberate raw forensics, and current-run/transport limitations |
-| Testing skill trees | Not yet documented | The design checklist gives initial review prompts only |
+| Testing skill trees | Focused validation workflow | [validation-workflow.md](validation-workflow.md) covers complete-set authoring checks; runtime execution testing remains undocumented |
 
 ## Normative Language
 

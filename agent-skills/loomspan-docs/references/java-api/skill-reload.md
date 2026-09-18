@@ -7,6 +7,8 @@ coverage: source-verified
 
 # Two-stage skill updates
 
+For editor feedback, call `reloader.validate()` to reread configured resources or `reloader.validate(completeDocuments)` to check an in-memory complete replacement set. The result's `valid()` is false for any `ERROR`; `issues()` provides severity, source name, optional skill name and field path, and message. Warnings alone permit preparation. Supplied source labels are diagnostics, never paths. An empty collection proposes removal of YAML and REST skills while fixed Java skills remain. Repeated validation does not allocate an ID, create a candidate, activate a generation, instantiate a REST handler, change fixed caches, or notify retirement listeners. Validation does not invoke skills or models or test external connectivity. Correct the draft, then `prepare` current input, stage resources, and `publish`; validation does not guarantee or authorize these later lifecycle steps. See [draft validation workflow](../skill-authoring/validation-workflow.md).
+
 Inject the framework-provided `SkillReloader`. Register retirement notification, read `snapshot().generationId()`, and stage matching application-owned REST configuration before opening your traffic gate. The initially injected `SkillCatalog` is a permanent startup snapshot; call `reloader.snapshot()` for current discovery. Catalog lookup is unfiltered and does not authorize an invocation.
 
 ```java

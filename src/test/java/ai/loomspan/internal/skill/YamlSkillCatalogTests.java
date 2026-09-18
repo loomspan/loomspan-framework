@@ -4,6 +4,7 @@ import ai.loomspan.autoconfigure.LoomspanAutoConfiguration;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.api.SkillMethod;
 import ai.loomspan.api.SkillDocument;
+import ai.loomspan.api.SkillValidationIssue;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DynamicTest;
@@ -32,6 +33,66 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(OutputCaptureExtension.class)
 class YamlSkillCatalogTests {
+
+    @Test
+    void validationCollectsIndependentDocumentsAndKeepsSourceAndPath() {
+        YamlSkillCatalog catalog = new YamlSkillCatalog(new LoomspanProperties());
+        var checked = catalog.checkedSupplied(List.of(
+                new SkillDocument("bad YAML", "invalid: ["),
+                new SkillDocument("bad REST", "name: broken\ndescription: broken\nrest: true\nmodel: missing\n"),
+                new SkillDocument("good", "name: good\ndescription: good\nrest: true\n")), false);
+        assertThat(checked.result().valid()).isFalse();
+        assertThat(checked.issues()).extracting(issue -> issue.sourceName())
+                .containsExactly("bad YAML", "bad REST");
+        assertThat(checked.issues().get(1).skillName()).isEqualTo("broken");
+        assertThat(checked.issues().get(1).fieldPath()).isEqualTo("model");
+        assertThat(checked.definitions()).extracting(definition -> definition.manifest().getName())
+                .containsExactly("good");
+    }
+
+    @Test
+    void validationReturnsComplexityWarningsWithoutLogging(CapturedOutput output) throws Exception {
+        String yaml = new String(new ClassPathResource("skills/valid/output-schema-complex-skill.yaml")
+                .getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        LoomspanProperties properties = new LoomspanProperties();
+        LoomspanProperties.ConnectionProperties connection = new LoomspanProperties.ConnectionProperties();
+        connection.setDriver(AiDriver.OPENAI);
+        properties.setConnections(Map.of("connection", connection));
+        LoomspanProperties.ModelCatalogEntry model = new LoomspanProperties.ModelCatalogEntry();
+        model.setConnection("connection");
+        model.setProviderModel("provider-model");
+        model.setThinkingLevels(java.util.Set.of("medium"));
+        properties.setModels(Map.of("gpt-5", model));
+        YamlSkillCatalog catalog = new YamlSkillCatalog(properties);
+        var first = catalog.checkedSupplied(List.of(new SkillDocument("draft", yaml)), false).result();
+        var second = catalog.checkedSupplied(List.of(new SkillDocument("draft", yaml)), false).result();
+        assertThat(first.valid()).isTrue();
+        assertThat(first.issues()).isNotEmpty().allSatisfy(issue -> {
+            assertThat(issue.severity()).isEqualTo(SkillValidationIssue.Severity.WARNING);
+            assertThat(issue.sourceName()).isEqualTo("draft");
+            assertThat(issue.skillName()).isEqualTo("outputSchemaComplexSkill");
+            assertThat(issue.fieldPath()).startsWith("output_schema");
+        });
+        assertThat(second).isEqualTo(first);
+        assertThat(output.getOut()).doesNotContain("recommended maximum");
+    }
+
+    @Test
+    void validationReportsSuppliedEntryProblemsWithoutResolvingLabels() {
+        YamlSkillCatalog catalog = new YamlSkillCatalog(new LoomspanProperties());
+        String rest = "name: one\ndescription: one\nrest: true\n";
+        var checked = catalog.checkedSupplied(java.util.Arrays.asList(
+                null,
+                new SkillDocument(" ", rest),
+                new SkillDocument("file:/definitely-absent.yaml", rest),
+                new SkillDocument("file:/definitely-absent.yaml", rest),
+                new SkillDocument("FILE:/definitely-absent.yaml", rest.replace("one", "two")),
+                new SkillDocument("null YAML", null)), false);
+        assertThat(checked.issues()).extracting(issue -> issue.sourceName())
+                .containsExactly("<documents>", "<documents>", "file:/definitely-absent.yaml", "null YAML");
+        assertThat(checked.definitions()).extracting(definition -> definition.manifest().getName())
+                .containsExactly("one", "two");
+    }
 
     @Test
     void suppliedDocumentsValidateIdentityAndReuseManifestRules() {

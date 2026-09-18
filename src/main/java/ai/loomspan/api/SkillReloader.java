@@ -6,6 +6,12 @@ import java.util.function.Consumer;
 /** Framework-owned two-stage update service for the complete skill set. */
 public interface SkillReloader
 {
+    /** Rereads configured resources and checks the complete set without changing framework state. */
+    SkillValidationResult validate();
+
+    /** Checks a complete proposed replacement set. Feedback is advisory; prepare checks again. */
+    SkillValidationResult validate(Collection<SkillDocument> documents);
+
     /** Validates and freezes a candidate without changing the active generation. */
     PreparedSkillUpdate prepare();
 

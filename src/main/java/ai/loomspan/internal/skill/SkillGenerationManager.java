@@ -3,6 +3,8 @@ package ai.loomspan.internal.skill;
 import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.RestSkillInvocation;
 import ai.loomspan.api.SkillDocument;
+import ai.loomspan.api.SkillValidationIssue;
+import ai.loomspan.api.SkillValidationResult;
 import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
@@ -10,6 +12,7 @@ import ai.loomspan.internal.core.SkillExecutionDescriptor;
 import ai.loomspan.internal.core.SkillMethodBeanPostProcessor;
 import ai.loomspan.internal.core.SkillSource;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
+import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.security.SkillAccessPolicy;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -84,36 +87,116 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
     {
         initializeFixedDependencies();
         YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
-        catalog.afterPropertiesSet();
-        return prepareCatalog(catalog);
+        return prepareCatalog(check(catalog.checkedConfigured(true)));
     }
 
     public SkillGeneration prepare(List<SkillDocument> documents)
     {
         initializeFixedDependencies();
         YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
-        catalog.loadSupplied(documents);
-        return prepareCatalog(catalog);
+        return prepareCatalog(check(catalog.checkedSupplied(documents, true)));
     }
 
-    private SkillGeneration prepareCatalog(YamlSkillCatalog catalog)
+    public SkillValidationResult validate()
     {
+        requireInitialized();
+        YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
+        return check(catalog.checkedConfigured(false)).result();
+    }
+
+    public SkillValidationResult validate(List<SkillDocument> documents)
+    {
+        requireInitialized();
+        YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
+        return check(catalog.checkedSupplied(documents, false)).result();
+    }
+
+    private void requireInitialized()
+    {
+        if (fixedJavaCapabilities == null || fixedRestHandlerBeanNames == null)
+            throw new IllegalStateException("Skill validation requires completed framework startup");
+    }
+
+    private record CheckedSet(List<YamlSkillDefinition> definitions,
+            Map<YamlSkillDefinition, SkillInputContract> contracts, SkillValidationResult result)
+    {
+        void requireValid()
+        {
+            result.issues().stream().filter(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR)
+                    .findFirst().ifPresent(issue -> { throw new IllegalStateException(issue.message()); });
+        }
+    }
+
+    private CheckedSet check(YamlSkillCatalog.CheckedDocuments documents)
+    {
+        List<SkillValidationIssue> issues = new ArrayList<>(documents.issues());
+        Map<YamlSkillDefinition, SkillInputContract> contracts = new LinkedHashMap<>();
+        LinkedHashMap<String, CapabilityMetadata> names = new LinkedHashMap<>();
+        for (CapabilityMetadata javaCapability : fixedJavaCapabilities)
+            names.put(javaCapability.name(), javaCapability);
+        for (YamlSkillDefinition definition : documents.definitions())
+        {
+            String name = definition.manifest().getName();
+            CapabilityMetadata existing = names.get(name);
+            if (existing != null)
+                issues.add(error(definition, "name", "Capability with name '" + name
+                        + "' is already registered at " + existing.id() + "; conflicting declaration at "
+                        + (definition.rest() ? "rest:" : "yaml:") + definition.source().diagnosticName()));
+            else names.put(name, null);
+            try { contracts.put(definition, inputs.resolveYamlCapability(definition)); }
+            catch (IllegalStateException ex) { issues.add(error(definition, "input_schema", ex.getMessage())); }
+        }
+        List<YamlSkillDefinition> rest = documents.definitions().stream().filter(YamlSkillDefinition::rest).toList();
+        if (!rest.isEmpty() && fixedRestHandlerBeanNames.size() != 1)
+        {
+            String message = fixedRestHandlerBeanNames.isEmpty()
+                    ? "REST skill manifests require exactly one RestSkillHandler bean; found none for "
+                        + rest.stream().map(definition -> definition.source().diagnosticName()).sorted()
+                                .reduce((left, right) -> left + ", " + right).orElseThrow()
+                    : "REST skill manifests require exactly one RestSkillHandler bean; found "
+                        + String.join(", ", fixedRestHandlerBeanNames);
+            issues.add(error(rest.getFirst(), "rest", message));
+        }
+        // A nameless failed document could have declared any child; a named failure obscures only its own name.
+        boolean unknownFailedName = documents.issues().stream()
+                .anyMatch(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR && issue.skillName() == null);
+        List<String> failedNames = documents.issues().stream()
+                .filter(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR)
+                .map(SkillValidationIssue::skillName).filter(Objects::nonNull).toList();
+        for (YamlSkillDefinition definition : documents.definitions())
+            for (String child : definition.allowedSkills())
+                if (!names.containsKey(child) && !unknownFailedName && !failedNames.contains(child))
+                    issues.add(error(definition, "allowed_skills", "Unknown child skill '" + child
+                            + "' in allowed_skills of '" + definition.manifest().getName() + "' at "
+                            + definition.source().diagnosticName()));
+        return new CheckedSet(documents.definitions(), Map.copyOf(contracts), new SkillValidationResult(issues));
+    }
+
+    private static SkillValidationIssue error(YamlSkillDefinition definition, String path, String message)
+    {
+        return new SkillValidationIssue(SkillValidationIssue.Severity.ERROR,
+                definition.source().diagnosticName(), definition.manifest().getName(), path, message);
+    }
+
+    private SkillGeneration prepareCatalog(CheckedSet checked)
+    {
+        checked.requireValid();
         long ordinal = issuedGenerationIds.incrementAndGet();
         if (ordinal <= 0) throw new IllegalStateException("Skill generation ID space exhausted");
         String generationId = generationNamespace + "-" + ordinal;
-        List<YamlSkillDefinition> definitions = catalog.getSkills();
+        List<YamlSkillDefinition> definitions = checked.definitions();
         LinkedHashMap<String, CapabilityMetadata> capabilities = new LinkedHashMap<>();
         for (CapabilityMetadata metadata : fixedJavaCapabilities) putCapability(capabilities, metadata);
 
         List<YamlSkillDefinition> restDefinitions = definitions.stream().filter(YamlSkillDefinition::rest).toList();
-        RestSkillHandler restHandler = restDefinitions.isEmpty() ? null : requireRestHandler(restDefinitions);
+        RestSkillHandler restHandler = restDefinitions.isEmpty() ? null : requireRestHandler();
         LinkedHashMap<String, YamlSkillDefinition> definitionsByName = new LinkedHashMap<>();
         for (YamlSkillDefinition definition : definitions)
         {
             String name = definition.manifest().getName();
             definitionsByName.put(name, definition);
             String description = definition.manifest().getDescription();
-            var contract = inputs.resolveYamlCapability(definition);
+            var contract = checked.contracts().get(definition);
             boolean rest = definition.rest();
             RestSkillHandler handler = restHandler;
             CapabilityMetadata metadata = new CapabilityMetadata(
@@ -129,12 +212,6 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
                     contract, new SkillSource(definition.source().diagnosticName(), null, null));
             putCapability(capabilities, metadata);
         }
-        for (YamlSkillDefinition definition : definitions)
-            for (String child : definition.allowedSkills())
-                if (!capabilities.containsKey(child))
-                    throw new IllegalStateException("Unknown child skill '" + child + "' in allowed_skills of '"
-                            + definition.manifest().getName() + "' at " + definition.source().diagnosticName());
-
         return new SkillGeneration(generationId, capabilities, definitionsByName);
     }
 
@@ -254,17 +331,8 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
         fixedRestHandlerBeanNames = List.of(names);
     }
 
-    private synchronized RestSkillHandler requireRestHandler(List<YamlSkillDefinition> definitions)
+    private synchronized RestSkillHandler requireRestHandler()
     {
-        if (fixedRestHandlerBeanNames.isEmpty())
-        {
-            String resources = definitions.stream().map(definition -> definition.source().diagnosticName())
-                    .sorted().reduce((left, right) -> left + ", " + right).orElseThrow();
-            throw new IllegalStateException("REST skill manifests require exactly one RestSkillHandler bean; found none for " + resources);
-        }
-        if (fixedRestHandlerBeanNames.size() > 1)
-            throw new IllegalStateException("REST skill manifests require exactly one RestSkillHandler bean; found "
-                    + String.join(", ", fixedRestHandlerBeanNames));
         if (fixedRestHandler == null)
             fixedRestHandler = beans.getBean(fixedRestHandlerBeanNames.getFirst(), RestSkillHandler.class);
         return fixedRestHandler;

@@ -5,6 +5,7 @@ import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillReloadException;
 import ai.loomspan.api.SkillReloader;
 import ai.loomspan.api.SkillDocument;
+import ai.loomspan.api.SkillValidationResult;
 import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
 
 import java.util.Objects;
@@ -28,6 +29,19 @@ public final class DefaultSkillReloader implements SkillReloader
         this.generations = Objects.requireNonNull(generations, "generations must not be null");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle must not be null");
         generations.deliveryEnabled(lifecycle::isAdmissionOpen);
+    }
+
+    @Override
+    public SkillValidationResult validate()
+    {
+        return generations.validate();
+    }
+
+    @Override
+    public SkillValidationResult validate(Collection<SkillDocument> documents)
+    {
+        Objects.requireNonNull(documents, "documents must not be null");
+        return generations.validate(new ArrayList<>(documents));
     }
 
     @Override

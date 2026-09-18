@@ -3,6 +3,8 @@ package ai.loomspan.internal.skill;
 import ai.loomspan.api.PreparedSkillUpdate;
 import ai.loomspan.api.SkillReloadException;
 import ai.loomspan.api.SkillDocument;
+import ai.loomspan.api.SkillValidationIssue;
+import ai.loomspan.api.SkillValidationResult;
 import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
 import ai.loomspan.internal.core.SkillMethodBeanPostProcessor;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
@@ -28,6 +30,30 @@ import static org.mockito.Mockito.when;
 
 class SkillReloaderTest
 {
+    @Test
+    void validationValuesAreImmutableAndPreparedCandidateRetainsItsBase()
+    {
+        java.util.ArrayList<SkillValidationIssue> mutable = new java.util.ArrayList<>();
+        mutable.add(new SkillValidationIssue(SkillValidationIssue.Severity.WARNING, "draft", null,
+                "output_schema", "review complexity"));
+        SkillValidationResult feedback = new SkillValidationResult(mutable);
+        mutable.clear();
+        assertThat(feedback.valid()).isTrue();
+        assertThat(feedback.issues()).hasSize(1);
+        assertThatThrownBy(() -> feedback.issues().clear()).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(new SkillValidationResult(List.of(new SkillValidationIssue(
+                SkillValidationIssue.Severity.ERROR, "draft", null, null, "bad"))).valid()).isFalse();
+
+        SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);
+        manager.afterSingletonsInstantiated();
+        DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle());
+        PreparedSkillUpdate candidate = reloader.prepare();
+        assertThat(reloader.validate().valid()).isTrue();
+        assertThat(reloader.validate().valid()).isTrue();
+        assertThat(reloader.snapshot().generationId()).isNotEqualTo(candidate.generationId());
+        reloader.publish(candidate);
+        assertThat(reloader.snapshot().generationId()).isEqualTo(candidate.generationId());
+    }
     @Test
     void unusedPublishedGenerationsRetireOnceAndRejectedCandidatesDoNot()
     {
@@ -382,7 +408,12 @@ class SkillReloaderTest
     private static YamlSkillCatalog emptyCatalog()
     {
         YamlSkillCatalog catalog = mock(YamlSkillCatalog.class);
-        when(catalog.getSkills()).thenReturn(List.of());
+        when(catalog.checkedConfigured(true)).thenReturn(
+                new YamlSkillCatalog.CheckedDocuments(List.of(), List.of()));
+        when(catalog.checkedConfigured(false)).thenReturn(
+                new YamlSkillCatalog.CheckedDocuments(List.of(), List.of()));
+        when(catalog.checkedSupplied(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq(true)))
+                .thenReturn(new YamlSkillCatalog.CheckedDocuments(List.of(), List.of()));
         return catalog;
     }
 
