@@ -54,7 +54,7 @@ Add the starter to your application:
 <dependency>
     <groupId>ai.loomspan</groupId>
     <artifactId>loomspan-spring-boot-starter</artifactId>
-    <version>1.0.0-beta.5</version>
+    <version>1.0.0-beta.6-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -290,13 +290,13 @@ snapshot. Git tags are the release-version catalog, so there is no separate
 bootstrap version list to update.
 
 Keep the project on the next anticipated beta version with `-SNAPSHOT` during
-normal development. Remove that suffix when preparing the beta release. For
-beta 5, the transition is:
+normal development. Remove that suffix when preparing the beta release. The
+transition is:
 
 ```text
-development: 1.0.0-beta.5-SNAPSHOT
-release: 1.0.0-beta.5
-tag: v1.0.0-beta.5
+development: <release-version>-SNAPSHOT
+release: <release-version>
+tag: v<release-version>
 then begin the next development snapshot
 ```
 
