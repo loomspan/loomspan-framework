@@ -55,7 +55,7 @@ class ObservabilityActuatorCoexistenceIntegrationTest
         HttpResponse<String> missingKey = client.send(request(false), HttpResponse.BodyHandlers.ofString());
 
         assertThat(validKey.statusCode()).isEqualTo(200);
-        assertThat(validKey.body()).contains("\"consoleCompatibilityVersion\":\"1.0.0-beta.5-SNAPSHOT\"");
+        assertThat(validKey.body()).contains("\"consoleCompatibilityVersion\":\"1.0.0-beta.5\"");
         assertThat(missingKey.statusCode()).isEqualTo(401);
         assertThat(missingKey.body()).contains("\"code\":\"LOOMSPAN_API_KEY_REJECTED\"");
     }

@@ -54,7 +54,7 @@ Add the starter to your application:
 <dependency>
     <groupId>ai.loomspan</groupId>
     <artifactId>loomspan-spring-boot-starter</artifactId>
-    <version>1.0.0-beta.5-SNAPSHOT</version>
+    <version>1.0.0-beta.5</version>
 </dependency>
 ```
 
@@ -274,9 +274,9 @@ Skill versions with one command:
 
 ```bash
 python scripts/loomspan_version.py check
-python scripts/loomspan_version.py set 1.0.0-beta.5-SNAPSHOT
+python scripts/loomspan_version.py set <release-version>
 # Review, test, and commit the release version.
-python scripts/loomspan_version.py tag 1.0.0-beta.5-SNAPSHOT
+python scripts/loomspan_version.py tag <release-version>
 ```
 
 `set` requires a clean worktree and replaces the exact current version in all
@@ -290,35 +290,35 @@ snapshot. Git tags are the release-version catalog, so there is no separate
 bootstrap version list to update.
 
 Keep the project on the next anticipated beta version with `-SNAPSHOT` during
-normal development. Remove that suffix when preparing the beta release. The
-current development version is `1.0.0-beta.5-SNAPSHOT`. The beta 4 release transition is:
+normal development. Remove that suffix when preparing the beta release. For
+beta 5, the transition is:
 
 ```text
 development: 1.0.0-beta.5-SNAPSHOT
-release: 1.0.0-beta.5-SNAPSHOT
-tag: v1.0.0-beta.5-SNAPSHOT
+release: 1.0.0-beta.5
+tag: v1.0.0-beta.5
 then begin the next development snapshot
 ```
 
 Starting from a clean development snapshot worktree, prepare the release.
-If the version is already `1.0.0-beta.5-SNAPSHOT`, skip the `set` command. Pushing
+If the version is already the release version, skip the `set` command. Pushing
 the tag below starts the Console release and automatic Maven Central publication:
 
 ```bash
 python scripts/loomspan_version.py check
-python scripts/loomspan_version.py set 1.0.0-beta.5-SNAPSHOT
+python scripts/loomspan_version.py set <release-version>
 
 # Review and run the appropriate tests before committing.
 git add .
-git commit -m "Release 1.0.0-beta.5-SNAPSHOT"
+git commit -m "Release <release-version>"
 git push origin main
 
 # Before tagging, run Console Release and Maven Central Release manually
 # against main in GitHub Actions. Both manual runs only validate.
 # Require both runs and Console CI to pass on this exact commit.
 
-python scripts/loomspan_version.py tag 1.0.0-beta.5-SNAPSHOT
-git push origin main v1.0.0-beta.5-SNAPSHOT
+python scripts/loomspan_version.py tag <release-version>
+git push origin main v<release-version>
 ```
 
 The Console preflight must pass native packaging and archive smoke checks on
@@ -328,8 +328,8 @@ before creating the tag. After pushing the tag, verify that Maven Central
 publication succeeds and the GitHub Release contains all three Console archives
 and `SHA256SUMS` before announcing the release.
 
-After releasing beta 4, start the next development version from a clean worktree.
-This updates the working branch; the beta 4 tag continues to identify its release:
+After releasing, start the next development version from a clean worktree.
+This updates the working branch; the release tag continues to identify its release:
 
 ```bash
 python scripts/loomspan_version.py set <next-version>-SNAPSHOT
@@ -345,13 +345,6 @@ Substitute the actual release and next-development versions in these commands.
 Bootstrap resolves a release from its exact `v<version>` tag. It resolves a
 SNAPSHOT from `main` only when the root POM and version-coupled skill metadata
 on `main` declare that exact SNAPSHOT version.
-
-For beta 4 compatibility and migration details, read
-[`docs/releases/1.0.0-beta.5-SNAPSHOT.md`](docs/releases/1.0.0-beta.5-SNAPSHOT.md). Local preparation,
-the external Sidecar SC5 gate, and final validation-only workflow evidence are
-tracked separately in
-[`ai/thoughts/release-readiness/1.0.0-beta.5-SNAPSHOT.md`](ai/thoughts/release-readiness/1.0.0-beta.5-SNAPSHOT.md).
-That readiness record does not authorize tagging or publication.
 
 ### Maven Central releases
 
