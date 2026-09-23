@@ -22,6 +22,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,6 +72,13 @@ class ObservabilityArtifactIntegrationTest
         assertThat(response.headers().firstValue("Cache-Control")).hasValue("no-store");
         assertThat(response.headers().firstValue(ObservabilityApiKeyFilter.INSTANCE_HEADER))
                 .hasValue(activation.runtime().orElseThrow().instanceId().toString());
+        // The client can receive Content-Length bytes before the async worker releases its slot.
+        long deadline = System.nanoTime() + Duration.ofSeconds(2).toNanos();
+        while (activation.runtime().orElseThrow().artifactDelivery().admittedCount() != 0
+                && System.nanoTime() < deadline)
+        {
+            Thread.sleep(10);
+        }
         assertThat(activation.runtime().orElseThrow().artifactDelivery().admittedCount()).isZero();
     }
 
