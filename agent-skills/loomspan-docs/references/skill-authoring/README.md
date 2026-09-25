@@ -44,7 +44,7 @@ Read [source-verification.md](source-verification.md) before performing a source
 | Declare or diagnose generated-plan task counts | [planning-task-constraints.md](planning-task-constraints.md) | [evidence-contracts.md](evidence-contracts.md) when output supportability is also required |
 | Configure planning concurrency or diagnose task grouping/dependencies | [planning-concurrency.md](planning-concurrency.md) | [planning-task-constraints.md](planning-task-constraints.md) when child task counts are also constrained |
 | Select a model or configure its connection | [model-selection-and-connections.md](model-selection-and-connections.md) | [mental-model.md](mental-model.md) |
-| Diagnose retries, usage, terminal failures, or a nested runtime path with the packaged Agent Skill | [traces-and-debugging.md](traces-and-debugging.md) | The relevant validation or evidence topic |
+| Diagnose retries, usage, terminal failures, or a nested runtime path with the packaged Agent Skill `loomspan-console` | [traces-and-debugging.md](traces-and-debugging.md) | The relevant validation or evidence topic |
 | Validate a complete draft YAML skill set before staging | [validation-workflow.md](validation-workflow.md) | [Java skill reload API](../java-api/skill-reload.md) for application integration |
 | Resolve ambiguity or an edge case | [source-verification.md](source-verification.md) | The topic's implementation anchors |
 

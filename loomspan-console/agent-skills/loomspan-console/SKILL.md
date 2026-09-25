@@ -1,9 +1,10 @@
 ---
-name: loomspan
+name: loomspan-console
 description: Investigate Loomspan runtime status, plans, model and tool content, structured output, failures, usage, retries, searches, and nested skill paths through the read-only Loomspan Console MCP tools.
 license: Apache-2.0
 compatibility: Requires a local client that can use Agent Skills and an already configured Loomspan Console MCP connection for live inspection.
 metadata:
+  loomspan-component: console
   loomspan-version: "1.0.0-beta.6-SNAPSHOT"
 ---
 

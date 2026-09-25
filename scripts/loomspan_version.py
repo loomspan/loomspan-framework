@@ -16,8 +16,10 @@ import xml.etree.ElementTree as ET
 
 
 VERSIONED_SKILLS = (
-    Path("loomspan-console/agent-skills/loomspan/SKILL.md"),
+    Path("loomspan-console/agent-skills/loomspan-console/SKILL.md"),
     Path("agent-skills/loomspan-docs/SKILL.md"),
+    Path("agent-skills/loomspan/SKILL.md"),
+    Path("agent-skills/loomspan-install/SKILL.md"),
 )
 SKILL_VERSION = re.compile(
     r'^  loomspan-version:\s*(?:"([^"]+)"|\'([^\']+)\'|([^#\s]+))\s*$'

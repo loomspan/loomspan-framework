@@ -39,9 +39,10 @@ jobs:
       - name: Validate canonical Agent Skills with pinned official reference
         working-directory: loomspan-console
         run: |
-          uv run --frozen --project skills-ref-validation skills-ref validate ./agent-skills/loomspan
+          uv run --frozen --project skills-ref-validation skills-ref validate ./agent-skills/loomspan-console
           uv run --frozen --project skills-ref-validation skills-ref validate ../agent-skills/loomspan-docs
-          uv run --frozen --project skills-ref-validation skills-ref validate ../agent-skills/bootstrap
+          uv run --frozen --project skills-ref-validation skills-ref validate ../agent-skills/loomspan-install
+          uv run --frozen --project skills-ref-validation skills-ref validate ../agent-skills/loomspan
       - name: Verify coordinated repository versioning
         working-directory: loomspan-console
         run: |

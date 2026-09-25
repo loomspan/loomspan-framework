@@ -64,10 +64,11 @@ dual-output so structured results remain complete and text-only workflows keep
 their deterministic, safety-reviewed evidence.
 
 The release also carries the byte-identical, client-neutral
-`skills/loomspan/` package. Installation is a user-selected
-copy or filesystem link into a local client's user/global skill location; it
+`skills/loomspan-console/` package. Installation is a user-selected
+copy or link through the host's supported manager in project scope by default
+(or an explicitly selected supported scope); it
 does not auto-install or contain an endpoint or key. The canonical skill is
-unversioned during unreleased development and does not negotiate a version with
+marked with its exact component version, including development snapshots and does not negotiate a version with
 the MCP server. Live use requires the existing protected MCP configuration.
 MCP clients discover the current tools rather than checking static capability
 IDs; raw artifact inspection remains an optional workflow outside ordinary

@@ -243,31 +243,25 @@ Observers receive at most one available completed view after success or a post-s
 
 ## Defining Skills
 
-### Bootstrap version-matched Loomspan skills
+### Install version-matched Loomspan skills
 
-The repository publishes a one-shot `bootstrap` Agent Skill. It reads the
-current Maven project's Loomspan dependency and installs only the requested
-Loomspan skills from the matching Git revision. Ask the current coding agent to
-read it directly from GitHub; the bootstrap itself does not need to remain
-installed:
+Read [loomspan-install](agent-skills/loomspan-install/SKILL.md) directly through your agent host to install or update guidance. Sidecar is the primary path for applications in any language, with or without an SDK; embedded Java is also supported. No Loomspan checkout or live service is required.
 
-```text
-Read and follow the bootstrap skill at https://github.com/loomspan/loomspan-framework/tree/main/agent-skills/bootstrap to install loomspan and loomspan-docs for this project. Do not install the bootstrap skill itself.
-```
+For Sidecar, identify the exact runtime target from project/deployment information. The installer reads that Sidecar revision's POM to select framework guidance. For embedded Java it reads the application's direct starter dependency (literal or a single same-POM literal property); unresolved or ambiguous selections require clarification. Versions are independent:
 
-Bootstrap is a single instruction-only `SKILL.md`. It never asks the agent to
-download or execute bootstrap code. Repository inspection, approval, and skill
-installation are delegated to the current agent harness's native capabilities,
-so the same prompt can be used with Codex, Gemini CLI or Antigravity, Windsurf,
-and Devin. The harness chooses or asks for its supported user, workspace, or
-repository installation scope.
+| Skill | Owner/source | Version selector |
+| --- | --- | --- |
+| `loomspan` | Framework `agent-skills/loomspan` | Selected framework version |
+| `loomspan-docs` | Framework `agent-skills/loomspan-docs` | Selected framework version |
+| `loomspan-console` | Console `loomspan-console/agent-skills/loomspan-console` | Coordinated framework/Console version |
+| `loomspan-sidecar-authoring` | Sidecar `agent-skills/loomspan-sidecar-authoring` | Selected Sidecar target |
+| Future `loomspan-sdk-<language>` | SDK owner's published skill folder | Actual application SDK dependency |
 
-Release versions resolve to the exact `v<version>` Git tag. The current
-development snapshot resolves to `main` only when `main` declares that exact
-snapshot version. Bootstrap asks before replacing an existing installed skill
-and never edits the project or changes its framework dependency. The
-version-coupled skills declare `metadata.loomspan-version`; bootstrap reports
-that installed version and verifies the staged marker before placement.
+All skills declare `metadata.loomspan-component` and exact owning `metadata.loomspan-version`; Sidecar additionally declares its required `metadata.loomspan-framework-version`. SDK owners publish their package identity, exact source mapping and explicit compatibility facts with source/revision provenance (initially an SDK-owned `references/compatibility.md` table of exact pairs). Unknown compatibility stays unknown; equal versions never imply compatibility. SDK skills own language setup, application security integration, callbacks, request context and lifecycle, while Sidecar guidance owns server configuration. No SDK implementation is supplied here.
+
+The installer validates the complete exact-source set before host writes, defaults to host-supported project scope and honors explicit supported scope and existing update consent. Missing host capabilities are reported without a silent global-scope fallback. Updates change only selected skills, never dependencies or runtime/deployment configuration. Existing old Console guidance named `loomspan` must be handled through authorized host management before the new router can occupy that name. Specialists remain directly usable; the router loads only relevant available guidance and never installs automatically. The instruction-only installer itself is not automatically installed.
+
+Release `X` selects tag `vX`; snapshots use main only when its root POM exactly matches. Current Sidecar pins beta.5-SNAPSHOT while framework main is beta.6-SNAPSHOT, and earlier beta.5 sources lack the new router/Console names. This source change does not retroactively make those combinations available: preflight reports missing exact sources without substituting main/latest, upgrading dependencies or overwriting releases.
 
 Repository maintainers coordinate Maven, fixture, documentation, and Agent
 Skill versions with one command:
@@ -284,10 +278,10 @@ tracked text files, including the reactor POMs and version-coupled skill
 metadata. It also refreshes fixture byte lengths and evaluation fixture
 checksums. Historical evaluation records are preserved. It does not commit.
 `tag` requires a clean, committed, non-SNAPSHOT
-version and creates the annotated `v<version>` tag used by bootstrap; it does
+version and creates the annotated `v<version>` tag used by the installer; it does
 not push. After releasing, use `set` again to begin the next development
 snapshot. Git tags are the release-version catalog, so there is no separate
-bootstrap version list to update.
+installer version list to update.
 
 Keep the project on the next anticipated beta version with `-SNAPSHOT` during
 normal development. Remove that suffix when preparing the beta release. The

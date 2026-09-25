@@ -67,7 +67,7 @@ promise of comprehensive sanitization. Applications MUST apply their own data
 classification, access control, redaction, retention, and export policy before
 persisting or exposing them.
 
-Use the separate `loomspan` runtime-inspection skill when the task needs live
+Use the separate `loomspan-console` runtime-inspection skill when the task needs live
 trace discovery, retries, usage, failures, or raw artifacts rather than an
 application callback.
 

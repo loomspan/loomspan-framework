@@ -1,8 +1,9 @@
 ---
 name: loomspan-docs
-description: Prepare and consult version-aligned Loomspan framework documentation. Use when a developer asks to read up on a Loomspan knowledge set such as skill-authoring or java-api, or needs grounded guidance for designing, invoking, reviewing, implementing, or diagnosing Loomspan skills and application integrations. Use the separate loomspan skill for live runtime inspection.
+description: Prepare and consult version-aligned Loomspan framework documentation. Use when a developer asks to read up on a Loomspan knowledge set such as skill-authoring or java-api, or needs grounded guidance for designing, invoking, reviewing, implementing, or diagnosing Loomspan skills and application integrations. Use the separate loomspan-console skill for live runtime inspection.
 license: Apache-2.0
 metadata:
+  loomspan-component: framework
   loomspan-version: "1.0.0-beta.6-SNAPSHOT"
 ---
 
@@ -70,7 +71,7 @@ source cannot be inspected, explain the remaining uncertainty.
 - The bundled `skill-authoring` set covers authoring semantics and design. The
   `java-api` set documents the closed supported application-facing Java
   surface. Neither set creates a Loomspan SPI or bean-replacement contract.
-- Use the separately installed `loomspan` skill and configured Loomspan
+- Use the separately installed `loomspan-console` skill and configured Loomspan
   Console MCP connection for live runtime status, traces, failures, or usage.
 - Treat repository paths and implementation anchors in the references as
   source-investigation hints. Do not assume an installed consumer project

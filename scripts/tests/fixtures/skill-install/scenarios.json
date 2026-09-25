@@ -1,0 +1,452 @@
+[
+  {
+    "id": "R1",
+    "project": "sidecar",
+    "request": "Install Loomspan guidance for this direct API project.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R2a",
+    "project": "java-literal",
+    "request": "Install Loomspan guidance for this embedded Java project.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R2b",
+    "project": "java-property",
+    "request": "Install Loomspan guidance for this embedded Java project.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R3a",
+    "project": "absent",
+    "request": "Install Loomspan guidance for this project.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R3b",
+    "project": "conflict",
+    "request": "Install Loomspan guidance for this project.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R3c",
+    "project": "java-chain",
+    "request": "Install Loomspan guidance for this project.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R3d",
+    "project": "java-inherited",
+    "request": "Install Loomspan guidance for this project.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R3e",
+    "project": "java-bom",
+    "request": "Install Loomspan guidance for this project.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R3f",
+    "project": "java-ambiguous",
+    "request": "Install Loomspan guidance for this project.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R4a",
+    "project": "java-old",
+    "request": "Install matching embedded Java guidance.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R4b",
+    "project": "java-literal",
+    "request": "Install matching embedded Java guidance.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    },
+    "source_overrides": {
+      "framework/v4.5.0": "framework/wrong-marker"
+    }
+  },
+  {
+    "id": "R4c",
+    "project": "java-snapshot",
+    "request": "Install matching embedded Java guidance.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R5",
+    "project": "sdk",
+    "request": "Install guidance for this SDK-based Sidecar project.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R6a",
+    "project": "sdk",
+    "request": "Install guidance.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    },
+    "unavailable": [
+      "sources/sdk-python/v7.8.0/agent-skills/loomspan-sdk-python/references/compatibility.md"
+    ]
+  },
+  {
+    "id": "R6b",
+    "project": "sdk",
+    "request": "Install guidance.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    },
+    "compatibility_override": "The SDK owner explicitly declares SDK 7.8.0 incompatible with Sidecar 2.3.0 at sdk-python/v7.8.0/references/compatibility.md."
+  },
+  {
+    "id": "R7a",
+    "project": "sidecar",
+    "request": "Install guidance in user scope explicitly.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  },
+  {
+    "id": "R7b",
+    "project": "sidecar",
+    "request": "Install guidance.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    },
+    "host_override": {
+      "scopes": [
+        "user"
+      ]
+    }
+  },
+  {
+    "id": "R8a",
+    "project": "sidecar",
+    "request": "Update all selected Loomspan skills to match my current project. I authorize replacement of the existing selected skills.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    },
+    "host_override": {
+      "installed": {
+        "loomspan": "framework/4.4.0",
+        "loomspan-docs": "framework/4.4.0",
+        "loomspan-console": "console/4.4.0",
+        "loomspan-sidecar-authoring": "sidecar/2.2.0"
+      }
+    }
+  },
+  {
+    "id": "R8b",
+    "project": "sidecar",
+    "request": "Update selected skills, but do not replace loomspan-docs.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    },
+    "host_override": {
+      "installed": {
+        "loomspan-docs": "framework/4.4.0"
+      }
+    }
+  },
+  {
+    "id": "R8c",
+    "project": "sidecar",
+    "request": "Install matching guidance. Do not remove or replace the existing loomspan skill.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    },
+    "host_override": {
+      "installed": {
+        "loomspan": "old Console runtime investigation, no component marker, version 4.4.0"
+      }
+    }
+  },
+  {
+    "id": "R9a",
+    "project": "sidecar",
+    "request": "Install guidance.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    },
+    "host_override": {
+      "results": "first install succeeds, second fails; subsequent outcomes not supplied"
+    }
+  },
+  {
+    "id": "R9b",
+    "project": "sidecar",
+    "request": "Install guidance.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    },
+    "host_override": {
+      "results": "all installs report success; marker readback unavailable"
+    }
+  },
+  {
+    "id": "R10",
+    "project": "sidecar",
+    "request": "For each independent request, choose relevant guidance: investigate runtime failure; explain Java invocation semantics; configure Sidecar direct API; implement SDK authentication/callback lifecycle. Repeat SDK request when SDK specialist is unavailable.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    },
+    "available_skills": [
+      "loomspan-docs",
+      "loomspan-console",
+      "loomspan-sidecar-authoring",
+      "loomspan-sdk-python"
+    ]
+  },
+  {
+    "id": "R11",
+    "project": "sdk",
+    "request": "Can I put my management token into the execution request and have the callback trust it for record ownership? Explain the integration responsibilities.",
+    "host": {
+      "scopes": [
+        "project",
+        "user"
+      ],
+      "inspect_exact_sources": true,
+      "install_complete_folders": true,
+      "installed": {},
+      "authorization": "install requested set; replace only when explicitly requested",
+      "results": "all requested operations succeed and installed markers readable",
+      "refresh": "new session"
+    }
+  }
+]

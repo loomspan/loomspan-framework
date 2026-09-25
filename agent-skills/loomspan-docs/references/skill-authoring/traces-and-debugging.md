@@ -11,7 +11,7 @@ coverage: source-verified
 
 For current runtime status, failed/slow/expensive executions, retries, or an
 unfamiliar nested skill path, install the canonical
-separately installable `loomspan` Agent Skill
+separately installable `loomspan-console` Agent Skill
 by an explicit user-selected copy or filesystem link. It is packaged unchanged
 in native Console archives; installation and MCP configuration remain manual
 and client-owned.

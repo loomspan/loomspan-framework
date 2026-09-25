@@ -67,9 +67,9 @@ func TestStrictSmokeRequiresExactRuntimeDebuggingSkill(t *testing.T) {
 		omit      string
 		extraName string
 	}{
-		{"missing", "skills/loomspan/SKILL.md", ""},
-		{"extra", "", "skills/loomspan/extra.md"},
-		{"duplicate", "", "skills/loomspan/SKILL.md"},
+		{"missing", "skills/loomspan-console/SKILL.md", ""},
+		{"extra", "", "skills/loomspan-console/extra.md"},
+		{"duplicate", "", "skills/loomspan-console/SKILL.md"},
 	} {
 		t.Run(mutation.name, func(t *testing.T) {
 			archive := filepath.Join(t.TempDir(), "bad.zip")

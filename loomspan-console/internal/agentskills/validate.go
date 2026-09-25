@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	RuntimeDebuggingSkillName = "loomspan"
+	RuntimeDebuggingSkillName = "loomspan-console"
 	maxDescriptionBytes       = 1024
 	maxInstructionBytes       = 80 * 1024
 	maxReferenceBytes         = 80 * 1024
@@ -208,8 +208,8 @@ func validateManifest(raw []byte) error {
 	if value.License != "Apache-2.0" || strings.TrimSpace(value.Compatibility) == "" {
 		return fmt.Errorf("skill license or compatibility is invalid")
 	}
-	if len(value.Metadata) != 1 || strings.TrimSpace(value.Metadata["loomspan-version"]) == "" || strings.Contains(value.Metadata["loomspan-version"], "${") {
-		return fmt.Errorf("skill metadata must declare one resolved loomspan-version")
+	if len(value.Metadata) != 2 || value.Metadata["loomspan-component"] != "console" || strings.TrimSpace(value.Metadata["loomspan-version"]) == "" || strings.Contains(value.Metadata["loomspan-version"], "${") {
+		return fmt.Errorf("skill metadata must declare console component and one resolved loomspan-version")
 	}
 	return nil
 }

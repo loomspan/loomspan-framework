@@ -28,12 +28,11 @@ def run_git(root: Path, *arguments: str) -> str:
 
 
 def write_fixture(root: Path, version: str) -> None:
-    (root / "loomspan-console" / "agent-skills" / "loomspan").mkdir(parents=True)
-    (root / "agent-skills" / "loomspan-docs").mkdir(parents=True)
     (root / "pom.xml").write_text(
         f"<project><version>{version}</version></project>\n", encoding="utf-8"
     )
     for relative in versioning.VERSIONED_SKILLS:
+        (root / relative).parent.mkdir(parents=True, exist_ok=True)
         (root / relative).write_text(
             f'---\nname: test\nmetadata:\n  loomspan-version: "{version}"\n---\n',
             encoding="utf-8",

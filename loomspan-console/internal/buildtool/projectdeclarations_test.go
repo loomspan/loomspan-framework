@@ -93,9 +93,10 @@ func TestOfficialAgentSkillValidatorIsPinnedAndRequired(t *testing.T) {
 		contents := readTestFile(t, filepath.Join(paths.repository, ".github", "workflows", workflow))
 		for _, required := range []string{
 			"uv==0.11.7",
-			"uv run --frozen --project skills-ref-validation skills-ref validate ./agent-skills/loomspan",
+			"uv run --frozen --project skills-ref-validation skills-ref validate ./agent-skills/loomspan-console",
 			"skills-ref validate ../agent-skills/loomspan-docs",
-			"skills-ref validate ../agent-skills/bootstrap",
+			"skills-ref validate ../agent-skills/loomspan-install",
+			"skills-ref validate ../agent-skills/loomspan",
 			"python ../scripts/loomspan_version.py check",
 			"python -m unittest discover ../scripts/tests",
 		} {
@@ -139,7 +140,7 @@ func TestReleaseAndAuthoringDocumentationReferenceCanonicalSkillContract(t *test
 		"release README": readTestFile(t, filepath.Join(paths.release, "README.md")),
 	}
 	for name, contents := range documents {
-		for _, required := range []string{"skills/loomspan/", "copy", "link", "unversioned", "MCP"} {
+		for _, required := range []string{"skills/loomspan-console/", "copy", "link", "component version", "MCP"} {
 			if !strings.Contains(contents, required) {
 				t.Errorf("%s does not contain %q", name, required)
 			}
@@ -264,7 +265,7 @@ func TestConsoleWorkflowsArePinnedAndLeastPrivilege(t *testing.T) {
 		if strings.Contains(contents, "pull_request_target") {
 			t.Fatalf("%s executes pull_request_target", name)
 		}
-		for _, skill := range []string{"../agent-skills/loomspan-docs", "../agent-skills/bootstrap"} {
+		for _, skill := range []string{"./agent-skills/loomspan-console", "../agent-skills/loomspan-docs", "../agent-skills/loomspan-install", "../agent-skills/loomspan"} {
 			if !strings.Contains(contents, skill) {
 				t.Errorf("%s does not validate the distributable skill %s", name, skill)
 			}

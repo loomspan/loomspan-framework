@@ -59,9 +59,9 @@ The release names are
 `loomspan-console-VERSION-macos-arm64.tar.gz`, with an additional
 `loomspan-console-VERSION-macos-arm64.dmg`. Each archive has one top-level
 directory containing the executable—or `Loomspan Console.app` on macOS—plus
-`LICENSE`, the runtime `README.md`, and the exact six-file portable Agent Skill at `skills/loomspan/`
-(`SKILL.md` plus five files in `references/`). The canonical skill remains
-unversioned while Loomspan is unreleased; its contents are packaged and tested
+`LICENSE`, the runtime `README.md`, and the exact six-file portable Agent Skill at `skills/loomspan-console/`
+(`SKILL.md` plus five files in `references/`). The canonical skill declares its exact component version, including snapshots;
+its contents are packaged and tested
 atomically with the Console and are not target negotiation.
 Check `SHA256SUMS` with `sha256sum -c SHA256SUMS` on POSIX systems; in
 PowerShell compare `(Get-FileHash -Algorithm SHA256 .\\ARCHIVE).Hash` with the
@@ -420,10 +420,10 @@ automated protocol, schema, transport, and boundedness evidence.
 ## Portable runtime debugging skill
 
 The canonical client-neutral package is
-`agent-skills/loomspan/`; every native archive embeds those
-same bytes at `skills/loomspan/`. Installation is explicit:
-copy that directory, or create a filesystem link to it, in a client-selected
-user/global Agent Skill location. Console does not auto-install it, edit client
+`agent-skills/loomspan-console/`; every native archive embeds those
+same bytes at `skills/loomspan-console/`. Installation is explicit:
+use the host's supported manager to copy or link the complete directory in project scope
+by default, or an explicitly selected supported scope. Console does not auto-install it, edit client
 configuration, or publish a client-specific fork.
 
 The skill never contains the MCP endpoint or key. Live inspection requires the

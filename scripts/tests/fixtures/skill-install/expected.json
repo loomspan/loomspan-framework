@@ -1,0 +1,13 @@
+{
+  "R1": "framework 4.5.0 trio + sidecar 2.3.0; project; no POM/server",
+  "R2": "framework 4.5.0 trio only",
+  "R3": "clarify unresolved input; zero writes",
+  "R4": "preflight failure; zero writes; no fallback",
+  "R5": "independent SDK 7.8.0; cite exact synthetic compatibility",
+  "R6": "unknown explicit; incompatible blocks writes",
+  "R7": "honor user scope; unsupported project stops",
+  "R8": "existing consent honored; declined skips and collision not coherent",
+  "R9": "actual partial or unverifiable results; no rollback claim",
+  "R10": "focused ownership; no automatic install",
+  "R11": "management, execution and callback authorization separate"
+}
