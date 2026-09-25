@@ -259,6 +259,7 @@ test.use({ trace: "off", screenshot: "off", video: "off" });
 
 async function connectToTarget(page: import("@playwright/test").Page, consoleProcess: { origin: string; pairingUrl: string }, targetOrigin: string) {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetOrigin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");

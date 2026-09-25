@@ -12,7 +12,9 @@ test("renders the console shell and runtime compatibility version", () => {
   expect(screen.getByRole("link", { name: "Skills" })).toHaveAttribute("href", "/skills");
   expect(screen.getByRole("link", { name: "Active Executions" })).toHaveAttribute("href", "/active-executions");
   expect(screen.getByRole("link", { name: "Traces" })).toHaveAttribute("href", "/traces");
+  expect(screen.getByRole("link", { name: "Trace Storage" })).toHaveAttribute("href", "/trace-storage");
   expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings/mcp");
+  expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
   expect(screen.getByTestId("console-version")).toHaveTextContent("1.0.0-beta.6-SNAPSHOT");
 });
 
@@ -25,5 +27,5 @@ test("renders a safe not-found route as text", () => {
   const unsafe = `<img src=x onerror=alert("unsafe")>`;
   render(<RouterProvider router={memoryRouter(`/${encodeURIComponent(unsafe)}`)} />);
   expect(screen.getByRole("heading", { name: "This Console route does not exist" })).toBeVisible();
-  expect(document.querySelector("img")).toBeNull();
+  expect(document.querySelector("main img, img[onerror]")).toBeNull();
 });

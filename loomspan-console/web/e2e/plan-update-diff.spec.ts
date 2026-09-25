@@ -15,6 +15,7 @@ test("plan update diff remains usable with keyboard, narrow viewport and forced 
     return JSON.stringify(record);
   }).join("\n") + "\n";
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/trace-storage`);
   await page.getByLabel("Trace files").setInputFiles({ name: "plan-updates.ndjson", mimeType: "application/x-ndjson", buffer: Buffer.from(trace) });
   await expect(page.getByRole("heading", { name: "Trace explorer" })).toBeVisible();

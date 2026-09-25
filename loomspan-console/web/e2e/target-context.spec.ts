@@ -154,6 +154,7 @@ test("paired developer connects and refreshes independent target status", async 
     }
   });
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetApplication.origin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");
@@ -190,6 +191,7 @@ test("WF-TC-ART-01 target rotation clears local storage and stale handle is not 
   targetApplication,
 }) => {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetApplication.origin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");
@@ -233,6 +235,7 @@ test("WF-TC-ART-02 acquisition after target rotation installs a fresh copy in th
   targetApplication,
 }) => {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetApplication.origin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");

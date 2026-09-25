@@ -11,6 +11,7 @@ const portableTrace = path.resolve(
 
 test("opens a same-version trace file without a configured target", async ({ page, consoleProcess }) => {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/trace-storage`);
   await expect(page.getByRole("heading", { name: "Trace Storage" })).toBeVisible();
 
@@ -29,6 +30,7 @@ test("rejects a different-version trace without installing it", async ({ page, c
   const mismatched = fs.readFileSync(portableTrace).toString("utf8")
     .replace('"consoleCompatibilityVersion":"1.0.0-beta.6-SNAPSHOT"', '"consoleCompatibilityVersion":"9.9.9"');
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/trace-storage`);
 
   await page.getByLabel("Trace files").setInputFiles({

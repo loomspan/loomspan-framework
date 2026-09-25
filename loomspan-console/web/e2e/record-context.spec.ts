@@ -10,6 +10,7 @@ test("record context and expanded responses stay readable with long nested skill
   const skill = "hotelSelectionWithAnIntentionallyLongSkillName";
   const trace = fs.readFileSync(fixture, "utf8").replaceAll("shared.skill", skill);
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/trace-storage`);
   await page.getByLabel("Trace files").setInputFiles({ name: "context.ndjson", mimeType: "application/x-ndjson", buffer: Buffer.from(trace) });
   await expect(page.getByRole("heading", { name: "Trace explorer" })).toBeVisible();

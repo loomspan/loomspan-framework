@@ -110,7 +110,7 @@ export function TargetProvider({
 
   return (
     <TargetContext.Provider value={value}>
-      <div key={state.generation}>{children}</div>
+      <div key={state.generation} className="target-scope">{children}</div>
     </TargetContext.Provider>
   );
 }

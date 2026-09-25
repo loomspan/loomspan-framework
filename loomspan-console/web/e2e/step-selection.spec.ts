@@ -16,6 +16,7 @@ test("step boundaries share a fill and the selected activity owns the outline", 
   });
   const trace = records.map((record, index) => JSON.stringify({ ...record, sequence: index + 1 })).join("\n") + "\n";
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/trace-storage`);
   await page.getByLabel("Trace files").setInputFiles({ name: "step-selection.ndjson", mimeType: "application/x-ndjson", buffer: Buffer.from(trace) });
   await expect(page.getByRole("heading", { name: "Trace explorer" })).toBeVisible();

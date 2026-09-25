@@ -243,6 +243,7 @@ test("Overview gives each active execution its own compact activity feed", async
   targetApp,
 }) => {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetApp.origin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");
@@ -264,6 +265,7 @@ test("WF-SLOW-EXECUTION (WF-SE) preserves selection while live activity advances
   targetApp,
 }) => {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetApp.origin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");
@@ -291,6 +293,7 @@ test("WF-SE terminal and observation-ended transitions remain in place", async (
   targetApp,
 }) => {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetApp.origin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");
@@ -317,6 +320,7 @@ test("WF-SE same-instance transient disconnect reconnects without discarding con
   targetApp,
 }) => {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetApp.origin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");
@@ -343,6 +347,7 @@ test("WF-SE target change discards prior live state", async ({
   targetApp,
 }) => {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetApp.origin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");
@@ -391,6 +396,7 @@ test("WF-SE-ART completed execution requires deliberate acquisition before appea
   targetApp,
 }) => {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetApp.origin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");

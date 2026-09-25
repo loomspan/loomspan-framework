@@ -71,6 +71,7 @@ test("paired developer sees live activity stream after connecting", async ({
   targetApplication,
 }) => {
   await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/target`);
   await page.getByLabel("Target address").fill(targetApplication.origin);
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");
