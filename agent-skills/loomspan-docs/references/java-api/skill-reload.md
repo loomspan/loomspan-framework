@@ -7,6 +7,23 @@ coverage: source-verified
 
 # Two-stage skill updates
 
+## Complete execution publication
+
+Use `validate(completeDocuments, new ExecutionConfiguration(candidateYaml))` and `prepare(completeDocuments, configuration)` when model connections, aliases, session limits, or trace persistence change with the skill set. The authored YAML has one `loomspan` mapping containing only `connections`, `models`, `session`, and `execution-trace.persistence`. Its connection credentials must use external property names through `api-key-ref`, `gemini.credentials-ref`, or `header-refs`; direct `api-key`, `gemini.credentials-uri`, and literal `headers` are rejected. `prepare` resolves references from the host Spring `Environment` and constructs provider clients before publication. Missing or blank references fail without changing the active generation. Validation neither resolves references nor constructs clients or sends model requests. Preparation constructs clients but sends no model request. An explicit empty document collection replaces all YAML/REST skills while preserving fixed Java declarations.
+
+```java
+ExecutionConfiguration configuration = new ExecutionConfiguration(candidateYaml);
+SkillValidationResult feedback = reloader.validate(completeDocuments, configuration);
+if (feedback.valid()) {
+    try (PreparedSkillUpdate update = reloader.prepare(completeDocuments, configuration)) {
+        configurationStore.stage(update.generationId(), restConfiguration);
+        reloader.publish(update); // transfers provider ownership to the generation
+    }
+}
+```
+
+Close any candidate that will not be published. A stale or shutdown-rejected candidate is closed by the framework; a repeated publish rejection does not close its already active generation. Existing skill-only overloads use a copy of the execution settings active at preparation, including after an explicit publication. Root handoff captures the entire version, so its delayed work, descendants, provider retries, limits, and tracing retain that version. Superseded provider clients close after captured physical work finishes. Republishing earlier authored content yields another process-local ID. Process settings (shutdown, observability API/auth/retention, skill locations, Spring/server infrastructure) cannot be published. Ordinary `application.yml` remains the startup path; trace persistence now binds only at `loomspan.execution-trace.persistence` with default `ONERROR`. Applications using the former top-level key must move it under `loomspan`. External credential revocation may still fail a provider request.
+
 For editor feedback, call `reloader.validate()` to reread configured resources or `reloader.validate(completeDocuments)` to check an in-memory complete replacement set. Check the result's `valid()` before treating `skills()` as a complete candidate: any `ERROR` makes it false and leaves metadata empty, while warnings retain complete metadata. Empty metadata can also mean a valid empty candidate. `issues()` provides severity, source name, optional skill name and field path, and message. Each immutable `ValidatedSkill` has an exact callable `name()` and `SkillKind` of `JAVA`, `YAML`, or `REST`. Successful results include fixed Java and the entire proposed YAML/REST set, sorted by exact case-sensitive name; both result lists are immutable and detached from later operations. Supplied source labels are diagnostics, never paths. An empty collection proposes removal of YAML and REST skills while fixed Java skills remain.
 
 ```java
@@ -39,7 +56,7 @@ RestSkillHandler handler = invocation -> configurationStore.get(invocation.gener
         .call(invocation.skillName(), invocation.input());
 ```
 
-After the application publishes stable YAML files and prevents writes for the duration of preparation, call `PreparedSkillUpdate update = reloader.prepare()`. This synchronously validates a complete new model-backed and REST YAML set against fixed Java declarations, model connections, and the one fixed REST handler bean. It does not activate the candidate. Stage external artifacts under `update.generationId()`, then call `reloader.publish(update)`. `update.snapshot()` shows the candidate before publication. Publication uses the frozen candidate without file reads or revalidation. Identical YAML still gets a fresh process-local ID. Empty YAML removes all YAML skills, not Java declarations. No file transaction, Java hot swap, model reconnection, or handler replacement is supplied.
+After the application publishes stable YAML files and prevents writes for the duration of preparation, call `PreparedSkillUpdate update = reloader.prepare()`. This synchronously validates a complete new model-backed and REST YAML set against fixed Java declarations, the active model connections, and the one fixed REST handler bean. It does not activate the candidate. Stage external artifacts under `update.generationId()`, then call `reloader.publish(update)`. `update.snapshot()` shows the candidate before publication. Publication uses the frozen candidate without file reads or revalidation. Identical YAML still gets a fresh process-local ID. Empty YAML removes all YAML skills, not Java declarations. No file transaction, Java hot swap, or handler replacement is supplied.
 
 For YAML already held by the application, call `reloader.prepare(Collection<SkillDocument>)` with the complete replacement set. Each record contains `sourceName` and `yaml`; the collection and elements must be non-null, source names must be nonblank and exactly unique, and YAML must be non-null. A source name is diagnostic text, not a resource path or the callable YAML `name`; case-different labels are distinct. Loomspan copies the collection and freezes the YAML as UTF-8 during preparation. The same parser, model/REST rules, child references, input contracts, roles, fixed Java declarations, and handler binding apply. An empty collection removes all YAML and REST declarations while leaving Java skills. A later no-argument `prepare()` still discovers the configured locations.
 

@@ -63,7 +63,7 @@ class NamedAiConnectionRegistryTests {
 
     @Test
     void opaqueClientRetryOwnershipRequiresLoomspanRetryToBeDisabled() {
-        ChatModel model = mock(ChatModel.class);
+        ChatModel model = mock(ChatModel.class, withSettings().extraInterfaces(DisposableBean.class));
         SpringAiProviderIntegration integration = mock(SpringAiProviderIntegration.class);
         LoomspanProperties.ConnectionProperties properties = connection("http://opaque.example");
         ProviderConnectionRuntime opaque = new ProviderConnectionRuntime(model, AiDriver.OLLAMA,
@@ -75,6 +75,8 @@ class NamedAiConnectionRegistryTests {
                 .isInstanceOf(SafeAiConnectionConfigurationException.class)
                 .hasMessageContaining("loomspan.connections.opaque.provider-retry.enabled")
                 .hasMessageNotContaining("opaque.example");
+        try { verify((DisposableBean) model).destroy(); }
+        catch (Exception ex) { throw new AssertionError(ex); }
 
         properties.getProviderRetry().setEnabled(false);
         ProviderConnectionRuntime disabled = new ProviderConnectionRuntime(model, AiDriver.OLLAMA,

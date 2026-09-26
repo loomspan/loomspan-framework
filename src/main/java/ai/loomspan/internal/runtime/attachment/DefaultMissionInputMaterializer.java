@@ -32,6 +32,14 @@ public class DefaultMissionInputMaterializer implements MissionInputMaterializer
     private final SkillInputContractResolver inputContractResolver;
     private final long maxSizeBytes;
 
+    private long maxSizeBytes()
+    {
+        return ai.loomspan.internal.core.ExecutionBindingScope.current()
+                .map(binding -> binding.generation().runtime())
+                .map(runtime -> runtime.properties().getSession().getAttachments().getMaxSize().toBytes())
+                .orElse(maxSizeBytes);
+    }
+
     public DefaultMissionInputMaterializer(RefResolver refResolver)
     {
         this(refResolver, new SkillInputContractResolver(), DEFAULT_MAX_SIZE);
@@ -171,10 +179,10 @@ public class DefaultMissionInputMaterializer implements MissionInputMaterializer
         validateMediaSignature(resource, contentType, AttachmentMediaType.fromManifest(schema.attachmentMediaType()), path);
 
         Long size = contentLength(resource);
-        if (size != null && size > maxSizeBytes)
+        if (size != null && size > maxSizeBytes())
         {
             throw new IllegalArgumentException("Attachment field '" + path + "' is " + size
-                    + " bytes, exceeding configured limit of " + maxSizeBytes + " bytes");
+                    + " bytes, exceeding configured limit of " + maxSizeBytes() + " bytes");
         }
 
         String digest = digest(resource, path);
@@ -311,10 +319,10 @@ public class DefaultMissionInputMaterializer implements MissionInputMaterializer
             while ((read = inputStream.read(buffer)) != -1)
             {
                 total += read;
-                if (total > maxSizeBytes)
+                if (total > maxSizeBytes())
                 {
                     throw new IllegalArgumentException("Attachment field '" + path
-                            + "' exceeds configured limit of " + maxSizeBytes + " bytes");
+                            + "' exceeds configured limit of " + maxSizeBytes() + " bytes");
                 }
                 digest.update(buffer, 0, read);
             }

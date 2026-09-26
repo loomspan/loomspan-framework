@@ -25,6 +25,7 @@ public class LoomspanSessionRunner
     private final Clock clock;
     private final ExecutionObservationHandleFactory observationHandleFactory;
     private final InternalExecutionTraceHandleFactory traceHandleFactory;
+    private @Nullable CompletionGraceRetention generationTraceRetention;
     private final ObjectMapper canonicalTraceMapper;
     private final @Nullable FrameworkExecutionLifecycle frameworkLifecycle;
 
@@ -200,6 +201,7 @@ public class LoomspanSessionRunner
                                 Objects.requireNonNull(canonicalTraceMapper,
                                         "canonicalTraceMapper must not be null")),
                 canonicalTraceMapper, Objects.requireNonNull(frameworkLifecycle));
+        this.generationTraceRetention = completionGraceRetention;
     }
 
     public void runWithNewSession(String entrySkill, SkillGeneration generation, Consumer<LoomspanSession> action)
@@ -293,20 +295,29 @@ public class LoomspanSessionRunner
                     "Loomspan invocation admission is no longer executable");
         try
         {
+            var captured = generation.runtime();
+            InternalExecutionTraceHandleFactory selectedTraceFactory = captured == null || generationTraceRetention == null
+                    ? traceHandleFactory
+                    : (sessionId, selectedEntrySkill, generationId, policy, handleClock, observationHandle) ->
+                            new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                                    sessionId, selectedEntrySkill, generationId, policy, handleClock, observationHandle,
+                                    generationTraceRetention,
+                                    ConfiguredLimitsSnapshot.from(captured.properties().getSession().getQuotas()),
+                                    canonicalTraceMapper);
             LoomspanSession session = new LoomspanSession(
                 UUID.randomUUID().toString(),
                 entrySkill,
                 generation.id(),
-                maxDepth,
+                captured == null ? maxDepth : captured.properties().getSession().getMaxDepth(),
                 null,
                 null,
                 null,
                 null,
                 authentication,
-                tracePersistencePolicy,
+                captured == null ? tracePersistencePolicy : captured.tracePersistence(),
                 clock,
                 observationHandleFactory,
-                traceHandleFactory,
+                selectedTraceFactory,
                 () -> UUID.randomUUID().toString(),
                 canonicalTraceMapper);
             if (root != null) session.attachAdmittedRoot(root);

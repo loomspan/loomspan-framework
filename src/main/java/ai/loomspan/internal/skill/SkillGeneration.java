@@ -13,13 +13,14 @@ import java.util.Map;
 import java.util.Objects;
 
 /** One complete immutable executable view of every skill declaration. */
-public final class SkillGeneration
+public final class SkillGeneration implements AutoCloseable
 {
     private final String id;
     private final Map<String, CapabilityMetadata> capabilities;
     private final Map<String, YamlSkillDefinition> definitions;
     private final SkillCatalog skillCatalog;
     private final RegisteredSkillCatalog registeredSkillCatalog;
+    private final ExecutionRuntime runtime;
 
     public SkillGeneration(String id, Map<String, CapabilityMetadata> capabilities,
             Map<String, YamlSkillDefinition> definitions)
@@ -31,6 +32,14 @@ public final class SkillGeneration
             Map<String, YamlSkillDefinition> definitions, SkillCatalog skillCatalog,
             RegisteredSkillCatalog registeredSkillCatalog)
     {
+        this(id, capabilities, definitions, skillCatalog, registeredSkillCatalog, null);
+    }
+
+    public SkillGeneration(String id, Map<String, CapabilityMetadata> capabilities,
+            Map<String, YamlSkillDefinition> definitions, SkillCatalog skillCatalog,
+            RegisteredSkillCatalog registeredSkillCatalog, ExecutionRuntime runtime)
+    {
+        this.runtime = runtime;
         this.id = requireNonBlank(id, "id");
         this.capabilities = immutableExactMap(capabilities, "capabilities");
         this.definitions = immutableExactMap(definitions, "definitions");
@@ -62,6 +71,8 @@ public final class SkillGeneration
     public Map<String, YamlSkillDefinition> definitions() { return definitions; }
     public SkillCatalog skillCatalog() { return skillCatalog; }
     public RegisteredSkillCatalog registeredSkillCatalog() { return registeredSkillCatalog; }
+    public ExecutionRuntime runtime() { return runtime; }
+    @Override public void close() { if (runtime != null) runtime.close(); }
 
     public boolean owns(CapabilityMetadata capability)
     {

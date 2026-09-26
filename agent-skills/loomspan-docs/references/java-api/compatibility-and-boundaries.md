@@ -9,7 +9,7 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the twenty-two types in the closed
+Application code MAY depend on the twenty-three types in the closed
 `ai.loomspan.api` allowlist:
 
 | Type | Supported purpose |
@@ -19,10 +19,11 @@ Application code MAY depend on the twenty-two types in the closed
 | `AdmittedSkillInvocation` | Read the captured generation ID, execute once, or release an already-admitted root invocation |
 | `SkillReloader` | Prepare, publish, or snapshot a complete skill generation |
 | `SkillDocument` | Supply one in-memory YAML document and a diagnostic source label |
+| `ExecutionConfiguration` | Supply reference-only authored YAML for a complete execution candidate |
 | `SkillValidationResult` | Inspect issues and complete candidate names/kinds after successful validation |
 | `SkillValidationIssue` | Inspect structured draft diagnostics |
 | `ValidatedSkill` | Read an exact proposed callable name and public kind |
-| `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog before publication |
+| `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog and close it if unused |
 | `SkillCatalog` | Discover an immutable startup, prepared-candidate, or current snapshot of registered skills |
 | `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
 | `SkillKind` | Distinguish YAML, Java, and REST registrations |
@@ -42,6 +43,8 @@ still use the narrowest type needed: inject or mock `SkillTemplate`, use the
 annotations on application-owned beans, and consume the public value records.
 
 ## Compatibility Changes in This Revision
+
+`ExecutionConfiguration` and the `(documents, configuration)` validation and preparation overloads let a host publish model connections, aliases, limits, and tracing with skills. `PreparedSkillUpdate.close()` is a default method for source and binary compatibility with existing implementations; framework candidates release unpublished provider resources when closed. The application YAML key for trace persistence moved from top-level `execution-trace.persistence` to `loomspan.execution-trace.persistence` without an alias. Consumers must update that YAML key when adopting this revision. Existing skill-only overloads remain supported and copy the active execution settings. See [two-stage skill updates](skill-reload.md).
 
 `SkillValidationResult` now has two record components, `issues` and `skills`.
 Direct constructors and record-pattern users must adopt the two-component shape
@@ -122,7 +125,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the `api` package has exactly the twenty-two allowlisted public top-level types;
+- the `api` package has exactly the twenty-three allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

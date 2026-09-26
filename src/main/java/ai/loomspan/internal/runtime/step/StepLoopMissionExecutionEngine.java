@@ -90,6 +90,14 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
     private final PlanningService planningService;
     private final ExecutionStateService executionStateService;
     private final Duration missionTimeout;
+    private Duration timeout(ai.loomspan.internal.core.LoomspanSession session)
+    {
+        return ai.loomspan.internal.core.ExecutionBindingScope.current()
+                .filter(binding -> binding.session() == session)
+                .map(binding -> binding.generation().runtime())
+                .map(runtime -> runtime.properties().getSession().getMissionTimeout())
+                .orElse(missionTimeout);
+    }
     private final ExecutorService missionExecutor;
     private final SessionUsageService sessionUsageService;
     private final ObjectMapper objectMapper;
@@ -264,12 +272,12 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         }
         try
         {
-            return mission.get(missionTimeout.toMillis(), TimeUnit.MILLISECONDS);
+            return mission.get(timeout(session).toMillis(), TimeUnit.MILLISECONDS);
         }
         catch (TimeoutException ex)
         {
             LoomspanMissionTimeoutException failure = new LoomspanMissionTimeoutException(
-                    session.getSessionId(), skillName, missionTimeout, ex);
+                    session.getSessionId(), skillName, timeout(session), ex);
             MissionLifecycle.PrimaryCancellation primary = lifecycle.beginCancellation(capturedBinding, failure,
                     () -> executionStateService.recordFailure(session, failure, Map.of("message", "Mission execution timed out")));
             cleanupPreservingPrimary(session, missionContext, capturedBinding, lifecycle.awaitCutoff(), primary.cause());
@@ -278,7 +286,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         catch (InterruptedException ex)
         {
             LoomspanMissionTimeoutException failure = new LoomspanMissionTimeoutException(
-                    session.getSessionId(), skillName, missionTimeout, ex);
+                    session.getSessionId(), skillName, timeout(session), ex);
             MissionLifecycle.PrimaryCancellation primary = lifecycle.beginCancellation(capturedBinding, failure,
                     () -> executionStateService.recordFailure(session, failure, Map.of("message", "Mission execution interrupted")));
             cleanupPreservingPrimary(session, missionContext, capturedBinding, lifecycle.awaitCutoff(), primary.cause());
@@ -349,7 +357,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             lifecycle.requireOpenForNewWork(ExecutionBindingScope.requireCurrent());
             if (Thread.currentThread().isInterrupted())
             {
-                throw new LoomspanMissionTimeoutException(session.getSessionId(), skillName, missionTimeout,
+                throw new LoomspanMissionTimeoutException(session.getSessionId(), skillName, timeout(session),
                         new InterruptedException("Step loop interrupted"));
             }
 
@@ -616,7 +624,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         catch (InterruptedException ex)
         {
             LoomspanMissionTimeoutException failure = new LoomspanMissionTimeoutException(
-                    session.getSessionId(), skillName, missionTimeout, ex);
+                    session.getSessionId(), skillName, timeout(session), ex);
             MissionLifecycle.PrimaryCancellation primary = lifecycle.beginCancellation(
                     ExecutionBindingScope.requireCurrent(), failure, () -> executionStateService.recordFailure(
                             session, failure, Map.of("message", "Concurrent task join interrupted")), false);

@@ -3,6 +3,7 @@ package ai.loomspan.internal.springai;
 import ai.loomspan.internal.chat.SkillAdvisorResolver;
 import ai.loomspan.internal.chat.ProviderAttemptCallAdvisor;
 import ai.loomspan.internal.chat.SkillChatModelResolver;
+import ai.loomspan.internal.core.ExecutionBindingScope;
 import ai.loomspan.internal.linter.LinterCallAdvisor;
 import ai.loomspan.internal.outputschema.OutputSchemaCallAdvisor;
 import ai.loomspan.internal.runtime.evidence.EvidenceContractCallAdvisor;
@@ -80,7 +81,11 @@ final class SpringAiChatClientAssembler
         Objects.requireNonNull(definition, "definition must not be null");
         EffectiveSkillExecutionConfiguration executionConfiguration = definition.requireExecutionConfiguration();
         String skillName = definition.manifest().getName();
-        ProviderConnectionRuntime runtime = chatModelResolver.resolve(skillName, executionConfiguration);
+        var captured = ExecutionBindingScope.current().map(binding -> binding.generation().runtime()).orElse(null);
+        ProviderConnectionRuntime runtime = captured == null
+                ? chatModelResolver.resolve(skillName, executionConfiguration)
+                : captured.connection(executionConfiguration.connection());
+        if (runtime == null) throw new IllegalStateException("No connection for skill '" + skillName + "'");
         ChatModel chatModel = runtime.chatModel();
         List<Advisor> advisors = resolvedAdvisors(skillAdvisorResolver.resolve(definition), includeFinalResponseValidators,
                 new ProviderAttemptCallAdvisor(runtime, executionStateService, modelUsageExtractor, sessionUsageService));

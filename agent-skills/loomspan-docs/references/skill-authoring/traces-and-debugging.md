@@ -50,7 +50,7 @@ an internal diagnostic format rather than an application dependency.
 
 `entrySkill` is the exact registered name of the top-level Java, REST, or model-backed YAML skill whose invocation owns the session. Loomspan records it before execution begins, keeps it unchanged across nested skill invocations, and exposes it in Trace Catalog and Trace Detail without requiring artifact acquisition. It is a recorded fact: it does not prove that the skill is still registered or that it is more important than nested work.
 
-`TRACE_STARTED.metadata.generationId` records the complete generation captured by the root. Live execution and finalized trace diagnostics carry the same process-local ID, including when old work finishes after a newer publication. Use it to distinguish which declaration set a current execution used, not as a durable content hash, chronological ordering, or historical catalog key. See [the application reload contract](../java-api/skill-reload.md).
+`TRACE_STARTED.metadata.generationId` records the complete skill and execution-configuration generation captured by the root. Live execution and finalized trace diagnostics carry the same process-local ID, including when old work finishes after a newer publication. Its trace persistence and run-start limit snapshot come from that captured generation. Use the ID to distinguish which complete version a current execution used, not as a durable content hash, chronological ordering, or historical catalog key. See [the application reload contract](../java-api/skill-reload.md).
 
 ## Live review and purpose
 

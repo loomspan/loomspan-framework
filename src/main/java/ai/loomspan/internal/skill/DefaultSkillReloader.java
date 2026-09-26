@@ -1,6 +1,7 @@
 package ai.loomspan.internal.skill;
 
 import ai.loomspan.api.PreparedSkillUpdate;
+import ai.loomspan.api.ExecutionConfiguration;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillReloadException;
 import ai.loomspan.api.SkillReloader;
@@ -45,6 +46,13 @@ public final class DefaultSkillReloader implements SkillReloader
     }
 
     @Override
+    public SkillValidationResult validate(Collection<SkillDocument> documents, ExecutionConfiguration configuration)
+    {
+        Objects.requireNonNull(documents, "documents must not be null");
+        return generations.validate(new ArrayList<>(documents), configuration);
+    }
+
+    @Override
     public PreparedSkillUpdate prepare()
     {
         return prepareWith(generations::prepare);
@@ -59,6 +67,13 @@ public final class DefaultSkillReloader implements SkillReloader
         });
     }
 
+    @Override
+    public PreparedSkillUpdate prepare(Collection<SkillDocument> documents, ExecutionConfiguration configuration)
+    {
+        Objects.requireNonNull(documents, "documents must not be null");
+        return prepareWith(() -> generations.prepare(new ArrayList<>(documents), configuration));
+    }
+
     private PreparedSkillUpdate prepareWith(Supplier<SkillGeneration> preparation)
     {
         synchronized (preparationLock)
@@ -67,7 +82,13 @@ public final class DefaultSkillReloader implements SkillReloader
             final SkillGeneration candidate;
             try { candidate = preparation.get(); }
             catch (RuntimeException ex) { throw new SkillReloadException("Failed to prepare skill generation", ex); }
-            checkOpen();
+            try { checkOpen(); }
+            catch (RuntimeException | Error ex)
+            {
+                try { candidate.close(); }
+                catch (RuntimeException closeFailure) { ex.addSuppressed(closeFailure); }
+                throw ex;
+            }
             return new Candidate(owner, baseId, candidate);
         }
     }
@@ -77,25 +98,36 @@ public final class DefaultSkillReloader implements SkillReloader
     {
         Objects.requireNonNull(update, "update must not be null");
         SkillGenerationManager.Retirement[] retirement = new SkillGenerationManager.Retirement[1];
-        synchronized (publicationLock)
+        if (!(update instanceof Candidate candidate) || candidate.owner != owner)
+            throw new SkillReloadException("Skill update belongs to another framework instance or was not prepared by Loomspan");
+        try
         {
-            if (!(update instanceof Candidate candidate) || candidate.owner != owner)
-                throw new SkillReloadException("Skill update belongs to another framework instance or was not prepared by Loomspan");
-            try
+            synchronized (publicationLock)
             {
-                lifecycle.whileAdmissionOpen(() -> {
-                    if (candidate.published)
-                        throw new SkillReloadException("Skill update was already published");
-                    if (!generations.active().id().equals(candidate.baseId))
-                        throw new SkillReloadException("Skill update is stale; active generation changed since preparation");
-                    retirement[0] = generations.activateAndSelect(candidate.generation);
-                    candidate.published = true;
-                });
+                synchronized (candidate)
+                {
+                    lifecycle.whileAdmissionOpen(() -> {
+                        if (candidate.published)
+                            throw new SkillReloadException("Skill update was already published");
+                        if (candidate.closed)
+                            throw new SkillReloadException("Skill update was closed");
+                        if (!generations.active().id().equals(candidate.baseId))
+                            throw new SkillReloadException("Skill update is stale; active generation changed since preparation");
+                        retirement[0] = generations.activateAndSelect(candidate.generation);
+                        candidate.published = true;
+                    });
+                }
             }
-            catch (RejectedExecutionException ex)
-            {
-                throw new SkillReloadException("Cannot publish skill update after shutdown began", ex);
-            }
+        }
+        catch (RejectedExecutionException ex)
+        {
+            closeRejected(candidate, ex);
+            throw new SkillReloadException("Cannot publish skill update after shutdown began", ex);
+        }
+        catch (SkillReloadException ex)
+        {
+            closeRejected(candidate, ex);
+            throw ex;
         }
         SkillGenerationManager.dispatch(retirement[0]);
     }
@@ -125,12 +157,19 @@ public final class DefaultSkillReloader implements SkillReloader
         { throw new SkillReloadException("Shutdown began during skill preparation", ex); }
     }
 
+    private static void closeRejected(Candidate candidate, RuntimeException primary)
+    {
+        try { candidate.close(); }
+        catch (RuntimeException closeFailure) { primary.addSuppressed(closeFailure); }
+    }
+
     private static final class Candidate implements PreparedSkillUpdate
     {
         private final Object owner;
         private final String baseId;
         private final SkillGeneration generation;
         private boolean published;
+        private boolean closed;
 
         private Candidate(Object owner, String baseId, SkillGeneration generation)
         {
@@ -141,5 +180,11 @@ public final class DefaultSkillReloader implements SkillReloader
 
         @Override public String generationId() { return generation.id(); }
         @Override public SkillCatalog snapshot() { return generation.skillCatalog(); }
+        @Override public synchronized void close()
+        {
+            if (closed || published) return;
+            closed = true;
+            generation.close();
+        }
     }
 }

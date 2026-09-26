@@ -151,7 +151,8 @@ public final class ObservabilityRouteRegistrar implements SmartInitializingSingl
             return new ObservabilityRuntime(
                     instanceId, clock, observation, delivery, artifactDelivery, grace,
                     active, replay, live, skills, traces,
-                    configuration, properties.getSession().getQuotas(), traceProperties.getPersistence());
+                    configuration, properties.getSession().getQuotas(), traceProperties.getPersistence(),
+                    generations::quotasForGeneration, generations::activeTracePersistence);
         }
         catch (RuntimeException | Error failure)
         {

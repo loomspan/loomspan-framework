@@ -8,10 +8,12 @@ import org.springframework.beans.factory.DisposableBean;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public final class NamedAiConnectionRegistry implements DisposableBean
+public final class NamedAiConnectionRegistry
 {
     private final Map<String, ProviderConnectionRuntime> connections;
+    private final AtomicBoolean destroyed = new AtomicBoolean();
 
     public NamedAiConnectionRegistry(Map<String, LoomspanProperties.ConnectionProperties> connections,
             SpringAiProviderIntegration integration)
@@ -23,9 +25,10 @@ public final class NamedAiConnectionRegistry implements DisposableBean
         {
             String name = entry.getKey();
             LoomspanProperties.ConnectionProperties properties = entry.getValue();
+            ProviderConnectionRuntime runtime = null;
             try
             {
-                ProviderConnectionRuntime runtime = integration.create(name, properties);
+                runtime = integration.create(name, properties);
                 if (runtime.attemptOwnership() != ai.loomspan.internal.provider.AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP
                         && properties.getProviderRetry().isEnabled())
                 {
@@ -36,6 +39,7 @@ public final class NamedAiConnectionRegistry implements DisposableBean
             }
             catch (SafeAiConnectionConfigurationException ex)
             {
+                if (runtime != null) closeUnregistered(runtime, ex);
                 cleanupAfterConstructionFailure(built, ex);
                 throw ex;
             }
@@ -44,6 +48,7 @@ public final class NamedAiConnectionRegistry implements DisposableBean
                 IllegalStateException failure = new IllegalStateException(
                         "Failed to construct AI connection '" + name + "' for driver " + properties.getDriver()
                                 + "; check " + constructionSettings(name, properties));
+                if (runtime != null) closeUnregistered(runtime, failure);
                 cleanupAfterConstructionFailure(built, failure);
                 throw failure;
             }
@@ -71,17 +76,21 @@ public final class NamedAiConnectionRegistry implements DisposableBean
         return connections;
     }
 
-    @Override
     public void destroy() throws Exception
     {
+        if (!destroyed.compareAndSet(false, true)) return;
         Exception failure = destroyModels(connections);
         if (failure != null) throw failure;
     }
 
     private static void cleanupAfterConstructionFailure(Map<String, ProviderConnectionRuntime> built, RuntimeException failure)
     {
-        Exception cleanupFailure = destroyModels(built);
-        if (cleanupFailure != null) failure.addSuppressed(cleanupFailure);
+        destroyModels(built);
+    }
+
+    private static void closeUnregistered(ProviderConnectionRuntime runtime, RuntimeException failure)
+    {
+        destroyModels(Map.of("unregistered", runtime));
     }
 
     private static Exception destroyModels(Map<String, ProviderConnectionRuntime> models)

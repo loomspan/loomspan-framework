@@ -25,6 +25,14 @@ public final class MissionWorkExecutor
         this.sessionUsageService = Objects.requireNonNull(sessionUsageService);
     }
 
+    private Duration timeout(LoomspanSession session)
+    {
+        return ExecutionBindingScope.current().filter(binding -> binding.session() == session)
+                .map(binding -> binding.generation().runtime())
+                .map(runtime -> runtime.properties().getSession().getMissionTimeout())
+                .orElse(missionTimeout);
+    }
+
     public String execute(LoomspanSession session, String skillName, Callable<String> work)
     {
         Objects.requireNonNull(work, "work must not be null");
@@ -59,12 +67,12 @@ public final class MissionWorkExecutor
         }
         try
         {
-            return mission.get(missionTimeout.toMillis(), TimeUnit.MILLISECONDS);
+            return mission.get(timeout(session).toMillis(), TimeUnit.MILLISECONDS);
         }
         catch (TimeoutException ex)
         {
             LoomspanMissionTimeoutException failure = new LoomspanMissionTimeoutException(
-                    session.getSessionId(), skillName, missionTimeout, ex);
+                    session.getSessionId(), skillName, timeout(session), ex);
             MissionLifecycle.PrimaryCancellation primary = lifecycle.beginCancellation(capturedBinding, failure,
                     () -> executionStateService.recordFailure(session, failure, Map.of("message", "Mission execution timed out")));
             MissionLifecycle.Cutoff cutoff = lifecycle.awaitCutoff();
@@ -74,7 +82,7 @@ public final class MissionWorkExecutor
         catch (InterruptedException ex)
         {
             LoomspanMissionTimeoutException failure = new LoomspanMissionTimeoutException(
-                    session.getSessionId(), skillName, missionTimeout, ex);
+                    session.getSessionId(), skillName, timeout(session), ex);
             MissionLifecycle.PrimaryCancellation primary = lifecycle.beginCancellation(capturedBinding, failure,
                     () -> executionStateService.recordFailure(session, failure, Map.of("message", "Mission execution interrupted")));
             MissionLifecycle.Cutoff cutoff = lifecycle.awaitCutoff();

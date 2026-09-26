@@ -28,7 +28,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 class LoomspanAutoConfigurationBoundaryTest
 {
     private static final Set<String> CORE_BEAN_FACTORIES = Set.of(
-            "LoomspanExceptionTransformer",
+            "LoomspanExceptionTransformer", "executionTraceProperties",
             "skillMethodBeanPostProcessor", "LoomspanSessionRunner", "skillGenerationManager",
             "skillInputContractResolver", "skillInputValidator",
             "skillCatalog", "skillReloader", "skillRoleEvaluator", "accessGuard", "skillVisibilityResolver", "virtualFileSystem", "refResolver",
@@ -167,7 +167,7 @@ class LoomspanAutoConfigurationBoundaryTest
     void purposeOwnedCodecRolesAreRequiredByEveryConfiguredSerializationBoundary()
     {
         Set<String> codecBackedCoreFactories = Set.of(
-                "skillMethodBeanPostProcessor", "LoomspanSessionRunner", "yamlSkillCatalog",
+                "skillMethodBeanPostProcessor", "LoomspanSessionRunner", "yamlSkillCatalog", "skillGenerationManager",
                 "skillInputContractResolver", "skillTemplate", "planningService",
                 "stepLoopMissionExecutionEngine");
         assertThat(Arrays.stream(LoomspanAutoConfiguration.class.getDeclaredMethods())
@@ -176,7 +176,7 @@ class LoomspanAutoConfigurationBoundaryTest
                         .as("%s must consume a purpose-owned codec role", method.getName())
                         .contains(LoomspanJacksonCodecs.class));
 
-        Set<String> codecBackedAiFactories = Set.of("namedAiConnectionRegistry", "skillAdvisorResolver");
+        Set<String> codecBackedAiFactories = Set.of("skillAdvisorResolver");
         assertThat(Arrays.stream(LoomspanAiAutoConfiguration.class.getDeclaredMethods())
                 .filter(method -> codecBackedAiFactories.contains(method.getName())))
                 .allSatisfy(method -> assertThat(method.getParameterTypes())

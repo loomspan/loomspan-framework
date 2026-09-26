@@ -99,6 +99,25 @@ class SkillReloaderTest
     }
 
     @Test
+    void closingUnusedCandidateIsIdempotentAndCannotPublish()
+    {
+        SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);
+        manager.afterSingletonsInstantiated();
+        DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle());
+        String active = reloader.snapshot().generationId();
+        PreparedSkillUpdate abandoned = reloader.prepare();
+        abandoned.close();
+        abandoned.close();
+        assertThatThrownBy(() -> reloader.publish(abandoned)).isInstanceOf(SkillReloadException.class)
+                .hasMessageContaining("closed");
+        assertThat(reloader.snapshot().generationId()).isEqualTo(active);
+        PreparedSkillUpdate published = reloader.prepare();
+        reloader.publish(published);
+        published.close();
+        assertThat(reloader.snapshot().generationId()).isEqualTo(published.generationId());
+    }
+
+    @Test
     void listenerFailureAndCloseCannotChangePublicationOrOtherDelivery() throws Exception
     {
         SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);

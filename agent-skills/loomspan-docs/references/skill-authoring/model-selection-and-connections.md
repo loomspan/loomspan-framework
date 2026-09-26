@@ -44,7 +44,9 @@ loomspan:
 
 The YAML skill declares `model: summarizer` or `model: planner`; it does not declare the driver or endpoint.
 
-The resolved per-skill execution configuration belongs to the complete generation captured by a root invocation. Nested and parallel work in that tree keeps the same resolved configuration even if a newer generation is internally activated; newly captured roots use the newer configuration. Named connection runtime objects remain application/Spring dependencies rather than per-generation copies.
+The resolved per-skill execution configuration and its named connection clients belong to the complete generation captured by a root invocation. Nested and parallel work, including provider retries, uses those captured clients after another generation is published. New roots use the new generation. Superseded clients close only after captured physical work finishes. A skill and a previously unknown model alias can therefore be validated and published together through `SkillReloader.validate(documents, configuration)` and `prepare(documents, configuration)`; see the [Java publication contract](../java-api/skill-reload.md).
+
+The connection table below describes ordinary embedded `application.yml`. In an explicit publication, supply the same driver and provider settings in `ExecutionConfiguration` but replace credentials with external property references: `api-key-ref`, `gemini.credentials-ref`, and `header-refs`. Literal `api-key`, `gemini.credentials-uri`, and `headers` are rejected in authored candidates. The host must provision the referenced Spring `Environment` properties before preparation; validation checks reference syntax without resolving them. Candidate YAML may include only `loomspan.connections`, `loomspan.models`, `loomspan.session`, and `loomspan.execution-trace.persistence`. Omitted session and trace settings use the startup defaults, rather than values from mutable global properties. Skill-only updates copy the active generation's settings.
 
 ## Connection rules
 

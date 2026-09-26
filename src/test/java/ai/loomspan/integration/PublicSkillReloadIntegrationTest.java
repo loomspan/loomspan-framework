@@ -1,6 +1,7 @@
 package ai.loomspan.integration;
 
 import ai.loomspan.api.PreparedSkillUpdate;
+import ai.loomspan.api.ExecutionConfiguration;
 import ai.loomspan.api.SkillInvocationHandoff;
 import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.RestSkillInvocation;
@@ -36,6 +37,175 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PublicSkillReloadIntegrationTest
 {
+    @Test
+    void pendingRootKeepsProviderRetryPolicyAfterPublication(@TempDir Path directory) throws Exception
+    {
+        try (MockWebServer first = new MockWebServer(); MockWebServer second = new MockWebServer())
+        {
+            first.enqueue(new MockResponse().setResponseCode(503).setBody("temporary"));
+            first.enqueue(modelResponse("retried"));
+            second.enqueue(new MockResponse().setResponseCode(503).setBody("temporary"));
+            second.enqueue(modelResponse("unexpected-retry"));
+            var documents = List.of(new SkillDocument("candidate",
+                    "name: retrySkill\ndescription: selected model\nmodel: selected\nplanning_mode: false\n"));
+            new ApplicationContextRunner()
+                    .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class,
+                            ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
+                            LoomspanAutoConfiguration.class,
+                            ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
+                    .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml",
+                            "candidate.a=external-a", "candidate.b=external-b")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        SkillReloader reloader = context.getBean(SkillReloader.class);
+                        SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
+                        reloader.publish(reloader.prepare(documents, candidateConfiguration(first, "candidate.a", 2)));
+                        var pending = handoff.handoff("retrySkill", Map.of());
+                        reloader.publish(reloader.prepare(documents, candidateConfiguration(second, "candidate.b", 1)));
+                        assertThat(pending.invoke()).isEqualTo("retried");
+                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("retrySkill", Map.of()))
+                                .isInstanceOf(ai.loomspan.api.SkillException.class);
+                    });
+            assertThat(first.getRequestCount()).isEqualTo(2);
+            assertThat(second.getRequestCount()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void pendingRootKeepsItsConnectionAcrossPublication(@TempDir Path directory) throws Exception
+    {
+        try (MockWebServer first = new MockWebServer(); MockWebServer second = new MockWebServer())
+        {
+            first.enqueue(modelResponse("first"));
+            second.enqueue(modelResponse("second"));
+            String yaml = "name: candidateSkill\ndescription: selected model\nmodel: selected\nplanning_mode: false\n";
+            var documents = List.of(new SkillDocument("candidate", yaml));
+            new ApplicationContextRunner()
+                    .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class,
+                            ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
+                            LoomspanAutoConfiguration.class,
+                            ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
+                    .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml",
+                            "candidate.a=external-a", "candidate.b=external-b")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        SkillReloader reloader = context.getBean(SkillReloader.class);
+                        SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
+                        String initial = reloader.snapshot().generationId();
+                        assertThat(reloader.validate(documents, candidateConfiguration(first, "missing.key")).valid()).isTrue();
+                        assertThatThrownBy(() -> reloader.prepare(documents, candidateConfiguration(first, "missing.key")))
+                                .isInstanceOf(SkillReloadException.class).hasMessageNotContaining("external-a");
+                        assertThat(reloader.snapshot().generationId()).isEqualTo(initial);
+                        PreparedSkillUpdate a = reloader.prepare(documents, candidateConfiguration(first, "candidate.a"));
+                        assertThat(first.getRequestCount()).isZero();
+                        reloader.publish(a);
+                        var pending = handoff.handoff("candidateSkill", Map.of());
+                        assertThat(pending.generationId()).isEqualTo(a.generationId());
+                        PreparedSkillUpdate b = reloader.prepare(documents, candidateConfiguration(second, "candidate.b"));
+                        assertThat(second.getRequestCount()).isZero();
+                        reloader.publish(b);
+                        assertThat(pending.invoke()).isEqualTo("first");
+                        assertThat(context.getBean(SkillTemplate.class).invoke("candidateSkill", Map.of())).isEqualTo("second");
+                        PreparedSkillUpdate skillOnly = reloader.prepare(documents);
+                        assertThat(skillOnly.snapshot().skill("candidateSkill")).isPresent();
+                        reloader.publish(skillOnly);
+                        assertThat(skillOnly.generationId()).isNotEqualTo(b.generationId());
+                    });
+            assertThat(first.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS).getHeader("Authorization"))
+                    .isEqualTo("Bearer external-a");
+            assertThat(second.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS).getHeader("Authorization"))
+                    .isEqualTo("Bearer external-b");
+        }
+    }
+
+    private static MockResponse modelResponse(String content)
+    {
+        return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
+                {"id":"candidate","object":"chat.completion","created":1,"model":"compact",
+                 "choices":[{"index":0,"message":{"role":"assistant","content":"%s"},"finish_reason":"stop"}],
+                 "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                """.formatted(content));
+    }
+
+    private static ExecutionConfiguration candidateConfiguration(MockWebServer server, String keyReference)
+    {
+        return candidateConfiguration(server, keyReference, 3);
+    }
+
+    private static ExecutionConfiguration candidateConfiguration(MockWebServer server, String keyReference,
+            int maxAttempts)
+    {
+        return new ExecutionConfiguration("""
+                loomspan:
+                  connections:
+                    candidate:
+                      driver: openai
+                      base-url: %s
+                      api-key-ref: %s
+                      provider-retry:
+                        max-attempts: %d
+                        initial-backoff: 0ms
+                        max-backoff: 0ms
+                        jitter: 0
+                  models:
+                    selected:
+                      connection: candidate
+                      provider-model: compact
+                """.formatted(server.url("/v1"), keyReference, maxAttempts));
+    }
+
+    @Test
+    void publishesNewModelAliasAndSkillAsOneCandidate(@TempDir Path directory) throws Exception
+    {
+        try (MockWebServer server = new MockWebServer())
+        {
+            server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
+                    {"id":"candidate","object":"chat.completion","created":1,"model":"candidate-model",
+                     "choices":[{"index":0,"message":{"role":"assistant","content":"candidate"},"finish_reason":"stop"}],
+                     "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                    """));
+            String document = "name: candidateSkill\ndescription: candidate skill\nmodel: candidate-model\nplanning_mode: false\n";
+            ExecutionConfiguration configuration = new ExecutionConfiguration("""
+                    loomspan:
+                      connections:
+                        candidate:
+                          driver: openai
+                          base-url: %s
+                          api-key-ref: candidate.key
+                      models:
+                        candidate-model:
+                          connection: candidate
+                          provider-model: candidate-model
+                      session:
+                        quotas:
+                          max-model-calls: 1
+                      execution-trace:
+                        persistence: always
+                    """.formatted(server.url("/v1")));
+            new ApplicationContextRunner()
+                    .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class,
+                            ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
+                            LoomspanAutoConfiguration.class,
+                            ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
+                    .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml", "candidate.key=external-key")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        SkillReloader reloader = context.getBean(SkillReloader.class);
+                        var documents = List.of(new SkillDocument("candidate", document));
+                        assertThat(reloader.validate(documents, configuration).valid()).isTrue();
+                        assertThat(server.getRequestCount()).isZero();
+                        try (PreparedSkillUpdate prepared = reloader.prepare(documents, configuration))
+                        {
+                            assertThat(prepared.snapshot().skill("candidateSkill")).isPresent();
+                            assertThat(server.getRequestCount()).isZero();
+                            reloader.publish(prepared);
+                        }
+                        assertThat(context.getBean(SkillTemplate.class).invoke("candidateSkill", Map.of()))
+                                .isEqualTo("candidate");
+                    });
+            assertThat(server.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS)).isNotNull();
+        }
+    }
     @Test
     void publicValidationRereadsConfiguredResourcesAndKeepsSuppliedInputIsolated(@TempDir Path directory)
             throws Exception

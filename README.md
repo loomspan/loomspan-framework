@@ -85,9 +85,8 @@ loomspan:
     default-model:
       connection: ollama-main
       provider-model: ibm/granite4:tiny-h
-
-execution-trace:
-  persistence: ALWAYS
+  execution-trace:
+    persistence: ALWAYS
 ```
 
 Every LLM-backed YAML skill must name one of the entries under `loomspan.models`. Java skills do not require a framework model. `default-model` is an ordinary model key; it is not selected automatically.
@@ -189,12 +188,45 @@ try {
 
 Authentication must be installed before `handoff`; execution authorizes with that captured identity and restores the worker's prior security context. Exactly one execution, release, or framework cutoff wins. Mission timeout accounting begins when ordinary mission work is submitted, while the single framework shutdown deadline may already be running; a pending handle may start within its remainder and is invalidated at cutoff. Observer delivery remains inside root ownership.
 
-The supported starter Java API is closed to these twenty-two types in `ai.loomspan.api`: `SkillTemplate`, `SkillInvocationHandoff`, `AdmittedSkillInvocation`, `SkillReloader`, `SkillDocument`, `SkillValidationResult`, `SkillValidationIssue`, `ValidatedSkill`, `PreparedSkillUpdate`, `SkillCatalog`, `SkillDescriptor`, `SkillKind`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `RestSkillHandler`, `RestSkillInvocation`, `SkillException`, `SkillReloadException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. `RestSkillHandler` is the sole supported SPI; it does not make any framework bean replaceable. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API.
+The supported starter Java API is closed to these twenty-three types in `ai.loomspan.api`: `SkillTemplate`, `SkillInvocationHandoff`, `AdmittedSkillInvocation`, `SkillReloader`, `SkillDocument`, `ExecutionConfiguration`, `SkillValidationResult`, `SkillValidationIssue`, `ValidatedSkill`, `PreparedSkillUpdate`, `SkillCatalog`, `SkillDescriptor`, `SkillKind`, `SkillExecutionView`, `SkillExecutionEvent`, `SkillMethod`, `SkillParam`, `RestSkillHandler`, `RestSkillInvocation`, `SkillException`, `SkillReloadException`, `SkillInputValidationException`, and `SkillInputValidationIssue`. `RestSkillHandler` is the sole supported SPI; it does not make any framework bean replaceable. A Java `public` modifier does not add a type to this API: everything under `ai.loomspan.internal` is implementation detail and may change without a compatibility shim, while `ai.loomspan.autoconfigure` contains Spring-facing integration and configuration-binding machinery rather than an application extension API.
 
 The installable [Java API knowledge set](agent-skills/loomspan-docs/references/java-api/README.md)
 provides LLM-oriented routing and source-verified guidance for this surface.
 
 ### Preparing and publishing skill changes
+
+To publish execution settings with skills, supply the complete document set and an `ExecutionConfiguration` containing a `loomspan` YAML mapping. It accepts only `connections`, `models`, `session`, and `execution-trace.persistence`. Connection credentials in this authored value use `api-key-ref`, `gemini.credentials-ref`, and `header-refs`; each reference names an external Spring `Environment` property. Loomspan resolves references during `prepare` and creates the required clients. Missing or blank references fail preparation. `validate` checks syntax and skill/model references without resolving secrets or making a provider request. Direct credential values and process settings are rejected in explicit candidates. Ordinary startup `application.yml` still accepts its existing connection fields and applies the same session and trace defaults.
+
+```yaml
+loomspan:
+  connections:
+    primary:
+      driver: openai
+      api-key-ref: provider.primary.key
+  models:
+    editor:
+      connection: primary
+      provider-model: gpt-4.1-mini
+  session:
+    max-depth: 8
+    quotas:
+      max-provider-attempts: 24
+  execution-trace:
+    persistence: ONERROR
+```
+
+```java
+ExecutionConfiguration execution = new ExecutionConfiguration(candidateYaml);
+SkillValidationResult feedback = reloader.validate(completeDocuments, execution);
+if (feedback.valid()) {
+    try (PreparedSkillUpdate candidate = reloader.prepare(completeDocuments, execution)) {
+        configurationStore.stage(candidate.generationId(), replacementConfiguration);
+        reloader.publish(candidate);
+    }
+}
+```
+
+The authored YAML can be stored by the host because it contains references, never resolved values. A published candidate transfers its clients to the active generation; close an unused candidate to release them. A skill-only `prepare()` or `prepare(documents)` copies the active execution settings. Root handoff selects one complete version; delayed physical work, children, retries, limits, and tracing keep that version until the root and its physical work finish. Republishing earlier content creates a new generation ID. Process settings such as shutdown, observability API enablement and retention, Spring/server settings, and skill resource locations are outside execution publication. Revoking an external credential may still cause subsequent provider calls to fail.
 
 `SkillReloader` separates framework validation from application readiness. Stage the initial generation's REST configuration under `reloader.snapshot().generationId()` before admitting application traffic or invoking skills. Keep one fixed `RestSkillHandler` bean and select application-owned configuration using `invocation.generationId()`; this ID comes from the captured invocation tree, not from its input map or the currently active catalog.
 
@@ -563,9 +595,8 @@ loomspan:
       max-model-calls: 64
       max-provider-attempts: 192
       max-usage-units: 200000
-
-execution-trace:
-  persistence: ONERROR # NEVER, ONERROR, or ALWAYS
+  execution-trace:
+    persistence: ONERROR # NEVER, ONERROR, or ALWAYS
 ```
 
 `loomspan.shutdown.timeout` defaults to `30s`, is the single framework shutdown budget, and must be a positive YAML duration. When the owning Spring application context begins closing, Loomspan atomically rejects new top-level skill invocations before constructing their sessions. Roots already admitted may continue nested skill work, subject to their ordinary mission deadlines, quotas, and depth limits.

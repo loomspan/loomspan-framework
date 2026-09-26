@@ -1,6 +1,7 @@
 package ai.loomspan.autoconfigure;
 
 import ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry;
+import ai.loomspan.internal.skill.SkillGenerationManager;
 import ai.loomspan.internal.chat.DefaultSkillAdvisorResolver;
 import ai.loomspan.internal.chat.DefaultSkillChatModelResolver;
 import ai.loomspan.internal.chat.SkillAdvisorResolver;
@@ -25,17 +26,11 @@ import org.springframework.core.io.ResourceLoader;
 @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 public class LoomspanAiAutoConfiguration
 {
-    @Bean
+    @Bean(destroyMethod = "")
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    NamedAiConnectionRegistry namedAiConnectionRegistry(LoomspanProperties properties,
-            ResourceLoader resourceLoader,
-            ObjectProvider<ObservationRegistry> observationRegistryProvider,
-            LoomspanJacksonCodecs codecs)
+    NamedAiConnectionRegistry namedAiConnectionRegistry(SkillGenerationManager generations)
     {
-        return new NamedAiConnectionRegistry(properties.getConnections(),
-                new SpringAiProviderIntegration(resourceLoader,
-                        observationRegistryProvider.getIfAvailable(() -> ObservationRegistry.NOOP),
-                        codecs.schemaTree()));
+        return generations.active().runtime().registry();
     }
 
     @Bean

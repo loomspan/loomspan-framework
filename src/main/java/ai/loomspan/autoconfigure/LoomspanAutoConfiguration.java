@@ -70,13 +70,18 @@ import java.util.concurrent.Executors;
 
 @AutoConfiguration
 @EnableConfigurationProperties({
-        ExecutionTraceProperties.class,
         LoomspanProperties.class
 })
 @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 public class LoomspanAutoConfiguration
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoomspanAutoConfiguration.class);
+    @Bean
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    ExecutionTraceProperties executionTraceProperties(LoomspanProperties properties)
+    {
+        return properties.getExecutionTrace();
+    }
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     LoomspanExceptionTransformer LoomspanExceptionTransformer()
@@ -165,14 +170,22 @@ public class LoomspanAutoConfiguration
             LoomspanJacksonCodecs codecs,
             SkillMethodBeanPostProcessor skillMethodBeanPostProcessor,
             SkillInputContractResolver skillInputContractResolver,
-            org.springframework.beans.factory.ListableBeanFactory beanFactory)
+            org.springframework.beans.factory.ListableBeanFactory beanFactory,
+            org.springframework.core.env.Environment environment,
+            org.springframework.core.io.ResourceLoader resourceLoader,
+            org.springframework.beans.factory.ObjectProvider<io.micrometer.observation.ObservationRegistry> observationRegistryProvider)
     {
         LoomspanProperties fixedSkillLoadingProperties = skillLoadingPropertiesSnapshot(properties);
         return new SkillGenerationManager(skillMethodBeanPostProcessor,
                 () -> new YamlSkillCatalog(fixedSkillLoadingProperties,
                         new org.springframework.core.io.support.PathMatchingResourcePatternResolver(),
                         codecs.skillYaml()),
-                skillInputContractResolver, beanFactory);
+                skillInputContractResolver, beanFactory, properties, environment,
+                (effective, policy) -> new ai.loomspan.internal.skill.ExecutionRuntime(effective, policy,
+                        new ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry(effective.getConnections(),
+                                new ai.loomspan.internal.springai.SpringAiProviderIntegration(resourceLoader,
+                                        observationRegistryProvider.getIfAvailable(() -> io.micrometer.observation.ObservationRegistry.NOOP),
+                                        codecs.schemaTree()))));
     }
 
     static LoomspanProperties skillLoadingPropertiesSnapshot(LoomspanProperties source)

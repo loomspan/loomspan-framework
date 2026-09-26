@@ -39,6 +39,34 @@ import static org.mockito.Mockito.when;
 class SkillGenerationManagerTest
 {
     @Test
+    void providerResourcesRetireAfterTheLastCapturedOwnerAndCloseOnce() throws Exception
+    {
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of());
+        SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
+                () -> catalog(), new SkillInputContractResolver(), new StaticListableBeanFactory());
+        manager.afterSingletonsInstantiated();
+        var firstRegistry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
+        var secondRegistry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
+        SkillGeneration first = new SkillGeneration("first", Map.of(), Map.of(), null, null,
+                new ExecutionRuntime(new LoomspanProperties(), ai.loomspan.internal.core.TracePersistencePolicy.ONERROR,
+                        firstRegistry));
+        SkillGeneration second = new SkillGeneration("second", Map.of(), Map.of(), null, null,
+                new ExecutionRuntime(new LoomspanProperties(), ai.loomspan.internal.core.TracePersistencePolicy.ONERROR,
+                        secondRegistry));
+        manager.activate(first);
+        var captured = manager.capture();
+        manager.activate(second);
+        org.mockito.Mockito.verifyNoInteractions(firstRegistry);
+        captured.lease().close();
+        captured.lease().close();
+        verify(firstRegistry).destroy();
+        manager.destroy();
+        manager.destroy();
+        verify(secondRegistry).destroy();
+    }
+
+    @Test
     void validationReturnsCompleteSortedKindsForProposedCandidate(@TempDir Path directory) throws Exception
     {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);

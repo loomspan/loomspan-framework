@@ -26,6 +26,16 @@ public class DefaultSessionUsageService implements SessionUsageService
         this.usageMetricsRecorder = Objects.requireNonNull(usageMetricsRecorder, "usageMetricsRecorder must not be null");
     }
 
+    private LoomspanProperties.Session.Quotas quotas(LoomspanSession session)
+    {
+        return ExecutionBindingScope.current()
+                .filter(binding -> binding.session() == session)
+                .map(binding -> binding.generation().runtime())
+                .filter(Objects::nonNull)
+                .map(runtime -> runtime.properties().getSession().getQuotas())
+                .orElse(quotas);
+    }
+
     @Override
     public SessionUsageSnapshot snapshot(LoomspanSession session)
     {
@@ -40,7 +50,7 @@ public class DefaultSessionUsageService implements SessionUsageService
         requireWritable(session, () -> {
             SessionUsageSnapshot updated = update(session, SessionUsageSnapshot::incrementSkillInvocations);
             usageMetricsRecorder.recordSkillInvocation(skillName);
-            enforce(session, skillName, GuardrailType.MAX_SKILL_INVOCATIONS, quotas.getMaxSkillInvocations(), updated.skillInvocations());
+            enforce(session, skillName, GuardrailType.MAX_SKILL_INVOCATIONS, quotas(session).getMaxSkillInvocations(), updated.skillInvocations());
             return null;
         });
     }
@@ -53,8 +63,8 @@ public class DefaultSessionUsageService implements SessionUsageService
         runIfWritable(session, () -> {
             SessionUsageSnapshot updated = update(session, snapshot -> snapshot.recordModelUsage(Objects.requireNonNull(usageRecord, "usageRecord must not be null")));
             usageMetricsRecorder.recordModelUsage(skillName, Objects.requireNonNull(identity, "identity must not be null"), usageRecord);
-            enforce(session, skillName, GuardrailType.MAX_MODEL_CALLS, quotas.getMaxModelCalls(), updated.modelCalls());
-            enforce(session, skillName, GuardrailType.MAX_USAGE_UNITS, quotas.getMaxUsageUnits(), updated.usageUnits());
+            enforce(session, skillName, GuardrailType.MAX_MODEL_CALLS, quotas(session).getMaxModelCalls(), updated.modelCalls());
+            enforce(session, skillName, GuardrailType.MAX_USAGE_UNITS, quotas(session).getMaxUsageUnits(), updated.usageUnits());
         });
     }
 
@@ -63,7 +73,7 @@ public class DefaultSessionUsageService implements SessionUsageService
     {
         Objects.requireNonNull(session, "session must not be null");
         requireWritable(session, () -> {
-            int limit = quotas.getMaxProviderAttempts();
+            int limit = quotas(session).getMaxProviderAttempts();
             final boolean[] rejected = {false};
             SessionUsageSnapshot updated = update(session, snapshot -> {
                 if (limit > 0 && snapshot.providerAttempts() >= limit) { rejected[0] = true; return snapshot; }
@@ -94,7 +104,7 @@ public class DefaultSessionUsageService implements SessionUsageService
         requireWritable(session, () -> {
             SessionUsageSnapshot updated = update(session, SessionUsageSnapshot::incrementToolInvocations);
             session.markToolActivity(requireBinding(session).branch().requireLeaf().frameId());
-            enforce(session, skillName, GuardrailType.MAX_TOOL_INVOCATIONS, quotas.getMaxToolInvocations(), updated.toolInvocations());
+            enforce(session, skillName, GuardrailType.MAX_TOOL_INVOCATIONS, quotas(session).getMaxToolInvocations(), updated.toolInvocations());
             return null;
         });
     }
@@ -118,7 +128,7 @@ public class DefaultSessionUsageService implements SessionUsageService
             if (recordedOutcome.status() == LinterOutcomeStatus.RETRYING)
             {
                 enforce(session, recordedOutcome.skillName(), GuardrailType.MAX_LINTER_RETRIES,
-                        quotas.getMaxLinterRetries(), updated.linterRetries());
+                        quotas(session).getMaxLinterRetries(), updated.linterRetries());
                 return;
             }
             ExecutionFrame currentFrame = requireBinding(session).branch().requireLeaf();

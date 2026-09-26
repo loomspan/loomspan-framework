@@ -2,11 +2,9 @@ package ai.loomspan.autoconfigure;
 
 import ai.loomspan.internal.core.TracePersistencePolicy;
 import jakarta.validation.constraints.NotNull;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 @Validated
-@ConfigurationProperties(prefix = "execution-trace")
 public class ExecutionTraceProperties
 {
     @NotNull

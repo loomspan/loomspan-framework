@@ -3,6 +3,10 @@ package ai.loomspan.internal.skill;
 import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.RestSkillInvocation;
 import ai.loomspan.api.SkillDocument;
+import ai.loomspan.api.ExecutionConfiguration;
+import ai.loomspan.autoconfigure.LoomspanProperties;
+import ai.loomspan.internal.core.TracePersistencePolicy;
+import org.springframework.core.env.Environment;
 import ai.loomspan.api.SkillValidationIssue;
 import ai.loomspan.api.SkillValidationResult;
 import ai.loomspan.api.SkillKind;
@@ -18,6 +22,7 @@ import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.security.SkillAccessPolicy;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.DisposableBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,15 +41,19 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.function.Consumer;
 import java.util.function.BooleanSupplier;
+import java.util.function.BiFunction;
 
 /** Prepares detached complete skill generations and atomically owns the active one. */
-public final class SkillGenerationManager implements SmartInitializingSingleton
+public final class SkillGenerationManager implements SmartInitializingSingleton, DisposableBean
 {
     private static final Logger log = LoggerFactory.getLogger(SkillGenerationManager.class);
     private final SkillMethodBeanPostProcessor javaSkills;
     private final Supplier<YamlSkillCatalog> yamlCatalogFactory;
     private final SkillInputContractResolver inputs;
     private final ListableBeanFactory beans;
+    private final LoomspanProperties startupProperties;
+    private final Environment environment;
+    private final BiFunction<LoomspanProperties, TracePersistencePolicy, ExecutionRuntime> runtimeFactory;
     private final AtomicReference<SkillGeneration> active = new AtomicReference<>();
     private final Object generationMonitor = new Object();
     private final Map<String, PublishedGeneration> published = new HashMap<>();
@@ -62,10 +71,22 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
             SkillInputContractResolver inputs,
             ListableBeanFactory beans)
     {
+        this(javaSkills, yamlCatalogFactory, inputs, beans, null, null, null);
+    }
+
+    public SkillGenerationManager(SkillMethodBeanPostProcessor javaSkills,
+            Supplier<YamlSkillCatalog> yamlCatalogFactory,
+            SkillInputContractResolver inputs, ListableBeanFactory beans,
+            LoomspanProperties startupProperties, Environment environment,
+            BiFunction<LoomspanProperties, TracePersistencePolicy, ExecutionRuntime> runtimeFactory)
+    {
         this.javaSkills = Objects.requireNonNull(javaSkills, "javaSkills must not be null");
         this.yamlCatalogFactory = Objects.requireNonNull(yamlCatalogFactory, "yamlCatalogFactory must not be null");
         this.inputs = Objects.requireNonNull(inputs, "inputs must not be null");
         this.beans = Objects.requireNonNull(beans, "beans must not be null");
+        this.startupProperties = startupProperties;
+        this.environment = environment;
+        this.runtimeFactory = runtimeFactory;
     }
 
     @Override
@@ -89,28 +110,94 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
     public SkillGeneration prepare()
     {
         initializeFixedDependencies();
-        YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
-        return prepareCatalog(check(catalog.checkedConfigured(true)));
+        YamlSkillCatalog catalog = currentCatalog();
+        return prepareCatalog(check(catalog.checkedConfigured(true)), currentProperties(), currentPolicy());
     }
 
     public SkillGeneration prepare(List<SkillDocument> documents)
     {
         initializeFixedDependencies();
-        YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
-        return prepareCatalog(check(catalog.checkedSupplied(documents, true)));
+        YamlSkillCatalog catalog = currentCatalog();
+        return prepareCatalog(check(catalog.checkedSupplied(documents, true)), currentProperties(), currentPolicy());
+    }
+
+    public SkillGeneration prepare(List<SkillDocument> documents, ExecutionConfiguration configuration)
+    {
+        initializeFixedDependencies();
+        ExecutionConfigurationParser.Parsed parsed = ExecutionConfigurationParser.parse(configuration, environment, false);
+        parsed.properties().setSkills(startupProperties.getSkills());
+        YamlSkillCatalog catalog = new YamlSkillCatalog(parsed.properties());
+        CheckedSet checked = check(catalog.checkedSupplied(documents, true));
+        checked.requireValid();
+        // Resolve references only after all authored configuration and skills have passed validation.
+        parsed = ExecutionConfigurationParser.parse(configuration, environment, true);
+        parsed.properties().setSkills(startupProperties.getSkills());
+        return prepareCatalog(checked, parsed.properties(), parsed.tracePersistence());
+    }
+
+    public SkillValidationResult validate(List<SkillDocument> documents, ExecutionConfiguration configuration)
+    {
+        requireInitialized();
+        try
+        {
+            ExecutionConfigurationParser.Parsed parsed = ExecutionConfigurationParser.parse(configuration, environment, false);
+            parsed.properties().setSkills(startupProperties.getSkills());
+            return validationResult(check(new YamlSkillCatalog(parsed.properties()).checkedSupplied(documents, false)));
+        }
+        catch (RuntimeException ex)
+        {
+            return new SkillValidationResult(List.of(new SkillValidationIssue(
+                    SkillValidationIssue.Severity.ERROR, "<configuration>", null, "configuration", ex.getMessage())), List.of());
+        }
+    }
+
+    private LoomspanProperties currentProperties()
+    {
+        SkillGeneration generation = active.get();
+        return generation == null || generation.runtime() == null ? startupProperties : generation.runtime().properties();
+    }
+
+    private YamlSkillCatalog currentCatalog()
+    {
+        return runtimeFactory == null ? Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null")
+                : new YamlSkillCatalog(currentProperties());
+    }
+
+    private TracePersistencePolicy currentPolicy()
+    {
+        SkillGeneration generation = active.get();
+        return generation == null || generation.runtime() == null
+                ? startupProperties == null ? TracePersistencePolicy.ONERROR : startupProperties.getExecutionTrace().getPersistence()
+                : generation.runtime().tracePersistence();
+    }
+
+    public LoomspanProperties.Session.Quotas quotasForGeneration(String generationId)
+    {
+        synchronized (generationMonitor)
+        {
+            PublishedGeneration generation = published.get(generationId);
+            if (generation == null || generation.generation.runtime() == null)
+                return startupProperties.getSession().getQuotas();
+            return generation.generation.runtime().properties().getSession().getQuotas();
+        }
+    }
+
+    public TracePersistencePolicy activeTracePersistence()
+    {
+        return currentPolicy();
     }
 
     public SkillValidationResult validate()
     {
         requireInitialized();
-        YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
+        YamlSkillCatalog catalog = currentCatalog();
         return validationResult(check(catalog.checkedConfigured(false)));
     }
 
     public SkillValidationResult validate(List<SkillDocument> documents)
     {
         requireInitialized();
-        YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
+        YamlSkillCatalog catalog = currentCatalog();
         return validationResult(check(catalog.checkedSupplied(documents, false)));
     }
 
@@ -196,7 +283,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
                 definition.source().diagnosticName(), definition.manifest().getName(), path, message);
     }
 
-    private SkillGeneration prepareCatalog(CheckedSet checked)
+    private SkillGeneration prepareCatalog(CheckedSet checked, LoomspanProperties properties, TracePersistencePolicy policy)
     {
         checked.requireValid();
         long ordinal = issuedGenerationIds.incrementAndGet();
@@ -230,7 +317,9 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
                     contract, new SkillSource(definition.source().diagnosticName(), null, null));
             putCapability(capabilities, metadata);
         }
-        return new SkillGeneration(generationId, capabilities, definitionsByName);
+        ExecutionRuntime runtime = runtimeFactory == null ? null : runtimeFactory.apply(properties, policy);
+        try { return new SkillGeneration(generationId, capabilities, definitionsByName, null, null, runtime); }
+        catch (RuntimeException | Error ex) { if (runtime != null) runtime.close(); throw ex; }
     }
 
     public void activate(SkillGeneration candidate)
@@ -245,7 +334,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
         synchronized (generationMonitor)
         {
             SkillGeneration previous = active.getAndSet(candidate);
-            published.put(candidate.id(), new PublishedGeneration(candidate.id()));
+            published.put(candidate.id(), new PublishedGeneration(candidate));
             if (previous == null) return null;
             PublishedGeneration old = published.get(previous.id());
             old.superseded = true;
@@ -270,6 +359,21 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
         deliveryEnabled = Objects.requireNonNull(condition, "condition must not be null");
     }
 
+    @Override public void destroy()
+    {
+        List<Retirement> retirements = new ArrayList<>();
+        synchronized (generationMonitor)
+        {
+            for (PublishedGeneration state : List.copyOf(published.values()))
+            {
+                state.superseded = true;
+                Retirement retirement = selectIfRetired(state);
+                if (retirement != null) retirements.add(retirement);
+            }
+        }
+        retirements.forEach(SkillGenerationManager::dispatch);
+    }
+
     public AutoCloseable onGenerationRetired(Consumer<String> listener)
     {
         Objects.requireNonNull(listener, "listener must not be null");
@@ -285,13 +389,15 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
     {
         if (!state.superseded || state.owners != 0) return null;
         published.remove(state.id);
-        if (!deliveryEnabled.getAsBoolean()) return null;
-        return new Retirement(state.id, retirementListeners.stream().map(entry -> entry.listener).toList());
+        return new Retirement(state.id, state.generation,
+                deliveryEnabled.getAsBoolean() ? retirementListeners.stream().map(entry -> entry.listener).toList() : List.of());
     }
 
     public static void dispatch(Retirement retirement)
     {
         if (retirement == null) return;
+        try { retirement.generation.close(); }
+        catch (Throwable failure) { log.warn("Skill generation resource close failed for {}", retirement.id, failure); }
         for (Consumer<String> listener : retirement.listeners)
         {
             try { listener.accept(retirement.id); }
@@ -302,10 +408,11 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
     private static final class PublishedGeneration
     {
         private final String id;
+        private final SkillGeneration generation;
         private int owners;
         private boolean superseded;
 
-        private PublishedGeneration(String id) { this.id = id; }
+        private PublishedGeneration(SkillGeneration generation) { this.id = generation.id(); this.generation = generation; }
     }
 
     private static final class Registration
@@ -338,7 +445,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton
         }
     }
 
-    public record Retirement(String id, List<Consumer<String>> listeners) {}
+    public record Retirement(String id, SkillGeneration generation, List<Consumer<String>> listeners) {}
 
     private synchronized void initializeFixedDependencies()
     {

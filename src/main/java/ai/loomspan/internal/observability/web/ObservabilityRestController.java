@@ -126,7 +126,7 @@ public final class ObservabilityRestController
                 .newestFirst(cursor.highWater(), cursor.beforeOrdinal(), pageSize + 1);
         Instant observedAt = Instant.now(runtime.clock());
         List<ObservabilityDtos.ActiveExecution> items = source.stream()
-                .map(item -> mapper.active(item, observedAt, runtime.quotas())).toList();
+                .map(item -> mapper.active(item, observedAt, runtime.quotas(item.generationId()))).toList();
         String resume = initial ? Long.toString(runtime.replayBuffer().currentCursor()) : null;
         byte[] body = pages.write(items, pageSize, emitted ->
         {
@@ -144,9 +144,10 @@ public final class ObservabilityRestController
         validateNoQuery(request);
         ObservabilityRuntime runtime = runtime();
         requireLive(runtime);
-        return json(pages.writeObject(mapper.active(runtime.activeExecutions().find(sessionId)
-                .orElseThrow(ObservabilityRestController::notFound),
-                Instant.now(runtime.clock()), runtime.quotas())));
+        ActiveExecutionSnapshot snapshot = runtime.activeExecutions().find(sessionId)
+                .orElseThrow(ObservabilityRestController::notFound);
+        return json(pages.writeObject(mapper.active(snapshot,
+                Instant.now(runtime.clock()), runtime.quotas(snapshot.generationId()))));
     }
 
     public void activity(HttpServletRequest request, HttpServletResponse response) throws IOException

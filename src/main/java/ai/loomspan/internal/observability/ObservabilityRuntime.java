@@ -17,6 +17,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+import java.util.function.Function;
 
 public final class ObservabilityRuntime implements AutoCloseable
 {
@@ -33,7 +34,8 @@ public final class ObservabilityRuntime implements AutoCloseable
     private final FinalizedTraceCatalog traces;
     private final LoomspanProperties.Observability configuration;
     private final LoomspanProperties.Session.Quotas quotas;
-    private final TracePersistencePolicy tracePersistencePolicy;
+    private final Function<String, LoomspanProperties.Session.Quotas> generationQuotas;
+    private final Supplier<TracePersistencePolicy> activeTracePersistence;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public ObservabilityRuntime(
@@ -52,6 +54,30 @@ public final class ObservabilityRuntime implements AutoCloseable
             LoomspanProperties.Session.Quotas quotas,
             TracePersistencePolicy tracePersistencePolicy)
     {
+        this(instanceId, clock, observationFactory, activityDelivery, artifactDelivery,
+                completionRetention, activeExecutions, replayBuffer, liveMonitoring, skills,
+                traces, configuration, quotas, tracePersistencePolicy,
+                ignored -> quotas, () -> tracePersistencePolicy);
+    }
+
+    public ObservabilityRuntime(
+            UUID instanceId,
+            Clock clock,
+            ExecutionObservationHandleFactory observationFactory,
+            ObservabilityActivityDelivery activityDelivery,
+            ObservabilityArtifactDelivery artifactDelivery,
+            CompletionGraceRetention completionRetention,
+            ActiveExecutionRegistry activeExecutions,
+            ActivityReplayBuffer replayBuffer,
+            LiveMonitoringAvailability liveMonitoring,
+            Supplier<RegisteredSkillCatalog> skills,
+            FinalizedTraceCatalog traces,
+            LoomspanProperties.Observability configuration,
+            LoomspanProperties.Session.Quotas quotas,
+            TracePersistencePolicy tracePersistencePolicy,
+            Function<String, LoomspanProperties.Session.Quotas> generationQuotas,
+            Supplier<TracePersistencePolicy> activeTracePersistence)
+    {
         this.instanceId = Objects.requireNonNull(instanceId, "instanceId must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.observationFactory = Objects.requireNonNull(observationFactory, "observationFactory must not be null");
@@ -66,8 +92,9 @@ public final class ObservabilityRuntime implements AutoCloseable
         this.traces = Objects.requireNonNull(traces, "traces must not be null");
         this.configuration = Objects.requireNonNull(configuration, "configuration must not be null");
         this.quotas = Objects.requireNonNull(quotas, "quotas must not be null");
-        this.tracePersistencePolicy = Objects.requireNonNull(
-                tracePersistencePolicy, "tracePersistencePolicy must not be null");
+        Objects.requireNonNull(tracePersistencePolicy, "tracePersistencePolicy must not be null");
+        this.generationQuotas = Objects.requireNonNull(generationQuotas, "generationQuotas must not be null");
+        this.activeTracePersistence = Objects.requireNonNull(activeTracePersistence, "activeTracePersistence must not be null");
     }
 
     public UUID instanceId() { return instanceId; }
@@ -83,7 +110,8 @@ public final class ObservabilityRuntime implements AutoCloseable
     public FinalizedTraceCatalog traces() { return traces; }
     public LoomspanProperties.Observability configuration() { return configuration; }
     public LoomspanProperties.Session.Quotas quotas() { return quotas; }
-    public TracePersistencePolicy tracePersistencePolicy() { return tracePersistencePolicy; }
+    public LoomspanProperties.Session.Quotas quotas(String generationId) { return generationQuotas.apply(generationId); }
+    public TracePersistencePolicy tracePersistencePolicy() { return activeTracePersistence.get(); }
 
     @Override
     public void close()

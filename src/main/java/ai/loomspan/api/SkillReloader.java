@@ -12,11 +12,17 @@ public interface SkillReloader
     /** Checks a complete proposed replacement set. Feedback is advisory; prepare checks again. */
     SkillValidationResult validate(Collection<SkillDocument> documents);
 
+    /** Checks a complete skill and execution-configuration candidate without creating provider clients. */
+    SkillValidationResult validate(Collection<SkillDocument> documents, ExecutionConfiguration configuration);
+
     /** Validates and freezes a candidate without changing the active generation. */
     PreparedSkillUpdate prepare();
 
     /** Validates and freezes a complete replacement YAML set held by the application. */
     PreparedSkillUpdate prepare(Collection<SkillDocument> documents);
+
+    /** Freezes a complete skill and execution-configuration candidate before atomic publication. */
+    PreparedSkillUpdate prepare(Collection<SkillDocument> documents, ExecutionConfiguration configuration);
 
     /** Publishes a candidate prepared by this framework instance exactly once. */
     void publish(PreparedSkillUpdate update);

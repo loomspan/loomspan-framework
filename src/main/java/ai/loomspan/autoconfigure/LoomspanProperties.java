@@ -33,6 +33,9 @@ public class LoomspanProperties implements InitializingBean
     private Session session = new Session();
 
     @Valid
+    private ExecutionTraceProperties executionTrace = new ExecutionTraceProperties();
+
+    @Valid
     private Shutdown shutdown = new Shutdown();
 
     @Valid
@@ -50,6 +53,12 @@ public class LoomspanProperties implements InitializingBean
     public Session getSession()
     {
         return session;
+    }
+
+    public ExecutionTraceProperties getExecutionTrace() { return executionTrace; }
+    public void setExecutionTrace(ExecutionTraceProperties value)
+    {
+        executionTrace = value == null ? new ExecutionTraceProperties() : value;
     }
 
     public Shutdown getShutdown()
