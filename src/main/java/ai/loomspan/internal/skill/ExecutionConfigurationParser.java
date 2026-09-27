@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashSet;
 
 /** Strict boundary between authored candidate YAML and runtime configuration. */
 public final class ExecutionConfigurationParser
@@ -33,7 +34,19 @@ public final class ExecutionConfigurationParser
 
     public static Parsed parse(ExecutionConfiguration authored, Environment environment, boolean resolveReferences)
     {
+        return parse(authored, environment, null, resolveReferences);
+    }
+
+    public static Parsed parse(ExecutionConfiguration authored, Map<String, String> supplied)
+    {
+        return parse(authored, null, supplied, true);
+    }
+
+    private static Parsed parse(ExecutionConfiguration authored, Environment environment,
+            Map<String, String> supplied, boolean resolveReferences)
+    {
         if (authored == null) throw new IllegalArgumentException("configuration must not be null");
+        Set<String> used = new HashSet<>();
         try
         {
             Object decoded = YAML.readValue(authored.yaml(), Object.class);
@@ -53,18 +66,22 @@ public final class ExecutionConfigurationParser
                     String fieldPath = path + "." + field.getKey();
                     switch (field.getKey())
                     {
-                        case "api-key-ref" -> flat.put(path + ".api-key", reference(field.getValue(), fieldPath, environment, resolveReferences));
+                        case "api-key-ref" -> flat.put(path + ".api-key", reference(field.getValue(), fieldPath, environment, supplied, used, resolveReferences));
                         case "header-refs" -> {
                             for (var header : object(field.getValue(), fieldPath).entrySet())
-                                flat.put(path + ".headers[" + header.getKey() + "]", reference(header.getValue(), fieldPath + "." + header.getKey(), environment, resolveReferences));
+                                flat.put(path + ".headers[" + header.getKey() + "]", reference(header.getValue(), fieldPath + "." + header.getKey(), environment, supplied, used, resolveReferences));
                         }
                         case "openai" -> flattenObject(object(field.getValue(), fieldPath), Set.of("compatibility-profile", "organization-id", "project-id"), fieldPath, flat);
                         case "gemini" -> {
                             Map<String, Object> gemini = object(field.getValue(), fieldPath);
-                            keys(gemini, Set.of("vertex-ai", "project-id", "location", "credentials-ref"), fieldPath);
+                            keys(gemini, Set.of("vertex-ai", "project-id", "location", "credentials-ref", "credentials-json-ref"), fieldPath);
+                            if (gemini.containsKey("credentials-ref") && gemini.containsKey("credentials-json-ref"))
+                                throw invalid(fieldPath + ".credentials-json-ref");
                             for (var geminiField : gemini.entrySet())
                                 if (geminiField.getKey().equals("credentials-ref"))
-                                    flat.put(fieldPath + ".credentials-uri", reference(geminiField.getValue(), fieldPath + ".credentials-ref", environment, resolveReferences));
+                                    flat.put(fieldPath + ".credentials-uri", reference(geminiField.getValue(), fieldPath + ".credentials-ref", environment, supplied, used, resolveReferences));
+                                else if (geminiField.getKey().equals("credentials-json-ref"))
+                                    flat.put(fieldPath + ".credentials-json", reference(geminiField.getValue(), fieldPath + ".credentials-json-ref", environment, supplied, used, resolveReferences));
                                 else flat.put(fieldPath + "." + geminiField.getKey(), scalar(geminiField.getValue(), fieldPath));
                         }
                         case "provider-retry" -> flattenObject(object(field.getValue(), fieldPath), RETRY, fieldPath, flat);
@@ -99,6 +116,8 @@ public final class ExecutionConfigurationParser
             Map<String, Object> trace = optionalObject(loomspan.get("execution-trace"), "loomspan.execution-trace");
             keys(trace, Set.of("persistence"), "loomspan.execution-trace");
             if (trace.containsKey("persistence")) flat.put("loomspan.execution-trace.persistence", scalar(trace.get("persistence"), "loomspan.execution-trace.persistence"));
+            if (supplied != null && !used.containsAll(supplied.keySet()))
+                throw new CredentialReferenceException("credentialValues contains an unused reference");
             LoomspanProperties properties = new Binder(new MapConfigurationPropertySource(flat))
                     .bind("loomspan", Bindable.of(LoomspanProperties.class)).orElseGet(LoomspanProperties::new);
             properties.afterPropertiesSet();
@@ -121,13 +140,16 @@ public final class ExecutionConfigurationParser
             throw invalid("loomspan.session.quotas");
     }
 
-    private static String reference(Object value, String path, Environment environment, boolean resolve)
+    private static String reference(Object value, String path, Environment environment,
+            Map<String, String> supplied, Set<String> used, boolean resolve)
     {
         String key = scalar(value, path);
         if (key.isBlank()) throw invalid(path);
         if (!resolve) return "unresolved-reference";
-        String resolved = environment.getProperty(key);
-        if (resolved == null || resolved.isBlank()) throw new IllegalArgumentException(path + " references a missing or blank external property");
+        String resolved = supplied == null ? environment.getProperty(key) : supplied.get(key);
+        if (resolved == null || resolved.isBlank()) throw new CredentialReferenceException(
+                path + " references a missing or blank external property");
+        used.add(key);
         return resolved;
     }
 
@@ -166,4 +188,10 @@ public final class ExecutionConfigurationParser
     }
 
     private static IllegalArgumentException invalid(String path) { return new IllegalArgumentException(path + " has an invalid value"); }
+
+    /** Messages contain authored field paths only, never reference names or resolved values. */
+    public static final class CredentialReferenceException extends IllegalArgumentException
+    {
+        private CredentialReferenceException(String message) { super(message); }
+    }
 }

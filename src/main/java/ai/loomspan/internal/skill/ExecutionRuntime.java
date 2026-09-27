@@ -75,6 +75,7 @@ public final class ExecutionRuntime implements AutoCloseable
                 options.setProjectId(original.getGemini().getProjectId());
                 options.setLocation(original.getGemini().getLocation());
                 options.setCredentialsUri(original.getGemini().getCredentialsUri());
+                options.setCredentialsJson(original.getGemini().getCredentialsJson());
                 connection.setGemini(options);
             }
             LoomspanProperties.ProviderRetryProperties retry = new LoomspanProperties.ProviderRetryProperties();

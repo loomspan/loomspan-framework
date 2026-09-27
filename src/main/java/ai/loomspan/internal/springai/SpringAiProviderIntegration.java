@@ -12,6 +12,7 @@ import ai.loomspan.internal.provider.ProviderFailureClassification;
 import ai.loomspan.internal.provider.ProviderFailureDetails;
 import ai.loomspan.internal.provider.ProviderRetryPolicy;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.genai.Client;
 import com.google.genai.errors.ApiException;
 import com.anthropic.errors.AnthropicServiceException;
@@ -166,6 +167,7 @@ public final class SpringAiProviderIntegration
         {
             builder.vertexAI(true).project(options.getProjectId()).location(options.getLocation());
             if (StringUtils.hasText(options.getCredentialsUri())) builder.credentials(loadCredentials(connectionName, options.getCredentialsUri()));
+            else if (StringUtils.hasText(options.getCredentialsJson())) builder.credentials(loadCredentialsJson(connectionName, options.getCredentialsJson()));
         }
         return GoogleGenAiChatModel.builder().genAiClient(builder.build()).retryTemplate(oneAttemptTemplate())
                 .observationRegistry(observationRegistry).build();
@@ -487,6 +489,19 @@ public final class SpringAiProviderIntegration
         {
             throw new SafeAiConnectionConfigurationException("loomspan.connections." + connectionName
                     + ".gemini.credentials-uri could not be loaded");
+        }
+    }
+
+    private GoogleCredentials loadCredentialsJson(String connectionName, String json)
+    {
+        try (InputStream input = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)))
+        {
+            return ServiceAccountCredentials.fromStream(input);
+        }
+        catch (IOException | RuntimeException ex)
+        {
+            throw new SafeAiConnectionConfigurationException("loomspan.connections." + connectionName
+                    + ".gemini.credentials-json-ref is invalid");
         }
     }
 

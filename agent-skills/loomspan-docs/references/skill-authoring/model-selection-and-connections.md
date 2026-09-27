@@ -44,9 +44,9 @@ loomspan:
 
 The YAML skill declares `model: summarizer` or `model: planner`; it does not declare the driver or endpoint.
 
-The resolved per-skill execution configuration and its named connection clients belong to the complete generation captured by a root invocation. Nested and parallel work, including provider retries, uses those captured clients after another generation is published. New roots use the new generation. Superseded clients close only after captured physical work finishes. A skill and a previously unknown model alias can therefore be validated and published together through `SkillReloader.validate(documents, configuration)` and `prepare(documents, configuration)`; see the [Java publication contract](../java-api/skill-reload.md).
+The resolved per-skill execution configuration and its named connection clients belong to the complete generation captured by a root invocation. Nested and parallel work, including provider retries, uses those captured clients after another generation is published. New roots use the new generation. Superseded clients close only after captured physical work finishes. A skill and a previously unknown model alias can therefore be validated and published together through `SkillReloader.validate(documents, configuration)` and `prepare(documents, configuration)`; hosts with their own credential store may use the map overload. See the [Java publication contract](../java-api/skill-reload.md).
 
-The connection table below describes ordinary embedded `application.yml`. In an explicit publication, supply the same driver and provider settings in `ExecutionConfiguration` but replace credentials with external property references: `api-key-ref`, `gemini.credentials-ref`, and `header-refs`. Literal `api-key`, `gemini.credentials-uri`, and `headers` are rejected in authored candidates. The host must provision the referenced Spring `Environment` properties before preparation; validation checks reference syntax without resolving them. Candidate YAML may include only `loomspan.connections`, `loomspan.models`, `loomspan.session`, and `loomspan.execution-trace.persistence`. Omitted session and trace settings use the startup defaults, rather than values from mutable global properties. Skill-only updates copy the active generation's settings.
+The connection table below describes ordinary embedded `application.yml`. In an explicit publication, supply the same driver and provider settings in `ExecutionConfiguration` but replace credentials with references: `api-key-ref`, `gemini.credentials-ref` for a URI, `gemini.credentials-json-ref` for in-memory Vertex service-account JSON, and `header-refs`. The two Gemini credential sources are mutually exclusive. Literal `api-key`, `gemini.credentials-uri`, and `headers` are rejected in authored candidates. The existing prepare overload reads referenced Spring `Environment` properties. The map overload requires all referenced values from a copied host map and never falls back to Environment; unused, missing, and blank entries fail preparation. Validation checks reference syntax without resolving them. Candidate YAML may include only `loomspan.connections`, `loomspan.models`, `loomspan.session`, and `loomspan.execution-trace.persistence`. Omitted session and trace settings use fresh binding defaults, rather than values from mutable global properties. Skill-only updates copy the active generation's settings.
 
 ## Connection rules
 
@@ -69,7 +69,7 @@ Every connection owns a `provider-retry` policy. Defaults are enabled, three tot
 
 One Loomspan model interaction is one semantic request from mission, planning, or step execution. The single Spring AI tool loop may require multiple model turns inside that interaction. A semantic validator retry starts another semantic attempt; a provider retry repeats one unchanged model turn. Every actual downstream send is one physical provider attempt, is counted against quota once, and is owned by Loomspan because provider-native retries are disabled.
 
-Credentials SHOULD come from environment placeholders or an external secret source and MUST NOT be committed. Connection diagnostics, traces, and metrics identify framework model, connection, and driver; they do not expose API keys, header values, base URLs, or credential contents.
+Credentials SHOULD come from environment placeholders or an external secret source and MUST NOT be committed. Connection diagnostics, traces, and metrics identify framework model, connection, and driver; framework-controlled metadata does not expose API keys, header values, base URLs, or credential contents. Authored YAML retains reference names, not resolved values. Environment-variable changes require restart. For rotation, publish a replacement, allow old work to finish, then revoke the old key; external revocation can break a captured execution.
 
 ## Thinking levels
 
@@ -90,7 +90,7 @@ The identical bounded guidance is recorded on every failed physical attempt, inc
 
 ## Source verification anchors
 
-- Configuration and validation: `LoomspanProperties`, `LoomspanPropertiesTest`.
+- Configuration and validation: `LoomspanProperties`, `LoomspanPropertiesTest`, `ExecutionConfigurationParserTest`.
 - Skill model resolution: `YamlSkillCatalog`, `EffectiveSkillExecutionConfiguration`.
 - Connection construction and lookup: `NamedAiConnectionRegistry`, `SpringAiProviderIntegration`, `DefaultSkillChatModelResolver`.
 - Retry/profile ownership: `LoomspanPropertiesTest`, `ProviderRetryDeciderTest`,

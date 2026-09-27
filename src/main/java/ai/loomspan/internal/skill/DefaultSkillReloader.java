@@ -11,6 +11,8 @@ import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
 
 import java.util.Objects;
 import java.util.Collection;
+import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.function.Supplier;
 import java.util.concurrent.RejectedExecutionException;
@@ -74,14 +76,35 @@ public final class DefaultSkillReloader implements SkillReloader
         return prepareWith(() -> generations.prepare(new ArrayList<>(documents), configuration));
     }
 
+    @Override
+    public PreparedSkillUpdate prepare(Collection<SkillDocument> documents, ExecutionConfiguration configuration,
+            Map<String, String> credentialValues)
+    {
+        Objects.requireNonNull(documents, "documents must not be null");
+        Objects.requireNonNull(credentialValues, "credentialValues must not be null");
+        // Snapshot at entry, including null values so validation can report a safe field path.
+        Map<String, String> supplied = new LinkedHashMap<>(credentialValues);
+        return prepareWith(() -> generations.prepare(new ArrayList<>(documents), configuration, supplied), true);
+    }
+
     private PreparedSkillUpdate prepareWith(Supplier<SkillGeneration> preparation)
+    {
+        return prepareWith(preparation, false);
+    }
+
+    private PreparedSkillUpdate prepareWith(Supplier<SkillGeneration> preparation, boolean hostSecrets)
     {
         synchronized (preparationLock)
         {
             String baseId = readWhileOpen();
             final SkillGeneration candidate;
             try { candidate = preparation.get(); }
-            catch (RuntimeException ex) { throw new SkillReloadException("Failed to prepare skill generation", ex); }
+            catch (RuntimeException ex) {
+                if (hostSecrets) throw new SkillReloadException(
+                        ex instanceof ExecutionConfigurationParser.CredentialReferenceException
+                                ? ex.getMessage() : "Failed to prepare skill generation");
+                throw new SkillReloadException("Failed to prepare skill generation", ex);
+            }
             try { checkOpen(); }
             catch (RuntimeException | Error ex)
             {

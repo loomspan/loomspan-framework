@@ -4,6 +4,7 @@ import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.SkillDocument;
+import ai.loomspan.api.ExecutionConfiguration;
 import ai.loomspan.api.SkillValidationIssue;
 import ai.loomspan.api.SkillKind;
 import ai.loomspan.api.ValidatedSkill;
@@ -38,6 +39,59 @@ import static org.mockito.Mockito.when;
 
 class SkillGenerationManagerTest
 {
+    @Test
+    void hostCredentialsAndExecutionSettingsRemainWithCapturedGeneration(@TempDir Path directory) throws Exception
+    {
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of());
+        LoomspanProperties startup = loadingProperties(directory);
+        var environment = new org.springframework.mock.env.MockEnvironment()
+                .withProperty("host.key", "deployment-key");
+        var registries = new java.util.ArrayList<ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry>();
+        SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
+                () -> new YamlSkillCatalog(startup), new SkillInputContractResolver(),
+                new StaticListableBeanFactory(), startup, environment, (effective, policy) -> {
+                    var registry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
+                    registries.add(registry);
+                    return new ExecutionRuntime(effective, policy, registry);
+                });
+        manager.afterSingletonsInstantiated();
+        String template = """
+                loomspan:
+                  connections:
+                    primary:
+                      driver: openai
+                      api-key-ref: host.key
+                  models:
+                    chosen:
+                      connection: primary
+                      provider-model: selected
+                  session:
+                    max-depth: %d
+                    quotas:
+                      max-provider-attempts: %d
+                """;
+        SkillGeneration first = manager.prepare(List.of(), new ExecutionConfiguration(template.formatted(3, 4)),
+                Map.of("host.key", "key-A"));
+        manager.activate(first);
+        var owner = manager.capture();
+        SkillGeneration second = manager.prepare(List.of(), new ExecutionConfiguration(template.formatted(7, 9)),
+                Map.of("host.key", "key-B"));
+        manager.activate(second);
+        assertThat(owner.generation().runtime().properties().getConnections().get("primary").getApiKey())
+                .isEqualTo("key-A");
+        assertThat(owner.generation().runtime().properties().getSession().getMaxDepth()).isEqualTo(3);
+        assertThat(owner.generation().runtime().properties().getSession().getQuotas().getMaxProviderAttempts())
+                .isEqualTo(4);
+        assertThat(manager.active().runtime().properties().getConnections().get("primary").getApiKey())
+                .isEqualTo("key-B");
+        assertThat(manager.active().runtime().properties().getSession().getMaxDepth()).isEqualTo(7);
+        assertThat(manager.active().runtime().properties().getSession().getQuotas().getMaxProviderAttempts())
+                .isEqualTo(9);
+        org.mockito.Mockito.verifyNoInteractions(registries.get(1));
+        owner.lease().close();
+        verify(registries.get(1)).destroy();
+    }
     @Test
     void providerResourcesRetireAfterTheLastCapturedOwnerAndCloseOnce() throws Exception
     {

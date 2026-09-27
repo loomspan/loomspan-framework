@@ -53,6 +53,50 @@ class SpringAiProviderIntegrationTest
             new SpringAiProviderIntegration(new DefaultResourceLoader());
 
     @Test
+    void malformedInMemoryVertexCredentialFailsLocallyWithoutDisclosingContent()
+    {
+        var connection = new LoomspanProperties.ConnectionProperties();
+        connection.setDriver(AiDriver.GEMINI);
+        var options = new LoomspanProperties.GeminiOptions();
+        options.setVertexAi(true);
+        options.setProjectId("project");
+        options.setLocation("us-central1");
+        options.setCredentialsJson("invalid-json-secret-sentinel");
+        connection.setGemini(options);
+        assertThat(catchThrowable(() -> integration.create("vertex", connection)))
+                .hasMessageContaining("credentials-json-ref")
+                .hasMessageNotContaining("invalid-json-secret-sentinel");
+    }
+
+    @Test
+    void inMemoryVertexServiceAccountBuildsWithoutModelRequest() throws Exception
+    {
+        var keys = java.security.KeyPairGenerator.getInstance("RSA");
+        keys.initialize(2048);
+        String pem = "-----BEGIN PRIVATE KEY-----\n"
+                + java.util.Base64.getMimeEncoder(64, new byte[] {'\n'})
+                        .encodeToString(keys.generateKeyPair().getPrivate().getEncoded())
+                + "\n-----END PRIVATE KEY-----\n";
+        String json = """
+                {"type":"service_account","project_id":"project","private_key_id":"test",
+                 "private_key":"%s","client_email":"test@project.iam.gserviceaccount.com",
+                 "client_id":"123456789", "auth_uri":"https://accounts.google.com/o/oauth2/auth",
+                 "token_uri":"https://oauth2.googleapis.com/token"}
+                """.formatted(pem.replace("\n", "\\n"));
+        assertThat(com.google.auth.oauth2.ServiceAccountCredentials.fromStream(
+                new ByteArrayInputStream(json.getBytes(java.nio.charset.StandardCharsets.UTF_8)))).isNotNull();
+        var connection = new LoomspanProperties.ConnectionProperties();
+        connection.setDriver(AiDriver.GEMINI);
+        var options = new LoomspanProperties.GeminiOptions();
+        options.setVertexAi(true);
+        options.setProjectId("project");
+        options.setLocation("us-central1");
+        options.setCredentialsJson(json);
+        connection.setGemini(options);
+        assertThat(integration.create("vertex", connection).chatModel()).isNotNull();
+    }
+
+    @Test
     void googleSdkRetriesAreDisabledAtTheHttpClientBoundary()
     {
         assertThat(SpringAiProviderIntegration.oneAttemptGoogleHttpOptions()

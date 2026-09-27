@@ -92,7 +92,7 @@ relevant topic set.
 | --- | --- | --- |
 | Supported public types | Source-verified | Exact twenty-three-type allowlist and package boundaries |
 | Catalog and pre-checks | Source-verified | Eager unfiltered snapshot, exact schemas, both validation overloads, authorization, and no-reservation limits |
-| Two-stage skill updates | Source-verified | Complete skill and execution candidate, reference-only credential input, frozen generation, process-local ID, one-shot publication, candidate disposal, safe retirement callback, and application-owned readiness and cleanup |
+| Two-stage skill updates | Source-verified | Complete skill and execution candidate, environment or host-map credential references, frozen generation, process-local ID, one-shot publication, candidate disposal, safe retirement callback, and application-owned readiness and cleanup |
 | Skill invocation | Source-verified | Direct invocation plus atomic single-use handoff with captured generation ID, input normalization and validation, result, session, security context, and observer timing |
 | Java skill annotations | Source-verified | Exact shared names, direct root/child invocation, proxy constraints, and supported application usage; detailed reflected input shapes live in `skill-authoring` |
 | Execution observations | Source-verified | Immutable view/event values, normalization, detail-value constraints, and trust boundary |

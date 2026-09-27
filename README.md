@@ -195,7 +195,7 @@ provides LLM-oriented routing and source-verified guidance for this surface.
 
 ### Preparing and publishing skill changes
 
-To publish execution settings with skills, supply the complete document set and an `ExecutionConfiguration` containing a `loomspan` YAML mapping. It accepts only `connections`, `models`, `session`, and `execution-trace.persistence`. Connection credentials in this authored value use `api-key-ref`, `gemini.credentials-ref`, and `header-refs`; each reference names an external Spring `Environment` property. Loomspan resolves references during `prepare` and creates the required clients. Missing or blank references fail preparation. `validate` checks syntax and skill/model references without resolving secrets or making a provider request. Direct credential values and process settings are rejected in explicit candidates. Ordinary startup `application.yml` still accepts its existing connection fields and applies the same session and trace defaults.
+To publish execution settings with skills, supply the complete document set and an `ExecutionConfiguration` containing a `loomspan` YAML mapping. It accepts only `connections`, `models`, `session`, and `execution-trace.persistence`. Authored credentials use `api-key-ref`, `gemini.credentials-ref` (a URI), `gemini.credentials-json-ref` (in-memory Vertex service-account JSON), and `header-refs`. The two-argument `prepare` resolves these from Spring `Environment`; the three-argument overload resolves **all** references only from its copied `Map<String, String>`, with no Environment fallback. Missing, blank, or unused map entries fail preparation. `validate` checks syntax and skill/model references without resolving secrets or making a provider request. Preparation constructs clients but makes no model request. Direct credential values and process settings are rejected in explicit candidates. Ordinary startup `application.yml` retains its connection fields and the same session and trace defaults. Changed environment variables require a process restart.
 
 ```yaml
 loomspan:
@@ -219,14 +219,15 @@ loomspan:
 ExecutionConfiguration execution = new ExecutionConfiguration(candidateYaml);
 SkillValidationResult feedback = reloader.validate(completeDocuments, execution);
 if (feedback.valid()) {
-    try (PreparedSkillUpdate candidate = reloader.prepare(completeDocuments, execution)) {
+    try (PreparedSkillUpdate candidate = reloader.prepare(completeDocuments, execution,
+            Map.of("provider.primary.key", decryptedKey))) {
         configurationStore.stage(candidate.generationId(), replacementConfiguration);
         reloader.publish(candidate);
     }
 }
 ```
 
-The authored YAML can be stored by the host because it contains references, never resolved values. A published candidate transfers its clients to the active generation; close an unused candidate to release them. A skill-only `prepare()` or `prepare(documents)` copies the active execution settings. Root handoff selects one complete version; delayed physical work, children, retries, limits, and tracing keep that version until the root and its physical work finish. Republishing earlier content creates a new generation ID. Process settings such as shutdown, observability API enablement and retention, Spring/server settings, and skill resource locations are outside execution publication. Revoking an external credential may still cause subsequent provider calls to fail.
+The authored YAML can be stored by the host because it contains references, never resolved values. Do not include credential values in catalogs, trace metadata, or application readback. A published candidate transfers its clients to the active generation; close an unused candidate to release them. A skill-only `prepare()` or `prepare(documents)` copies the active execution settings. Root handoff selects one complete version; delayed physical work, children, retries, limits, and tracing keep that version until the root and its physical work finish. Republishing earlier content creates a new generation ID. Process settings such as shutdown, observability API enablement and retention, Spring/server settings, and skill resource locations are outside execution publication. For key rotation, publish the replacement, let old work finish, then revoke the old key. External revocation can still break a captured execution's later provider call.
 
 `SkillReloader` separates framework validation from application readiness. Stage the initial generation's REST configuration under `reloader.snapshot().generationId()` before admitting application traffic or invoking skills. Keep one fixed `RestSkillHandler` bean and select application-owned configuration using `invocation.generationId()`; this ID comes from the captured invocation tree, not from its input map or the currently active catalog.
 

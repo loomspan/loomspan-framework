@@ -1,6 +1,7 @@
 package ai.loomspan.api;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /** Framework-owned two-stage update service for the complete skill set. */
@@ -23,6 +24,13 @@ public interface SkillReloader
 
     /** Freezes a complete skill and execution-configuration candidate before atomic publication. */
     PreparedSkillUpdate prepare(Collection<SkillDocument> documents, ExecutionConfiguration configuration);
+
+    /**
+     * Freezes a complete candidate using only the supplied values for every authored credential
+     * reference. The map is copied at entry; no Spring Environment fallback is used.
+     */
+    PreparedSkillUpdate prepare(Collection<SkillDocument> documents, ExecutionConfiguration configuration,
+            Map<String, String> credentialValues);
 
     /** Publishes a candidate prepared by this framework instance exactly once. */
     void publish(PreparedSkillUpdate update);

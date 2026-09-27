@@ -38,6 +38,48 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PublicSkillReloadIntegrationTest
 {
     @Test
+    void publicHostMapPublishesReplacementKeysWithoutDeploymentProperties(@TempDir Path directory) throws Exception
+    {
+        try (MockWebServer first = new MockWebServer(); MockWebServer second = new MockWebServer())
+        {
+            first.enqueue(modelResponse("first"));
+            second.enqueue(modelResponse("second"));
+            var documents = List.of(new SkillDocument("candidate",
+                    "name: candidateSkill\ndescription: selected model\nmodel: selected\nplanning_mode: false\n"));
+            new ApplicationContextRunner()
+                    .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class,
+                            ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
+                            LoomspanAutoConfiguration.class,
+                            ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
+                    .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        SkillReloader reloader = context.getBean(SkillReloader.class);
+                        SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
+                        var firstConfiguration = candidateConfiguration(first, "host.key");
+                        assertThatThrownBy(() -> reloader.prepare(documents, firstConfiguration, Map.of()))
+                                .isInstanceOf(SkillReloadException.class).hasMessageContaining("api-key-ref");
+                        PreparedSkillUpdate a = reloader.prepare(documents, firstConfiguration,
+                                Map.of("host.key", "host-A"));
+                        assertThat(first.getRequestCount()).isZero();
+                        reloader.publish(a);
+                        var pending = handoff.handoff("candidateSkill", Map.of());
+                        assertThat(pending.generationId()).isEqualTo(a.generationId());
+                        PreparedSkillUpdate b = reloader.prepare(documents,
+                                candidateConfiguration(second, "host.key"), Map.of("host.key", "host-B"));
+                        assertThat(second.getRequestCount()).isZero();
+                        reloader.publish(b);
+                        assertThat(pending.invoke()).isEqualTo("first");
+                        assertThat(context.getBean(SkillTemplate.class).invoke("candidateSkill", Map.of()))
+                                .isEqualTo("second");
+                    });
+            assertThat(first.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS).getHeader("Authorization"))
+                    .isEqualTo("Bearer host-A");
+            assertThat(second.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS).getHeader("Authorization"))
+                    .isEqualTo("Bearer host-B");
+        }
+    }
+    @Test
     void pendingRootKeepsProviderRetryPolicyAfterPublication(@TempDir Path directory) throws Exception
     {
         try (MockWebServer first = new MockWebServer(); MockWebServer second = new MockWebServer())

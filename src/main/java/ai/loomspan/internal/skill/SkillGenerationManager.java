@@ -123,6 +123,12 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
 
     public SkillGeneration prepare(List<SkillDocument> documents, ExecutionConfiguration configuration)
     {
+        return prepare(documents, configuration, null);
+    }
+
+    public SkillGeneration prepare(List<SkillDocument> documents, ExecutionConfiguration configuration,
+            Map<String, String> credentialValues)
+    {
         initializeFixedDependencies();
         ExecutionConfigurationParser.Parsed parsed = ExecutionConfigurationParser.parse(configuration, environment, false);
         parsed.properties().setSkills(startupProperties.getSkills());
@@ -130,7 +136,9 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         CheckedSet checked = check(catalog.checkedSupplied(documents, true));
         checked.requireValid();
         // Resolve references only after all authored configuration and skills have passed validation.
-        parsed = ExecutionConfigurationParser.parse(configuration, environment, true);
+        parsed = credentialValues == null
+                ? ExecutionConfigurationParser.parse(configuration, environment, true)
+                : ExecutionConfigurationParser.parse(configuration, credentialValues);
         parsed.properties().setSkills(startupProperties.getSkills());
         return prepareCatalog(checked, parsed.properties(), parsed.tracePersistence());
     }
