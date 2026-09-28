@@ -19,7 +19,7 @@ func TestRunPipelineStopsWhenFrontendTestsFail(t *testing.T) {
 		},
 	}
 
-	err := runPipeline(modeVerify, pipelineContext{productVersion: "1.0.0-beta.6"}, deps)
+	err := runPipeline(modeVerify, pipelineContext{productVersion: "1.0.0-beta.7-SNAPSHOT"}, deps)
 
 	if !errors.Is(err, frontendFailure) {
 		t.Fatalf("runPipeline() error = %v, want %v", err, frontendFailure)

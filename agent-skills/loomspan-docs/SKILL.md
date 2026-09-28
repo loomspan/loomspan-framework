@@ -4,7 +4,7 @@ description: Prepare and consult version-aligned Loomspan framework documentatio
 license: Apache-2.0
 metadata:
   loomspan-component: framework
-  loomspan-version: "1.0.0-beta.6"
+  loomspan-version: "1.0.0-beta.7-SNAPSHOT"
 ---
 
 # Loomspan framework documentation

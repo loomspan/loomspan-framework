@@ -54,7 +54,7 @@ Add the starter to your application:
 <dependency>
     <groupId>ai.loomspan</groupId>
     <artifactId>loomspan-spring-boot-starter</artifactId>
-    <version>1.0.0-beta.6</version>
+    <version>1.0.0-beta.7-SNAPSHOT</version>
 </dependency>
 ```
 
