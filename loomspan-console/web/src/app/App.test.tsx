@@ -15,7 +15,7 @@ test("renders the console shell and runtime compatibility version", () => {
   expect(screen.getByRole("link", { name: "Trace Storage" })).toHaveAttribute("href", "/trace-storage");
   expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings/mcp");
   expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
-  expect(screen.getByTestId("console-version")).toHaveTextContent("1.0.0-beta.6-SNAPSHOT");
+  expect(screen.getByTestId("console-version")).toHaveTextContent("1.0.0-beta.6");
 });
 
 test("does not retain the obsolete foundation deep route", () => {
