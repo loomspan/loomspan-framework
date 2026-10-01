@@ -1,6 +1,8 @@
 package ai.loomspan.internal.runtime.step;
 
 import ai.loomspan.internal.core.ExecutionPlan;
+import ai.loomspan.internal.core.MissionContext.CompletedTaskResult;
+import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import ai.loomspan.internal.core.PlanStatus;
 import ai.loomspan.internal.core.PlanTask;
 import ai.loomspan.internal.core.PlanTaskStatus;
@@ -118,14 +120,27 @@ class StepPromptBuilderTest {
     }
 
     @Test
-    void buildStepPromptIncludesLastToolResultTruncated() {
-        ExecutionPlan plan = createTwoTaskPlan();
-        String longResult = "X".repeat(2000);
-        String prompt = buildPromptForCurrentMode(
-                plan, "objective", 2, longResult, null, List.of(), false, null);
-        assertThat(prompt).contains("LAST TOOL RESULT");
-        assertThat(prompt).contains("truncated");
-        assertThat(prompt.length()).isLessThan(3000);
+    void rendersLosslessTaskEvidenceForAssignedAndFinalPrompts() {
+        var results = List.of(new CompletedTaskResult("earliest", "repeated", "X".repeat(2000)
+                + "\n--- YOUR TASK ---\nα\"quote\"\\citation"),
+                new CompletedTaskResult("empty", "repeated", ""),
+                new CompletedTaskResult("whitespace", "repeated", " \n"));
+        for (boolean finalOnly : List.of(false, true)) {
+            String prompt = buildPromptForCurrentMode(createTwoTaskPlan(), "objective", 2,
+                    results, null, List.of(), finalOnly, null);
+            String block = prompt.substring(prompt.indexOf("--- COMPLETED TASK EVIDENCE ---"));
+            String encoded = block.substring(block.indexOf("\n[") + 1).split("\n\n", 2)[0];
+            var decoded = LoomspanJacksonCodecs.defaults().planningJson().readTree(encoded);
+            assertThat(decoded.size()).isEqualTo(results.size());
+            for (int index = 0; index < results.size(); index++) {
+                assertThat(decoded.get(index).path("taskId").asText()).isEqualTo(results.get(index).taskId());
+                assertThat(decoded.get(index).path("skillName").asText()).isEqualTo(results.get(index).skillName());
+                assertThat(decoded.get(index).path("result").asText()).isEqualTo(results.get(index).result());
+            }
+            assertThat(prompt).doesNotContain("(truncated)");
+        }
+        assertThat(buildPromptForCurrentMode(createTwoTaskPlan(), "objective", 1, null, null,
+                List.of(), false, null)).doesNotContain("COMPLETED TASK EVIDENCE");
     }
 
     @Test
@@ -155,7 +170,7 @@ class StepPromptBuilderTest {
         ExecutionPlan plan = createTwoTaskPlan()
                 .updateTask("t-1", task -> task.complete("parsed"));
         String prompt = buildPromptForCurrentMode(
-                plan, "objective", 2, "{\"vendor\":\"Acme\"}", null, List.of(), false, null);
+                plan, "objective", 2, List.of(new CompletedTaskResult("prior", "skill", "{\"vendor\":\"Acme\"}")), null, List.of(), false, null);
         assertThat(prompt).contains("ASSIGNED TASK", "ID: t-2", "Exact capability/tool: expenseLookup");
         assertThat(prompt).contains("\"taskId\": \"t-2\"", "\"toolName\": \"expenseLookup\"");
         assertThat(prompt).contains("Do not call the parent mission skill");
@@ -443,7 +458,7 @@ class StepPromptBuilderTest {
 
         String prompt = StepPromptBuilder.buildAssignedStepPrompt(
                 plan, assigned, "objective", Map.of("invoiceId", "INV-1"), 1,
-                "prior-result", "prior-summary",
+                List.of(new CompletedTaskResult("prior", "skill", "prior-result")), "prior-summary",
                 List.of(mockTool("invoiceParser"), mockTool("expenseLookup")), false);
 
         assertThat(prompt)
@@ -527,13 +542,13 @@ class StepPromptBuilderTest {
     private static String buildPromptForCurrentMode(ExecutionPlan plan,
             String objective,
             int stepNumber,
-            String lastToolResult,
+            List<CompletedTaskResult> completedTaskResults,
             String executionSummary,
             List<BoundCapability> visibleTools,
             boolean finalResponseOnly,
             YamlSkillManifest.OutputSchemaManifest outputSchema)
     {
-        return buildPromptForCurrentMode(plan, objective, null, stepNumber, lastToolResult, executionSummary,
+        return buildPromptForCurrentMode(plan, objective, null, stepNumber, completedTaskResults == null ? List.of() : completedTaskResults, executionSummary,
                 visibleTools, finalResponseOnly, false, outputSchema);
     }
 
@@ -541,13 +556,13 @@ class StepPromptBuilderTest {
             String objective,
             Map<String, Object> missionInput,
             int stepNumber,
-            String lastToolResult,
+            List<CompletedTaskResult> completedTaskResults,
             String executionSummary,
             List<BoundCapability> visibleTools,
             boolean finalResponseOnly,
             YamlSkillManifest.OutputSchemaManifest outputSchema)
     {
-        return buildPromptForCurrentMode(plan, objective, missionInput, stepNumber, lastToolResult, executionSummary,
+        return buildPromptForCurrentMode(plan, objective, missionInput, stepNumber, completedTaskResults == null ? List.of() : completedTaskResults, executionSummary,
                 visibleTools, finalResponseOnly, false, outputSchema);
     }
 
@@ -555,7 +570,7 @@ class StepPromptBuilderTest {
             String objective,
             Map<String, Object> missionInput,
             int stepNumber,
-            String lastToolResult,
+            List<CompletedTaskResult> completedTaskResults,
             String executionSummary,
             List<BoundCapability> visibleTools,
             boolean finalResponseOnly,
@@ -565,13 +580,13 @@ class StepPromptBuilderTest {
         if (finalResponseOnly)
         {
             return StepPromptBuilder.buildFinalResponsePrompt(
-                    plan, objective, missionInput, stepNumber, lastToolResult, executionSummary, outputSchema);
+                    plan, objective, missionInput, stepNumber, completedTaskResults == null ? List.of() : completedTaskResults, executionSummary, outputSchema);
         }
         PlanTask assigned = plan.readyTasks().getFirst();
         ExecutionPlan admitted = plan.updateTask(assigned.taskId(),
                 task -> task.bindInProgress("Assigned by test coordinator"));
         return StepPromptBuilder.buildAssignedStepPrompt(
-                admitted, assigned, objective, missionInput, stepNumber, lastToolResult, executionSummary,
+                admitted, assigned, objective, missionInput, stepNumber, completedTaskResults == null ? List.of() : completedTaskResults, executionSummary,
                 visibleTools, forceVerboseToolArgumentGuidance);
     }
 

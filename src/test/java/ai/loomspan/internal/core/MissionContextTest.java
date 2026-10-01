@@ -22,16 +22,16 @@ class MissionContextTest
         assertThat(mission.currentPlan()).isEmpty();
         assertThat(mission.successfulDirectSkills()).isEmpty();
         assertThat(mission.executionSummary()).isEmpty();
-        assertThat(mission.lastToolResult()).isEmpty();
+        assertThat(mission.completedTaskResults()).isEmpty();
 
         mission.recordSuccessfulDirectSkill("a");
         mission.recordSuccessfulDirectSkill("b");
         for (int index = 1; index <= 6; index++) mission.appendExecutionSummary("line-" + index);
-        mission.setLastToolResult("");
+        mission.recordCompletedTaskResult("task", "a", "");
 
         assertThat(mission.successfulDirectSkills()).containsExactly("a", "b");
         assertThat(mission.executionSummary()).contains("line-2\nline-3\nline-4\nline-5\nline-6");
-        assertThat(mission.lastToolResult()).contains("");
+        assertThat(mission.completedTaskResults()).containsExactly(new MissionContext.CompletedTaskResult("task", "a", ""));
     }
 
     @Test
@@ -84,6 +84,36 @@ class MissionContextTest
         assertThatThrownBy(() -> new MissionContext(
                 new LoomspanSession("other", "entry", 3), "child", "frame", parent))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void retainsCompleteTaskResultsIndependentlyOfProgressSummaries()
+    {
+        MissionContext mission = mission("retention");
+        String longResult = "α\n\"quote\"\\".repeat(1000);
+        for (int index = 0; index < 8; index++)
+        {
+            mission.recordCompletedTaskResult("task-" + index, "repeated", longResult + index);
+            mission.appendExecutionSummary("line-" + index);
+        }
+        var snapshot = mission.completedTaskResults();
+        mission.recordCompletedTaskResult("empty", "repeated", "");
+        mission.recordCompletedTaskResult("whitespace", "repeated", " \n");
+        assertThat(snapshot).hasSize(8);
+        assertThat(snapshot).extracting(MissionContext.CompletedTaskResult::taskId)
+                .containsExactly("task-0", "task-1", "task-2", "task-3", "task-4", "task-5", "task-6", "task-7");
+        assertThat(snapshot.getFirst().result()).isEqualTo(longResult + "0");
+        assertThat(mission.completedTaskResults()).extracting(MissionContext.CompletedTaskResult::result).endsWith("", " \n");
+        assertThatThrownBy(() -> snapshot.clear()).isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> mission.recordCompletedTaskResult("task-0", "other", "overwrite"))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(mission.completedTaskResults().getFirst().result()).isEqualTo(longResult + "0");
+        assertThatThrownBy(() -> mission.recordCompletedTaskResult(" ", "skill", "result"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> mission.recordCompletedTaskResult("task", " ", "result"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> mission.recordCompletedTaskResult("task", "skill", null))
+                .isInstanceOf(NullPointerException.class);
     }
 
     private static MissionContext mission(String id)

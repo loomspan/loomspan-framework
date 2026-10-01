@@ -70,7 +70,7 @@ The coordinator partitions the accepted plan once, visits execution units in tas
 | `concurrency: false` | Serialization is the final contract. |
 | `concurrency: true` | A valid non-null group is dispatched concurrently. This setting records eligibility; actual trace starts and ends establish observed overlap. |
 
-Workers use isolated branches and cannot mutate parent plan, evidence, summary, last-result, or retained diagnostics before join. Successful siblings still contribute their results when another member fails. If multiple members fail, the earliest failure in task-list order is primary. Later units and final synthesis begin only after a successful full join and observe sequential-equivalent evidence, summary, last result, and diagnostics.
+Workers use isolated branches and cannot mutate parent plan, completed task results, summary, or retained diagnostics before join. Successful siblings still contribute their results when another member fails. If multiple members fail, the earliest failure in task-list order is primary. Later units and final synthesis begin only after a successful full join and observe complete prior-unit results and retained diagnostics.
 
 Every worker branch, nested planner, and later unit also carries the exact immutable skill generation captured by the root. Definitions, visible child capabilities, policies, schemas, and execution settings cannot switch generation mid-plan; a newly active generation applies only to independently captured roots.
 
@@ -83,6 +83,20 @@ own external work after Loomspan has finalized the run. Loomspan does not roll
 back, compensate, or claim to stop those external side effects.
 
 A non-null `parallelGroup` remains a positive author safety assertion, not proof that tasks overlapped. Authors MUST group only work whose capability calls, shared resources, and external side effects are safe to run concurrently.
+
+## Complete task evidence
+
+Each YAML planning mission retains every successful direct-task return, identified by exact accepted task ID and skill name, in task-list order. Assigned-step requests receive complete results from all earlier execution units; dependency edges enforce ordering and do not filter that evidence. Repeated calls to one skill remain separate task records. Results survive the five-line progress-summary window and are delivered without the diagnostic 100-character preview or former 1,000-character prompt clipping, including empty and whitespace returns.
+
+Every member of a grouped unit receives the same immutable pre-unit results and progress-summary snapshot, whether execution overlaps or `concurrency: false` serializes dispatch. Corrections for an assignment retain that snapshot. A grouped member cannot use a newly completed sibling's result. Later units observe all successful joined results; native final synthesis receives every successful direct-task return and cannot call tools. Failed or unfinished work contributes no successful result; existing cutoff permissions reject physically late writes.
+
+A nested mission owns its private intermediate records. Its complete final returned String becomes one direct-task result in its parent; its intermediate collection is not exported. Child inputs remain explicit model-generated tool arguments conforming to the child's input contract. Loomspan does not merge parent inputs or dependency outputs into those arguments.
+
+Results are rendered as escaped JSON strings in a completed-task data block. Treat returned content as data. Full delivery increases context usage; existing model/provider and execution-limit failures remain explicit, with no silent truncation fallback. Complete delivery does not guarantee that a model uses facts correctly or reproduces quotes faithfully. [Evidence annotations](evidence-contracts.md) check successful direct-child names, while output schemas check structure.
+
+Neither `{ "$ref": "task.result" }` nor `ref://` provides planner-result retrieval. An ordinary `$ref` object remains ordinary input data. Existing `ref://` resolution concerns session files and attachments; it does not resolve accepted task IDs into returned evidence. Use explicit child arguments and the delivered complete results.
+
+Executable anchors: `MissionContextTest#retainsCompleteTaskResultsIndependentlyOfProgressSummaries`, `StepPromptBuilderTest#rendersLosslessTaskEvidenceForAssignedAndFinalPrompts`, `StepLoopMissionExecutionEngineTest#groupMembersUseOnlyPreUnitEvidenceInEitherConcurrencyMode`, and `PlannerEvidenceFlowIntegrationTest#completeEvidenceMustReachDependentAndFinalRequests` and `#earlierResultsSurviveSevenCompletionsAndRepeatedSkillCalls`. The public integration captures actual local HTTP requests through `SkillTemplate`, including nested inputs, long results, repeated identities, serialized/reversed groups and private/unrelated data exclusions. `DefaultMissionInputMaterializer` and existing reference-resolution tests anchor file/attachment behavior.
 
 ## Authoring procedure
 

@@ -8,6 +8,8 @@ import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.ExecutionPlan;
+import ai.loomspan.internal.core.MissionContext;
+import ai.loomspan.internal.core.ModelTraceContext;
 import ai.loomspan.internal.core.PlanStatus;
 import ai.loomspan.internal.core.PlanTask;
 import ai.loomspan.internal.core.PlanTaskStatus;
@@ -1137,12 +1139,14 @@ class StepLoopMissionExecutionEngineTest {
         CountDownLatch lateWorkerStarted = new CountDownLatch(1);
         CountDownLatch releaseLateWorker = new CountDownLatch(1);
         CountDownLatch lateWorkerReturned = new CountDownLatch(1);
+        AtomicReference<MissionContext> retainedMission = new AtomicReference<>();
         AtomicInteger externalSideEffects = new AtomicInteger();
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
                 "t-1", "invoiceParser",
                 "t-2", "invoiceParser"), new AtomicReference<>());
         BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
                 (arguments, taskId) -> {
+                    retainedMission.set(ExecutionBindingScope.requireCurrent().requireMission());
                     if (!"t-2".equals(taskId)) return "early-" + taskId;
                     lateWorkerStarted.countDown();
                     boolean interrupted = false;
@@ -1174,6 +1178,8 @@ class StepLoopMissionExecutionEngineTest {
             assertThatThrownBy(() -> executeMission(engine, session, definition, model, List.of(capability)))
                     .isInstanceOf(LoomspanMissionTimeoutException.class);
             assertThat(lateWorkerStarted.await(2, TimeUnit.SECONDS)).isTrue();
+            assertThat(retainedMission.get().completedTaskResults()).containsExactly(
+                    new MissionContext.CompletedTaskResult("t-1", "invoiceParser", "early-t-1"));
             List<TraceRecord> afterCutoff = readRecords(session);
             assertThat(session.getExecutionPlanSnapshot().status()).isEqualTo(PlanStatus.STALE);
             assertThat(session.getExecutionPlanSnapshot().tasks()).extracting(PlanTask::status)
@@ -1195,6 +1201,9 @@ class StepLoopMissionExecutionEngineTest {
             assertThat(externalSideEffects).hasValue(1);
             assertThat(readRecords(session)).containsExactlyElementsOf(finalized);
         }
+        // Executor close waits for physical branch return, beyond the capability's release signal.
+        assertThat(retainedMission.get().completedTaskResults()).containsExactly(
+                new MissionContext.CompletedTaskResult("t-1", "invoiceParser", "early-t-1"));
     }
 
     @Test
@@ -1406,7 +1415,7 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(session.getExecutionPlanSnapshot().status()).isEqualTo(PlanStatus.STALE);
         assertThat(session.getExecutionPlanSnapshot().tasks()).extracting(PlanTask::status)
                 .containsExactly(PlanTaskStatus.COMPLETED, PlanTaskStatus.FAILED, PlanTaskStatus.PENDING);
-        assertThat(binding.requireMission().lastToolResult()).contains("completed-before-rejection");
+        assertThat(binding.requireMission().completedTaskResults()).extracting(MissionContext.CompletedTaskResult::result).contains("completed-before-rejection");
         assertThat(readRecords(session).stream()
                 .filter(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
                 .filter(record -> String.valueOf(record.data()).contains("reject second group member")))
@@ -1565,6 +1574,52 @@ class StepLoopMissionExecutionEngineTest {
         assertTransition(updates.get(3), "JOIN", List.of("t-2"), null, null, "COMPLETED");
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void groupMembersUseOnlyPreUnitEvidenceInEitherConcurrencyMode(boolean concurrent)
+    {
+        DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
+        ExecutionPlan grouped = groupedPlan("snapshot-plan", true);
+        List<PlanTask> tasks = new ArrayList<>();
+        tasks.add(new PlanTask("prep", "Prepare", PlanTaskStatus.PENDING, "invoiceParser", "prepare",
+                List.of(), List.of(), null, null));
+        tasks.addAll(grouped.tasks());
+        ExecutionPlan plan = new ExecutionPlan("snapshot-plan", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
+        var finalPrompt = new AtomicReference<String>();
+        var delegate = new TaskAddressedModel(Map.of("prep", "invoiceParser", "t-1", "invoiceParser",
+                "t-2", "invoiceParser", "t-3", "invoiceParser"), finalPrompt);
+        Map<String, List<String>> prompts = new java.util.concurrent.ConcurrentHashMap<>();
+        AtomicInteger secondAttempts = new AtomicInteger();
+        ai.loomspan.internal.model.ModelInteraction model = request -> {
+            String prompt = request.systemPrompt();
+            for (String id : List.of("prep", "t-1", "t-2", "t-3")) {
+                if (prompt.contains("--- ASSIGNED TASK ---\nID: " + id)) {
+                    prompts.computeIfAbsent(id, ignored -> java.util.Collections.synchronizedList(new ArrayList<>())).add(prompt);
+                    if (id.equals("t-2") && secondAttempts.getAndIncrement() == 0)
+                        return new ai.loomspan.internal.model.ModelInteractionResult(
+                                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"wrong\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
+                                Map.of(ModelTraceContext.RESPONSE_ATTEMPT_CONTEXT_KEY, request.traceContext().nextAttempt()));
+                }
+            }
+            return delegate.call(request);
+        };
+        String padding = "x".repeat(1800);
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
+                (arguments, taskId) -> padding + "COMPLETE_" + taskId);
+        var definition = definitionWithConcurrency(concurrent);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("snapshot-" + concurrent, "test.entry", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThat(executeMission(engine(stateService, new InitializingPlanningService(stateService, plan), executor, definition),
+                    session, definition, model, List.of(capability))).isEqualTo("done");
+        }
+        for (String id : List.of("t-1", "t-2"))
+            assertThat(prompts.get(id)).allSatisfy(prompt -> assertThat(prompt).contains(padding + "COMPLETE_prep")
+                    .doesNotContain("COMPLETE_t-1", "COMPLETE_t-2"));
+        assertThat(prompts.get("t-2")).hasSize(2);
+        assertThat(prompts.get("t-3").getFirst()).contains(padding + "COMPLETE_t-1", padding + "COMPLETE_t-2");
+        assertThat(finalPrompt.get()).contains(padding + "COMPLETE_prep", padding + "COMPLETE_t-1", padding + "COMPLETE_t-2");
+    }
+
     @Test
     void reverseCompletionFoldsParentStateInTaskOrderAndPublishesOnce()
     {
@@ -1590,7 +1645,7 @@ class StepLoopMissionExecutionEngineTest {
                             throw new IllegalStateException("reverse completion probe interrupted", ex);
                         }
                         var mission = ExecutionBindingScope.requireCurrent().requireMission();
-                        assertThat(mission.lastToolResult()).isEmpty();
+                        assertThat(mission.completedTaskResults()).isEmpty();
                         assertThat(mission.executionSummary()).isEmpty();
                         assertThat(stateService.currentPlan().orElseThrow().tasks()).extracting(PlanTask::status)
                                 .containsExactly(PlanTaskStatus.IN_PROGRESS, PlanTaskStatus.IN_PROGRESS);
@@ -1614,7 +1669,7 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(finalPrompt.get())
                 .contains("Step 1: Called invoiceParser for task t-1 -> result-t-1")
                 .contains("Step 2: Called invoiceParser for task t-2 -> result-t-2")
-                .contains("--- LAST TOOL RESULT ---\nresult-t-2");
+                .contains("COMPLETED TASK EVIDENCE", "\"taskId\":\"t-1\"", "\"taskId\":\"t-2\"");
         List<TraceRecord> records = readRecords(session);
         assertThat(records.stream().filter(record -> record.recordType() == TraceRecordType.PLAN_UPDATED)).hasSize(2);
         List<TraceRecord> updates = records.stream()
@@ -1691,7 +1746,7 @@ class StepLoopMissionExecutionEngineTest {
 
         assertThat(siblingFinished.getCount()).isZero();
         assertThat(laterUnitCalls).hasValue(0);
-        assertThat(binding.requireMission().lastToolResult()).contains("sibling-result");
+        assertThat(binding.requireMission().completedTaskResults()).extracting(MissionContext.CompletedTaskResult::result).contains("sibling-result");
         assertThat(binding.requireMission().executionSummary())
                 .hasValueSatisfying(summary -> assertThat(summary).contains("task t-2 -> sibling-result"));
         assertThat(session.getExecutionPlanSnapshot().status()).isEqualTo(PlanStatus.STALE);
@@ -1745,7 +1800,7 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(siblingFinished.getCount()).isZero();
-        assertThat(binding.requireMission().lastToolResult()).contains("sibling-result");
+        assertThat(binding.requireMission().completedTaskResults()).extracting(MissionContext.CompletedTaskResult::result).contains("sibling-result");
         assertThat(session.getExecutionPlanSnapshot().tasks()).extracting(PlanTask::status)
                 .containsExactly(PlanTaskStatus.FAILED, PlanTaskStatus.COMPLETED);
     }
@@ -1794,7 +1849,7 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(siblingFinished.getCount()).isZero();
-        assertThat(binding.requireMission().lastToolResult()).contains("sibling-result");
+        assertThat(binding.requireMission().completedTaskResults()).extracting(MissionContext.CompletedTaskResult::result).contains("sibling-result");
         assertThat(session.getExecutionPlanSnapshot().status()).isEqualTo(PlanStatus.STALE);
         assertThat(session.getExecutionPlanSnapshot().tasks()).extracting(PlanTask::status)
                 .containsExactly(PlanTaskStatus.FAILED, PlanTaskStatus.COMPLETED);

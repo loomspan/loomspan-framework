@@ -8,6 +8,8 @@ import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -27,7 +29,7 @@ public final class MissionContext
     private final LinkedHashSet<String> successfulDirectSkills = new LinkedHashSet<>();
     private final Deque<String> executionSummary = new ArrayDeque<>();
     private @Nullable ExecutionPlan plan;
-    private @Nullable String lastToolResult;
+    private final LinkedHashMap<String, CompletedTaskResult> completedTaskResults = new LinkedHashMap<>();
     private @Nullable LinterOutcome lastLinterOutcome;
     private @Nullable OutputSchemaOutcome lastOutputSchemaOutcome;
 
@@ -109,14 +111,29 @@ public final class MissionContext
         return executionSummary.isEmpty() ? Optional.empty() : Optional.of(String.join("\n", executionSummary));
     }
 
-    public synchronized Optional<String> lastToolResult()
+    /** Complete direct-task returns; progress summaries are independently bounded. */
+    public synchronized List<CompletedTaskResult> completedTaskResults()
     {
-        return Optional.ofNullable(lastToolResult);
+        return List.copyOf(completedTaskResults.values());
     }
 
-    public synchronized void setLastToolResult(@Nullable String result)
+    public synchronized void recordCompletedTaskResult(String taskId, String skillName, String result)
     {
-        lastToolResult = result;
+        CompletedTaskResult entry = new CompletedTaskResult(taskId, skillName, result);
+        if (completedTaskResults.putIfAbsent(taskId, entry) != null)
+        {
+            throw new IllegalStateException("Task result already recorded: " + taskId);
+        }
+    }
+
+    public record CompletedTaskResult(String taskId, String skillName, String result)
+    {
+        public CompletedTaskResult
+        {
+            taskId = requireNonBlank(taskId, "taskId");
+            skillName = requireNonBlank(skillName, "skillName");
+            Objects.requireNonNull(result, "result must not be null");
+        }
     }
 
     public synchronized Optional<LinterOutcome> lastLinterOutcome()

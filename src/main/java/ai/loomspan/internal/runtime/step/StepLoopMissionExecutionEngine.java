@@ -17,6 +17,7 @@ import ai.loomspan.internal.core.ExecutionBinding;
 import ai.loomspan.internal.core.ExecutionBindingScope;
 import ai.loomspan.internal.core.PhysicalBranchContext;
 import ai.loomspan.internal.core.MissionContext;
+import ai.loomspan.internal.core.MissionContext.CompletedTaskResult;
 import ai.loomspan.internal.core.MissionLifecycle;
 import ai.loomspan.internal.core.MissionWriteRevokedException;
 import ai.loomspan.internal.core.PlanStatus;
@@ -389,12 +390,12 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         unit.members().get(memberIndex), nextTaskStep + memberIndex, concurrentDispatch));
             }
 
+            List<CompletedTaskResult> priorCompletedTaskResults = mission.completedTaskResults();
+            String priorExecutionSummary = mission.executionSummary().orElse(null);
             if (concurrentDispatch)
             {
                 Admission admission = admitAssignments(session, assignments, lifecycle);
                 ExecutionPlan admittedPlan = admission.plan();
-                String priorLastToolResult = mission.lastToolResult().orElse(null);
-                String priorExecutionSummary = mission.executionSummary().orElse(null);
                 ExecutionBinding coordinatorBinding = ExecutionBindingScope.requireCurrent();
                 try
                 {
@@ -413,7 +414,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                                 }
                                 AssignedTaskOutcome outcome = executeAssignedTask(
                                         session, skillName, objective, renderedInput, executionConfiguration, modelInteraction,
-                                        visibleTools, admittedPlan, assignment, workerBinding, priorLastToolResult,
+                                        visibleTools, admittedPlan, assignment, workerBinding, priorCompletedTaskResults,
                                         priorExecutionSummary, definition, lifecycle);
                                 lifecycle.publishOutcome(entry, workerBinding, outcome);
                                 return outcome;
@@ -453,8 +454,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         }
                         outcome = executeAssignedTask(
                                 session, skillName, objective, renderedInput, executionConfiguration, modelInteraction,
-                                visibleTools, admittedPlan, assignment, workerBinding, mission.lastToolResult().orElse(null),
-                                mission.executionSummary().orElse(null), definition, lifecycle);
+                                visibleTools, admittedPlan, assignment, workerBinding, priorCompletedTaskResults,
+                                priorExecutionSummary, definition, lifecycle);
                         lifecycle.publishOutcome(entry, workerBinding, outcome);
                     }
                     finally { lifecycle.taskReturned(entry); }
@@ -479,7 +480,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         }
         StepResult finalResult = executeOneStep(
                 session, skillName, objective, renderedInput, executionConfiguration, modelInteraction, visibleTools,
-                completedPlan, nextTaskStep, mission.lastToolResult().orElse(null), mission.executionSummary().orElse(null),
+                completedPlan, nextTaskStep, mission.completedTaskResults(), mission.executionSummary().orElse(null),
                 definition, null, lifecycle);
         if (!finalResult.isFinalResponse())
         {
@@ -571,7 +572,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             ExecutionPlan admittedPlan,
             AssignedTaskExecution assignment,
             ExecutionBinding workerBinding,
-            @Nullable String priorLastToolResult,
+            List<CompletedTaskResult> priorCompletedTaskResults,
             @Nullable String priorExecutionSummary,
             @Nullable YamlSkillDefinition skillDefinition,
             MissionLifecycle lifecycle)
@@ -581,7 +582,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         {
             StepResult result = ExecutionBindingScope.supplyWith(workerBinding, () -> executeOneStep(
                     session, skillName, objective, renderedInput, executionConfiguration, modelInteraction, visibleTools,
-                    admittedPlan, assignment.stepNumber(), priorLastToolResult,
+                    admittedPlan, assignment.stepNumber(), priorCompletedTaskResults,
                     priorExecutionSummary, skillDefinition, assignment, lifecycle));
             return new AssignedTaskOutcome.Success(
                     Objects.requireNonNull(result.toolResult(), "assigned tool result must not be null"),
@@ -702,7 +703,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                 String summaryLine = "Step %d: Called %s for task %s -> %s".formatted(
                         assignment.stepNumber(), current.capabilityName(), current.taskId(), truncate(success.result(), 100));
                 mission.appendExecutionSummary(summaryLine);
-                mission.setLastToolResult(success.result());
+                mission.recordCompletedTaskResult(current.taskId(), current.capabilityName(), success.result());
                 if (success.linterOutcome() != null) mission.recordLinterOutcome(success.linterOutcome());
                 if (success.outputSchemaOutcome() != null) mission.recordOutputSchemaOutcome(success.outputSchemaOutcome());
             }
@@ -765,7 +766,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             List<BoundCapability> visibleTools,
             ExecutionPlan plan,
             int stepNumber,
-            @Nullable String lastToolResult,
+            List<CompletedTaskResult> completedTaskResults,
             @Nullable String executionSummary,
             @Nullable YamlSkillDefinition skillDefinition,
             @Nullable AssignedTaskExecution assignment,
@@ -799,12 +800,12 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                 lastAction = null;
                 String stepPrompt = assignment == null
                         ? StepPromptBuilder.buildFinalResponsePrompt(
-                                plan, objective, renderedInput.traceSafeInput(), stepNumber, lastToolResult,
+                                plan, objective, renderedInput.traceSafeInput(), stepNumber, completedTaskResults,
                                 executionSummary,
                                 skillDefinition == null ? null : skillDefinition.outputSchema())
                         : StepPromptBuilder.buildAssignedStepPrompt(
                                 plan, assignment.task(), objective, renderedInput.traceSafeInput(), stepNumber,
-                                lastToolResult, executionSummary, visibleTools, forceVerboseToolArgumentGuidance);
+                                completedTaskResults, executionSummary, visibleTools, forceVerboseToolArgumentGuidance);
                 SkillPromptComposition promptComposition = skillDefinition == null
                         ? new SkillPromptComposition(stepPrompt, false, null, "step_execution_prompt")
                         : SkillPromptComposer.composeStepExecutionPrompt(skillDefinition, stepPrompt);
@@ -1371,7 +1372,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         mission.appendExecutionSummary("Step %d: Called %s for task %s -> %s".formatted(
                                 assignment.stepNumber(), existing.capabilityName(), existing.taskId(),
                                 truncate(success.result(), 100)));
-                        mission.setLastToolResult(success.result());
+                        mission.recordCompletedTaskResult(existing.taskId(), existing.capabilityName(), success.result());
                         if (linterOutcome == null) linterOutcome = success.linterOutcome();
                         if (outputSchemaOutcome == null) outputSchemaOutcome = success.outputSchemaOutcome();
                     }

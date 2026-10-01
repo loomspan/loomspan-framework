@@ -81,6 +81,12 @@ Java children satisfy the same exact-name success rules as YAML children. Author
 
 A reference MUST name a direct child of the declaring skill and MUST NOT name a grandchild or internal probe. During a nested YAML mission, Loomspan isolates the child's successful-skill set from its parent. Child internals never bubble upward; after a nested child succeeds, only that child's public direct name is credited at the parent boundary.
 
+## Evidence delivery versus supportability
+
+The `evidence` annotation evaluates a set of successful direct-child names; repeated calls contribute one set member. It does not inspect returned values or retrieve task results. Separately, planning missions deliver complete task-keyed direct returns to later execution units and final synthesis, including a nested child's complete final return while keeping that child's private intermediates isolated. See [complete task evidence](planning-concurrency.md#complete-task-evidence) for grouped snapshots, explicit child arguments and reference limitations.
+
+Schema validity checks output structure, successful-child annotations check execution supportability, and complete result delivery preserves available data. None proves factual correctness, source accuracy or quote fidelity. Applications needing those guarantees must validate the returned claims against their sources.
+
 ## Authoring procedure
 
 1. Identify immediate root output properties needing supportability enforcement.

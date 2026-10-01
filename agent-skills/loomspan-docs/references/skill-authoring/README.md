@@ -42,6 +42,7 @@ Read [source-verification.md](source-verification.md) before performing a source
 | Configure Java/YAML roles or diagnose authorization | [authorization.md](authorization.md) | [mental-model.md](mental-model.md) for local visibility |
 | Add evidence-backed output claims | [evidence-contracts.md](evidence-contracts.md) | [mental-model.md](mental-model.md) |
 | Declare or diagnose generated-plan task counts | [planning-task-constraints.md](planning-task-constraints.md) | [evidence-contracts.md](evidence-contracts.md) when output supportability is also required |
+| Diagnose missing planner facts or citations | [complete task evidence](planning-concurrency.md#complete-task-evidence) | [evidence-contracts.md](evidence-contracts.md) for name-only supportability |
 | Configure planning concurrency or diagnose task grouping/dependencies | [planning-concurrency.md](planning-concurrency.md) | [planning-task-constraints.md](planning-task-constraints.md) when child task counts are also constrained |
 | Select a model or configure its connection | [model-selection-and-connections.md](model-selection-and-connections.md) | [mental-model.md](mental-model.md) |
 | Diagnose retries, usage, terminal failures, or a nested runtime path with the packaged Agent Skill `loomspan-console` | [traces-and-debugging.md](traces-and-debugging.md) | The relevant validation or evidence topic |
@@ -56,14 +57,14 @@ Do not load every document by default. Start with the routing entry most relevan
 | --- | --- | --- |
 | Skill-tree mental model | Initial, source-verified | Shared Java/YAML identity, immutable complete generations, public activation, root capture, local visibility, lifecycle, and nesting |
 | Shared skill identity | Source-verified | Exact `name` format, case sensitivity, no-rewrite policy, propagation, duplicates across sources, supplied diagnostic labels, and no diagnostic-location aliases |
-| Evidence contracts | Source-verified | Immediate-root property annotations, strict scalar/placement rules, Boolean direct-child expressions, planning/final truth sets, metadata isolation, enforcement, and nested mission isolation |
+| Evidence contracts | Source-verified | Immediate-root property annotations, strict scalar/placement rules, Boolean direct-child expressions, planning/final truth sets, metadata isolation, enforcement, nested mission isolation, and separation from complete result delivery and factual correctness |
 | Source verification | Initial | How an LLM should use guide, tests, fixtures, samples, and production code together |
 | Skill-design review | Initial | Cross-cutting questions; not a manifest validator |
 | REST YAML manifest | Source-verified | Exact declaration matrix, direct execution, roles, fixed handler rule, captured generation identity, safe retirement routing, file-derived or supplied labels, and diagnostics |
 | Input contracts | Initial, source-verified | Reflected Java `Object`, generic and typed maps, DTOs, arrays, requiredness boundaries, shared root/child reflected contracts, validation, and planner guidance; complete pure-YAML schema syntax remains undocumented |
 | Output contracts | Source-verified | Supported `output_schema` vocabulary, normalization, validation, retries, model guidance, and current limitations |
 | Prompts | Focused, source-verified | Recursive output-contract guidance is covered; general private prompt composition still needs a dedicated topic |
-| Planning and nested planning | Focused, source-verified | Task counts, concurrency applicability, exact grouping, ordered units, dependencies, coordinator assignment, exact worker correction, step costs, enabled-group fork/join, serialized opt-out, task-ordered folding, mission-wide cutoff cleanup, hierarchical late-write fencing, and diagnostic isolation are covered |
+| Planning and nested planning | Focused, source-verified | Task counts, concurrency applicability, exact grouping, ordered units, dependencies, coordinator assignment, exact worker correction, step costs, enabled-group fork/join, serialized opt-out, task-ordered folding, mission-wide cutoff cleanup, hierarchical late-write fencing, diagnostic isolation, complete task-keyed prior-unit/final results, nested returned-only boundaries, explicit child arguments, and reference limitations are covered |
 | Capability visibility and RBAC | Focused, source-verified | JSR-250 class/method/interface policies, required enforcement, role prefix/hierarchy parity, local allowlists, and scoped caller authentication; expression security is outside this contract |
 | Attachments and virtual files | Not yet documented | Requires separate source verification |
 | Model selection and connections | Focused, source-verified | Framework model aliases, named connections, thinking levels, environment and host-map credential references including Vertex JSON, generation capture, rotation, migration, and diagnostics |
