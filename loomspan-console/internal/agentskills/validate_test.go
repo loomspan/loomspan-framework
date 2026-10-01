@@ -90,9 +90,9 @@ func TestRuntimeDebuggingSkillValidationRejectsUnsafeAndNonPortableVariants(t *t
 		{"old name", replaceSkill("name: loomspan-console", "name: loomspan"), "name"},
 		{"wrong component", replaceSkill("loomspan-component: console", "loomspan-component: framework"), "metadata"},
 		{"extra metadata", replaceSkill("loomspan-component: console", "loomspan-component: console\n  extra: value"), "metadata"},
-		{"unknown metadata", replaceSkill("loomspan-version: \"1.0.0-beta.7-SNAPSHOT\"", "another-version: \"1.0.0-beta.7-SNAPSHOT\""), "metadata"},
-		{"blank version metadata", replaceSkill("loomspan-version: \"1.0.0-beta.7-SNAPSHOT\"", "loomspan-version: \"\""), "metadata"},
-		{"unresolved version metadata", replaceSkill("loomspan-version: \"1.0.0-beta.7-SNAPSHOT\"", "loomspan-version: \"${project.version}\""), "metadata"},
+		{"unknown metadata", replaceSkill("loomspan-version: \"1.0.0-beta.7\"", "another-version: \"1.0.0-beta.7\""), "metadata"},
+		{"blank version metadata", replaceSkill("loomspan-version: \"1.0.0-beta.7\"", "loomspan-version: \"\""), "metadata"},
+		{"unresolved version metadata", replaceSkill("loomspan-version: \"1.0.0-beta.7\"", "loomspan-version: \"${project.version}\""), "metadata"},
 		{"broken reference", replaceSkill("references/runtime-model.md", "references/missing.md"), "reference"},
 		{"endpoint", func(t *testing.T, root string) { appendSkill(t, root, "\nUse https://example.invalid/mcp\n") }, "endpoint"},
 		{"access key", func(t *testing.T, root string) {

@@ -47,7 +47,7 @@ const BrowserSessionContext = createContext<BrowserSessionContextValue>({
   status: "paired",
   bootstrap: {
     processId: "test",
-    consoleVersion: "1.0.0-beta.7-SNAPSHOT",
+    consoleVersion: "1.0.0-beta.7",
     workspacePath: "test-workspace",
     tabId: "test-tab",
     csrfToken: "test-token",
