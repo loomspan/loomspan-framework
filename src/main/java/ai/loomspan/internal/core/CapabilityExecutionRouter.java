@@ -70,11 +70,11 @@ public class CapabilityExecutionRouter
                     + "' does not belong to the current skill generation");
         }
         return executionCoordinatorProvider.getObject().execute(capability,
-                objectiveFor(capability, normalizedInput), normalizedInput, session, authentication);
+                objectiveFor(capability), normalizedInput, session, authentication);
     }
 
-    private String objectiveFor(CapabilityMetadata capability, Map<String, Object> arguments)
+    private String objectiveFor(CapabilityMetadata capability)
     {
-        return "Execute skill '%s' using the provided mission input object.".formatted(capability.name());
+        return "Fulfill the mission for skill '%s' using the provided mission input object.".formatted(capability.name());
     }
 }

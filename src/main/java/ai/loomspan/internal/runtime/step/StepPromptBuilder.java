@@ -43,7 +43,6 @@ final class StepPromptBuilder
         Objects.requireNonNull(assignedTask, "assignedTask must not be null");
         Objects.requireNonNull(objective, "objective must not be null");
         String toolName = assignedTask.capabilityName() == null ? "unspecified" : assignedTask.capabilityName();
-        String missionContext = MissionInputMessageFormatter.buildMissionContext(objective, null, plan.capabilityName());
         String acceptedPlan = plan.tasks().stream()
                 .map(task -> "  - [%s] %s: %s".formatted(task.status(), task.taskId(), task.title()))
                 .reduce((left, right) -> left + "\n" + right)
@@ -52,7 +51,7 @@ final class StepPromptBuilder
         StringBuilder sb = new StringBuilder();
         sb.append("""
                 You are executing one coordinator-assigned task from an accepted mission plan.
-                Mission context:
+                Overall mission context (non-actionable; execute only the assigned task below):
                 %s
                 Step: %d
                 Plan: %s (status: %s)
@@ -67,7 +66,7 @@ final class StepPromptBuilder
                 Expected outputs: %s
                 Exact capability/tool: %s
                 """.formatted(
-                missionContext,
+                objective,
                 stepNumber,
                 plan.planId(),
                 plan.status(),
@@ -129,7 +128,6 @@ final class StepPromptBuilder
     {
         Objects.requireNonNull(plan, "plan must not be null");
         Objects.requireNonNull(objective, "objective must not be null");
-        String missionContext = MissionInputMessageFormatter.buildMissionContext(objective, null, plan.capabilityName());
 
         StringBuilder sb = new StringBuilder();
         sb.append("""
@@ -138,7 +136,7 @@ final class StepPromptBuilder
                 %s
                 Step: %d
                 Plan: %s (status: %s)
-                """.formatted(missionContext, stepNumber, plan.planId(), plan.status()));
+                """.formatted(objective, stepNumber, plan.planId(), plan.status()));
 
         if (executionSummary != null && !executionSummary.isBlank())
         {
@@ -185,9 +183,7 @@ final class StepPromptBuilder
     {
         Objects.requireNonNull(plan, "plan must not be null");
         Objects.requireNonNull(objective, "objective must not be null");
-        return MissionInputMessageFormatter.buildUserMessage(
-                MissionInputMessageFormatter.buildMissionContext(objective, null, plan.capabilityName()),
-                missionInput);
+        return MissionInputMessageFormatter.buildUserMessage(objective, missionInput);
     }
 
     private static void appendCompletedTaskEvidence(StringBuilder sb, List<CompletedTaskResult> results)

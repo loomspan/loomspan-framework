@@ -9,6 +9,8 @@ import ai.loomspan.internal.core.PlanTaskStatus;
 import ai.loomspan.internal.runtime.tool.BoundCapability;
 import ai.loomspan.internal.skill.YamlSkillManifest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.List;
@@ -58,21 +60,46 @@ class StepPromptBuilderTest {
         assertThat(prompt).contains("Check for duplicate invoices");
     }
 
-    @Test
-    void buildStepPromptRemovesSkillNameFromMissionContext() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "Compare duplicateInvoiceChecker with 'duplicateInvoiceChecker' and YAML skill 'duplicateInvoiceChecker'.",
+            "Preserve preduplicateInvoiceCheckerpost and duplicateInvoiceCheckerArchive references.",
+            "Execute YAML skill 'duplicateInvoiceChecker' using the provided mission input object. Then retain the audit explanation.",
+            "Execute skill 'duplicateInvoiceChecker' using the provided mission input object. Then compare α and β.\n Keep this suffix.",
+            "Fulfill the mission for skill 'duplicateInvoiceChecker' using the provided mission input object."
+    })
+    void preservesCompleteObjectiveAcrossAssignedFinalAndUserPrompts(String objective) {
         ExecutionPlan plan = createTwoTaskPlan();
-        String prompt = buildPromptForCurrentMode(
-                plan,
-                "Execute YAML skill 'duplicateInvoiceChecker' using the provided mission input object.",
-                Map.of("payload", "x"),
-                1,
-                null,
-                null,
-                List.of(),
-                false,
-                null);
-        assertThat(prompt).doesNotContain("duplicateInvoiceChecker");
-        assertThat(prompt).contains("Use the provided mission inputs.");
+        for (Map<String, Object> input : List.<Map<String, Object>>of(Map.of(),
+                Map.of("payload", "duplicateInvoiceChecker", "nested", Map.of("value", "α\nβ")))) {
+            String assigned = buildPromptForCurrentMode(plan, objective, input, 1, null, null,
+                    List.of(mockTool("invoiceParser", """
+                            {"type":"object","properties":{"payload":{"type":"string"}},
+                             "required":["payload"],"additionalProperties":false}
+                            """)), false, null);
+            String finalPrompt = StepPromptBuilder.buildFinalResponsePrompt(plan, objective, input,
+                    3, List.of(), null, null);
+            String userMessage = StepPromptBuilder.buildStepUserMessage(plan, objective, input);
+            assertThat(assigned).contains(objective,
+                    "Overall mission context (non-actionable; execute only the assigned task below)",
+                    "ID: t-1", "Title: Parse invoice", "Intent: Extract vendor, amount, date",
+                    "Expected outputs: parsedInvoice", "Exact capability/tool: invoiceParser",
+                    "\"taskId\": \"t-1\"", "\"toolName\": \"invoiceParser\"",
+                    "\"payload\": \"<string>\"", "Do not call the parent mission skill");
+            assertThat(finalPrompt).contains(objective, "CALL_TOOL is not allowed anymore", "Do NOT call any tool");
+            assertThat(userMessage).contains(objective);
+            assertThat(countOccurrences(assigned + finalPrompt, "Canonical mission input:")).isZero();
+            assertThat(countOccurrences(userMessage, "Canonical mission input:")).isEqualTo(input.isEmpty() ? 0 : 1);
+            if (!input.isEmpty()) {
+                String encoded = userMessage.substring(userMessage.indexOf("Canonical mission input:\n")
+                        + "Canonical mission input:\n".length()).split("\n\n", 2)[0];
+                assertThat(LoomspanJacksonCodecs.defaults().planningJson().readTree(encoded))
+                        .isEqualTo(LoomspanJacksonCodecs.defaults().planningJson().valueToTree(input));
+            }
+        }
+        assertThat(StepPromptBuilder.buildStepUserMessage(plan, objective)).isEqualTo(objective);
+        assertThat(StepPromptBuilder.buildFinalResponsePrompt(plan, objective, null, 3, List.of(), null, null))
+                .contains(objective);
     }
 
     @Test
@@ -85,7 +112,7 @@ class StepPromptBuilderTest {
                 Map.of("payload", "x"));
 
         assertThat(userMessage).contains("Mission objective:");
-        assertThat(userMessage).contains("Use the provided mission inputs.");
+        assertThat(userMessage).contains("Execute YAML skill 'duplicateInvoiceChecker' using the provided mission input object.");
         assertThat(userMessage).contains("\"payload\" : \"x\"");
         assertThat(countOccurrences(userMessage, "Canonical mission input:")).isEqualTo(1);
     }

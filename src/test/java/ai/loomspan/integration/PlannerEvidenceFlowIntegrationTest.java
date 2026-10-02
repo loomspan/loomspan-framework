@@ -86,6 +86,23 @@ class PlannerEvidenceFlowIntegrationTest {
         softly.assertThat(capture.requestContaining("All required plan tasks are already COMPLETE"))
                 .as("native final synthesis").contains("FACT_N_TAIL");
         softly.assertAll();
+
+        String objective = "Fulfill the mission for skill 'root' using the provided mission input object.";
+        for (String request : List.of(capture.requestContaining("Exact capability/tool: assess"),
+                capture.requestContaining("All required plan tasks are already COMPLETE"))) {
+            JsonNode messages = JSON.readTree(request).path("messages");
+            String system = messages.get(0).path("content").asText();
+            String user = messages.get(1).path("content").asText();
+            assertThat(system).contains(objective).doesNotContain("Canonical mission input:", "Execute skill the mission");
+            assertThat(user).contains(objective, "\"caseId\" : \"local-case\"");
+            assertThat(user.split("Canonical mission input:", -1)).hasSize(2);
+        }
+        assertThat(JSON.readTree(capture.requestContaining("Exact capability/tool: assess"))
+                .path("messages").get(0).path("content").asText())
+                .contains("Overall mission context (non-actionable; execute only the assigned task below)",
+                        "Do not call the parent mission skill");
+        assertThat(JSON.readTree(capture.requestContaining("All required plan tasks are already COMPLETE"))
+                .path("messages").get(0).path("content").asText()).contains("Do NOT call any tool");
     }
 
     private Capture run(boolean concurrent, boolean longResults) throws Exception {

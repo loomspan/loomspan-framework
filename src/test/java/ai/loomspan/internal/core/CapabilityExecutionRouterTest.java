@@ -238,7 +238,7 @@ class CapabilityExecutionRouterTest {
                         }
                         """),
                 null);
-        when(coordinator.execute(eq(capability), eq("Execute skill 'childLlmSkill' using the provided mission input object."),
+        when(coordinator.execute(eq(capability), eq("Fulfill the mission for skill 'childLlmSkill' using the provided mission input object."),
                 eq(Map.of("invoiceId", "INV-7")), eq(session), eq(null)))
                 .thenReturn("child result");
 

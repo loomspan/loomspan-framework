@@ -57,6 +57,10 @@ The validator reports all non-cascading issues with stable codes. It does not re
 
 The coordinator partitions the accepted plan once, visits execution units in task-list order, and assigns every task to exactly its accepted `taskId` and `capabilityName`. A worker may correct an invalid action only for that same assignment; it cannot select another ready task or synthesize the final response. Final synthesis is offered only after every accepted task is complete.
 
+Assigned-step, step user-message, and final-synthesis prompts preserve substantive mission objective text, including skill-name references and text after generated-looking prefixes. Overall mission context is background for the assigned worker; its actionable contract remains the exact assigned child task, tool, and arguments, with an explicit prohibition on calling the parent mission skill. Ordinary `SkillTemplate` invocations construct mission wording directly and deliver structured business input through the existing canonical-input user-message path. Input values are not embedded in that generated objective or copied into the step system prompt. Final synthesis cannot call any tool. This prompt guidance does not establish improved live-model accuracy.
+
+Executable anchors: `CapabilityExecutionRouter#objectiveFor`, `StepPromptBuilder`, `MissionInputMessageFormatter#buildUserMessage`, `StepPromptBuilderTest#preservesCompleteObjectiveAcrossAssignedFinalAndUserPrompts`, `StepLoopMissionExecutionEngineTest#usesCanonicalMissionInputForPlanningAndStepUserMessages`, and `PlannerEvidenceFlowIntegrationTest#completeEvidenceMustReachDependentAndFinalRequests` protect objective fidelity, input delivery, and assigned/final action boundaries with offline requests.
+
 | Contract | Current behavior |
 | --- | --- |
 | Unit admission | The complete unit width plus one reserved final-synthesis step MUST fit before any member is admitted. |

@@ -865,6 +865,8 @@ class StepLoopMissionExecutionEngineTest {
 
     @Test
     void usesCanonicalMissionInputForPlanningAndStepUserMessages() {
+        String objective = "Execute YAML skill 'rootVisibleSkill' using the provided mission input object."
+                + " Compare rootVisibleSkillArchive and retain the audit explanation.";
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan plan = singleTaskPlan();
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
@@ -884,7 +886,7 @@ class StepLoopMissionExecutionEngineTest {
                     engine,
                     session,
                     definition(),
-                    "Execute YAML skill 'rootVisibleSkill' using the provided mission input object.",
+                    objective,
                     Map.of("invoiceId", "INV-7"),
                     chatClient,
                     List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
@@ -896,6 +898,14 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(chatClient.userMessagesSeen().getFirst())
                 .contains("Canonical mission input")
                 .contains("\"invoiceId\" : \"INV-7\"");
+        assertThat(chatClient.userMessagesSeen()).hasSize(2).allSatisfy(message -> {
+            assertThat(message).contains(objective, "\"invoiceId\" : \"INV-7\"");
+            assertThat(message.split("Canonical mission input:", -1)).hasSize(2);
+        });
+        assertThat(chatClient.systemMessagesSeen()).hasSize(2).allSatisfy(message ->
+                assertThat(message).contains(objective).doesNotContain("Canonical mission input:"));
+        assertThat(chatClient.systemMessagesSeen().getFirst()).contains("Do not call the parent mission skill");
+        assertThat(chatClient.systemMessagesSeen().getLast()).contains("Do NOT call any tool");
     }
 
     @Test
