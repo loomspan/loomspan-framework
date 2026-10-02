@@ -33,6 +33,23 @@ class StepPromptBuilderTest {
     }
 
     @Test
+    void immediateActionExamplesAreParseableWithIllustrativeValuesExplainedOutsideJson()
+    {
+        ExecutionPlan plan = createTwoTaskPlan();
+        String assigned = buildPromptForCurrentMode(plan, "objective", 1, null, null, List.of(mockTool("invoiceParser")), false, null);
+        String finalPrompt = StepPromptBuilder.buildFinalResponsePrompt(plan, "objective", null, 3, List.of(), null, null);
+        for (String prompt : List.of(assigned, finalPrompt))
+        {
+            int start = prompt.indexOf("{", prompt.indexOf("--- YOUR TASK ---"));
+            int end = prompt.indexOf("\n}", start) + 2;
+            assertThat(LoomspanJacksonCodecs.defaults().planningJson().readTree(prompt.substring(start, end)).isObject()).isTrue();
+            assertThat(prompt.substring(start, end)).doesNotContain("<");
+            assertThat(prompt).contains("illustrative only");
+        }
+        assertThat(assigned).contains("required by the assigned tool contract", "include every required argument");
+    }
+
+    @Test
     void buildStepPromptContainsObjective() {
         ExecutionPlan plan = createTwoTaskPlan();
         String prompt = buildPromptForCurrentMode(

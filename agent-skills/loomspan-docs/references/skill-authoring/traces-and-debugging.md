@@ -366,6 +366,14 @@ zero denominator has an undefined proportion, and an absent snapshot is
 unavailable; neither produces a percentage. These comparisons are not monetary
 cost, excess, correctness, importance, cause, or action recommendations.
 
+## Step-action correction evidence
+
+For an invalid planning step action, the existing correction attempt preserves the original task instructions and user input and adds the rejected assistant response and concrete failure diagnostic as quoted data. Short responses are replayed completely. Oversized responses retain the beginning and a reliably mapped failing region; missing or unmappable locations use the beginning and tail. Omissions are explicit. Parser failures include the bounded original parser reason, available coordinates in the parsed candidate, and a nearby fragment when its character offset is usable. Action-validation failures retain their own reason and are not labeled syntax errors.
+
+The correction requests one complete valid JSON action for the same assignment. A rejected action does not execute a tool; an accepted correction passes through normal action and argument validation before execution. The invalid-action allowance remains one retry. Final output-schema, evidence, and linter correction retain their separate existing allowances. Better feedback does not guarantee live-model recovery or detect every argument-fidelity problem. Read the model request/response evidence when diagnosing correction, rather than assuming the bounded rejection-record preview contains the complete rejected action.
+
+Source and regression anchors: `StepLoopMissionExecutionEngine.parseStepAction` and its step loop, `StepActionCorrection`, `StepPromptBuilder`, `StepActionCorrectionTest`, `StepLoopMissionExecutionEngineTest`, and `StepPromptBuilderTest`. `OutputSchemaCallAdvisorTest` protects ordinary output-schema correction separately.
+
 ## Tool-call lifecycle
 
 `TOOL_CALL_STARTED` is the authoritative pre-invocation fact. Loomspan writes

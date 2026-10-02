@@ -1,5 +1,7 @@
 package ai.loomspan.internal.runtime.step;
 
+import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
+
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanStackOverflowException;
@@ -342,6 +344,73 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(chatClient.systemMessagesSeen().get(1))
                 .contains("YOUR PREVIOUS ACTION WAS INVALID")
                 .containsOnlyOnce("STEP_PROMPT_SENTINEL");
+        assertThat(chatClient.userMessagesSeen().get(1))
+                .contains("Step-action validation failed", "Task 't-1' is assigned", "Too early")
+                .doesNotContain("Parser reason", "JSON parsing failed");
+    }
+
+    @Test
+    void syntheticTrailingBraceRecoveryReplaysShortAndLongCandidatesWithoutRejectedToolCalls()
+    {
+        // Self-contained synthetic fixtures reproduce the captured defect shape; they are not live captures.
+        for (int payloadSize : List.of(5, 16_000))
+        {
+            String valid = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\","
+                    + "\"toolArguments\":{\"rawText\":\"" + "x".repeat(payloadSize) + "TAIL_SENTINEL\"}}";
+            String rejected = valid + "}";
+            DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
+            PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
+            SequenceChatClient chatClient = new SequenceChatClient(rejected, valid,
+                    "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
+            AtomicInteger calls = new AtomicInteger();
+            BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
+                    (arguments, taskId) -> {
+                        assertThat(chatClient.systemMessagesSeen()).hasSize(2);
+                        calls.incrementAndGet();
+                        assertThat(arguments).containsEntry("rawText", "x".repeat(payloadSize) + "TAIL_SENTINEL");
+                        return "parsed";
+                    });
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
+                    "synthetic-brace-" + payloadSize, "test.entry", 3);
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor())
+            {
+                StepLoopMissionExecutionEngine engine = engine(stateService, planningService, executor, definitionWithPrompt());
+                assertThat(executeMission(engine, session, definitionWithPrompt(), chatClient, List.of(countedTool)))
+                        .isEqualTo("Finished");
+            }
+            assertThat(calls).hasValue(1);
+            assertThat(chatClient.systemMessagesSeen().get(1))
+                    .contains("one complete corrected action", "CALL_TOOL envelope", "STEP_PROMPT_SENTINEL")
+                    .doesNotContain("Do NOT call any tool");
+            String evidence = chatClient.userMessagesSeen().get(1);
+            assertThat(evidence).startsWith(chatClient.userMessagesSeen().getFirst())
+                    .contains("TAIL_SENTINEL", "Unexpected close marker", "Parser reason")
+                    .doesNotContain("at ai.loomspan", "java.lang", "configuration");
+            if (payloadSize > StepActionCorrection.MAX_CANDIDATE_CHARS)
+                assertThat(evidence).contains("omitted").hasSizeLessThan(12_000);
+            else assertThat(evidence).contains(LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(rejected));
+        }
+    }
+
+    @Test
+    void repeatedSyntheticMalformedActionsExhaustOneRetryWithoutToolExecution()
+    {
+        DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
+        PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
+        String malformed = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}}";
+        SequenceChatClient chatClient = new SequenceChatClient(malformed, malformed);
+        AtomicInteger calls = new AtomicInteger();
+        BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
+                (arguments, taskId) -> { calls.incrementAndGet(); return "unexpected"; });
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("brace-exhaustion", "test.entry", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor())
+        {
+            StepLoopMissionExecutionEngine engine = engine(stateService, planningService, executor, definition());
+            assertThatThrownBy(() -> executeMission(engine, session, definition(), chatClient, List.of(countedTool)))
+                    .hasMessageContaining("failed to produce a valid step action after 2 attempts");
+        }
+        assertThat(calls).hasValue(0);
+        assertThat(chatClient.systemMessagesSeen()).hasSize(2);
     }
 
     @Test
@@ -525,7 +594,7 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(session.getLastOutputSchemaOutcome()).isPresent();
         assertThat(session.getLastOutputSchemaOutcome().orElseThrow().status()).isEqualTo(OutputSchemaOutcomeStatus.PASSED);
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
-        assertThat(chatClient.systemMessagesSeen().get(1)).contains("Final response violates output_schema");
+        assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1)).contains("Final response violates output_schema");
     }
 
     @Test
@@ -562,7 +631,7 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(session.getLastOutputSchemaOutcome().orElseThrow().attempt()).isEqualTo(1);
         assertThat(session.getLastOutputSchemaOutcome().orElseThrow().status()).isEqualTo(OutputSchemaOutcomeStatus.PASSED);
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
-        assertThat(chatClient.systemMessagesSeen().get(1))
+        assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
                 .contains("unsupported by gathered evidence")
                 .contains("requires successful completion of 'expenseLookup'")
                 .contains("successfully completed direct skills: [invoiceParser]");
@@ -641,8 +710,8 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
-        assertThat(chatClient.systemMessagesSeen().get(0)).contains("All required plan tasks are already COMPLETE");
-        assertThat(chatClient.systemMessagesSeen().get(1))
+        assertThat(chatClient.systemMessagesSeen().get(0) + chatClient.userMessagesSeen().get(0)).contains("All required plan tasks are already COMPLETE");
+        assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
                 .contains("All required plan tasks are already completed. Return FINAL_RESPONSE instead of CALL_TOOL.")
                 .contains("You must return a FINAL_RESPONSE action");
         assertThat(readRecords(session)).anyMatch(record -> record.recordType() == TraceRecordType.STEP_ACTION_REJECTED
@@ -689,7 +758,7 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(chatClient.systemMessagesSeen()).hasSize(3);
-        assertThat(chatClient.systemMessagesSeen().get(1))
+        assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
                 .contains("missing_required")
                 .contains("rawText")
                 .contains("YOUR PREVIOUS ACTION WAS INVALID");
@@ -735,7 +804,7 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(chatClient.systemMessagesSeen()).hasSize(3);
-        assertThat(chatClient.systemMessagesSeen().get(1))
+        assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
                 .contains("unresolved placeholder values")
                 .contains("payload")
                 .contains("YOUR PREVIOUS ACTION WAS INVALID");
@@ -899,13 +968,13 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(chatClient.systemMessagesSeen()).hasSize(3);
-        assertThat(chatClient.systemMessagesSeen().get(0))
+        assertThat(chatClient.systemMessagesSeen().get(0) + chatClient.userMessagesSeen().get(0))
                 .contains("ASSIGNED TASK")
                 .contains("Exact capability/tool: expenseLookup")
                 .doesNotContain("Skill: duplicateInvoiceChecker");
         assertThat(chatClient.userMessagesSeen()).isNotEmpty();
         assertThat(chatClient.userMessagesSeen().get(0)).doesNotContain("duplicateInvoiceChecker");
-        assertThat(chatClient.systemMessagesSeen().get(1))
+        assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
                 .contains("Tool 'duplicateInvoiceChecker' is not in the available tools")
                 .contains("Exact capability/tool: expenseLookup")
                 .contains("Do not call the parent mission skill");
@@ -948,7 +1017,7 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(session.getLastLinterOutcome()).isPresent();
         assertThat(session.getLastLinterOutcome().orElseThrow().status()).isEqualTo(LinterOutcomeStatus.PASSED);
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
-        assertThat(chatClient.systemMessagesSeen().get(1)).contains("Must start with APPROVED:");
+        assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1)).contains("Must start with APPROVED:");
     }
 
     @Test
@@ -2096,7 +2165,7 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(invocationOrder).containsExactly("t-1", "t-2");
-        assertThat(chatClient.systemMessagesSeen().get(1))
+        assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
                 .contains("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId.");
         List<TraceRecord> records = readRecords(session);
         assertThat(records.stream()

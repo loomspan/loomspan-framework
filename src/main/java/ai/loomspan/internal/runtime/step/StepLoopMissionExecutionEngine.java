@@ -794,7 +794,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             int linterAttempt = 1;
             int outputSchemaAttempt = 1;
             int evidenceAttempt = 1;
-            String invalidActionFeedback = null;
+            StepActionCorrection.Failure invalidActionFeedback = null;
+            String rejectedCandidate = null;
             while (true)
             {
                 lastAction = null;
@@ -810,10 +811,13 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         ? new SkillPromptComposition(stepPrompt, false, null, "step_execution_prompt")
                         : SkillPromptComposer.composeStepExecutionPrompt(skillDefinition, stepPrompt);
                 String stepUserMessage = StepPromptBuilder.buildStepUserMessage(plan, objective, renderedInput.traceSafeInput());
-                String effectivePrompt = invalidActionFeedback == null || invalidActionFeedback.isBlank()
+                String effectivePrompt = invalidActionFeedback == null
                         ? promptComposition.systemPrompt()
-                        : promptComposition.systemPrompt() + "\n\nYOUR PREVIOUS ACTION WAS INVALID: "
-                                + invalidActionFeedback + "\nPlease correct and try again.";
+                        : promptComposition.systemPrompt() + StepActionCorrection.correctionRequest(finalResponseOnly);
+                if (invalidActionFeedback != null)
+                {
+                    stepUserMessage += StepActionCorrection.evidence(rejectedCandidate, invalidActionFeedback);
+                }
 
                 String modelResponse = callModelForStep(
                         session, skillName, executionConfiguration, modelInteraction, effectivePrompt,
@@ -823,7 +827,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         trustedIdentity,
                         lifecycle);
 
-                StepAction action = parseStepAction(modelResponse, finalResponseOnly);
+                ParsedStepAction parsed = parseStepAction(modelResponse, finalResponseOnly);
+                StepAction action = parsed.action();
                 if (action == null)
                 {
                     executionStateService.recordStepEvent(session, stepFrame, TraceRecordType.STEP_ACTION_REJECTED,
@@ -836,7 +841,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                                         .formatted(MAX_INVALID_ACTION_RETRIES + 1, stepNumber, skillName));
                         throw failure;
                     }
-                    invalidActionFeedback = "Failed to parse model response as StepAction";
+                    invalidActionFeedback = parsed.failure();
+                    rejectedCandidate = modelResponse;
                     invalidActionRetryCount++;
                     continue;
                 }
@@ -883,7 +889,9 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                                 .formatted(stepNumber, skillName, validation.rejectionReason()));
                         throw failure;
                     }
-                    invalidActionFeedback = validation.rejectionReason();
+                    invalidActionFeedback = new StepActionCorrection.Failure(
+                            "Step-action validation failed: " + validation.rejectionReason(), null);
+                    rejectedCandidate = modelResponse;
                     forceVerboseToolArgumentGuidance = true;
                     if (!skillValidationRejected)
                     {
@@ -1037,31 +1045,36 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         return StepResult.toolExecuted(toolResult);
     }
 
-    @Nullable
-    private StepAction parseStepAction(String modelResponse, boolean finalResponseOnly)
+    private record ParsedStepAction(StepAction action, StepActionCorrection.Failure failure) {}
+
+    private ParsedStepAction parseStepAction(String modelResponse, boolean finalResponseOnly)
     {
         if (modelResponse == null || modelResponse.isBlank())
         {
-            return null;
+            return new ParsedStepAction(null, new StepActionCorrection.Failure("Step-action parsing failed: empty model response", null));
         }
         String unwrapped = unwrapFencedBlock(modelResponse);
         try
         {
             StepAction parsed = objectMapper.readValue(unwrapped, StepAction.class);
+            if (parsed == null)
+            {
+                return new ParsedStepAction(null, new StepActionCorrection.Failure("Step-action parsing failed: JSON null is not an action", null));
+            }
             if (finalResponseOnly && (parsed.stepAction() == null || parsed.stepAction() != StepActionType.FINAL_RESPONSE))
             {
                 JsonNode node = objectMapper.readTree(unwrapped);
                 if (looksLikeBareFinalResponsePayload(node))
                 {
-                    return StepAction.finalResponse(node);
+                    return new ParsedStepAction(StepAction.finalResponse(node), null);
                 }
             }
-            return parsed;
+            return new ParsedStepAction(parsed, null);
         }
         catch (JacksonException ex)
         {
             log.debug("Failed to parse step action JSON: {}", ex.getMessage());
-            return null;
+            return new ParsedStepAction(null, StepActionCorrection.parsingFailure(ex, unwrapped, modelResponse));
         }
     }
 

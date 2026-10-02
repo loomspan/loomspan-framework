@@ -101,16 +101,21 @@ final class StepPromptBuilder
 
                 {
                   "stepAction": "CALL_TOOL",
-                  "taskId": "%s",
-                  "toolName": "%s",
-                  "toolArguments": { <arguments for this tool> }
+                  "taskId": %s,
+                  "toolName": %s,
+                  "toolArguments": {}
                 }
+
+                The empty toolArguments object is illustrative only. Replace it with the real arguments
+                required by the assigned tool contract above; include every required argument.
 
                 Rules:
                 - Return CALL_TOOL for exactly the assigned task and tool shown above.
                 - Do not call the parent mission skill or invent a new tool name.
                 - Return raw JSON only.
-                """.formatted(toolName, assignedTask.taskId(), toolName));
+                """.formatted(toolName,
+                LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(assignedTask.taskId()),
+                LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(toolName)));
         return sb.toString();
     }
 
@@ -152,8 +157,11 @@ final class StepPromptBuilder
 
                 {
                   "stepAction": "FINAL_RESPONSE",
-                  "finalResponse": { <your complete response to the mission objective> }
+                  "finalResponse": {}
                 }
+
+                The empty finalResponse object is illustrative only. Supply your complete response
+                to the mission objective, matching the required output contract below when present.
                 """);
 
         appendOutputSchemaGuidance(sb, outputSchema);
