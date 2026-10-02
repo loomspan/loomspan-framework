@@ -1,5 +1,6 @@
 package ai.loomspan.internal.outputschema;
 
+import ai.loomspan.testkit.CorrectionEvidenceFixtures;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.ModelTraceContext;
@@ -89,9 +90,10 @@ class OutputSchemaCallAdvisorTest {
     @Test
     void rebuildsThirdAttemptFromBaselineWithOnlyLatestCandidateAndCorrection() {
         OutputSchemaCallAdvisor advisor = advisor(2);
+        String first = CorrectionEvidenceFixtures.equipmentComparison("ATTEMPT_ONE") + "}";
+        String second = CorrectionEvidenceFixtures.equipmentComparison("ATTEMPT_TWO") + "}";
         RecordingChain chain = new RecordingChain(List.of(
-                "{\"vendorName\":\"ATTEMPT_ONE\",\"totalAmount\":\"invalid\"}",
-                "{\"vendorName\":\"ATTEMPT_TWO\",\"totalAmount\":\"invalid\"}",
+                first, second,
                 "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
         OpenAiChatOptions options = OpenAiChatOptions.builder().model("retry-model").temperature(0.2).build();
         Object traceMarker = new Object();
@@ -115,6 +117,8 @@ class OutputSchemaCallAdvisorTest {
         assertThat(chain.requests.get(2).prompt().getSystemMessage().getText())
                 .contains("BASELINE_SYSTEM")
                 .doesNotContain("Output schema validation failed");
+        assertThat(chain.requests.get(2).prompt().getInstructions().get(2).getText()).isEqualTo(second);
+        assertThat(chain.requests.get(2).prompt().getInstructions().get(1).getText()).isEqualTo("BASELINE_USER");
         assertThat(chain.requests.get(2).context()).containsEntry("request-sentinel", "preserved");
         assertThat(chain.requests.get(2).context().get(ModelTraceContext.REQUEST_CONTEXT_KEY)).isSameAs(traceMarker);
         assertThat(chain.requests.get(2).prompt().getOptions()).isEqualTo(options);
@@ -253,8 +257,8 @@ class OutputSchemaCallAdvisorTest {
     }
 
     @Test
-    void boundsCandidateAndCorrectionByUnicodeCodePoint() {
-        String exact = "x".repeat(OutputSchemaCallAdvisor.MAX_CANDIDATE_CODE_POINTS);
+    void replaysCompleteLargeUnicodeCandidateAndBoundsCorrectionOnly() {
+        String exact = "x".repeat(8192);
         RecordingChain exactChain = new RecordingChain(List.of(exact, "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
         advisor(1).adviseCall(request("Extract invoice"), exactChain);
         String exactReplay = exactChain.requests.get(1).prompt().getInstructions().stream()
@@ -264,7 +268,7 @@ class OutputSchemaCallAdvisorTest {
         assertThat(exactChain.requests.get(1).prompt().getUserMessage().getText())
                 .doesNotContain("candidate was truncated");
 
-        String oversized = "x".repeat(OutputSchemaCallAdvisor.MAX_CANDIDATE_CODE_POINTS) + "\ud83d\ude80";
+        String oversized = "x".repeat(8192) + "\ud83d\ude80" + "middle".repeat(2000) + "末尾}}";
         OutputSchemaCallAdvisor advisor = advisor(1);
         RecordingChain chain = new RecordingChain(List.of(oversized, "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
 
@@ -274,26 +278,78 @@ class OutputSchemaCallAdvisorTest {
                 .filter(message -> message.getMessageType() == MessageType.ASSISTANT)
                 .findFirst().orElseThrow().getText();
         String correction = chain.requests.get(1).prompt().getUserMessage().getText();
-        assertThat(replay.codePointCount(0, replay.length()))
-                .isEqualTo(OutputSchemaCallAdvisor.MAX_CANDIDATE_CODE_POINTS);
-        assertThat(replay).doesNotEndWith("\ud83d");
+        assertThat(replay).isEqualTo(oversized);
         assertThat(correction)
-                .contains("candidate was truncated to 8192 Unicode code points")
+                .doesNotContain("candidate was truncated")
                 .endsWith("Return one complete corrected JSON object only, with no explanation, markdown, or code fences.");
         assertThat(correction.codePointCount(0, correction.length()))
                 .isLessThanOrEqualTo(OutputSchemaCallAdvisor.MAX_CORRECTION_CODE_POINTS);
     }
 
     @Test
-    void omitsSyntheticAssistantMessageForBlankCandidate() {
+    void preservesWhitespaceOnlyCandidateExactly() {
         OutputSchemaCallAdvisor advisor = advisor(1);
-        RecordingChain chain = new RecordingChain(List.of(" ", "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
+        String candidate = " \t\n \r\n";
+        RecordingChain chain = new RecordingChain(List.of(candidate, "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
 
         advisor.adviseCall(request("Extract invoice"), chain);
 
         assertThat(chain.requests.get(1).prompt().getInstructions())
                 .extracting(message -> message.getMessageType())
-                .containsExactly(MessageType.SYSTEM, MessageType.USER, MessageType.USER);
+                .containsExactly(MessageType.SYSTEM, MessageType.USER, MessageType.ASSISTANT, MessageType.USER);
+        assertThat(chain.requests.get(1).prompt().getInstructions().get(2).getText()).isEqualTo(candidate);
+    }
+
+    @Test
+    void structuredEquipmentCorrectionPreservesCompleteCandidateAndValidatesReplacement() {
+        String valid = CorrectionEvidenceFixtures.equipmentComparison("STRUCTURED");
+        String rejected = " \n" + valid + "}\t";
+        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
+        schema.setType("object");
+        schema.setRequired(List.of("equipmentAssessment", "comparisonOptions", "citations"));
+        YamlSkillManifest.OutputSchemaManifest assessment = new YamlSkillManifest.OutputSchemaManifest();
+        assessment.setType("object");
+        assessment.setAdditionalProperties(true);
+        YamlSkillManifest.OutputSchemaManifest option = new YamlSkillManifest.OutputSchemaManifest();
+        option.setType("object");
+        option.setAdditionalProperties(true);
+        YamlSkillManifest.OutputSchemaManifest options = new YamlSkillManifest.OutputSchemaManifest();
+        options.setType("array");
+        options.setItems(option);
+        YamlSkillManifest.OutputSchemaManifest citation = new YamlSkillManifest.OutputSchemaManifest();
+        citation.setType("string");
+        YamlSkillManifest.OutputSchemaManifest citations = new YamlSkillManifest.OutputSchemaManifest();
+        citations.setType("array");
+        citations.setItems(citation);
+        schema.setProperties(Map.of("equipmentAssessment", assessment, "comparisonOptions", options, "citations", citations));
+        schema.setAdditionalProperties(true);
+        OutputSchemaCallAdvisor advisor = new OutputSchemaCallAdvisor("equipment", schema,
+                new OutputSchemaValidator(), new OutputSchemaPromptAugmentor(), 1, ignored -> { });
+        RecordingChain chain = new RecordingChain(List.of(rejected, valid));
+        assertThat(text(advisor.adviseCall(request("Compare NB-P240-017 event E17"), chain))).isEqualTo(valid);
+        assertThat(chain.requests.get(1).prompt().getInstructions().get(2).getText()).isEqualTo(rejected);
+        assertThat(chain.requests.get(1).prompt().getInstructions().get(1).getText()).contains("Compare NB-P240-017 event E17");
+        assertThat(chain.requests.get(1).prompt().getSystemMessage().getText()).contains("equipmentAssessment", "citations");
+    }
+
+    @Test
+    void largeRejectedCandidatesExhaustWithOnlyLatestEvidenceAndFullTerminalOutput() {
+        String first = CorrectionEvidenceFixtures.equipmentComparison("EXHAUST_ONE") + "}";
+        String second = CorrectionEvidenceFixtures.equipmentComparison("EXHAUST_TWO") + "}";
+        String terminal = CorrectionEvidenceFixtures.equipmentComparison("EXHAUST_TERMINAL") + "}";
+        List<OutputSchemaOutcome> outcomes = new ArrayList<>();
+        OutputSchemaCallAdvisor advisor = new OutputSchemaCallAdvisor("invoice", schema(),
+                new OutputSchemaValidator(), new OutputSchemaPromptAugmentor(), 2, outcomes::add);
+        RecordingChain chain = new RecordingChain(List.of(first, second, terminal));
+        assertThatThrownBy(() -> advisor.adviseCall(request("Original task"), chain))
+                .isInstanceOf(LoomspanOutputSchemaValidationException.class)
+                .satisfies(error -> assertThat(((LoomspanOutputSchemaValidationException) error).getRawOutput()).isEqualTo(terminal));
+        assertThat(chain.requests).hasSize(3);
+        assertThat(chain.requests.get(2).prompt().getInstructions().get(2).getText()).isEqualTo(second);
+        assertThat(chain.requests.get(2).prompt().getInstructions()).noneSatisfy(message ->
+                assertThat(message.getText()).contains("EXHAUST_ONE"));
+        assertThat(outcomes).extracting(OutputSchemaOutcome::status)
+                .containsExactly(OutputSchemaOutcomeStatus.RETRYING, OutputSchemaOutcomeStatus.RETRYING, OutputSchemaOutcomeStatus.EXHAUSTED);
     }
 
     @Test

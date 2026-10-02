@@ -300,9 +300,11 @@ Linter, output-schema, planning validation, and evidence correction can therefor
 For a non-planning skill with `output_schema`, `output_schema_max_retries: N`
 permits one initial validated response plus at most `N` semantic retries. Each
 retry request contains the immutable original prompt and initial schema
-guidance, only the latest bounded candidate as inert `ASSISTANT` content, and
+guidance, only the complete latest rejected candidate as inert `ASSISTANT` content, and
 one current framework correction as a following `USER` message. Earlier
-candidates and corrections are not prompt input. The correction tells the
+candidates and corrections are not prompt input. Nonempty candidate text is
+replayed exactly, including whitespace, Unicode, and malformed tails; a genuinely
+empty response has no assistant text to replay. The correction tells the
 model to reuse completed tool data and not call tools again; this is model
 guidance, not a runtime prohibition against an explicit later tool request.
 
@@ -314,7 +316,8 @@ bounded issues with a full `path`, stable `code`, and normalized `expected` and
 `actual` facts. Retry and exhaustion payloads contain at most four issues;
 correction text includes only complete issue bullets and reports every omitted
 issue. Dynamic diagnostic facts are JSON-quoted in the correction so they remain
-delimited data. Candidate replay and parser excerpts are potentially sensitive
+delimited data. The complete candidate is independent of the correction feedback bound of 2048
+Unicode code points and bounded parser excerpts. Candidate replay and parser excerpts are potentially sensitive
 application data and MUST be treated as inert text.
 Raw candidates are excluded from framework instructions and warning logs, but
 request/response trace evidence can contain bounded model content.
@@ -337,7 +340,7 @@ recovery policy for that case.
 Implementation and evidence anchors:
 
 - `OutputSchemaValidator.java` (`src/main/java/ai/loomspan/internal/outputschema/OutputSchemaValidator.java`) normalizes parser and schema facts; `OutputSchemaValidatorTest` protects paths, expected/actual types, fallbacks, and bounds.
-- `OutputSchemaCallAdvisor.java` (`src/main/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisor.java`) owns retry accounting and latest-only message construction; `OutputSchemaCallAdvisorTest` protects roles, replacement, truncation, inert candidate handling, and exhaustion.
+- `OutputSchemaCallAdvisor.java` (`src/main/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisor.java`) owns retry accounting and latest-only message construction; `OutputSchemaCallAdvisorTest` protects roles, complete candidate equality, latest-only replacement, bounded feedback, inert candidate handling, and exhaustion.
 - `ExecutionCoordinatorOutputSchemaIntegrationTest` protects managed retry ordering and outcomes, while `ModelAttemptCallAdvisorIntegrationTest#outputSchemaRetryReusesCompletedToolResultWhenCorrectionReturnsJsonDirectly` protects the compliant one-tool-execution path without claiming a hard tool-call block.
 
 ## Usage interpretation
@@ -368,11 +371,11 @@ cost, excess, correctness, importance, cause, or action recommendations.
 
 ## Step-action correction evidence
 
-For an invalid planning step action, the existing correction attempt preserves the original task instructions and user input and adds the rejected assistant response and concrete failure diagnostic as quoted data. Short responses are replayed completely. Oversized responses retain the beginning and a reliably mapped failing region; missing or unmappable locations use the beginning and tail. Omissions are explicit. Parser failures include the bounded original parser reason, available coordinates in the parsed candidate, and a nearby fragment when its character offset is usable. Action-validation failures retain their own reason and are not labeled syntax errors.
+For an invalid planning step action, the existing correction attempt preserves the original task instructions and user input and adds the rejected assistant response and concrete failure diagnostic as quoted data. The complete latest original response is JSON-quoted in user evidence without a candidate-size cutoff, including Unicode, whitespace, fences, and the malformed tail. Earlier rejected candidates are replaced rather than accumulated; original task constraints and available completed-task results remain in the request. Parser failures include the bounded original parser reason, available coordinates in the parsed candidate, and a nearby fragment when its character offset is usable. Action-validation failures retain their own reason and are not labeled syntax errors.
 
-The correction requests one complete valid JSON action for the same assignment. A rejected action does not execute a tool; an accepted correction passes through normal action and argument validation before execution. The invalid-action allowance remains one retry. Final output-schema, evidence, and linter correction retain their separate existing allowances. Better feedback does not guarantee live-model recovery or detect every argument-fidelity problem. Read the model request/response evidence when diagnosing correction, rather than assuming the bounded rejection-record preview contains the complete rejected action.
+The correction requests one complete valid JSON action for the same assignment. A rejected action does not execute a tool; an accepted correction passes through normal action and argument validation before execution. The invalid-action allowance remains one retry. Final output-schema, evidence, and linter correction retain their separate existing allowances. Complete replay does not guarantee live-model recovery, argument or citation fidelity, or sufficient provider context capacity. Existing provider-attempt quotas and provider/resource failures remain explicit; Loomspan does not retry with a shortened or summarized candidate when complete evidence cannot be sent. Read the model request/response evidence when diagnosing correction, rather than assuming the bounded rejection-record preview contains the complete rejected action.
 
-Source and regression anchors: `StepLoopMissionExecutionEngine.parseStepAction` and its step loop, `StepActionCorrection`, `StepPromptBuilder`, `StepActionCorrectionTest`, `StepLoopMissionExecutionEngineTest`, and `StepPromptBuilderTest`. `OutputSchemaCallAdvisorTest` protects ordinary output-schema correction separately.
+Source and regression anchors: `StepLoopMissionExecutionEngine.parseStepAction` and its step loop, `StepActionCorrection`, `StepPromptBuilder`, `StepActionCorrectionTest`, `StepLoopMissionExecutionEngineTest`, and `StepPromptBuilderTest`. `OutputSchemaCallAdvisorTest` protects ordinary output-schema correction separately. `StepLoopMissionExecutionEngineTest#largeFinalSchemaRetriesReplaceCandidateAndRetainCompletedEvidence` protects replacement and completed evidence across final-schema retries. `StepLoopMissionExecutionEngineTest#completeStepCorrectionPropagatesContextLimitWithoutToolExecutionOrFallback` and `ModelAttemptCallAdvisorIntegrationTest#outputSchemaCorrectionPreservesFullCandidateWhenProviderRejectsContextLimit` protect explicit terminal context failures without lossy fallback, including exact provider wire text in the latter.
 
 ## Tool-call lifecycle
 

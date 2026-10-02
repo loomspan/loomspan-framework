@@ -1,5 +1,7 @@
 package ai.loomspan.internal.runtime.step;
 
+import ai.loomspan.testkit.CorrectionEvidenceFixtures;
+
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 
 import ai.loomspan.autoconfigure.AiDriver;
@@ -355,8 +357,11 @@ class StepLoopMissionExecutionEngineTest {
         // Self-contained synthetic fixtures reproduce the captured defect shape; they are not live captures.
         for (int payloadSize : List.of(5, 16_000))
         {
-            String valid = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\","
-                    + "\"toolArguments\":{\"rawText\":\"" + "x".repeat(payloadSize) + "TAIL_SENTINEL\"}}";
+            String payload = payloadSize > 8192 ? CorrectionEvidenceFixtures.equipmentComparison("TAIL_SENTINEL")
+                    : "short \ud83d\ude80TAIL_SENTINEL";
+            String valid = LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(Map.of(
+                    "stepAction", "CALL_TOOL", "taskId", "t-1", "toolName", "invoiceParser",
+                    "toolArguments", Map.of("rawText", payload)));
             String rejected = valid + "}";
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
             PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
@@ -367,7 +372,7 @@ class StepLoopMissionExecutionEngineTest {
                     (arguments, taskId) -> {
                         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
                         calls.incrementAndGet();
-                        assertThat(arguments).containsEntry("rawText", "x".repeat(payloadSize) + "TAIL_SENTINEL");
+                        assertThat(arguments).containsEntry("rawText", payload);
                         return "parsed";
                     });
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
@@ -386,9 +391,7 @@ class StepLoopMissionExecutionEngineTest {
             assertThat(evidence).startsWith(chatClient.userMessagesSeen().getFirst())
                     .contains("TAIL_SENTINEL", "Unexpected close marker", "Parser reason")
                     .doesNotContain("at ai.loomspan", "java.lang", "configuration");
-            if (payloadSize > StepActionCorrection.MAX_CANDIDATE_CHARS)
-                assertThat(evidence).contains("omitted").hasSizeLessThan(12_000);
-            else assertThat(evidence).contains(LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(rejected));
+            assertThat(CorrectionEvidenceFixtures.decodedStepCandidate(evidence)).isEqualTo(rejected);
         }
     }
 
@@ -397,7 +400,7 @@ class StepLoopMissionExecutionEngineTest {
     {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
-        String malformed = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}}";
+        String malformed = CorrectionEvidenceFixtures.equipmentComparison("MALFORMED") + "}";
         SequenceChatClient chatClient = new SequenceChatClient(malformed, malformed);
         AtomicInteger calls = new AtomicInteger();
         BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
@@ -411,6 +414,35 @@ class StepLoopMissionExecutionEngineTest {
         }
         assertThat(calls).hasValue(0);
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
+        assertThat(CorrectionEvidenceFixtures.decodedStepCandidate(chatClient.userMessagesSeen().get(1))).isEqualTo(malformed);
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.STEP_COMPLETED);
+    }
+
+    @Test
+    void invalidCorrectedToolIdentityStillExhaustsWithoutExecution() {
+        for (String invalidField : List.of("taskId", "toolName")) {
+            DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
+            PlanningService planning = new InitializingPlanningService(state, singleTaskPlan());
+            String rejected = CorrectionEvidenceFixtures.equipmentComparison("IDENTITY_REJECTED") + "}";
+            Map<String, Object> action = new java.util.LinkedHashMap<>(Map.of("stepAction", "CALL_TOOL",
+                    "taskId", "t-1", "toolName", "invoiceParser", "toolArguments", Map.of("rawText", "INV-1")));
+            action.put(invalidField, "unassigned");
+            SequenceChatClient client = new SequenceChatClient(rejected,
+                    LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(action));
+            AtomicInteger toolCalls = new AtomicInteger();
+            BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
+                    (arguments, taskId) -> { toolCalls.incrementAndGet(); return "unexpected"; });
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("invalid-corrected-" + invalidField, "test.entry", 3);
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                StepLoopMissionExecutionEngine engine = engine(state, planning, executor, definition());
+                assertThatThrownBy(() -> executeMission(engine, session, definition(), client, List.of(countedTool)))
+                        .hasMessageContaining("Step action validation exhausted");
+            }
+            assertThat(toolCalls).hasValue(0);
+            assertThat(client.userMessagesSeen()).hasSize(2);
+            assertThat(CorrectionEvidenceFixtures.decodedStepCandidate(client.userMessagesSeen().get(1))).isEqualTo(rejected);
+            assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.STEP_COMPLETED);
+        }
     }
 
     @Test
@@ -595,6 +627,76 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(session.getLastOutputSchemaOutcome().orElseThrow().status()).isEqualTo(OutputSchemaOutcomeStatus.PASSED);
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
         assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1)).contains("Final response violates output_schema");
+    }
+
+    @Test
+    void largeFinalSchemaRetriesReplaceCandidateAndRetainCompletedEvidence() {
+        for (boolean pass : List.of(true, false)) {
+            DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
+            ExecutionPlan plan = singleTaskPlan();
+            PlanningService planning = new InitializingPlanningService(state, plan);
+            YamlSkillDefinition baseDefinition = definitionWithOutputSchema();
+            YamlSkillManifest manifest = baseDefinition.manifest();
+            manifest.setOutputSchemaMaxRetries(2);
+            YamlSkillDefinition definition = new YamlSkillDefinition(baseDefinition.resource(), manifest, baseDefinition.executionConfiguration());
+            String first = finalEnvelope(CorrectionEvidenceFixtures.equipmentComparison("FINAL_ONE"));
+            String second = finalEnvelope(CorrectionEvidenceFixtures.equipmentComparison("FINAL_TWO"));
+            String terminal = finalEnvelope(pass ? "{\"result\":\"Finished\"}"
+                    : CorrectionEvidenceFixtures.equipmentComparison("FINAL_TERMINAL"));
+            SequenceChatClient client = new SequenceChatClient(
+                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{\"rawText\":\"INV-1\"}}",
+                    first, second, terminal);
+            AtomicInteger toolCalls = new AtomicInteger();
+            BoundCapability tool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
+                    (arguments, taskId) -> { toolCalls.incrementAndGet(); return "AUTHORITATIVE_RESULT"; });
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("large-final-" + pass, "test.entry", 3);
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                StepLoopMissionExecutionEngine engine = engine(state, planning, executor, definition);
+                if (pass) assertThat(executeMission(engine, session, definition, client, List.of(tool))).isEqualTo("{\"result\":\"Finished\"}");
+                else assertThatThrownBy(() -> executeMission(engine, session, definition, client, List.of(tool)))
+                        .hasMessageContaining("Final response validation exhausted");
+            }
+            assertThat(toolCalls).hasValue(1);
+            assertThat(client.userMessagesSeen()).hasSize(4);
+            assertThat(CorrectionEvidenceFixtures.decodedStepCandidate(client.userMessagesSeen().get(2))).isEqualTo(first);
+            assertThat(CorrectionEvidenceFixtures.decodedStepCandidate(client.userMessagesSeen().get(3))).isEqualTo(second);
+            assertThat(client.userMessagesSeen().get(3) + client.systemMessagesSeen().get(3))
+                    .contains("AUTHORITATIVE_RESULT", "FINAL_RESPONSE envelope", "Final response violates output_schema")
+                    .doesNotContain("FINAL_ONE");
+            assertThat(session.getLastOutputSchemaOutcome().orElseThrow().status())
+                    .isEqualTo(pass ? OutputSchemaOutcomeStatus.PASSED : OutputSchemaOutcomeStatus.EXHAUSTED);
+            if (!pass) assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.STEP_COMPLETED
+                    && "FINAL_RESPONSE".equals(record.metadata().get("stepAction")));
+        }
+    }
+
+    @Test
+    void completeStepCorrectionPropagatesContextLimitWithoutToolExecutionOrFallback() {
+        DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
+        PlanningService planning = new InitializingPlanningService(state, singleTaskPlan());
+        String rejected = CorrectionEvidenceFixtures.equipmentComparison("CONTEXT_LIMIT") + "}";
+        IllegalStateException contextFailure = new IllegalStateException("context_length_exceeded: complete correction exceeds provider capacity");
+        SequenceChatClient client = new SequenceChatClient(rejected);
+        client.failureAfterResponses = contextFailure;
+        AtomicInteger toolCalls = new AtomicInteger();
+        BoundCapability tool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
+                (arguments, taskId) -> { toolCalls.incrementAndGet(); return "unexpected"; });
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-context-limit", "test.entry", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            StepLoopMissionExecutionEngine engine = engine(state, planning, executor, definitionWithPrompt());
+            assertThatThrownBy(() -> executeMission(engine, session, definitionWithPrompt(), client, List.of(tool)))
+                    .isSameAs(contextFailure);
+        }
+        assertThat(client.userMessagesSeen()).hasSize(2);
+        assertThat(CorrectionEvidenceFixtures.decodedStepCandidate(client.userMessagesSeen().get(1))).isEqualTo(rejected);
+        assertThat(toolCalls).hasValue(0);
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.STEP_COMPLETED);
+        assertThat(readRecords(session)).anyMatch(record -> record.recordType() == TraceRecordType.STEP_FAILED);
+    }
+
+    private static String finalEnvelope(String response) {
+        return LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(Map.of(
+                "stepAction", "FINAL_RESPONSE", "finalResponse", response));
     }
 
     @Test
@@ -2731,6 +2833,7 @@ class StepLoopMissionExecutionEngineTest {
     private static final class SequenceChatClient implements ai.loomspan.internal.model.ModelInteraction {
 
         private final Deque<String> responses = new ArrayDeque<>();
+        private RuntimeException failureAfterResponses;
         private final List<String> systemMessagesSeen = new ArrayList<>();
         private final List<String> userMessagesSeen = new ArrayList<>();
         private final List<CapturedMedia> userMediaSeen = new ArrayList<>();
@@ -2770,6 +2873,7 @@ class StepLoopMissionExecutionEngineTest {
             }
             String next = responses.pollFirst();
             if (next == null) {
+                if (failureAfterResponses != null) throw failureAfterResponses;
                 throw new IllegalStateException("No more queued chat responses");
             }
             return new ai.loomspan.internal.model.ModelInteractionResult(next, Map.of(

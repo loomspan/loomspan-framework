@@ -32,7 +32,6 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
     private static final int MAX_ISSUES_IN_HINT = 4;
     private static final int MAX_ISSUES_IN_OUTCOME = 4;
     static final int MAX_CORRECTION_CODE_POINTS = 2_048;
-    static final int MAX_CANDIDATE_CODE_POINTS = 8_192;
 
     private final String skillName;
     private final YamlSkillManifest.OutputSchemaManifest schema;
@@ -235,12 +234,11 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
             OutputSchemaValidationResult result)
     {
         List<Message> messages = new ArrayList<>(baselinePrompt.getInstructions());
-        CandidateReplay replay = candidateReplay(candidate);
-        if (StringUtils.hasText(replay.text()))
+        if (candidate != null && !candidate.isEmpty())
         {
-            messages.add(new AssistantMessage(replay.text()));
+            messages.add(new AssistantMessage(candidate));
         }
-        messages.add(new UserMessage(correctionMessage(result, replay.truncated())));
+        messages.add(new UserMessage(correctionMessage(result)));
         return new Prompt(messages, baselinePrompt.getOptions());
     }
 
@@ -319,7 +317,7 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         return message == null || message.getText() == null ? "" : message.getText();
     }
 
-    private String correctionMessage(OutputSchemaValidationResult result, boolean candidateTruncated)
+    private String correctionMessage(OutputSchemaValidationResult result)
     {
         String heading = result.failureMode() == OutputSchemaFailureMode.INVALID_JSON
                 ? "The previous response could not be parsed as JSON."
@@ -333,7 +331,7 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         for (int displayed = bullets.size(); displayed >= 0; displayed--)
         {
             int omitted = result.issues().size() - displayed;
-            String tail = correctionTail(omitted, candidateTruncated);
+            String tail = correctionTail(omitted);
             String renderedBullets = String.join("", bullets.subList(0, displayed)).stripTrailing();
             String correction = prefix + renderedBullets + "\n" + tail;
             if (codePointCount(correction) <= MAX_CORRECTION_CODE_POINTS)
@@ -345,17 +343,12 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         throw new IllegalStateException("Required output-schema correction text exceeds its configured bound");
     }
 
-    private String correctionTail(int omitted, boolean candidateTruncated)
+    private String correctionTail(int omitted)
     {
         StringBuilder tail = new StringBuilder();
         if (omitted > 0)
         {
             tail.append(omitted).append(" additional issue(s) omitted.\n");
-        }
-        if (candidateTruncated)
-        {
-            tail.append("The previous assistant candidate was truncated to ")
-                    .append(MAX_CANDIDATE_CODE_POINTS).append(" Unicode code points.\n");
         }
         return tail.append("Preserve all already-valid structure and values visible in the previous assistant response.\n")
                 .append("Do NOT call any tools again; use the data already returned by completed tool calls.\n")
@@ -394,18 +387,6 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         return quoted.append('\"').toString();
     }
 
-    private CandidateReplay candidateReplay(String candidate)
-    {
-        if (!StringUtils.hasText(candidate))
-        {
-            return new CandidateReplay("", false);
-        }
-        int count = codePointCount(candidate);
-        return count <= MAX_CANDIDATE_CODE_POINTS
-                ? new CandidateReplay(candidate, false)
-                : new CandidateReplay(truncateCodePoints(candidate, MAX_CANDIDATE_CODE_POINTS), true);
-    }
-
     private String logIssueMessage(OutputSchemaValidationIssue issue)
     {
         String path = StringUtils.hasText(issue.path()) ? issue.path() : "$";
@@ -435,14 +416,4 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         return value.codePointCount(0, value.length());
     }
 
-    private String truncateCodePoints(String value, int maxCodePoints)
-    {
-        if (maxCodePoints <= 0) return "";
-        if (codePointCount(value) <= maxCodePoints) return value;
-        return value.substring(0, value.offsetByCodePoints(0, maxCodePoints));
-    }
-
-    private record CandidateReplay(String text, boolean truncated)
-    {
-    }
 }

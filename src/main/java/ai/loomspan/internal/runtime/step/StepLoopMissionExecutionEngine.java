@@ -890,7 +890,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         throw failure;
                     }
                     invalidActionFeedback = new StepActionCorrection.Failure(
-                            "Step-action validation failed: " + validation.rejectionReason(), null);
+                            "Step-action validation failed: " + validation.rejectionReason());
                     rejectedCandidate = modelResponse;
                     forceVerboseToolArgumentGuidance = true;
                     if (!skillValidationRejected)
@@ -1051,7 +1051,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
     {
         if (modelResponse == null || modelResponse.isBlank())
         {
-            return new ParsedStepAction(null, new StepActionCorrection.Failure("Step-action parsing failed: empty model response", null));
+            return new ParsedStepAction(null, new StepActionCorrection.Failure("Step-action parsing failed: empty model response"));
         }
         String unwrapped = unwrapFencedBlock(modelResponse);
         try
@@ -1059,7 +1059,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             StepAction parsed = objectMapper.readValue(unwrapped, StepAction.class);
             if (parsed == null)
             {
-                return new ParsedStepAction(null, new StepActionCorrection.Failure("Step-action parsing failed: JSON null is not an action", null));
+                return new ParsedStepAction(null, new StepActionCorrection.Failure("Step-action parsing failed: JSON null is not an action"));
             }
             if (finalResponseOnly && (parsed.stepAction() == null || parsed.stepAction() != StepActionType.FINAL_RESPONSE))
             {
@@ -1074,7 +1074,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         catch (JacksonException ex)
         {
             log.debug("Failed to parse step action JSON: {}", ex.getMessage());
-            return new ParsedStepAction(null, StepActionCorrection.parsingFailure(ex, unwrapped, modelResponse));
+            return new ParsedStepAction(null, StepActionCorrection.parsingFailure(ex, unwrapped));
         }
     }
 

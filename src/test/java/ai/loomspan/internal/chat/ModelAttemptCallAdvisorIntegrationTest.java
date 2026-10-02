@@ -1,5 +1,9 @@
 package ai.loomspan.internal.chat;
 
+import ai.loomspan.testkit.CorrectionEvidenceFixtures;
+import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
+import ai.loomspan.internal.outputschema.OutputSchemaOutcome;
+import ai.loomspan.internal.outputschema.OutputSchemaOutcomeStatus;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.core.AdvisorTraceFact;
@@ -129,6 +133,73 @@ class ModelAttemptCallAdvisorIntegrationTest
                 if (scenario.equals("recovered")) assertThat(records(session))
                         .noneMatch(r -> r.recordType() == TraceRecordType.ERROR_RECORDED);
             }
+        }
+    }
+
+    @Test
+    void outputSchemaCorrectionPreservesFullCandidateWhenProviderRejectsContextLimit() throws Exception
+    {
+        try (MockWebServer server = new MockWebServer())
+        {
+            String candidate = CorrectionEvidenceFixtures.equipmentComparison("PROVIDER_LIMIT") + "}";
+            var json = LoomspanJacksonCodecs.defaults().planningJson();
+            String quoted = json.writeValueAsString(candidate);
+            server.enqueue(openAiText(quoted.substring(1, quoted.length() - 1)));
+            server.enqueue(new MockResponse().setResponseCode(400).setHeader("Content-Type", "application/json")
+                    .setBody("""
+                            {"error":{"message":"Maximum context length exceeded for complete correction CONTEXT_SENTINEL",
+                            "type":"invalid_request_error","param":"messages","code":"context_length_exceeded"}}
+                            """));
+            var properties = new LoomspanProperties.ConnectionProperties();
+            properties.setDriver(AiDriver.OPENAI);
+            properties.setApiKey("local-key");
+            properties.setBaseUrl(server.url("/v1").toString());
+            properties.getProviderRetry().setMaxAttempts(3);
+            properties.getProviderRetry().setInitialBackoff(java.time.Duration.ZERO);
+            properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
+            properties.getProviderRetry().setJitter(0);
+            var runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("local", properties);
+            var usage = usageService();
+            var state = new DefaultExecutionStateService(CLOCK, usage);
+            var session = TestLoomspanSessions.withId("complete-correction-context-limit", "test.entry", 4);
+            var binding = TestExecutionBindings.missionBinding(session);
+            ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding,
+                    () -> state.openMissionFrame(session, "test.skill", Map.of()));
+            openFrame(binding, state, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
+            var schema = new YamlSkillManifest.OutputSchemaManifest();
+            schema.setType("object");
+            List<OutputSchemaOutcome> outcomes = new ArrayList<>();
+            var advisor = new OutputSchemaCallAdvisor("equipment", schema, new OutputSchemaValidator(),
+                    new OutputSchemaPromptAugmentor(), 2, outcomes::add);
+            var client = ChatClient.builder(runtime.chatModel()).defaultAdvisors(advisor,
+                    new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), usage)).build();
+            assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding,
+                    () -> client.prompt().system("ORIGINAL_SYSTEM").user("Compare NB-P240-017 event E17")
+                            .options(OpenAiChatOptions.builder().model("test-model"))
+                            .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
+                            .call().content()))
+                    .isInstanceOf(RuntimeException.class)
+                    .satisfies(failure -> {
+                        var details = runtime.failureTranslator().translate(failure);
+                        assertThat(details.category()).isEqualTo(ProviderFailureCategory.INVALID_REQUEST);
+                        assertThat(details.classification()).isEqualTo(ProviderFailureClassification.PERMANENT);
+                        assertThat(details.diagnostics()).anySatisfy(diagnostic -> assertThat(diagnostic.get("text").toString())
+                                .contains("context_length_exceeded", "CONTEXT_SENTINEL"));
+                    });
+            assertThat(server.getRequestCount()).isEqualTo(2);
+            server.takeRequest(2, TimeUnit.SECONDS);
+            var wire = json.readTree(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8());
+            var messages = wire.path("messages");
+            assertThat(messages).hasSize(4);
+            assertThat(messages.get(0).path("content").asText()).contains("ORIGINAL_SYSTEM", "Return JSON only");
+            assertThat(messages.get(1).path("content").asText()).isEqualTo("Compare NB-P240-017 event E17");
+            assertThat(messages.get(2).path("role").asText()).isEqualTo("assistant");
+            assertThat(messages.get(2).path("content").asText()).isEqualTo(candidate);
+            assertThat(outcomes).extracting(OutputSchemaOutcome::status).containsExactly(OutputSchemaOutcomeStatus.RETRYING);
+            assertThat(session.getSessionUsage().orElseThrow().providerAttempts()).isEqualTo(2);
+            assertThat(records(session)).filteredOn(record -> record.recordType() == TraceRecordType.MODEL_REQUEST_SENT).hasSize(2);
+            assertThat(records(session)).filteredOn(record -> record.recordType() == TraceRecordType.MODEL_ATTEMPT_FAILED)
+                    .singleElement().satisfies(record -> assertThat(record.metadata()).containsEntry("failureCategory", "INVALID_REQUEST"));
         }
     }
 
