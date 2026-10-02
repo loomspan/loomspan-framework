@@ -99,7 +99,7 @@ class SpringAiProviderIntegrationTest
     @Test
     void googleSdkRetriesAreDisabledAtTheHttpClientBoundary()
     {
-        assertThat(SpringAiProviderIntegration.oneAttemptGoogleHttpOptions()
+        assertThat(SpringAiProviderIntegration.oneAttemptGoogleHttpOptions(null)
                 .retryOptions().orElseThrow().attempts()).contains(1);
     }
 

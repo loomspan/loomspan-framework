@@ -130,6 +130,7 @@ public final class SpringAiProviderIntegration
         OpenAiChatOptions.Builder optionsBuilder = OpenAiChatOptions.builder()
                 .apiKey(properties.getApiKey())
                 .maxRetries(0);
+        if (properties.getRequestTimeout() != null) optionsBuilder.timeout(properties.getRequestTimeout());
         if (StringUtils.hasText(properties.getBaseUrl())) optionsBuilder.baseUrl(properties.getBaseUrl());
         LoomspanProperties.OpenAiOptions options = properties.getOpenai();
         if (options != null)
@@ -153,6 +154,7 @@ public final class SpringAiProviderIntegration
                 .apiKey(properties.getApiKey())
                 .maxRetries(0)
                 .customHeaders(properties.getHeaders());
+        if (properties.getRequestTimeout() != null) optionsBuilder.timeout(properties.getRequestTimeout());
         if (StringUtils.hasText(properties.getBaseUrl())) optionsBuilder.baseUrl(properties.getBaseUrl());
         return AnthropicChatModel.builder().options(optionsBuilder.build())
                 .observationRegistry(observationRegistry).build();
@@ -160,7 +162,7 @@ public final class SpringAiProviderIntegration
 
     private GoogleGenAiChatModel gemini(String connectionName, LoomspanProperties.ConnectionProperties properties)
     {
-        Client.Builder builder = Client.builder().httpOptions(oneAttemptGoogleHttpOptions());
+        Client.Builder builder = Client.builder().httpOptions(oneAttemptGoogleHttpOptions(properties.getRequestTimeout()));
         LoomspanProperties.GeminiOptions options = properties.getGemini();
         if (StringUtils.hasText(properties.getApiKey())) builder.apiKey(properties.getApiKey());
         else
@@ -184,9 +186,11 @@ public final class SpringAiProviderIntegration
                 .observationRegistry(observationRegistry).build();
     }
 
-    static HttpOptions oneAttemptGoogleHttpOptions()
+    static HttpOptions oneAttemptGoogleHttpOptions(Duration timeout)
     {
-        return HttpOptions.builder().retryOptions(HttpRetryOptions.builder().attempts(1).build()).build();
+        var builder = HttpOptions.builder().retryOptions(HttpRetryOptions.builder().attempts(1).build());
+        if (timeout != null) builder.timeout(Math.toIntExact(timeout.toMillis()));
+        return builder.build();
     }
 
     private RetryTemplate oneAttemptTemplate()

@@ -95,6 +95,28 @@ A connection is a concrete endpoint/account and chooses a built-in `driver`; a m
 
 Provider retries are owned by each application connection, not by YAML skills. The default is three total attempts with 500 ms initial backoff, a 2.0 multiplier, a 5 s cap, and 0.2 jitter. Set `provider-retry.enabled: false` (or `max-attempts: 1`) for one attempt. Loomspan disables the supported Spring AI clients' own application-level retries so these limits describe actual downstream calls.
 
+Set `loomspan.connections.<name>.request-timeout` to bound each physical OpenAI (including OpenRouter), Anthropic, or Gemini HTTP call, in either Gemini authentication mode, through complete response-body consumption. Headers, whitespace keepalives and successive chunks do not restart the deadline. This is a connection transport setting, not a skill/model override or a request JSON parameter. It preserves the separate connect-timeout behavior; OpenAI/Anthropic inherit read/write inactivity limits from the configured duration. Provider, server and proxy limits still apply.
+
+Accepted values are exact whole milliseconds from `1ms` through `2147483647ms`, inclusive; Spring duration units and exact ISO-8601 durations are accepted. Zero, negative, malformed, fractional-millisecond and out-of-range values fail validation with the property path. Omission preserves OpenAI/Anthropic's 60-second whole-call default, Gemini's unset call limit, and Ollama's existing transport. An explicit Ollama value is rejected as unsupported.
+
+This partial connection/session fragment allows a 240-second call within a 600-second mission; model aliases and skills are still required:
+
+```yaml
+loomspan:
+  connections:
+    reasoning:
+      driver: openai
+      base-url: https://openrouter.ai/api/v1
+      api-key: ${OPENROUTER_API_KEY}
+      request-timeout: 240s
+      openai:
+        compatibility-profile: openrouter
+  session:
+    mission-timeout: 600s
+```
+
+Every permitted physical attempt receives the connection budget, while all calls, work and retry backoff consume the same mission budget. Multiple full attempts are not guaranteed. A provider timeout follows the existing Framework retry policy; mission cutoff, cancellation and caller interruption retain their existing ownership. The setting also works in `ExecutionConfiguration` publication with credential references through either `prepare` overload. New roots use the published budget; admitted roots, delayed work, descendants and retries keep their captured clients and budget. Skill-only updates retain the active settings. See the [connection reference](agent-skills/loomspan-docs/references/skill-authoring/model-selection-and-connections.md) and [publication contract](agent-skills/loomspan-docs/references/java-api/skill-reload.md).
+
 When a provider failure is permanent or its retries are exhausted, Loomspan logs one WARN naming the framework model, connection, driver, provider model, and the `loomspan.connections.<name>` or `loomspan.models.<name>.provider-model` settings to investigate. Each failed physical attempt also records that same bounded guidance between its Java stack and provider diagnostics; recovered retries retain trace evidence but do not emit a terminal WARN. Guidance is conservative: authentication rejection does not prove a key is missing, and HTTP 404 can reflect endpoint, model, or access configuration. Provider diagnostic text may contain sensitive values and is not generally scrubbed.
 
 The `openai` and `anthropic` drivers use Spring AI 2's official SDK-backed clients. Their optional `base-url` is the SDK service root: OpenAI appends `/chat/completions`, so include `/v1` in the root when the service requires it; Anthropic appends `/v1/messages`. Both accept common static `headers`; use that map for Anthropic beta or other supported custom headers. OpenAI additionally supports organization/project IDs and the explicit OpenRouter compatibility profile. The former OpenAI completion-path override and Anthropic completion-path/version/beta fields are rejected rather than aliased. The `ollama` driver uses its native `/api/chat` protocol. Gemini supports either API-key mode or Vertex AI mode (`project-id` and `location`, with optional credentials resource), but not both on one connection.

@@ -9,6 +9,10 @@ coverage: source-verified
 
 ## Complete execution publication
 
+Connection `request-timeout` is publishable through the existing `ExecutionConfiguration` and both credential preparation paths. Validation checks its supported drivers, exact whole-millisecond precision and `1..2147483647ms` range without resolving credentials or calling providers. Invalid candidates leave the active generation unchanged. Host-map preparation intentionally wraps non-credential errors generically with no original cause to protect supplied secrets; use `validate` for the actionable safe property path. See [provider call budgets](../skill-authoring/model-selection-and-connections.md#provider-call-budgets) for defaults, Ollama rejection and the mission/retry distinction.
+
+The timeout is copied into generation settings and actual clients. Skill-only updates retain the active value. New roots use the replacement budget, while previously admitted roots, delayed descendants and retries retain their captured clients/budget. Publication does not extend their mission deadline.
+
 Use `validate(completeDocuments, new ExecutionConfiguration(candidateYaml))` and `prepare(completeDocuments, configuration)` when model connections, aliases, session limits, or trace persistence change with the skill set. The authored YAML has one `loomspan` mapping containing only `connections`, `models`, `session`, and `execution-trace.persistence`. Its credentials must use property names through `api-key-ref`, `gemini.credentials-ref` (URI), `gemini.credentials-json-ref` (Vertex service-account JSON), or `header-refs`; direct `api-key`, `gemini.credentials-uri`, and literal `headers` are rejected. The two-argument `prepare` resolves references from Spring `Environment`. For a host-owned encrypted credential source, call `prepare(completeDocuments, configuration, credentialValues)`; Loomspan copies that map at entry, requires every referenced value from it, rejects missing, blank, and unused entries, and never falls back to Environment. Validation neither resolves references nor constructs clients or sends model requests. Preparation constructs clients but sends no model request. An explicit empty document collection replaces all YAML/REST skills while preserving fixed Java declarations.
 
 ```java
@@ -82,6 +86,9 @@ The application owns readiness, staging, cleanup, and retries. Publishing B does
 
 - `PublicSkillReloadIntegrationTest` exercises startup ID staging, frozen publication, new REST routing, pending-admission retirement, and unchanged startup catalog.
 - `PublicSkillReloadIntegrationTest` also exercises supplied REST YAML without files, old admitted work, configured alternation, and restart resubmission.
+- `PublicSkillReloadIntegrationTest` exercises both timeout credential paths, safe atomic rejection, old/new budgets,
+  repeated skill-only retention, captured child/retry calls and longer-provider-budget mission/caller cutoff.
+- `SkillGenerationManagerTest#runtimeSnapshotDetachesRequestTimeoutFromStartupMutation` protects the explicit copy.
 - `SkillReloaderTest` protects owner, base, one-shot, overlapping preparation/publication, unused-generation retirement, listener isolation, and shutdown checks.
 - `SkillGenerationManagerTest` protects complete validation, same-content fresh IDs, additions/deletions/empty set, and fixed handler reuse.
 - `LoomspanPublicSurfaceArchitectureTest` protects the closed API and sole supported SPI.

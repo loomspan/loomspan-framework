@@ -38,6 +38,267 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PublicSkillReloadIntegrationTest
 {
     @Test
+    void embeddedStartupOpenRouterHonorsHeaderAndActiveBodyDeadline(@TempDir Path directory) throws Exception
+    {
+        for (boolean chunks : List.of(false, true))
+            for (boolean expires : List.of(false, true))
+                try (MockWebServer server = new MockWebServer())
+                {
+                    var response = modelResponse("embedded-success");
+                    if (chunks) response.setChunkedBody(" ".repeat(1000) + response.getBody().readUtf8(), 50)
+                            .throttleBody(50, 75, java.util.concurrent.TimeUnit.MILLISECONDS);
+                    else response.setHeadersDelay(expires ? 1800 : 150, java.util.concurrent.TimeUnit.MILLISECONDS);
+                    server.enqueue(response);
+                    timeoutContext(directory).withPropertyValues(
+                            "loomspan.connections.candidate.driver=openai",
+                            "loomspan.connections.candidate.base-url=" + server.url("/v1"),
+                            "loomspan.connections.candidate.api-key=local-fake-key",
+                            "loomspan.connections.candidate.request-timeout=" + (expires ? "1s" : "4s"),
+                            "loomspan.connections.candidate.openai.compatibility-profile=openrouter",
+                            "loomspan.connections.candidate.provider-retry.max-attempts=1",
+                            "loomspan.models.selected.connection=candidate",
+                            "loomspan.models.selected.provider-model=compact",
+                            "loomspan.session.mission-timeout=10s").run(context -> {
+                        assertThat(context).hasNotFailed();
+                        var reloader = context.getBean(SkillReloader.class);
+                        reloader.publish(reloader.prepare(List.of(new SkillDocument("embedded", """
+                                name: candidateSkill
+                                description: embedded model
+                                model: selected
+                                planning_mode: false
+                                """))));
+                        var template = context.getBean(SkillTemplate.class);
+                        if (expires) assertThatThrownBy(() -> template.invoke("candidateSkill", Map.of()))
+                                .isInstanceOf(ai.loomspan.api.SkillException.class)
+                                .satisfies(PublicSkillReloadIntegrationTest::assertProviderTimeout);
+                        else assertThat(template.invoke("candidateSkill", Map.of())).isEqualTo("embedded-success");
+                        assertThat(server.getRequestCount()).isEqualTo(1);
+                    });
+                }
+    }
+    @Test
+    void delayedDescendantAndItsRetryRetainCapturedProviderBudget(@TempDir Path directory) throws Exception
+    {
+        try (MockWebServer first = new MockWebServer(); MockWebServer second = new MockWebServer())
+        {
+            first.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
+                    {"id":"tool","object":"chat.completion","created":1,"model":"compact",
+                     "choices":[{"index":0,"message":{"role":"assistant","content":null,
+                       "tool_calls":[{"id":"child-call","type":"function","function":{"name":"child","arguments":"{}"}}]},
+                       "finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                    """));
+            first.enqueue(modelResponse("too-late").setHeadersDelay(3000, java.util.concurrent.TimeUnit.MILLISECONDS));
+            first.enqueue(modelResponse("child-return").setHeadersDelay(1500, java.util.concurrent.TimeUnit.MILLISECONDS));
+            first.enqueue(modelResponse("old-tree-finished"));
+            second.enqueue(modelResponse("new-too-late").setHeadersDelay(1500, java.util.concurrent.TimeUnit.MILLISECONDS));
+            var documents = List.of(new SkillDocument("root", """
+                    name: parent
+                    description: calls child
+                    model: selected
+                    planning_mode: false
+                    allowed_skills:
+                      - name: child
+                    """), new SkillDocument("child", """
+                    name: child
+                    description: child model
+                    model: selected
+                    planning_mode: false
+                    """));
+            timeoutContext(directory).run(context -> {
+                var reloader = context.getBean(SkillReloader.class);
+                var a = reloader.prepare(documents, timeoutConfiguration(first, "2s", 2),
+                        Map.of("candidate.key", "local-A"));
+                reloader.publish(a);
+                var pending = context.getBean(SkillInvocationHandoff.class).handoff("parent", Map.of());
+                var b = reloader.prepare(documents, timeoutConfiguration(second, "1s", 1),
+                        Map.of("candidate.key", "local-B"));
+                reloader.publish(b);
+                assertThat(pending.generationId()).isEqualTo(a.generationId());
+                assertThat(pending.invoke()).isEqualTo("old-tree-finished");
+                assertThat(first.getRequestCount()).isEqualTo(4);
+                assertThat(second.getRequestCount()).isZero();
+                assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("child", Map.of()))
+                        .isInstanceOf(ai.loomspan.api.SkillException.class)
+                        .satisfies(PublicSkillReloadIntegrationTest::assertProviderTimeout);
+                assertThat(second.getRequestCount()).isEqualTo(1);
+            });
+            var rootRequest = first.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(rootRequest).isNotNull();
+            String childFirst = first.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS).getBody().readUtf8();
+            assertThat(first.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS).getBody().readUtf8()).isEqualTo(childFirst);
+            assertThat(first.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS).getBody().readUtf8()).contains("child-return");
+        }
+    }
+    @Test
+    void longerProviderBudgetCannotExtendMissionOrCallerInterruption(@TempDir Path directory) throws Exception
+    {
+        for (boolean interrupt : List.of(false, true))
+        {
+            try (MockWebServer server = new MockWebServer())
+            {
+                var entered = new java.util.concurrent.CountDownLatch(1);
+                var release = new java.util.concurrent.CountDownLatch(1);
+                var returned = new java.util.concurrent.CountDownLatch(1);
+                server.setDispatcher(new okhttp3.mockwebserver.Dispatcher() {
+                    @Override public MockResponse dispatch(okhttp3.mockwebserver.RecordedRequest request)
+                            throws InterruptedException
+                    {
+                        entered.countDown();
+                        try {
+                            if (!release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                                throw new AssertionError("response release was not signaled");
+                            return modelResponse("late-success");
+                        }
+                        finally { returned.countDown(); }
+                    }
+                });
+                var documents = List.of(new SkillDocument("candidate",
+                        "name: candidateSkill\ndescription: model\nmodel: selected\nplanning_mode: false\n"));
+                try
+                {
+                    timeoutContext(directory).run(context -> {
+                        assertThat(context).hasNotFailed();
+                        var reloader = context.getBean(SkillReloader.class);
+                        var configuration = new ExecutionConfiguration(timeoutConfiguration(server, "4s", 3).yaml()
+                                + "  session:\n    mission-timeout: " + (interrupt ? "10s" : "1s") + "\n");
+                        var a = reloader.prepare(documents, configuration, Map.of("candidate.key", "local-key"));
+                        reloader.publish(a);
+                        var retired = new java.util.concurrent.CountDownLatch(1);
+                        try (var registration = reloader.onGenerationRetired(id -> {
+                            if (id.equals(a.generationId())) retired.countDown();
+                        }))
+                        {
+                            var failure = new AtomicReference<Throwable>();
+                            var view = new AtomicReference<ai.loomspan.api.SkillExecutionView>();
+                            var callerInterrupted = new java.util.concurrent.atomic.AtomicBoolean();
+                            Thread caller = Thread.ofPlatform().unstarted(() -> {
+                                try { context.getBean(SkillTemplate.class).invoke("candidateSkill", Map.of(), view::set); }
+                                catch (Throwable ex) { failure.set(ex); callerInterrupted.set(Thread.currentThread().isInterrupted()); }
+                            });
+                            try
+                            {
+                                caller.start();
+                                assertThat(entered.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                                if (interrupt) caller.interrupt();
+                                caller.join(3000);
+                                assertThat(caller.isAlive()).isFalse();
+                                assertThat(failure.get()).isInstanceOf(ai.loomspan.api.SkillException.class)
+                                        .hasStackTraceContaining("LoomspanMissionTimeoutException");
+                                assertThat(callerInterrupted.get()).isEqualTo(interrupt);
+                                assertThat(view.get()).isNotNull();
+                                assertThat(view.get().events()).noneSatisfy(event ->
+                                        assertThat(event.details().toString()).contains("late-success"));
+                                reloader.publish(reloader.prepare(documents));
+                                release.countDown();
+                                assertThat(returned.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                                assertThat(retired.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                                assertThat(server.getRequestCount()).isEqualTo(1);
+                            }
+                            finally { release.countDown(); caller.interrupt(); caller.join(3000); }
+                        }
+                    });
+                }
+                finally { release.countDown(); }
+            }
+        }
+    }
+    @Test
+    void publishedTimeoutCapturesOldRootAndSurvivesRepeatedSkillOnlyUpdates(@TempDir Path directory) throws Exception
+    {
+        try (MockWebServer server = new MockWebServer())
+        {
+            server.enqueue(modelResponse("old").setHeadersDelay(1800, java.util.concurrent.TimeUnit.MILLISECONDS));
+            for (int i = 0; i < 3; i++) server.enqueue(modelResponse("late")
+                    .setHeadersDelay(1800, java.util.concurrent.TimeUnit.MILLISECONDS));
+            var documents = List.of(new SkillDocument("candidate",
+                    "name: candidateSkill\ndescription: model\nmodel: selected\nplanning_mode: false\n"));
+            timeoutContext(directory).withPropertyValues("candidate.key=local-key").run(context -> {
+                assertThat(context).hasNotFailed();
+                var reloader = context.getBean(SkillReloader.class);
+                var oldConfig = timeoutConfiguration(server, "4s", 1);
+                assertThat(reloader.validate(documents, oldConfig).valid()).isTrue();
+                var a = reloader.prepare(documents, oldConfig); // Environment path
+                assertThat(server.getRequestCount()).isZero();
+                reloader.publish(a);
+                var pending = context.getBean(SkillInvocationHandoff.class).handoff("candidateSkill", Map.of());
+                var b = reloader.prepare(documents, timeoutConfiguration(server, "1s", 1),
+                        Map.of("candidate.key", "host-local-key")); // Host-map path
+                assertThat(server.getRequestCount()).isZero();
+                reloader.publish(b);
+                assertThat(pending.generationId()).isEqualTo(a.generationId());
+                assertThat(pending.invoke()).isEqualTo("old");
+                var startup = context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class);
+                startup.getSession().setMissionTimeout(java.time.Duration.ofMillis(1));
+                for (int i = 0; i < 3; i++)
+                {
+                    if (i > 0) reloader.publish(reloader.prepare(documents));
+                    assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("candidateSkill", Map.of()))
+                            .isInstanceOf(ai.loomspan.api.SkillException.class)
+                            .satisfies(PublicSkillReloadIntegrationTest::assertProviderTimeout);
+                }
+                assertThat(server.getRequestCount()).isEqualTo(4);
+            });
+        }
+    }
+
+    @Test
+    void invalidTimeoutCandidatesRejectAtomicallyWithoutRequestsOrHostSecretDisclosure(@TempDir Path directory)
+            throws Exception
+    {
+        try (MockWebServer server = new MockWebServer())
+        {
+            var documents = List.of(new SkillDocument("candidate",
+                    "name: candidateSkill\ndescription: model\nmodel: selected\nplanning_mode: false\n"));
+            timeoutContext(directory).withPropertyValues("candidate.key=environment-local-key").run(context -> {
+                var reloader = context.getBean(SkillReloader.class);
+                String active = reloader.snapshot().generationId();
+                for (String invalid : List.of("0ms", "-1ms", "PT0.0015S", "2147483648ms", "malformed-secret-sentinel"))
+                {
+                    var candidate = timeoutConfiguration(server, invalid, 1);
+                    var validation = reloader.validate(documents, candidate);
+                    assertThat(validation.valid()).isFalse();
+                    assertThat(validation.issues()).anySatisfy(issue -> assertThat(issue.message())
+                            .contains("loomspan.connections.candidate.request-timeout").doesNotContain("secret-sentinel"));
+                    assertThatThrownBy(() -> reloader.prepare(documents, candidate))
+                            .isInstanceOf(SkillReloadException.class);
+                    assertThatThrownBy(() -> reloader.prepare(documents, candidate,
+                            Map.of("candidate.key", "host-secret-sentinel")))
+                            .isInstanceOf(SkillReloadException.class)
+                            .hasNoCause().hasMessageNotContaining("host-secret-sentinel")
+                            .hasMessageNotContaining("malformed-secret-sentinel");
+                    assertThat(reloader.snapshot().generationId()).isEqualTo(active);
+                }
+                assertThat(server.getRequestCount()).isZero();
+            });
+        }
+    }
+
+    private static ApplicationContextRunner timeoutContext(Path directory)
+    {
+        return new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(
+                ConfigurationPropertiesAutoConfiguration.class,
+                ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
+                LoomspanAutoConfiguration.class, ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
+                .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml");
+    }
+
+    private static void assertProviderTimeout(Throwable failure)
+    {
+        assertThat(java.util.stream.Stream.iterate(failure, java.util.Objects::nonNull, Throwable::getCause)
+                .anyMatch(cause -> cause instanceof java.net.SocketTimeoutException
+                        || cause instanceof java.io.InterruptedIOException
+                        && cause.getMessage() != null
+                        && cause.getMessage().toLowerCase(java.util.Locale.ROOT).contains("timeout")))
+                .as("actual provider timeout cause").isTrue();
+    }
+
+    private static ExecutionConfiguration timeoutConfiguration(MockWebServer server, String timeout, int attempts)
+    {
+        return new ExecutionConfiguration(candidateConfiguration(server, "candidate.key", attempts).yaml()
+                .replace("driver: openai", "driver: openai\n      request-timeout: " + timeout
+                        + "\n      openai:\n        compatibility-profile: openrouter"));
+    }
+    @Test
     void publicHostMapPublishesReplacementKeysWithoutDeploymentProperties(@TempDir Path directory) throws Exception
     {
         try (MockWebServer first = new MockWebServer(); MockWebServer second = new MockWebServer())

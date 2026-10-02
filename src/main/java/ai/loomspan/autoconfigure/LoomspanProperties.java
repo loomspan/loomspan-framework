@@ -146,6 +146,7 @@ public class LoomspanProperties implements InitializingBean
                 throw invalid(path + ".driver", "is required");
             }
             validateApplicableOptions(path, connection, driver);
+            validateRequestTimeout(path, connection, driver);
             validateRequiredFields(path, connection, driver);
             validateHeaders(path, connection, driver);
             validateProviderRetry(path, connection.getProviderRetry());
@@ -179,6 +180,18 @@ public class LoomspanProperties implements InitializingBean
         {
             throw invalid(path + ".jitter", "must be finite and between 0.0 and 1.0");
         }
+    }
+
+    private void validateRequestTimeout(String connectionPath, ConnectionProperties connection, AiDriver driver)
+    {
+        Duration timeout = connection.getRequestTimeout();
+        if (timeout == null) return;
+        String path = connectionPath + ".request-timeout";
+        if (driver == AiDriver.OLLAMA) throw invalid(path, "is not supported for driver OLLAMA");
+        if (timeout.compareTo(Duration.ofMillis(1)) < 0
+                || timeout.compareTo(Duration.ofMillis(Integer.MAX_VALUE)) > 0
+                || timeout.getNano() % 1_000_000 != 0)
+            throw invalid(path, "must be an exact whole-millisecond duration between 1ms and 2147483647ms");
     }
 
     private void validateApplicableOptions(String path, ConnectionProperties connection, AiDriver driver)
@@ -440,6 +453,7 @@ public class LoomspanProperties implements InitializingBean
 
     public static class ConnectionProperties
     {
+        private Duration requestTimeout;
         @NotNull
         private AiDriver driver;
         private String baseUrl;
@@ -453,6 +467,8 @@ public class LoomspanProperties implements InitializingBean
         public void setDriver(AiDriver driver) { this.driver = driver; }
         public String getBaseUrl() { return baseUrl; }
         public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+        public Duration getRequestTimeout() { return requestTimeout; }
+        public void setRequestTimeout(Duration value) { requestTimeout = value; }
         public String getApiKey() { return apiKey; }
         public void setApiKey(String apiKey) { this.apiKey = apiKey; }
         public Map<String, String> getHeaders() { return headers; }

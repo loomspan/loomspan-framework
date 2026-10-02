@@ -76,6 +76,63 @@ class ModelAttemptCallAdvisorIntegrationTest
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-24T12:00:00Z"), ZoneOffset.UTC);
 
     @Test
+    void realProviderTimeoutRetriesPreserveRequestCountsClassificationAndQuota() throws Exception
+    {
+        for (String scenario : List.of("recovered", "exhausted", "quota"))
+        {
+            try (MockWebServer server = new MockWebServer())
+            {
+                server.enqueue(openAiText("late").setHeadersDelay(1800, TimeUnit.MILLISECONDS));
+                server.enqueue(openAiText("recovered").setHeadersDelay(
+                        scenario.equals("exhausted") ? 1800 : 0, TimeUnit.MILLISECONDS));
+                var properties = new LoomspanProperties.ConnectionProperties();
+                properties.setDriver(AiDriver.OPENAI);
+                properties.setApiKey("local-key");
+                properties.setBaseUrl(server.url("/v1").toString());
+                properties.setRequestTimeout(java.time.Duration.ofSeconds(1));
+                properties.getProviderRetry().setMaxAttempts(2);
+                properties.getProviderRetry().setInitialBackoff(java.time.Duration.ZERO);
+                properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
+                properties.getProviderRetry().setJitter(0);
+                var runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("local", properties);
+                var quotas = new LoomspanProperties.Session.Quotas();
+                if (scenario.equals("quota")) quotas.setMaxProviderAttempts(1);
+                var usage = new DefaultSessionUsageService(quotas, new NoOpUsageMetricsRecorder());
+                var state = new DefaultExecutionStateService(CLOCK, usage);
+                var session = TestLoomspanSessions.withId("real-timeout-" + scenario, "test.entry", 4);
+                var binding = TestExecutionBindings.missionBinding(session);
+                ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding,
+                        () -> state.openMissionFrame(session, "test.skill", Map.of()));
+                openFrame(binding, state, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
+                var client = ChatClient.builder(runtime.chatModel()).defaultAdvisors(
+                        new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), usage)).build();
+                java.util.function.Supplier<String> call = () -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
+                        binding, () -> client.prompt().user("unchanged")
+                                .options(OpenAiChatOptions.builder().model("test-model"))
+                                .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
+                                .call().content());
+                if (scenario.equals("recovered")) assertThat(call.get()).isEqualTo("recovered");
+                else if (scenario.equals("quota")) assertThatThrownBy(call::get).isInstanceOf(LoomspanQuotaExceededException.class);
+                else assertThatThrownBy(call::get).isInstanceOf(RuntimeException.class)
+                        .satisfies(failure -> assertThat(runtime.failureTranslator().translate(failure).category())
+                                .isEqualTo(ProviderFailureCategory.TIMEOUT));
+                int attempts = scenario.equals("quota") ? 1 : 2;
+                assertThat(server.getRequestCount()).isEqualTo(attempts);
+                assertThat(session.getSessionUsage().orElseThrow().providerAttempts()).isEqualTo(attempts);
+                String first = server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8();
+                if (attempts == 2) assertThat(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8()).isEqualTo(first);
+                assertThat(records(session).stream().filter(r -> r.recordType() == TraceRecordType.MODEL_REQUEST_SENT))
+                        .hasSize(attempts);
+                assertThat(records(session).stream().filter(r -> r.recordType() == TraceRecordType.MODEL_ATTEMPT_FAILED))
+                        .hasSize(scenario.equals("exhausted") ? 2 : 1)
+                        .allSatisfy(r -> assertThat(r.metadata()).containsEntry("failureCategory", "TIMEOUT"));
+                if (scenario.equals("recovered")) assertThat(records(session))
+                        .noneMatch(r -> r.recordType() == TraceRecordType.ERROR_RECORDED);
+            }
+        }
+    }
+
+    @Test
     void recordsEachAdvisorRetryAsOnePhysicalAttemptInTheSameRetrySequence()
     {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();

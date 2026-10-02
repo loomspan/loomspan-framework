@@ -24,7 +24,7 @@ public final class ExecutionConfigurationParser
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private static final Set<String> ROOT = Set.of("loomspan");
     private static final Set<String> PUBLISHABLE = Set.of("connections", "models", "session", "execution-trace");
-    private static final Set<String> CONNECTION = Set.of("driver", "base-url", "api-key-ref", "header-refs", "openai", "gemini", "provider-retry");
+    private static final Set<String> CONNECTION = Set.of("driver", "base-url", "request-timeout", "api-key-ref", "header-refs", "openai", "gemini", "provider-retry");
     private static final Set<String> MODEL = Set.of("connection", "provider-model", "thinking-levels");
     private static final Set<String> SESSION = Set.of("max-depth", "mission-timeout", "quotas", "attachments");
     private static final Set<String> QUOTAS = Set.of("max-skill-invocations", "max-tool-invocations", "max-linter-retries", "max-model-calls", "max-provider-attempts", "max-usage-units");

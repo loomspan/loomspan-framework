@@ -58,6 +58,7 @@ public final class ExecutionRuntime implements AutoCloseable
             LoomspanProperties.ConnectionProperties connection = new LoomspanProperties.ConnectionProperties();
             connection.setDriver(original.getDriver());
             connection.setBaseUrl(original.getBaseUrl());
+            connection.setRequestTimeout(original.getRequestTimeout());
             connection.setApiKey(original.getApiKey());
             connection.setHeaders(original.getHeaders());
             if (original.getOpenai() != null)

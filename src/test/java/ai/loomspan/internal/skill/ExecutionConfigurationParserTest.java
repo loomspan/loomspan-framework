@@ -14,6 +14,28 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ExecutionConfigurationParserTest
 {
+    @Test
+    void rejectsInvalidRequestTimeoutWithSafeFullPath()
+    {
+        for (String value : java.util.List.of("0ms", "-1ms", "PT0.000999999S", "PT0.0015S",
+                "2147483648ms", "PT9223372036854775807S", "malformed-secret-sentinel"))
+            assertThatThrownBy(() -> ExecutionConfigurationParser.parse(new ExecutionConfiguration(
+                    CANDIDATE.replace("driver: openai", "driver: openai\n      request-timeout: " + value)),
+                    new StandardEnvironment(), false))
+                    .hasMessageContaining("loomspan.connections.primary.request-timeout")
+                    .hasMessageNotContaining("secret-sentinel");
+    }
+    @Test
+    void acceptsRequestTimeoutOnSupportedConnection()
+    {
+        var parsed = ExecutionConfigurationParser.parse(new ExecutionConfiguration(
+                CANDIDATE.replace("driver: openai", "driver: openai\n      request-timeout: 240s")),
+                new StandardEnvironment(), false);
+        assertThat(parsed.properties().getConnections()).containsKey("primary");
+        assertThat(parsed.properties().getConnections().get("primary").getRequestTimeout())
+                .isEqualTo(java.time.Duration.ofSeconds(240));
+    }
+
     private static final String CANDIDATE = """
             loomspan:
               connections:

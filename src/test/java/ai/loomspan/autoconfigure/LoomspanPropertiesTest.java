@@ -12,6 +12,84 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LoomspanPropertiesTest {
 
+    @Test
+    void requestTimeoutBindsAcrossSupportedDriversAndPreservesOmission()
+    {
+        var bindingRunner = new ApplicationContextRunner().withUserConfiguration(TimeoutBinding.class);
+        for (String driver : java.util.List.of("openai", "anthropic", "gemini"))
+            for (String value : java.util.List.of("1ms", "240s", "PT0.001S", "2147483647ms"))
+                bindingRunner.withPropertyValues("loomspan.connections.named.driver=" + driver,
+                        "loomspan.connections.named.api-key=fake-key",
+                        "loomspan.connections.named.request-timeout=" + value).run(context -> {
+                            assertThat(context).hasNotFailed();
+                            assertThat(context.getBean(LoomspanProperties.class).getConnections().get("named")
+                                    .getRequestTimeout()).isPositive();
+                        });
+        bindingRunner.withPropertyValues("loomspan.connections.named.driver=gemini",
+                "loomspan.connections.named.gemini.vertex-ai=true",
+                "loomspan.connections.named.gemini.project-id=project",
+                "loomspan.connections.named.gemini.location=us-central1",
+                "loomspan.connections.named.request-timeout=240s").run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(LoomspanProperties.class).getConnections().get("named")
+                            .getRequestTimeout()).isEqualTo(java.time.Duration.ofSeconds(240));
+                });
+        assertThat(new LoomspanProperties.ConnectionProperties().getRequestTimeout()).isNull();
+    }
+
+    @Test
+    void invalidTimeoutStartupBindingReportsItsFullPath()
+    {
+        var bindingRunner = new ApplicationContextRunner().withUserConfiguration(TimeoutBinding.class);
+        for (String value : java.util.List.of("0ms", "-1ms", "PT0.000999999S", "PT0.0015S",
+                "2147483648ms", "PT9223372036854775807S", "malformed"))
+            bindingRunner.withPropertyValues("loomspan.connections.named.driver=openai",
+                    "loomspan.connections.named.api-key=credential-secret-sentinel",
+                    "loomspan.connections.named.request-timeout=" + value).run(context ->
+                    assertThat(context.getStartupFailure()).isNotNull()
+                            .hasStackTraceContaining("loomspan.connections.named.request-timeout")
+                            .hasMessageNotContaining("credential-secret-sentinel"));
+        bindingRunner.withPropertyValues("loomspan.connections.named.driver=ollama",
+                "loomspan.connections.named.base-url=http://localhost:11434",
+                "loomspan.connections.named.request-timeout=1s").run(context ->
+                assertThat(context.getStartupFailure()).rootCause()
+                        .hasMessageContaining("loomspan.connections.named.request-timeout")
+                        .hasMessageContaining("not supported for driver OLLAMA"));
+    }
+
+    @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
+    @org.springframework.boot.context.properties.EnableConfigurationProperties(LoomspanProperties.class)
+    static class TimeoutBinding {}
+
+    @Test
+    void rejectsInvalidRequestTimeoutBeforeLossyOrOverflowingConversion()
+    {
+        var connection = new LoomspanProperties.ConnectionProperties();
+        connection.setDriver(AiDriver.OPENAI);
+        connection.setApiKey("secret-sentinel");
+        var properties = new LoomspanProperties();
+        properties.setConnections(java.util.Map.of("named", connection));
+        for (java.time.Duration value : java.util.List.of(java.time.Duration.ZERO,
+                java.time.Duration.ofMillis(-1), java.time.Duration.ofNanos(999999),
+                java.time.Duration.ofNanos(1500000), java.time.Duration.ofMillis(2147483648L),
+                java.time.Duration.ofSeconds(Long.MAX_VALUE)))
+        {
+            connection.setRequestTimeout(value);
+            assertThatThrownBy(properties::afterPropertiesSet)
+                    .hasMessageContaining("loomspan.connections.named.request-timeout")
+                    .hasMessageContaining("whole-millisecond").hasMessageNotContaining("secret-sentinel");
+        }
+        connection.setDriver(AiDriver.OLLAMA);
+        connection.setApiKey(null);
+        connection.setBaseUrl("http://localhost:11434");
+        connection.setRequestTimeout(java.time.Duration.ofSeconds(1));
+        assertThatThrownBy(properties::afterPropertiesSet)
+                .hasMessageContaining("loomspan.connections.named.request-timeout")
+                .hasMessageContaining("not supported for driver OLLAMA");
+        connection.setRequestTimeout(null);
+        assertThatCode(properties::afterPropertiesSet).doesNotThrowAnyException();
+    }
+
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(
                     ConfigurationPropertiesAutoConfiguration.class,

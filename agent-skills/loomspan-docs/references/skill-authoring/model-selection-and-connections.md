@@ -52,10 +52,10 @@ The connection table below describes ordinary embedded `application.yml`. In an 
 
 | Driver | Required mode | Optional connection settings |
 | --- | --- | --- |
-| `openai` | `api-key` | `base-url`, static `headers`, `openai.organization-id`, `openai.project-id`, `openai.compatibility-profile` |
-| `anthropic` | `api-key` | `base-url`, static `headers` |
+| `openai` | `api-key` | `base-url`, `request-timeout`, static `headers`, `openai.organization-id`, `openai.project-id`, `openai.compatibility-profile` |
+| `anthropic` | `api-key` | `base-url`, `request-timeout`, static `headers` |
 | `ollama` | `base-url` | None; this driver uses Ollama's native API |
-| `gemini` | Exactly one of API-key mode or Vertex AI mode | API-key mode uses `api-key`; Vertex mode uses `gemini.vertex-ai: true`, `project-id`, `location`, and optional `credentials-uri` |
+| `gemini` | Exactly one of API-key mode or Vertex AI mode | `request-timeout` in either mode; API-key mode uses `api-key`; Vertex mode uses `gemini.vertex-ai: true`, `project-id`, `location`, and optional `credentials-uri` |
 
 Static `headers` are accepted only by the OpenAI and Anthropic drivers. Provider-specific option blocks MUST match their driver. Unknown `loomspan.*` fields are rejected at startup. Loomspan does not read, merge, or inherit `spring.ai.*` configuration.
 
@@ -70,6 +70,39 @@ Every connection owns a `provider-retry` policy. Defaults are enabled, three tot
 One Loomspan model interaction is one semantic request from mission, planning, or step execution. The single Spring AI tool loop may require multiple model turns inside that interaction. A semantic validator retry starts another semantic attempt; a provider retry repeats one unchanged model turn. Every actual downstream send is one physical provider attempt, is counted against quota once, and is owned by Loomspan because provider-native retries are disabled.
 
 Credentials SHOULD come from environment placeholders or an external secret source and MUST NOT be committed. Connection diagnostics, traces, and metrics identify framework model, connection, and driver; framework-controlled metadata does not expose API keys, header values, base URLs, or credential contents. Authored YAML retains reference names, not resolved values. Environment-variable changes require restart. For rotation, publish a replacement, allow old work to finish, then revoke the old key; external revocation can break a captured execution.
+
+## Provider call budgets
+
+`loomspan.connections.<name>.request-timeout` MAY bound one physical HTTP call through complete response consumption, including header wait and OpenRouter response inspection. Headers, whitespace keepalives and continuing body chunks do not reset the whole-call deadline. It is not a connect or read-inactivity setting and cannot be overridden by a skill/model or emitted as request JSON. Existing connect behavior is preserved. The current OpenAI/Anthropic SDK transports also derive their read/write inactivity limits from this duration, so raising the budget raises those inherited limits. This setting does not override provider/server/proxy limits.
+
+| Driver | Omitted `request-timeout` | Explicit value |
+| --- | --- | --- |
+| OpenAI, including OpenRouter | 60-second whole-call limit | Configured whole-call budget |
+| Anthropic | 60-second whole-call limit | Configured whole-call budget |
+| Gemini API key and Vertex AI | Client-call limit unset | Configured whole-call budget |
+| Ollama | Existing transport unchanged | Rejected as unsupported |
+
+An authored value MUST be an exact whole-millisecond duration from `1ms` through `2147483647ms` inclusive (24 days, 20 hours, 31 minutes, 23.647 seconds). Spring duration units and exact ISO-8601 syntax are accepted. Zero, negatives, malformed text, sub-millisecond or fractional-millisecond durations, and larger values fail safely with the full property path; values are never clamped or converted to unlimited. Existing configurations need no migration.
+
+Partial startup fragment; supply model aliases and skills separately:
+
+```yaml
+loomspan:
+  connections:
+    reasoning:
+      driver: openai
+      base-url: https://openrouter.ai/api/v1
+      api-key: ${OPENROUTER_API_KEY}
+      request-timeout: 240s
+      openai:
+        compatibility-profile: openrouter
+  session:
+    mission-timeout: 600s
+```
+
+The mission deadline remains authoritative over all calls, other work and retry backoff. Each permitted physical attempt receives its connection budget, but multiple full budgets are not promised inside the mission. Genuine provider timeouts use the existing Framework retry policy; cancellation, interruption and mission cutoff retain their existing failure ownership and late-write fences. Native retries remain disabled.
+
+For `ExecutionConfiguration`, use the same key and replace `api-key` with `api-key-ref`. Both preparation credential paths accept it; validation does not resolve credentials or call providers. New roots receive the published clients/budget. Previously admitted roots, delayed descendants and retries keep the captured generation; skill-only updates retain the active budget. Host-map preparation keeps its generic safe error wrapper; obtain actionable timeout paths with `validate` before `prepare`. See [publication](../java-api/skill-reload.md).
 
 ## Thinking levels
 
@@ -98,6 +131,12 @@ The identical bounded guidance is recorded on every failed physical attempt, inc
   `ModelAttemptCallAdvisorIntegrationTest`.
 - Request options and tool-loop assembly: `SpringAiChatOptionsContributorTest` and `SpringAiChatClientAssemblerIntegrationTest`.
 - Wire behavior: `ConnectionProtocolTest`.
+- Call budgets/default transport phases: `LoomspanProperties#validateRequestTimeout`,
+  `ProviderRequestTimeoutIntegrationTest` (actual standard/OpenRouter, Anthropic and both Gemini modes,
+  delayed headers, active body deadline, configured success, actual client defaults).
+- Captured timeout/publication and cutoff: `PublicSkillReloadIntegrationTest#publishedTimeoutCapturesOldRootAndSurvivesRepeatedSkillOnlyUpdates`,
+  `#delayedDescendantAndItsRetryRetainCapturedProviderBudget`, `#longerProviderBudgetCannotExtendMissionOrCallerInterruption`;
+  retry accounting: `ModelAttemptCallAdvisorIntegrationTest#realProviderTimeoutRetriesPreserveRequestCountsClassificationAndQuota`.
 - Operational identity: `ModelExecutionIdentity`, `ExecutionTraceContractTest`, `MicrometerUsageMetricsRecorderTest`.
 
 This topic does not fully specify provider SDK behavior or third-party compatibility guarantees. Inspect the pinned Spring AI version and the target service's protocol documentation when those details determine correctness.

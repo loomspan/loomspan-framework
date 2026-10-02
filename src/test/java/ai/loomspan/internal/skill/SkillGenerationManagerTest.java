@@ -40,6 +40,21 @@ import static org.mockito.Mockito.when;
 class SkillGenerationManagerTest
 {
     @Test
+    void runtimeSnapshotDetachesRequestTimeoutFromStartupMutation()
+    {
+        var original = new LoomspanProperties.ConnectionProperties();
+        original.setRequestTimeout(java.time.Duration.ofSeconds(4));
+        var properties = new LoomspanProperties();
+        properties.setConnections(Map.of("primary", original));
+        var registry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
+        try (var runtime = new ExecutionRuntime(properties, ai.loomspan.internal.core.TracePersistencePolicy.NEVER, registry))
+        {
+            original.setRequestTimeout(java.time.Duration.ofMillis(1));
+            assertThat(runtime.properties().getConnections().get("primary").getRequestTimeout())
+                    .isEqualTo(java.time.Duration.ofSeconds(4));
+        }
+    }
+    @Test
     void hostCredentialsAndExecutionSettingsRemainWithCapturedGeneration(@TempDir Path directory) throws Exception
     {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
