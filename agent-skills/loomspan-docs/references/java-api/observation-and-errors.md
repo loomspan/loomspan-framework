@@ -64,8 +64,17 @@ followed by a successful provider attempt.
 These events are intended for trusted development and debugging and may contain
 application business data. They are not a durable trace schema. Framework and
 Console must not classify sensitivity or mask, redact, or sanitize prompts or
-data: altering content can change user-request behavior and diagnostic meaning.
+data outside the exception below: altering content can change user-request
+behavior and diagnostic meaning.
 Applications control access, retention, and export of events they consume.
+
+Known, supported exception: the derived execution journal underlying observer
+events retains its existing `ExecutionJournalProjector` field-name redaction.
+This heuristic is not comprehensive sensitivity detection. It does not alter
+canonical trace records, model prompts, tool execution inputs, or the skill
+result returned by `SkillTemplate.invoke()`. Preserve this existing exception
+without extending it to other paths or broadening it without an explicit product
+decision.
 
 Use the separate `loomspan-console` runtime-inspection skill when the task needs live
 trace discovery, retries, usage, failures, or raw artifacts rather than an

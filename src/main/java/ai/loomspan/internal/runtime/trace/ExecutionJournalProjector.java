@@ -334,6 +334,16 @@ public final class ExecutionJournalProjector
         return payload;
     }
 
+    /**
+     * Known, supported exception to the general no-masking/no-redaction policy:
+     * retain the existing field-name redaction in this derived execution journal,
+     * including the events delivered to SkillTemplate's observer callback.
+     * This projection does not rewrite canonical trace records, model prompts,
+     * tool execution inputs, or the skill result returned by invoke(). The
+     * heuristic is not a guarantee that all sensitive data has been identified.
+     * Do not extend this exception to other paths or broaden its rules without
+     * an explicit product decision. See ai/thoughts/framework-feature-design-lens.md.
+     */
     private JsonNode sanitize(JsonNode node)
     {
         if (node == null)

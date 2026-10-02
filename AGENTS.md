@@ -14,6 +14,14 @@ Enforce authentication, authorization, and explicit access boundaries rather
 than rewriting content. Existing size limits and explicit truncation are
 resource controls, not sensitivity classification or redaction.
 
+Known, supported exception: retain the existing field-name redaction in
+`ExecutionJournalProjector` for the derived execution journal, including events
+delivered to the `SkillTemplate` observer callback. This exception does not
+apply to canonical traces, model prompts, tool execution inputs, or the result
+returned by `invoke()`, and does not guarantee comprehensive sensitivity
+detection. Do not remove it on general-policy grounds or broaden it without an
+explicit product decision.
+
 ## Public API and compatibility
 
 Loomspan's supported application-facing Java API is deliberately small and closed. It consists only of the public top-level types in `ai.loomspan.api` that are allowlisted by `LoomspanPublicSurfaceArchitectureTest`.

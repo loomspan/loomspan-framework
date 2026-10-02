@@ -10,6 +10,12 @@ access boundaries. Do not add or recommend sensitivity heuristics, secret
 scanners, or masking in implementation, tests, reviews, or documentation.
 Size limits and explicit truncation remain resource controls, not redaction.
 
+The Framework's existing `ExecutionJournalProjector` field-name redaction is a
+known, supported exception for its derived journal and `SkillTemplate` observer
+events only. It does not authorize redaction of canonical traces, model prompts,
+tool execution inputs, skill results, or Console content. Preserve this narrow
+exception; do not broaden it without an explicit product decision.
+
 ## Development stage
 
 This project is pre-release and under active development. There are no external
