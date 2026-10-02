@@ -105,7 +105,7 @@ Perform this step **before** plan-conformance validation. Select all applicable 
 
 - Identify trust boundaries and attacker-controlled inputs.
 - Check authorization, authentication, injection, path handling, deserialization, request forgery, unsafe redirects, and privilege changes where relevant.
-- Check secrets, tokens, credentials, headers, personal data, and sensitive payloads for exposure through logs, traces, metrics, exceptions, object rendering, or persistence.
+- Check authentication, authorization, and explicit visibility boundaries for logs, traces, metrics, exceptions, object rendering, and persistence. Framework and Console must not classify sensitivity or mask, redact, or sanitize prompts or data; do not report unmodified diagnostic content as a defect merely because it may contain sensitive values.
 - Verify secure defaults and ensure new configuration cannot bypass established controls.
 - Do not report generic security concerns without a concrete path through the changed code.
 
@@ -135,8 +135,8 @@ Perform this step **before** plan-conformance validation. Select all applicable 
 
 #### Observability and operations
 
-- Verify logs, metrics, traces, and errors identify the failing operation without leaking sensitive data.
-- Check metric-tag cardinality. For Ephemeral diagnostic formats, verify current writer/reader/projector/debugging-tool coherence, usefulness, accuracy, ordering, failure visibility, security boundaries, and redaction. Historical or cross-version readability is not required unless a ticket explicitly changes the canonical policy.
+- Verify logs, metrics, traces, and errors identify the failing operation while preserving content fidelity and enforcing explicit access boundaries. Do not require content masking or redaction.
+- Check metric-tag cardinality. For Ephemeral diagnostic formats, verify current writer/reader/projector/debugging-tool coherence, usefulness, accuracy, ordering, failure visibility, content fidelity, and security boundaries. Historical or cross-version readability is not required unless a ticket explicitly changes the canonical policy.
 - Confirm operators can distinguish multiple configured instances, tenants, models, or endpoints when the change introduces them.
 - Verify failures at startup and runtime are diagnosable.
 
@@ -360,7 +360,7 @@ End with the Step Report from the automation protocol: `ARTIFACTS` names the rev
 - [ ] Commands reported as passing were actually run in this fresh review context.
 - [ ] Ticket, plan, and testing-plan criteria were mapped to evidence when present.
 - [ ] Skill-authoring documentation impact was assessed independently against the actual diff.
-- [ ] Secrets and sensitive data were checked across logs, traces, metrics, errors, and object rendering where applicable.
+- [ ] Explicit access boundaries and content fidelity were checked across logs, traces, metrics, errors, and object rendering; no sensitivity classification, masking, or redaction was introduced or required.
 - [ ] Findings are ordered by severity and the disposition matches them.
 - [ ] In pipeline mode, all actionable findings were fixed or escalated, every fix was followed by another complete review, and `REVIEW_RESULT` accurately reflects whether this context changed implementation artifacts.
 

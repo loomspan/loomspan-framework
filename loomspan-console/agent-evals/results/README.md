@@ -4,9 +4,12 @@ Use a dated directory for one current-checkout paired matrix. Repository replay
 records must identify themselves as deterministic replays; fresh client/model
 records must retain their actual client/model/build metadata. Retain completed
 unfavorable model runs; keep infrastructure failures separate and rerun them.
-Commit only records that pass fail-closed sanitization: no session directory,
+Commit only records containing the permitted evaluation metadata: no session directory,
 MCP key, authorization header, absolute machine path, full tool payload, or
-internal owner/handle/scope selector. A dated summary is derived evidence and
+internal owner/handle/scope selector. This is a constraint on which evaluation
+metadata is committed, not permission to mask or redact prompts, payloads, or
+runtime evidence. Framework and Console must not classify sensitivity or
+rewrite data. A dated summary is derived evidence and
 must reproduce from the committed records with `agent-eval verify` for the current
 package, or `agent-eval verify-replay` for historical deterministic replays.
 

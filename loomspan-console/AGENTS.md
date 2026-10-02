@@ -1,5 +1,15 @@
 # Loomspan Console — Agent Notes
 
+## Prompt and data fidelity
+
+Console and Framework must not classify data as sensitive or mask, redact, or
+sanitize prompts or data. They cannot determine sensitivity or safely alter
+content without affecting user requests or diagnostic fidelity. Preserve
+recorded content, and enforce authentication, authorization, and explicit
+access boundaries. Do not add or recommend sensitivity heuristics, secret
+scanners, or masking in implementation, tests, reviews, or documentation.
+Size limits and explicit truncation remain resource controls, not redaction.
+
 ## Development stage
 
 This project is pre-release and under active development. There are no external

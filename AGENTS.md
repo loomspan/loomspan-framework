@@ -1,5 +1,19 @@
 # Loomspan repository guidance
 
+## Prompt and data fidelity
+
+Framework and Console must not classify data as sensitive or attempt to mask,
+redact, or sanitize prompts, inputs, outputs, tool arguments, evidence, or
+diagnostic content. They cannot determine which data is sensitive or whether
+altering it would change the response to a user request. Preserve content and
+diagnostic fidelity; do not introduce field-name heuristics, secret scanners,
+replacement values, or automatic masking. Do not recommend or require these
+mechanisms in tickets, plans, tests, reviews, or documentation.
+
+Enforce authentication, authorization, and explicit access boundaries rather
+than rewriting content. Existing size limits and explicit truncation are
+resource controls, not sensitivity classification or redaction.
+
 ## Public API and compatibility
 
 Loomspan's supported application-facing Java API is deliberately small and closed. It consists only of the public top-level types in `ai.loomspan.api` that are allowlisted by `LoomspanPublicSurfaceArchitectureTest`.

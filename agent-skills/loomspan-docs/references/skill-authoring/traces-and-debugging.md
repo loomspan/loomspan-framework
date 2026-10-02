@@ -260,10 +260,11 @@ the attempt boundary, even when a later attempt succeeds. A
 `MODEL_ATTEMPT_FAILED` record is therefore a warning about that attempt, not a
 canonical execution error. Call an attempt recovered only when a later
 `MODEL_RESPONSE_RECEIVED` in the same retry sequence succeeds. The failure
-record's diagnostic content uses the same ordinary trace-content access and
-sensitivity rules as other recorded content; progressive loading is a
-readability and response-budget mechanism, not a separate authorization or
-redaction boundary.
+record's diagnostic content uses the same ordinary trace-content access rules
+as other recorded content; progressive loading is a readability and
+response-budget mechanism, not a separate authorization boundary. Framework
+and Console must not classify sensitivity or mask, redact, or sanitize prompts
+or data.
 
 Console's `retryCount` is `sum(max(0, attemptsInSequence - 1))`, equivalently
 the count of validated attempts whose `attemptNumber > 1`. Ten independent

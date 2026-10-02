@@ -61,11 +61,11 @@ only; stack text and provider diagnostics remain in the trace content selected
 through Console. This warning is not a terminal execution error and may be
 followed by a successful provider attempt.
 
-These events are intended for trusted development and debugging. They may
-contain application business data and are neither a durable trace schema nor a
-promise of comprehensive sanitization. Applications MUST apply their own data
-classification, access control, redaction, retention, and export policy before
-persisting or exposing them.
+These events are intended for trusted development and debugging and may contain
+application business data. They are not a durable trace schema. Framework and
+Console must not classify sensitivity or mask, redact, or sanitize prompts or
+data: altering content can change user-request behavior and diagnostic meaning.
+Applications control access, retention, and export of events they consume.
 
 Use the separate `loomspan-console` runtime-inspection skill when the task needs live
 trace discovery, retries, usage, failures, or raw artifacts rather than an

@@ -35,7 +35,9 @@ For internal or accidentally exposed implementation, prefer one coherent design.
 
 Documented configuration and manifest behavior is deliberate and must always receive an impact assessment. An intentional pre-1.0 break must be identified in the ticket and, when the execution route produces one, the plan; explain the developer or skill-author impact; and update every in-repository configuration, manifest, fixture, sample, test, and guidance reference atomically. Ticket-led execution records the impact assessment in the ticket's `Execution notes`; it does not waive the assessment or any profile-upgrade trigger. Prefer one coherent new contract; add migration machinery only when the ticket explicitly requires it.
 
-Execution traces are debugging and execution-understanding tools, not historical analytics, archival, audit-history, or trend-analysis formats. Preserve diagnostic usefulness, accuracy, ordering, failure visibility, security boundaries, and sensitive-data redaction, and keep the current writer, reader, projector, and debugging tools coherent. Trace schemas, record types, field names, storage layout, and projection behavior may change to improve the current tool.
+Execution traces are debugging and execution-understanding tools, not historical analytics, archival, audit-history, or trend-analysis formats. Preserve diagnostic usefulness, accuracy, ordering, failure visibility, content fidelity, and security boundaries, and keep the current writer, reader, projector, and debugging tools coherent. Trace schemas, record types, field names, storage layout, and projection behavior may change to improve the current tool.
+
+Framework and Console must not attempt to classify data as sensitive or redact, mask, or sanitize prompts or data. Neither component can know which data is sensitive or how to alter it safely without affecting responses to user requests or the meaning of recorded evidence. Preserve prompts, inputs, outputs, tool arguments, evidence, and diagnostic content. Protect access through authentication, authorization, and explicit visibility boundaries; do not substitute content rewriting for those controls. Size limits and clearly marked truncation are resource controls, not sensitivity classification. Tickets, plans, tests, and reviews must not introduce or require automatic masking or redaction.
 
 A complete canonical trace may be deliberately saved and opened as a portable diagnostic artifact only by a Console with the exact same `consoleCompatibilityVersion`. The trace carries that required framework-owned marker, and the external file is the durable object; opening it creates only ordinary transient Console evidence governed by the existing capacity, expiry, removal, shutdown, and restart-cleanup rules. This narrow same-version transfer does not create Console-owned history, restart adoption, historical discovery, or cross-version interchange. Derived indexes, analysis manifests, handles, continuations, and imported catalogs remain ephemeral current-process formats.
 
@@ -211,7 +213,7 @@ Use the questions that are relevant to the proposal. They are prompts for discus
 - Are authorization and tenant boundaries preserved at execution time?
 - Are validation and failure behavior deterministic and actionable?
 - Can traces distinguish caller-, model-, and framework-supplied information?
-- Are sensitive values redacted appropriately?
+- Are prompts and data preserved without sensitivity classification, masking, or redaction, with access controlled at explicit boundaries?
 - Are nested, concurrent, asynchronous, cancellation, and replay behavior well defined?
 
 ### Evidence and cost

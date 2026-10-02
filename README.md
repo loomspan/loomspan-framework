@@ -294,7 +294,7 @@ trafficGate.open();
 
 For integration testing, configure a real or local protocol-compatible named connection and invoke the YAML skill through `SkillTemplate`. Loomspan's supported-surface integration test follows this pattern: it supplies a local OpenAI-compatible endpoint through `loomspan.connections`, invokes an LLM-backed YAML skill that calls both an annotation-defined Java leaf and an application-handled REST leaf, directly invokes the REST leaf, and observes only public API values. Tests should not replace internal resolvers, coordinators, model factories, registries, or virtual-file-system beans.
 
-Observers receive at most one available completed view after success or a post-session execution failure. Delivery is synchronous on the caller after binding restoration and before root release; pre-session rejection and every `validate` call produce no callback. Failure-history mapping or observer errors never replace the original execution failure, while an observer error after successful execution propagates unchanged. Views contain immutable, current-version `SkillExecutionEvent` values intended for trusted development and debugging; they may contain application business data and are not a durable, guaranteed, or comprehensively sanitized history contract. Invalid caller input raises `SkillInputValidationException`, authorization failures remain Spring Security `AccessDeniedException`, and other runtime failures crossing the facade become a safe `SkillException`.
+Observers receive at most one available completed view after success or a post-session execution failure. Delivery is synchronous on the caller after binding restoration and before root release; pre-session rejection and every `validate` call produce no callback. Failure-history mapping or observer errors never replace the original execution failure, while an observer error after successful execution propagates unchanged. Views contain immutable, current-version `SkillExecutionEvent` values intended for trusted development and debugging; they may contain application business data and are not a durable or guaranteed history contract. Framework and Console must preserve prompt and data fidelity without sensitivity classification, masking, or redaction. Invalid caller input raises `SkillInputValidationException`, authorization failures remain Spring Security `AccessDeniedException`, and other runtime failures crossing the facade become a safe `SkillException`.
 
 ## Defining Skills
 
@@ -552,7 +552,7 @@ If any REST manifests exist, startup requires exactly one application `RestSkill
 
 The handler receives one `RestSkillInvocation` containing `skillName()`, `input()`, and the trusted captured `generationId()` after input validation and reference resolution. Its map/list containers are recursively copied into immutable snapshots; null values and non-container leaf identity are preserved, including resolved Spring `Resource` handles, but bytes behind a `Resource` are outside the immutability promise. Caller authentication is scoped through `SecurityContextHolder` on the actual handler thread and the previous context is restored; identity and session data are not SPI arguments. The handler is called once. A null result fails, an empty string succeeds, `AccessDeniedException` and existing `SkillException` failures retain their facade behavior, other runtime failures become safe `SkillException` failures, and JVM `Error` is not caught. Unlike annotation-defined Java skill failures, REST failures do not use the Java exception-to-text adapter.
 
-REST input, result, error, and observation data receive no new comprehensive sanitization guarantee. Console identifies these declarations as `REST` and shows their source label and YAML text under the exact matching framework/Console version policy. Configured files produce descriptive paths; supplied documents produce their logical labels.
+Framework and Console must not classify sensitivity or mask, redact, or sanitize prompts or data, including REST input, result, error, and observation data. Neither component can determine what is sensitive or how to alter it safely without affecting user requests or diagnostic meaning. Access is protected through authentication, authorization, and explicit visibility boundaries; size limits and marked truncation remain resource controls. Console identifies these declarations as `REST` and shows their source label and YAML text under the exact matching framework/Console version policy. Configured files produce descriptive paths; supplied documents produce their logical labels.
 
 ### Annotation-defined Java skills
 
@@ -713,7 +713,7 @@ still mandatory. A generic proxy or host-security `401`/`403` occurs before the
 adapter and is distinct from the adapter's `LOOMSPAN_API_KEY_REJECTED` problem.
 The normal servlet context path applies to every route. If startup detects an
 invalid configuration or an overlapping application mapping, it logs a
-sanitized diagnostic and leaves the entire optional adapter, observation, and
+configuration diagnostic and leaves the entire optional adapter, observation, and
 completion grace behavior disabled.
 
 TLS and any host/proxy rejection remain application infrastructure
