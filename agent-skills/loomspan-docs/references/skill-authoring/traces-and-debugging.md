@@ -46,6 +46,24 @@ reader-compatibility fact only: it does not authenticate the producer, verify
 integrity, or establish provenance. Continue to treat the serialized shape as
 an internal diagnostic format rather than an application dependency.
 
+## Mission input nulls
+
+Ordinary JSON mission-input diagnostics preserve explicit null object values and
+array positions, including nested `context.serviceHistory: null`. Schema-guided
+trace preparation snapshots the object and array containers it visits without changing the
+execution input. Trace acceptance does not relax input validation: a null
+required business field still follows the normal validation failure path.
+
+`ExecutionCoordinator#traceSafeNode` owns schema-guided capture.
+`ExecutionCoordinatorTest#nestedChildPreservesNullContextThroughValidationExecutionAndCanonicalTrace`
+protects accepted child input and canonical null fidelity;
+`nullBearingMapAndListSnapshotsRemainImmutableAndIsolatedFromExecutionInputMutation`
+protects nested null positions, non-null content, and snapshot isolation;
+`nestedChildRequiredNullStillFailsNormalValidationBeforeSkillExecution`
+protects required-field rejection. These provider-free regressions establish
+Framework behavior; they do not establish model argument quality or business
+scenario success.
+
 ## Trace identity
 
 `entrySkill` is the exact registered name of the top-level Java, REST, or model-backed YAML skill whose invocation owns the session. Loomspan records it before execution begins, keeps it unchanged across nested skill invocations, and exposes it in Trace Catalog and Trace Detail without requiring artifact acquisition. It is a recorded fact: it does not prove that the skill is still registered or that it is more important than nested work.

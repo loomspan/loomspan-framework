@@ -18,6 +18,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -438,7 +439,7 @@ public class ExecutionCoordinator
                         childValue,
                         join(path, childName)));
             });
-            return Map.copyOf(safe);
+            return Collections.unmodifiableMap(safe);
         }
         if ("array".equals(schema.getType()) && value instanceof List<?> list && schema.getItems() != null)
         {
@@ -447,7 +448,7 @@ public class ExecutionCoordinator
             {
                 safe.add(traceSafeNode(schema.getItems(), list.get(index), path + "[" + index + "]"));
             }
-            return List.copyOf(safe);
+            return Collections.unmodifiableList(safe);
         }
         return value;
     }

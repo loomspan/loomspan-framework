@@ -37,6 +37,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -53,6 +54,156 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 class ExecutionCoordinatorTest {
 
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-03-15T12:00:00Z"), ZoneOffset.UTC);
+
+    @Test
+    void nestedChildPreservesNullContextThroughValidationExecutionAndCanonicalTrace()
+    {
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("serviceHistory", null);
+        context.put("referenceEvidence", List.of());
+        context.put("equipment", "pump");
+        Map<String, Object> input = Map.of("context", context, "requiredInput", "compare");
+        var childInput = new java.util.concurrent.atomic.AtomicReference<Map<String, Object>>();
+        ExecutionCoordinator coordinator = nullInputCoordinator(
+                (session, definition, objective, missionInput, model, tools, planning, authentication) -> {
+                    if (definition.manifest().getName().equals("parentSkill"))
+                        return String.valueOf(tools.getFirst().invoke(input, null));
+                    childInput.set(missionInput);
+                    return "compared";
+                });
+        LoomspanSession session = new LoomspanSession("null-child", "parentSkill", 3, null, TracePersistencePolicy.ALWAYS);
+
+        assertThat(coordinator.execute("parentSkill", "Compare equipment", session, null)).isEqualTo("compared");
+        assertThat(childInput.get()).isEqualTo(input);
+        TraceRecord parent = missionOpened(session, "parentSkill");
+        TraceRecord child = missionOpened(session, "compareOptions");
+        assertThat(child.parentFrameId()).isNotNull();
+        assertThat(child.parentFrameId()).isNotEqualTo(child.frameId());
+        assertThat(parent.parentFrameId()).isNull();
+        assertThat(child.data().path("missionInput")).isEqualTo(new tools.jackson.databind.ObjectMapper().valueToTree(input));
+        assertThat(child.data().path("missionInput").path("context").has("serviceHistory")).isTrue();
+        assertThat(child.data().path("missionInput").path("context").path("serviceHistory").isNull()).isTrue();
+        assertThat(readTraceRecords(session)).extracting(TraceRecord::recordType).doesNotContain(TraceRecordType.ERROR_RECORDED);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void nullBearingMapAndListSnapshotsRemainImmutableAndIsolatedFromExecutionInputMutation()
+    {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("note", "inspection");
+        item.put("value", 7);
+        List<Object> items = new ArrayList<>();
+        items.add(null);
+        items.add(item);
+        items.add(null);
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("serviceHistory", null);
+        context.put("referenceEvidence", items);
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("context", context);
+        input.put("requiredInput", "original");
+        var expected = new tools.jackson.databind.ObjectMapper().valueToTree(input);
+        var captured = new java.util.concurrent.atomic.AtomicReference<Map<String, Object>>();
+        ExecutionCoordinator coordinator = nullInputCoordinator(
+                (session, definition, objective, missionInput, model, tools, planning, authentication) -> {
+                    assertThat(missionInput).isSameAs(input);
+                    Map<String, Object> snapshot = (Map<String, Object>) ExecutionBindingScope.requireCurrent()
+                            .branch().leaf().orElseThrow().parameters().get("missionInput");
+                    captured.set(snapshot);
+                    Map<String, Object> capturedContext = (Map<String, Object>) snapshot.get("context");
+                    List<Object> capturedItems = (List<Object>) capturedContext.get("referenceEvidence");
+                    assertThatThrownBy(() -> snapshot.put("extra", true)).isInstanceOf(UnsupportedOperationException.class);
+                    assertThatThrownBy(() -> capturedContext.put("extra", true)).isInstanceOf(UnsupportedOperationException.class);
+                    assertThatThrownBy(() -> capturedItems.add("extra")).isInstanceOf(UnsupportedOperationException.class);
+                    assertThatThrownBy(() -> ((Map<String, Object>) capturedItems.get(1)).put("extra", true))
+                            .isInstanceOf(UnsupportedOperationException.class);
+                    item.put("value", 99);
+                    items.removeFirst();
+                    context.put("serviceHistory", "later");
+                    input.put("requiredInput", "later");
+                    return "executed";
+                });
+        LoomspanSession session = new LoomspanSession("null-snapshot", "compareOptions", 3, null, TracePersistencePolicy.ALWAYS);
+
+        assertThat(coordinator.execute("compareOptions", "Compare equipment", input, session, null)).isEqualTo("executed");
+        assertThat((tools.jackson.databind.JsonNode) new tools.jackson.databind.ObjectMapper().valueToTree(captured.get())).isEqualTo(expected);
+        assertThat(missionOpened(session, "compareOptions").data().path("missionInput")).isEqualTo(expected);
+    }
+
+    @Test
+    void nestedChildRequiredNullStillFailsNormalValidationBeforeSkillExecution()
+    {
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("context", Map.of());
+        input.put("requiredInput", null);
+        var childExecuted = new java.util.concurrent.atomic.AtomicBoolean();
+        ExecutionCoordinator coordinator = nullInputCoordinator(
+                (session, definition, objective, missionInput, model, tools, planning, authentication) -> {
+                    if (definition.manifest().getName().equals("parentSkill"))
+                        return String.valueOf(tools.getFirst().invoke(input, null));
+                    childExecuted.set(true);
+                    return "unexpected";
+                });
+        LoomspanSession session = new LoomspanSession("null-validation", "parentSkill", 3, null, TracePersistencePolicy.ALWAYS);
+
+        Throwable failure = catchThrowable(() -> coordinator.execute("parentSkill", "Compare equipment", session, null));
+        assertThat(failure).isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
+        assertThat(((ai.loomspan.api.SkillInputValidationException) failure).getIssues())
+                .anySatisfy(issue -> {
+                    assertThat(issue.path()).isEqualTo("requiredInput");
+                    assertThat(issue.code()).isEqualTo("missing_required");
+                });
+        assertThat(childExecuted).isFalse();
+        assertThat(readTraceRecords(session)).filteredOn(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
+                .isNotEmpty();
+    }
+
+    private static TraceRecord missionOpened(LoomspanSession session, String skillName)
+    {
+        return readTraceRecords(session).stream()
+                .filter(record -> record.recordType() == TraceRecordType.FRAME_OPENED)
+                .filter(record -> record.frameType() == TraceFrameType.ROOT_MISSION)
+                .filter(record -> skillName.equals(record.route())).findFirst().orElseThrow();
+    }
+
+    private static ExecutionCoordinator nullInputCoordinator(MissionExecutionEngine engine)
+    {
+        var configuration = new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
+        YamlSkillManifest childManifest = manifest("compareOptions", List.of());
+        var root = new YamlSkillManifest.InputSchemaManifest();
+        root.setType("object");
+        root.setRequired(List.of("requiredInput"));
+        var context = new YamlSkillManifest.InputSchemaManifest();
+        context.setType("object");
+        var evidence = new YamlSkillManifest.InputSchemaManifest();
+        evidence.setType("array");
+        var item = new YamlSkillManifest.InputSchemaManifest();
+        item.setType("object");
+        evidence.setItems(item);
+        context.setProperties(Map.of("referenceEvidence", evidence));
+        var required = new YamlSkillManifest.InputSchemaManifest();
+        required.setType("string");
+        root.setProperties(Map.of("context", context, "requiredInput", required));
+        childManifest.setInputSchema(root);
+        var parentDefinition = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest("parentSkill", List.of("compareOptions")), configuration);
+        var childDefinition = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), childManifest, configuration);
+        var catalog = new StubYamlSkillCatalog(parentDefinition, childDefinition);
+        var registry = new TestCapabilityRegistry();
+        var resolver = new ai.loomspan.internal.runtime.input.SkillInputContractResolver();
+        for (YamlSkillDefinition definition : List.of(parentDefinition, childDefinition))
+        {
+            String name = definition.manifest().getName();
+            registry.register(name, new CapabilityMetadata("yaml:" + name, name, name,
+                    SkillExecutionDescriptor.from(configuration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
+                    arguments -> { throw new AssertionError("YAML must enter its mission engine"); }, CapabilityKind.YAML_SKILL,
+                    CapabilityToolDescriptor.generic(name, name), resolver.resolveYamlCapability(definition), null));
+        }
+        return coordinator(catalog, registry,
+                (name, session, authentication) -> name.equals("parentSkill") ? List.of(registry.getCapability("compareOptions")) : List.of(),
+                new RecordingModelInteractionFactory(new FakeCoordinatorChatClient(null, "unused", null, false)),
+                (value, session) -> value, null, engine);
+    }
 
     @Test
     void failedMissionFrameOpenReleasesRetiredGeneration()
