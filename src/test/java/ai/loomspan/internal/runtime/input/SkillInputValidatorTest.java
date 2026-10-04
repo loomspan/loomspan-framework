@@ -17,6 +17,33 @@ class SkillInputValidatorTest {
     private final SkillInputValidator validator = new SkillInputValidator();
 
     @Test
+    void scopedRenderingContractRetainsValidationAndTypedExtraValueBoundaries() {
+        var contract = new SkillInputContractResolver().resolveJavaCapability("""
+                {"type":"object","properties":{
+                  "shipmentId":{"type":"string"},"details":{"type":"object",
+                    "properties":{"routingEvidence":{}},"required":["routingEvidence"],"additionalProperties":true},
+                  "tags":{"type":"object","properties":{"declared":{"type":"boolean"}},"additionalProperties":{"type":"string"}}},
+                 "required":["shipmentId","details"],"additionalProperties":false}
+                """);
+        var evidence = new LinkedHashMap<String, Object>();
+        evidence.put("null", null);
+        evidence.put("list", List.of("east", Map.of("quote", 73)));
+        var valid = Map.<String, Object>of("shipmentId", "S-42", "details", Map.of("routingEvidence", evidence, "extra", evidence),
+                "tags", Map.of("declared", true, "extra", "east"));
+        var accepted = validator.validate(valid, contract);
+        assertThat(accepted.valid()).isTrue();
+        assertThat(accepted.normalizedInput()).isEqualTo(valid);
+        var rootExtra = new LinkedHashMap<>(valid);
+        rootExtra.put("extra", evidence);
+        assertThat(validator.validate(rootExtra, contract).issues()).extracting(SkillInputValidationIssue::code).contains("unknown_field");
+        assertThat(validator.validate(Map.of("shipmentId", "S-42", "details", Map.of("extra", evidence)), contract).issues())
+                .extracting(SkillInputValidationIssue::code).contains("missing_required");
+        var typedExtra = new LinkedHashMap<>(valid);
+        typedExtra.put("tags", Map.of("declared", true, "extra", List.of("east")));
+        assertThat(validator.validate(typedExtra, contract).valid()).isFalse();
+    }
+
+    @Test
     void validatesAndNormalizesInputContractCases() {
         SkillInputContract contract = new SkillInputContract(
                 SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,

@@ -958,11 +958,63 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(chatClient.systemMessagesSeen()).hasSize(3);
-        assertThat(chatClient.systemMessagesSeen().get(0)).doesNotContain("Required fields:");
+        assertThat(chatClient.systemMessagesSeen().get(0)).contains("At `$` (top level): Required fields: [rawText]");
         assertThat(chatClient.systemMessagesSeen().get(1))
                 .contains("YOUR PREVIOUS ACTION WAS INVALID")
-                .contains("Required fields: rawText")
-                .contains("`rawText` must be a string");
+                .contains("At `$` (top level): Required fields: [rawText]")
+                .contains("`$.rawText` must be a string");
+    }
+
+    @Test
+    void preservesScopedGuidanceAndEvidenceThroughObjectBoundaryCorrection() {
+        String schema = """
+                {"type":"object","properties":{
+                  "shipmentId":{"type":"string"},
+                  "details":{"type":"object","properties":{"routingEvidence":{}},
+                    "required":["routingEvidence"],"additionalProperties":true},
+                  "closed":{"type":"object","additionalProperties":false}},
+                 "required":["shipmentId","details"],"additionalProperties":false}
+                """;
+        var evidence = new java.util.LinkedHashMap<String, Object>();
+        evidence.put("text", "unchanged evidence α");
+        evidence.put("nullable", null);
+        evidence.put("list", List.of("east", Map.of("quote", 73)));
+        for (String invalidLocation : List.of("root", "closed")) {
+            var validArguments = Map.<String, Object>of("shipmentId", "S-42",
+                    "details", Map.of("routingEvidence", evidence, "unlisted", evidence));
+            var invalidArguments = new java.util.LinkedHashMap<>(validArguments);
+            if (invalidLocation.equals("root")) invalidArguments.put("forbidden", evidence);
+            else invalidArguments.put("closed", Map.of("forbidden", evidence));
+            String rejected = LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(Map.of(
+                    "stepAction", "CALL_TOOL", "taskId", "t-1", "toolName", "invoiceParser", "toolArguments", invalidArguments));
+            String valid = LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(Map.of(
+                    "stepAction", "CALL_TOOL", "taskId", "t-1", "toolName", "invoiceParser", "toolArguments", validArguments));
+            SequenceChatClient client = new SequenceChatClient(rejected, valid,
+                    "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
+            AtomicInteger calls = new AtomicInteger();
+            BoundCapability tool = new BoundCapability(toolWithSchema("invoiceParser", schema, "unused").metadata(),
+                    (arguments, taskId) -> {
+                        assertThat(client.systemMessagesSeen()).hasSize(2);
+                        assertThat(arguments).isEqualTo(validArguments);
+                        calls.incrementAndGet();
+                        return "parsed";
+                    });
+            var state = new DefaultExecutionStateService(FIXED_CLOCK);
+            var planning = new InitializingPlanningService(state, singleTaskPlan());
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("scope-correction-" + invalidLocation, "test.entry", 3);
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                assertThat(executeMission(engine(state, planning, executor), session, definition(), "Route shipment", Map.of("evidence", evidence), client, List.of(tool)))
+                        .isEqualTo("Finished");
+            }
+            assertThat(calls).hasValue(1);
+            for (String system : client.systemMessagesSeen().subList(0, 2)) {
+                assertThat(system).contains("At `$` (top level)", "Only these fields are allowed: [closed, details, shipmentId]",
+                        "At `$.details`: Required fields: [routingEvidence]", "Additional fields are allowed with any JSON value",
+                        "At `$.closed`", "Only these fields are allowed: []");
+            }
+            assertThat(CorrectionEvidenceFixtures.decodedStepCandidate(client.userMessagesSeen().get(1))).isEqualTo(rejected);
+            assertThat(client.userMessagesSeen().get(1)).startsWith(client.userMessagesSeen().getFirst()).contains("unchanged evidence α", "nullable", "quote");
+        }
     }
 
     @Test

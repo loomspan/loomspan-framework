@@ -51,6 +51,39 @@ Map<String, Object> rank(
 
 The exact callable name is `rankTransportOptions`; use it in `SkillTemplate` or a YAML parent's `allowed_skills`. No YAML wrapper is required or accepted.
 
+## Generated Input Guidance
+
+Assigned-tool examples illustrate declared structure; they are not actual argument
+values. Optional declared fields may be omitted. Both compact and verbose guidance
+list required and optional fields at each object location, including objects inside
+arrays and schema-constrained additional values. Child requirements apply when the
+containing object is supplied; they do not make an optional parent required.
+
+- At `$` (top level), a closed rule permits only that object's listed keys. Nested
+  closed rules apply only at their stated paths. An empty closed root requires `{}`.
+- Open objects explicitly permit additional fields with any JSON value. Their
+  illustrative fields are not exhaustive; an empty illustration may receive fields.
+- Typed additional values follow their own type and nested rules at `.*`. These
+  restrictions apply to unlisted fields, not to declared properties with different
+  types. `[]` denotes array items; quoted bracket paths distinguish literal dotted
+  keys from nested properties. `<key>` is an illustrative key, not a required name.
+- Generic contracts omit structured guidance. Verbose correction adds type detail
+  while retaining the same object boundaries as ordinary compact guidance.
+
+These are descriptions of the resolved contract, not new validation or dataflow
+rules. Skill instructions must identify required business data, including any
+undeclared fields in open objects. Openness does not require copying all available
+context, and Loomspan does not infer or automatically forward business values.
+
+`SkillInputPromptRendererTest` protects recursive scoped rules and examples;
+`StepPromptBuilderTest#compactAndVerboseSelectionsKeepObjectRulesAcrossPropertyThreshold`
+protects detail selection. `StepLoopMissionExecutionEngineTest#preservesScopedGuidanceAndEvidenceThroughObjectBoundaryCorrection`
+captures ordinary and corrective requests and checks evidence fidelity and
+validation before execution. `SkillInputValidatorTest#scopedRenderingContractRetainsValidationAndTypedExtraValueBoundaries`
+protects unchanged enforcement separately from model guidance. This subsection
+describes generated guidance for resolved contracts; it does not document the
+complete pure-YAML schema language.
+
 ## Design Guidance
 
 Use a record or DTO when the planner should discover stable fields such as `operator`, `price`, and `durationMinutes`. A generic map truthfully communicates that keys and value kinds are open; a detailed parameter description can give examples, but examples do not become enforced property schemas. Do not use `Object` or a generic map merely to avoid modeling a stable contract.

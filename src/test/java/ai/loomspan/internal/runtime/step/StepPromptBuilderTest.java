@@ -313,10 +313,10 @@ class StepPromptBuilderTest {
                 true,
                 null);
 
-        assertThat(prompt).contains("Required fields: invoiceId");
-        assertThat(prompt).contains("Required fields: options.includeHistory");
-        assertThat(prompt).contains("`options.includeHistory` must be a boolean");
-        assertThat(prompt).contains("Do not add fields under `options` beyond those shown above.");
+        assertThat(prompt).contains("At `$` (top level): Required fields: [invoiceId]");
+        assertThat(prompt).contains("At `$.options`: Required fields: [includeHistory]");
+        assertThat(prompt).contains("`$.options.includeHistory` must be a boolean");
+        assertThat(prompt).contains("At `$.options`: Required fields: [includeHistory]. Optional declared fields: []. Only these fields are allowed: [includeHistory].");
     }
 
     @Test
@@ -349,8 +349,8 @@ class StepPromptBuilderTest {
                 true,
                 null);
 
-        assertThat(prompt).contains("`options.includeHistory` must be a boolean");
-        assertThat(prompt).doesNotContain("Do not add fields under `options` beyond those shown above.");
+        assertThat(prompt).contains("`$.options.includeHistory` must be a boolean");
+        assertThat(prompt).doesNotContain("At `$.options`: Required fields: [includeHistory]. Optional declared fields: []. Only these fields are allowed: [includeHistory].");
     }
 
     @Test
@@ -412,9 +412,9 @@ class StepPromptBuilderTest {
                 false,
                 null);
 
-        assertThat(prompt).contains("Required fields: <key>.id");
-        assertThat(prompt).contains("`<key>.metadata.enabled` must be a boolean");
-        assertThat(prompt).contains("Do not add fields under `<key>` beyond those shown above.");
+        assertThat(prompt).contains("At `$.*`: Required fields: [id]");
+        assertThat(prompt).contains("`$.*.metadata.enabled` must be a boolean");
+        assertThat(prompt).contains("Only these fields are allowed: [id, metadata]");
     }
 
     @Test
@@ -443,7 +443,7 @@ class StepPromptBuilderTest {
                 null);
 
         assertThat(prompt).contains("TOOL ARGUMENT SHAPE");
-        assertThat(prompt).contains("\"values\": [ \"<value>\" ]");
+        assertThat(prompt).contains("\"values\": [ <any JSON value> ]");
     }
 
     @Test
@@ -477,9 +477,9 @@ class StepPromptBuilderTest {
         assertThat(compact).contains("\"value\": <any JSON value>");
         assertThat(compact).contains("\"<key>\": <any JSON value>");
         assertThat(compact).doesNotContain("This tool takes no arguments");
-        assertThat(verbose).contains("`value` must be any JSON value");
-        assertThat(verbose).contains("`options[].<key>` must be any JSON value");
-        assertThat(verbose).doesNotContain("`options[].<key>` must be a object");
+        assertThat(verbose).contains("`$.value` must be any JSON value");
+        assertThat(verbose).contains("`$.options[].*` must be any JSON value");
+        assertThat(verbose).doesNotContain("`$.options[].*` must be a object");
         assertThat(verbose).doesNotContain("This tool takes no arguments");
     }
 
@@ -581,6 +581,25 @@ class StepPromptBuilderTest {
         assertThat(prompt).doesNotContain("REQUIRED FINAL RESPONSE SHAPE");
         assertThat(prompt).doesNotContain("Property semantics:");
         assertThat(prompt).doesNotContain("Output contract:");
+    }
+
+    @Test
+    void compactAndVerboseSelectionsKeepObjectRulesAcrossPropertyThreshold() {
+        for (int count : List.of(6, 7)) {
+            var properties = new java.util.LinkedHashMap<String, Object>();
+            properties.put("details", Map.of("type", "object", "additionalProperties", true));
+            for (int index = 1; index < count; index++) properties.put("p" + index, Map.of("type", "string"));
+            String schema = LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(Map.of(
+                    "type", "object", "properties", properties, "required", List.of("details"), "additionalProperties", false));
+            for (boolean forced : List.of(false, true)) {
+                String prompt = buildPromptForCurrentMode(createTwoTaskPlan(), "objective", null, 1, List.of(), null,
+                        List.of(mockTool("invoiceParser", schema)), false, forced, null);
+                assertThat(prompt).contains("At `$` (top level): Required fields: [details]", "Only these fields are allowed:",
+                        "At `$.details`: Required fields: []", "Additional fields are allowed with any JSON value");
+                if (forced || count > 6) assertThat(prompt).contains("`$.p1` must be a string");
+                else assertThat(prompt).doesNotContain("`$.p1` must be a string");
+            }
+        }
     }
 
     private static String buildPromptForCurrentMode(ExecutionPlan plan,

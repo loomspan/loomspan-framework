@@ -3,6 +3,7 @@ package ai.loomspan.internal.runtime.input;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 
 public class SkillInputPromptRenderer
 {
@@ -18,7 +19,6 @@ public class SkillInputPromptRenderer
         {
             return "";
         }
-
         if (contract.schema().isObject()
                 && contract.schema().properties().isEmpty()
                 && contract.schema().additionalPropertiesSchema() == null
@@ -26,15 +26,13 @@ public class SkillInputPromptRenderer
         {
             return "{}\n(Note: This tool takes no arguments. You must pass an empty object.)";
         }
-
-        StringBuilder builder = new StringBuilder();
+        StringBuilder builder = new StringBuilder("Illustrative declared structure (optional fields may be omitted; permitted fields are not exhaustive in open objects):\n");
         builder.append(renderValue(contract.schema(), 0));
-
-        if (detailLevel == DetailLevel.VERBOSE)
-        {
-            appendVerboseRules(builder, contract.schema(), "", 0, 3);
-        }
-
+        builder.append("\nObject rules apply only at the stated location when that object is supplied. "
+                + "Required child fields do not require an optional parent. "
+                + "Populate permitted fields with actual data required by the skill instructions; openness does not require copying all context. "
+                + "`<key>` illustrates an additional key, not a required field.");
+        appendRules(builder, contract.schema(), "$", detailLevel);
         return builder.toString();
     }
 
@@ -43,49 +41,33 @@ public class SkillInputPromptRenderer
         String indent = "  ".repeat(depth);
         if (schema.isObject())
         {
-            StringBuilder builder = new StringBuilder();
-            builder.append("{\n");
-            List<String> propertyNames = schema.properties().keySet().stream().sorted().toList();
-            int entryCount = propertyNames.size() + (schema.additionalPropertiesSchema() != null ? 1 : 0);
-            int entryIndex = 0;
-
-            for (String propertyName : propertyNames)
+            StringBuilder builder = new StringBuilder("{\n");
+            List<String> names = schema.properties().keySet().stream().sorted().toList();
+            int count = names.size() + (schema.additionalPropertiesSchema() != null ? 1 : 0);
+            int index = 0;
+            for (String name : names)
             {
-                builder.append(indent)
-                        .append("  \"")
-                        .append(propertyName)
-                        .append("\": ")
-                        .append(renderValue(schema.properties().get(propertyName), depth + 1));
-                entryIndex++;
-                if (entryIndex < entryCount)
-                {
-                    builder.append(",");
-                }
+                builder.append(indent).append("  ").append(quote(name)).append(": ")
+                        .append(renderValue(schema.properties().get(name), depth + 1));
+                if (++index < count) builder.append(",");
                 builder.append("\n");
             }
-
             if (schema.additionalPropertiesSchema() != null)
             {
-                builder.append(indent)
-                        .append("  \"<key>\": ")
-                        .append(renderValue(schema.additionalPropertiesSchema(), depth + 1))
-                        .append("\n");
+                builder.append(indent).append("  \"<key>\": ")
+                        .append(renderValue(schema.additionalPropertiesSchema(), depth + 1)).append("\n");
             }
-
-            builder.append(indent).append("}");
-            return builder.toString();
+            return builder.append(indent).append("}").toString();
         }
         if (schema.isArray())
         {
-            return schema.items() == null
-                    ? "[ \"<value>\" ]"
+            return schema.items() == null ? "[ <any JSON value> ]"
                     : "[ " + renderValue(schema.items(), depth + 1) + " ]";
         }
         if (!schema.enumValues().isEmpty())
         {
-            return "\"<one of: " + String.join(", ", schema.enumValues()) + ">\"";
+            return quote("<one of: " + String.join(", ", schema.enumValues()) + ">");
         }
-        
         return switch (schema.type())
         {
             case SkillInputSchemaNode.ANY_TYPE -> "<any JSON value>";
@@ -96,96 +78,63 @@ public class SkillInputPromptRenderer
         };
     }
 
-    private void appendVerboseRules(StringBuilder builder,
-            SkillInputSchemaNode schema,
-            String path,
-            int depth,
-            int maxDepth)
+    private void appendRules(StringBuilder builder, SkillInputSchemaNode schema, String path, DetailLevel detailLevel)
     {
-        if (schema == null || depth > maxDepth)
+        if (detailLevel == DetailLevel.VERBOSE)
         {
-            return;
+            builder.append("\n`").append(path).append("` must be ").append(typeDescription(schema));
+            if (!schema.enumValues().isEmpty()) builder.append(" with one of ").append(schema.enumValues());
         }
-        if (!schema.required().isEmpty())
+        if (schema.isObject())
         {
-            String requiredFields = schema.required().stream()
-                    .map(field -> path == null || path.isBlank() ? field : path + "." + field)
-                    .reduce((left, right) -> left + ", " + right)
-                    .orElse("");
-            builder.append("\nRequired fields: ").append(requiredFields);
-        }
-        if (schema.isObject() && !schema.allowsAdditionalProperties())
-        {
-            builder.append("\n");
-            if (path == null || path.isBlank())
+            List<String> names = schema.properties().keySet().stream().sorted().toList();
+            builder.append("\nAt `").append(path).append("`");
+            if (path.equals("$")) builder.append(" (top level)");
+            builder.append(": Required fields: ").append(fieldNames(schema.required().stream().sorted().toList()))
+                    .append(". Optional declared fields: ")
+                    .append(fieldNames(names.stream().filter(name -> !schema.required().contains(name)).toList())).append(".");
+            if (!schema.allowsAdditionalProperties())
             {
-                builder.append("Do not add fields not shown above.");
+                builder.append(" Only these fields are allowed: ").append(fieldNames(names)).append(".");
+            }
+            else if (schema.additionalPropertiesSchema() == null)
+            {
+                builder.append(" Additional fields are allowed with any JSON value; the illustrated fields are not exhaustive, and an empty illustration need not remain empty.");
             }
             else
             {
-                builder.append("Do not add fields under `").append(path).append("` beyond those shown above.");
+                builder.append(" Additional fields are allowed; each unlisted field value must be ")
+                        .append(typeDescription(schema.additionalPropertiesSchema()));
+                if (!schema.additionalPropertiesSchema().enumValues().isEmpty())
+                    builder.append(" with one of ").append(schema.additionalPropertiesSchema().enumValues());
+                builder.append(" and follow the rules at `").append(path).append(".*`. These constraints apply only to unlisted fields.");
+                appendRules(builder, schema.additionalPropertiesSchema(), path + ".*", detailLevel);
+            }
+            for (Map.Entry<String, SkillInputSchemaNode> entry : new TreeMap<>(schema.properties()).entrySet())
+            {
+                appendRules(builder, entry.getValue(), propertyPath(path, entry.getKey()), detailLevel);
             }
         }
-        if (schema.additionalPropertiesSchema() != null)
+        if (schema.isArray() && schema.items() != null)
         {
-            String mapPath = path == null || path.isBlank() ? "<key>" : path + ".<key>";
-            SkillInputSchemaNode additionalSchema = schema.additionalPropertiesSchema();
-            builder.append("\n`").append(mapPath).append("` must be ").append(typeDescription(additionalSchema));
-            if (!additionalSchema.enumValues().isEmpty())
-            {
-                builder.append(" with one of ").append(additionalSchema.enumValues());
-            }
-            if (additionalSchema.isArray() && additionalSchema.items() != null)
-            {
-                builder.append("\n`").append(mapPath).append("[]` items must be ")
-                        .append(typeDescription(additionalSchema.items()));
-            }
-            if (additionalSchema.additionalPropertiesSchema() != null)
-            {
-                builder.append("\n`").append(mapPath).append(".*` values must be ")
-                        .append(typeDescription(additionalSchema.additionalPropertiesSchema()));
-            }
-            if (additionalSchema.isObject() || additionalSchema.isArray())
-            {
-                appendVerboseRules(builder, nestedSchema(additionalSchema),
-                        additionalSchema.isArray() ? mapPath + "[]" : mapPath, depth + 1, maxDepth);
-            }
-        }
-        for (Map.Entry<String, SkillInputSchemaNode> entry : new TreeMap<>(schema.properties()).entrySet())
-        {
-            SkillInputSchemaNode child = entry.getValue();
-            String childPath = path == null || path.isBlank() ? entry.getKey() : path + "." + entry.getKey();
-            builder.append("\n`").append(childPath).append("` must be ").append(typeDescription(child));
-
-            if (!child.enumValues().isEmpty())
-            {
-                builder.append(" with one of ").append(child.enumValues());
-            }
-            if (child.isArray() && child.items() != null)
-            {
-                builder.append("\n`").append(childPath).append("[]` items must be ")
-                        .append(typeDescription(child.items()));
-            }
-            if (child.additionalPropertiesSchema() != null)
-            {
-                builder.append("\n`").append(childPath).append(".*` values must be ")
-                        .append(typeDescription(child.additionalPropertiesSchema()));
-            }
-            if (child.isObject() || child.isArray())
-            {
-                appendVerboseRules(builder, nestedSchema(child),
-                        child.isArray() ? childPath + "[]" : childPath, depth + 1, maxDepth);
-            }
+            appendRules(builder, schema.items(), path + "[]", detailLevel);
         }
     }
 
-    private SkillInputSchemaNode nestedSchema(SkillInputSchemaNode schema)
+    private String propertyPath(String path, String name)
     {
-        if (schema == null)
-        {
-            return null;
-        }
-        return schema.isArray() ? schema.items() : schema;
+        return name.matches("[A-Za-z_][A-Za-z0-9_]*") ? path + "." + name : path + "[" + quote(name) + "]";
+    }
+
+    private String fieldNames(List<String> names)
+    {
+        return "[" + names.stream().map(name -> name.matches("[A-Za-z_][A-Za-z0-9_]*") ? name : quote(name))
+                .reduce((left, right) -> left + ", " + right).orElse("") + "]";
+    }
+
+    private String quote(String value)
+    {
+        return LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(value);
     }
 
     private String typeDescription(SkillInputSchemaNode schema)
