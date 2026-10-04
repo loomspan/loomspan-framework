@@ -69,11 +69,22 @@ containing object is supplied; they do not make an optional parent required.
   keys from nested properties. `<key>` is an illustrative key, not a required name.
 - Generic contracts omit structured guidance. Verbose correction adds type detail
   while retaining the same object boundaries as ordinary compact guidance.
+- Nonblank authored descriptions appear once per described node in a separate
+  section in both compact and verbose assigned-tool guidance, including corrective
+  requests. This shared resolved-contract behavior also covers declared YAML
+  inputs. Root/object descriptions, properties, array items and typed additional
+  values retain their own paths; ancestor descriptions are not copied to children.
+  Paths and description text are JSON-quoted, preserving multiline text, whitespace,
+  punctuation and literal key characters through escaping. Blank or absent
+  descriptions add no text. A described empty closed root retains its empty-object
+  rule; generic contracts still omit structured guidance.
 
 These are descriptions of the resolved contract, not new validation or dataflow
 rules. Skill instructions must identify required business data, including any
 undeclared fields in open objects. Openness does not require copying all available
 context, and Loomspan does not infer or automatically forward business values.
+Descriptions explain meaning, units, provenance or intended use; they do not add
+validation rules, defaults, data bindings or permission to invent absent values.
 
 `SkillInputPromptRendererTest` protects recursive scoped rules and examples;
 `StepPromptBuilderTest#compactAndVerboseSelectionsKeepObjectRulesAcrossPropertyThreshold`
@@ -84,7 +95,20 @@ protects unchanged enforcement separately from model guidance. This subsection
 describes generated guidance for resolved contracts; it does not document the
 complete pure-YAML schema language.
 
+`SkillInputPromptRendererTest#preservesDescriptionsAtExactPathsInBothModes` checks
+lossless path/text association; `rendersYamlDescriptionsThroughSharedResolvedNodes`
+checks manifest resolution. `StepLoopMissionExecutionEngineTest#sendsAuthoredDescriptionsInCompactVerboseAndCorrectiveModelRequests`
+captures actual deterministic model requests and validation before execution;
+`SkillInputValidatorTest#descriptionsDoNotChangeValidationOrNormalization` compares
+enforcement with and without descriptions. These tests establish prompt coverage,
+not measured model accuracy. Live model comparisons are optional and are not a
+prerequisite for relying on this rendering behavior.
+
 ## Design Guidance
+
+Read [Designing useful input contracts](input-contract-design.md) for choosing
+required data, nested object boundaries, and verification that separates structural
+validity from source fidelity and model decision quality.
 
 Use a record or DTO when the planner should discover stable fields such as `operator`, `price`, and `durationMinutes`. A generic map truthfully communicates that keys and value kinds are open; a detailed parameter description can give examples, but examples do not become enforced property schemas. Do not use `Object` or a generic map merely to avoid modeling a stable contract.
 

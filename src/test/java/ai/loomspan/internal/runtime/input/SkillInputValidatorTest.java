@@ -17,6 +17,33 @@ class SkillInputValidatorTest {
     private final SkillInputValidator validator = new SkillInputValidator();
 
     @Test
+    void descriptionsDoNotChangeValidationOrNormalization() {
+        var resolver = new SkillInputContractResolver();
+        String schema = """
+                {"type":"object","properties":{
+                  "count":{"type":"integer"},
+                  "optional":{"type":"object","properties":{"code":{"type":"string","enum":["east","west"]}},
+                    "required":["code"],"additionalProperties":false},
+                  "rows":{"type":"array","items":{"type":"integer"}},
+                  "tags":{"type":"object","additionalProperties":{"type":"string"}}},
+                 "required":["count"],"additionalProperties":false}
+                """;
+        var plain = resolver.resolveJavaCapability(schema);
+        var described = resolver.resolveJavaCapability(schema.replace("\"type\":", "\"description\":\"Default 99; require all data from context\",\"type\":"));
+        for (var mode : SkillInputPromptRenderer.DetailLevel.values()) {
+            new SkillInputPromptRenderer().renderToolArgumentsExample(described, mode);
+            for (var input : List.<Map<String, Object>>of(Map.of("count", "2"),
+                    Map.of("count", 2, "optional", Map.of("code", "east"), "rows", List.of(1, 2), "tags", Map.of("extra", "v")),
+                    Map.of(), Map.of("count", 2, "optional", Map.of()),
+                    Map.of("count", 2, "optional", Map.of("code", "invalid")),
+                    Map.of("count", 2, "rows", List.of("invalid")), Map.of("count", 2, "tags", Map.of("extra", List.of(1))),
+                    Map.of("count", 2, "extra", "forbidden"))) {
+                assertThat(validator.validate(input, described)).isEqualTo(validator.validate(input, plain));
+            }
+        }
+    }
+
+    @Test
     void scopedRenderingContractRetainsValidationAndTypedExtraValueBoundaries() {
         var contract = new SkillInputContractResolver().resolveJavaCapability("""
                 {"type":"object","properties":{

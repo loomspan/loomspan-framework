@@ -966,6 +966,62 @@ class StepLoopMissionExecutionEngineTest {
     }
 
     @Test
+    void sendsAuthoredDescriptionsInCompactVerboseAndCorrectiveModelRequests() {
+        for (boolean complex : List.of(false, true)) {
+            String schema = complex ? """
+                    {"type":"object","description":"Root meaning","properties":{
+                      "optional":{"type":"object","description":"Optional container","properties":{
+                        "rows":{"type":"array","description":"Rows","items":{"type":"object","description":"Each record",
+                          "properties":{"literal.dot":{"type":"string","description":"Line one\\nLine two; `units`"}},
+                          "required":["literal.dot"],"additionalProperties":{"type":"string","description":"Additional value"}}}},
+                        "required":["rows"],"additionalProperties":false},
+                      "count":{"type":"integer","description":"Number of records"}},
+                     "required":["count"],"additionalProperties":false}
+                    """ : """
+                    {"type":"object","description":"Root meaning","properties":{
+                      "count":{"type":"integer","description":"Number of records"}},
+                     "required":["count"],"additionalProperties":false}
+                    """;
+            var validArguments = Map.<String, Object>of("count", 2);
+            SequenceChatClient client = new SequenceChatClient(
+                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
+                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{\"count\":2}}",
+                    "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
+            AtomicInteger calls = new AtomicInteger();
+            BoundCapability tool = new BoundCapability(toolWithSchema("invoiceParser", schema, "unused").metadata(),
+                    (arguments, taskId) -> {
+                        assertThat(client.systemMessagesSeen()).hasSize(2);
+                        assertThat(arguments).isEqualTo(validArguments);
+                        calls.incrementAndGet();
+                        return "accepted";
+                    });
+            var state = new DefaultExecutionStateService(FIXED_CLOCK);
+            var planning = new InitializingPlanningService(state, singleTaskPlan());
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("description-correction-" + complex, "test.entry", 3);
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                assertThat(executeMission(engine(state, planning, executor), session, definition(), "Supply records", null, client, List.of(tool)))
+                        .isEqualTo("Finished");
+            }
+            assertThat(calls).hasValue(1);
+            for (String system : client.systemMessagesSeen().subList(0, 2)) {
+                assertThat(system).contains("Description at \"$\": \"Root meaning\"",
+                        "Description at \"$.count\": \"Number of records\"", "Required fields: [count]");
+                if (complex) assertThat(system).contains(
+                        "Description at \"$.optional\": \"Optional container\"",
+                        "Description at \"$.optional.rows\": \"Rows\"",
+                        "Description at \"$.optional.rows[]\": \"Each record\"",
+                        "Description at \"$.optional.rows[].*\": \"Additional value\"",
+                        "Description at \"$.optional.rows[][\\\"literal.dot\\\"]\": \"Line one\\nLine two; `units`\"",
+                        "Required child fields do not require an optional parent");
+            }
+            if (complex) assertThat(client.systemMessagesSeen().getFirst()).contains("`$.count` must be a integer");
+            else assertThat(client.systemMessagesSeen().getFirst()).doesNotContain("`$.count` must be a integer");
+            assertThat(client.systemMessagesSeen().get(1)).contains("YOUR PREVIOUS ACTION WAS INVALID", "`$.count` must be a integer");
+            assertThat(client.systemMessagesSeen().getLast()).doesNotContain("Description at");
+        }
+    }
+
+    @Test
     void preservesScopedGuidanceAndEvidenceThroughObjectBoundaryCorrection() {
         String schema = """
                 {"type":"object","properties":{

@@ -9,6 +9,82 @@ class SkillInputPromptRendererTest
     private final SkillInputContractResolver resolver = new SkillInputContractResolver();
 
     @Test
+    void preservesDescriptionsAtExactPathsInBothModes()
+    {
+        String multiline = "  Units: ms; `literal.*[]` and \"quotes\".\nKeep this line.\r\nBackslash: \\  ";
+        var properties = new java.util.LinkedHashMap<String, Object>();
+        properties.put("optional", java.util.Map.of("type", "object", "description", "Optional container",
+                "properties", java.util.Map.of("value", java.util.Map.of("type", "string", "description", multiline)),
+                "required", java.util.List.of("value"), "additionalProperties", false));
+        properties.put("rows", java.util.Map.of("type", "array", "description", "Rows", "items",
+                java.util.Map.of("type", "array", "items", java.util.Map.of("type", "object", "description", "Each record",
+                        "additionalProperties", java.util.Map.of("type", "string", "description", "Additional value")))));
+        properties.put("literal.dot", java.util.Map.of("type", "string", "description", "Literal key"));
+        properties.put("literal", java.util.Map.of("type", "object", "properties",
+                java.util.Map.of("dot", java.util.Map.of("type", "string", "description", "Nested key"))));
+        properties.put("tick`\"\\\n[]*", java.util.Map.of("description", "Unconstrained value"));
+        properties.put("absent", java.util.Map.of("type", "string"));
+        properties.put("blank", java.util.Map.of("type", "string", "description", " \n\t"));
+        var json = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().planningJson();
+        var contract = resolver.resolveJavaCapability(json.writeValueAsString(java.util.Map.of(
+                "type", "object", "description", "Root meaning", "properties", properties, "additionalProperties", false)));
+        var expected = java.util.Map.of("$", "Root meaning", "$.optional", "Optional container", "$.optional.value", multiline,
+                "$.rows", "Rows", "$.rows[][]", "Each record", "$.rows[][].*", "Additional value",
+                "$[\"literal.dot\"]", "Literal key", "$.literal.dot", "Nested key",
+                "$[" + json.writeValueAsString("tick`\"\\\n[]*") + "]", "Unconstrained value");
+        for (var mode : SkillInputPromptRenderer.DetailLevel.values())
+        {
+            String rendered = renderer.renderToolArgumentsExample(contract, mode);
+            var actual = new java.util.LinkedHashMap<String, String>();
+            rendered.lines().filter(line -> line.startsWith("Description at ")).forEach(line -> {
+                var pair = json.readTree("[" + line.substring("Description at ".length()).replaceFirst(": ", ",") + "]");
+                assertThat(actual.put(pair.get(0).asText(), pair.get(1).asText())).isNull();
+            });
+            assertThat(actual).containsExactlyInAnyOrderEntriesOf(expected);
+            assertThat(rendered).contains("Optional declared fields:", "Required child fields do not require an optional parent",
+                    "Descriptions explain meaning; they do not add validation rules, defaults, data bindings",
+                    "Only these fields are allowed: [value]");
+        }
+    }
+
+    @Test
+    void rendersYamlDescriptionsThroughSharedResolvedNodes()
+    {
+        var root = new ai.loomspan.internal.skill.YamlSkillManifest.InputSchemaManifest();
+        root.setType("object");
+        root.setDescription("YAML root");
+        var child = new ai.loomspan.internal.skill.YamlSkillManifest.InputSchemaManifest();
+        child.setType("string");
+        child.setDescription("YAML field");
+        root.setProperties(java.util.Map.of("field", child));
+        var contract = new SkillInputContract(SkillInputContract.SkillInputContractKind.YAML_EXPLICIT, resolver.fromManifest(root));
+        for (var mode : SkillInputPromptRenderer.DetailLevel.values())
+        {
+            assertThat(renderer.renderToolArgumentsExample(contract, mode))
+                    .contains("Description at \"$\": \"YAML root\"", "Description at \"$.field\": \"YAML field\"");
+        }
+    }
+
+    @Test
+    void leavesUndescribedAndGenericGuidanceUnchangedAndDescribesNoArgumentRoot()
+    {
+        for (var mode : SkillInputPromptRenderer.DetailLevel.values())
+        {
+            assertThat(renderer.renderToolArgumentsExample(resolver.resolveJavaCapability(
+                    "{\"type\":\"object\",\"additionalProperties\":false}"), mode))
+                    .isEqualTo("{}\n(Note: This tool takes no arguments. You must pass an empty object.)");
+            assertThat(renderer.renderToolArgumentsExample(resolver.resolveJavaCapability(
+                    "{\"type\":\"object\",\"description\":\"Nothing to supply\",\"additionalProperties\":false}"), mode))
+                    .contains("must pass an empty object", "Description at \"$\": \"Nothing to supply\"");
+            assertThat(renderer.renderToolArgumentsExample(resolver.resolveFromToolSchema(
+                    "{\"type\":\"object\",\"description\":\"Generic\"}"), mode)).isEmpty();
+            assertThat(renderer.renderToolArgumentsExample(resolver.resolveJavaCapability(
+                    "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}"), mode))
+                    .doesNotContain("Authored descriptions", "Description at");
+        }
+    }
+
+    @Test
     void scopesClosedRootAndOpenChildInBothModes()
     {
         var contract = resolver.resolveJavaCapability("""
