@@ -47,7 +47,7 @@ class ObservabilityJsonCodecContractTest
     void skillDetailsRoundTripWithOnlyApplicableSourceFields() throws Exception
     {
         var java = new ai.loomspan.internal.observability.web.dto.ObservabilityDtos.SkillDetail(
-                "Lookup", "JAVA", null, "lookupBean", "example.Lookup.find(java.lang.String)", null);
+                "Lookup", "JAVA", null, "lookupBean", "example.Lookup.find(java.lang.String)", null, null);
         String encoded = new String(codec.write(java), StandardCharsets.UTF_8);
         assertThat(encoded).contains("\"source\":\"JAVA\"", "\"beanName\":\"lookupBean\"")
                 .doesNotContain("sourcePath", "yaml");

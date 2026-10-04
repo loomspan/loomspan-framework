@@ -216,7 +216,7 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
                 .resolve(method, targetClass);
         CapabilityMetadata metadata = new CapabilityMetadata(location, name, capabilityDescription,
                 SkillExecutionDescriptor.none(), policy, invoker, CapabilityKind.JAVA_SKILL,
-                new CapabilityToolDescriptor(name, capabilityDescription, inputSchema),
+                new CapabilityToolDescriptor(name, capabilityDescription, inputSchema, null),
                 inputContractResolver.resolveJavaCapability(inputSchema),
                 new SkillSource(null, beanName, method.toGenericString()));
         CapabilityMetadata existing = capabilitiesByName.putIfAbsent(name, metadata);

@@ -47,6 +47,7 @@ const ALL_KINDS: ActivityKind[] = [
   "TOOL_CALL_STARTED",
   "TOOL_CALL_COMPLETED",
   "TOOL_CALL_FAILED",
+  "RESULT_FORWARDED",
   "STEP_STARTED",
   "STEP_ACTION_REJECTED",
   "STEP_COMPLETED",
@@ -302,4 +303,15 @@ describe("formatDelta", () => {
   it("returns nothing on an unparseable timestamp", () => {
     expect(formatDelta("invalid", "2026-07-25T12:00:00Z")).toBeNull();
   });
+});
+
+it("shows the authoritative forwarding parent, plan and selected child task", () => {
+  const activity = makeActivity("RESULT_FORWARDED", {
+    skillName: "parent", planId: "plan-selected", linkedTaskId: "task-selected", capabilityName: "child",
+  });
+  expect(presentActivity(activity).headline).toBe("child");
+  expect(factValue(activity, "parent")).toBe("parent");
+  expect(factValue(activity, "plan")).toBe("plan-selected");
+  expect(factValue(activity, "task")).toBe("task-selected");
+  expect(presentActivity(activity).isTerminal).toBe(false);
 });

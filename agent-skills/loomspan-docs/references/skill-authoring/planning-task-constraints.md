@@ -49,6 +49,10 @@ A child with a positive effective minimum MUST already be in the authorized visi
 
 On the first count violation, Loomspan records `PLAN_VALIDATION_FAILED`, adds feedback with the exact child, bound, and actual count, records `PLAN_RETRY_REQUESTED`, and makes one corrective planning attempt. Count feedback composes with evidence-coverage feedback in that same retry. If either validator still fails, planning terminates before `PLAN_CREATED`, plan storage, or execution. Minimum and maximum failures use `PLAN_TASK_MINIMUM_NOT_MET` and `PLAN_TASK_MAXIMUM_EXCEEDED`.
 
+## Designated result task
+
+With `output_from: {skill: finish}`, the selected exact direct child MUST have explicit `required: true` and `max_tasks: 1`; a minimum alone does not satisfy this declaration. This makes the accepted plan's designated task unique while retaining ordinary visibility preflight and combined one-correction validation. It does not skip other accepted work or replace execution-time authorization. Read [output contracts](output-contracts.md) for applicability, forbidden parent output policies, completion and schema metadata.
+
 ## Boundary from evidence
 
 Task constraints express unconditional generated-plan cardinality. Property-level `evidence` expressions express which successful direct children must support a particular output claim. Task constraints do not alter the evidence expression language or truth sets, and evidence does not imply a general minimum or maximum for an allowed child. Read [evidence-contracts.md](evidence-contracts.md) when output supportability is the requirement.

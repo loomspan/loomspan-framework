@@ -232,3 +232,21 @@ test("resets diff expansion when source, generation, or record evidence disappea
   view.rerender(<TraceRecords {...props} source="IMPORTED" scopeGeneration={2} />);
   expect(screen.queryByRole("region", { name: "Plan diff for record 7" })).toBeNull();
 });
+
+test("shows authoritative forwarding details without inventing a final model response", () => {
+  const value = { ...record("RESULT_FORWARDED"), frameType: "ROOT_MISSION",
+    resultForwarding: { skillName: "parent", planId: "plan-1", linkedTaskId: "<selected-task>", capabilityName: "child" } };
+  renderRecord(value);
+  fireEvent.click(screen.getByRole("button", { name: "Forwarding details" }));
+  const detail = screen.getByRole("region", { name: "Forwarding details for record 7" });
+  expect(detail).toHaveTextContent("parent");
+  expect(detail).toHaveTextContent("plan-1");
+  expect(detail).toHaveTextContent("<selected-task>");
+  expect(detail).toHaveTextContent("child");
+  expect(detail.querySelector("selected-task")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Response" })).toBeNull();
+  expect(getRawRecordRangeMock).not.toHaveBeenCalled();
+  expect(getTraceRecordsMock).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Hide forwarding details" }));
+  expect(screen.queryByRole("region", { name: "Forwarding details for record 7" })).toBeNull();
+});

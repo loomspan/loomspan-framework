@@ -161,7 +161,7 @@ class SpringAiChatClientAssemblerIntegrationTest
         CapabilityMetadata metadata = new CapabilityMetadata("test:lookup", "lookup", "Look up",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), ignored -> null, CapabilityKind.YAML_SKILL,
                 new CapabilityToolDescriptor("lookup", "Look up",
-                        "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}"),
+                        "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}", null),
                 SkillInputContract.genericObject(), null);
         return new BoundCapability(metadata, (arguments, task) -> {
             executions.incrementAndGet();

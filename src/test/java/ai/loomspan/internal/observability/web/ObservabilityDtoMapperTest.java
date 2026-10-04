@@ -76,7 +76,7 @@ class ObservabilityDtoMapperTest
     void skillProjectionUsesApiRootRelativeLinkAndUnchangedYaml()
     {
         String yaml = "# comment\r\nname: Check Dns\r\n";
-        RegisteredSkillEntry file = new RegisteredSkillEntry("Check Dns", "YAML", "classpath:/skills/check.yaml", null, null, yaml);
+        RegisteredSkillEntry file = new RegisteredSkillEntry("Check Dns", "YAML", "classpath:/skills/check.yaml", null, null, yaml, null);
         assertThat(mapper.skill(file.summary()).href()).isEqualTo("skills/Check%20Dns");
         assertThat(mapper.skill(file).yaml()).isEqualTo(yaml);
     }

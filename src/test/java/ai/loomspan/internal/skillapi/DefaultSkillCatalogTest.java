@@ -58,6 +58,6 @@ class DefaultSkillCatalogTest
     {
         return new CapabilityMetadata("test:" + name + ":" + kind, name, "Description " + name,
                 SkillExecutionDescriptor.none(), accessPolicy, arguments -> "ok", kind,
-                new CapabilityToolDescriptor(name, "Description " + name, schema), null);
+                new CapabilityToolDescriptor(name, "Description " + name, schema, null), null);
     }
 }

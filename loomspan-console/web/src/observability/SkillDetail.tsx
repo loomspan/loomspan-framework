@@ -78,6 +78,11 @@ export function SkillDetailView() {
             </div>}
           </dl>
 
+          <section className="view-subsection" aria-labelledby="skill-output-schema-title">
+            <h3 id="skill-output-schema-title">Effective output schema</h3>
+            <p className="observability-note">Generation metadata. Validation belongs to the skill that produces the result.</p>
+            {detail.outputSchema === null ? <p>Unspecified</p> : <pre className="yaml-block" aria-label="Effective output schema">{detail.outputSchema}</pre>}
+          </section>
           {detail.source !== "JAVA" && <section className="view-subsection" aria-labelledby="skill-yaml-title">
             <h3 id="skill-yaml-title">Skill YAML</h3>
             <pre className="yaml-block" aria-label="Skill YAML source">{detail.yaml}</pre>

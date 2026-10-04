@@ -416,6 +416,18 @@ record and renders its arguments and linked task ID as inert text. Task purpose
 belongs to the authoritative **Plans** view; Records does not parse raw plan
 history to reconstruct a task title.
 
+## Designated-child completion
+
+`RESULT_FORWARDED` records a successful explicit `output_from` decision at the parent mission after all accepted work succeeds and before its mission frame closes. It identifies the parent `skillName`, `planId`, selected accepted `linkedTaskId`, and direct-child `capabilityName`. Use these authoritative coordinates rather than inferring forwarding from a missing model response or completion order. Live activity and the derived execution journal identify the same forwarding decision.
+
+Live scalar details retain the existing 256-code-point preview bound; a long task ID may therefore be truncated, including to whitespace when its nonblank suffix lies beyond that bound. Use the canonical forwarding record for the complete exact identity. The canonical trace and returned result remain unchanged.
+
+No parent final-synthesis step, `FINAL_RESPONSE`, model request/response, provider usage, or parent final-validation event is invented. Producing-child model/validation facts remain attributed to that child. The existing canonical tool result contains the returned text; provenance need not duplicate it. Failed or cancelled work produces no successful forwarding decision and no fallback synthesis.
+
+Console skill detail exposes the generation's effective `outputSchema` metadata separately from unchanged original YAML. Null means unspecified. Inherited shape does not imply parent validation or inherited child evidence. Read [output contracts](output-contracts.md) for declaration and ownership.
+
+`StepLoopMissionExecutionEngineTest`, `ExecutionJournalProjectorTest`, `LiveActivityProjectorTest`, and the Java-written `ConsoleTraceFixtureCorpusTest`, `ConsoleRestFixtureCorpusTest` and `ConsoleSseFixtureCorpusTest` with Console readers protect the decision, identity and current-version boundary. Same-version portability and ordinary access restrictions continue to apply.
+
 ## Terminal outcome and failures
 
 The final trace record carries one outcome: `SUCCEEDED`, `FAILED`, or `ABORTED`, plus the authoritative terminal session-usage snapshot. A failed or aborted completion has a `terminalFailureId` that links to the corresponding `ERROR_RECORDED` fact. Success has no terminal failure ID. Earlier nonterminal errors can coexist with a successful outcome.

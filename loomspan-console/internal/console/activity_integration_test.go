@@ -468,3 +468,53 @@ func (credential testCredential) Apply(request *http.Request) error {
 	request.Header.Set(applicationclient.APIKeyHeader, string(credential))
 	return nil
 }
+
+func TestCommittedForwardingActivityPreservesAuthoritativeTaskIdentity(t *testing.T) {
+	const instanceID = "11111111-1111-4111-8111-111111111111"
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "loomspan-console-fixtures", "application-sse", "activity-result-forwarded.sse"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set(applicationclient.InstanceIDHeader, instanceID)
+		response.Header().Set("Content-Type", "text/event-stream")
+		handshake := "event: handshake\ndata: {\"instanceId\":\"" + instanceID + "\",\"observedAt\":\"2026-07-25T12:00:00Z\",\"afterCursor\":\"0\"}\n\n"
+		_, _ = response.Write([]byte(handshake))
+		_, _ = response.Write(fixture)
+	}))
+	defer server.Close()
+	address, _ := applicationclient.NormalizeAddress(server.URL)
+	client, _ := applicationclient.New(address, applicationclient.NetworkPolicy{ConnectTimeout: time.Second, ResponseHeaderTimeout: time.Second, RequestTimeout: time.Second}, "1.0.0-beta.8-SNAPSHOT")
+	defer client.Close()
+	stream, err := client.OpenActivity(context.Background(), instanceID, "0", testCredentialValue())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+	if _, err := stream.Next(); err != nil {
+		t.Fatal(err)
+	}
+	forwarded, err := stream.Next()
+	if err != nil || forwarded.Event != "activity" {
+		t.Fatalf("forwarding frame=%#v err=%v", forwarded, err)
+	}
+	var activity live.Activity
+	if err := json.Unmarshal(forwarded.Data, &activity); err != nil {
+		t.Fatal(err)
+	}
+	if err := activity.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if activity.Kind != live.KindResultForwarded {
+		t.Fatalf("kind=%s", activity.Kind)
+	}
+	var details map[string]string
+	if err := json.Unmarshal(activity.Details, &details); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"skillName", "planId", "linkedTaskId", "capabilityName"} {
+		if strings.TrimSpace(details[field]) == "" {
+			t.Fatalf("missing forwarding %s", field)
+		}
+	}
+}

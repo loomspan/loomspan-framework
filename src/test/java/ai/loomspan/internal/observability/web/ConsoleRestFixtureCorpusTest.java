@@ -158,12 +158,17 @@ class ConsoleRestFixtureCorpusTest
                         null, null, "skills/FetchDns"), new ObservabilityDtos.SkillSummary(
                 "LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", "skills/LookupDns")), false, null, OBSERVED));
         result.put("skill-detail.json", new ObservabilityDtos.SkillDetail(
-                "CheckDns", "YAML", "classpath:/skills/check-dns.yaml", null, null, "# DNS check\r\nname: CheckDns\r\n"));
+                "CheckDns", "YAML", "classpath:/skills/check-dns.yaml", null, null, "# DNS check\r\nname: CheckDns\r\n", null));
         result.put("skill-java-detail.json", new ObservabilityDtos.SkillDetail(
-                "LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", null));
+                "LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", null, null));
         result.put("skill-rest-detail.json", new ObservabilityDtos.SkillDetail(
                 "FetchDns", "REST", "opaque label", null, null,
-                "# REST DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application handler\r\nrest: true\r\n"));
+                "# REST DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application handler\r\nrest: true\r\n", null));
+        result.put("forwarding-skill-detail.json", new ObservabilityDtos.SkillDetail(
+                "prepareReport", "YAML", "opaque forwarding label", null, null,
+                "name: prepareReport\nmodel: local\ndescription: Prepare report\nplanning_mode: true\n"
+                        + "allowed_skills:\n  - {name: finishReport, required: true, max_tasks: 1}\noutput_from: {skill: finishReport}\n",
+                "{\"type\":\"object\",\"properties\":{\"report\":{\"type\":\"string\"}},\"required\":[\"report\"],\"additionalProperties\":false}"));
         result.put("active-executions-page.json",
                 new ObservabilityDtos.ActivePage(List.of(active), false, null, OBSERVED, "9"));
         result.put("active-execution-detail.json", active);

@@ -31,12 +31,10 @@ public final class ExecutionJournalProjector
     {
         // The journal is the single developer-facing projection we keep in the runtime.
         List<JournalEntry> entries = new ArrayList<>();
-        TraceRecord previousRecord = null;
 
         for (TraceRecord record : records == null ? List.<TraceRecord>of() : records)
         {
-            appendRecord(entries, previousRecord, record);
-            previousRecord = record;
+            appendRecord(entries, record);
         }
 
         return new ExecutionJournal(entries);
@@ -45,18 +43,16 @@ public final class ExecutionJournalProjector
     public ExecutionJournal project(ai.loomspan.internal.core.ExecutionTraceHandle traceHandle) throws java.io.IOException
     {
         List<JournalEntry> entries = new ArrayList<>();
-        final TraceRecord[] previousRecord = new TraceRecord[1];
 
         traceHandle.readRecords(record ->
         {
-            appendRecord(entries, previousRecord[0], record);
-            previousRecord[0] = record;
+            appendRecord(entries, record);
         });
 
         return new ExecutionJournal(entries);
     }
 
-    private void appendRecord(List<JournalEntry> entries, TraceRecord previousRecord, TraceRecord record)
+    private void appendRecord(List<JournalEntry> entries, TraceRecord record)
     {
         JournalEntry entry = toJournalEntry(record);
         if (entry != null)
@@ -76,6 +72,9 @@ public final class ExecutionJournalProjector
         {
             case FRAME_OPENED, FRAME_CLOSED -> skillLifecycleEntry(record);
             case MODEL_THOUGHT_CAPTURED -> entry(record, JournalLevel.INFO, JournalEntryType.THOUGHT, sanitize(record.data()));
+            case RESULT_FORWARDED -> entry(record, JournalLevel.INFO, JournalEntryType.RESULT_FORWARDED,
+                    Map.of("skillName", record.metadata().get("skillName"), "planId", record.metadata().get("planId"),
+                            "linkedTaskId", record.metadata().get("linkedTaskId"), "capabilityName", record.metadata().get("capabilityName")));
             case PLAN_CREATED -> entry(record, JournalLevel.INFO, JournalEntryType.PLAN_CREATED, sanitize(record.data()));
             case PLAN_UPDATED -> entry(record, JournalLevel.INFO, JournalEntryType.PLAN_UPDATED, sanitize(record.data()));
             case LINTER_RECORDED -> entry(record, JournalLevel.INFO, JournalEntryType.LINTER, sanitize(record.data()));

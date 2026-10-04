@@ -32,6 +32,7 @@ class LiveActivityProjectorTest
             TraceRecordType.MODEL_REQUEST_SENT,
             TraceRecordType.MODEL_RESPONSE_RECEIVED,
             TraceRecordType.MODEL_ATTEMPT_FAILED,
+            TraceRecordType.RESULT_FORWARDED,
             TraceRecordType.PLAN_CREATED,
             TraceRecordType.PLAN_UPDATED,
             TraceRecordType.PLAN_VALIDATION_FAILED,
@@ -45,6 +46,33 @@ class LiveActivityProjectorTest
             TraceRecordType.STEP_FAILED,
             TraceRecordType.ERROR_RECORDED,
             TraceRecordType.TRACE_COMPLETED);
+
+    @Test
+    void projectsForwardingWithoutParentModelAttribution() {
+        var state = state("session", "route");
+        var projector = new LiveActivityProjector();
+        Map<String, Object> identity = Map.of("skillName", "route", "planId", "parent-plan",
+                "linkedTaskId", "selected-task", "capabilityName", "producer");
+        var projection = projector.project(state, record(TraceRecordType.RESULT_FORWARDED, 1,
+                TraceFrameType.ROOT_MISSION, identity, null));
+        assertThat(projection.activity().kind()).isEqualTo(ExecutionActivityKind.RESULT_FORWARDED);
+        assertThat(projection.activity().details()).containsAllEntriesOf(identity);
+        assertThat(projection.activity().summary()).contains("producer", "selected-task");
+        assertThat(projection.snapshot().usage()).isEqualTo(SessionUsageSnapshot.empty());
+    }
+
+    @Test
+    void forwardingTaskPreviewRetainsExistingScalarBoundsWithoutChangingCanonicalIdentity() {
+        String taskId = " ".repeat(ExecutionObservationLimits.TEXT_CODE_POINTS) + "selected-task";
+        Map<String, Object> identity = Map.of("skillName", "route", "planId", "parent-plan",
+                "linkedTaskId", taskId, "capabilityName", "producer");
+        var canonical = record(TraceRecordType.RESULT_FORWARDED, 1,
+                TraceFrameType.ROOT_MISSION, identity, null);
+        var projection = new LiveActivityProjector().project(state("session", "route"), canonical);
+        assertThat(canonical.metadata().get("linkedTaskId")).isEqualTo(taskId);
+        assertThat(projection.activity().details().get("linkedTaskId"))
+                .isEqualTo(" ".repeat(ExecutionObservationLimits.TEXT_CODE_POINTS));
+    }
 
     @Test
     void sharedConcurrentFixtureMatchesEverySelectedActiveBranchPrefix() throws Exception

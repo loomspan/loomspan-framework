@@ -1061,6 +1061,7 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
               <div className="trace-record-actions">
               <button type="button" aria-expanded={isRawExpanded} aria-controls={`raw-detail-${record.sequence}`} onClick={() => handleToggleRaw(record)}>{isRawExpanded ? "Hide raw record" : "Read raw record"}</button>
               {contentRef && !isModelRecord && !isAttemptFailure && <button type="button" aria-expanded={isContentExpanded} aria-controls={`content-detail-${record.sequence}`} onClick={() => isContentExpanded ? onClearContent() : onContent(contentRef, record.sequence)}>{isContentExpanded ? "Hide content" : "Read content"}</button>}
+              {record.resultForwarding && <button type="button" aria-expanded={expanded === key + ":forwarding"} aria-controls={"forwarding-" + record.sequence} onClick={() => setExpanded(expanded === key + ":forwarding" ? null : key + ":forwarding")}>{expanded === key + ":forwarding" ? "Hide forwarding details" : "Forwarding details"}</button>}
               {record.type === "PLAN_UPDATED" && <button type="button" aria-expanded={isDiffExpanded} aria-controls={`plan-diff-${record.sequence}`} onClick={() => setExpanded(isDiffExpanded ? null : `${key}:diff`)}>{isDiffExpanded ? "Hide diff" : "View diff"}</button>}
               {record.plan && record.type === "PLAN_CREATED" && <button type="button" aria-label={`View finalized plan ${record.plan.planId} from record ${record.sequence}`} onClick={() => onSelectPlan?.(record.plan!.planId)}>View finalized plan</button>}
               {record.plan && record.type === "PLAN_UPDATED" && <button type="button" aria-label={`View plan change ${record.plan.planId} from record ${record.sequence}`} onClick={() => onSelectPlan?.(record.plan!.planId, record.sequence)}>View plan change</button>}
@@ -1089,6 +1090,16 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
               </div>
             </td>
           </tr>
+          {record.resultForwarding && expanded === key + ":forwarding" && <tr className="trace-record-detail-row"><td colSpan={5}>
+            <div id={"forwarding-" + record.sequence} className="trace-expanded" role="region" aria-label={"Forwarding details for record " + record.sequence}>
+              <dl className="trace-plan-fields">
+                <div><dt>Parent skill</dt><dd>{record.resultForwarding.skillName}</dd></div>
+                <div><dt>Plan</dt><dd>{record.resultForwarding.planId}</dd></div>
+                <div><dt>Selected task</dt><dd>{record.resultForwarding.linkedTaskId}</dd></div>
+                <div><dt>Child skill</dt><dd>{record.resultForwarding.capabilityName}</dd></div>
+              </dl>
+            </div>
+          </td></tr>}
           {isDiffExpanded && <tr className="trace-record-detail-row"><td colSpan={5}>
             <div id={`plan-diff-${record.sequence}`} className="trace-plan-diff trace-expanded" role="region" aria-label={`Plan diff for record ${record.sequence}`}>
               {record.plan && <p className="trace-plan-diff-heading">Skill: {record.plan.capabilityName}, Plan: <code>{record.plan.planId}</code></p>}

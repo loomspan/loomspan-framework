@@ -349,6 +349,16 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         ExecutionPlan acceptedPlan = executionStateService.currentPlan()
                 .orElseThrow(() -> new IllegalStateException(
                         "Plan disappeared before step-loop execution for skill '" + skillName + "'"));
+        String selectedSkill = definition.outputFromSkill();
+        PlanTask selectedTask = null;
+        if (selectedSkill != null) {
+            List<PlanTask> matches = acceptedPlan.tasks().stream()
+                    .filter(task -> selectedSkill.equals(task.capabilityName())).toList();
+            if (matches.size() != 1)
+                throw new IllegalStateException("Forwarding requires exactly one accepted direct task for '" + selectedSkill + "'");
+            selectedTask = matches.getFirst();
+        }
+        int finalSynthesisSlots = selectedTask == null ? 1 : 0;
         List<ExecutionUnit> units = ExecutionUnit.partition(acceptedPlan.tasks());
         Set<String> earlierTaskIds = new LinkedHashSet<>();
         int nextTaskStep = 1;
@@ -373,12 +383,13 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                 continue;
             }
 
-            if (nextTaskStep + unit.members().size() > maxSteps)
+            if (nextTaskStep - 1 + unit.members().size() + finalSynthesisSlots > maxSteps)
             {
                 IllegalStateException failure = new IllegalStateException("Step-loop exhausted %d steps for skill '%s' before the plan completed."
                         .formatted(maxSteps, skillName));
                 recordTerminalFailure(session, skillName, nextTaskStep, failure,
-                        "Step limit reached before the complete execution unit and final synthesis could be admitted.");
+                        "Step limit reached before the complete execution unit"
+                                + (finalSynthesisSlots == 1 ? " and final synthesis" : "") + " could be admitted.");
                 throw failure;
             }
             preflightUnit(session, skillName, unit, earlierTaskIds, nextTaskStep, visibleTools);
@@ -471,6 +482,30 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         lifecycle.requireOpenForNewWork(ExecutionBindingScope.requireCurrent());
         ExecutionPlan completedPlan = executionStateService.currentPlan()
                 .orElseThrow(() -> new IllegalStateException("Plan disappeared before final synthesis for skill '" + skillName + "'"));
+        if (selectedTask != null) {
+            PlanTask selected = selectedTask;
+            return ExecutionBindingScope.requireCurrent().requireWritable(() -> {
+                if (!acceptedPlan.planId().equals(completedPlan.planId()) || completedPlan.status() != PlanStatus.VALID
+                        || !skillName.equals(completedPlan.capabilityName())
+                        || completedPlan.tasks().size() != acceptedPlan.tasks().size()
+                        || acceptedPlan.tasks().stream().anyMatch(task -> completedPlan.findTask(task.taskId())
+                                .map(current -> current.status() != PlanTaskStatus.COMPLETED
+                                        || !Objects.equals(current.capabilityName(), task.capabilityName())).orElse(true)))
+                    throw new IllegalStateException("Forwarding requires the unchanged accepted plan and all tasks successfully completed");
+                for (PlanTask task : acceptedPlan.tasks()) {
+                    CompletedTaskResult retained = mission.completedTaskResult(task.taskId())
+                            .orElseThrow(() -> new IllegalStateException("Missing retained result for completed task '" + task.taskId() + "'"));
+                    if (!Objects.equals(task.capabilityName(), retained.skillName()))
+                        throw new IllegalStateException("Completed task result has an unexpected skill binding");
+                }
+                CompletedTaskResult result = mission.completedTaskResult(selected.taskId())
+                        .orElseThrow(() -> new IllegalStateException("Missing retained forwarding result for task '" + selected.taskId() + "'"));
+                if (!selectedSkill.equals(result.skillName()))
+                    throw new IllegalStateException("Retained forwarding result has an unexpected skill binding");
+                executionStateService.recordResultForwarded(session, skillName, completedPlan.planId(), selected.taskId(), selectedSkill);
+                return result.result();
+            });
+        }
         if (nextTaskStep > maxSteps)
         {
             IllegalStateException failure = new IllegalStateException("Step-loop exhausted %d steps for skill '%s' before the plan completed."

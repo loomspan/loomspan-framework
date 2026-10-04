@@ -45,7 +45,7 @@ class DefaultRegisteredSkillCatalogTest
         assertThat(catalog.find("alpha")).isEmpty();
         assertThat(catalog.registeredSkillCount()).isEqualTo(3);
         assertThat(catalog.find("JavaLookup").orElseThrow()).isEqualTo(new RegisteredSkillEntry(
-                "JavaLookup", "JAVA", null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null));
+                "JavaLookup", "JAVA", null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null, null));
     }
 
     @Test
@@ -98,6 +98,7 @@ class DefaultRegisteredSkillCatalogTest
         {
             var metadata = mock(CapabilityMetadata.class);
             when(metadata.name()).thenReturn(definition.manifest().getName());
+            when(metadata.tool()).thenReturn(ai.loomspan.internal.core.CapabilityToolDescriptor.generic(definition.manifest().getName(), "description"));
             when(metadata.kind()).thenReturn(definition.rest()
                     ? CapabilityKind.REST_SKILL
                     : CapabilityKind.YAML_SKILL);

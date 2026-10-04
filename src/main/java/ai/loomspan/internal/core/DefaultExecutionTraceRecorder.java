@@ -70,6 +70,20 @@ public final class DefaultExecutionTraceRecorder implements ExecutionTraceRecord
     }
 
     @Override
+    public void recordResultForwarded(LoomspanSession session, String skillName, String planId, String taskId, String capabilityName)
+    {
+        ExecutionBinding binding = requireBinding(session);
+        ExecutionFrame missionFrame = binding.branch().leafToRootSnapshot().stream()
+                .filter(frame -> frame.frameId().equals(binding.requireMission().missionFrameId())
+                        && frame.route().equals(skillName)
+                        && (frame.traceFrameType() == TraceFrameType.ROOT_MISSION || frame.traceFrameType() == TraceFrameType.SKILL_EXECUTION))
+                .findFirst().orElseThrow(() -> new IllegalStateException("Forwarding requires the parent mission frame"));
+        recordAgainstFrame(session, missionFrame, TraceRecordType.RESULT_FORWARDED, Map.of(
+                "skillName", requireNonBlank(skillName, "skillName"), "planId", requireNonBlank(planId, "planId"),
+                "linkedTaskId", requireNonBlank(taskId, "taskId"), "capabilityName", requireNonBlank(capabilityName, "capabilityName")), Map.of());
+    }
+
+    @Override
     public void recordPlanCreated(LoomspanSession session, ExecutionPlan plan, Map<String, Object> acceptedAttempt)
     {
         Map<String, Object> metadata = new LinkedHashMap<>();

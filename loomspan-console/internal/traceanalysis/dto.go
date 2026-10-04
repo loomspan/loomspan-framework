@@ -167,14 +167,23 @@ type ContentDescriptor struct {
 // RecordFacts contains typed facts whose recorded identifiers belong to this
 // canonical record. Arrays are always non-nil so absence remains explicit.
 type RecordFacts struct {
-	PlanUpdate    *PlanUpdate
-	Plan          *PlanReference
-	Attempts      []AttemptSummary
-	Retries       []RetrySummary
-	Validations   []ValidationSummary
-	Failures      []FailureSummary
-	Payloads      []PayloadDescriptor
-	SearchMatches []SearchResult
+	ResultForwarding *ResultForwarding
+	PlanUpdate       *PlanUpdate
+	Plan             *PlanReference
+	Attempts         []AttemptSummary
+	Retries          []RetrySummary
+	Validations      []ValidationSummary
+	Failures         []FailureSummary
+	Payloads         []PayloadDescriptor
+	SearchMatches    []SearchResult
+}
+
+// ResultForwarding is the producer's authoritative parent completion decision.
+type ResultForwarding struct {
+	SkillName      string `json:"skillName"`
+	PlanID         string `json:"planId"`
+	LinkedTaskID   string `json:"linkedTaskId"`
+	CapabilityName string `json:"capabilityName"`
 }
 
 type PlanReference struct {

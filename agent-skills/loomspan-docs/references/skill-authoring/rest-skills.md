@@ -27,7 +27,7 @@ rbac_roles: [ACCOUNT_READER]
 | `name`, `description` | Required under the shared YAML rules |
 | `rest` | Required and MUST be the Boolean `true`; omit it for non-REST YAML |
 | `input_schema`, `rbac_roles` | Optional |
-| `model`, `prompt`, `thinking_level`, `allowed_skills`, `planning_mode`, `concurrency`, `max_steps`, `linter`, `output_schema`, `output_schema_max_retries` | MUST be absent, including null or empty declarations |
+| `model`, `prompt`, `thinking_level`, `allowed_skills`, `planning_mode`, `concurrency`, `max_steps`, `linter`, `output_schema`, `output_schema_max_retries`, `output_from` | MUST be absent, including null or empty declarations |
 
 No input schema uses the existing generic object contract. Explicit schemas use the same validation and `ref://` resolution path as other skills. Business input is never inherited from a parent.
 
@@ -42,6 +42,10 @@ YAML `rbac_roles` applies normally. The captured caller authentication is instal
 When REST manifests exist, the application MUST provide exactly one `RestSkillHandler` bean. See [REST handler SPI](../java-api/rest-skills.md). With no REST manifests, handler beans are unused and do not trigger cardinality validation.
 
 Console lists the kind as `REST` and shows the source label and unchanged manifest text. For configured YAML, the label is derived from the resource path; for application-supplied YAML, it is the exact `SkillDocument.sourceName` and may be arbitrary nonblank text. The label is diagnostic only; manifest `name` remains the callable identity. The inspection wire field remains `sourcePath`. Console does not reveal handler internals or infer an endpoint. Framework and Console diagnostics require the exact coordinated project version; dual `development` versions only attempt ordinary complete validation.
+
+## Forwarded REST results
+
+A model-backed planning parent MAY designate this REST leaf with `output_from`, while the leaf itself MUST NOT declare it. The parent returns the handler's complete non-null text unchanged after all accepted work succeeds; it does not extract an envelope or validate the REST output. Effective output schema stays unspecified. Read [output contracts](output-contracts.md) for the parent declaration and restrictions. `DesignatedChildResultIntegrationTest` protects this facade boundary.
 
 ## Evidence
 

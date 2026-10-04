@@ -3,7 +3,7 @@ package ai.loomspan.api;
 import java.util.Objects;
 
 /** Read-only public metadata for a registered skill. */
-public record SkillDescriptor(String name, String description, SkillKind kind, String inputSchema)
+public record SkillDescriptor(String name, String description, SkillKind kind, String inputSchema, String outputSchema)
 {
     public SkillDescriptor
     {

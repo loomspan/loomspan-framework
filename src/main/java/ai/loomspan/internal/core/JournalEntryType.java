@@ -5,6 +5,7 @@ public enum JournalEntryType
     SKILL_STARTED,
     SKILL_FINISHED,
     THOUGHT,
+    RESULT_FORWARDED,
     PLAN_CREATED,
     PLAN_UPDATED,
     LINTER,

@@ -4,7 +4,7 @@ import java.util.Objects;
 
 /** Immutable source-specific diagnostic snapshot of one callable registration. */
 public record RegisteredSkillEntry(String registeredName, String source, String sourcePath,
-        String beanName, String method, String yaml)
+        String beanName, String method, String yaml, String outputSchema)
 {
     public RegisteredSkillEntry
     {

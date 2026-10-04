@@ -116,6 +116,7 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 	}
 	defer writer.abortRecordIndex()
 
+	forwardedResults := map[int64]*ResultForwarding{}
 	var completionRec *Record
 	var configuredLimits *ConfiguredLimits
 	var entrySkill string
@@ -146,6 +147,13 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 		if d := validator.onRecord(rec); d != nil {
 			return d
 		}
+		if rec.Type == RecordResultForwarded {
+			forwarded, valid := decodeResultForwarding(rec.Metadata)
+			if !valid {
+				return invalidityError(CategoryUnsupportedValue, scopeID)
+			}
+			forwardedResults[rec.Sequence] = forwarded
+		}
 		lastSeq = rec.Sequence
 		if rec.Type == RecordTraceStarted {
 			var valid bool
@@ -155,7 +163,9 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 			}
 			entrySkill, _ = extractEntrySkill(rec)
 			generationID, valid = extractGenerationID(rec)
-			if !valid { return invalidityError(CategoryUnsupportedValue, scopeID) }
+			if !valid {
+				return invalidityError(CategoryUnsupportedValue, scopeID)
+			}
 		}
 
 		// Record-address index row.
@@ -350,6 +360,11 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 	}
 	payloadResults := payloadIndexRows(assembler)
 	recordFacts := buildPersistedRecordFacts(plans.references(), plans.updates(), attemptResults, retryResults, validationLinks, failureResults, payloadResults)
+	for sequence, forwarding := range forwardedResults {
+		facts := recordFacts[sequence]
+		facts.ResultForwarding = forwarding
+		recordFacts[sequence] = facts
+	}
 
 	// Write immutable indexes.
 	if d := writer.flushRecordIndex(); d != nil {
@@ -453,7 +468,7 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 		Metadata: artifact.TraceMetadata{
 			TraceID: validator.traceID, SessionID: validator.sessionID,
 			EntrySkill: entrySkill, GenerationID: generationID,
-			Outcome:    string(outcome), FinalizedAt: completionRec.Timestamp,
+			Outcome: string(outcome), FinalizedAt: completionRec.Timestamp,
 			PersistencePolicy: completionRec.metadataStringOrEmpty("persistencePolicy"),
 		},
 	}, nil
@@ -503,11 +518,17 @@ func extractEntrySkill(rec *Record) (string, bool) {
 
 func extractGenerationID(rec *Record) (string, bool) {
 	fields, ok := decodeUniqueObject(rec.Metadata)
-	if !ok { return "", false }
+	if !ok {
+		return "", false
+	}
 	raw, ok := fields["generationId"]
-	if !ok || bytes.Equal(raw, nullBytes) { return "", false }
+	if !ok || bytes.Equal(raw, nullBytes) {
+		return "", false
+	}
 	var value string
-	if json.Unmarshal(raw, &value) != nil || strings.TrimSpace(value) == "" { return "", false }
+	if json.Unmarshal(raw, &value) != nil || strings.TrimSpace(value) == "" {
+		return "", false
+	}
 	return value, true
 }
 

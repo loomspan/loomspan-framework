@@ -1659,7 +1659,7 @@ class ExecutionCoordinatorTest {
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
-                new CapabilityToolDescriptor("allowedVisibleSkill", "child", methodSchema), null);
+                new CapabilityToolDescriptor("allowedVisibleSkill", "child", methodSchema, null), null);
 
         ExecutionStateService stateService = fixedStateService();
         PlanningService planningService = fixedPlanningService(stateService);

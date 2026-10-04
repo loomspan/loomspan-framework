@@ -37,12 +37,12 @@ public final class DefaultRegisteredSkillCatalog implements RegisteredSkillCatal
                 entry = new RegisteredSkillEntry(name,
                         metadata.kind().publicKind().name(),
                         pathResolver.resolve(definition.source()),
-                        null, null, decode(definition.source().bytes(), name));
+                        null, null, decode(definition.source().bytes(), name), metadata.tool().outputSchema());
             }
             else if (metadata.kind() == CapabilityKind.JAVA_SKILL)
             {
                 entry = new RegisteredSkillEntry(name, metadata.kind().publicKind().name(), null,
-                        metadata.source().beanName(), metadata.source().method(), null);
+                        metadata.source().beanName(), metadata.source().method(), null, null);
             }
             else throw new IllegalStateException("Unsupported capability kind " + metadata.kind());
             if (built.putIfAbsent(name, entry) != null)

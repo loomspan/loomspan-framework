@@ -131,7 +131,7 @@ export type SkillSummary = SkillLocation & {
   href?: string;
 };
 
-export type SkillDetail = { targetScopeId: string; registeredName: string } & (
+export type SkillDetail = { targetScopeId: string; registeredName: string; outputSchema: string | null } & (
   | { source: "YAML"; sourcePath: string; yaml: string; beanName?: never; method?: never }
   | { source: "REST"; sourcePath: string; yaml: string; beanName?: never; method?: never }
   | { source: "JAVA"; beanName: string; method: string; sourcePath?: never; yaml?: never }
@@ -293,7 +293,7 @@ export type TraceRecord = {
   sequence: number; type: string; failureId?: string; validationStatus?: string; frameId: string; parentFrameId: string;
   frameType: string; route: string; threadName: string; timestampMillis: number;
   representation: string; isChunk: boolean; isEnvelope: boolean;
-  content?: TraceContentDescriptor; plan?: PlanReference; planUpdate?: PlanUpdate;
+  content?: TraceContentDescriptor; resultForwarding?: { skillName: string; planId: string; linkedTaskId: string; capabilityName: string }; plan?: PlanReference; planUpdate?: PlanUpdate;
 };
 export type TraceContentDescriptor = { role: "DATA" | "RECONSTRUCTED" | "DIAGNOSTIC"; contentType: string; encoding: "UTF8" | "BINARY"; retainedBytes: number; available: boolean; complete: boolean; inlineEligibility: boolean; inlineOmission?: "PER_VALUE_LIMIT" | "AGGREGATE_LIMIT" | "UNAVAILABLE" | "INCOMPLETE"; contentRef?: string; inlineContent?: string };
 export type PlanFieldChange = { taskId?: string; field: "status" | "note"; before: string | null; after: string | null };
@@ -368,6 +368,7 @@ export type ActivityKind =
   | "TOOL_CALL_STARTED"
   | "TOOL_CALL_COMPLETED"
   | "TOOL_CALL_FAILED"
+  | "RESULT_FORWARDED"
   | "STEP_STARTED"
   | "STEP_ACTION_REJECTED"
   | "STEP_COMPLETED"
@@ -390,6 +391,7 @@ export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
   TOOL_CALL_STARTED: "Tool call started",
   TOOL_CALL_COMPLETED: "Tool call completed",
   TOOL_CALL_FAILED: "Tool call failed",
+  RESULT_FORWARDED: "Result forwarded",
   STEP_STARTED: "Step started",
   STEP_ACTION_REJECTED: "Step action rejected",
   STEP_COMPLETED: "Step completed",

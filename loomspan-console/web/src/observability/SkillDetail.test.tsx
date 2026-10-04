@@ -61,6 +61,7 @@ test("stale skill deep link resets before requesting the identifier", async () =
 test("skill detail renders sourcePath as plain text and yaml inside pre element", async () => {
   const yamlWithHtml = `<script>alert("xss")</script>\n# Skill YAML\nname: CheckDns`;
   vi.mocked(getSkillDetail).mockResolvedValue({
+    outputSchema: null,
     targetScopeId: "scope-1",
     registeredName: "CheckDns",
     source: "YAML", sourcePath: "/skills/check_dns.yaml",
@@ -96,6 +97,7 @@ test("skill detail renders error state", async () => {
 
 test("skill detail sourcePath is not a clickable link", async () => {
   vi.mocked(getSkillDetail).mockResolvedValue({
+    outputSchema: null,
     targetScopeId: "scope-1",
     registeredName: "CheckDns",
     source: "YAML", sourcePath: "opaque <label>",
@@ -114,6 +116,7 @@ test("skill detail sourcePath is not a clickable link", async () => {
 test("REST skill detail shows distinct label, path, and unchanged manifest", async () => {
   const yaml = "name: CheckDns\nrest: true\n# https://handler.example is inert text";
   vi.mocked(getSkillDetail).mockResolvedValue({
+    outputSchema: null,
     targetScopeId: "scope-1", registeredName: "CheckDns", source: "REST",
     sourcePath: "/skills/check_dns.yaml", yaml,
   });
@@ -127,6 +130,7 @@ test("REST skill detail shows distinct label, path, and unchanged manifest", asy
 
 test("Java skill details show bean and declared method without YAML content", async () => {
   vi.mocked(getSkillDetail).mockResolvedValue({
+    outputSchema: null,
     targetScopeId: "scope-1", registeredName: "CheckDns", source: "JAVA",
     beanName: "dnsSkills", method: "public java.lang.String example.Dns.lookup(java.lang.String)",
   });
@@ -138,4 +142,17 @@ test("Java skill details show bean and declared method without YAML content", as
   expect(screen.getByText("example.Dns.lookup()").closest("dl")).toHaveClass("java-skill-detail-facts");
   expect(screen.queryByText("Skill YAML")).not.toBeInTheDocument();
   expect(screen.queryByText("Source label")).not.toBeInTheDocument();
+});
+
+test("shows effective schema as inert metadata without modifying original YAML", async () => {
+  const outputSchema = JSON.stringify({ type: "object", description: "<script>schema</script>", properties: { answer: { type: "string" } } });
+  vi.mocked(getSkillDetail).mockResolvedValue({
+    targetScopeId: "scope-1", registeredName: "CheckDns", source: "YAML", sourcePath: "parent.yaml",
+    yaml: "name: parent\\noutput_from: {skill: child}", outputSchema,
+  });
+  render(<SkillDetailView />);
+  const schema = await screen.findByLabelText("Effective output schema", { selector: "pre" });
+  expect(schema.textContent).toBe(outputSchema);
+  expect(schema.innerHTML).not.toContain("<script>");
+  expect(screen.getByLabelText("Skill YAML source").textContent).toBe("name: parent\\noutput_from: {skill: child}");
 });

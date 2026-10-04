@@ -22,6 +22,7 @@ public class LiveActivityProjector
             TraceRecordType.MODEL_REQUEST_SENT,
             TraceRecordType.MODEL_RESPONSE_RECEIVED,
             TraceRecordType.MODEL_ATTEMPT_FAILED,
+            TraceRecordType.RESULT_FORWARDED,
             TraceRecordType.PLAN_CREATED,
             TraceRecordType.PLAN_UPDATED,
             TraceRecordType.PLAN_VALIDATION_FAILED,
@@ -298,6 +299,7 @@ public class LiveActivityProjector
             case MODEL_REQUEST_SENT -> ExecutionActivityKind.MODEL_REQUEST_SENT;
             case MODEL_RESPONSE_RECEIVED -> ExecutionActivityKind.MODEL_RESPONSE_RECEIVED;
             case MODEL_ATTEMPT_FAILED -> ExecutionActivityKind.MODEL_ATTEMPT_FAILED;
+            case RESULT_FORWARDED -> ExecutionActivityKind.RESULT_FORWARDED;
             case PLAN_CREATED -> ExecutionActivityKind.PLAN_CREATED;
             case PLAN_UPDATED -> ExecutionActivityKind.PLAN_UPDATED;
             case PLAN_VALIDATION_FAILED -> ExecutionActivityKind.PLAN_VALIDATION_FAILED;
@@ -324,6 +326,7 @@ public class LiveActivityProjector
             case MODEL_REQUEST_SENT, MODEL_RESPONSE_RECEIVED, MODEL_ATTEMPT_FAILED,
                     ADVISOR_REQUEST_MUTATION_RECORDED, ADVISOR_RESPONSE_MUTATION_RECORDED,
                     MODEL_THOUGHT_CAPTURED -> "MODEL";
+            case RESULT_FORWARDED -> "COMPLETING";
             case PLAN_CREATED, PLAN_UPDATED, PLAN_VALIDATION_FAILED, PLAN_RETRY_REQUESTED -> "PLANNING";
             case TOOL_CALL_STARTED, TOOL_CALL_COMPLETED, TOOL_CALL_FAILED -> "TOOL";
             case STEP_STARTED, STEP_ACTION_PROPOSED, STEP_ACTION_VALIDATED,
@@ -344,6 +347,7 @@ public class LiveActivityProjector
             case MODEL_REQUEST_SENT -> "Model request sent";
             case MODEL_RESPONSE_RECEIVED -> "Model response received";
             case MODEL_ATTEMPT_FAILED -> failedAttemptSummary(record);
+            case RESULT_FORWARDED -> "Result forwarded from " + record.metadata().get("capabilityName") + " (task " + record.metadata().get("linkedTaskId") + ")";
             case PLAN_CREATED -> "Plan created";
             case PLAN_UPDATED -> "Plan updated";
             case PLAN_VALIDATION_FAILED -> "Plan validation failed";

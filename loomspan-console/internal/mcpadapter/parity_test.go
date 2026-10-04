@@ -19,7 +19,9 @@ import (
 // observability DTO directly; MCP preserves skill identity, source path, YAML,
 // and observation facts while omitting internal ownership identifiers.
 func TestBrowserAndMCPPreserveSameSkillFacts(t *testing.T) {
+	schema := "{ \"type\": \"object\", \"description\": \"<schema>\" }"
 	browserFact := observability.SkillDetail{
+		OutputSchema:   &schema,
 		RegisteredName: "skill-☃", Source: "YAML", SourcePath: `C:\\deployed\\skill.yaml`,
 		Yaml: "name: skill-☃\ndescription: data only\n",
 	}
@@ -33,7 +35,7 @@ func TestBrowserAndMCPPreserveSameSkillFacts(t *testing.T) {
 		t.Fatalf("envelope=%#v err=%v", envelope, err)
 	}
 	mcpFact := envelope.Result.Skill
-	if mcpFact.RegisteredName != browserFact.RegisteredName || mcpFact.SourcePath != browserFact.SourcePath || mcpFact.YAML != browserFact.Yaml {
+	if mcpFact.RegisteredName != browserFact.RegisteredName || mcpFact.SourcePath != browserFact.SourcePath || mcpFact.YAML != browserFact.Yaml || mcpFact.OutputSchema == nil || *mcpFact.OutputSchema != schema {
 		t.Fatalf("browser=%#v MCP=%#v", browserFact, mcpFact)
 	}
 	if envelope.Result.ObservedAt != options.Now().UTC() {

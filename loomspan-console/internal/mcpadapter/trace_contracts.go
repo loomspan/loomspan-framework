@@ -312,22 +312,23 @@ type contentDescriptorDTO struct {
 	InlineContent     string `json:"inlineContent,omitempty"`
 }
 type recordDTO struct {
-	Sequence         int64                 `json:"sequence"`
-	Type             string                `json:"type"`
-	FailureID        string                `json:"failureId,omitempty"`
-	ValidationStatus string                `json:"validationStatus,omitempty"`
-	FrameID          string                `json:"frameId,omitempty"`
-	ParentFrameID    string                `json:"parentFrameId,omitempty"`
-	FrameType        string                `json:"frameType,omitempty"`
-	Route            string                `json:"route,omitempty"`
-	TimestampMillis  int64                 `json:"timestampMillis"`
-	Representation   string                `json:"representation"`
-	Content          *contentDescriptorDTO `json:"content,omitempty"`
-	Plan             *planReferenceDTO     `json:"plan,omitempty"`
-	Attempts         []attemptDTO          `json:"attempts"`
-	Retries          []retryDTO            `json:"retries"`
-	Validations      []validationDTO       `json:"validations"`
-	Failures         []failureDTO          `json:"failures"`
+	ResultForwarding *traceanalysis.ResultForwarding `json:"resultForwarding,omitempty"`
+	Sequence         int64                           `json:"sequence"`
+	Type             string                          `json:"type"`
+	FailureID        string                          `json:"failureId,omitempty"`
+	ValidationStatus string                          `json:"validationStatus,omitempty"`
+	FrameID          string                          `json:"frameId,omitempty"`
+	ParentFrameID    string                          `json:"parentFrameId,omitempty"`
+	FrameType        string                          `json:"frameType,omitempty"`
+	Route            string                          `json:"route,omitempty"`
+	TimestampMillis  int64                           `json:"timestampMillis"`
+	Representation   string                          `json:"representation"`
+	Content          *contentDescriptorDTO           `json:"content,omitempty"`
+	Plan             *planReferenceDTO               `json:"plan,omitempty"`
+	Attempts         []attemptDTO                    `json:"attempts"`
+	Retries          []retryDTO                      `json:"retries"`
+	Validations      []validationDTO                 `json:"validations"`
+	Failures         []failureDTO                    `json:"failures"`
 }
 type queryRecordsResult struct {
 	Evidence           evidenceDTO                   `json:"evidence"`

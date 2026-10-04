@@ -254,7 +254,7 @@ func recordQueryOutputSchema() *jsonschema.Schema {
 		"contentRef": compactString(), "inlineContent": compactString(), "inlineOmission": compactString(),
 	}, true)
 	record := compactObject([]string{"sequence", "type", "timestampMillis", "representation", "attempts", "retries", "validations", "failures"}, map[string]*jsonschema.Schema{
-		"sequence": compactInteger(), "type": compactString(), "failureId": compactString(), "validationStatus": compactString(), "timestampMillis": compactInteger(), "representation": compactString(), "plan": compactOpenObject(), "attempts": compactArray(compactOpenObject()), "retries": compactArray(compactOpenObject()), "validations": compactArray(compactOpenObject()), "failures": compactArray(compactOpenObject()), "content": content,
+		"sequence": compactInteger(), "type": compactString(), "failureId": compactString(), "validationStatus": compactString(), "timestampMillis": compactInteger(), "representation": compactString(), "plan": compactOpenObject(), "resultForwarding": compactOpenObject(), "attempts": compactArray(compactOpenObject()), "retries": compactArray(compactOpenObject()), "validations": compactArray(compactOpenObject()), "failures": compactArray(compactOpenObject()), "content": content,
 	}, true)
 	match := compactObject([]string{"sequence", "recordType", "matchOffset", "matchLength", "searchedField"}, map[string]*jsonschema.Schema{
 		"sequence": compactInteger(), "recordType": compactString(), "matchOffset": compactInteger(), "matchLength": compactInteger(), "searchedField": compactString(), "contentId": compactString(),
@@ -296,9 +296,17 @@ func skillSourceSchema(detail bool) *jsonschema.Schema {
 		yamlRequired = append(yamlRequired, "yaml")
 	}
 	javaProps := map[string]*jsonschema.Schema{"registeredName": compactString(), "source": {Type: "string", Enum: []any{"JAVA"}}, "beanName": compactString(), "method": compactString()}
+	javaRequired := []string{"registeredName", "source", "beanName", "method"}
+	if detail {
+		for _, props := range []map[string]*jsonschema.Schema{yamlProps, restProps, javaProps} {
+			props["outputSchema"] = &jsonschema.Schema{Types: []string{"string", "null"}}
+		}
+		yamlRequired = append(yamlRequired, "outputSchema")
+		javaRequired = append(javaRequired, "outputSchema")
+	}
 	return &jsonschema.Schema{AnyOf: []*jsonschema.Schema{
 		compactObject(yamlRequired, yamlProps, true),
 		compactObject(yamlRequired, restProps, true),
-		compactObject([]string{"registeredName", "source", "beanName", "method"}, javaProps, true),
+		compactObject(javaRequired, javaProps, true),
 	}}
 }

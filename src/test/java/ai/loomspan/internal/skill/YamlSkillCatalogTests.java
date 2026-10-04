@@ -35,6 +35,73 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class YamlSkillCatalogTests {
 
     @Test
+    void acceptsPlanningOutputFromForUniqueRequiredDirectChild() {
+        LoomspanProperties properties = forwardingProperties();
+        YamlSkillCatalog catalog = new YamlSkillCatalog(properties);
+        var checked = catalog.checkedSupplied(List.of(new SkillDocument("forwarder", forwardingYaml())), false);
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions()).hasSize(1);
+    }
+
+    @TestFactory
+    java.util.stream.Stream<DynamicTest> rejectsInvalidForwardingDeclarations() {
+        Map<String, String> invalid = Map.ofEntries(
+                Map.entry("null selector", forwardingYaml().replace("output_from:\n  skill: answer", "output_from: null")),
+                Map.entry("scalar selector", forwardingYaml().replace("output_from:\n  skill: answer", "output_from: answer")),
+                Map.entry("list selector", forwardingYaml().replace("output_from:\n  skill: answer", "output_from: [answer]")),
+                Map.entry("unknown selector field", forwardingYaml() + "  field: value\n"),
+                Map.entry("blank child", forwardingYaml().replace("skill: answer", "skill: ' '")),
+                Map.entry("trimmed child", forwardingYaml().replace("skill: answer", "skill: ' answer'")),
+                Map.entry("number child", forwardingYaml().replace("skill: answer", "skill: 3")),
+                Map.entry("null child", forwardingYaml().replace("skill: answer", "skill: null")),
+                Map.entry("nonplanning", forwardingYaml().replace("planning_mode: true", "planning_mode: false")),
+                Map.entry("missing explicit planning", forwardingYaml().replace("planning_mode: true\n", "")),
+                Map.entry("not required", forwardingYaml().replace("required: true", "min_tasks: 1")),
+                Map.entry("not unique", forwardingYaml().replace("max_tasks: 1", "max_tasks: 2")),
+                Map.entry("not allowed", forwardingYaml().replace("skill: answer", "skill: other")),
+                Map.entry("parent schema null", forwardingYaml() + "output_schema: null\n"),
+                Map.entry("parent retries null", forwardingYaml() + "output_schema_max_retries: null\n"),
+                Map.entry("parent linter null", forwardingYaml() + "linter: null\n"),
+                Map.entry("REST", "name: parent\ndescription: parent\nrest: true\noutput_from: null\n"));
+        return invalid.entrySet().stream().map(entry -> DynamicTest.dynamicTest(entry.getKey(), () -> {
+            var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(
+                    List.of(new SkillDocument("invalid-forwarder", entry.getValue())), false);
+            assertThat(checked.definitions()).isEmpty();
+            assertThat(checked.issues()).hasSize(1);
+            assertThat(checked.issues().getFirst().sourceName()).isEqualTo("invalid-forwarder");
+            assertThat(checked.issues().getFirst().fieldPath()).isNotBlank();
+        }));
+    }
+
+    private static LoomspanProperties forwardingProperties() {
+        LoomspanProperties properties = new LoomspanProperties();
+        LoomspanProperties.ConnectionProperties connection = new LoomspanProperties.ConnectionProperties();
+        connection.setDriver(AiDriver.OPENAI);
+        properties.setConnections(Map.of("connection", connection));
+        LoomspanProperties.ModelCatalogEntry model = new LoomspanProperties.ModelCatalogEntry();
+        model.setConnection("connection");
+        model.setProviderModel("provider-model");
+        model.setThinkingLevels(java.util.Set.of("medium"));
+        properties.setModels(Map.of("forward-model", model));
+        return properties;
+    }
+
+    private static String forwardingYaml() {
+        return """
+                name: parent
+                description: Prepare and delegate the answer
+                model: forward-model
+                planning_mode: true
+                allowed_skills:
+                  - name: answer
+                    required: true
+                    max_tasks: 1
+                output_from:
+                  skill: answer
+                """;
+    }
+
+    @Test
     void validationCollectsIndependentDocumentsAndKeepsSourceAndPath() {
         YamlSkillCatalog catalog = new YamlSkillCatalog(new LoomspanProperties());
         var checked = catalog.checkedSupplied(List.of(

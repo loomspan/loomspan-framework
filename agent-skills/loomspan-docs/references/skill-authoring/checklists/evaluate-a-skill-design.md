@@ -97,6 +97,16 @@ Read [planning-task-constraints.md](../planning-task-constraints.md) before decl
 
 Read [evidence-contracts.md](../evidence-contracts.md) before authoring property-level evidence requirements.
 
+For completion design, read [output contracts](../output-contracts.md):
+
+- Must the parent combine or interpret results, or does one direct child already produce the complete answer?
+- Does a forwarding parent retain meaningful orchestration duties rather than add only a wrapper?
+- Is `output_from.skill` an exact direct-child name with explicit `required: true` and `max_tasks: 1`?
+- Are parent schema, output retries, linter and copy instructions absent, with producer-owned policies retained?
+- Are all accepted tasks expected to finish, with sibling failure and cancellation tested?
+- Does the budget distinguish N forwarding assignments from N+1 ordinary synthesis slots?
+- Is available derived schema treated as metadata, with Java/REST schema unspecified and no inherited evidence validation?
+
 ## 7. Preserve Production Safeguards
 
 - Is authorization enforced by the framework rather than prompts?

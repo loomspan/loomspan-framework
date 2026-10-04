@@ -658,6 +658,7 @@ func (value frameDTO) MarshalJSON() ([]byte, error) {
 }
 func mapRecord(x traceanalysis.RecordSummary) recordDTO {
 	out := recordDTO{Sequence: x.Sequence, Type: x.Type, FailureID: x.FailureID, ValidationStatus: x.ValidationStatus, FrameID: x.FrameID, ParentFrameID: x.ParentFrameID, FrameType: x.FrameType, Route: x.Route, TimestampMillis: x.TimestampMillis, Representation: x.Representation, Attempts: []attemptDTO{}, Retries: []retryDTO{}, Validations: []validationDTO{}, Failures: []failureDTO{}}
+	out.ResultForwarding = x.Facts.ResultForwarding
 	if x.Facts.Plan != nil {
 		out.Plan = &planReferenceDTO{PlanID: x.Facts.Plan.PlanID, CapabilityName: x.Facts.Plan.CapabilityName}
 	}

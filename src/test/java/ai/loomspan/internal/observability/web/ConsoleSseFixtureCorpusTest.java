@@ -36,6 +36,13 @@ class ConsoleSseFixtureCorpusTest
                 json, activity("8", ExecutionActivityKind.EXECUTION_OBSERVATION_ENDED, "COMPLETED",
                         "Trace finalization failed",
                         Map.of("applicationTraceAvailability", "CORE_FINALIZATION_FAILED")));
+        Map<String, Object> forwardingDetails = new LinkedHashMap<>();
+        forwardingDetails.put("skillName", "prepareReport"); forwardingDetails.put("planId", "report-plan");
+        forwardingDetails.put("linkedTaskId", "finish-task"); forwardingDetails.put("capabilityName", "finishReport");
+        byte[] forwarded = ObservabilityActivityStream.activityFrame(json,
+                activity("9", ExecutionActivityKind.RESULT_FORWARDED, "RUNNING", "Forwarded finishReport result",
+                        forwardingDetails));
+        fixtures.put("activity-result-forwarded.sse", forwarded);
         fixtures.put("handshake.sse", handshake);
         fixtures.put("activity-trace-completed.sse", completed);
         fixtures.put("activity-core-finalization-failed.sse", failed);

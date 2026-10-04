@@ -40,6 +40,87 @@ import static org.mockito.Mockito.when;
 class SkillGenerationManagerTest
 {
     @Test
+    void resolvesForwardingMetadataThroughChainsWithoutInheritingEvidence(@TempDir Path directory) {
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));
+        StaticListableBeanFactory beans = new StaticListableBeanFactory();
+        beans.addBean("handler", (RestSkillHandler) invocation -> "raw");
+        SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), beans);
+        manager.afterSingletonsInstantiated();
+        var documents = List.of(forwardingDocument("outer", "inner"), forwardingDocument("inner", "producer"),
+                new SkillDocument("producer", """
+                        name: producer
+                        description: Produce an answer
+                        model: model
+                        allowed_skills: [{name: fixedJava}]
+                        output_schema:
+                          type: object
+                          properties:
+                            answer: {type: string, evidence: fixedJava, nullable: true}
+                          required: [answer]
+                          additionalProperties: false
+                        """),
+                forwardingDocument("javaParent", "fixedJava"), forwardingDocument("restParent", "restLeaf"),
+                new SkillDocument("restLeaf", "name: restLeaf\ndescription: REST leaf\nrest: true\n"),
+                forwardingDocument("plainParent", "plain"),
+                new SkillDocument("plain", "name: plain\ndescription: plain\nmodel: model\n"));
+        assertThat(manager.validate(documents).valid()).isTrue();
+        SkillGeneration generation = manager.prepare(documents);
+        String schema = generation.skillCatalog().skill("producer").orElseThrow().outputSchema();
+        assertThat(schema).contains("answer", "nullable", "additionalProperties").doesNotContain("evidence");
+        assertThat(generation.definition("producer").evidenceContract().isEmpty()).isFalse();
+        assertThat(generation.definition("inner").outputSchema()).isNull();
+        assertThat(generation.definition("inner").evidenceContract().isEmpty()).isTrue();
+        for (String name : List.of("outer", "inner", "producer")) {
+            assertThat(generation.skillCatalog().skill(name).orElseThrow().outputSchema()).isEqualTo(schema);
+            assertThat(generation.registeredSkillCatalog().find(name).orElseThrow().outputSchema()).isEqualTo(schema);
+        }
+        for (String name : List.of("javaParent", "fixedJava", "restParent", "restLeaf", "plainParent", "plain"))
+            assertThat(generation.skillCatalog().skill(name).orElseThrow().outputSchema()).isNull();
+        manager.activate(generation);
+        var captured = manager.capture();
+        var replacement = manager.prepare(List.of(forwardingDocument("outer", "fixedJava")));
+        manager.activate(replacement);
+        assertThat(captured.generation().skillCatalog().skill("outer").orElseThrow().outputSchema()).isEqualTo(schema);
+        assertThat(manager.active().skillCatalog().skill("outer").orElseThrow().outputSchema()).isNull();
+        captured.lease().close();
+    }
+
+    @Test
+    void rejectsForwardingCyclesAndMissingTargetsWithoutActivating(@TempDir Path directory) {
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of());
+        SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), new StaticListableBeanFactory());
+        manager.afterSingletonsInstantiated();
+        String original = manager.active().id();
+        for (var candidate : List.of(List.of(forwardingDocument("self", "self")),
+                List.of(forwardingDocument("one", "two"), forwardingDocument("two", "one")),
+                List.of(forwardingDocument("one", "missing")))) {
+            var validation = manager.validate(candidate);
+            assertThat(validation.valid()).isFalse();
+            assertThat(validation.issues()).anyMatch(issue -> "output_from.skill".equals(issue.fieldPath()));
+            assertThatThrownBy(() -> manager.prepare(candidate)).isInstanceOf(IllegalStateException.class);
+            assertThat(manager.active().id()).isEqualTo(original);
+        }
+        assertThat(manager.validate(List.of(
+                new SkillDocument("a", "name: a\ndescription: a\nmodel: model\nallowed_skills: [{name: b}]\n"),
+                new SkillDocument("b", "name: b\ndescription: b\nmodel: model\nallowed_skills: [{name: a}]\n"))).valid()).isTrue();
+    }
+
+    private static SkillDocument forwardingDocument(String name, String child) {
+        return new SkillDocument(name, """
+                name: %s
+                description: Prepare and delegate
+                model: model
+                planning_mode: true
+                allowed_skills: [{name: %s, required: true, max_tasks: 1}]
+                output_from: {skill: %s}
+                """.formatted(name, child, child));
+    }
+
+    @Test
     void runtimeSnapshotDetachesRequestTimeoutFromStartupMutation()
     {
         var original = new LoomspanProperties.ConnectionProperties();

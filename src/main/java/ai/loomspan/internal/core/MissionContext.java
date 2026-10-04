@@ -117,6 +117,10 @@ public final class MissionContext
         return List.copyOf(completedTaskResults.values());
     }
 
+    public synchronized Optional<CompletedTaskResult> completedTaskResult(String taskId) {
+        return Optional.ofNullable(completedTaskResults.get(requireNonBlank(taskId, "taskId")));
+    }
+
     public synchronized void recordCompletedTaskResult(String taskId, String skillName, String result)
     {
         CompletedTaskResult entry = new CompletedTaskResult(taskId, skillName, result);

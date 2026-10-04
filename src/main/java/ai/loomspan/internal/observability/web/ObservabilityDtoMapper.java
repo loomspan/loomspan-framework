@@ -20,7 +20,7 @@ public final class ObservabilityDtoMapper
 
     public ObservabilityDtos.SkillDetail skill(RegisteredSkillEntry source)
     {
-        return new ObservabilityDtos.SkillDetail(source.registeredName(), source.source(), source.sourcePath(), source.beanName(), source.method(), source.yaml());
+        return new ObservabilityDtos.SkillDetail(source.registeredName(), source.source(), source.sourcePath(), source.beanName(), source.method(), source.yaml(), source.outputSchema());
     }
 
     public ObservabilityDtos.ActiveExecution active(

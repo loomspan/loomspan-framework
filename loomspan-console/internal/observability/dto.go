@@ -30,13 +30,14 @@ type SkillSummary struct {
 }
 
 type SkillDetail struct {
-	TargetScopeID  string `json:"targetScopeId"`
-	RegisteredName string `json:"registeredName"`
-	Source         string `json:"source"`
-	SourcePath     string `json:"sourcePath,omitempty"`
-	BeanName       string `json:"beanName,omitempty"`
-	Method         string `json:"method,omitempty"`
-	Yaml           string `json:"yaml,omitempty"`
+	TargetScopeID  string  `json:"targetScopeId"`
+	RegisteredName string  `json:"registeredName"`
+	Source         string  `json:"source"`
+	SourcePath     string  `json:"sourcePath,omitempty"`
+	BeanName       string  `json:"beanName,omitempty"`
+	Method         string  `json:"method,omitempty"`
+	Yaml           string  `json:"yaml,omitempty"`
+	OutputSchema   *string `json:"outputSchema"`
 }
 
 type FramePathEntry struct {
@@ -140,7 +141,7 @@ func validateSkillWireFields(data []byte, source string, detail bool) error {
 		forbidden = []string{"sourcePath", "yaml"}
 	}
 	if !detail {
-		forbidden = append(forbidden, "yaml")
+		forbidden = append(forbidden, "yaml", "outputSchema")
 	}
 	for _, name := range forbidden {
 		if _, present := fields[name]; present {

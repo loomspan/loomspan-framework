@@ -521,22 +521,23 @@ func (value frameDTO) MarshalJSON() ([]byte, error) {
 }
 
 type recordDTO struct {
-	PlanUpdate       *planUpdateDTO        `json:"planUpdate,omitempty"`
-	Sequence         int64                 `json:"sequence"`
-	Type             string                `json:"type"`
-	FailureID        string                `json:"failureId,omitempty"`
-	ValidationStatus string                `json:"validationStatus,omitempty"`
-	FrameID          string                `json:"frameId"`
-	ParentFrameID    string                `json:"parentFrameId"`
-	FrameType        string                `json:"frameType"`
-	Route            string                `json:"route"`
-	ThreadName       string                `json:"threadName"`
-	TimestampMillis  int64                 `json:"timestampMillis"`
-	Representation   string                `json:"representation"`
-	IsChunk          bool                  `json:"isChunk"`
-	IsEnvelope       bool                  `json:"isEnvelope"`
-	Content          *contentDescriptorDTO `json:"content,omitempty"`
-	Plan             *planReferenceDTO     `json:"plan,omitempty"`
+	ResultForwarding *traceanalysis.ResultForwarding `json:"resultForwarding,omitempty"`
+	PlanUpdate       *planUpdateDTO                  `json:"planUpdate,omitempty"`
+	Sequence         int64                           `json:"sequence"`
+	Type             string                          `json:"type"`
+	FailureID        string                          `json:"failureId,omitempty"`
+	ValidationStatus string                          `json:"validationStatus,omitempty"`
+	FrameID          string                          `json:"frameId"`
+	ParentFrameID    string                          `json:"parentFrameId"`
+	FrameType        string                          `json:"frameType"`
+	Route            string                          `json:"route"`
+	ThreadName       string                          `json:"threadName"`
+	TimestampMillis  int64                           `json:"timestampMillis"`
+	Representation   string                          `json:"representation"`
+	IsChunk          bool                            `json:"isChunk"`
+	IsEnvelope       bool                            `json:"isEnvelope"`
+	Content          *contentDescriptorDTO           `json:"content,omitempty"`
+	Plan             *planReferenceDTO               `json:"plan,omitempty"`
 }
 type contentDescriptorDTO struct {
 	Role              string `json:"role"`
@@ -782,6 +783,7 @@ func recordDTOValue(x traceanalysis.RecordSummary) recordDTO {
 		}
 		item.Content = &contentDescriptorDTO{Role: string(x.Content.Role), ContentType: x.Content.ContentType, Encoding: string(x.Content.Encoding), RetainedBytes: x.Content.RetainedBytes, Available: x.Content.Available, Complete: x.Content.Complete, InlineEligibility: x.Content.InlineEligibility, InlineOmission: string(x.Content.InlineOmission), ContentRef: x.Content.ContentRef, InlineContent: inline}
 	}
+	item.ResultForwarding = x.Facts.ResultForwarding
 	if x.Facts.Plan != nil {
 		p := x.Facts.Plan
 		item.Plan = &planReferenceDTO{PlanID: p.PlanID, CapabilityName: p.CapabilityName}

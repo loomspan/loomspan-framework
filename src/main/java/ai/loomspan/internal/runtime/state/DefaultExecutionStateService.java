@@ -401,6 +401,15 @@ public class DefaultExecutionStateService implements ExecutionStateService
     }
 
     @Override
+    public void recordResultForwarded(LoomspanSession session, String skillName, String planId, String taskId, String capabilityName)
+    {
+        requireBinding(session).requireWritable(() -> {
+            traceRecorder.recordResultForwarded(session, skillName, planId, taskId, capabilityName);
+            return null;
+        });
+    }
+
+    @Override
     public void recordEvidenceValidation(LoomspanSession session,
             boolean passed,
             Map<String, Object> metadata,

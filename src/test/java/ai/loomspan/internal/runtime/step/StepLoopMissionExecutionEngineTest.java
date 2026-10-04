@@ -98,6 +98,196 @@ class StepLoopMissionExecutionEngineTest {
             new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
 
     @Test
+    void forwardsSelectedTaskResultWithoutFinalModelCall() {
+        DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
+        PlanningService planning = new InitializingPlanningService(state, singleTaskPlan());
+        YamlSkillManifest manifest = definitionWithMaxSteps(1).manifest();
+        YamlSkillManifest.OutputFromManifest selector = new YamlSkillManifest.OutputFromManifest();
+        selector.setSkill("invoiceParser");
+        manifest.setOutputFrom(selector);
+        YamlSkillDefinition forwarding = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        SequenceChatClient model = new SequenceChatClient(
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("forward-one", "rootVisibleSkill", 3);
+        String exact = "  [\"quoted\", {\"secret\":\"preserved\"}]\n";
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThat(executeMission(engine(state, planning, executor, forwarding), session, forwarding, model,
+                    List.of(tool("invoiceParser", exact)))).isEqualTo(exact);
+        }
+        assertThat(readRecords(session).stream().filter(record -> record.recordType().name().equals("RESULT_FORWARDED")))
+                .hasSize(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "  ", "\"quoted Java String\"", "null", "{\"finalResponse\":\"business value\"}", "[3,2,1]"})
+    void forwardingPreservesEveryDirectResultString(String exact) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var definition = forwardingDefinition(1, false);
+        var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser"), new AtomicReference<>());
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("exact-forward", "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition),
+                    session, definition, model, List.of(tool("invoiceParser", exact)))).isEqualTo(exact);
+        }
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.STRUCTURED_OUTPUT_RECORDED
+                || record.recordType() == TraceRecordType.LINTER_RECORDED || record.recordType() == TraceRecordType.EVIDENCE_VALIDATION_PASSED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void forwardingWaitsForWholeSelectedUnitAndLaterWork(boolean concurrent) throws Exception {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var tasks = List.of(
+                new PlanTask("t-1", "Answer", PlanTaskStatus.PENDING, "invoiceParser", "answer", List.of(), List.of(), "batch", null),
+                new PlanTask("t-2", "Required sibling", PlanTaskStatus.PENDING, "expenseLookup", "finish", List.of(), List.of(), "batch", null),
+                new PlanTask("t-3", "Accepted optional work", PlanTaskStatus.PENDING, "optional", "finish", List.of(), List.of(), null, null));
+        var plan = new ExecutionPlan("forward-complete", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
+        var definition = forwardingDefinition(3, concurrent);
+        CountDownLatch siblingStarted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger later = new AtomicInteger();
+        AtomicReference<String> unexpectedFinal = new AtomicReference<>();
+        var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser", "t-2", "expenseLookup", "t-3", "optional"), unexpectedFinal);
+        var selected = tool("invoiceParser", "x".repeat(8000) + " selected");
+        var sibling = new BoundCapability(tool("expenseLookup", "unused").metadata(), (arguments, taskId) -> {
+            siblingStarted.countDown();
+            try { assertThat(release.await(3, TimeUnit.SECONDS)).isTrue(); }
+            catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
+            return "sibling";
+        });
+        var optional = new BoundCapability(tool("optional", "unused").metadata(), (arguments, taskId) -> { later.incrementAndGet(); return "optional"; });
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("join-forward", "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor(); ExecutorService caller = Executors.newSingleThreadExecutor()) {
+            Future<String> result = caller.submit(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
+                    session, definition, model, List.of(selected, sibling, optional)));
+            try {
+                assertThat(siblingStarted.await(3, TimeUnit.SECONDS)).isTrue();
+                assertThat(result.isDone()).isFalse();
+                assertThat(later).hasValue(0);
+                assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_FORWARDED);
+            } finally { release.countDown(); }
+            assertThat(result.get(3, TimeUnit.SECONDS)).isEqualTo("x".repeat(8000) + " selected");
+        }
+        assertThat(later).hasValue(1);
+        assertThat(unexpectedFinal).hasNullValue();
+        assertThat(session.getExecutionPlanSnapshot().tasks()).allMatch(task -> task.status() == PlanTaskStatus.COMPLETED);
+        assertThat(readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.STEP_STARTED)).hasSize(3);
+        assertThat(readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.RESULT_FORWARDED)).singleElement()
+                .satisfies(record -> {
+                    assertThat(record.frameType()).isEqualTo(TraceFrameType.ROOT_MISSION);
+                    assertThat(record.metadata()).containsEntry("skillName", "rootVisibleSkill").containsEntry("planId", "forward-complete")
+                            .containsEntry("linkedTaskId", "t-1").containsEntry("capabilityName", "invoiceParser");
+                });
+        assertThat(session.getExecutionJournal().getEntriesSnapshot()).anyMatch(entry -> entry.type() == ai.loomspan.internal.core.JournalEntryType.RESULT_FORWARDED);
+    }
+
+    @Test
+    void forwardingRunsPrerequisiteBeforeSelectedTask() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var tasks = List.of(
+                new PlanTask("prep", "Prepare", PlanTaskStatus.PENDING, "prepare", "prepare input", List.of(), List.of(), null, null),
+                new PlanTask("t-1", "Answer", PlanTaskStatus.PENDING, "invoiceParser", "answer", List.of("prep"), List.of(), null, null));
+        var plan = new ExecutionPlan("forward-prerequisite", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
+        var definition = forwardingDefinition(2, false);
+        var delegate = new TaskAddressedModel(Map.of("prep", "prepare", "t-1", "invoiceParser"), new AtomicReference<>());
+        ai.loomspan.internal.model.ModelInteraction model = request -> {
+            if (request.systemPrompt().contains("--- ASSIGNED TASK ---\nID: t-1"))
+                assertThat(request.systemPrompt()).contains("EXACT_PREREQUISITE_RESULT");
+            return delegate.call(request);
+        };
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("prerequisite-forward", "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThat(executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
+                    session, definition, model, List.of(tool("prepare", "EXACT_PREREQUISITE_RESULT"), tool("invoiceParser", "selected-answer"))))
+                    .isEqualTo("selected-answer");
+        }
+    }
+
+    @Test
+    void rejectsWholeForwardingUnitWhenAssignmentsDoNotFit() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var tasks = List.of(
+                new PlanTask("t-1", "Answer", PlanTaskStatus.PENDING, "invoiceParser", "answer", List.of(), List.of(), "batch", null),
+                new PlanTask("t-2", "Sibling", PlanTaskStatus.PENDING, "expenseLookup", "finish", List.of(), List.of(), "batch", null));
+        var plan = new ExecutionPlan("forward-budget", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
+        var definition = forwardingDefinition(1, true);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("budget-forward", "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
+                    session, definition, new SequenceChatClient(), List.of(tool("invoiceParser", "answer"), tool("expenseLookup", "sibling"))))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("exhausted");
+        }
+        assertThat(session.getExecutionPlanSnapshot().tasks()).allMatch(task -> task.status() == PlanTaskStatus.PENDING);
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.PLAN_UPDATED || record.recordType() == TraceRecordType.RESULT_FORWARDED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void forwardingFailureNeverProducesParentSuccess(boolean selectedFails) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var definition = forwardingDefinition(2, false);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("failure-forward", "rootVisibleSkill", 3);
+        var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser", "t-2", "expenseLookup"), new AtomicReference<>());
+        var selected = selectedFails ? failingTool("invoiceParser") : tool("invoiceParser", "retained-selected");
+        var later = selectedFails ? tool("expenseLookup", "later") : failingTool("expenseLookup");
+        var binding = TestExecutionBindings.missionBinding(session);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding, () -> executeMission(
+                    engine(state, new InitializingPlanningService(state, twoTaskPlan()), executor, definition),
+                    session, definition, model, List.of(selected, later))))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("parser exploded");
+        }
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_FORWARDED);
+        if (!selectedFails) assertThat(binding.requireMission().completedTaskResult("t-1")).isPresent();
+    }
+
+    @Test
+    void forwardingRejectsAmbiguousOrMissingAcceptedTask() {
+        for (var plan : List.of(groupedPlan("ambiguous", false),
+                new ExecutionPlan("missing", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, List.of()))) {
+            var state = new DefaultExecutionStateService(FIXED_CLOCK);
+            var definition = forwardingDefinition(3, true);
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("invalid-forward", "rootVisibleSkill", 3);
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
+                        session, definition, new SequenceChatClient(), List.of(tool("invoiceParser", "unused"))))
+                        .isInstanceOf(IllegalStateException.class).hasMessageContaining("exactly one");
+            }
+            assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_FORWARDED);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "wrong-skill", "stale"})
+    void forwardingRejectsInvalidRetainedCompletion(String corruption) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var completed = singleTaskPlan().updateTask("t-1", task -> new PlanTask(task.taskId(), task.title(),
+                PlanTaskStatus.COMPLETED, task.capabilityName(), task.intent(), task.dependsOn(), task.expectedOutputs(), task.parallelGroup(), task.note()));
+        if (corruption.equals("stale")) completed = new ExecutionPlan(completed.planId(), completed.capabilityName(), completed.createdAt(), PlanStatus.STALE, completed.tasks());
+        var planning = new InitializingPlanningService(state, completed);
+        var definition = forwardingDefinition(1, false);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("retained-forward", "rootVisibleSkill", 3);
+        var binding = TestExecutionBindings.missionBinding(session);
+        if (!corruption.equals("missing")) binding.requireMission().recordCompletedTaskResult("t-1",
+                corruption.equals("wrong-skill") ? "other" : "invoiceParser", "result");
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding, () -> executeMission(engine(state, planning, executor, definition),
+                    session, definition, new SequenceChatClient(), List.of(tool("invoiceParser", "unused")))))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_FORWARDED);
+    }
+
+    private static YamlSkillDefinition forwardingDefinition(int maxSteps, boolean concurrent) {
+        var manifest = definitionWithMaxSteps(maxSteps).manifest();
+        manifest.setConcurrency(concurrent);
+        var selector = new YamlSkillManifest.OutputFromManifest();
+        selector.setSkill("invoiceParser");
+        manifest.setOutputFrom(selector);
+        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+    }
+
+    @Test
     void capturesExactBindingAndRestoresReusedWorkerAfterSuccess() throws Exception {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan completedPlan = new ExecutionPlan(
@@ -1419,12 +1609,17 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(binding.requireMission().lifecycle().closeNow().tasks()).isEmpty();
     }
 
-    @Test
-    void timeoutCutoffSuppressesLateWorkerWritesAfterCallerReturns() throws Exception
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void timeoutCutoffSuppressesLateWorkerWritesAfterCallerReturns(boolean forwarding) throws Exception
     {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
-        PlanningService planningService = new InitializingPlanningService(
-                stateService, groupedPlan("plan-timeout-cutoff", true));
+        ExecutionPlan original = groupedPlan("plan-timeout-cutoff", true);
+        ExecutionPlan plan = forwarding ? new ExecutionPlan(original.planId(), original.capabilityName(), original.createdAt(), original.status(),
+                original.tasks().stream().map(task -> new PlanTask(task.taskId(), task.title(), task.status(),
+                        task.taskId().equals("t-1") ? "invoiceParser" : "expenseLookup", task.intent(), task.dependsOn(), task.expectedOutputs(),
+                        task.parallelGroup(), task.note())).toList()) : original;
+        PlanningService planningService = new InitializingPlanningService(stateService, plan);
         CountDownLatch lateWorkerStarted = new CountDownLatch(1);
         CountDownLatch releaseLateWorker = new CountDownLatch(1);
         CountDownLatch lateWorkerReturned = new CountDownLatch(1);
@@ -1432,7 +1627,7 @@ class StepLoopMissionExecutionEngineTest {
         AtomicInteger externalSideEffects = new AtomicInteger();
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
                 "t-1", "invoiceParser",
-                "t-2", "invoiceParser"), new AtomicReference<>());
+                "t-2", forwarding ? "expenseLookup" : "invoiceParser"), new AtomicReference<>());
         BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
                 (arguments, taskId) -> {
                     retainedMission.set(ExecutionBindingScope.requireCurrent().requireMission());
@@ -1455,16 +1650,17 @@ class StepLoopMissionExecutionEngineTest {
                     lateWorkerReturned.countDown();
                     return "late-t-2";
                 });
-        YamlSkillDefinition definition = definitionWithConcurrency(true);
+        YamlSkillDefinition definition = forwarding ? forwardingDefinition(3, true) : definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-timeout-cutoff", "test.entry", 3);
+                "step-loop-timeout-cutoff", forwarding ? "rootVisibleSkill" : "test.entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor())
         {
             StepLoopMissionExecutionEngine engine = engine(
                     stateService, planningService, missionExecutor, definition, Duration.ofMillis(100));
 
-            assertThatThrownBy(() -> executeMission(engine, session, definition, model, List.of(capability)))
+            assertThatThrownBy(() -> executeMission(engine, session, definition, model, forwarding ? List.of(capability, new BoundCapability(tool("expenseLookup", "unused").metadata(),
+                            (arguments, taskId) -> capability.invoke(arguments, taskId))) : List.of(capability)))
                     .isInstanceOf(LoomspanMissionTimeoutException.class);
             assertThat(lateWorkerStarted.await(2, TimeUnit.SECONDS)).isTrue();
             assertThat(retainedMission.get().completedTaskResults()).containsExactly(
@@ -1482,6 +1678,7 @@ class StepLoopMissionExecutionEngineTest {
             session.finalizeTrace(new TraceCompletion(
                     TraceOutcome.ABORTED, SessionUsageSnapshot.empty(), terminalFailureId, Map.of()));
             List<TraceRecord> finalized = readRecords(session);
+            assertThat(finalized).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_FORWARDED);
             assertThat(finalized.stream().filter(record -> record.recordType() == TraceRecordType.TRACE_COMPLETED))
                     .hasSize(1);
 

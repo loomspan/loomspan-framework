@@ -100,6 +100,12 @@ function describeActivity(
       add(facts, "decision", text(details, "retryDecision"));
       add(facts, "delay", retryDelay(details));
       break;
+    case "RESULT_FORWARDED":
+      headline = text(details, "capabilityName");
+      add(facts, "parent", text(details, "skillName"));
+      add(facts, "plan", text(details, "planId"));
+      add(facts, "task", text(details, "linkedTaskId"));
+      break;
     case "TOOL_CALL_STARTED":
     case "TOOL_CALL_COMPLETED":
     case "TOOL_CALL_FAILED":

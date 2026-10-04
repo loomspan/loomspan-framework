@@ -28,6 +28,7 @@ public final class BoundCapability
     public CapabilityMetadata metadata() { return metadata; }
     public String name() { return metadata.name(); }
     public String description() { return metadata.tool().description(); }
+    public String outputSchema() { return metadata.tool().outputSchema(); }
     public String inputSchema() { return metadata.tool().inputSchema(); }
 
     public Object invoke(Map<String, Object> arguments, @Nullable String linkedTaskId)

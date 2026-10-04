@@ -34,6 +34,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.HashMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -216,7 +219,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     }
 
     private record CheckedSet(List<YamlSkillDefinition> definitions,
-            Map<YamlSkillDefinition, SkillInputContract> contracts, List<SkillValidationIssue> issues)
+            Map<YamlSkillDefinition, SkillInputContract> contracts, Map<String, String> outputSchemas, List<SkillValidationIssue> issues)
     {
         void requireValid()
         {
@@ -282,7 +285,64 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
                     issues.add(error(definition, "allowed_skills", "Unknown child skill '" + child
                             + "' in allowed_skills of '" + definition.manifest().getName() + "' at "
                             + definition.source().diagnosticName()));
-        return new CheckedSet(documents.definitions(), Map.copyOf(contracts), List.copyOf(issues));
+        Map<String, YamlSkillDefinition> definitions = new LinkedHashMap<>();
+        documents.definitions().forEach(definition -> definitions.put(definition.manifest().getName(), definition));
+        Map<String, String> schemas = new LinkedHashMap<>();
+        Set<String> resolved = new HashSet<>();
+        for (YamlSkillDefinition definition : documents.definitions())
+            resolveOutputSchema(definition, definitions, names.keySet(), schemas, resolved,
+                    new LinkedHashSet<>(), issues, unknownFailedName, failedNames);
+        return new CheckedSet(documents.definitions(), Map.copyOf(contracts), Map.copyOf(schemas), List.copyOf(issues));
+    }
+
+    private static String resolveOutputSchema(YamlSkillDefinition definition,
+            Map<String, YamlSkillDefinition> definitions, Set<String> names, Map<String, String> schemas,
+            Set<String> resolved, LinkedHashSet<String> visiting, List<SkillValidationIssue> issues,
+            boolean unknownFailedName, List<String> failedNames)
+    {
+        String name = definition.manifest().getName();
+        if (resolved.contains(name)) return schemas.get(name);
+        if (!visiting.add(name)) {
+            issues.add(error(definition, "output_from.skill", "Forwarding cycle: " + String.join(" -> ", visiting) + " -> " + name));
+            return null;
+        }
+        String schema = null;
+        String child = definition.outputFromSkill();
+        if (child != null) {
+            if (!names.contains(child) && !unknownFailedName && !failedNames.contains(child))
+                issues.add(error(definition, "output_from.skill", "Unknown forwarding child '" + child + "'"));
+            YamlSkillDefinition target = definitions.get(child);
+            if (target != null) schema = resolveOutputSchema(target, definitions, names, schemas,
+                    resolved, visiting, issues, unknownFailedName, failedNames);
+        }
+        else if (!definition.rest() && definition.outputSchema() != null) {
+            var mapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion();
+            schema = mapper.writeValueAsString(outputSchemaMetadata(definition.outputSchema()));
+        }
+        visiting.remove(name);
+        resolved.add(name);
+        if (schema != null) schemas.put(name, schema);
+        return schema;
+    }
+
+    /** Schema shape metadata excludes child-local evidence orchestration annotations. */
+    private static Map<String, Object> outputSchemaMetadata(YamlSkillManifest.OutputSchemaManifest schema)
+    {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("type", schema.getType());
+        if (!schema.getProperties().isEmpty()) {
+            Map<String, Object> properties = new LinkedHashMap<>();
+            schema.getProperties().forEach((name, child) -> properties.put(name, outputSchemaMetadata(child)));
+            result.put("properties", properties);
+        }
+        if (!schema.getRequired().isEmpty()) result.put("required", schema.getRequired());
+        if (schema.getAdditionalProperties() != null) result.put("additionalProperties", schema.getAdditionalProperties());
+        if (schema.getItems() != null) result.put("items", outputSchemaMetadata(schema.getItems()));
+        if (!schema.getEnumValues().isEmpty()) result.put("enum", schema.getEnumValues());
+        if (schema.getDescription() != null) result.put("description", schema.getDescription());
+        if (schema.getFormat() != null) result.put("format", schema.getFormat());
+        if (schema.getNullable() != null) result.put("nullable", schema.getNullable());
+        return result;
     }
 
     private static SkillValidationIssue error(YamlSkillDefinition definition, String path, String message)
@@ -321,7 +381,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
                     rest ? arguments -> invokeRest(handler, name, generationId, arguments)
                             : arguments -> { throw new IllegalStateException("YAML skills require model execution"); },
                     rest ? CapabilityKind.REST_SKILL : CapabilityKind.YAML_SKILL,
-                    new CapabilityToolDescriptor(name, description, inputs.toJsonSchema(contract)),
+                    new CapabilityToolDescriptor(name, description, inputs.toJsonSchema(contract), checked.outputSchemas().get(name)),
                     contract, new SkillSource(definition.source().diagnosticName(), null, null));
             putCapability(capabilities, metadata);
         }

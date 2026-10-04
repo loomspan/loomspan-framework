@@ -95,6 +95,11 @@ public record YamlSkillDefinition(
         return copyValue(manifest.getOutputSchema(), YamlSkillManifest.OutputSchemaManifest.class);
     }
 
+    /** Exact direct child selected for runtime result forwarding, or null for synthesis. */
+    public String outputFromSkill() {
+        return manifest.getOutputFrom() == null ? null : manifest.getOutputFrom().getSkill();
+    }
+
     public String prompt()
     {
         return manifest.getPrompt();

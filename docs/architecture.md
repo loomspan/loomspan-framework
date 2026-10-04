@@ -19,6 +19,17 @@ small reasoning task. Java and REST skills can also be invoked directly without
 a framework model call. The [skill-tree reference](../agent-skills/loomspan-docs/references/skill-authoring/mental-model.md)
 defines exact naming, visibility, and composition semantics.
 
+A planner ordinarily synthesizes its own final answer after all accepted tasks
+succeed, using N task slots plus one final `max_steps` slot. If one direct child
+already produces the complete answer, explicit `output_from: {skill: finish}`
+completion forwards its existing Framework String unchanged after the same full
+work boundary and needs only N slots. The selected child must be explicitly
+required and unique. Failure or cancellation does not fall back to synthesis.
+Forwarding retains model orchestration but creates no parent final model call,
+output validation, linter or correction. Effective output schema is immutable
+metadata inherited through the captured generation; producer-local evidence and
+validation remain with the child. See [output contracts](../agent-skills/loomspan-docs/references/skill-authoring/output-contracts.md).
+
 ## When this approach fits
 
 Consider Loomspan when the next useful operation depends on interpreting a

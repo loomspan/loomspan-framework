@@ -276,7 +276,7 @@ class CapabilityExecutionRouterTest {
                           "required": ["payload"],
                           "additionalProperties": false
                         }
-                        """),
+                        """, null),
                 new SkillInputContractResolver().resolveFromToolSchema("""
                         {
                           "type": "object",
@@ -334,7 +334,7 @@ class CapabilityExecutionRouterTest {
                 "generic map target",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> { received.set(arguments); return "unchanged"; }, CapabilityKind.JAVA_SKILL,
-                new CapabilityToolDescriptor("genericMapTarget", "generic map target", schema),
+                new CapabilityToolDescriptor("genericMapTarget", "generic map target", schema, null),
                 contractResolver.resolveFromToolSchema(schema), null);
         Map<String, Object> input = Map.of(
                 "value", "ref://artifacts/missing-value.txt",

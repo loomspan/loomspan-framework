@@ -79,6 +79,8 @@ public interface ExecutionTraceRecorder
             Map<String, Object> attempt, Map<String, Object> failureMetadata, Throwable failure,
             List<Map<String, Object>> providerDiagnostics);
 
+    void recordResultForwarded(LoomspanSession session, String skillName, String planId, String taskId, String capabilityName);
+
     void recordPlanCreated(LoomspanSession session, ExecutionPlan plan, Map<String, Object> acceptedAttempt);
 
     void recordPlanUpdated(LoomspanSession session, ExecutionPlan plan, PlanExecutionTransition transition);

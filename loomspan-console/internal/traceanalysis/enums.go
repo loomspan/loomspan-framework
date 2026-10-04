@@ -29,6 +29,7 @@ const (
 	RecordEvidenceValidationPassed TraceRecordType = "EVIDENCE_VALIDATION_PASSED"
 	RecordLinterRecorded           TraceRecordType = "LINTER_RECORDED"
 	RecordStructuredOutputRecorded TraceRecordType = "STRUCTURED_OUTPUT_RECORDED"
+	RecordResultForwarded          TraceRecordType = "RESULT_FORWARDED"
 	RecordStepStarted              TraceRecordType = "STEP_STARTED"
 	RecordStepActionProposed       TraceRecordType = "STEP_ACTION_PROPOSED"
 	RecordStepActionValidated      TraceRecordType = "STEP_ACTION_VALIDATED"
@@ -51,7 +52,7 @@ func RecordTypeValues() []string {
 		string(RecordPlanValidationFailed), string(RecordPlanRetryRequested),
 		string(RecordToolCallStarted), string(RecordToolCallCompleted), string(RecordToolCallFailed), string(RecordEvidenceRecorded),
 		string(RecordEvidenceValidationFailed), string(RecordEvidenceValidationPassed), string(RecordLinterRecorded),
-		string(RecordStructuredOutputRecorded), string(RecordStepStarted), string(RecordStepActionProposed),
+		string(RecordStructuredOutputRecorded), string(RecordResultForwarded), string(RecordStepStarted), string(RecordStepActionProposed),
 		string(RecordStepActionValidated), string(RecordStepActionRejected), string(RecordStepCompleted), string(RecordStepFailed), string(RecordErrorRecorded),
 		string(RecordFrameClosed), string(RecordTraceCompleted),
 	}

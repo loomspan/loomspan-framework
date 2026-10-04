@@ -46,12 +46,13 @@ type skillSummaryDTO struct {
 }
 
 type skillDetailDTO struct {
-	RegisteredName string `json:"registeredName"`
-	Source         string `json:"source"`
-	SourcePath     string `json:"sourcePath,omitempty"`
-	BeanName       string `json:"beanName,omitempty"`
-	Method         string `json:"method,omitempty"`
-	YAML           string `json:"yaml,omitempty"`
+	RegisteredName string  `json:"registeredName"`
+	Source         string  `json:"source"`
+	SourcePath     string  `json:"sourcePath,omitempty"`
+	BeanName       string  `json:"beanName,omitempty"`
+	Method         string  `json:"method,omitempty"`
+	YAML           string  `json:"yaml,omitempty"`
+	OutputSchema   *string `json:"outputSchema"`
 }
 
 type skillListResult struct {

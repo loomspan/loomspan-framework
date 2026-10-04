@@ -105,7 +105,7 @@ func handleGetSkill(ctx context.Context, options ServerOptions, input getSkillIn
 	result := skillDetailResult{
 		ObservedAt: options.Now().UTC(),
 		Skill: skillDetailDTO{
-			RegisteredName: detail.RegisteredName, Source: detail.Source, SourcePath: detail.SourcePath, BeanName: detail.BeanName, Method: detail.Method, YAML: detail.Yaml,
+			RegisteredName: detail.RegisteredName, Source: detail.Source, SourcePath: detail.SourcePath, BeanName: detail.BeanName, Method: detail.Method, YAML: detail.Yaml, OutputSchema: detail.OutputSchema,
 		},
 	}
 	if domain := publicationDomain(options, scope); domain != nil {
@@ -142,6 +142,9 @@ func skillDetailText(result skillDetailResult) string {
 	appendCommon(&writer, result.ObservedAt)
 	writer.quoted("skill.registeredName", result.Skill.RegisteredName)
 	writer.quoted("skill.source", result.Skill.Source)
+	if result.Skill.OutputSchema != nil {
+		writer.quoted("skill.outputSchema", *result.Skill.OutputSchema)
+	}
 	if result.Skill.Source == "JAVA" {
 		writer.quoted("skill.beanName", result.Skill.BeanName)
 		writer.quoted("skill.method", result.Skill.Method)

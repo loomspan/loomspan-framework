@@ -41,6 +41,7 @@ const views: TraceExplorerView[] = ["timeline", "plans", "usage", "records"];
 const defaultRecordTypes = [
   "MODEL_REQUEST_SENT",
   "MODEL_RESPONSE_RECEIVED",
+  "RESULT_FORWARDED",
   "MODEL_ATTEMPT_FAILED",
   "PLAN_CREATED",
   "PLAN_UPDATED",

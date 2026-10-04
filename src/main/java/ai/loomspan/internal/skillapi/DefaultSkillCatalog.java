@@ -26,7 +26,7 @@ public final class DefaultSkillCatalog implements SkillCatalog
         for (var metadata : capabilities)
         {
             SkillDescriptor descriptor = new SkillDescriptor(metadata.name(), metadata.description(),
-                    metadata.kind().publicKind(), metadata.tool().inputSchema());
+                    metadata.kind().publicKind(), metadata.tool().inputSchema(), metadata.tool().outputSchema());
             if (built.putIfAbsent(metadata.name(), descriptor) != null)
             {
                 throw new IllegalArgumentException("Duplicate registered skill name '" + metadata.name() + "'");

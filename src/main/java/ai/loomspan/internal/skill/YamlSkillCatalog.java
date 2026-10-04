@@ -60,7 +60,8 @@ public class YamlSkillCatalog implements InitializingBean
             YamlSkillManifest.Field.THINKING_LEVEL, YamlSkillManifest.Field.ALLOWED_SKILLS,
             YamlSkillManifest.Field.PLANNING_MODE, YamlSkillManifest.Field.CONCURRENCY,
             YamlSkillManifest.Field.MAX_STEPS, YamlSkillManifest.Field.LINTER,
-            YamlSkillManifest.Field.OUTPUT_SCHEMA, YamlSkillManifest.Field.OUTPUT_SCHEMA_MAX_RETRIES);
+            YamlSkillManifest.Field.OUTPUT_SCHEMA, YamlSkillManifest.Field.OUTPUT_SCHEMA_MAX_RETRIES,
+            YamlSkillManifest.Field.OUTPUT_FROM);
     private final LoomspanProperties modelsProperties;
     private final LoomspanProperties.Skills skillProperties;
     private final ResourcePatternResolver resourcePatternResolver;
@@ -415,6 +416,7 @@ public class YamlSkillCatalog implements InitializingBean
             }
             validateRawRest(resource, root, skillName);
             validateRawConcurrency(resource, root, skillName);
+            validateRawOutputFrom(resource, root, skillName);
             validateRawAllowedSkills(resource, root, skillName);
 
             try
@@ -438,6 +440,35 @@ public class YamlSkillCatalog implements InitializingBean
         {
             throw new DocumentReadException("Failed to read YAML skill from " + describe(resource), ex);
         }
+    }
+
+    private void validateRawOutputFrom(Resource resource, JsonNode root, String skillName)
+    {
+        if (!root.has("output_from")) return;
+        JsonNode selector = root.get("output_from");
+        if (!selector.isObject())
+            throw invalidNamedSkill(resource, skillName, "output_from", "must be an object containing only skill");
+        for (String field : selector.propertyNames())
+            if (!field.equals("skill"))
+                throw invalidNamedSkill(resource, skillName, "output_from." + field, "unknown field");
+        JsonNode target = selector.get("skill");
+        if (target == null || !target.isTextual() || !PUBLIC_SKILL_NAME_PATTERN.matcher(target.textValue()).matches())
+            throw invalidNamedSkill(resource, skillName, "output_from.skill", "must be an exact valid public skill name");
+        if (!root.path("planning_mode").isBoolean() || !root.path("planning_mode").booleanValue())
+            throw invalidNamedSkill(resource, skillName, "output_from", "requires explicit planning_mode: true");
+        for (String conflict : List.of("output_schema", "output_schema_max_retries", "linter"))
+            if (root.has(conflict))
+                throw invalidNamedSkill(resource, skillName, conflict, "cannot be declared with output_from; the producing child owns final validation");
+        JsonNode children = root.path("allowed_skills");
+        boolean selected = false;
+        if (children.isArray()) for (JsonNode child : children) {
+            if (target.textValue().equals(child.path("name").asText())
+                    && child.path("required").isBoolean() && child.path("required").booleanValue()
+                    && child.path("max_tasks").isIntegralNumber() && child.path("max_tasks").intValue() == 1)
+                selected = true;
+        }
+        if (!selected)
+            throw invalidNamedSkill(resource, skillName, "output_from.skill", "must select a direct allowed child with required: true and max_tasks: 1");
     }
 
     private void validateRawRest(Resource resource, JsonNode root, String skillName)

@@ -93,6 +93,12 @@ To investigate beyond the supplied message, expose order lookups or deployment
 history as Java or REST skills and let a planning parent call those allowed
 capabilities. See the [skill-tree guide](agent-skills/loomspan-docs/references/skill-authoring/mental-model.md).
 
+When one direct child supplies the complete answer, an explicit model planner
+can use `output_from: {skill: finish}` with a required, unique `finish` task. It
+still completes all accepted work, then returns that child's existing text
+unchanged without a parent synthesis request. See [output contracts](agent-skills/loomspan-docs/references/skill-authoring/output-contracts.md)
+for syntax, schema ownership, and model/Java/REST examples.
+
 ## Choose your integration
 
 - **Embedded Java:** add the Spring Boot starter and invoke skills in your
@@ -123,6 +129,9 @@ change between betas, including breaking changes. Pin an exact version and revie
 
 The supported Java API is the closed allowlist in `ai.loomspan.api`, summarized
 in the [public API reference](agent-skills/loomspan-docs/references/java-api/compatibility-and-boundaries.md).
-`RestSkillHandler` is the sole supported Java SPI. Types under `internal` and
+The catalog descriptor is `SkillDescriptor(name, description, kind, inputSchema,
+outputSchema)`; nullable `outputSchema` describes effective output shape, including
+forwarding chains, without adding parent or Java/REST output validation. This
+revision uses only the five-argument constructor. `RestSkillHandler` is the sole supported Java SPI. Types under `internal` and
 `autoconfigure` are not application extension APIs; Loomspan does not expose an
 internal bean-replacement contract.

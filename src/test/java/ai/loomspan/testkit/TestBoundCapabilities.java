@@ -42,7 +42,7 @@ public final class TestBoundCapabilities {
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()),
                 input -> null,
                 CapabilityKind.YAML_SKILL,
-                new CapabilityToolDescriptor(name, description == null || description.isBlank() ? name : description, inputSchema),
+                new CapabilityToolDescriptor(name, description == null || description.isBlank() ? name : description, inputSchema, null),
                 contract,
                 null);
         return new BoundCapability(metadata, (arguments, linkedTaskId) -> null);

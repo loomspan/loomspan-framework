@@ -84,6 +84,13 @@ earlier success-only behavior SHOULD make observer handling idempotent and
 MUST apply the same security and retention policy to both outcomes. There is no
 success-only compatibility mode.
 
+`SkillDescriptor` now has five components: `name`, `description`, `kind`,
+`inputSchema`, and nullable String `outputSchema`. Direct constructors and
+record-pattern users MUST adopt the five-component shape and rebuild. There is
+no four-argument compatibility constructor. Equality, `toString()` and serialized
+record shape include output metadata. This extends the existing supported type;
+no additional application API or SPI is introduced. See [catalog metadata](catalog-and-validation.md).
+
 ## Unsupported Dependencies
 
 Application code MUST NOT treat these areas as supported extension API:

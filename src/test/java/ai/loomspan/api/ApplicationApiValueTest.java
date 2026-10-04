@@ -24,7 +24,10 @@ class ApplicationApiValueTest
                         List.of("name", String.class),
                         List.of("description", String.class),
                         List.of("kind", SkillKind.class),
-                        List.of("inputSchema", String.class));
+                        List.of("inputSchema", String.class),
+                        List.of("outputSchema", String.class));
+        assertThat(SkillDescriptor.class.getConstructors()).hasSize(1);
+        assertThat(SkillDescriptor.class.getConstructors()[0].getParameterCount()).isEqualTo(5);
         assertThat(SkillCatalog.class.getDeclaredMethods())
                 .extracting(java.lang.reflect.Method::getName)
                 .containsExactlyInAnyOrder("generationId", "skills", "skill");
@@ -42,7 +45,7 @@ class ApplicationApiValueTest
                 .isEqualTo(void.class);
         assertThat(SkillTemplate.class.getMethod("validate", String.class, Map.class).getReturnType())
                 .isEqualTo(void.class);
-        assertThatThrownBy(() -> new SkillDescriptor(" ", "description", SkillKind.YAML, "{}"))
+        assertThatThrownBy(() -> new SkillDescriptor(" ", "description", SkillKind.YAML, "{}", null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

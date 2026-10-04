@@ -459,7 +459,9 @@ public class DefaultPlanningService implements PlanningService
         SkillPromptComposition promptComposition = SkillPromptComposer.composePlanningPrompt(
                 definition,
                 buildPlanningPrompt(capabilityName, visibleTools, retryFeedback, evidenceContract,
-                        definition.allowedSkillConstraints()));
+                        definition.allowedSkillConstraints()) + (definition.outputFromSkill() == null ? ""
+                        : "\nCompletion: execute all accepted tasks; the runtime then returns the exact result from the unique direct task for "
+                            + definition.outputFromSkill() + ". Do not copy or synthesize its result."));
         String planningPrompt = promptComposition.systemPrompt();
         String planningUserMessage = MissionInputMessageFormatter.buildUserMessage(objective, missionInput);
 
@@ -716,7 +718,8 @@ public class DefaultPlanningService implements PlanningService
             description = "No description provided.";
         }
 
-        return "- %s: %s".formatted(callback.name(), description);
+        return "- %s: %s\n  Input schema: %s%s".formatted(callback.name(), description, callback.inputSchema(),
+                callback.outputSchema() == null ? "" : "\n  Effective output schema metadata (producer-owned validation): " + callback.outputSchema());
     }
 
     private Map<String, Object> closeMetadata(String status, @Nullable Throwable failure)

@@ -41,6 +41,8 @@ public interface ExecutionStateService
 
     Optional<ExecutionPlan> currentPlan();
 
+    void recordResultForwarded(LoomspanSession session, String skillName, String planId, String taskId, String capabilityName);
+
     void logPlanCreated(LoomspanSession session, ExecutionPlan plan, Map<String, Object> acceptedAttempt);
 
     void logPlanUpdated(LoomspanSession session, ExecutionPlan plan, @Nullable PlanExecutionTransition transition);

@@ -59,7 +59,7 @@ The validator reports all non-cascading issues with stable codes. It does not re
 
 ## Execution behavior
 
-The coordinator partitions the accepted plan once, visits execution units in task-list order, and assigns every task to exactly its accepted `taskId` and `capabilityName`. A worker may correct an invalid action only for that same assignment; it cannot select another ready task or synthesize the final response. Final synthesis is offered only after every accepted task is complete.
+The coordinator partitions the accepted plan once, visits execution units in task-list order, and assigns every task to exactly its accepted `taskId` and `capabilityName`. A worker may correct an invalid action only for that same assignment; it cannot select another ready task or synthesize the final response. Ordinary final synthesis is offered only after every accepted task is complete. An explicit `output_from` parent instead forwards its designated accepted task result after that same complete-success boundary; it cannot return early when the selected task finishes.
 
 Assigned-step, step user-message, and final-synthesis prompts preserve substantive mission objective text, including skill-name references and text after generated-looking prefixes. Overall mission context is background for the assigned worker; its actionable contract remains the exact assigned child task, tool, and arguments, with an explicit prohibition on calling the parent mission skill. Ordinary `SkillTemplate` invocations construct mission wording directly and deliver structured business input through the existing canonical-input user-message path. Input values are not embedded in that generated objective or copied into the step system prompt. Final synthesis cannot call any tool. This prompt guidance does not establish improved live-model accuracy.
 
@@ -67,8 +67,8 @@ Executable anchors: `CapabilityExecutionRouter#objectiveFor`, `StepPromptBuilder
 
 | Contract | Current behavior |
 | --- | --- |
-| Unit admission | The complete unit width plus one reserved final-synthesis step MUST fit before any member is admitted. |
-| Step cost | Each assigned task costs one `max_steps` slot. Final synthesis costs one slot. Corrections for the same assignment remain within that assigned step. |
+| Unit admission | Consumed assignment slots plus the complete unit width and the completion reservation MUST fit before any member is admitted: one reserved slot for synthesis, zero for explicit forwarding. |
+| Step cost | Each assigned task costs one `max_steps` slot. Ordinary final synthesis costs one slot; designated-child forwarding costs no additional slot. Corrections for the same assignment remain within that assigned step. |
 | Execution order | Units execute in task-list order. Members of a valid group overlap only when effective concurrency is `true`; ungrouped tasks and disabled groups serialize. |
 | Enabled-group admission | Every member becomes `IN_PROGRESS` in one plan transition before any member is submitted. |
 | Normal join | Loomspan waits for every started member's ordinary success or failure outcome. One member failure does not cancel a started sibling. |
@@ -113,7 +113,7 @@ Executable anchors: `MissionContextTest#retainsCompleteTaskResultsIndependentlyO
 3. Keep the visible child surface narrow and use exact capability names.
 4. Treat every group as an explicit safety claim; leave uncertain tasks ungrouped.
 5. Add `dependsOn` for causal requirements and directly required results even when unit order guarantees availability; omit unrelated tasks and ancestors whose results are not directly required. These edges do not themselves authorize overlap.
-6. Budget one step per generated task plus one final-synthesis step; grouped units are admitted atomically against that budget.
+6. Budget one step per generated task plus one for ordinary final synthesis; explicit `output_from` forwarding needs no final slot. Grouped units are admitted atomically against the chosen budget. Read [output contracts](output-contracts.md) before choosing completion mode.
 7. Test real overlap for enabled groups, serialized behavior for disabled and ungrouped units, exact assigned-action correction, full-join failure behavior, ordered outcome folding, invalid same-unit and forward references, one corrected planning attempt, and exhausted validation.
 
 ## Known limits

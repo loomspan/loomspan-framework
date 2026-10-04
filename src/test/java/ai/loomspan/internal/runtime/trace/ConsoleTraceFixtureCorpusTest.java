@@ -94,6 +94,8 @@ class ConsoleTraceFixtureCorpusTest
             "current-plan-semantic-evidence",
             "canonical-concurrent-contract",
             "nested-assignment-shadowing",
+            "forwarded-child-result",
+            "nested-forwarded-child-result",
             "planned-tool-success",
             "unplanned-tool-failure",
             "timeout-step-failure",
@@ -201,6 +203,30 @@ class ConsoleTraceFixtureCorpusTest
                 .noneMatch(type -> type.startsWith("MODEL_") || type.startsWith("PLAN_"));
         assertThat(records.stream().filter(record -> "FRAME_CLOSED".equals(record.path("recordType").asText())))
                 .hasSize(1);
+    }
+
+    @Test
+    @Order(2)
+    void forwardingCorpusRecordsExactDecisionAfterAllWorkAndBeforeMissionClosure() throws Exception
+    {
+        for (String name : List.of("forwarded-child-result", "nested-forwarded-child-result")) {
+            List<JsonNode> records = parseLines(fixtureRoot().resolve("traces/" + name + ".ndjson"));
+            List<JsonNode> decisions = records.stream().filter(record -> record.path("recordType").asText().equals("RESULT_FORWARDED")).toList();
+            assertThat(decisions).hasSize(name.startsWith("nested-") ? 2 : 1);
+            for (JsonNode decision : decisions) {
+                assertThat(decision.path("metadata").propertyNames()).containsExactlyInAnyOrder("skillName", "planId", "linkedTaskId", "capabilityName", "recordedAt");
+                long sequence = decision.path("sequence").asLong();
+                String owner = decision.path("frameId").asText();
+                assertThat(records.stream().filter(record -> record.path("recordType").asText().equals("FRAME_CLOSED")
+                        && record.path("frameId").asText().equals(owner)).findFirst().orElseThrow().path("sequence").asLong()).isGreaterThan(sequence);
+                assertThat(records.stream().filter(record -> record.path("recordType").asText().equals("PLAN_UPDATED")
+                        && record.at("/metadata/planId").asText().equals(decision.at("/metadata/planId").asText())
+                        && record.path("sequence").asLong() < sequence).reduce((a, b) -> b).orElseThrow()
+                        .at("/data/tasks")).allSatisfy(task -> assertThat(task.path("status").asText()).isEqualTo("COMPLETED"));
+            }
+            assertThat(records.stream().filter(record -> record.path("recordType").asText().startsWith("MODEL_")))
+                    .allSatisfy(record -> assertThat(record.path("frameType").asText()).isEqualTo("PLANNING"));
+        }
     }
 
     @Test
@@ -1002,6 +1028,8 @@ class ConsoleTraceFixtureCorpusTest
             }
             case "canonical-concurrent-contract" -> executeCanonicalConcurrentFixture(handle);
             case "nested-assignment-shadowing" -> executeNestedAssignmentShadowingFixture(handle);
+            case "forwarded-child-result" -> executeForwardingFixture(session, handle, false);
+            case "nested-forwarded-child-result" -> executeForwardingFixture(session, handle, true);
             case "planned-tool-success" -> executeToolLifecycleFixture(session, handle, false);
             case "unplanned-tool-failure" ->
             {
@@ -1040,11 +1068,15 @@ class ConsoleTraceFixtureCorpusTest
             default -> throw new IllegalArgumentException(name);
         }
 
-        int toolInvocations = name.equals("planned-tool-success") || name.equals("unplanned-tool-failure") ? 1 : 0;
-        int modelCalls = name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
-        int providerAttempts = name.equals("recovered-provider-attempt-diagnostic") ? 2
+        int toolInvocations = name.equals("forwarded-child-result") ? 2 : name.equals("nested-forwarded-child-result") ? 4
+                : name.equals("planned-tool-success") || name.equals("unplanned-tool-failure") ? 1 : 0;
+        int modelCalls = name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
+                : name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
+        int providerAttempts = name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
+                : name.equals("recovered-provider-attempt-diagnostic") ? 2
                 : name.equals("terminal-provider-failure-actionable") ? 1 : 0;
-        int exactModelResponses = name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
+        int exactModelResponses = name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
+                : name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
         SessionUsageSnapshot usageSnapshot = new SessionUsageSnapshot(
                 0, toolInvocations, 0, modelCalls, providerAttempts,
                 terminal.promptUnits(), terminal.completionUnits(), terminal.totalUnits(),
@@ -1052,7 +1084,7 @@ class ConsoleTraceFixtureCorpusTest
         Map<String, Object> completionDetails = new LinkedHashMap<>();
         completionDetails.put("outcome", outcome);
         completionDetails.put("sessionUsageSnapshot",
-                toolInvocations == 1 || name.equals("recovered-provider-attempt-diagnostic")
+                toolInvocations > 0 || name.equals("recovered-provider-attempt-diagnostic")
                         ? usageSnapshot.toTraceMap()
                         : terminal.asMap());
         session.finalizeTrace(new TraceCompletion(
@@ -1090,6 +1122,22 @@ class ConsoleTraceFixtureCorpusTest
                 stableLines.add(line);
             }
             Files.writeString(trace, String.join("\n", stableLines) + "\n", StandardCharsets.UTF_8);
+        }
+        if (name.endsWith("forwarded-child-result")) {
+            List<String> stable = new ArrayList<>();
+            for (String line : Files.readAllLines(trace, StandardCharsets.UTF_8)) {
+                JsonNode record = JSON.readTree(line);
+                if (record.path("recordType").asText().equals("RESULT_FORWARDED")) {
+                    JsonNode metadata = record.path("metadata");
+                    String identity = JSON.writeValueAsString(ordered("skillName", metadata.path("skillName").asText(),
+                            "planId", metadata.path("planId").asText(), "linkedTaskId", metadata.path("linkedTaskId").asText(),
+                            "capabilityName", metadata.path("capabilityName").asText(), "recordedAt", metadata.path("recordedAt")));
+                    line = line.substring(0, line.lastIndexOf(",\"metadata\":")) + ",\"metadata\":" + identity
+                            + line.substring(line.lastIndexOf(",\"data\":"));
+                }
+                stable.add(line);
+            }
+            Files.writeString(trace, String.join("\n", stable) + "\n", StandardCharsets.UTF_8);
         }
         writeExpected(root, name, validExpected(root, name, outcome, terminalFailureId, attributed, terminal));
     }
@@ -1484,6 +1532,88 @@ class ConsoleTraceFixtureCorpusTest
         }
         catch (IOException ex) { throw ex; }
         catch (Exception ex) { throw new IllegalStateException(ex); }
+    }
+
+    private static void executeForwardingFixture(LoomspanSession session, DefaultExecutionTraceHandle handle, boolean nested) throws Exception
+    {
+        PhysicalBranchContext branch = new PhysicalBranchContext(session);
+        ExecutionFrame root = frame("forward-root", null, TraceFrameType.ROOT_MISSION, "prepareReport");
+        appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant()); branch.push(root);
+        ExecutionBindingScope.callWith(fixtureBinding(session, branch, "prepareReport", root.frameId()), () -> {
+            forwardingPlan(handle, root, "report-plan", "prepareReport", nested ? "coordinateReport" : "finishReport", "PENDING", "PENDING");
+            forwardingPlan(handle, root, "report-plan", "prepareReport", nested ? "coordinateReport" : "finishReport", "IN_PROGRESS", "PENDING");
+            ExecutionFrame selected = frame("selected-tool", root.frameId(), TraceFrameType.TOOL_INVOCATION, nested ? "coordinateReport" : "finishReport");
+            appendFrame(handle, TraceRecordType.FRAME_OPENED, selected, CLOCK.instant()); branch.push(selected);
+            DefaultExecutionTraceRecorder recorder = new DefaultExecutionTraceRecorder(CLOCK);
+            ToolTraceContext selectedContext = new ToolTraceContext(selected.route(), "finish-task", false);
+            recorder.recordToolStarted(session, selected, selectedContext, ordered("arguments", ordered()));
+            if (nested) {
+                ExecutionFrame child = frame("forward-child", selected.frameId(), TraceFrameType.SKILL_EXECUTION, "coordinateReport");
+                appendFrame(handle, TraceRecordType.FRAME_OPENED, child, CLOCK.instant()); branch.push(child);
+                ExecutionBindingScope.callWith(fixtureBinding(session, branch, "coordinateReport", child.frameId()), () -> {
+                    forwardingPlan(handle, child, "child-plan", "coordinateReport", "finishReport", "PENDING", "PENDING");
+                    forwardingPlan(handle, child, "child-plan", "coordinateReport", "finishReport", "IN_PROGRESS", "PENDING");
+                    ExecutionFrame producer = frame("producer-tool", child.frameId(), TraceFrameType.TOOL_INVOCATION, "finishReport");
+                    appendFrame(handle, TraceRecordType.FRAME_OPENED, producer, CLOCK.instant()); branch.push(producer);
+                    ToolTraceContext producerContext = new ToolTraceContext("finishReport", "finish-task", false);
+                    recorder.recordToolStarted(session, producer, producerContext, ordered("arguments", ordered()));
+                    recorder.recordToolCompleted(session, producer, producerContext, ordered("result", "  \u5b8c\u6574 report\n"));
+                    appendFrame(handle, TraceRecordType.FRAME_CLOSED, producer, CLOCK.instant()); branch.close(producer);
+                    forwardingPlan(handle, child, "child-plan", "coordinateReport", "finishReport", "COMPLETED", "PENDING");
+                    executeLaterForwardingWork(session, handle, branch, recorder, child, "child-plan", "coordinateReport", "finishReport", "child-later");
+                    recorder.recordResultForwarded(session, "coordinateReport", "child-plan", "finish-task", "finishReport");
+                    return null;
+                });
+                appendFrame(handle, TraceRecordType.FRAME_CLOSED, child, CLOCK.instant()); branch.close(child);
+            }
+            recorder.recordToolCompleted(session, selected, selectedContext, ordered("result", "  \u5b8c\u6574 report\n"));
+            appendFrame(handle, TraceRecordType.FRAME_CLOSED, selected, CLOCK.instant()); branch.close(selected);
+            forwardingPlan(handle, root, "report-plan", "prepareReport", selected.route(), "COMPLETED", "PENDING");
+            executeLaterForwardingWork(session, handle, branch, recorder, root, "report-plan", "prepareReport", selected.route(), "root-later");
+            recorder.recordResultForwarded(session, "prepareReport", "report-plan", "finish-task", selected.route());
+            return null;
+        });
+        appendFrame(handle, TraceRecordType.FRAME_CLOSED, root, CLOCK.instant()); branch.close(root);
+    }
+
+    private static void executeLaterForwardingWork(LoomspanSession session, DefaultExecutionTraceHandle handle,
+            PhysicalBranchContext branch, DefaultExecutionTraceRecorder recorder, ExecutionFrame owner,
+            String plan, String parent, String selected, String frameId) throws IOException
+    {
+        forwardingPlan(handle, owner, plan, parent, selected, "COMPLETED", "IN_PROGRESS");
+        ExecutionFrame later = frame(frameId, owner.frameId(), TraceFrameType.TOOL_INVOCATION, "laterWork");
+        appendFrame(handle, TraceRecordType.FRAME_OPENED, later, CLOCK.instant()); branch.push(later);
+        ToolTraceContext context = new ToolTraceContext("laterWork", "later-task", false);
+        recorder.recordToolStarted(session, later, context, ordered("arguments", ordered()));
+        recorder.recordToolCompleted(session, later, context, ordered("result", "later complete"));
+        appendFrame(handle, TraceRecordType.FRAME_CLOSED, later, CLOCK.instant()); branch.close(later);
+        forwardingPlan(handle, owner, plan, parent, selected, "COMPLETED", "COMPLETED");
+    }
+
+    private static void forwardingPlan(DefaultExecutionTraceHandle handle, ExecutionFrame owner, String plan,
+            String parent, String selected, String selectedStatus, String laterStatus) throws IOException
+    {
+        List<Map<String, Object>> tasks = new ArrayList<>();
+        for (int index = 0; index < 2; index++) tasks.add(ordered("taskId", index == 0 ? "finish-task" : "later-task",
+                "title", index == 0 ? "Produce complete report" : "Finish later work", "status", index == 0 ? selectedStatus : laterStatus,
+                "capabilityName", index == 0 ? selected : "laterWork", "intent", "Complete accepted work", "dependsOn", List.of(),
+                "expectedOutputs", List.of(), "parallelGroup", null, "note", null));
+        Map<String, Object> snapshot = ordered("planId", plan, "capabilityName", parent, "createdAt", CLOCK.instant().toString(),
+                "status", "VALID", "tasks", tasks);
+        Map<String, Object> metadata = ordered("planId", plan);
+        TraceRecordType type = TraceRecordType.PLAN_UPDATED;
+        if (selectedStatus.equals("PENDING")) type = TraceRecordType.PLAN_CREATED;
+        else if (selectedStatus.equals("IN_PROGRESS")) metadata = transitionMetadata(plan, "ADMISSION", List.of("finish-task"), null, false, null);
+        else if (laterStatus.equals("IN_PROGRESS")) metadata = transitionMetadata(plan, "ADMISSION", List.of("later-task"), null, false, null);
+        else metadata = transitionMetadata(plan, "JOIN", List.of(laterStatus.equals("PENDING") ? "finish-task" : "later-task"), null, null, "COMPLETED");
+        if (type == TraceRecordType.PLAN_CREATED) {
+            ExecutionFrame planning = frame("planning-" + plan, owner.frameId(), TraceFrameType.PLANNING, parent + "#planning");
+            appendFrame(handle, TraceRecordType.FRAME_OPENED, planning, CLOCK.instant());
+            appendAttempt(handle, planning, "retry-" + plan, "attempt-" + plan, 1, 0, 0, "EXACT");
+            handle.append(type, planning, TraceFrameType.PLANNING,
+                    ordered("planId", plan, "attemptId", "attempt-" + plan, "retrySequenceId", "retry-" + plan), snapshot);
+            appendFrame(handle, TraceRecordType.FRAME_CLOSED, planning, CLOCK.instant());
+        } else handle.append(type, owner, owner.traceFrameType(), metadata, snapshot);
     }
 
     private static String executeToolLifecycleFixture(
@@ -1884,6 +2014,12 @@ class ConsoleTraceFixtureCorpusTest
         result.put("terminalUsage", terminal.asMap());
         result.put("unattributedUsage", terminal.minus(attributed).asMap());
         result.put("usageComplete", usageComplete(name));
+        if (name.endsWith("forwarded-child-result")) {
+            List<Map<String, Object>> forwarding = new ArrayList<>();
+            if (name.startsWith("nested-")) forwarding.add(ordered("skillName", "coordinateReport", "planId", "child-plan", "linkedTaskId", "finish-task", "capabilityName", "finishReport"));
+            forwarding.add(ordered("skillName", "prepareReport", "planId", "report-plan", "linkedTaskId", "finish-task", "capabilityName", name.startsWith("nested-") ? "coordinateReport" : "finishReport"));
+            result.put("resultForwardings", forwarding);
+        }
         result.put("attempts", expectedAttempts(name));
         result.put("retries", expectedRetries(name));
         result.put("validationLinks", expectedValidationLinks(name));
@@ -2203,6 +2339,9 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "forwarded-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1));
+            case "nested-forwarded-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1),
+                    expectedAttempt(name, "retry-child-plan", "attempt-child-plan", 1));
             case "advisor-retry", "validation-exhaustion" -> List.of(
                     expectedAttempt(name, "retry-1", "attempt-1", 1),
                     expectedAttempt(name, "retry-1", "attempt-2", 2));
@@ -2305,7 +2444,8 @@ class ConsoleTraceFixtureCorpusTest
                 default -> new Usage(3, 1);
             };
             case "validation-exhaustion" -> attemptId.equals("attempt-1") ? new Usage(6, 2) : new Usage(5, 2);
-            case "unavailable-usage", "missing-response-usage", "runtime-terminal-failure", "runtime-terminal-abort" -> Usage.ZERO;
+            case "unavailable-usage", "missing-response-usage", "runtime-terminal-failure", "runtime-terminal-abort",
+                    "forwarded-child-result", "nested-forwarded-child-result" -> Usage.ZERO;
             case "unattributed-usage" -> new Usage(10, 4, 16);
             case "nonterminal-error-then-success" -> new Usage(5, 2);
             case "chunked-payload", "chunked-json-payload" -> new Usage(2, 1);
@@ -2360,6 +2500,20 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "forwarded-child-result" -> List.of(
+                    expectedFrame("forward-root", null, "ROOT_MISSION", "prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("planning-report-plan", "forward-root", "PLANNING", "prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("selected-tool", "forward-root", "TOOL_INVOCATION", "finishReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("root-later", "forward-root", "TOOL_INVOCATION", "laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+            case "nested-forwarded-child-result" -> List.of(
+                    expectedFrame("forward-root", null, "ROOT_MISSION", "prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("planning-report-plan", "forward-root", "PLANNING", "prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("selected-tool", "forward-root", "TOOL_INVOCATION", "coordinateReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("forward-child", "selected-tool", "SKILL_EXECUTION", "coordinateReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("planning-child-plan", "forward-child", "PLANNING", "coordinateReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("producer-tool", "forward-child", "TOOL_INVOCATION", "finishReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("child-later", "forward-child", "TOOL_INVOCATION", "laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("root-later", "forward-root", "TOOL_INVOCATION", "laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "java-root-success" -> List.of(
                     expectedFrame("java-root", null, "ROOT_MISSION", "javaLookup", 0, 0,
                             Usage.ZERO, Usage.ZERO, Usage.ZERO));

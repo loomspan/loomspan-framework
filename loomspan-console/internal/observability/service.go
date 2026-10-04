@@ -298,6 +298,12 @@ func validateSkillSummary(skill SkillSummary) error {
 }
 
 func validateSkillDetail(skill SkillDetail, requestedName string) error {
+	if skill.OutputSchema != nil {
+		var schema map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(*skill.OutputSchema), &schema); err != nil || schema == nil {
+			return errors.New("outputSchema must be JSON object text or null")
+		}
+	}
 	if err := validateSkillSummary(SkillSummary{RegisteredName: skill.RegisteredName,
 		Source: skill.Source, SourcePath: skill.SourcePath, BeanName: skill.BeanName, Method: skill.Method}); err != nil {
 		return err

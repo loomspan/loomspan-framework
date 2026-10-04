@@ -33,6 +33,7 @@ public class YamlSkillManifest
         PROMPT("prompt"),
         INPUT_SCHEMA("input_schema"),
         OUTPUT_SCHEMA("output_schema"),
+        OUTPUT_FROM("output_from"),
         PLANNING_MODE("planning_mode"),
         CONCURRENCY("concurrency"),
         MAX_STEPS("max_steps"),
@@ -82,6 +83,9 @@ public class YamlSkillManifest
 
     @JsonProperty("output_schema")
     private OutputSchemaManifest outputSchema;
+
+    @JsonProperty("output_from")
+    private OutputFromManifest outputFrom;
 
     @JsonProperty("input_schema")
     private InputSchemaManifest inputSchema;
@@ -299,6 +303,20 @@ public class YamlSkillManifest
     {
         declaredFields.add(Field.OUTPUT_SCHEMA);
         this.outputSchema = outputSchema;
+    }
+
+    public OutputFromManifest getOutputFrom() { return outputFrom; }
+
+    public void setOutputFrom(OutputFromManifest outputFrom) {
+        declaredFields.add(Field.OUTPUT_FROM);
+        this.outputFrom = outputFrom;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+    public static class OutputFromManifest {
+        private String skill;
+        public String getSkill() { return skill; }
+        public void setSkill(String skill) { this.skill = skill; }
     }
 
     public InputSchemaManifest getInputSchema()

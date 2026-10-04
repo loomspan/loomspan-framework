@@ -40,11 +40,11 @@ public final class ObservabilityDtos
         }
     }
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record SkillDetail(String registeredName, String source, String sourcePath, String beanName, String method, String yaml)
+    public record SkillDetail(String registeredName, String source, String sourcePath, String beanName, String method, String yaml, @JsonInclude(JsonInclude.Include.ALWAYS) String outputSchema)
     {
         public SkillDetail
         {
-            new RegisteredSkillEntry(registeredName, source, sourcePath, beanName, method, yaml);
+            new RegisteredSkillEntry(registeredName, source, sourcePath, beanName, method, yaml, outputSchema);
         }
     }
     public record FramePathEntry(String frameId, TraceFrameType frameType, String route)

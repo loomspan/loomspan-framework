@@ -47,9 +47,16 @@ public final class InvoiceWorkflow {
 ```
 
 The return value is text. A caller that requires machine-readable output
-SHOULD give the YAML skill an `output_schema` and then parse the returned JSON
+SHOULD give the producing model YAML skill an `output_schema` and then parse the returned JSON
 according to the application's own boundary policy. Java results use Jackson
 serialization and do not have a YAML output schema.
+
+An explicit planning `output_from` parent returns its designated accepted direct
+child task's existing String unchanged after every accepted task succeeds. It
+makes no final model request or duplicate parent validation. Java result text
+retains Jackson representation, including quoted Java Strings; REST returns
+handler text with no envelope extraction. Effective catalog schema is metadata,
+not a new Java/REST validation guarantee. Read [output contracts](../skill-authoring/output-contracts.md).
 
 ## Choose an Input Overload
 
