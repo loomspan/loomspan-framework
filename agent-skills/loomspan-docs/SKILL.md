@@ -9,7 +9,8 @@ metadata:
 
 # Loomspan framework documentation
 
-Use this skill as a versioned context loader and documentation router. The
+Use this skill for developing applications with Loomspan, not for maintaining or
+releasing the framework itself. Use it as a versioned context loader and documentation router. The
 bundled references are authoritative authoring guidance for the Loomspan
 revision from which this skill was installed. They do not replace executable
 framework behavior when an exact edge case requires source verification.

@@ -133,11 +133,6 @@ view.
 - supported public signatures do not expose `internal` or `autoconfigure`
   types.
 
-When changing Loomspan production types, run this architecture test. New
-application-facing API must be a deliberate project decision: place it in
-`ai.loomspan.api`, add it to the closed allowlist, document it in the
-root README and this knowledge set, and add supported-surface tests.
-
 REST is also a semantic expansion of the framework-to-Console protocol in
 beta 4 even though the JSON record shape did not gain a separate version
 field. Framework and Console therefore retain the coordinated exact project
@@ -151,4 +146,4 @@ ordinary complete validation.
 - `LoomspanPublicSurfaceArchitectureTest` defines the executable classification.
 - `ai/loomspan/api/package-info.java` states the supported package boundary.
 - Root `AGENTS.md` records the repository's compatibility policy.
-- Root `README.md`, under “Invoking a skill,” gives the consumer-facing summary.
+- Root `README.md`, under “Explore further,” gives the consumer-facing summary.

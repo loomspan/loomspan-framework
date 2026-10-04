@@ -13,7 +13,7 @@ This directory is the AI-first knowledge base for an LLM that collaborates with 
 
 Loomspan is under active development and has no production release yet. These documents describe the Loomspan revision with which this skill package was published. When working from a source checkout, use the skill package from that same checkout. When working from a Maven dependency, install the skill from the matching repository tag once releases exist. The guide is deliberately incomplete: a missing topic must not be treated as either unsupported or fully understood.
 
-The intended future consumer is a SkillBuilder application, potentially built with Loomspan itself. Until then, an LLM can use these documents directly while working in the repository.
+The consumer is an application developer and their AI assistant, including when this package is installed outside the framework repository. Framework contribution and release engineering are separate workflows.
 
 ## Authority and Verification
 
@@ -47,6 +47,8 @@ Read [source-verification.md](source-verification.md) before performing a source
 | Select a model or configure its connection | [model-selection-and-connections.md](model-selection-and-connections.md) | [mental-model.md](mental-model.md) |
 | Diagnose step-action correction, retries, usage, terminal failures, or a nested runtime path with the packaged Agent Skill `loomspan-console` | [traces-and-debugging.md](traces-and-debugging.md) | The relevant validation or evidence topic |
 | Validate a complete draft YAML skill set before staging | [validation-workflow.md](validation-workflow.md) | [Java skill reload API](../java-api/skill-reload.md) for application integration |
+| Configure execution budgets or diagnose shutdown | [execution-limits.md](execution-limits.md) | [invocation](../java-api/invocation.md) for pending admissions |
+| Diagnose observability HTTP or trace artifact transfers | [observability-http.md](observability-http.md) | [traces-and-debugging.md](traces-and-debugging.md) for interpretation |
 | Resolve ambiguity or an edge case | [source-verification.md](source-verification.md) | The topic's implementation anchors |
 
 Do not load every document by default. Start with the routing entry most relevant to the developer's goal and expand only when the task crosses another documented concern.
@@ -68,7 +70,8 @@ Do not load every document by default. Start with the routing entry most relevan
 | Capability visibility and RBAC | Focused, source-verified | JSR-250 class/method/interface policies, required enforcement, role prefix/hierarchy parity, local allowlists, and scoped caller authentication; expression security is outside this contract |
 | Attachments and virtual files | Not yet documented | Requires separate source verification |
 | Model selection and connections | Focused, source-verified | Framework model aliases, named connections, thinking levels, exact provider-call budgets/range/defaults and mission/retry distinctions, environment and host-map credential references including Vertex JSON, generation capture, rotation, migration, and diagnostics |
-| Execution limits and quotas | Focused, source-verified | Startup defaults, complete candidate session settings, captured provider-attempt quota and run-start diagnostic comparison; detailed per-limit authoring guidance remains incomplete |
+| Observability HTTP diagnostics | Migrated README contract | Same-version adapter and artifact-transfer behavior; source anchors retained |
+| Execution limits and quotas | [Focused, source-verified](execution-limits.md) | Startup defaults, complete candidate session settings, captured provider-attempt quota and run-start diagnostic comparison; detailed per-limit authoring guidance remains incomplete |
 | Traces and debugging | Source-verified | Mission-input null fidelity with unchanged business validation, complete latest-candidate replay for schema and step-action correction with separately bounded parser/validation feedback and explicit provider/resource failures, unchanged invalid-action allowance, thirteen-tool discovery, current runtime status, visible complete live branches with exact snapshot simultaneity, authoritative MCP whole-plan queries, assignment-aware canonical timeline rows, admission/join events plus accepted-order plan projections, inline same-plan status/note comparisons with exact nullable values and explicit bounded/unavailable evidence, exact nullable observed-overlap semantics, independent finalized/acquired/imported discovery, compact/detailed frames and records, descriptor/inline/exact semantic reads, lossless byte-budgeted traversal, usage/failures, deliberate raw forensics, and current-run/transport limitations |
 | Testing skill trees | Focused validation workflow | [validation-workflow.md](validation-workflow.md) covers complete-set checks and candidate name/kind metadata; runtime execution testing remains undocumented |
 
