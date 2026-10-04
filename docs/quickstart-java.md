@@ -1,6 +1,7 @@
 # First embedded Java skill
 
-This example runs one model-backed skill in a command-line Spring Boot application.
+This example turns a customer support report into an engineering triage brief
+using one model-backed skill in a command-line Spring Boot application.
 It requires Java 21+, Maven 3.9+, and an OpenAI connection with a model your account
 can use. It makes a real provider request when run. Use
 [connection guidance](../agent-skills/loomspan-docs/references/skill-authoring/model-selection-and-connections.md)
@@ -76,18 +77,21 @@ Set `OPENAI_API_KEY` and `LOOMSPAN_PROVIDER_MODEL` in the environment of the pro
 that will launch the application. The latter is a provider model ID available to
 your account, not the Loomspan alias `assistant`.
 
-Create `src/main/resources/skills/summarize-note.yaml`:
+Create `src/main/resources/skills/triage-support-request.yaml`:
 
 ```yaml
-name: summarizeNote
-description: Summarize a supplied note in one sentence.
+name: triageSupportRequest
+description: Turn a customer issue into an actionable engineering triage brief.
 model: assistant
-prompt: Preserve the key facts and do not invent missing details.
+prompt: >
+  Assess customer impact and urgency, distinguish reported facts from hypotheses,
+  and propose the next investigation steps. Identify missing information.
+  Do not claim to have checked systems or taken action.
 input_schema:
   type: object
   properties:
-    note: { type: string }
-  required: [note]
+    customerMessage: { type: string }
+  required: [customerMessage]
   additionalProperties: false
 ```
 
@@ -116,9 +120,13 @@ public class DemoApplication {
     }
 
     @Bean
-    ApplicationRunner summarize(SkillTemplate skills) {
-        return args -> System.out.println(skills.invoke("summarizeNote",
-            Map.of("note", "The release review moved to Friday at 10am.")));
+    ApplicationRunner triage(SkillTemplate skills) {
+        return args -> System.out.println(skills.invoke("triageSupportRequest",
+            Map.of("customerMessage", """
+                Since this morning's deployment, checkout times out after payment.
+                Three customers say they were charged but received no order confirmation.
+                Retrying sometimes creates two orders. Browsing and cart updates still work.
+                """)));
     }
 }
 ```
@@ -131,9 +139,15 @@ From the new application's directory:
 mvn spring-boot:run
 ```
 
-The application prints a textual model response and closes. An illustrative
-response is “The release review is now Friday at 10am.” Wording and accuracy are
-model-dependent; the prompt is not a correctness guarantee.
+The application prints a textual triage brief and closes. An illustrative brief
+would identify reported charges without order confirmations and duplicate orders
+as urgent customer impact, treat the deployment as a possible cause rather than a
+proven one, and suggest correlating payment and order records and checking retry
+behavior. It should ask for affected order identifiers and timestamps.
+
+This first skill reasons over the supplied report; it does not query those systems.
+Wording and accuracy are model-dependent. Add application capabilities when the
+workflow needs to gather evidence, as described below.
 
 If startup fails, check the exact dependency, environment variables, alias, and
 `.yaml` file location. If the provider request fails, follow the named connection

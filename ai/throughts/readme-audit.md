@@ -103,7 +103,7 @@ No production code, public API, configuration defaults, or runtime policy change
   `SupportedSurfaceIntegrationTest`.
 - Extracted the quickstart's exact POM, Java, and YAML code blocks into an ignored
   temporary application. Compiled and ran it with a local OpenAI-compatible HTTP
-  test endpoint, checking the requested model, input note, and printed response.
+  test endpoint, checking the requested model, input message, and printed response.
   No paid provider was called; real-provider behavior and model quality remain
   outside this check.
 - Version consistency and the `loomspan-docs` skill validator passed. The validator

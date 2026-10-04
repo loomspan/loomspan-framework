@@ -53,44 +53,54 @@ your runtime version; reading the current README does not establish compatibilit
 with an older release. Installing guidance and connecting Console MCP are separate
 setup steps; see [setup and integration choices](docs/setup.md).
 
-## A small example
+## From customer report to engineering triage
 
-A model-backed skill can start with one YAML file:
+Turn an unstructured support request into an assessment of impact, possible causes,
+and concrete investigation steps. Start with one model-backed YAML skill:
 
 ```yaml
-name: summarizeNote
-description: Summarize a supplied note in one sentence.
+name: triageSupportRequest
+description: Turn a customer issue into an actionable engineering triage brief.
 model: assistant
-prompt: Preserve the key facts and do not invent missing details.
+prompt: >
+  Assess customer impact and urgency, distinguish reported facts from hypotheses,
+  and propose the next investigation steps. Identify missing information.
+  Do not claim to have checked systems or taken action.
 input_schema:
   type: object
   properties:
-    note: { type: string }
-  required: [note]
+    customerMessage: { type: string }
+  required: [customerMessage]
   additionalProperties: false
 ```
 
 In an embedded Java application, invoke it through an injected `SkillTemplate`:
 
 ```java
-String summary = skills.invoke("summarizeNote",
-    Map.of("note", "The release review moved to Friday at 10am."));
+String triage = skills.invoke("triageSupportRequest", Map.of("customerMessage", """
+        Since this morning's deployment, checkout times out after payment.
+        Three customers say they were charged but received no order confirmation.
+        Retrying sometimes creates two orders. Browsing and cart updates still work.
+        """));
 ```
 
 This illustrates the declaration and call; the `assistant` model alias still
 needs configuration. The [complete Java quickstart](docs/quickstart-java.md)
 provides the dependency, configuration, file locations, and runnable application.
-From there, add Java or REST capabilities and compose a planning skill when the
-task needs multiple steps.
+The brief gives an engineer a starting point: reported payment/order mismatches,
+a possible connection to the deployment, and checks needed to establish the cause.
+To investigate beyond the supplied message, expose order lookups or deployment
+history as Java or REST skills and let a planning parent call those allowed
+capabilities. See the [skill-tree guide](agent-skills/loomspan-docs/references/skill-authoring/mental-model.md).
 
 ## Choose your integration
 
 - **Embedded Java:** add the Spring Boot starter and invoke skills in your
   application. This revision targets Java 21+, Spring Boot 4.1, and Spring AI 2;
   building with Maven requires 3.9+.
-- **Sidecar:** use the separate Loomspan HTTP service from applications in other
-  languages or when you want a separate runtime. See [setup](docs/setup.md) for
-  its independently selected version and guidance.
+- **[Sidecar](https://github.com/loomspan/loomspan-sidecar):** use the separate
+  Loomspan HTTP service from applications in other languages or when you want a
+  separate runtime. Its repository covers setup, versions, and integration guidance.
 
 Model-backed skills need a named connection using the OpenAI, Anthropic, Gemini,
 or Ollama driver. Java and REST leaves can execute without a framework model call.
