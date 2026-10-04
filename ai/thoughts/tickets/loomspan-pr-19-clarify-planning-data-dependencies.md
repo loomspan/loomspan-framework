@@ -32,17 +32,17 @@ a small, general clarification in Framework-generated planning guidance.
 
 ## Acceptance criteria
 
-- [ ] Actual generated planning prompts explain that direct result dependencies
+- [x] Actual generated planning prompts explain that direct result dependencies
   should be declared even when list/group order already guarantees availability.
-- [ ] The resulting guidance remains coherent with earlier-unit-only dependency
+- [x] The resulting guidance remains coherent with earlier-unit-only dependency
   references, independent parallel members, and complete-unit join semantics.
-- [ ] Verification covers a generic situation in which a later task requires
+- [x] Verification covers a generic situation in which a later task requires
   one earlier result despite an existing ordering barrier; the guidance does not
   demand dependencies on unrelated earlier tasks or all transitive ancestors.
-- [ ] Production guidance contains no domain-specific solution or model/provider
+- [x] Production guidance contains no domain-specific solution or model/provider
   special case. Runtime, validation, serialized-plan, public API and configuration
   behavior remain unchanged.
-- [ ] Report prompt-contract verification separately from any observed model
+- [x] Report prompt-contract verification separately from any observed model
   response improvement. A live model comparison is optional; neither a provider
   credential nor a successful stochastic response is required for completion.
   Do not claim demonstrated accuracy gains without comparative evidence.
@@ -113,3 +113,42 @@ assert that a GitHub PR with that number already exists.
   validation, plan contracts, public API, or broader production behavior require
   reconsidering scope and the Full 5-Step Pipeline. A materially different dependency
   interpretation must not silently replace the agreed clarification.
+
+## Execution notes
+
+- On 2026-10-04 the developer approved the Fast-Track 2-Step Pipeline —
+  Implementation & Review at the auto-profile gate ("proceed"). Step 4 uses
+  this ticket directly; no research or plan artifacts are required. The checkout
+  was clean before implementation. Independent Step 5 review remains required.
+- The production change is two general planning-rule sentences in
+  `DefaultPlanningService`, beside the existing earlier-unit-only dependency
+  rule. They require direct result declarations despite ordering barriers and
+  discourage unrelated edges and redundant transitive ancestry. Existing
+  execution-unit order, joined groups, and independent member rules remain.
+- Contract assessment: generated model guidance is internal implementation with
+  skill-author-facing recommendations. No supported Application API, Supported
+  SPI, configuration/manifest syntax or validation, persisted/serialized plan,
+  diagnostic format, scheduling/lifecycle, or Java-to-Go boundary contract changes.
+  No signatures, Spring extension points, new types, compatibility shims, or
+  protocol markers are introduced. The existing prompt owner is reused; no new
+  abstraction or unrelated cleanup is needed.
+- Skill-authoring impact is affected: the matching-checkout `loomspan-docs`
+  planning-concurrency topic and README coverage now explain the recommendation,
+  distinguish it from enforced validation, and cite the focused request test.
+  Drift classification is **aligned**: source and existing documentation agree
+  on earlier execution units, complete-unit joins, and independent members;
+  this change supplies the agreed clarification without changing those semantics.
+- `PlanningServiceTest#planningPromptDeclaresDirectResultDependenciesDespiteOrderingBarriers`
+  captures actual generated requests for both singleton and parallel-group
+  predecessors. Its scripted plan has one directly required result, one unrelated
+  result, and a transitive source; it checks guidance and exact preservation of
+  accepted task/dependency fields. This is offline prompt-contract verification,
+  not evidence of improved model responses.
+- Verification: `mvn "-Dtest=PlanningServiceTest,PlanStructureValidatorTest,ExecutionUnitTest,StepLoopMissionExecutionEngineTest,LoomspanPublicSurfaceArchitectureTest" test`
+  passed all 115 tests with no failures, errors, or skips. `git diff --check`
+  passed. The broader full Maven suite was not run because these checks cover the
+  bounded prompt change and the unchanged surrounding invariants.
+- Optional developer check: compare live model responses on representative
+  domain-independent plans before and after the wording change if evidence of
+  model improvement is desired. No live model comparison was run and no accuracy
+  gain is claimed; credentials and stochastic success are not completion gates.

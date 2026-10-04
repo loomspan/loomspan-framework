@@ -656,6 +656,8 @@ public class DefaultPlanningService implements PlanningService
                 - A non-null parallelGroup is a positive assertion that every member is safe to run at the same time and does not require another member's result.
                 - Leave tasks ungrouped whenever ordering, shared-result dependence, or safe overlap is uncertain.
                 - dependsOn expresses explicit causal or dataflow requirements and may reference only tasks in earlier execution units.
+                - Declare dependencies on earlier tasks whose results this task directly requires, even when list order or a completed parallel group already guarantees those results are available.
+                - Do not add dependencies on unrelated earlier tasks or on every member of an earlier parallel group merely because they share a group. Include all members when this task directly requires every member's result. Do not add transitive ancestors unless this task directly requires their results.
                 - Gather enough evidence to support the final answer before the mission is complete.
                 %s%s%s""".formatted(capabilityName, toolList, taskCountConstraints, evidenceConstraints, retrySection);
     }

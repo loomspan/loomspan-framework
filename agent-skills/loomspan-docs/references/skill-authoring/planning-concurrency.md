@@ -35,6 +35,10 @@ Every generated task has one exact visible `capabilityName`, a `dependsOn` array
 
 The planner MUST NOT infer eligibility from missing dependencies. A non-null group is a positive assertion that its members are independent and safe to overlap. Authors SHOULD leave tasks ungrouped whenever ordering, shared-result dependence, side-effect safety, or overlap eligibility is uncertain.
 
+Generated planning guidance asks for dependencies on earlier tasks whose results the task directly requires, even when list order or a completed parallel group already guarantees availability. Authors SHOULD declare these direct result dependencies without adding unrelated earlier tasks or transitive ancestors whose results the task does not directly require. Group membership alone is not a reason to depend on every member; include all members when every member's result is directly required. This is planning guidance, not additional mandatory dependency validation or automatic plan repair; execution-unit order and complete-unit joins still govern scheduling.
+
+`DefaultPlanningService` and `PlanningServiceTest#planningPromptDeclaresDirectResultDependenciesDespiteOrderingBarriers` protect this guidance in actual planning requests. The offline test uses singleton and grouped predecessors with a required result, an unrelated result, and a transitive source; it verifies prompt wording and unchanged acceptance of direct edges. `PlanningServiceTest#planningPromptAllowsEveryEarlierGroupMemberWhenAllResultsAreRequired` also verifies guidance and unchanged acceptance when all members' results are directly required. These tests do not demonstrate improved live-model accuracy.
+
 Minimal valid generated-task fragment:
 
 ```json
@@ -108,7 +112,7 @@ Executable anchors: `MissionContextTest#retainsCompleteTaskResultsIndependentlyO
 2. Omit `concurrency` for the default-enabled behavior, declare `true` for clarity, or declare `false` when authored semantics require forced serialization.
 3. Keep the visible child surface narrow and use exact capability names.
 4. Treat every group as an explicit safety claim; leave uncertain tasks ungrouped.
-5. Add `dependsOn` for causal and dataflow requirements even though those edges do not themselves authorize overlap.
+5. Add `dependsOn` for causal requirements and directly required results even when unit order guarantees availability; omit unrelated tasks and ancestors whose results are not directly required. These edges do not themselves authorize overlap.
 6. Budget one step per generated task plus one final-synthesis step; grouped units are admitted atomically against that budget.
 7. Test real overlap for enabled groups, serialized behavior for disabled and ungrouped units, exact assigned-action correction, full-join failure behavior, ordered outcome folding, invalid same-unit and forward references, one corrected planning attempt, and exhausted validation.
 

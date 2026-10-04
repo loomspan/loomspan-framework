@@ -650,6 +650,68 @@ class PlanningServiceTest {
     }
 
     @Test
+    void planningPromptDeclaresDirectResultDependenciesDespiteOrderingBarriers() {
+        // Scripted responses verify the prompt contract and exact accepted edges, not model accuracy.
+        for (boolean grouped : List.of(false, true)) {
+            DefaultPlanningService planningService = new DefaultPlanningService(new DefaultExecutionStateService(FIXED_CLOCK));
+            String group = grouped ? "independent-results" : null;
+            ExecutionPlan scriptedPlan = new ExecutionPlan("direct-results", "rootVisibleSkill", FIXED_CLOCK.instant(), List.of(
+                    new PlanTask("source", "Read source", PlanTaskStatus.PENDING, "allowedVisibleSkill",
+                            "Read initial source", List.of(), List.of("source data"), null, null),
+                    new PlanTask("required", "Derive required result", PlanTaskStatus.PENDING, "allowedVisibleSkill",
+                            "Derive a result from source data", List.of("source"), List.of("required result"), group, null),
+                    new PlanTask("unrelated", "Gather independent result", PlanTaskStatus.PENDING, "allowedVisibleSkill",
+                            "Gather unrelated data", List.of(), List.of("unrelated result"), group, null),
+                    new PlanTask("consume", "Use required result", PlanTaskStatus.PENDING, "allowedVisibleSkill",
+                            "Use only the required result, without the source or unrelated data",
+                            List.of("required"), List.of("derived conclusion"), null, null)));
+            SimpleChatClient chatClient = new SimpleChatClient(scriptedPlan, "done");
+
+            ExecutionPlan accepted = initializePlan(planningService,
+                    ai.loomspan.internal.core.TestLoomspanSessions.withId("session-direct-results-" + grouped, "test.entry", 3),
+                    "Derive a conclusion from the required result after gathering independent results",
+                    null, rootDefinition(), chatClient, defaultVisibleTools()).orElseThrow();
+
+            assertThat(chatClient.getSystemMessagesSeen()).hasSize(1);
+            assertThat(chatClient.getSystemMessagesSeen().getFirst())
+                    .contains("Declare dependencies on earlier tasks whose results this task directly requires")
+                    .contains("even when list order or a completed parallel group already guarantees those results are available")
+                    .contains("Do not add dependencies on unrelated earlier tasks or on every member of an earlier parallel group merely because they share a group")
+                    .contains("Include all members when this task directly requires every member's result")
+                    .contains("Do not add transitive ancestors unless this task directly requires their results")
+                    .contains("may reference only tasks in earlier execution units")
+                    .contains("does not require another member's result")
+                    .contains("joins the complete unit before starting the next unit");
+            assertThat(accepted.tasks()).isEqualTo(scriptedPlan.tasks());
+            assertThat(accepted.findTask("consume").orElseThrow().dependsOn()).containsExactly("required");
+        }
+    }
+
+    @Test
+    void planningPromptAllowsEveryEarlierGroupMemberWhenAllResultsAreRequired() {
+        DefaultPlanningService planningService = new DefaultPlanningService(new DefaultExecutionStateService(FIXED_CLOCK));
+        ExecutionPlan scriptedPlan = new ExecutionPlan("all-direct-results", "rootVisibleSkill", FIXED_CLOCK.instant(), List.of(
+                new PlanTask("first", "Gather first result", PlanTaskStatus.PENDING, "allowedVisibleSkill",
+                        "Gather first independent result", List.of(), List.of("first result"), "independent-results", null),
+                new PlanTask("second", "Gather second result", PlanTaskStatus.PENDING, "allowedVisibleSkill",
+                        "Gather second independent result", List.of(), List.of("second result"), "independent-results", null),
+                new PlanTask("combine", "Combine both results", PlanTaskStatus.PENDING, "allowedVisibleSkill",
+                        "Combine the first and second results", List.of("first", "second"), List.of("combined conclusion"), null, null)));
+        SimpleChatClient chatClient = new SimpleChatClient(scriptedPlan, "done");
+
+        ExecutionPlan accepted = initializePlan(planningService,
+                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-all-direct-results", "test.entry", 3),
+                "Combine both independent results", null, rootDefinition(), chatClient, defaultVisibleTools()).orElseThrow();
+
+        assertThat(chatClient.getSystemMessagesSeen()).hasSize(1);
+        assertThat(chatClient.getSystemMessagesSeen().getFirst())
+                .contains("merely because they share a group")
+                .contains("Include all members when this task directly requires every member's result");
+        assertThat(accepted.tasks()).isEqualTo(scriptedPlan.tasks());
+        assertThat(accepted.findTask("combine").orElseThrow().dependsOn()).containsExactly("first", "second");
+    }
+
+    @Test
     void planningPromptIncludesSkillPromptBeforePlanningContract() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
