@@ -1,5 +1,7 @@
 package ai.loomspan.internal.runtime.step;
 
+import ai.loomspan.internal.outputvalidation.OutputValidationPolicy;
+import ai.loomspan.internal.outputvalidation.OutputValidationFeedback;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -31,7 +33,6 @@ import ai.loomspan.internal.outputschema.OutputSchemaOutcome;
 import ai.loomspan.internal.outputschema.OutputBindingComposition;
 import ai.loomspan.internal.outputschema.OutputBindingProjection;
 import ai.loomspan.internal.outputschema.OutputSchemaOutcomeStatus;
-import ai.loomspan.internal.outputschema.OutputSchemaValidationIssue;
 import ai.loomspan.internal.outputschema.OutputSchemaValidationResult;
 import ai.loomspan.internal.outputschema.OutputSchemaValidator;
 import ai.loomspan.internal.runtime.LoomspanMissionTimeoutException;
@@ -561,12 +562,10 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
     private FinalResponseValidationOutcome validateContributionFailure(LoomspanSession session, YamlSkillDefinition definition,
             OutputSchemaValidationResult result, int linterAttempt, int schemaAttempt, int evidenceAttempt) {
         int maxRetries = definition.outputSchemaMaxRetries();
-        boolean exhausted = schemaAttempt > maxRetries;
-        executionStateService.recordOutputSchemaOutcome(session, new OutputSchemaOutcome(definition.manifest().getName(),
-                result.failureMode(), schemaAttempt, schemaAttempt - 1, maxRetries,
-                exhausted ? OutputSchemaOutcomeStatus.EXHAUSTED : OutputSchemaOutcomeStatus.RETRYING, result.issues()));
+        boolean exhausted = OutputValidationPolicy.exhausted(schemaAttempt, maxRetries);
+        executionStateService.recordOutputSchemaOutcome(session, OutputValidationPolicy.schemaOutcome(definition.manifest().getName(), schemaAttempt, maxRetries, false, result.failureMode(), result.issues(), Integer.MAX_VALUE));
         return new FinalResponseValidationOutcome(StepValidationResult.rejected("Final model contribution violates output bindings: "
-                + summarizeOutputSchemaIssues(result.issues())), linterAttempt, schemaAttempt + 1, evidenceAttempt, exhausted);
+                + OutputValidationFeedback.planningSchemaSummary(result.issues())), linterAttempt, schemaAttempt + 1, evidenceAttempt, exhausted);
     }
 
     private void preflightUnit(LoomspanSession session,
@@ -1260,31 +1259,21 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         }
 
         int maxRetries = linter.getMaxRetries() == null ? 0 : linter.getMaxRetries();
-        boolean matches = finalResponse != null && java.util.regex.Pattern
-                .compile(linter.getRegex().getPattern())
-                .matcher(finalResponse)
-                .matches();
-        LinterOutcomeStatus status = matches
-                ? LinterOutcomeStatus.PASSED
-                : attempt <= maxRetries ? LinterOutcomeStatus.RETRYING : LinterOutcomeStatus.EXHAUSTED;
+        boolean matches = finalResponse != null && OutputValidationPolicy.matches(
+                java.util.regex.Pattern.compile(linter.getRegex().getPattern()), finalResponse);
         String detail = matches
                 ? "Final response matched configured regex linter."
                 : (linter.getRegex().getMessage() == null || linter.getRegex().getMessage().isBlank()
                         ? "Final response did not match the configured regex linter."
                         : linter.getRegex().getMessage());
 
-        executionStateService.recordLinterOutcome(LoomspanSession.getCurrentSession(), new LinterOutcome(
-                skillDefinition.manifest().getName(),
-                linter.getType(),
-                attempt,
-                attempt - 1,
-                maxRetries,
-                status,
-                detail));
+        LinterOutcome outcome = OutputValidationPolicy.linterOutcome(skillDefinition.manifest().getName(),
+                linter.getType(), attempt, maxRetries, matches, detail);
+        executionStateService.recordLinterOutcome(LoomspanSession.getCurrentSession(), outcome);
 
         return matches
                 ? ValidatorAttemptOutcome.passed(attempt)
-                : ValidatorAttemptOutcome.failed(detail, attempt + 1, status == LinterOutcomeStatus.EXHAUSTED);
+                : ValidatorAttemptOutcome.failed(detail, attempt + 1, outcome.status() == LinterOutcomeStatus.EXHAUSTED);
     }
 
     private ValidatorAttemptOutcome validateOutputSchema(LoomspanSession session,
@@ -1299,18 +1288,9 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
 
         int maxRetries = skillDefinition.outputSchemaMaxRetries();
         OutputSchemaValidationResult result = outputSchemaValidator.validate(finalResponse, skillDefinition.outputSchema());
-        OutputSchemaOutcomeStatus status = result.valid()
-                ? OutputSchemaOutcomeStatus.PASSED
-                : attempt <= maxRetries ? OutputSchemaOutcomeStatus.RETRYING : OutputSchemaOutcomeStatus.EXHAUSTED;
-
-        executionStateService.recordOutputSchemaOutcome(session, new OutputSchemaOutcome(
-                skillDefinition.manifest().getName(),
-                result.failureMode(),
-                attempt,
-                attempt - 1,
-                maxRetries,
-                status,
-                result.issues()));
+        OutputSchemaOutcome outcome = OutputValidationPolicy.schemaOutcome(skillDefinition.manifest().getName(),
+                attempt, maxRetries, result.valid(), result.failureMode(), result.issues(), Integer.MAX_VALUE);
+        executionStateService.recordOutputSchemaOutcome(session, outcome);
 
         if (result.valid())
         {
@@ -1318,9 +1298,9 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         }
 
         return ValidatorAttemptOutcome.failed(
-                "Final response violates output_schema: " + summarizeOutputSchemaIssues(result.issues()),
+                "Final response violates output_schema: " + OutputValidationFeedback.planningSchemaSummary(result.issues()),
                 attempt + 1,
-                status == OutputSchemaOutcomeStatus.EXHAUSTED);
+                outcome.status() == OutputSchemaOutcomeStatus.EXHAUSTED);
     }
 
     private ValidatorAttemptOutcome validateEvidence(LoomspanSession session,
@@ -1354,7 +1334,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             return ValidatorAttemptOutcome.passed(attempt);
         }
 
-        boolean exhausted = attempt > maxRetries;
+        boolean exhausted = OutputValidationPolicy.exhausted(attempt, maxRetries);
         if (exhausted)
         {
             return ValidatorAttemptOutcome.failed(
@@ -1396,26 +1376,6 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         {
             throw new IllegalStateException("Failed to serialize FINAL_RESPONSE payload", ex);
         }
-    }
-
-    private String summarizeOutputSchemaIssues(List<OutputSchemaValidationIssue> issues)
-    {
-        if (issues == null || issues.isEmpty())
-        {
-            return "unknown schema validation error";
-        }
-
-        return issues.stream()
-                .limit(3)
-                .map(issue ->
-                {
-                    String field = issue.canonicalField() == null || issue.canonicalField().isBlank()
-                            ? issue.path()
-                            : issue.canonicalField();
-                    return field + ": " + issue.message();
-                })
-                .reduce((left, right) -> left + "; " + right)
-                .orElse("unknown schema validation error");
     }
 
     private List<Map<String, Object>> attachmentDescriptors(RenderedMissionInput renderedInput)

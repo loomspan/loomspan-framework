@@ -1,5 +1,7 @@
 package ai.loomspan.internal.runtime.evidence;
 
+import ai.loomspan.internal.outputvalidation.OutputValidationPolicy;
+import ai.loomspan.internal.outputvalidation.OutputValidationFeedback;
 import ai.loomspan.internal.core.AdvisorTraceContext;
 import ai.loomspan.internal.core.AdvisorTraceFact;
 import ai.loomspan.internal.core.AdvisorTraceRecorder;
@@ -12,14 +14,12 @@ import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.util.StringUtils;
 
 import java.util.Objects;
 import java.util.function.Consumer;
 
 public final class EvidenceContractCallAdvisor implements CallAdvisor
 {
-    private static final int MAX_ISSUES_IN_HINT = 4;
 
     private final String skillName;
     private final EvidenceContract contract;
@@ -76,7 +76,7 @@ public final class EvidenceContractCallAdvisor implements CallAdvisor
             }
 
             failRecorder.accept(result);
-            if (attempt > maxRetries)
+            if (OutputValidationPolicy.exhausted(attempt, maxRetries))
             {
                 advisorTraceRecorder.record(AdvisorTraceFact.exhausted(
                         new AdvisorTraceContext(getName(), skillName, attempt, "exhausted",
@@ -114,19 +114,10 @@ public final class EvidenceContractCallAdvisor implements CallAdvisor
 
     private Prompt appendHint(Prompt prompt, EvidenceCoverageResult result)
     {
-        StringBuilder hint = new StringBuilder("""
-                Evidence validation failed for the previous response.
-                Do NOT call any tools again. Use only results already gathered from successfully completed direct child skills.
-                Return ONLY corrected raw JSON that removes unsupported optional claims or limits them to supported successful skills.
-                Issues:
-                """);
-
-        result.issues().stream()
-                .limit(MAX_ISSUES_IN_HINT)
-                .forEach(issue -> hint.append("- ").append(issue.message()).append('\n'));
+        String hint = OutputValidationFeedback.ordinaryEvidenceHint(result);
 
         return prompt.augmentSystemMessage(systemMessage -> systemMessage.mutate()
-                .text(joinSystemText(systemMessage.getText(), hint.toString().stripTrailing()))
+                .text(OutputValidationFeedback.joinSystemText(systemMessage.getText(), hint))
                 .build());
     }
 
@@ -141,12 +132,4 @@ public final class EvidenceContractCallAdvisor implements CallAdvisor
         return message == null || message.getText() == null ? "" : message.getText();
     }
 
-    private String joinSystemText(String original, String hint)
-    {
-        if (!StringUtils.hasText(original))
-        {
-            return hint;
-        }
-        return original + "\n\n" + hint;
-    }
 }

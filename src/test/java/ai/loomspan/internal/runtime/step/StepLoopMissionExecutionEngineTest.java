@@ -442,6 +442,146 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(session.getLastLinterOutcome().orElseThrow().status()).isEqualTo(ai.loomspan.internal.linter.LinterOutcomeStatus.PASSED);
     }
 
+    @Test
+    void preservesIndependentPlanningValidatorCountersAndShortCircuitOrder() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var base = definitionWithOutputSchemaAndEvidenceContract();
+        var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern(".*GOOD.*"); regex.setMessage("Use GOOD");
+        var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(1); linter.setRegex(regex);
+        var manifest = base.manifest(); manifest.setLinter(linter);
+        var definition = new YamlSkillDefinition(base.resource(), manifest, EXECUTION_CONFIGURATION, base.evidenceContract());
+        var client = new SequenceChatClient(
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
+                finalObjectEnvelope("{\"result\":3}"), finalObjectEnvelope("{\"result\":\"BAD\",\"reasoning\":\"unsupported\"}"),
+                finalObjectEnvelope("{\"result\":\"BAD\"}"), finalObjectEnvelope("{\"result\":\"GOOD\"}"));
+        var calls = new AtomicInteger();
+        var producer = new BoundCapability(tool("invoiceParser", "unused").metadata(), List.of(),
+                (arguments, taskId, sourceResults) -> { calls.incrementAndGet(); return "AUTHORITATIVE_RESULT"; });
+        var session = TestLoomspanSessions.withId("combined-validation", "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition),
+                    session, definition, client, List.of(producer))).isEqualTo("{\"result\":\"GOOD\"}");
+        }
+        assertThat(calls).hasValue(1);
+        var records = readRecords(session);
+        assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.STRUCTURED_OUTPUT_RECORDED)
+                .map(r -> r.data().path("attempt").asInt())).containsExactly(1, 2, 2, 2);
+        assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.EVIDENCE_VALIDATION_FAILED || r.recordType() == TraceRecordType.EVIDENCE_VALIDATION_PASSED)
+                .map(r -> r.metadata().get("attempt"))).containsExactly(1, 2, 2);
+        assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.LINTER_RECORDED)
+                .map(r -> r.data().path("attempt").asInt())).containsExactly(1, 2);
+        assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.STEP_ACTION_REJECTED)
+                .map(r -> r.metadata().get("stepNumber"))).containsExactly(2, 2, 2);
+        assertThat(client.userMessagesSeen().get(4) + client.systemMessagesSeen().get(4)).contains("AUTHORITATIVE_RESULT", "Use GOOD").doesNotContain("unsupported");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {0, 2})
+    void fullBoundLinterFailureRecordsConfiguredBudgetButNeverCorrects(int budget) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var manifest = outputBindingDefinition(1, false).manifest();
+        var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern("^NEVER$");
+        var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(budget); linter.setRegex(regex); manifest.setLinter(linter);
+        var definition = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        var model = new SequenceChatClient("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
+        var session = TestLoomspanSessions.withId("bound-lint-terminal", "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition),
+                    session, definition, model, List.of(tool("invoiceParser", "\"exact\""))))
+                    .hasMessageContaining("binding_output_contract");
+        }
+        var outcome = session.getLastLinterOutcome().orElseThrow();
+        assertThat(outcome.attempt()).isEqualTo(1); assertThat(outcome.retryCount()).isZero();
+        assertThat(outcome.maxRetries()).isEqualTo(budget);
+        assertThat(outcome.status()).isEqualTo(budget == 0 ? ai.loomspan.internal.linter.LinterOutcomeStatus.EXHAUSTED : ai.loomspan.internal.linter.LinterOutcomeStatus.RETRYING);
+        assertThat(outcome.detail()).isEqualTo("Final response did not match the configured regex linter.");
+        assertThat(model.userMessagesSeen()).hasSize(1);
+        assertThat(readRecords(session)).noneMatch(r -> r.recordType() == TraceRecordType.RESULT_ASSEMBLED);
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"schema,0,false", "schema,2,false", "schema,2,true", "evidence,0,false", "evidence,2,false", "evidence,2,true", "linter,0,false", "linter,2,false", "linter,2,true"})
+    void preservesPlanningTerminalBudgets(String validator, int budget, boolean terminalPass) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var base = definitionWithOutputSchemaAndEvidenceContract();
+        var manifest = base.manifest(); manifest.setOutputSchemaMaxRetries(budget);
+        var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern(".*GOOD.*"); regex.setMessage(" ");
+        var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(budget); linter.setRegex(regex); manifest.setLinter(linter);
+        var definition = new YamlSkillDefinition(base.resource(), manifest, EXECUTION_CONFIGURATION, base.evidenceContract());
+        String invalid = switch (validator) {
+            case "schema" -> "{\"result\":3}";
+            case "evidence" -> "{\"result\":\"GOOD\",\"reasoning\":\"unsupported\"}";
+            default -> "{\"result\":\"BAD\"}";
+        };
+        var responses = new ArrayList<String>();
+        responses.add("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
+        for (int attempt = 0; attempt <= budget; attempt++) responses.add(finalObjectEnvelope(terminalPass && attempt == budget ? "{\"result\":\"GOOD\"}" : invalid));
+        var model = new SequenceChatClient(responses.toArray(String[]::new));
+        var session = TestLoomspanSessions.withId("terminal-" + validator, "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition);
+            if (terminalPass) assertThat(executeMission(engine, session, definition, model, List.of(tool("invoiceParser", "accepted"))))
+                    .isEqualTo("{\"result\":\"GOOD\"}");
+            else assertThatThrownBy(() -> executeMission(engine, session, definition, model, List.of(tool("invoiceParser", "accepted"))))
+                    .hasMessageContaining("Final response validation exhausted at step 2");
+        }
+        assertThat(model.userMessagesSeen()).hasSize(budget + 2);
+        var records = readRecords(session);
+        var policyRecords = records.stream().filter(r -> switch (validator) {
+            case "schema" -> r.recordType() == TraceRecordType.STRUCTURED_OUTPUT_RECORDED;
+            case "evidence" -> r.recordType() == TraceRecordType.EVIDENCE_VALIDATION_FAILED || r.recordType() == TraceRecordType.EVIDENCE_VALIDATION_PASSED;
+            default -> r.recordType() == TraceRecordType.LINTER_RECORDED;
+        }).toList();
+        assertThat(policyRecords).hasSize(budget + 1);
+        if (!terminalPass) {
+            assertThat(records).noneMatch(r -> r.recordType() == TraceRecordType.STEP_COMPLETED && "FINAL_RESPONSE".equals(r.metadata().get("stepAction")));
+            assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.STEP_ACTION_REJECTED)).hasSize(budget + 1);
+            assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.STEP_FAILED)).hasSize(1);
+        }
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void contributionFailureUsesSchemaBudgetAndCompleteAssemblyPolicies(boolean corrected) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var manifest = outputBindingDefinition(2, false).manifest(); manifest.setOutputSchemaMaxRetries(1);
+        var scalar = new YamlSkillManifest.OutputSchemaManifest(); scalar.setType("string");
+        manifest.getOutputSchema().setProperties(Map.of("report", scalar, "summary", scalar, "reasoning", scalar));
+        manifest.getOutputSchema().setRequired(List.of("report", "summary"));
+        var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern("(?s)(?=.*AUTHORITATIVE)(?=.*GOOD).*"); regex.setMessage("Use GOOD");
+        var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(1); linter.setRegex(regex); manifest.setLinter(linter);
+        var definition = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION,
+                ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(Map.of("report", "invoiceParser", "reasoning", "expenseLookup")));
+        var responses = new ArrayList<String>();
+        responses.add("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
+        responses.add(finalObjectEnvelope("{\"report\":null,\"summary\":\"BAD\"}"));
+        if (corrected) {
+            responses.add(finalObjectEnvelope("{\"summary\":\"BAD\",\"reasoning\":\"unsupported\"}"));
+            responses.add(finalObjectEnvelope("{\"summary\":\"BAD\"}"));
+            responses.add(finalObjectEnvelope("{\"summary\":\"GOOD\"}"));
+        } else responses.add(finalObjectEnvelope("{\"report\":\"AUTHORITATIVE\",\"summary\":\"BAD\"}"));
+        var model = new SequenceChatClient(responses.toArray(String[]::new));
+        var calls = new AtomicInteger();
+        var producer = new BoundCapability(tool("invoiceParser", "unused").metadata(), List.of(),
+                (arguments, taskId, sources) -> { calls.incrementAndGet(); return "\"AUTHORITATIVE\""; });
+        var session = TestLoomspanSessions.withId("mixed-policy", "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition);
+            if (corrected) assertThat(executeMission(engine, session, definition, model, List.of(producer))).contains("AUTHORITATIVE", "GOOD").doesNotContain("unsupported");
+            else assertThatThrownBy(() -> executeMission(engine, session, definition, model, List.of(producer)))
+                    .hasMessageContaining("Final response validation exhausted");
+        }
+        assertThat(calls).hasValue(1);
+        assertThat(model.userMessagesSeen()).hasSize(corrected ? 5 : 3);
+        assertThat(model.userMessagesSeen().get(2)).contains("Final model contribution violates output bindings");
+        var records = readRecords(session);
+        assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.RESULT_ASSEMBLED)).hasSize(corrected ? 1 : 0);
+        var schemas = records.stream().filter(r -> r.recordType() == TraceRecordType.STRUCTURED_OUTPUT_RECORDED).toList();
+        assertThat(schemas.stream().map(r -> r.data().path("attempt").asInt())).containsExactlyElementsOf(corrected ? List.of(1, 2, 2, 2) : List.of(1, 2));
+        assertThat(schemas.getFirst().data().path("issues").get(0).path("code").asText()).isEqualTo("binding_model_override");
+        if (!corrected) assertThat(records).noneMatch(r -> r.recordType() == TraceRecordType.LINTER_RECORDED || r.recordType() == TraceRecordType.EVIDENCE_VALIDATION_FAILED || r.recordType() == TraceRecordType.EVIDENCE_VALIDATION_PASSED);
+    }
+
     private static YamlSkillDefinition outputBindingDefinition(int maxSteps, boolean concurrent) {
         var manifest = definitionWithMaxSteps(maxSteps).manifest();
         manifest.setConcurrency(concurrent);
@@ -1069,6 +1209,10 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(toolCalls).hasValue(0);
         assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.STEP_COMPLETED);
         assertThat(readRecords(session)).anyMatch(record -> record.recordType() == TraceRecordType.STEP_FAILED);
+    }
+
+    private static String finalObjectEnvelope(String response) {
+        return "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":" + response + "}";
     }
 
     private static String finalEnvelope(String response) {

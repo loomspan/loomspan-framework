@@ -16,10 +16,10 @@ import java.util.Objects;
 
 public final class OutputSchemaValidator
 {
-    static final String INVALID_JSON = "invalid_json";
+    public static final String INVALID_JSON = "invalid_json";
     static final String TYPE_MISMATCH = "type_mismatch";
     static final String MISSING_REQUIRED = "missing_required_property";
-    static final String UNKNOWN_PROPERTY = "unknown_property";
+    public static final String UNKNOWN_PROPERTY = "unknown_property";
     static final String ENUM_MISMATCH = "enum_mismatch";
     static final String AMBIGUOUS_PROPERTY = "ambiguous_property";
     static final String UNSUPPORTED_SCHEMA = "unsupported_schema";

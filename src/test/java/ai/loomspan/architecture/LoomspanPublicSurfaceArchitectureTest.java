@@ -61,6 +61,8 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.autoconfigure.AiDriver");
 
     private static final Map<String, String> TECHNICALLY_PUBLIC_INTERNAL_TYPES = Map.ofEntries(
+            Map.entry("ai.loomspan.internal.outputvalidation.OutputValidationPolicy", "Public only for shared framework-owned advisor and execution policy mechanics."),
+            Map.entry("ai.loomspan.internal.outputvalidation.OutputValidationFeedback", "Public only for shared framework-owned path-specific validation feedback."),
             Map.entry("ai.loomspan.internal.release.LoomspanReleaseVersion", "Public only for framework-owned release metadata collaboration."),
             Map.entry("ai.loomspan.internal.observability.ObservabilityActivationCoordinator", "Public only for framework-owned auto-configuration composition."),
             Map.entry("ai.loomspan.internal.observability.ObservabilityRuntime", "Public only for framework-owned adapter composition."),

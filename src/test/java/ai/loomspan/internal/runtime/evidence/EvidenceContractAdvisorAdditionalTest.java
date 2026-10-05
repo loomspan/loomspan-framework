@@ -78,6 +78,32 @@ class EvidenceContractAdvisorAdditionalTest
         });
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"0,false", "2,false", "2,true"})
+    void preservesTerminalBudgetAndAccumulatedHints(int budget, boolean terminalPass) {
+        var failures = new ArrayList<EvidenceCoverageResult>();
+        var passes = new ArrayList<EvidenceCoverageResult>();
+        var facts = new ArrayList<ai.loomspan.internal.core.AdvisorTraceFact>();
+        var advisor = new EvidenceContractCallAdvisor("parent", TestEvidenceContracts.compiled(Map.of("claim", "producer")),
+                new EvidenceBackedOutputValidator(), budget, passes::add, failures::add, facts::add);
+        var candidates = new ArrayList<String>();
+        for (int attempt = 0; attempt <= budget; attempt++) candidates.add(terminalPass && attempt == budget ? "{}" : "{\"claim\":\"FULL_CANDIDATE\"}");
+        var chain = new RecordingChain(candidates);
+        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session ->
+                TestExecutionBindings.callWithCurrentSessionMission(() -> {
+                    if (terminalPass) assertThat(advisor.adviseCall(request(), chain).chatResponse().getResult().getOutput().getText()).isEqualTo("{}");
+                    else assertThatThrownBy(() -> advisor.adviseCall(request(), chain)).isInstanceOf(LoomspanEvidenceValidationException.class)
+                            .hasMessageContaining((budget + 1) + " attempt");
+                    return null;
+                }));
+        assertThat(chain.requests).hasSize(budget + 1);
+        assertThat(failures).hasSize(terminalPass ? budget : budget + 1);
+        assertThat(passes).hasSize(terminalPass ? 1 : 0);
+        assertThat(facts.getLast().context().attempt()).isEqualTo(budget + 1);
+        assertThat(facts.getLast().context().status()).isEqualTo(terminalPass ? "passed" : "exhausted");
+        assertThat(chain.requests.getLast().prompt().getSystemMessage().getText().split("Evidence validation failed", -1)).hasSize(budget + 1);
+    }
+
     private static YamlSkillManifest.OutputSchemaManifest scalar(String type)
     {
         YamlSkillManifest.OutputSchemaManifest scalar = new YamlSkillManifest.OutputSchemaManifest();

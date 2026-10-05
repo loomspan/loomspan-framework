@@ -1,5 +1,7 @@
 package ai.loomspan.internal.outputschema;
 
+import ai.loomspan.internal.outputvalidation.OutputValidationPolicy;
+import ai.loomspan.internal.outputvalidation.OutputValidationFeedback;
 import ai.loomspan.internal.core.AdvisorTraceContext;
 import ai.loomspan.internal.core.AdvisorTraceFact;
 import ai.loomspan.internal.core.AdvisorTraceRecorder;
@@ -16,7 +18,6 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,9 +30,8 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
     public static final String CONTEXT_KEY = "loomspan.output-schema.outcome";
     public static final String PLANNING_CALL_KEY = "loomspan.advisor.planning-call";
 
-    private static final int MAX_ISSUES_IN_HINT = 4;
     private static final int MAX_ISSUES_IN_OUTCOME = 4;
-    static final int MAX_CORRECTION_CODE_POINTS = 2_048;
+    static final int MAX_CORRECTION_CODE_POINTS = OutputValidationFeedback.MAX_CORRECTION_CODE_POINTS;
 
     private final String skillName;
     private final YamlSkillManifest.OutputSchemaManifest schema;
@@ -125,28 +125,24 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
                     var replacement = new org.springframework.ai.chat.model.Generation(AssistantMessage.builder().content(assembled.content()).properties(output.getMetadata()).toolCalls(output.getToolCalls()).media(output.getMedia()).build(), generation.getMetadata());
                     response = response.mutate().chatResponse(new org.springframework.ai.chat.model.ChatResponse(List.of(replacement), originalResponse.getMetadata())).build();
                 }
-                return record(response, outcome(attempt, OutputSchemaOutcomeStatus.PASSED, null, List.of()));
+                return record(response, OutputValidationPolicy.schemaOutcome(skillName, attempt, maxRetries, true, null, List.of(), MAX_ISSUES_IN_OUTCOME));
             }
 
-            if (attempt > maxRetries)
+            if (OutputValidationPolicy.exhausted(attempt, maxRetries))
             {
                 log.warn("Output schema validation exhausted for skill '{}' after attempt {} of {} (failureMode={}): {}",
                         skillName,
                         attempt,
                         maxRetries + 1,
                         result.failureMode(),
-                        summarizeIssues(result.issues(), MAX_ISSUES_IN_HINT));
+                        OutputValidationFeedback.ordinarySchemaSummary(result.issues(), 4));
 
-                OutputSchemaOutcome exhaustedOutcome = outcome(
-                        attempt,
-                        OutputSchemaOutcomeStatus.EXHAUSTED,
-                        result.failureMode(),
-                        result.issues());
+                OutputSchemaOutcome exhaustedOutcome = OutputValidationPolicy.schemaOutcome(skillName, attempt, maxRetries, false, result.failureMode(), result.issues(), MAX_ISSUES_IN_OUTCOME);
 
                 advisorTraceRecorder.record(AdvisorTraceFact.exhausted(
                         new AdvisorTraceContext(getName(), skillName, attempt, "exhausted",
                                 ModelTraceContext.attemptFrom(response.context())),
-                        truncateIssues(result.issues(), MAX_ISSUES_IN_OUTCOME)));
+                        OutputValidationPolicy.limitIssues(result.issues(), MAX_ISSUES_IN_OUTCOME)));
 
                 recordOnSession(exhaustedOutcome);
 
@@ -164,14 +160,14 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
                     attempt,
                     maxRetries + 1,
                     result.failureMode(),
-                    summarizeIssues(result.issues(), MAX_ISSUES_IN_HINT));
+                    OutputValidationFeedback.ordinarySchemaSummary(result.issues(), 4));
 
-            record(response, outcome(attempt, OutputSchemaOutcomeStatus.RETRYING, result.failureMode(), result.issues()));
+            record(response, OutputValidationPolicy.schemaOutcome(skillName, attempt, maxRetries, false, result.failureMode(), result.issues(), MAX_ISSUES_IN_OUTCOME));
 
             advisorTraceRecorder.record(AdvisorTraceFact.retryRequested(
                     new AdvisorTraceContext(getName(), skillName, attempt, "retrying",
                             ModelTraceContext.attemptFrom(response.context())),
-                    truncateIssues(result.issues(), MAX_ISSUES_IN_OUTCOME)));
+                    OutputValidationPolicy.limitIssues(result.issues(), MAX_ISSUES_IN_OUTCOME)));
 
             currentRequest = baselineRequest.mutate()
                     .prompt(buildRetryPrompt(baselineRequest.prompt(), candidate, result))
@@ -203,21 +199,6 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
     public int getOrder()
     {
         return DEFAULT_CHAT_MEMORY_PRECEDENCE_ORDER - (compositionDefinition == null ? 90 : 70);
-    }
-
-    private OutputSchemaOutcome outcome(int attempt,
-            OutputSchemaOutcomeStatus status,
-            OutputSchemaFailureMode failureMode,
-            List<OutputSchemaValidationIssue> issues)
-    {
-        return new OutputSchemaOutcome(
-                skillName,
-                failureMode,
-                attempt,
-                attempt - 1,
-                maxRetries,
-                status,
-                truncateIssues(issues, MAX_ISSUES_IN_OUTCOME));
     }
 
     private ChatClientResponse record(ChatClientResponse response, OutputSchemaOutcome outcome)
@@ -268,72 +249,8 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         {
             messages.add(new AssistantMessage(candidate));
         }
-        messages.add(new UserMessage(correctionMessage(result)));
+        messages.add(new UserMessage(OutputValidationFeedback.ordinarySchemaCorrection(result, compositionDefinition != null)));
         return new Prompt(messages, baselinePrompt.getOptions());
-    }
-
-    private String issueMessage(OutputSchemaValidationIssue issue)
-    {
-        String path = StringUtils.hasText(issue.path()) ? issue.path() : "$";
-        if (OutputSchemaValidator.INVALID_JSON.equals(issue.code()))
-        {
-            StringBuilder message = new StringBuilder("Path ").append(quoteFact(path)).append(": invalid JSON");
-            if (StringUtils.hasText(issue.reason()))
-            {
-                message.append(". Parser reason: ").append(quoteFact(issue.reason()));
-            }
-            if (issue.line() != null || issue.column() != null || issue.characterOffset() != null)
-            {
-                message.append(". Location:");
-                if (issue.line() != null) message.append(" line ").append(issue.line());
-                if (issue.column() != null) message.append(", column ").append(issue.column());
-                if (issue.characterOffset() != null) message.append(", character offset ").append(issue.characterOffset());
-            }
-            if (StringUtils.hasText(issue.fragment()))
-            {
-                message.append(". Nearby fragment (escaped JSON string): ").append(quoteFact(issue.fragment()));
-            }
-            return message.append('.').toString();
-        }
-        if (StringUtils.hasText(issue.expected()) && StringUtils.hasText(issue.actual()))
-        {
-            return "Path " + quoteFact(path) + ": expected " + quoteFact(issue.expected())
-                    + ", received " + quoteFact(issue.actual()) + ".";
-        }
-        return "Path " + quoteFact(path) + ": " + quoteFact(sentence(issue.message()));
-    }
-
-    private List<OutputSchemaValidationIssue> truncateIssues(List<OutputSchemaValidationIssue> issues, int maxIssues)
-    {
-        if (issues == null || issues.isEmpty())
-        {
-            return List.of();
-        }
-
-        return issues.stream()
-                .limit(maxIssues)
-                .toList();
-    }
-
-    private String summarizeIssues(List<OutputSchemaValidationIssue> issues, int maxIssues)
-    {
-        if (issues == null || issues.isEmpty())
-        {
-            return "no validation issues recorded";
-        }
-
-        List<String> summarized = issues.stream()
-                .limit(maxIssues)
-                .map(this::logIssueMessage)
-                .toList();
-
-        if (issues.size() > maxIssues)
-        {
-            summarized = new ArrayList<>(summarized);
-            summarized.add("+" + (issues.size() - maxIssues) + " more issue(s)");
-        }
-
-        return String.join("; ", summarized);
     }
 
     private String extractAssistantText(ChatClientResponse response)
@@ -345,105 +262,6 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
 
         AssistantMessage message = response.chatResponse().getResult().getOutput();
         return message == null || message.getText() == null ? "" : message.getText();
-    }
-
-    private String correctionMessage(OutputSchemaValidationResult result)
-    {
-        String heading = result.failureMode() == OutputSchemaFailureMode.INVALID_JSON
-                ? "The previous response could not be parsed as JSON."
-                : "The previous response is valid JSON but does not satisfy the configured output_schema.";
-        String prefix = heading + "\nIssues:\n";
-        List<String> bullets = result.issues().stream()
-                .limit(MAX_ISSUES_IN_HINT)
-                .map(issue -> "- " + issueMessage(issue) + "\n")
-                .toList();
-
-        for (int displayed = bullets.size(); displayed >= 0; displayed--)
-        {
-            int omitted = result.issues().size() - displayed;
-            String tail = correctionTail(omitted);
-            String renderedBullets = String.join("", bullets.subList(0, displayed)).stripTrailing();
-            String correction = prefix + renderedBullets + "\n" + tail;
-            if (codePointCount(correction) <= MAX_CORRECTION_CODE_POINTS)
-            {
-                return correction;
-            }
-        }
-
-        throw new IllegalStateException("Required output-schema correction text exceeds its configured bound");
-    }
-
-    private String correctionTail(int omitted)
-    {
-        StringBuilder tail = new StringBuilder();
-        if (omitted > 0)
-        {
-            tail.append(omitted).append(" additional issue(s) omitted.\n");
-        }
-        return tail.append("Preserve all already-valid structure and values visible in the previous assistant response.\n")
-                .append("Do NOT call any tools again; use the data already returned by completed tool calls.\n")
-                .append(compositionDefinition == null ? "Return one complete corrected JSON object only, with no explanation, markdown, or code fences." : "Return only the corrected model-owned JSON contribution. Omit every framework-bound destination; Framework supplies those values.")
-                .toString();
-    }
-
-    private String quoteFact(String value)
-    {
-        StringBuilder quoted = new StringBuilder("\"");
-        for (int index = 0; index < value.length();)
-        {
-            int codePoint = value.codePointAt(index);
-            switch (codePoint)
-            {
-                case '\"' -> quoted.append("\\\"");
-                case '\\' -> quoted.append("\\\\");
-                case '\b' -> quoted.append("\\b");
-                case '\f' -> quoted.append("\\f");
-                case '\n' -> quoted.append("\\n");
-                case '\r' -> quoted.append("\\r");
-                case '\t' -> quoted.append("\\t");
-                default -> {
-                    if (codePoint < 0x20)
-                    {
-                        quoted.append(String.format("\\u%04x", codePoint));
-                    }
-                    else
-                    {
-                        quoted.appendCodePoint(codePoint);
-                    }
-                }
-            }
-            index += Character.charCount(codePoint);
-        }
-        return quoted.append('\"').toString();
-    }
-
-    private String logIssueMessage(OutputSchemaValidationIssue issue)
-    {
-        String path = StringUtils.hasText(issue.path()) ? issue.path() : "$";
-        if (OutputSchemaValidator.INVALID_JSON.equals(issue.code()))
-        {
-            return path + ": invalid JSON";
-        }
-        if (OutputSchemaValidator.UNKNOWN_PROPERTY.equals(issue.code()))
-        {
-            return "output object: validation issue code " + issue.code();
-        }
-        if (StringUtils.hasText(issue.expected()) && StringUtils.hasText(issue.actual()))
-        {
-            return path + ": expected " + issue.expected() + ", received " + issue.actual();
-        }
-        return path + ": validation issue code " + issue.code();
-    }
-
-    private String sentence(String message)
-    {
-        if (!StringUtils.hasText(message)) return "validation failed.";
-        return message.endsWith(".") ? message : message + ".";
-    }
-
-    private int codePointCount(String value)
-    {
-        return value.codePointCount(0, value.length());
     }
 
 }

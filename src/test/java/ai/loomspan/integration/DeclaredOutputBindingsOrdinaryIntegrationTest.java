@@ -44,6 +44,10 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                     .hasStackTraceContaining("binding_linter_validation");
             assertThat(calls.get()).isZero();
             assertThat(events).isNotEmpty().noneMatch(event->event.type().equalsIgnoreCase("RESULT_ASSEMBLED"));
+            assertThat(events).filteredOn(event -> event.type().equalsIgnoreCase("LINTER")).singleElement()
+                    .satisfies(event -> assertThat(event.details()).containsEntry("attempt", 1).containsEntry("retryCount", 0)
+                            .containsEntry("maxRetries", 2).containsEntry("status", "EXHAUSTED")
+                            .containsEntry("detail", "Assembled output did not match configured regex linter."));
         });
     }
     @Test void heldCorrectionRetainsCapturedBindingGenerationAcrossReload() throws Exception {
@@ -143,6 +147,37 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
             assertThat(events).isNotEmpty().noneMatch(event->event.type().equalsIgnoreCase("RESULT_ASSEMBLED"));
         });
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void mixedLinterChecksCompleteAssemblyAndRejectsExhaustion(boolean corrected) throws Exception {
+        custom("""
+                output_schema:
+                  type: object
+                  properties:
+                    assessment: {type: object, additionalProperties: true}
+                    summary: {type: string}
+                  required: [assessment, summary]
+                  additionalProperties: false
+                output_bindings:
+                  /assessment: {from: input, path: /assessment}
+                linter:
+                  type: regex
+                  max_retries: 1
+                  regex:
+                    pattern: '(?s)(?=.*original)(?=.*GOOD).*'
+                    message: Use GOOD
+                """,List.of("{\"summary\":\"BAD\"}", corrected ? "{\"summary\":\"GOOD\"}" : "{\"summary\":\"BAD\"}"),
+                body -> assertThat(body).contains("Framework supplies these output destinations"), (template,calls) -> {
+                    var events = new ArrayList<ai.loomspan.api.SkillExecutionEvent>();
+                    if (corrected) assertThat(template.invoke("comparison", Map.of("assessment",Map.of("exact","original")), view -> events.addAll(view.events())))
+                            .contains("original", "GOOD");
+                    else assertThatThrownBy(() -> template.invoke("comparison", Map.of("assessment",Map.of("exact","original")), view -> events.addAll(view.events())))
+                            .hasStackTraceContaining("binding_linter_validation");
+                    assertThat(calls).hasValue(2);
+                    assertThat(events.stream().filter(event -> event.type().equalsIgnoreCase("RESULT_ASSEMBLED"))).hasSize(corrected ? 1 : 0);
+                });
+    }
+
     private String nestedContract() { return """
             output_schema:
               type: object

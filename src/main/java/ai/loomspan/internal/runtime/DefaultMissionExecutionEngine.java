@@ -1,5 +1,7 @@
 package ai.loomspan.internal.runtime;
 
+import ai.loomspan.internal.outputvalidation.OutputValidationPolicy;
+
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.ExecutionFrame;
 import ai.loomspan.internal.core.ExecutionPlan;
@@ -90,9 +92,7 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
                 if (!composition.modelContributionRequired()) {
                     var assembled = composition.composeEmpty();
                     if (!assembled.validation().valid()) throw new IllegalArgumentException("binding_output_validation: " + assembled.validation().issues());
-                    executionStateService.recordOutputSchemaOutcome(session, new ai.loomspan.internal.outputschema.OutputSchemaOutcome(
-                            skillName, null, 1, 0, definition.outputSchemaMaxRetries(),
-                            ai.loomspan.internal.outputschema.OutputSchemaOutcomeStatus.PASSED, List.of()));
+                    executionStateService.recordOutputSchemaOutcome(session, OutputValidationPolicy.schemaOutcome(skillName, 1, definition.outputSchemaMaxRetries(), true, null, List.of(), 4));
                     validateBoundPolicies(session, definition, assembled.content());
                     lifecycle.requireOpenForNewWork(capturedBinding);
                     executionStateService.recordResultAssembled(session, skillName, null, false, composition.provenance(), assembled.content());
@@ -169,10 +169,9 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
         if (!evidence.complete()) throw new IllegalArgumentException("binding_evidence_validation: " + evidence.issues());
         var linter = definition.linter();
         if (linter != null && "regex".equals(linter.getType()) && linter.getRegex()!=null) {
-            boolean matches = java.util.regex.Pattern.compile(linter.getRegex().getPattern()).matcher(content).matches();
-            executionStateService.recordLinterOutcome(session,new ai.loomspan.internal.linter.LinterOutcome(definition.manifest().getName(),
-                    linter.getType(),1,0,linter.getMaxRetries()==null ? 0 : linter.getMaxRetries(),
-                    matches ? ai.loomspan.internal.linter.LinterOutcomeStatus.PASSED : ai.loomspan.internal.linter.LinterOutcomeStatus.EXHAUSTED,
+            boolean matches = OutputValidationPolicy.matches(java.util.regex.Pattern.compile(linter.getRegex().getPattern()), content);
+            executionStateService.recordLinterOutcome(session,OutputValidationPolicy.immutableLinterOutcome(definition.manifest().getName(),
+                    linter.getType(), linter.getMaxRetries()==null ? 0 : linter.getMaxRetries(), matches,
                     matches ? "Assembled output matched configured regex linter." : "Assembled output did not match configured regex linter."));
             if (!matches) throw new IllegalArgumentException("binding_linter_validation: Immutable assembled output failed configured regex linter.");
         }

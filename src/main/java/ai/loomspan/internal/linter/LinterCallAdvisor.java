@@ -1,5 +1,7 @@
 package ai.loomspan.internal.linter;
 
+import ai.loomspan.internal.outputvalidation.OutputValidationPolicy;
+import ai.loomspan.internal.outputvalidation.OutputValidationFeedback;
 import ai.loomspan.internal.core.AdvisorTraceContext;
 import ai.loomspan.internal.core.AdvisorTraceFact;
 import ai.loomspan.internal.core.AdvisorTraceRecorder;
@@ -11,7 +13,6 @@ import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.util.StringUtils;
 
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -86,26 +87,26 @@ public final class LinterCallAdvisor implements CallAdvisor
         {
             ChatClientResponse response = downstreamChain.nextCall(currentRequest);
             String candidate = extractAssistantText(response);
-            if (pattern.matcher(candidate).matches())
+            if (OutputValidationPolicy.matches(pattern, candidate))
             {
                 advisorTraceRecorder.record(AdvisorTraceFact.passed(
                         new AdvisorTraceContext(getName(), skillName, attempt, "passed",
                                 ModelTraceContext.attemptFrom(response.context())),
                         candidate));
-                return record(response, outcome(attempt, LinterOutcomeStatus.PASSED, failureMessage));
+                return record(response, OutputValidationPolicy.linterOutcome(skillName, linterType, attempt, maxRetries, true, failureMessage));
             }
 
-            if (attempt > maxRetries)
+            if (OutputValidationPolicy.exhausted(attempt, maxRetries))
             {
                 advisorTraceRecorder.record(AdvisorTraceFact.exhausted(
                         new AdvisorTraceContext(getName(), skillName, attempt, "exhausted",
                                 ModelTraceContext.attemptFrom(response.context())),
                         candidate,
                         failureMessage));
-                return record(response, outcome(attempt, LinterOutcomeStatus.EXHAUSTED, failureMessage));
+                return record(response, OutputValidationPolicy.linterOutcome(skillName, linterType, attempt, maxRetries, false, failureMessage));
             }
 
-            record(response, outcome(attempt, LinterOutcomeStatus.RETRYING, failureMessage));
+            record(response, OutputValidationPolicy.linterOutcome(skillName, linterType, attempt, maxRetries, false, failureMessage));
 
             advisorTraceRecorder.record(AdvisorTraceFact.retryRequested(
                     new AdvisorTraceContext(getName(), skillName, attempt, "retrying",
@@ -131,11 +132,6 @@ public final class LinterCallAdvisor implements CallAdvisor
     public int getOrder()
     {
         return DEFAULT_CHAT_MEMORY_PRECEDENCE_ORDER - 100;
-    }
-
-    private LinterOutcome outcome(int attempt, LinterOutcomeStatus status, String detail)
-    {
-        return new LinterOutcome(skillName, linterType, attempt, attempt - 1, maxRetries, status, detail);
     }
 
     private ChatClientResponse record(ChatClientResponse response, LinterOutcome outcome)
@@ -178,7 +174,7 @@ public final class LinterCallAdvisor implements CallAdvisor
     {
         String hint = HINT_TEMPLATE.formatted(detail).stripTrailing();
         return prompt.augmentSystemMessage(systemMessage -> systemMessage.mutate()
-                .text(joinSystemText(systemMessage.getText(), hint))
+                .text(OutputValidationFeedback.joinSystemText(systemMessage.getText(), hint))
                 .build());
     }
 
@@ -190,15 +186,6 @@ public final class LinterCallAdvisor implements CallAdvisor
         }
         AssistantMessage message = response.chatResponse().getResult().getOutput();
         return message == null || message.getText() == null ? "" : message.getText();
-    }
-
-    private String joinSystemText(String original, String hint)
-    {
-        if (!StringUtils.hasText(original))
-        {
-            return hint;
-        }
-        return original + "\n\n" + hint;
     }
 
 }
