@@ -324,7 +324,7 @@ public class DefaultPlanningService implements PlanningService
                 if (candidate != null) {
                     var counts = planTaskConstraintValidator.validate(candidate, taskConstraints);
                     var coverage = evidenceCoverageValidator.validatePlanCoverage(candidate, evidenceContract);
-                    var bindings = new PlanInputBindingDependencyValidator().validate(candidate, taskConstraints);
+                    var bindings = bindingIssues(candidate, definition);
                     combinedFeedback = mergeRetryFeedback(combinedFeedback,
                             mergeRetryFeedback(mergeRetryFeedback(counts.retryFeedback(), coverage.retryFeedback()), String.join("\n", bindings)));
                     recordPlanTaskConstraintEvent(session, planningFrame, TraceRecordType.PLAN_VALIDATION_FAILED,
@@ -365,7 +365,7 @@ public class DefaultPlanningService implements PlanningService
                     plan,
                     evidenceContract);
 
-            List<String> bindingIssues = new PlanInputBindingDependencyValidator().validate(plan, taskConstraints);
+            List<String> bindingIssues = bindingIssues(plan, definition);
             String bindingFeedback = String.join("\n", bindingIssues);
             boolean hasBindingIssues = !bindingIssues.isEmpty();
             boolean hasDeterministicEvidenceGap = !evidenceCoverage.complete();
@@ -420,13 +420,19 @@ public class DefaultPlanningService implements PlanningService
         }
     }
 
+    private List<String> bindingIssues(ExecutionPlan plan, YamlSkillDefinition definition) {
+        List<String> issues = new ArrayList<>(new PlanInputBindingDependencyValidator().validate(plan, definition.allowedSkillConstraints()));
+        issues.addAll(new PlanOutputBindingProducerValidator().validate(plan, definition.outputBindings()));
+        return List.copyOf(issues);
+    }
+
     private void recordInputBindingDependencyEvent(LoomspanSession session, ExecutionFrame frame,
             TraceRecordType type, List<String> issues, int retryCount, Map<String, Object> modelAttempt) {
         if (issues.isEmpty()) return;
         Map<String, Object> metadata = new LinkedHashMap<>(modelAttempt);
         metadata.put("retryCount", retryCount);
         metadata.put("validationStatus", planningValidationStatus(type, retryCount));
-        metadata.put("issueCodes", List.of("input-binding-dependency"));
+        metadata.put("issueCodes", issues.stream().map(issue -> issue.startsWith("Output binding") ? "output-binding-producer" : "input-binding-dependency").distinct().toList());
         metadata.put("severity", "ERROR");
         executionStateService.recordPlanningEvent(session, frame, type, metadata, issues);
     }
@@ -508,7 +514,7 @@ public class DefaultPlanningService implements PlanningService
         SkillPromptComposition promptComposition = SkillPromptComposer.composePlanningPrompt(
                 definition,
                 buildPlanningPrompt(capabilityName, visibleTools, retryFeedback, evidenceContract,
-                        definition.allowedSkillConstraints()) + (definition.outputFromSkill() == null ? ""
+                        definition.allowedSkillConstraints()) + PlanOutputBindingProducerValidator.render(definition.outputBindings()) + (definition.outputFromSkill() == null ? ""
                         : "\nCompletion: execute all accepted tasks; the runtime then returns the exact result from the unique direct task for "
                             + definition.outputFromSkill() + ". Do not copy or synthesize its result."));
         String planningPrompt = promptComposition.systemPrompt();

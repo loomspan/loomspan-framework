@@ -27,7 +27,7 @@ rbac_roles: [ACCOUNT_READER]
 | `name`, `description` | Required under the shared YAML rules |
 | `rest` | Required and MUST be the Boolean `true`; omit it for non-REST YAML |
 | `input_schema`, `rbac_roles` | Optional |
-| `model`, `prompt`, `thinking_level`, `allowed_skills`, `planning_mode`, `concurrency`, `max_steps`, `linter`, `output_schema`, `output_schema_max_retries`, `output_from` | MUST be absent, including null or empty declarations |
+| `model`, `prompt`, `thinking_level`, `allowed_skills`, `planning_mode`, `concurrency`, `max_steps`, `linter`, `output_schema`, `output_schema_max_retries`, `output_from`, `output_bindings`, `output_bindings` | MUST be absent, including null or empty declarations |
 
 No input schema uses the existing generic object contract. Explicit schemas use the same validation and `ref://` resolution path as other skills. Business input is never inherited from a parent.
 

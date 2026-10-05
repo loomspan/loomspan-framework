@@ -61,7 +61,7 @@ public class YamlSkillCatalog implements InitializingBean
             YamlSkillManifest.Field.PLANNING_MODE, YamlSkillManifest.Field.CONCURRENCY,
             YamlSkillManifest.Field.MAX_STEPS, YamlSkillManifest.Field.LINTER,
             YamlSkillManifest.Field.OUTPUT_SCHEMA, YamlSkillManifest.Field.OUTPUT_SCHEMA_MAX_RETRIES,
-            YamlSkillManifest.Field.OUTPUT_FROM);
+            YamlSkillManifest.Field.OUTPUT_FROM, YamlSkillManifest.Field.OUTPUT_BINDINGS);
     private final LoomspanProperties modelsProperties;
     private final LoomspanProperties.Skills skillProperties;
     private final ResourcePatternResolver resourcePatternResolver;
@@ -419,6 +419,7 @@ public class YamlSkillCatalog implements InitializingBean
             }
             validateRawRest(resource, root, skillName);
             validateRawConcurrency(resource, root, skillName);
+            validateRawOutputBindings(resource, root, skillName);
             validateRawOutputFrom(resource, root, skillName);
             validateRawAllowedSkills(resource, root, skillName);
 
@@ -574,8 +575,34 @@ public class YamlSkillCatalog implements InitializingBean
     private void validateRawInputBindings(Resource resource, String skillName, JsonNode entry, String entryPath)
     {
         if (!entry.has("input_bindings")) return;
-        String fieldPath = entryPath + ".input_bindings";
-        JsonNode bindings = entry.get("input_bindings");
+        validateRawBindings(resource, skillName, entry.get("input_bindings"), entryPath + ".input_bindings", false);
+    }
+
+    private void validateRawOutputBindings(Resource resource, JsonNode root, String skillName) {
+        if (!root.has("output_bindings")) return;
+        if (root.has("output_from"))
+            throw invalidNamedSkill(resource, skillName, "output_bindings", "output_from and output_bindings are mutually exclusive");
+        if (!root.path("output_schema").isObject() || !"object".equals(root.path("output_schema").path("type").asText()))
+            throw invalidNamedSkill(resource, skillName, "output_bindings", "requires a declared object output_schema");
+        JsonNode bindings = root.get("output_bindings");
+        if (bindings != null && bindings.isObject() && bindings.isEmpty())
+            throw invalidNamedSkill(resource, skillName, "output_bindings", "must be a nonempty destination map");
+        validateRawBindings(resource, skillName, bindings, "output_bindings", true);
+        for (var field : bindings.properties()) {
+            if (!"child_result".equals(field.getValue().path("from").asText())) continue;
+            if (!root.path("planning_mode").isBoolean() || !root.path("planning_mode").booleanValue())
+                throw invalidNamedSkill(resource, skillName, "output_bindings", "child_result requires explicit planning_mode: true");
+            String producer = field.getValue().path("skill").asText();
+            boolean allowed = false;
+            for (JsonNode child : root.path("allowed_skills"))
+                if (producer.equals(child.path("name").asText())) allowed = true;
+            if (!allowed || producer.equals(skillName))
+                throw invalidNamedSkill(resource, skillName, "output_bindings", "requires a distinct allowed direct producer '" + producer + "'");
+        }
+    }
+
+    private void validateRawBindings(Resource resource, String skillName, JsonNode bindings, String fieldPath, boolean output)
+    {
         if (bindings == null || !bindings.isObject())
             throw invalidNamedSkill(resource, skillName, fieldPath, "must be a non-null object");
         List<ai.loomspan.internal.runtime.input.ObjectFieldPath> destinations = new java.util.ArrayList<>();
@@ -584,7 +611,8 @@ public class YamlSkillCatalog implements InitializingBean
             try {
                 var destination = ai.loomspan.internal.runtime.input.ObjectFieldPath.parse(field.getKey(), false);
                 for (var existing : destinations)
-                    if (existing.isAncestorOf(destination) || destination.isAncestorOf(existing))
+                    if (existing.isAncestorOf(destination) || destination.isAncestorOf(existing)
+                            || (output && overlappingIgnoringCase(existing.tokens(), destination.tokens())))
                         throw new IllegalArgumentException("duplicate or overlapping binding destinations");
                 destinations.add(destination);
                 JsonNode value = field.getValue();
@@ -610,9 +638,15 @@ public class YamlSkillCatalog implements InitializingBean
                         kind.equals("input") ? ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT
                                 : ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.CHILD_RESULT, source, producer);
             } catch (IllegalArgumentException | NullPointerException ex) {
-                throw invalidNamedSkill(resource, skillName, path, "invalid input binding declaration: " + ex.getMessage());
+                throw invalidNamedSkill(resource, skillName, path, "invalid " + (output ? "output" : "input") + " binding declaration: " + ex.getMessage());
             }
         }
+    }
+
+    private static boolean overlappingIgnoringCase(List<String> left, List<String> right) {
+        for (int i = 0; i < Math.min(left.size(), right.size()); i++)
+            if (!ai.loomspan.internal.outputschema.OutputSchemaValidator.propertyNamesMatch(left.get(i), right.get(i))) return false;
+        return true;
     }
     private void validateRawConcurrency(Resource resource, JsonNode root, String skillName)
     {

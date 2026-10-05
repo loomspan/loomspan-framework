@@ -313,6 +313,7 @@ type contentDescriptorDTO struct {
 }
 type recordDTO struct {
 	ResultForwarding *traceanalysis.ResultForwarding `json:"resultForwarding,omitempty"`
+	ResultAssembly   *traceanalysis.ResultAssembly   `json:"resultAssembly,omitempty"`
 	Sequence         int64                           `json:"sequence"`
 	Type             string                          `json:"type"`
 	FailureID        string                          `json:"failureId,omitempty"`

@@ -40,6 +40,62 @@ import static org.mockito.Mockito.when;
 class SkillGenerationManagerTest
 {
     @Test
+    void validatesOutputBindingPathsTypesAndProducerCountsAgainstCompleteGeneration(@TempDir Path directory) {
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of());
+        SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), new StaticListableBeanFactory());
+        manager.afterSingletonsInstantiated();
+        String parent = """
+                name: parent
+                description: parent
+                model: model
+                planning_mode: true
+                allowed_skills: [{name: producer, max_tasks: 2}]
+                input_schema:
+                  type: object
+                  properties:
+                    id: {type: integer}
+                  additionalProperties: false
+                output_schema:
+                  type: object
+                  properties:
+                    CaseId: {type: number}
+                    answer: {type: string}
+                  required: [CaseId, answer]
+                  additionalProperties: false
+                output_bindings:
+                  /caseid: {from: input, path: /id}
+                  /answer: {from: child_result, skill: producer, path: /value}
+                """;
+        var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\noutput_schema: {type: object, properties: {value: {type: string}}, additionalProperties: false}\n");
+        assertThat(manager.validate(List.of(new SkillDocument("parent", parent), producer)).valid()).isTrue();
+        var generation = manager.prepare(List.of(new SkillDocument("parent", parent), producer));
+        assertThat(generation.definition("parent").outputBindings().getFirst().destination().pointer()).isEqualTo("/CaseId");
+        Map<String, String> invalid = Map.ofEntries(
+                Map.entry("count zero", parent.replace("max_tasks: 2", "max_tasks: 0")),
+                Map.entry("count minimum", parent.replace("max_tasks: 2", "min_tasks: 2")),
+                Map.entry("unknown source", parent.replace("path: /id", "path: /absent")),
+                Map.entry("closed destination", parent.replace("/caseid:", "/absent:")),
+                Map.entry("scalar ancestor", parent.replace("/caseid:", "/caseid/child:")),
+                Map.entry("array traversal", parent.replace("id: {type: integer}", "id: {type: array, items: {type: integer}}").replace("path: /id", "path: /id/0")),
+                Map.entry("types", parent.replace("CaseId: {type: number}", "CaseId: {type: boolean}")),
+                Map.entry("producer source", parent.replace("path: /value", "path: /absent")));
+        for (var entry : invalid.entrySet()) {
+            var validation = manager.validate(List.of(new SkillDocument("parent", entry.getValue()), producer));
+            assertThat(validation.valid()).as(entry.getKey()).isFalse();
+            assertThat(validation.issues()).anyMatch(issue -> issue.fieldPath().equals("output_bindings"));
+        }
+        var unknown = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\n");
+        assertThat(manager.validate(List.of(new SkillDocument("parent", parent), unknown)).valid()).isTrue();
+        var open = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\noutput_schema: {type: object, additionalProperties: true}\n");
+        assertThat(manager.validate(List.of(new SkillDocument("parent", parent), open)).valid()).isTrue();
+        var nullable = new SkillDocument("producer", producer.yaml().replace("type: string", "type: string, nullable: true"));
+        assertThat(manager.validate(List.of(new SkillDocument("parent", parent), nullable)).issues())
+                .anyMatch(issue -> issue.message().contains("nullable"));
+    }
+
+    @Test
     void validatesBindingGraphsAndKnownSchemasWithoutGuessingProducerOutput(@TempDir Path directory) {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of());

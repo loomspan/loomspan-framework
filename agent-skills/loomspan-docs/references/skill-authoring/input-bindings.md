@@ -193,3 +193,7 @@ Focused tests: `YamlSkillCatalogTests`, `ChildInputBindingTest`,
 `DeclaredChildInputBindingsIntegrationTest` and `BindingIsolationIntegrationTest`.
 These establish deterministic mechanics, not improved live model reliability or
 business reasoning. Large evidence still consumes the receiving model's context.
+
+## Output destination
+
+Top-level `output_bindings` reuses these source descriptors and object-pointer semantics, placing selected values into the current skill output. It requires an object output contract and may combine exact bound evidence with model-owned reasoning. Read [output assembly](output-contracts.md#declared-output-assembly) for complete examples and ownership/failure rules.

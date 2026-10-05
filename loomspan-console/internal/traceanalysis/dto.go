@@ -168,6 +168,7 @@ type ContentDescriptor struct {
 // canonical record. Arrays are always non-nil so absence remains explicit.
 type RecordFacts struct {
 	ResultForwarding *ResultForwarding
+	ResultAssembly   *ResultAssembly
 	PlanUpdate       *PlanUpdate
 	Plan             *PlanReference
 	Attempts         []AttemptSummary

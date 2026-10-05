@@ -77,3 +77,7 @@ Task-count constraints cannot express conditional branches, ordering, dependenci
 - `PlanTaskConstraintValidator.java` (`src/main/java/ai/loomspan/internal/runtime/planning/PlanTaskConstraintValidator.java`) defines exact counting and stable issue codes.
 - `DefaultPlanningService.java` (`src/main/java/ai/loomspan/internal/runtime/planning/DefaultPlanningService.java`) owns prompt rendering, visibility preflight, retry composition, trace facts, and terminal rejection.
 - `YamlSkillCatalogTests`, `PlanTaskConstraintValidatorTest`, and `PlanningServiceTest` protect syntax/defaults, exact counts, prompt, preflight, retry, exhaustion, and plan-storage exclusion.
+
+## Output producer requirements
+
+A top-level `output_bindings` child-result source requires exactly one accepted direct task for that producer, unconditionally. Multiple bindings from one producer share that task. Missing or duplicate producers use the existing combined plan correction budget; impossible declared counts fail configuration. Unlike whole forwarding, an output-binding producer need not explicitly declare `required: true, max_tasks: 1`. Runtime still executes every accepted task. Read [output assembly](output-contracts.md#declared-output-assembly).

@@ -12,6 +12,7 @@ import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.ExecutionPlan;
+import ai.loomspan.internal.core.TestLoomspanSessions;
 import ai.loomspan.internal.core.MissionContext;
 import ai.loomspan.internal.core.ModelTraceContext;
 import ai.loomspan.internal.core.PlanStatus;
@@ -70,6 +71,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -318,6 +320,149 @@ class StepLoopMissionExecutionEngineTest {
                     .isInstanceOf(IllegalStateException.class);
         }
         assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_FORWARDED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "wrong-skill", "stale"})
+    void outputAssemblyRejectsInvalidRetainedCompletion(String corruption) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var completed = singleTaskPlan().updateTask("t-1", task -> new PlanTask(task.taskId(), task.title(),
+                PlanTaskStatus.COMPLETED, task.capabilityName(), task.intent(), task.dependsOn(), task.expectedOutputs(), task.parallelGroup(), task.note()));
+        if (corruption.equals("stale")) completed = new ExecutionPlan(completed.planId(), completed.capabilityName(), completed.createdAt(), PlanStatus.STALE, completed.tasks());
+        var planning = new InitializingPlanningService(state, completed);
+        var definition = outputBindingDefinition(1, false);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("retained-assembly", "rootVisibleSkill", 3);
+        var binding = TestExecutionBindings.missionBinding(session);
+        if (!corruption.equals("missing")) binding.requireMission().recordCompletedTaskResult("t-1",
+                corruption.equals("wrong-skill") ? "other" : "invoiceParser", "result");
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding, () -> executeMission(engine(state, planning, executor, definition),
+                    session, definition, new SequenceChatClient(), List.of(tool("invoiceParser", "unused")))))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_ASSEMBLED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void outputAssemblyJoinsWholeProducerUnitAndUnrelatedWork(boolean concurrent) throws Exception {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var tasks = List.of(
+                new PlanTask("t-1", "Bound answer", PlanTaskStatus.PENDING, "invoiceParser", "answer", List.of(), List.of(), "batch", null),
+                new PlanTask("t-2", "Sibling", PlanTaskStatus.PENDING, "expenseLookup", "finish", List.of(), List.of(), "batch", null),
+                new PlanTask("t-3", "Later", PlanTaskStatus.PENDING, "optional", "finish", List.of(), List.of(), null, null));
+        var plan = new ExecutionPlan("assembled-complete", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
+        var definition = twoProducerOutputBindingDefinition(3, concurrent);
+        CountDownLatch held = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicInteger later = new AtomicInteger();
+        AtomicReference<String> unexpectedFinal = new AtomicReference<>();
+        var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser", "t-2", "expenseLookup", "t-3", "optional"), unexpectedFinal);
+        var sibling = new BoundCapability(tool("expenseLookup", "unused").metadata(), List.of(), (arguments, taskId, sources) -> {
+            held.countDown();
+            try { assertThat(release.await(5, TimeUnit.SECONDS)).isTrue(); }
+            catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
+            return "sibling";
+        });
+        var optional = new BoundCapability(tool("optional", "unused").metadata(), List.of(), (arguments, taskId, sources) -> { later.incrementAndGet(); return "later"; });
+        var session = TestLoomspanSessions.withId("join-assembly", "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor(); ExecutorService caller = Executors.newSingleThreadExecutor()) {
+            Future<String> result = caller.submit(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
+                    session, definition, model, List.of(tool("invoiceParser", "exact answer"), sibling, optional)));
+            try {
+                assertThat(held.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(result.isDone()).isFalse(); assertThat(later).hasValue(0);
+                assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_ASSEMBLED);
+            } finally { release.countDown(); }
+            assertThat(result.get(5, TimeUnit.SECONDS)).isEqualTo("{\"report\":\"exact answer\",\"other\":\"sibling\"}");
+        }
+        assertThat(later).hasValue(1); assertThat(unexpectedFinal).hasNullValue();
+        assertThat(readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.RESULT_ASSEMBLED)).singleElement()
+                .satisfies(record -> assertThat(record.metadata()).containsEntry("modelContributionRequired", false).containsEntry("planId", "assembled-complete"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void failedProducerOrUnrelatedWorkCannotPublishOutputAssembly(boolean producerFails) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var definition = outputBindingDefinition(2, false);
+        var session = TestLoomspanSessions.withId("failed-assembly", "rootVisibleSkill", 3);
+        var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser", "t-2", "expenseLookup"), new AtomicReference<>());
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, twoTaskPlan()), executor, definition), session,
+                    definition, model, List.of(producerFails ? failingTool("invoiceParser") : tool("invoiceParser", "retained"),
+                            producerFails ? tool("expenseLookup", "later") : failingTool("expenseLookup"))))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("parser exploded");
+        }
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_ASSEMBLED);
+    }
+
+    @Test
+    void outputBindingDoesNotGrantAccessToAnInvisibleProducer() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var definition = outputBindingDefinition(1, false);
+        var session = TestLoomspanSessions.withId("invisible-output-producer", "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition),
+                    session, definition, new SequenceChatClient(), List.of())).isInstanceOf(IllegalStateException.class).hasMessageContaining("not eligible");
+        }
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.MODEL_REQUEST_SENT
+                || record.recordType() == TraceRecordType.RESULT_ASSEMBLED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void assembledOutputPoliciesValidateExactBoundDecimals(boolean mixed) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var manifest = outputBindingDefinition(mixed ? 2 : 1, false).manifest();
+        var number = new YamlSkillManifest.OutputSchemaManifest(); number.setType("number");
+        var properties = new LinkedHashMap<String, YamlSkillManifest.OutputSchemaManifest>();
+        properties.put("report", number);
+        if (mixed) {
+            var summary = new YamlSkillManifest.OutputSchemaManifest(); summary.setType("string");
+            properties.put("summary", summary);
+        }
+        manifest.getOutputSchema().setProperties(properties);
+        manifest.getOutputSchema().setRequired(mixed ? List.of("report", "summary") : List.of("report"));
+        String decimal = "0.12345678901234567890123456789";
+        var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(0);
+        var regex = new YamlSkillManifest.RegexManifest();
+        regex.setPattern(".*" + java.util.regex.Pattern.quote("\"report\":" + decimal) + ".*");
+        linter.setRegex(regex); manifest.setLinter(linter);
+        var definition = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        var model = new SequenceChatClient(mixed ? new String[] {
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
+                "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":{\"summary\":\"reasoned\"}}"} : new String[] {
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}"});
+        var session = TestLoomspanSessions.withId("decimal-assembly", "rootVisibleSkill", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition),
+                    session, definition, model, List.of(tool("invoiceParser", decimal))))
+                    .contains("\"report\":" + decimal);
+        }
+        assertThat(session.getLastLinterOutcome().orElseThrow().status()).isEqualTo(ai.loomspan.internal.linter.LinterOutcomeStatus.PASSED);
+    }
+
+    private static YamlSkillDefinition outputBindingDefinition(int maxSteps, boolean concurrent) {
+        var manifest = definitionWithMaxSteps(maxSteps).manifest();
+        manifest.setConcurrency(concurrent);
+        var descriptor = new YamlSkillManifest.InputBindingManifest();
+        descriptor.setFrom("child_result"); descriptor.setSkill("invoiceParser"); descriptor.setPath("");
+        manifest.setOutputBindings(Map.of("/report", descriptor));
+        var schema = new YamlSkillManifest.OutputSchemaManifest(); schema.setType("object"); schema.setAdditionalProperties(false);
+        var report = new YamlSkillManifest.OutputSchemaManifest(); report.setType("string");
+        schema.setProperties(Map.of("report", report)); schema.setRequired(List.of("report")); manifest.setOutputSchema(schema);
+        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+    }
+
+    private static YamlSkillDefinition twoProducerOutputBindingDefinition(int maxSteps, boolean concurrent) {
+        var manifest = outputBindingDefinition(maxSteps, concurrent).manifest();
+        var descriptor = new YamlSkillManifest.InputBindingManifest();
+        descriptor.setFrom("child_result"); descriptor.setSkill("expenseLookup"); descriptor.setPath("");
+        var bindings = new LinkedHashMap<>(manifest.getOutputBindings()); bindings.put("/other",descriptor); manifest.setOutputBindings(bindings);
+        var fields = new LinkedHashMap<>(manifest.getOutputSchema().getProperties());
+        var other = new YamlSkillManifest.OutputSchemaManifest(); other.setType("string"); fields.put("other",other);
+        manifest.getOutputSchema().setProperties(fields); manifest.getOutputSchema().setRequired(List.of("report","other"));
+        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]),manifest,EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillDefinition forwardingDefinition(int maxSteps, boolean concurrent) {

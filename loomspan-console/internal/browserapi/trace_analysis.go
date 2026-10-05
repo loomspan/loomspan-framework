@@ -522,6 +522,7 @@ func (value frameDTO) MarshalJSON() ([]byte, error) {
 
 type recordDTO struct {
 	ResultForwarding *traceanalysis.ResultForwarding `json:"resultForwarding,omitempty"`
+	ResultAssembly   *traceanalysis.ResultAssembly   `json:"resultAssembly,omitempty"`
 	PlanUpdate       *planUpdateDTO                  `json:"planUpdate,omitempty"`
 	Sequence         int64                           `json:"sequence"`
 	Type             string                          `json:"type"`
@@ -784,6 +785,7 @@ func recordDTOValue(x traceanalysis.RecordSummary) recordDTO {
 		item.Content = &contentDescriptorDTO{Role: string(x.Content.Role), ContentType: x.Content.ContentType, Encoding: string(x.Content.Encoding), RetainedBytes: x.Content.RetainedBytes, Available: x.Content.Available, Complete: x.Content.Complete, InlineEligibility: x.Content.InlineEligibility, InlineOmission: string(x.Content.InlineOmission), ContentRef: x.Content.ContentRef, InlineContent: inline}
 	}
 	item.ResultForwarding = x.Facts.ResultForwarding
+	item.ResultAssembly = x.Facts.ResultAssembly
 	if x.Facts.Plan != nil {
 		p := x.Facts.Plan
 		item.Plan = &planReferenceDTO{PlanID: p.PlanID, CapabilityName: p.CapabilityName}

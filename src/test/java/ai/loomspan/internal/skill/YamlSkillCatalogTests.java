@@ -35,6 +35,93 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class YamlSkillCatalogTests {
 
     @Test
+    void outputBindingsKeepUnicodePropertiesDistinctUnderNativeOutputMatching() {
+        String yaml = """
+                name: bound
+                description: distinct output keys
+                model: forward-model
+                output_schema:
+                  type: object
+                  properties:
+                    i: {type: string}
+                    \u0131: {type: string}
+                  required: [i, \u0131]
+                output_bindings:
+                  /i: {from: input, path: /first}
+                  /\u0131: {from: input, path: /second}
+                """;
+        var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(
+                List.of(new SkillDocument("bound", yaml)), false);
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions().getFirst().outputBindings()).extracting(binding -> binding.destination().pointer())
+                .containsExactly("/i", "/\u0131");
+    }
+
+    @Test
+    void acceptsInputOnlyOutputBindingsWithDeclaredObjectContract() {
+        String yaml = """
+                name: bound
+                description: bound output
+                model: forward-model
+                prompt: Answer
+                output_schema:
+                  type: object
+                  properties:
+                    id: {type: string}
+                  required: [id]
+                  additionalProperties: false
+                output_bindings:
+                  /id: {from: input, path: /id}
+                """;
+        var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(
+                List.of(new SkillDocument("bound", yaml)), false);
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions()).hasSize(1);
+        var definition = checked.definitions().getFirst();
+        assertThat(definition.isOutputBindingsDeclared()).isTrue();
+        assertThat(definition.outputBindings().getFirst().destination().pointer()).isEqualTo("/id");
+        var copy = definition.manifest();
+        copy.getOutputBindings().get("/id").setPath("/changed");
+        assertThat(definition.outputBindings().getFirst().sourcePath().pointer()).isEqualTo("/id");
+    }
+
+    @TestFactory
+    java.util.stream.Stream<DynamicTest> rejectsMalformedOutputBindingDeclarations() {
+        Map<String, String> invalid = Map.ofEntries(
+                Map.entry("null", "null"), Map.entry("empty", "{}"),
+                Map.entry("unknown source", "{/id: {from: other, path: /id}}"),
+                Map.entry("missing path", "{/id: {from: input}}"),
+                Map.entry("null path", "{/id: {from: input, path: null}}"),
+                Map.entry("numeric path", "{/id: {from: input, path: 3}}"),
+                Map.entry("input skill", "{/id: {from: input, path: /id, skill: producer}}"),
+                Map.entry("unknown field", "{/id: {from: input, path: /id, extra: true}}"),
+                Map.entry("root", "{'': {from: input, path: /id}}"),
+                Map.entry("overlap", "{/id: {from: input, path: /id}, /id/a: {from: input, path: /id}}"),
+                Map.entry("case overlap", "{/id: {from: input, path: /id}, /ID/a: {from: input, path: /id}}"),
+                Map.entry("duplicate", "{/id: {from: input, path: /id}, /id: {from: input, path: /other}}"),
+                Map.entry("nonplanning child", "{/id: {from: child_result, skill: producer, path: ''}}"));
+        return invalid.entrySet().stream().map(entry -> DynamicTest.dynamicTest(entry.getKey(), () -> {
+            String yaml = "name: bound\ndescription: bound\nmodel: forward-model\noutput_schema: {type: object}\noutput_bindings: " + entry.getValue();
+            var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(List.of(new SkillDocument("invalid-output-binding", yaml)), false);
+            assertThat(checked.definitions()).isEmpty();
+            assertThat(checked.issues()).hasSize(1);
+        }));
+    }
+
+    @Test
+    void rejectsBothOutputModesAndRequiresObjectOutputContract() {
+        for (String yaml : List.of(forwardingYaml() + "output_bindings: null\n",
+                "name: bound\ndescription: bound\nmodel: forward-model\noutput_bindings: {/id: {from: input, path: /id}}",
+                "name: bound\ndescription: bound\nmodel: forward-model\noutput_schema: {type: string}\noutput_bindings: {/id: {from: input, path: /id}}",
+                "name: bound\ndescription: bound\nrest: true\noutput_bindings: {/id: {from: input, path: /id}}")) {
+            var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(List.of(new SkillDocument("invalid-output", yaml)), false);
+            assertThat(checked.definitions()).isEmpty();
+            assertThat(checked.issues()).hasSize(1);
+            if (yaml.contains("output_from")) assertThat(checked.issues().getFirst().message()).contains("output_from", "output_bindings");
+        }
+    }
+
+    @Test
     void acceptsParentInputBindingsWithObjectPointersForPlanningChildren() {
         String yaml = forwardingYaml().replace("    max_tasks: 1", "    max_tasks: 1\n    input_bindings:\n      /caseId: {from: input, path: /requestId}");
         var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(

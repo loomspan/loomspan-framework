@@ -99,6 +99,14 @@ still completes all accepted work, then returns that child's existing text
 unchanged without a parent synthesis request. See [output contracts](agent-skills/loomspan-docs/references/skill-authoring/output-contracts.md)
 for syntax, schema ownership, and model/Java/REST examples.
 
+A model skill can declare top-level `output_bindings` to assemble exact values
+from its validated input and successful accepted direct children into its object
+output contract. Fully bound outputs skip final synthesis; mixed outputs ask the
+model for unbound reasoning fields and validate the complete assembled object.
+All accepted child work must succeed. `output_from` and `output_bindings` are
+mutually exclusive. See [output assembly](agent-skills/loomspan-docs/references/skill-authoring/output-contracts.md#declared-output-assembly)
+for complete schemas, source ownership and failure semantics.
+
 A planning parent can declare `input_bindings` under each allowed child to copy
 validated parent input or one accepted direct-child result into the child's input.
 The model supplies only unbound arguments; Framework preserves selected values

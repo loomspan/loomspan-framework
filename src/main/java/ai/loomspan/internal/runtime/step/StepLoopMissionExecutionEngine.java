@@ -28,6 +28,8 @@ import ai.loomspan.internal.core.TraceRecordType;
 import ai.loomspan.internal.linter.LinterOutcome;
 import ai.loomspan.internal.linter.LinterOutcomeStatus;
 import ai.loomspan.internal.outputschema.OutputSchemaOutcome;
+import ai.loomspan.internal.outputschema.OutputBindingComposition;
+import ai.loomspan.internal.outputschema.OutputBindingProjection;
 import ai.loomspan.internal.outputschema.OutputSchemaOutcomeStatus;
 import ai.loomspan.internal.outputschema.OutputSchemaValidationIssue;
 import ai.loomspan.internal.outputschema.OutputSchemaValidationResult;
@@ -353,6 +355,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                 .validate(acceptedPlan, definition.allowedSkillConstraints());
         if (!bindingDependencyIssues.isEmpty())
             throw new IllegalStateException("binding_plan_dependency: " + String.join("; ", bindingDependencyIssues));
+        List<String> outputProducerIssues = new ai.loomspan.internal.runtime.planning.PlanOutputBindingProducerValidator().validate(acceptedPlan, definition.outputBindings());
+        if (!outputProducerIssues.isEmpty()) throw new IllegalStateException("binding_plan_producer: " + String.join("; ", outputProducerIssues));
         String selectedSkill = definition.outputFromSkill();
         PlanTask selectedTask = null;
         if (selectedSkill != null) {
@@ -362,7 +366,9 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                 throw new IllegalStateException("Forwarding requires exactly one accepted direct task for '" + selectedSkill + "'");
             selectedTask = matches.getFirst();
         }
-        int finalSynthesisSlots = selectedTask == null ? 1 : 0;
+        boolean hasOutputBindings = !definition.outputBindings().isEmpty();
+        boolean contributionRequired = !hasOutputBindings || new OutputBindingProjection(definition.outputSchema(), definition.outputBindings()).modelContributionRequired();
+        int finalSynthesisSlots = selectedTask == null && contributionRequired ? 1 : 0;
         List<ExecutionUnit> units = ExecutionUnit.partition(acceptedPlan.tasks());
         Set<String> earlierTaskIds = new LinkedHashSet<>();
         int nextTaskStep = 1;
@@ -486,22 +492,18 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         lifecycle.requireOpenForNewWork(ExecutionBindingScope.requireCurrent());
         ExecutionPlan completedPlan = executionStateService.currentPlan()
                 .orElseThrow(() -> new IllegalStateException("Plan disappeared before final synthesis for skill '" + skillName + "'"));
+        if (selectedTask != null || hasOutputBindings) requireCompletedAcceptedWork(acceptedPlan, completedPlan, mission, skillName);
+        OutputBindingComposition composition = hasOutputBindings ? mission.getOrCreateOutputComposition(() -> new OutputBindingComposition(definition, mission, objectMapper)) : null;
+        if (composition != null && !contributionRequired) {
+            OutputBindingComposition.Result assembled = composition.composeEmpty();
+            if (!assembled.validation().valid()) throw new IllegalArgumentException("binding_output_contract: " + assembled.validation().issues());
+            requireCompleteOutputPolicies(session, definition, assembled.content());
+            executionStateService.recordResultAssembled(session, skillName, completedPlan.planId(), false, assembled.provenance(), assembled.content());
+            return assembled.content();
+        }
         if (selectedTask != null) {
             PlanTask selected = selectedTask;
             return ExecutionBindingScope.requireCurrent().requireWritable(() -> {
-                if (!acceptedPlan.planId().equals(completedPlan.planId()) || completedPlan.status() != PlanStatus.VALID
-                        || !skillName.equals(completedPlan.capabilityName())
-                        || completedPlan.tasks().size() != acceptedPlan.tasks().size()
-                        || acceptedPlan.tasks().stream().anyMatch(task -> completedPlan.findTask(task.taskId())
-                                .map(current -> current.status() != PlanTaskStatus.COMPLETED
-                                        || !Objects.equals(current.capabilityName(), task.capabilityName())).orElse(true)))
-                    throw new IllegalStateException("Forwarding requires the unchanged accepted plan and all tasks successfully completed");
-                for (PlanTask task : acceptedPlan.tasks()) {
-                    CompletedTaskResult retained = mission.completedTaskResult(task.taskId())
-                            .orElseThrow(() -> new IllegalStateException("Missing retained result for completed task '" + task.taskId() + "'"));
-                    if (!Objects.equals(task.capabilityName(), retained.skillName()))
-                        throw new IllegalStateException("Completed task result has an unexpected skill binding");
-                }
                 CompletedTaskResult result = mission.completedTaskResult(selected.taskId())
                         .orElseThrow(() -> new IllegalStateException("Missing retained forwarding result for task '" + selected.taskId() + "'"));
                 if (!selectedSkill.equals(result.skillName()))
@@ -520,12 +522,51 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         StepResult finalResult = executeOneStep(
                 session, skillName, objective, renderedInput, executionConfiguration, modelInteraction, visibleTools,
                 completedPlan, nextTaskStep, mission.completedTaskResults(), mission.executionSummary().orElse(null),
-                definition, null, lifecycle);
+                definition, null, lifecycle, composition);
         if (!finalResult.isFinalResponse())
         {
             throw new IllegalStateException("Final synthesis did not return a final response for skill '" + skillName + "'.");
         }
+        if (composition != null) {
+            ExecutionPlan finalPlan = executionStateService.currentPlan().orElseThrow();
+            requireCompletedAcceptedWork(acceptedPlan, finalPlan, mission, skillName);
+            executionStateService.recordResultAssembled(session, skillName, finalPlan.planId(), true, composition.provenance(), finalResult.finalResponse());
+        }
         return finalResult.finalResponse();
+    }
+
+    private void requireCompletedAcceptedWork(ExecutionPlan accepted, ExecutionPlan completed, MissionContext mission, String skillName) {
+        if (!accepted.planId().equals(completed.planId()) || completed.status() != PlanStatus.VALID
+                || !skillName.equals(completed.capabilityName()) || completed.tasks().size() != accepted.tasks().size()
+                || accepted.tasks().stream().anyMatch(task -> completed.findTask(task.taskId()).map(current ->
+                    current.status() != PlanTaskStatus.COMPLETED || !Objects.equals(current.capabilityName(), task.capabilityName())
+                    || !Objects.equals(current.title(), task.title()) || !Objects.equals(current.intent(), task.intent())
+                    || !Objects.equals(current.expectedOutputs(), task.expectedOutputs())
+                    || !Objects.equals(current.dependsOn(), task.dependsOn()) || !Objects.equals(current.parallelGroup(), task.parallelGroup())).orElse(true)))
+            throw new IllegalStateException("Output completion requires the unchanged accepted plan and all tasks successfully completed");
+        for (PlanTask task : accepted.tasks()) {
+            CompletedTaskResult retained = mission.completedTaskResult(task.taskId()).orElseThrow(() ->
+                    new IllegalStateException("Missing retained result for completed task '" + task.taskId() + "'"));
+            if (!Objects.equals(task.capabilityName(), retained.skillName()) || !task.taskId().equals(retained.taskId()))
+                throw new IllegalStateException("Completed task result has an unexpected accepted task binding");
+        }
+    }
+
+    private void requireCompleteOutputPolicies(LoomspanSession session, YamlSkillDefinition definition, String content) {
+        FinalResponseValidationOutcome outcome = validateFinalResponseForSkill(session,
+                content, objectMapper.readTree(content), definition, 1, 1, 1);
+        if (!outcome.validation().valid()) throw new IllegalArgumentException("binding_output_contract: " + outcome.validation().rejectionReason());
+    }
+
+    private FinalResponseValidationOutcome validateContributionFailure(LoomspanSession session, YamlSkillDefinition definition,
+            OutputSchemaValidationResult result, int linterAttempt, int schemaAttempt, int evidenceAttempt) {
+        int maxRetries = definition.outputSchemaMaxRetries();
+        boolean exhausted = schemaAttempt > maxRetries;
+        executionStateService.recordOutputSchemaOutcome(session, new OutputSchemaOutcome(definition.manifest().getName(),
+                result.failureMode(), schemaAttempt, schemaAttempt - 1, maxRetries,
+                exhausted ? OutputSchemaOutcomeStatus.EXHAUSTED : OutputSchemaOutcomeStatus.RETRYING, result.issues()));
+        return new FinalResponseValidationOutcome(StepValidationResult.rejected("Final model contribution violates output bindings: "
+                + summarizeOutputSchemaIssues(result.issues())), linterAttempt, schemaAttempt + 1, evidenceAttempt, exhausted);
     }
 
     private void preflightUnit(LoomspanSession session,
@@ -622,7 +663,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             StepResult result = ExecutionBindingScope.supplyWith(workerBinding, () -> executeOneStep(
                     session, skillName, objective, renderedInput, executionConfiguration, modelInteraction, visibleTools,
                     admittedPlan, assignment.stepNumber(), priorCompletedTaskResults,
-                    priorExecutionSummary, skillDefinition, assignment, lifecycle));
+                    priorExecutionSummary, skillDefinition, assignment, lifecycle, null));
             return new AssignedTaskOutcome.Success(
                     Objects.requireNonNull(result.toolResult(), "assigned tool result must not be null"),
                     workerBranch.lastLinterOutcome().orElse(null),
@@ -809,7 +850,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             @Nullable String executionSummary,
             @Nullable YamlSkillDefinition skillDefinition,
             @Nullable AssignedTaskExecution assignment,
-            MissionLifecycle lifecycle)
+            MissionLifecycle lifecycle,
+            @Nullable OutputBindingComposition composition)
     {
         boolean finalResponseOnly = assignment == null;
         Map<String, Object> trustedIdentity = trustedStepIdentity(plan, assignment, stepNumber);
@@ -842,7 +884,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         ? StepPromptBuilder.buildFinalResponsePrompt(
                                 plan, objective, renderedInput.traceSafeInput(), stepNumber, completedTaskResults,
                                 executionSummary,
-                                skillDefinition == null ? null : skillDefinition.outputSchema())
+                                skillDefinition == null ? null : composition == null ? skillDefinition.outputSchema() : composition.projection().schema())
                         : StepPromptBuilder.buildAssignedStepPrompt(
                                 plan, assignment.task(), objective, renderedInput.traceSafeInput(), stepNumber,
                                 completedTaskResults, executionSummary, visibleTools, forceVerboseToolArgumentGuidance);
@@ -850,9 +892,10 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         ? new SkillPromptComposition(stepPrompt, false, null, "step_execution_prompt")
                         : SkillPromptComposer.composeStepExecutionPrompt(skillDefinition, stepPrompt);
                 String stepUserMessage = StepPromptBuilder.buildStepUserMessage(plan, objective, renderedInput.traceSafeInput());
+                String bindingGuidance = composition == null ? "" : composition.guidance();
                 String effectivePrompt = invalidActionFeedback == null
-                        ? promptComposition.systemPrompt()
-                        : promptComposition.systemPrompt() + StepActionCorrection.correctionRequest(finalResponseOnly);
+                        ? promptComposition.systemPrompt() + bindingGuidance
+                        : promptComposition.systemPrompt() + bindingGuidance + StepActionCorrection.correctionRequest(finalResponseOnly);
                 if (invalidActionFeedback != null)
                 {
                     stepUserMessage += StepActionCorrection.evidence(rejectedCandidate, invalidActionFeedback);
@@ -897,10 +940,16 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         ? StepActionValidator.validateFinal(action, plan)
                         : StepActionValidator.validateAssigned(action, plan, assignment.task(), visibleTools);
                 boolean skillValidationRejected = false;
+                String assembledResponse = null;
                 if (validation.valid() && action.stepAction() == StepActionType.FINAL_RESPONSE)
                 {
-                    FinalResponseValidationOutcome finalValidation = validateFinalResponseForSkill(
-                            session, action, skillDefinition, linterAttempt, outputSchemaAttempt, evidenceAttempt);
+                    OutputBindingComposition.Result assembled = composition == null ? null : composition.compose(serializeFinalResponse(action.finalResponse()));
+                    if (assembled != null && assembled.validation().valid()) assembledResponse = assembled.content();
+                    String validationContent = assembledResponse == null ? serializeFinalResponse(action.finalResponse()) : assembledResponse;
+                    JsonNode validationNode = assembledResponse == null ? action.finalResponse() : objectMapper.readTree(assembledResponse);
+                    FinalResponseValidationOutcome finalValidation = assembled != null && !assembled.validation().valid()
+                            ? validateContributionFailure(session, skillDefinition, assembled.validation(), linterAttempt, outputSchemaAttempt, evidenceAttempt)
+                            : validateFinalResponseForSkill(session, validationContent, validationNode, skillDefinition, linterAttempt, outputSchemaAttempt, evidenceAttempt);
                     validation = finalValidation.validation();
                     linterAttempt = finalValidation.nextLinterAttempt();
                     outputSchemaAttempt = finalValidation.nextOutputSchemaAttempt();
@@ -946,7 +995,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                 {
                     case CALL_TOOL -> executeToolAction(session, action, visibleTools, stepFrame, stepNumber, trustedIdentity, completedTaskResults);
                     case FINAL_RESPONSE -> {
-                        String finalResponse = serializeFinalResponse(action.finalResponse());
+                        String finalResponse = assembledResponse == null ? serializeFinalResponse(action.finalResponse()) : assembledResponse;
                         executionStateService.recordStepEvent(session, stepFrame, TraceRecordType.STEP_COMPLETED,
                                 mergeMetadata(trustedIdentity, Map.of("stepAction", "FINAL_RESPONSE")), Map.of());
                         yield StepResult.finalResponse(finalResponse);
@@ -1156,7 +1205,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
     }
 
     private FinalResponseValidationOutcome validateFinalResponseForSkill(LoomspanSession session,
-            StepAction action,
+            String finalResponse,
+            @Nullable JsonNode finalResponseNode,
             @Nullable YamlSkillDefinition skillDefinition,
             int linterAttempt,
             int outputSchemaAttempt,
@@ -1167,7 +1217,6 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             return FinalResponseValidationOutcome.ok(linterAttempt, outputSchemaAttempt, evidenceAttempt);
         }
 
-        String finalResponse = serializeFinalResponse(action.finalResponse());
         ValidatorAttemptOutcome outputSchemaValidation = validateOutputSchema(
                 session, skillDefinition, finalResponse, outputSchemaAttempt);
         if (!outputSchemaValidation.valid())
@@ -1180,7 +1229,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                     outputSchemaValidation.exhausted());
         }
 
-        ValidatorAttemptOutcome evidenceValidation = validateEvidence(session, skillDefinition, action.finalResponse(), evidenceAttempt);
+        ValidatorAttemptOutcome evidenceValidation = validateEvidence(session, skillDefinition, finalResponseNode, evidenceAttempt);
         if (!evidenceValidation.valid())
         {
             return new FinalResponseValidationOutcome(

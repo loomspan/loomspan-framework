@@ -16,6 +16,7 @@ import (
 // from the already selected record rather than persisted here.
 type persistedRecordFacts struct {
 	ResultForwarding *ResultForwarding `json:"resultForwarding,omitempty"`
+	ResultAssembly   *ResultAssembly   `json:"resultAssembly,omitempty"`
 	PlanUpdate       *PlanUpdate       `json:"planUpdate,omitempty"`
 	Plan             *PlanReference    `json:"plan,omitempty"`
 	Attempts         []attemptResult   `json:"attempts,omitempty"`
@@ -26,7 +27,7 @@ type persistedRecordFacts struct {
 }
 
 func (facts persistedRecordFacts) empty() bool {
-	return facts.ResultForwarding == nil && facts.Plan == nil && facts.PlanUpdate == nil && len(facts.Attempts) == 0 && len(facts.Retries) == 0 && len(facts.Validations) == 0 && len(facts.Failures) == 0 && len(facts.Payloads) == 0
+	return facts.ResultAssembly == nil && facts.ResultForwarding == nil && facts.Plan == nil && facts.PlanUpdate == nil && len(facts.Attempts) == 0 && len(facts.Retries) == 0 && len(facts.Validations) == 0 && len(facts.Failures) == 0 && len(facts.Payloads) == 0
 }
 
 func buildPersistedRecordFacts(plans map[int64]PlanReference, updates map[int64]*PlanUpdate, attempts []attemptResult, retries []retryResult, validations []validationLink, failures []failureResult, payloads []payloadIndexRow) map[int64]persistedRecordFacts {
@@ -140,7 +141,7 @@ func (reader *recordFactReader) Read(ctx context.Context, position int64) (persi
 }
 
 func materializeRecordFacts(stored persistedRecordFacts, rec *Record, filter RecordFilter, ref evidence.Reference, handle artifact.Handle, traceCtx TraceContext) (RecordFacts, error) {
-	facts := RecordFacts{ResultForwarding: stored.ResultForwarding, PlanUpdate: stored.PlanUpdate, Attempts: []AttemptSummary{}, Retries: []RetrySummary{}, Validations: []ValidationSummary{}, Failures: []FailureSummary{}, Payloads: []PayloadDescriptor{}, SearchMatches: []SearchResult{}}
+	facts := RecordFacts{ResultAssembly: stored.ResultAssembly, ResultForwarding: stored.ResultForwarding, PlanUpdate: stored.PlanUpdate, Attempts: []AttemptSummary{}, Retries: []RetrySummary{}, Validations: []ValidationSummary{}, Failures: []FailureSummary{}, Payloads: []PayloadDescriptor{}, SearchMatches: []SearchResult{}}
 	if stored.Plan != nil {
 		copy := *stored.Plan
 		facts.Plan = &copy

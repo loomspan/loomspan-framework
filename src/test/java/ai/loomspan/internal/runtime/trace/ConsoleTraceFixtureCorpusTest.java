@@ -76,6 +76,8 @@ class ConsoleTraceFixtureCorpusTest
     private static final Set<String> VALID = Set.of(
             "single-attempt-success",
             "java-root-success",
+            "assembled-input-result",
+            "assembled-child-result",
             "runtime-terminal-failure",
             "terminal-provider-failure-actionable",
             "runtime-terminal-abort",
@@ -866,6 +868,18 @@ class ConsoleTraceFixtureCorpusTest
                 appendAttempt(handle, "retry-1", "attempt-1", 1, 10, 4, "EXACT");
                 attributed = terminal = new Usage(10, 4);
             }
+            case "assembled-input-result" -> {
+                PhysicalBranchContext branch = new PhysicalBranchContext(session);
+                ExecutionFrame owner = frame("assembly-root", null, TraceFrameType.ROOT_MISSION, "test.entry");
+                appendFrame(handle, TraceRecordType.FRAME_OPENED, owner, CLOCK.instant()); branch.push(owner);
+                ExecutionBindingScope.callWith(fixtureBinding(session, branch, "test.entry", owner.frameId()), () -> {
+                    new DefaultExecutionTraceRecorder(CLOCK).recordResultAssembled(session, "test.entry", null, false,
+                            List.of(ordered("destination", "/assessment", "sourceKind", "input", "sourcePath", "/assessment", "parentMissionFrameId", owner.frameId())),
+                            "{\"assessment\":{\"amount\":9007199254740993,\"lines\":[\"second\",\"first\"],\"text\":\"{\\\"nested\\\":true}\"}}");
+                    return null;
+                });
+                appendFrame(handle, TraceRecordType.FRAME_CLOSED, owner, CLOCK.instant()); branch.close(owner);
+            }
             case "java-root-success" ->
             {
                 // Java engine dispatch shares this mission-frame writer and emits no model or plan records.
@@ -1028,8 +1042,9 @@ class ConsoleTraceFixtureCorpusTest
             }
             case "canonical-concurrent-contract" -> executeCanonicalConcurrentFixture(handle);
             case "nested-assignment-shadowing" -> executeNestedAssignmentShadowingFixture(handle);
-            case "forwarded-child-result" -> executeForwardingFixture(session, handle, false);
-            case "nested-forwarded-child-result" -> executeForwardingFixture(session, handle, true);
+            case "forwarded-child-result" -> executeForwardingFixture(session, handle, false, false);
+            case "assembled-child-result" -> executeForwardingFixture(session, handle, false, true);
+            case "nested-forwarded-child-result" -> executeForwardingFixture(session, handle, true, false);
             case "planned-tool-success" -> executeToolLifecycleFixture(session, handle, false);
             case "unplanned-tool-failure" ->
             {
@@ -1068,14 +1083,14 @@ class ConsoleTraceFixtureCorpusTest
             default -> throw new IllegalArgumentException(name);
         }
 
-        int toolInvocations = name.equals("forwarded-child-result") ? 2 : name.equals("nested-forwarded-child-result") ? 4
+        int toolInvocations = (name.equals("forwarded-child-result") || name.equals("assembled-child-result")) ? 2 : name.equals("nested-forwarded-child-result") ? 4
                 : name.equals("planned-tool-success") || name.equals("unplanned-tool-failure") ? 1 : 0;
-        int modelCalls = name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
+        int modelCalls = name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
                 : name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
-        int providerAttempts = name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
+        int providerAttempts = name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
                 : name.equals("recovered-provider-attempt-diagnostic") ? 2
                 : name.equals("terminal-provider-failure-actionable") ? 1 : 0;
-        int exactModelResponses = name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
+        int exactModelResponses = name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
                 : name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
         SessionUsageSnapshot usageSnapshot = new SessionUsageSnapshot(
                 0, toolInvocations, 0, modelCalls, providerAttempts,
@@ -1534,7 +1549,7 @@ class ConsoleTraceFixtureCorpusTest
         catch (Exception ex) { throw new IllegalStateException(ex); }
     }
 
-    private static void executeForwardingFixture(LoomspanSession session, DefaultExecutionTraceHandle handle, boolean nested) throws Exception
+    private static void executeForwardingFixture(LoomspanSession session, DefaultExecutionTraceHandle handle, boolean nested, boolean assembly) throws Exception
     {
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         ExecutionFrame root = frame("forward-root", null, TraceFrameType.ROOT_MISSION, "prepareReport");
@@ -1570,7 +1585,19 @@ class ConsoleTraceFixtureCorpusTest
             appendFrame(handle, TraceRecordType.FRAME_CLOSED, selected, CLOCK.instant()); branch.close(selected);
             forwardingPlan(handle, root, "report-plan", "prepareReport", selected.route(), "COMPLETED", "PENDING");
             executeLaterForwardingWork(session, handle, branch, recorder, root, "report-plan", "prepareReport", selected.route(), "root-later");
-            recorder.recordResultForwarded(session, "prepareReport", "report-plan", "finish-task", selected.route());
+            if (assembly) {
+                ExecutionFrame contribution = frame("assembly-model", root.frameId(), TraceFrameType.MODEL_CALL, "prepareReport#model");
+                appendFrame(handle, TraceRecordType.FRAME_OPENED, contribution, CLOCK.instant());
+                handle.append(TraceRecordType.MODEL_REQUEST_SENT, contribution, TraceFrameType.MODEL_CALL,
+                        attempt("retry-assembly", "attempt-assembly", 1, Map.of()), Map.of("messages", List.of("Generate summary only; report is framework-owned")));
+                handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED, contribution, TraceFrameType.MODEL_CALL,
+                        attempt("retry-assembly", "attempt-assembly", 1, Map.of("usage", usage(Usage.ZERO, "EXACT"))), Map.of("content", "{\"summary\":\"Original model wording\"}"));
+                appendFrame(handle, TraceRecordType.FRAME_CLOSED, contribution, CLOCK.instant());
+            }
+            if (assembly) recorder.recordResultAssembled(session, "prepareReport", "report-plan", true,
+                    List.of(ordered("destination", "/report", "sourceKind", "child_result", "sourcePath", "", "parentMissionFrameId", root.frameId(), "sourceTaskId", "finish-task", "sourceSkill", selected.route())),
+                    "{\"report\":\"  \u5b8c\u6574 report\\n\",\"summary\":\"Original model wording\"}");
+            else recorder.recordResultForwarded(session, "prepareReport", "report-plan", "finish-task", selected.route());
             return null;
         });
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, root, CLOCK.instant()); branch.close(root);
@@ -2020,6 +2047,12 @@ class ConsoleTraceFixtureCorpusTest
             forwarding.add(ordered("skillName", "prepareReport", "planId", "report-plan", "linkedTaskId", "finish-task", "capabilityName", name.startsWith("nested-") ? "coordinateReport" : "finishReport"));
             result.put("resultForwardings", forwarding);
         }
+        if (name.equals("assembled-input-result")) result.put("resultAssemblies", List.of(ordered(
+                "skillName", "test.entry", "owningMissionFrameId", "assembly-root", "modelContributionRequired", false,
+                "outputBindings", List.of(ordered("destination", "/assessment", "sourceKind", "input", "sourcePath", "/assessment", "parentMissionFrameId", "assembly-root")))));
+        if (name.equals("assembled-child-result")) result.put("resultAssemblies", List.of(ordered(
+                "skillName", "prepareReport", "owningMissionFrameId", "forward-root", "planId", "report-plan", "modelContributionRequired", true,
+                "outputBindings", List.of(ordered("destination", "/report", "sourceKind", "child_result", "sourcePath", "", "parentMissionFrameId", "forward-root", "sourceTaskId", "finish-task", "sourceSkill", "finishReport")))));
         result.put("attempts", expectedAttempts(name));
         result.put("retries", expectedRetries(name));
         result.put("validationLinks", expectedValidationLinks(name));
@@ -2340,6 +2373,7 @@ class ConsoleTraceFixtureCorpusTest
         return switch (name)
         {
             case "forwarded-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1));
+            case "assembled-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1), expectedAttempt(name, "retry-assembly", "attempt-assembly", 1));
             case "nested-forwarded-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1),
                     expectedAttempt(name, "retry-child-plan", "attempt-child-plan", 1));
             case "advisor-retry", "validation-exhaustion" -> List.of(
@@ -2407,7 +2441,7 @@ class ConsoleTraceFixtureCorpusTest
                     "usage", Usage.ZERO.asMap(),
                     "usageComplete", false));
             case "missing-response-usage" -> List.of(expectedAttempt(name, "retry-1", "attempt-1", 1));
-            case "java-root-success" -> List.of();
+            case "java-root-success", "assembled-input-result" -> List.of();
             case "nested-frame-usage" -> List.of(
                     expectedAttempt(name, "retry-framed", "attempt-framed", 1),
                     expectedAttempt(name, "retry-unframed", "attempt-unframed", 1));
@@ -2445,7 +2479,7 @@ class ConsoleTraceFixtureCorpusTest
             };
             case "validation-exhaustion" -> attemptId.equals("attempt-1") ? new Usage(6, 2) : new Usage(5, 2);
             case "unavailable-usage", "missing-response-usage", "runtime-terminal-failure", "runtime-terminal-abort",
-                    "forwarded-child-result", "nested-forwarded-child-result" -> Usage.ZERO;
+                    "forwarded-child-result", "nested-forwarded-child-result", "assembled-child-result" -> Usage.ZERO;
             case "unattributed-usage" -> new Usage(10, 4, 16);
             case "nonterminal-error-then-success" -> new Usage(5, 2);
             case "chunked-payload", "chunked-json-payload" -> new Usage(2, 1);
@@ -2500,6 +2534,12 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "assembled-child-result" -> List.of(
+                    expectedFrame("forward-root", null, "ROOT_MISSION", "prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("planning-report-plan", "forward-root", "PLANNING", "prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("selected-tool", "forward-root", "TOOL_INVOCATION", "finishReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("root-later", "forward-root", "TOOL_INVOCATION", "laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("assembly-model", "forward-root", "MODEL_CALL", "prepareReport#model", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "forwarded-child-result" -> List.of(
                     expectedFrame("forward-root", null, "ROOT_MISSION", "prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
                     expectedFrame("planning-report-plan", "forward-root", "PLANNING", "prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
@@ -2514,6 +2554,7 @@ class ConsoleTraceFixtureCorpusTest
                     expectedFrame("producer-tool", "forward-child", "TOOL_INVOCATION", "finishReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
                     expectedFrame("child-later", "forward-child", "TOOL_INVOCATION", "laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
                     expectedFrame("root-later", "forward-root", "TOOL_INVOCATION", "laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+            case "assembled-input-result" -> List.of(expectedFrame("assembly-root", null, "ROOT_MISSION", "test.entry", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "java-root-success" -> List.of(
                     expectedFrame("java-root", null, "ROOT_MISSION", "javaLookup", 0, 0,
                             Usage.ZERO, Usage.ZERO, Usage.ZERO));

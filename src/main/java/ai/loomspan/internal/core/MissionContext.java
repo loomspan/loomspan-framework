@@ -37,6 +37,7 @@ public final class MissionContext
     private final LinkedHashMap<String, CompletedTaskResult> completedTaskResults = new LinkedHashMap<>();
     private @Nullable LinterOutcome lastLinterOutcome;
     private @Nullable OutputSchemaOutcome lastOutputSchemaOutcome;
+    private @Nullable ai.loomspan.internal.outputschema.OutputBindingComposition outputComposition;
 
     public MissionContext(LoomspanSession session, String skillName, String missionFrameId,
             @Nullable MissionContext parent)
@@ -74,6 +75,19 @@ public final class MissionContext
     }
 
     public synchronized Map<String, Object> input() { return input; }
+
+    /** One source snapshot for all output correction attempts in this invocation. */
+    public synchronized ai.loomspan.internal.outputschema.OutputBindingComposition getOrCreateOutputComposition(
+            java.util.function.Supplier<ai.loomspan.internal.outputschema.OutputBindingComposition> factory)
+    {
+        Objects.requireNonNull(factory, "factory must not be null");
+        if (outputComposition == null)
+        {
+            outputComposition = Objects.requireNonNull(factory.get(), "output composition factory returned null");
+        }
+        return outputComposition;
+    }
+
 
     public synchronized Optional<ExecutionPlan> currentPlan()
     {

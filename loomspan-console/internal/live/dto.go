@@ -29,6 +29,7 @@ const (
 	KindToolCallCompleted         ActivityKind = "TOOL_CALL_COMPLETED"
 	KindToolCallFailed            ActivityKind = "TOOL_CALL_FAILED"
 	KindResultForwarded           ActivityKind = "RESULT_FORWARDED"
+	KindResultAssembled           ActivityKind = "RESULT_ASSEMBLED"
 	KindStepStarted               ActivityKind = "STEP_STARTED"
 	KindStepActionRejected        ActivityKind = "STEP_ACTION_REJECTED"
 	KindStepCompleted             ActivityKind = "STEP_COMPLETED"
@@ -43,7 +44,7 @@ var allKinds = map[ActivityKind]bool{
 	KindModelRequestSent: true, KindModelResponseReceived: true, KindModelAttemptFailed: true,
 	KindPlanCreated: true, KindPlanUpdated: true, KindPlanValidationFailed: true,
 	KindPlanRetryRequested: true, KindToolCallStarted: true, KindToolCallCompleted: true,
-	KindResultForwarded: true, KindToolCallFailed: true, KindStepStarted: true, KindStepActionRejected: true,
+	KindResultForwarded: true, KindResultAssembled: true, KindToolCallFailed: true, KindStepStarted: true, KindStepActionRejected: true,
 	KindStepCompleted: true, KindStepFailed: true, KindErrorRecorded: true, KindTraceCompleted: true,
 	KindExecutionObservationEnded: true,
 }
@@ -68,6 +69,7 @@ func KindLabels() map[ActivityKind]string {
 		KindToolCallCompleted:         "Tool call completed",
 		KindToolCallFailed:            "Tool call failed",
 		KindResultForwarded:           "Result forwarded",
+		KindResultAssembled:           "Result assembled",
 		KindStepStarted:               "Step started",
 		KindStepActionRejected:        "Step action rejected",
 		KindStepCompleted:             "Step completed",
@@ -132,6 +134,21 @@ func (a *Activity) Validate() error {
 	}
 	if len(a.Details) == 0 || !json.Valid(a.Details) {
 		return fmt.Errorf("details must contain valid JSON")
+	}
+	if a.Kind == KindResultAssembled {
+		var details map[string]json.RawMessage
+		if json.Unmarshal(a.Details, &details) != nil {
+			return fmt.Errorf("assembly details must be an object")
+		}
+		for _, field := range []string{"skillName", "owningMissionFrameId"} {
+			var value string
+			if json.Unmarshal(details[field], &value) != nil || value == "" {
+				return fmt.Errorf("assembly %s must be a nonempty string preview", field)
+			}
+		}
+		if string(details["modelContributionRequired"]) != "true" && string(details["modelContributionRequired"]) != "false" {
+			return fmt.Errorf("assembly modelContributionRequired must be boolean")
+		}
 	}
 	if a.Kind == KindResultForwarded {
 		var details map[string]json.RawMessage

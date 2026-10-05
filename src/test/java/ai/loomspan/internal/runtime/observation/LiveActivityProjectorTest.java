@@ -33,6 +33,7 @@ class LiveActivityProjectorTest
             TraceRecordType.MODEL_RESPONSE_RECEIVED,
             TraceRecordType.MODEL_ATTEMPT_FAILED,
             TraceRecordType.RESULT_FORWARDED,
+            TraceRecordType.RESULT_ASSEMBLED,
             TraceRecordType.PLAN_CREATED,
             TraceRecordType.PLAN_UPDATED,
             TraceRecordType.PLAN_VALIDATION_FAILED,
@@ -46,6 +47,18 @@ class LiveActivityProjectorTest
             TraceRecordType.STEP_FAILED,
             TraceRecordType.ERROR_RECORDED,
             TraceRecordType.TRACE_COMPLETED);
+
+    @Test
+    void projectsAssemblyDecisionWithoutPayloadOrModelAttribution() {
+        Map<String, Object> metadata = Map.of("skillName", "route", "owningMissionFrameId", "root", "modelContributionRequired", false,
+                "outputBindings", List.of(Map.of("destination", "/value", "sourceKind", "input", "sourcePath", "/value", "parentMissionFrameId", "root")));
+        var projection = new LiveActivityProjector().project(state("session", "route"),
+                record(TraceRecordType.RESULT_ASSEMBLED, 1, TraceFrameType.ROOT_MISSION, metadata, StringNode.valueOf("{\"value\":9007199254740993}")));
+        assertThat(projection.activity().kind()).isEqualTo(ExecutionActivityKind.RESULT_ASSEMBLED);
+        assertThat(projection.activity().details()).containsEntry("modelContributionRequired", false).containsEntry("owningMissionFrameId", "root");
+        assertThat(projection.activity().details()).doesNotContainKeys("outputBindings", "value");
+        assertThat(projection.snapshot().usage()).isEqualTo(SessionUsageSnapshot.empty());
+    }
 
     @Test
     void projectsForwardingWithoutParentModelAttribution() {

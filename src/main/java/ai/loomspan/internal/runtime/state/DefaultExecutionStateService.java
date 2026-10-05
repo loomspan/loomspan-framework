@@ -401,6 +401,16 @@ public class DefaultExecutionStateService implements ExecutionStateService
     }
 
     @Override
+    public void recordResultAssembled(LoomspanSession session, String skillName, String planId,
+            boolean modelContributionRequired, List<Map<String, Object>> provenance, String assembled)
+    {
+        requireBinding(session).requireWritable(() -> {
+            traceRecorder.recordResultAssembled(session, skillName, planId, modelContributionRequired, provenance, assembled);
+            return null;
+        });
+    }
+
+    @Override
     public void recordResultForwarded(LoomspanSession session, String skillName, String planId, String taskId, String capabilityName)
     {
         requireBinding(session).requireWritable(() -> {

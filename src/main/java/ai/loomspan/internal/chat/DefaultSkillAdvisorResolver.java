@@ -99,14 +99,16 @@ public final class DefaultSkillAdvisorResolver implements SkillAdvisorResolver
 
         if (definition.outputSchema() != null)
         {
-            advisors.add(new OutputSchemaCallAdvisor(
+            OutputSchemaCallAdvisor schemaAdvisor = new OutputSchemaCallAdvisor(
                     definition.manifest().getName(),
                     definition.outputSchema(),
                     outputSchemaValidator,
                     outputSchemaPromptAugmentor,
                     definition.outputSchemaMaxRetries(),
                     outcome -> executionStateService.recordOutputSchemaOutcome(LoomspanSession.getCurrentSession(), outcome),
-                    advisorTraceRecorder));
+                    advisorTraceRecorder);
+            if (!definition.outputBindings().isEmpty()) schemaAdvisor.withOutputBindings(definition);
+            advisors.add(schemaAdvisor);
         }
 
         if (!definition.evidenceContract().isEmpty())

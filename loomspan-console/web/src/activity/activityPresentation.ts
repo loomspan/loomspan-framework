@@ -100,7 +100,13 @@ function describeActivity(
       add(facts, "decision", text(details, "retryDecision"));
       add(facts, "delay", retryDelay(details));
       break;
-    case "RESULT_FORWARDED":
+    case "RESULT_ASSEMBLED":
+ headline = text(details, "skillName");
+ add(facts, "owner", text(details, "owningMissionFrameId"));
+ add(facts, "plan", text(details, "planId"));
+ if (details?.modelContributionRequired === false) add(facts, "model", "Final synthesis skipped");
+ break;
+ case "RESULT_FORWARDED":
       headline = text(details, "capabilityName");
       add(facts, "parent", text(details, "skillName"));
       add(facts, "plan", text(details, "planId"));

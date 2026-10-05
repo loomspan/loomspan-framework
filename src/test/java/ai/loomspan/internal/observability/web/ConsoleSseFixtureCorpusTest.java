@@ -43,6 +43,13 @@ class ConsoleSseFixtureCorpusTest
                 activity("9", ExecutionActivityKind.RESULT_FORWARDED, "RUNNING", "Forwarded finishReport result",
                         forwardingDetails));
         fixtures.put("activity-result-forwarded.sse", forwarded);
+        Map<String, Object> assemblyDetails = new LinkedHashMap<>();
+        assemblyDetails.put("owningMissionFrameId", "owner");
+        assemblyDetails.put("modelContributionRequired", false);
+        assemblyDetails.put("skillName", "prepareReport");
+        fixtures.put("activity-result-assembled.sse", ObservabilityActivityStream.activityFrame(json,
+                activity("10", ExecutionActivityKind.RESULT_ASSEMBLED, "RUNNING", "Result assembled from declared output bindings",
+                        assemblyDetails)));
         fixtures.put("handshake.sse", handshake);
         fixtures.put("activity-trace-completed.sse", completed);
         fixtures.put("activity-core-finalization-failed.sse", failed);

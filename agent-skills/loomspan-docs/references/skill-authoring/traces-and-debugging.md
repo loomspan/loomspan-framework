@@ -554,3 +554,9 @@ cross-version application contracts.
   `e2e/plan-update-diff.spec.ts` protect inert accessible rendering and evidence
   lifetime. Production owners are `plans.go#comparePlanSnapshots`,
   `trace_analysis.go#boundedRecordDTOValue`, and `TraceRecords.tsx`.
+
+## Declared output assembly
+
+`RESULT_ASSEMBLED` is recorded at the owning mission after complete output validation succeeds and before mission closure. Metadata contains `skillName`, `owningMissionFrameId`, optional `planId`, `modelContributionRequired` and `outputBindings`. Each provenance entry contains `destination`, `sourceKind`, `sourcePath`, `parentMissionFrameId`, and exact `sourceTaskId`/`sourceSkill` for child results. Provenance identifies sources without duplicating their selected values. `modelContributionRequired: false` authoritatively identifies skipped final synthesis.
+
+The normal payload channel contains the validated assembled JSON. Console projects `resultAssembly` alongside ordinary content descriptors and byte-range access. Original model responses and accepted child records remain separate and unchanged. Live activity carries bounded identity previews and the contribution decision. Declaration, plan/source selection, model override and complete output-validation failures occur before successful assembly; source failures never cause model fallback. `ConsoleTraceFixtureCorpusTest`, `ConsoleSseFixtureCorpusTest` and `LiveActivityProjectorTest` cover the current diagnostic vocabulary.

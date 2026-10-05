@@ -70,6 +70,26 @@ public final class DefaultExecutionTraceRecorder implements ExecutionTraceRecord
     }
 
     @Override
+    public void recordResultAssembled(LoomspanSession session, String skillName, String planId,
+            boolean modelContributionRequired, List<Map<String, Object>> provenance, String assembled)
+    {
+        ExecutionBinding binding = requireBinding(session);
+        MissionContext mission = binding.requireMission();
+        if (!skillName.equals(mission.skillName())) throw new IllegalArgumentException("Assembly skill does not match owning mission");
+        ExecutionFrame missionFrame = binding.branch().leafToRootSnapshot().stream()
+                .filter(frame -> frame.frameId().equals(mission.missionFrameId()) && frame.route().equals(skillName)
+                        && (frame.traceFrameType() == TraceFrameType.ROOT_MISSION || frame.traceFrameType() == TraceFrameType.SKILL_EXECUTION))
+                .findFirst().orElseThrow(() -> new IllegalStateException("Assembly requires the owning mission frame"));
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("skillName", requireNonBlank(skillName, "skillName"));
+        metadata.put("owningMissionFrameId", mission.missionFrameId());
+        if (planId != null) metadata.put("planId", requireNonBlank(planId, "planId"));
+        metadata.put("modelContributionRequired", modelContributionRequired);
+        metadata.put("outputBindings", List.copyOf(provenance));
+        recordAgainstFrame(session, missionFrame, TraceRecordType.RESULT_ASSEMBLED, metadata, Objects.requireNonNull(assembled));
+    }
+
+    @Override
     public void recordResultForwarded(LoomspanSession session, String skillName, String planId, String taskId, String capabilityName)
     {
         ExecutionBinding binding = requireBinding(session);

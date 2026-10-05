@@ -293,7 +293,7 @@ export type TraceRecord = {
   sequence: number; type: string; failureId?: string; validationStatus?: string; frameId: string; parentFrameId: string;
   frameType: string; route: string; threadName: string; timestampMillis: number;
   representation: string; isChunk: boolean; isEnvelope: boolean;
-  content?: TraceContentDescriptor; resultForwarding?: { skillName: string; planId: string; linkedTaskId: string; capabilityName: string }; plan?: PlanReference; planUpdate?: PlanUpdate;
+  content?: TraceContentDescriptor; resultAssembly?: { skillName: string; owningMissionFrameId: string; planId?: string; modelContributionRequired: boolean; outputBindings: { destination: string; sourceKind: "input" | "child_result"; sourcePath: string; parentMissionFrameId: string; sourceTaskId?: string; sourceSkill?: string }[] }; resultForwarding?: { skillName: string; planId: string; linkedTaskId: string; capabilityName: string }; plan?: PlanReference; planUpdate?: PlanUpdate;
 };
 export type TraceContentDescriptor = { role: "DATA" | "RECONSTRUCTED" | "DIAGNOSTIC"; contentType: string; encoding: "UTF8" | "BINARY"; retainedBytes: number; available: boolean; complete: boolean; inlineEligibility: boolean; inlineOmission?: "PER_VALUE_LIMIT" | "AGGREGATE_LIMIT" | "UNAVAILABLE" | "INCOMPLETE"; contentRef?: string; inlineContent?: string };
 export type PlanFieldChange = { taskId?: string; field: "status" | "note"; before: string | null; after: string | null };
@@ -368,6 +368,7 @@ export type ActivityKind =
   | "TOOL_CALL_STARTED"
   | "TOOL_CALL_COMPLETED"
   | "TOOL_CALL_FAILED"
+  | "RESULT_ASSEMBLED"
   | "RESULT_FORWARDED"
   | "STEP_STARTED"
   | "STEP_ACTION_REJECTED"
@@ -392,6 +393,7 @@ export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
   TOOL_CALL_COMPLETED: "Tool call completed",
   TOOL_CALL_FAILED: "Tool call failed",
   RESULT_FORWARDED: "Result forwarded",
+ RESULT_ASSEMBLED: "Result assembled",
   STEP_STARTED: "Step started",
   STEP_ACTION_REJECTED: "Step action rejected",
   STEP_COMPLETED: "Step completed",

@@ -117,6 +117,7 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 	defer writer.abortRecordIndex()
 
 	forwardedResults := map[int64]*ResultForwarding{}
+	assembledResults := map[int64]*ResultAssembly{}
 	var completionRec *Record
 	var configuredLimits *ConfiguredLimits
 	var entrySkill string
@@ -153,6 +154,46 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 				return invalidityError(CategoryUnsupportedValue, scopeID)
 			}
 			forwardedResults[rec.Sequence] = forwarded
+		}
+		if rec.Type == RecordResultAssembled {
+			assembly, valid := decodeResultAssembly(rec.Metadata)
+			if !valid || assembly.OwningMissionFrameID != rec.FrameID {
+				return invalidityError(CategoryUnsupportedValue, scopeID)
+			}
+			owner := frames.frames[rec.FrameID]
+			if owner == nil || owner.closed || owner.route != assembly.SkillName || (owner.frameType != FrameRootMission && owner.frameType != FrameSkillExecution) {
+				return invalidityError(CategoryUnsupportedValue, scopeID)
+			}
+			if assembly.PlanID != "" {
+				lineage := plans.lineages[assembly.PlanID]
+				if lineage == nil || lineage.snapshot == nil || lineage.snapshot.Status != "VALID" {
+					return invalidityError(CategoryUnsupportedValue, scopeID)
+				}
+				planning := frames.frames[lineage.planningFrameID]
+				if planning == nil || planning.parentFrameID != rec.FrameID {
+					return invalidityError(CategoryUnsupportedValue, scopeID)
+				}
+				for _, task := range lineage.snapshot.Tasks {
+					if task.Status != "COMPLETED" {
+						return invalidityError(CategoryUnsupportedValue, scopeID)
+					}
+				}
+				for _, binding := range assembly.OutputBindings {
+					if binding.SourceKind != "child_result" {
+						continue
+					}
+					count := 0
+					for _, task := range lineage.snapshot.Tasks {
+						if task.TaskID == binding.SourceTaskID && task.CapabilityName != nil && *task.CapabilityName == binding.SourceSkill {
+							count++
+						}
+					}
+					if count != 1 {
+						return invalidityError(CategoryUnsupportedValue, scopeID)
+					}
+				}
+			}
+			assembledResults[rec.Sequence] = assembly
 		}
 		lastSeq = rec.Sequence
 		if rec.Type == RecordTraceStarted {
@@ -366,6 +407,11 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 		recordFacts[sequence] = facts
 	}
 
+	for sequence, assembly := range assembledResults {
+		facts := recordFacts[sequence]
+		facts.ResultAssembly = assembly
+		recordFacts[sequence] = facts
+	}
 	// Write immutable indexes.
 	if d := writer.flushRecordIndex(); d != nil {
 		return artifact.ProcessResult{}, d

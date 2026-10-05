@@ -83,6 +83,23 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
             }
 
             lifecycle.requireOpenForNewWork(capturedBinding);
+            var composition = definition.outputBindings().isEmpty() ? null : capturedBinding.requireMission().getOrCreateOutputComposition(
+                    () -> new ai.loomspan.internal.outputschema.OutputBindingComposition(definition,
+                        capturedBinding.requireMission(), ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree()));
+            if (composition != null) {
+                if (!composition.modelContributionRequired()) {
+                    var assembled = composition.composeEmpty();
+                    if (!assembled.validation().valid()) throw new IllegalArgumentException("binding_output_validation: " + assembled.validation().issues());
+                    executionStateService.recordOutputSchemaOutcome(session, new ai.loomspan.internal.outputschema.OutputSchemaOutcome(
+                            skillName, null, 1, 0, definition.outputSchemaMaxRetries(),
+                            ai.loomspan.internal.outputschema.OutputSchemaOutcomeStatus.PASSED, List.of()));
+                    validateBoundPolicies(session, definition, assembled.content());
+                    lifecycle.requireOpenForNewWork(capturedBinding);
+                    executionStateService.recordResultAssembled(session, skillName, null, false, composition.provenance(), assembled.content());
+                    return assembled.content();
+                }
+            }
+
             SkillPromptComposition promptComposition = executionStateService.currentPlan()
                     .map(plan -> SkillPromptComposer.composePlannedExecutionPrompt(definition, buildPlannedExecutionPrompt(plan)))
                     .orElseGet(() -> SkillPromptComposer.composeDefaultExecutionPrompt(definition));
@@ -105,8 +122,15 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
                         skillName,
                         "mission");
 
-                return modelInteraction.call(new ModelInteractionRequest(
+                String content = modelInteraction.call(new ModelInteractionRequest(
                         executionPrompt, renderedInput, modelTraceContext, visibleTools, false)).content();
+                if (composition != null) {
+                    if (capturedBinding.requireMission().lastLinterOutcome().map(outcome -> outcome.status() == ai.loomspan.internal.linter.LinterOutcomeStatus.EXHAUSTED).orElse(false))
+                        throw new IllegalArgumentException("binding_linter_validation: Assembled output exhausted configured regex linter correction.");
+                    lifecycle.requireOpenForNewWork(capturedBinding);
+                    executionStateService.recordResultAssembled(session, skillName, null, true, composition.provenance(), content);
+                }
+                return content;
             }
             catch (RuntimeException | Error ex)
             {
@@ -136,6 +160,22 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
                 executionStateService.closeFrame(session, modelFrame, closeMetadata(modelFrameStatus, modelFailure));
             }
         });
+    }
+
+    private void validateBoundPolicies(LoomspanSession session, YamlSkillDefinition definition, String content) {
+        var evidence = new ai.loomspan.internal.runtime.evidence.EvidenceBackedOutputValidator().validate(content,
+                definition.evidenceContract(), ExecutionBindingScope.requireCurrent().requireMission().successfulDirectSkills());
+        if (!definition.evidenceContract().isEmpty()) executionStateService.recordEvidenceValidation(session, evidence.complete(), Map.of("skillName",definition.manifest().getName()), evidence);
+        if (!evidence.complete()) throw new IllegalArgumentException("binding_evidence_validation: " + evidence.issues());
+        var linter = definition.linter();
+        if (linter != null && "regex".equals(linter.getType()) && linter.getRegex()!=null) {
+            boolean matches = java.util.regex.Pattern.compile(linter.getRegex().getPattern()).matcher(content).matches();
+            executionStateService.recordLinterOutcome(session,new ai.loomspan.internal.linter.LinterOutcome(definition.manifest().getName(),
+                    linter.getType(),1,0,linter.getMaxRetries()==null ? 0 : linter.getMaxRetries(),
+                    matches ? ai.loomspan.internal.linter.LinterOutcomeStatus.PASSED : ai.loomspan.internal.linter.LinterOutcomeStatus.EXHAUSTED,
+                    matches ? "Assembled output matched configured regex linter." : "Assembled output did not match configured regex linter."));
+            if (!matches) throw new IllegalArgumentException("binding_linter_validation: Immutable assembled output failed configured regex linter.");
+        }
     }
 
     private Map<String, Object> closeMetadata(String status, @Nullable Throwable failure)

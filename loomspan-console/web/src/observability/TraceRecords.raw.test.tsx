@@ -250,3 +250,18 @@ test("shows authoritative forwarding details without inventing a final model res
   fireEvent.click(screen.getByRole("button", { name: "Hide forwarding details" }));
   expect(screen.queryByRole("region", { name: "Forwarding details for record 7" })).toBeNull();
 });
+
+test("shows exact assembly provenance and skipped final synthesis", () => {
+  const value = { ...record("RESULT_ASSEMBLED"), resultAssembly: { skillName: "parent", owningMissionFrameId: "owner", modelContributionRequired: false,
+    outputBindings: [{ destination: "/evidence", sourceKind: "input" as const, sourcePath: "", parentMissionFrameId: "owner" }] } };
+  renderRecord(value);
+  fireEvent.click(screen.getByRole("button", { name: "Assembly details" }));
+  const detail = screen.getByRole("region", { name: "Assembly details for record 7" });
+  expect(detail).toHaveTextContent("Final synthesis skipped");
+  expect(detail).toHaveTextContent("/evidence");
+  expect(detail).toHaveTextContent("owner");
+  expect(detail).toHaveTextContent("(whole source)");
+  fireEvent.click(screen.getByRole("button", { name: "Hide assembly details" }));
+  expect(screen.queryByRole("region", { name: "Assembly details for record 7" })).toBeNull();
+  expect(getRawRecordRangeMock).not.toHaveBeenCalled();
+});

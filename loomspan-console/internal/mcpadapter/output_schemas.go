@@ -254,7 +254,7 @@ func recordQueryOutputSchema() *jsonschema.Schema {
 		"contentRef": compactString(), "inlineContent": compactString(), "inlineOmission": compactString(),
 	}, true)
 	record := compactObject([]string{"sequence", "type", "timestampMillis", "representation", "attempts", "retries", "validations", "failures"}, map[string]*jsonschema.Schema{
-		"sequence": compactInteger(), "type": compactString(), "failureId": compactString(), "validationStatus": compactString(), "timestampMillis": compactInteger(), "representation": compactString(), "plan": compactOpenObject(), "resultForwarding": compactOpenObject(), "attempts": compactArray(compactOpenObject()), "retries": compactArray(compactOpenObject()), "validations": compactArray(compactOpenObject()), "failures": compactArray(compactOpenObject()), "content": content,
+		"sequence": compactInteger(), "type": compactString(), "failureId": compactString(), "validationStatus": compactString(), "timestampMillis": compactInteger(), "representation": compactString(), "plan": compactOpenObject(), "resultForwarding": compactOpenObject(), "resultAssembly": compactOpenObject(), "attempts": compactArray(compactOpenObject()), "retries": compactArray(compactOpenObject()), "validations": compactArray(compactOpenObject()), "failures": compactArray(compactOpenObject()), "content": content,
 	}, true)
 	match := compactObject([]string{"sequence", "recordType", "matchOffset", "matchLength", "searchedField"}, map[string]*jsonschema.Schema{
 		"sequence": compactInteger(), "recordType": compactString(), "matchOffset": compactInteger(), "matchLength": compactInteger(), "searchedField": compactString(), "contentId": compactString(),

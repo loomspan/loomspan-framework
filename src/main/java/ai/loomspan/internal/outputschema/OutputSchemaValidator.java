@@ -36,6 +36,12 @@ public final class OutputSchemaValidator
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
     }
 
+    /** Match using the native output contract's locale-independent normalized property keys. */
+    public static boolean propertyNamesMatch(String left, String right)
+    {
+        return left.toLowerCase(Locale.ROOT).equals(right.toLowerCase(Locale.ROOT));
+    }
+
     public OutputSchemaValidationResult validate(String rawOutput, YamlSkillManifest.OutputSchemaManifest schema)
     {
         Objects.requireNonNull(schema, "schema must not be null");

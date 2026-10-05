@@ -75,6 +75,7 @@ public final class ExecutionJournalProjector
             case RESULT_FORWARDED -> entry(record, JournalLevel.INFO, JournalEntryType.RESULT_FORWARDED,
                     Map.of("skillName", record.metadata().get("skillName"), "planId", record.metadata().get("planId"),
                             "linkedTaskId", record.metadata().get("linkedTaskId"), "capabilityName", record.metadata().get("capabilityName")));
+            case RESULT_ASSEMBLED -> entry(record, JournalLevel.INFO, JournalEntryType.RESULT_ASSEMBLED, sanitize(record.data()));
             case PLAN_CREATED -> entry(record, JournalLevel.INFO, JournalEntryType.PLAN_CREATED, sanitize(record.data()));
             case PLAN_UPDATED -> entry(record, JournalLevel.INFO, JournalEntryType.PLAN_UPDATED, sanitize(record.data()));
             case LINTER_RECORDED -> entry(record, JournalLevel.INFO, JournalEntryType.LINTER, sanitize(record.data()));

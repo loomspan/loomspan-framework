@@ -9,7 +9,7 @@ coverage: source-verified
 
 ## Applicability
 
-Use this topic to choose final synthesis with `output_schema` or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract gives the model provider-neutral instructions, validates the returned JSON exactly, and can drive semantic retries. Java skills have no YAML `output_schema`; their returned-value behavior is Jackson serialization of the Java result.
+Use this topic to choose final synthesis, declared output assembly with `output_bindings`, or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract gives the model provider-neutral instructions, validates the returned JSON exactly, and can drive semantic retries. Java skills have no YAML `output_schema`; their returned-value behavior is Jackson serialization of the Java result.
 
 The root schema MUST have `type: object`. Supported node types are `object`, `array`, `string`, `integer`, `number`, and `boolean`.
 
@@ -17,7 +17,9 @@ The root schema MUST have `type: object`. Supported node types are `object`, `ar
 
 | Responsibility | Declaration | Completion |
 | --- | --- | --- |
-| Combine, interpret, or change child results | Omit `output_from`; author a parent `output_schema` when structured output is required | The parent synthesizes and owns its final-output validation. |
+| Generate the whole output | Omit `output_from` and `output_bindings`; author a parent `output_schema` when structured output is required | The parent synthesizes and owns its final-output validation. |
+| Preserve selected input/child values in every output field | Declare `output_bindings` covering a closed output object | Framework assembles and validates it with no final model request. |
+| Preserve evidence while generating reasoning | Bind preserved fields and leave reasoning fields unbound | The model contributes only unbound fields; Framework validates the complete assembly. |
 | Orchestrate work while one direct child already supplies the complete intended answer | `output_from: {skill: finish}` | Runtime returns that accepted task's existing Framework String unchanged after all accepted work succeeds. |
 
 Forwarding retains model planning, input preparation, explicit unbound child arguments, [author-declared input bindings](input-bindings.md), dependencies, and genuine orchestration duties. Authors SHOULD reconsider a wrapper with no additional responsibility. Do not instruct a forwarding parent to copy, quote, or reconstruct the child's answer.
@@ -98,6 +100,78 @@ The application's sole `RestSkillHandler` returns non-null text. That text is fo
 
 A chain `prepareReport -> coordinateReport -> finishReport` works when each forwarding parent independently declares its selected direct child as required and unique. Every level completes its entire accepted plan and forwards its own selected task result; no level may select a grandchild directly.
 
+## Declared output assembly
+
+Top-level `output_bindings` uses the same destination-keyed map and descriptors as [input bindings](input-bindings.md). Its destination is this skill's output. `from: input` selects this invocation's validated input; `from: child_result` selects exactly one successful accepted direct-child task, with `skill` naming the producer. `path: ""` selects the whole source. A nonempty source path selects an object subtree. Object JSON Pointers support `~0` and `~1`; array traversal, transforms and interpolation are unsupported. Entire selected arrays retain their order.
+
+A model-backed skill MUST declare an object `output_schema`. `output_from` and `output_bindings` MUST NOT coexist, including explicit null declarations. Destination paths MUST be nonempty and nonoverlapping. Duplicate YAML keys and unknown descriptor fields are rejected. Known source/destination paths and compatible types are checked against the captured complete generation. Open or unspecified source schemas require runtime checks; Java return types and REST response text never invent producer contracts.
+
+This full assembly combines two direct-child objects with the current input identifier. `assistant` must be a configured model alias; declare each producer separately with its own input contract. The selected child results must be objects compatible with these destination schemas.
+
+```yaml
+name: assembleCase
+model: assistant
+planning_mode: true
+max_steps: 2
+prompt: Run assessEquipment and planResolution with the case details.
+input_schema:
+  type: object
+  properties:
+    caseId: {type: string}
+  required: [caseId]
+  additionalProperties: false
+allowed_skills:
+  - {name: assessEquipment, required: true, max_tasks: 1}
+  - {name: planResolution, required: true, max_tasks: 1}
+output_schema:
+  type: object
+  properties:
+    caseId: {type: string}
+    equipmentAssessment: {type: object, additionalProperties: true}
+    recommendation: {type: object, additionalProperties: true}
+  required: [caseId, equipmentAssessment, recommendation]
+  additionalProperties: false
+output_bindings:
+  /caseId: {from: input, path: /caseId}
+  /equipmentAssessment: {from: child_result, skill: assessEquipment, path: ""}
+  /recommendation: {from: child_result, skill: planResolution, path: ""}
+```
+
+Every bound child producer must occur exactly once in the accepted plan, even when its allowed entry is optional. Impossible declared counts fail configuration validation. These output requirements add no dependency or false ordering; independent producers may run in parallel. All accepted work must succeed before assembly, including work unrelated to these bindings. Planning, access, invocation limits and cancellation still apply.
+
+An ordinary skill can bind only from its own input. This mixed contract preserves assessment evidence and asks the model for `summary` only:
+
+```yaml
+name: summarizeAssessment
+model: assistant
+prompt: Explain the supplied assessment in a short summary.
+input_schema:
+  type: object
+  properties:
+    assessment: {type: object, additionalProperties: true}
+  required: [assessment]
+  additionalProperties: false
+output_schema:
+  type: object
+  properties:
+    assessment: {type: object, additionalProperties: true}
+    summary: {type: string}
+  required: [assessment, summary]
+  additionalProperties: false
+output_bindings:
+  /assessment: {from: input, path: /assessment}
+```
+
+Initial and corrective output instructions describe only the projected unbound contract. Full input and accepted-result evidence remain available for reasoning. Required unbound siblings remain enforced, including inside optional ancestors created by binding insertion. A bound ancestor owns its entire subtree. The model MUST NOT supply a bound destination, even an equal value or null, or a blocking scalar/array/null ancestor. Such contribution errors can consume the normal bounded output correction budget; accepted children are not replayed.
+
+Framework resolves every binding, including optional destinations, then copies containers and validates the complete original contract before publication. Selected values retain exact numbers, strings, null and ordered arrays without coercion or date rewriting. JSON-looking nested strings remain strings; plain-text child results remain text. Newly assembled JSON need not preserve source lexical whitespace. Existing `output_from` retains exact full-text semantics.
+
+Missing paths differ from explicit null. Unavailable, ambiguous, failed, cross-invocation or contract-invalid sources fail with diagnostics and never fall back to model copying. Source snapshots and the captured generation remain stable across correction. Fully bound output skips final synthesis only when no optional/required declared field or open field space remains model-owned. An open root or unbound open object can still require a model contribution. A planning full assembly costs N task steps; a mixed output costs N+1.
+
+`RESULT_ASSEMBLED` identifies ownership and whether a model contribution was required. Its payload is the validated assembled output, while original model and child records retain their evidence. See [assembly diagnostics](traces-and-debugging.md#declared-output-assembly).
+
+Implementation evidence: `OutputBindingProjection`, `OutputBindingComposition`, `ChildInputBindingAssembler`, `PlanOutputBindingProducerValidator`, and the ordinary and step mission engines. `OutputBindingCompositionTest` protects projection, ownership conflicts and exact insertion; `OutputBindingIsolationTest` protects concurrent/nested invocation and generation snapshots. `DeclaredOutputBindingsOrdinaryIntegrationTest` and `DeclaredOutputBindingsPlanningIntegrationTest` exercise facade completion and correction, including model/Java/REST sources. `ConsoleTraceFixtureCorpusTest` exports current Java assembly authority for Console readers.
+
 ## Effective output metadata
 
 Public `SkillDescriptor.outputSchema()`, planner tool descriptions, and Console skill detail expose nullable normalized JSON-object schema text from the captured complete generation. Ordinary model skills expose their authored output shape; forwarding parents derive it through their selected-child chain. Shape, constraints, descriptions and provider-neutral `nullable` semantics are retained, while child-local `evidence` annotations are omitted. This text describes Loomspan's supported schema vocabulary; it is not a provider-native JSON Schema response format.
@@ -149,7 +223,7 @@ Array-item validation reports concrete indexed paths such as `$.rows[0].amount`.
 
 ## Guidance, validation, and retries
 
-For ordinary model execution, Loomspan places the complete effective contract in the first request. For ordinary synthesis in planning mode, it places the same contract in the first `FINAL_RESPONSE` request, after required plan tasks complete; tool-call steps do not receive final-output guidance. The renderer includes every normalized node, required or optional presence, nullable or non-null values, effective object openness, array items, enum, format, and description. It does not include evidence expressions, mappings, retry settings, or provider metadata.
+For ordinary model execution without `output_bindings`, Loomspan places the complete effective contract in the first request. For ordinary synthesis in planning mode without output bindings, it places the same contract in the first `FINAL_RESPONSE` request, after required plan tasks complete; tool-call steps do not receive final-output guidance. The renderer includes every normalized node, required or optional presence, nullable or non-null values, effective object openness, array items, enum, format, and description. It does not include evidence expressions, mappings, retry settings, or provider metadata.
 
 Loomspan then parses and validates the returned JSON. It does not silently coerce, insert, remove, or repair candidate fields and does not request a provider-native JSON Schema response format. With `output_schema_max_retries: N`, a non-planning output allows one initial validated response plus at most `N` semantic corrections. Planning final-response validation uses its planning retry path. For physical-attempt identity, accounting, correction-message composition, and trace diagnosis, read [traces-and-debugging.md](traces-and-debugging.md).
 

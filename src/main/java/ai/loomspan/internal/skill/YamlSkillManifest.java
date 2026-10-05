@@ -34,6 +34,7 @@ public class YamlSkillManifest
         INPUT_SCHEMA("input_schema"),
         OUTPUT_SCHEMA("output_schema"),
         OUTPUT_FROM("output_from"),
+        OUTPUT_BINDINGS("output_bindings"),
         PLANNING_MODE("planning_mode"),
         CONCURRENCY("concurrency"),
         MAX_STEPS("max_steps"),
@@ -86,6 +87,19 @@ public class YamlSkillManifest
 
     @JsonProperty("output_from")
     private OutputFromManifest outputFrom;
+
+    @JsonProperty("output_bindings")
+    private Map<String, InputBindingManifest> outputBindings = Map.of();
+
+    public Map<String, InputBindingManifest> getOutputBindings() { return outputBindings; }
+
+    public void setOutputBindings(Map<String, InputBindingManifest> value) {
+        declaredFields.add(Field.OUTPUT_BINDINGS);
+        outputBindings = value == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(value));
+    }
+
+    @JsonIgnore
+    public boolean isOutputBindingsDeclared() { return isDeclared(Field.OUTPUT_BINDINGS); }
 
     @JsonProperty("input_schema")
     private InputSchemaManifest inputSchema;

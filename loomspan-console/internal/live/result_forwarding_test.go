@@ -38,3 +38,17 @@ func TestForwardedActivityAcceptsBoundedTaskIdentityPreview(t *testing.T) {
 		t.Fatalf("rejected bounded producer preview: %v", err)
 	}
 }
+
+func TestAssemblyActivityRequiresOwnerAndContributionDecision(t *testing.T) {
+	activity := makeActivity("1", "session", string(KindResultAssembled))
+	activity.Details = json.RawMessage(`{"skillName":"parent","owningMissionFrameId":"owner","modelContributionRequired":false}`)
+	if err := activity.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{`{"skillName":"parent","modelContributionRequired":false}`, `{"skillName":"parent","owningMissionFrameId":"owner","modelContributionRequired":null}`} {
+		activity.Details = json.RawMessage(raw)
+		if activity.Validate() == nil {
+			t.Fatalf("accepted malformed assembly preview %s", raw)
+		}
+	}
+}

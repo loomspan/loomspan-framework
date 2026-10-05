@@ -40,6 +40,14 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
     private final int maxRetries;
     private final OutputSchemaOutcomeRecorder outcomeRecorder;
     private final AdvisorTraceRecorder advisorTraceRecorder;
+    private ai.loomspan.internal.skill.YamlSkillDefinition compositionDefinition;
+    private OutputBindingComposition invocationComposition;
+    private ai.loomspan.internal.core.MissionContext compositionMission;
+
+    public OutputSchemaCallAdvisor withOutputBindings(ai.loomspan.internal.skill.YamlSkillDefinition definition) {
+        compositionDefinition = Objects.requireNonNull(definition);
+        return this;
+    }
 
     public OutputSchemaCallAdvisor(String skillName,
             YamlSkillManifest.OutputSchemaManifest schema,
@@ -85,8 +93,11 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
             return callAdvisorChain.nextCall(chatClientRequest);
         }
 
+        OutputBindingComposition composition = compositionDefinition == null ? null : invocationComposition();
+        Prompt initialPrompt = promptAugmentor.augment(chatClientRequest.prompt(), composition == null ? schema : composition.projection().schema());
+        if (composition != null) initialPrompt = initialPrompt.augmentSystemMessage(message -> message.mutate().text(message.getText() + "\n" + composition.guidance()).build());
         ChatClientRequest baselineRequest = chatClientRequest.mutate()
-                .prompt(promptAugmentor.augment(chatClientRequest.prompt(), schema))
+                .prompt(initialPrompt)
                 .build();
         ChatClientRequest currentRequest = baselineRequest;
 
@@ -97,7 +108,8 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         {
             ChatClientResponse response = downstreamChain.nextCall(currentRequest);
             String candidate = extractAssistantText(response);
-            OutputSchemaValidationResult result = validator.validate(candidate, schema);
+            OutputBindingComposition.Result assembled = composition == null ? null : composition.compose(candidate);
+            OutputSchemaValidationResult result = assembled == null ? validator.validate(candidate, schema) : assembled.validation();
 
             if (result.valid())
             {
@@ -106,6 +118,13 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
                                 ModelTraceContext.attemptFrom(response.context())),
                         candidate));
 
+                if (assembled != null) {
+                    var originalResponse = response.chatResponse();
+                    var generation = originalResponse.getResult();
+                    var output = generation.getOutput();
+                    var replacement = new org.springframework.ai.chat.model.Generation(AssistantMessage.builder().content(assembled.content()).properties(output.getMetadata()).toolCalls(output.getToolCalls()).media(output.getMedia()).build(), generation.getMetadata());
+                    response = response.mutate().chatResponse(new org.springframework.ai.chat.model.ChatResponse(List.of(replacement), originalResponse.getMetadata())).build();
+                }
                 return record(response, outcome(attempt, OutputSchemaOutcomeStatus.PASSED, null, List.of()));
             }
 
@@ -163,6 +182,17 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         }
     }
 
+    private synchronized OutputBindingComposition invocationComposition() {
+        var mission = ai.loomspan.internal.core.ExecutionBindingScope.requireCurrent().requireMission();
+        if (invocationComposition == null) {
+            compositionMission = mission;
+            invocationComposition = mission.getOrCreateOutputComposition(() -> new OutputBindingComposition(compositionDefinition, mission,
+                    ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree()));
+        }
+        if (compositionMission != mission) throw new IllegalStateException("Output binding advisor reused across owning invocations.");
+        return invocationComposition;
+    }
+
     @Override
     public String getName()
     {
@@ -172,7 +202,7 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
     @Override
     public int getOrder()
     {
-        return DEFAULT_CHAT_MEMORY_PRECEDENCE_ORDER - 90;
+        return DEFAULT_CHAT_MEMORY_PRECEDENCE_ORDER - (compositionDefinition == null ? 90 : 70);
     }
 
     private OutputSchemaOutcome outcome(int attempt,
@@ -352,7 +382,7 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         }
         return tail.append("Preserve all already-valid structure and values visible in the previous assistant response.\n")
                 .append("Do NOT call any tools again; use the data already returned by completed tool calls.\n")
-                .append("Return one complete corrected JSON object only, with no explanation, markdown, or code fences.")
+                .append(compositionDefinition == null ? "Return one complete corrected JSON object only, with no explanation, markdown, or code fences." : "Return only the corrected model-owned JSON contribution. Omit every framework-bound destination; Framework supplies those values.")
                 .toString();
     }
 

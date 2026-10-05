@@ -47,6 +47,7 @@ const ALL_KINDS: ActivityKind[] = [
   "TOOL_CALL_STARTED",
   "TOOL_CALL_COMPLETED",
   "TOOL_CALL_FAILED",
+  "RESULT_ASSEMBLED",
   "RESULT_FORWARDED",
   "STEP_STARTED",
   "STEP_ACTION_REJECTED",
@@ -314,4 +315,12 @@ it("shows the authoritative forwarding parent, plan and selected child task", ()
   expect(factValue(activity, "plan")).toBe("plan-selected");
   expect(factValue(activity, "task")).toBe("task-selected");
   expect(presentActivity(activity).isTerminal).toBe(false);
+});
+
+it("presents authoritative assembly ownership and skipped synthesis", () => {
+ const activity = makeActivity("RESULT_ASSEMBLED", { skillName: "parent", owningMissionFrameId: "owner", modelContributionRequired: false });
+ expect(presentActivity(activity).headline).toBe("parent");
+ expect(factValue(activity, "owner")).toBe("owner");
+ expect(factValue(activity, "model")).toBe("Final synthesis skipped");
+ expect(presentActivity(activity).isTerminal).toBe(false);
 });

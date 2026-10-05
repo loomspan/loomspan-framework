@@ -41,6 +41,9 @@ public interface ExecutionStateService
 
     Optional<ExecutionPlan> currentPlan();
 
+    void recordResultAssembled(LoomspanSession session, String skillName, @Nullable String planId,
+            boolean modelContributionRequired, List<Map<String, Object>> provenance, String assembled);
+
     void recordResultForwarded(LoomspanSession session, String skillName, String planId, String taskId, String capabilityName);
 
     void logPlanCreated(LoomspanSession session, ExecutionPlan plan, Map<String, Object> acceptedAttempt);

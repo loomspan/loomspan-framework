@@ -133,3 +133,7 @@ This contract does not provide per-skill parallelism limits, capability-level co
 - `SessionUsageServiceTest#simultaneousProviderAttemptReservationsRespectTheLimit` and `#simultaneousUsageUpdatesLoseNoIncrements` protect run-wide quota and usage updates during overlap.
 - `StepPromptBuilder`, `StepActionValidator`, and their tests define the exact-assignment worker protocol and correction messages.
 - `MissionLifecycleTest`, `PhysicalBranchContext`, `ExecutionBinding`, `DefaultExecutionStateService`, and their tests define ancestor-aware cutoff permission, exact-once branch cleanup, isolated worker diagnostics, and parent-owned mission state.
+
+## Assembled completion
+
+`output_bindings` imposes producer uniqueness without adding dependencies. Independent producers may share a parallel group. Assembly starts only after all accepted tasks join successfully. Fully bound output requires N task slots and no synthetic final step; mixed output requires N+1. Output correction retains accepted child work and exact bound sources. Read [output assembly](output-contracts.md#declared-output-assembly).

@@ -1061,6 +1061,7 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
               <div className="trace-record-actions">
               <button type="button" aria-expanded={isRawExpanded} aria-controls={`raw-detail-${record.sequence}`} onClick={() => handleToggleRaw(record)}>{isRawExpanded ? "Hide raw record" : "Read raw record"}</button>
               {contentRef && !isModelRecord && !isAttemptFailure && <button type="button" aria-expanded={isContentExpanded} aria-controls={`content-detail-${record.sequence}`} onClick={() => isContentExpanded ? onClearContent() : onContent(contentRef, record.sequence)}>{isContentExpanded ? "Hide content" : "Read content"}</button>}
+              {record.resultAssembly && <button type="button" aria-expanded={expanded === key + ":assembly"} aria-controls={"assembly-" + record.sequence} onClick={() => setExpanded(expanded === key + ":assembly" ? null : key + ":assembly")}>{expanded === key + ":assembly" ? "Hide assembly details" : "Assembly details"}</button>}
               {record.resultForwarding && <button type="button" aria-expanded={expanded === key + ":forwarding"} aria-controls={"forwarding-" + record.sequence} onClick={() => setExpanded(expanded === key + ":forwarding" ? null : key + ":forwarding")}>{expanded === key + ":forwarding" ? "Hide forwarding details" : "Forwarding details"}</button>}
               {record.type === "PLAN_UPDATED" && <button type="button" aria-expanded={isDiffExpanded} aria-controls={`plan-diff-${record.sequence}`} onClick={() => setExpanded(isDiffExpanded ? null : `${key}:diff`)}>{isDiffExpanded ? "Hide diff" : "View diff"}</button>}
               {record.plan && record.type === "PLAN_CREATED" && <button type="button" aria-label={`View finalized plan ${record.plan.planId} from record ${record.sequence}`} onClick={() => onSelectPlan?.(record.plan!.planId)}>View finalized plan</button>}
@@ -1098,6 +1099,14 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
                 <div><dt>Selected task</dt><dd>{record.resultForwarding.linkedTaskId}</dd></div>
                 <div><dt>Child skill</dt><dd>{record.resultForwarding.capabilityName}</dd></div>
               </dl>
+            </div>
+          </td></tr>}
+          {record.resultAssembly && expanded === key + ":assembly" && <tr className="trace-record-detail-row"><td colSpan={5}>
+            <div id={"assembly-" + record.sequence} className="trace-expanded" role="region" aria-label={"Assembly details for record " + record.sequence}>
+              <p>Skill: {record.resultAssembly.skillName}; owner: {record.resultAssembly.owningMissionFrameId}</p>
+              <p>{record.resultAssembly.modelContributionRequired ? "Model contribution required" : "Final synthesis skipped"}</p>
+              {record.resultAssembly.planId && <p>Plan: {record.resultAssembly.planId}</p>}
+              <dl>{record.resultAssembly.outputBindings.map(binding => <div key={binding.destination}><dt>{binding.destination}</dt><dd>{binding.sourceKind} at {binding.sourcePath || "(whole source)"}; owner {binding.parentMissionFrameId}{binding.sourceTaskId && <>; task {binding.sourceTaskId}; skill {binding.sourceSkill}</>}</dd></div>)}</dl>
             </div>
           </td></tr>}
           {isDiffExpanded && <tr className="trace-record-detail-row"><td colSpan={5}>
