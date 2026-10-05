@@ -45,6 +45,6 @@ public final class TestBoundCapabilities {
                 new CapabilityToolDescriptor(name, description == null || description.isBlank() ? name : description, inputSchema, null),
                 contract,
                 null);
-        return new BoundCapability(metadata, (arguments, linkedTaskId) -> null);
+        return new BoundCapability(metadata, java.util.List.of(), (arguments, linkedTaskId, sourceResults) -> null);
     }
 }

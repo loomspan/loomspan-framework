@@ -22,8 +22,8 @@ class PlanTaskConstraintValidatorTest
                 task("wrong-case", "InvoiceParser"), task("blank", ""), task("null", null));
 
         PlanTaskConstraintValidationResult result = validator.validate(plan,
-                List.of(new AllowedSkillConstraint("invoiceParser", 2, 2, false),
-                        new AllowedSkillConstraint("optionalLookup", null, 1, false)));
+                List.of(new AllowedSkillConstraint("invoiceParser", 2, 2, false, java.util.List.of()),
+                        new AllowedSkillConstraint("optionalLookup", null, 1, false, java.util.List.of())));
 
         assertThat(result.hasErrors()).isFalse();
     }
@@ -34,8 +34,8 @@ class PlanTaskConstraintValidatorTest
         ExecutionPlan plan = plan(task("one", "overused"), task("two", "overused"));
 
         PlanTaskConstraintValidationResult result = validator.validate(plan,
-                List.of(new AllowedSkillConstraint("requiredChild", null, null, true),
-                        new AllowedSkillConstraint("overused", null, 1, false)));
+                List.of(new AllowedSkillConstraint("requiredChild", null, null, true, java.util.List.of()),
+                        new AllowedSkillConstraint("overused", null, 1, false, java.util.List.of())));
 
         assertThat(result.issues()).extracting(PlanTaskConstraintIssue::code)
                 .containsExactly(PlanTaskConstraintValidator.MINIMUM_NOT_MET,
@@ -55,7 +55,7 @@ class PlanTaskConstraintValidatorTest
                 "exactChild", "Never mention exactChild", List.of("missing"), List.of("unrelated"), null, "ignored");
 
         assertThat(validator.validate(plan(misleading),
-                List.of(new AllowedSkillConstraint("exactChild", 1, 1, false))).issues()).isEmpty();
+                List.of(new AllowedSkillConstraint("exactChild", 1, 1, false, java.util.List.of()))).issues()).isEmpty();
     }
 
     private static ExecutionPlan plan(PlanTask... tasks)

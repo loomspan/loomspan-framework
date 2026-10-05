@@ -311,11 +311,42 @@ public class DefaultPlanningService implements PlanningService
                     attemptResult.planTree(), visibleCapabilityNames);
             if (structureValidation.hasErrors())
             {
+                String combinedFeedback = structureValidation.retryFeedback();
+                // Semantic structure failures can still carry enough information to check
+                // declaration counts, evidence and binding edges in the same correction.
+                ExecutionPlan candidate = null;
+                try {
+                    candidate = convertPlan(attemptResult.planTree(), capabilityName);
+                } catch (IllegalArgumentException | IllegalStateException ignored) {
+                    // A malformed task cannot be interpreted as a typed plan; structure
+                    // feedback remains authoritative and no candidate plan is stored.
+                }
+                if (candidate != null) {
+                    var counts = planTaskConstraintValidator.validate(candidate, taskConstraints);
+                    var coverage = evidenceCoverageValidator.validatePlanCoverage(candidate, evidenceContract);
+                    var bindings = new PlanInputBindingDependencyValidator().validate(candidate, taskConstraints);
+                    combinedFeedback = mergeRetryFeedback(combinedFeedback,
+                            mergeRetryFeedback(mergeRetryFeedback(counts.retryFeedback(), coverage.retryFeedback()), String.join("\n", bindings)));
+                    recordPlanTaskConstraintEvent(session, planningFrame, TraceRecordType.PLAN_VALIDATION_FAILED,
+                            counts.issues(), retryCount, attemptResult.modelAttempt());
+                    recordEvidenceCoverageEvent(session, planningFrame, TraceRecordType.PLAN_VALIDATION_FAILED,
+                            coverage, retryCount, attemptResult.modelAttempt());
+                    recordInputBindingDependencyEvent(session, planningFrame, TraceRecordType.PLAN_VALIDATION_FAILED,
+                            bindings, retryCount, attemptResult.modelAttempt());
+                    if (retryCount < MAX_PLANNING_VALIDATION_RETRIES) {
+                        recordPlanTaskConstraintEvent(session, planningFrame, TraceRecordType.PLAN_RETRY_REQUESTED,
+                                counts.issues(), retryCount, attemptResult.modelAttempt());
+                        recordEvidenceCoverageEvent(session, planningFrame, TraceRecordType.PLAN_RETRY_REQUESTED,
+                                coverage, retryCount, attemptResult.modelAttempt());
+                        recordInputBindingDependencyEvent(session, planningFrame, TraceRecordType.PLAN_RETRY_REQUESTED,
+                                bindings, retryCount, attemptResult.modelAttempt());
+                    }
+                }
                 recordPlanStructureEvent(session, planningFrame, TraceRecordType.PLAN_VALIDATION_FAILED,
                         structureValidation.issues(), retryCount, attemptResult.modelAttempt());
                 if (retryCount < MAX_PLANNING_VALIDATION_RETRIES)
                 {
-                    retryFeedback = structureValidation.retryFeedback();
+                    retryFeedback = combinedFeedback;
                     recordPlanStructureEvent(session, planningFrame, TraceRecordType.PLAN_RETRY_REQUESTED,
                             structureValidation.issues(), retryCount, attemptResult.modelAttempt());
                     retryCount++;
@@ -323,7 +354,7 @@ public class DefaultPlanningService implements PlanningService
                 }
                 throw new IllegalStateException(
                         "Plan validation failed for skill '%s': %s"
-                                .formatted(capabilityName, structureValidation.retryFeedback()));
+                                .formatted(capabilityName, combinedFeedback));
             }
 
             ExecutionPlan plan = convertPlan(attemptResult.planTree(), capabilityName);
@@ -334,8 +365,13 @@ public class DefaultPlanningService implements PlanningService
                     plan,
                     evidenceContract);
 
+            List<String> bindingIssues = new PlanInputBindingDependencyValidator().validate(plan, taskConstraints);
+            String bindingFeedback = String.join("\n", bindingIssues);
+            boolean hasBindingIssues = !bindingIssues.isEmpty();
             boolean hasDeterministicEvidenceGap = !evidenceCoverage.complete();
-            if ((validation.hasErrors() || hasDeterministicEvidenceGap) && retryCount < MAX_PLANNING_VALIDATION_RETRIES)
+            recordInputBindingDependencyEvent(session, planningFrame, TraceRecordType.PLAN_VALIDATION_FAILED,
+                    bindingIssues, retryCount, attemptResult.modelAttempt());
+            if ((validation.hasErrors() || hasDeterministicEvidenceGap || hasBindingIssues) && retryCount < MAX_PLANNING_VALIDATION_RETRIES)
             {
                 recordPlanTaskConstraintEvent(session, planningFrame, TraceRecordType.PLAN_VALIDATION_FAILED,
                         validation.issues(), retryCount, attemptResult.modelAttempt());
@@ -345,7 +381,9 @@ public class DefaultPlanningService implements PlanningService
                             evidenceCoverage, retryCount, attemptResult.modelAttempt());
                 }
 
-                retryFeedback = mergeRetryFeedback(validation.retryFeedback(), evidenceCoverage.retryFeedback());
+                retryFeedback = mergeRetryFeedback(mergeRetryFeedback(validation.retryFeedback(), evidenceCoverage.retryFeedback()), bindingFeedback);
+                recordInputBindingDependencyEvent(session, planningFrame, TraceRecordType.PLAN_RETRY_REQUESTED,
+                        bindingIssues, retryCount, attemptResult.modelAttempt());
                 recordPlanTaskConstraintEvent(session, planningFrame, TraceRecordType.PLAN_RETRY_REQUESTED,
                         validation.issues(), retryCount, attemptResult.modelAttempt());
                 if (hasDeterministicEvidenceGap)
@@ -358,7 +396,7 @@ public class DefaultPlanningService implements PlanningService
                 continue;
             }
 
-            if (validation.hasErrors() || hasDeterministicEvidenceGap)
+            if (validation.hasErrors() || hasDeterministicEvidenceGap || hasBindingIssues)
             {
                 recordPlanTaskConstraintEvent(session, planningFrame, TraceRecordType.PLAN_VALIDATION_FAILED,
                         validation.issues(), retryCount, attemptResult.modelAttempt());
@@ -370,7 +408,7 @@ public class DefaultPlanningService implements PlanningService
                 throw new IllegalStateException(
                         "Plan validation failed for skill '%s': %s"
                                 .formatted(capabilityName,
-                                        mergeRetryFeedback(validation.retryFeedback(), evidenceCoverage.retryFeedback())));
+                                        mergeRetryFeedback(mergeRetryFeedback(validation.retryFeedback(), evidenceCoverage.retryFeedback()), bindingFeedback)));
             }
 
             Map<String, Object> acceptedAttempt = requireAcceptedAttempt(attemptResult.modelAttempt());
@@ -380,6 +418,17 @@ public class DefaultPlanningService implements PlanningService
                 return Optional.of(plan);
             });
         }
+    }
+
+    private void recordInputBindingDependencyEvent(LoomspanSession session, ExecutionFrame frame,
+            TraceRecordType type, List<String> issues, int retryCount, Map<String, Object> modelAttempt) {
+        if (issues.isEmpty()) return;
+        Map<String, Object> metadata = new LinkedHashMap<>(modelAttempt);
+        metadata.put("retryCount", retryCount);
+        metadata.put("validationStatus", planningValidationStatus(type, retryCount));
+        metadata.put("issueCodes", List.of("input-binding-dependency"));
+        metadata.put("severity", "ERROR");
+        executionStateService.recordPlanningEvent(session, frame, type, metadata, issues);
     }
 
     private void recordEvidenceCoverageEvent(LoomspanSession session,
@@ -617,7 +666,7 @@ public class DefaultPlanningService implements PlanningService
             }
         }
 
-        String taskCountConstraints = renderTaskCountConstraints(taskConstraints);
+        String taskCountConstraints = renderTaskCountConstraints(taskConstraints) + PlanInputBindingDependencyValidator.render(taskConstraints);
 
         return """
                 Create an ordered flight plan for this mission before execution.

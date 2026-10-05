@@ -57,7 +57,7 @@ its source; and is the resulting decision sound? A required typed collection can
 still omit original members, repeat members, or contain rewritten values.
 Structural validation alone does not establish provenance, cross-result equality,
 authorization or business truth. Use deterministic application checks or supported
-data-transfer mechanisms when those guarantees are required; do not assume a
+[declared child input bindings](input-bindings.md) when exact source transfer is required; do not assume a
 declared dependency automatically binds or copies task results.
 
 Treat contract tightening as a caller-facing change. Check existing producers,

@@ -15,6 +15,34 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class MissionContextTest
 {
     @Test
+    @SuppressWarnings("unchecked")
+    void ownsDetachedInputAndDecodedAcceptedResultsPerMission() {
+        var session = new LoomspanSession("isolated", "entry", 3);
+        var parent = new MissionContext(session, "entry", "parent", null);
+        var child = new MissionContext(session, "entry", "child", parent);
+        var mutable = new java.util.LinkedHashMap<String,Object>(java.util.Map.of("marker", "parent"));
+        parent.captureInput(java.util.Map.of("nested", new java.util.ArrayList<>(List.of(mutable))));
+        child.captureInput(java.util.Map.of("marker", "child"));
+        mutable.put("marker", "mutated");
+        assertThat(parent.input().get("nested")).isEqualTo(List.of(java.util.Map.of("marker", "parent")));
+        assertThat(child.input()).containsEntry("marker", "child");
+        assertThatThrownBy(() -> parent.captureInput(java.util.Map.of())).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> parent.input().put("forbidden", 1)).isInstanceOf(UnsupportedOperationException.class);
+        parent.recordCompletedTaskResult("one", "producer", "  {\"amount\":1234567890123456789012345,\"text\":\"{ordinary}\"}  ");
+        var snapshot = parent.completedTaskResults();
+        child.recordCompletedTaskResult("one", "producer", "\"child\"");
+        parent.recordCompletedTaskResult("two", "producer", "{malformed");
+        assertThat(snapshot).hasSize(1);
+        var decoded = (java.util.Map<String,Object>) snapshot.getFirst().decodedResult();
+        assertThat(decoded).containsEntry("amount", new java.math.BigInteger("1234567890123456789012345"))
+                .containsEntry("text", "{ordinary}");
+        assertThat(snapshot.getFirst().result()).startsWith("  {").endsWith("}  ");
+        assertThatThrownBy(() -> decoded.put("forbidden", 1)).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(child.completedTaskResults().getFirst().decodedResult()).isEqualTo("child");
+        assertThat(parent.completedTaskResults().getLast().decodedResult()).isEqualTo("{malformed");
+    }
+
+    @Test
     void startsEmptyAndPreservesFiveLineSummaryAndEvidenceOrder()
     {
         LoomspanSession session = new LoomspanSession("mission", "entry", 3);

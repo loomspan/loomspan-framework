@@ -54,7 +54,7 @@ public class YamlSkillCatalog implements InitializingBean
     private static final int OUTPUT_SCHEMA_WARNING_REQUIRED = 8;
     private static final String PUBLIC_SKILL_NAME_REGEX = "^[A-Za-z_][A-Za-z0-9_]{0,63}$";
     private static final Pattern PUBLIC_SKILL_NAME_PATTERN = Pattern.compile(PUBLIC_SKILL_NAME_REGEX);
-    private static final Set<String> ALLOWED_SKILL_ENTRY_FIELDS = Set.of("name", "min_tasks", "max_tasks", "required");
+    private static final Set<String> ALLOWED_SKILL_ENTRY_FIELDS = Set.of("name", "min_tasks", "max_tasks", "required", "input_bindings");
     private static final Set<YamlSkillManifest.Field> REST_FORBIDDEN_FIELDS = Set.of(
             YamlSkillManifest.Field.MODEL, YamlSkillManifest.Field.PROMPT,
             YamlSkillManifest.Field.THINKING_LEVEL, YamlSkillManifest.Field.ALLOWED_SKILLS,
@@ -224,6 +224,9 @@ public class YamlSkillCatalog implements InitializingBean
         catch (JacksonYAMLParseException ex)
         { issues.add(error(diagnosticSource(resource), diagnosticSkillNames.get(resource), "manifest",
                 "Invalid YAML skill in '" + diagnosticSource(resource) + "': malformed YAML")); }
+        catch (tools.jackson.core.exc.StreamReadException ex)
+        { issues.add(error(diagnosticSource(resource), diagnosticSkillNames.get(resource), "manifest",
+                "Invalid YAML skill declaration in '" + diagnosticSource(resource) + "': " + ex.getOriginalMessage())); }
         catch (DocumentReadException ex)
         { issues.add(error(diagnosticSource(resource), diagnosticSkillNames.get(resource), null, ex.getMessage())); }
     }
@@ -550,7 +553,8 @@ public class YamlSkillCatalog implements InitializingBean
                 required = requiredNode.booleanValue();
             }
 
-            boolean declaresConstraint = entry.has("min_tasks") || entry.has("max_tasks") || entry.has("required");
+            validateRawInputBindings(resource, skillName, entry, entryPath);
+            boolean declaresConstraint = entry.has("min_tasks") || entry.has("max_tasks") || entry.has("required") || entry.has("input_bindings");
             if (declaresConstraint && (!root.has("planning_mode") || !root.path("planning_mode").isBoolean()
                     || !root.path("planning_mode").booleanValue()))
             {
@@ -567,6 +571,49 @@ public class YamlSkillCatalog implements InitializingBean
         }
     }
 
+    private void validateRawInputBindings(Resource resource, String skillName, JsonNode entry, String entryPath)
+    {
+        if (!entry.has("input_bindings")) return;
+        String fieldPath = entryPath + ".input_bindings";
+        JsonNode bindings = entry.get("input_bindings");
+        if (bindings == null || !bindings.isObject())
+            throw invalidNamedSkill(resource, skillName, fieldPath, "must be a non-null object");
+        List<ai.loomspan.internal.runtime.input.ObjectFieldPath> destinations = new java.util.ArrayList<>();
+        for (var field : bindings.properties()) {
+            String path = fieldPath + "." + field.getKey();
+            try {
+                var destination = ai.loomspan.internal.runtime.input.ObjectFieldPath.parse(field.getKey(), false);
+                for (var existing : destinations)
+                    if (existing.isAncestorOf(destination) || destination.isAncestorOf(existing))
+                        throw new IllegalArgumentException("duplicate or overlapping binding destinations");
+                destinations.add(destination);
+                JsonNode value = field.getValue();
+                if (!value.isObject()) throw new IllegalArgumentException("binding must be a non-null object");
+                if (!value.path("from").isTextual() || !value.path("path").isTextual())
+                    throw new IllegalArgumentException("from and path must be non-null strings");
+                String kind = value.get("from").textValue();
+                Set<String> keys = switch (kind) {
+                    case "input" -> Set.of("from", "path");
+                    case "child_result" -> Set.of("from", "path", "skill");
+                    default -> throw new IllegalArgumentException("unknown binding source kind '" + kind + "'");
+                };
+                for (String key : value.propertyNames())
+                    if (!keys.contains(key)) throw new IllegalArgumentException("unknown binding field '" + key + "'");
+                var source = ai.loomspan.internal.runtime.input.ObjectFieldPath.parse(value.get("path").textValue(), true);
+                String producer = null;
+                if (kind.equals("child_result")) {
+                    if (!value.path("skill").isTextual() || !PUBLIC_SKILL_NAME_PATTERN.matcher(value.get("skill").textValue()).matches())
+                        throw new IllegalArgumentException("child_result requires exact valid skill name");
+                    producer = value.get("skill").textValue();
+                }
+                new ai.loomspan.internal.runtime.input.ChildInputBinding(destination,
+                        kind.equals("input") ? ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT
+                                : ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.CHILD_RESULT, source, producer);
+            } catch (IllegalArgumentException | NullPointerException ex) {
+                throw invalidNamedSkill(resource, skillName, path, "invalid input binding declaration: " + ex.getMessage());
+            }
+        }
+    }
     private void validateRawConcurrency(Resource resource, JsonNode root, String skillName)
     {
         if (!root.has("concurrency"))

@@ -6,6 +6,9 @@ import ai.loomspan.internal.core.PlanTask;
 import ai.loomspan.internal.core.PlanTaskStatus;
 import tools.jackson.databind.json.JsonMapper;
 import ai.loomspan.internal.runtime.tool.BoundCapability;
+import ai.loomspan.internal.runtime.input.ChildInputBinding;
+import ai.loomspan.internal.runtime.input.ObjectFieldPath;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -48,6 +51,34 @@ class StepActionValidatorTest {
         plan = new ExecutionPlan("plan-1", "duplicateInvoiceChecker", Instant.now(),
                 PlanStatus.VALID, List.of(task1, task2));
         visibleTools = List.of(mockTool("invoiceParser"), mockTool("expenseLookup"));
+    }
+
+    @Test
+    void projectedArgumentsAcceptEmptyAndSiblingOnlyWhileGuardRejectsOverridesEvenForGenericContracts() {
+        var binding = new ChildInputBinding(ObjectFieldPath.parse("/context/evidence", false),
+                ChildInputBinding.SourceKind.INPUT, ObjectFieldPath.parse("/source", true), null);
+        for (String schema : List.of("{}", """
+                {"type":"object","properties":{"context":{"type":"object",
+                 "properties":{"evidence":{},"reasoning":{"type":"string"}},"required":["evidence"],"additionalProperties":true}},
+                 "required":["context"],"additionalProperties":false}
+                """)) {
+            var tool = new BoundCapability(mockTool("invoiceParser", schema).metadata(), List.of(binding),
+                    (arguments, taskId, sources) -> "unused");
+            for (Map<String,Object> accepted : List.<Map<String,Object>>of(Map.of(), Map.of("context", Map.of("reasoning", "new"))))
+                assertThat(validateCurrentMode(StepAction.callTool("t-1", "invoiceParser", accepted),
+                        plan, List.of(tool), true).valid()).isTrue();
+            var nullBound = new java.util.LinkedHashMap<String,Object>();
+            nullBound.put("evidence", null);
+            var nullAncestor = new java.util.LinkedHashMap<String,Object>();
+            nullAncestor.put("context", null);
+            for (Map<String,Object> rejected : List.<Map<String,Object>>of(Map.of("context", Map.of("evidence", "equal")),
+                    Map.of("context", nullBound), Map.of("context", "scalar"), Map.of("context", List.of(1)),
+                    Map.of("context", Map.of("evidence", Map.of("nested", "override"))), nullAncestor)) {
+                var result = validateCurrentMode(StepAction.callTool("t-1", "invoiceParser", rejected), plan, List.of(tool), true);
+                assertThat(result.valid()).isFalse();
+                assertThat(result.rejectionReason()).contains("Binding override", "/context/evidence");
+            }
+        }
     }
 
     @Nested

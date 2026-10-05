@@ -108,6 +108,7 @@ public class ExecutionCoordinator
         }
 
         MissionContext mission = new MissionContext(session, rootCapability.name(), UUID.randomUUID().toString(), parentMission);
+        mission.captureInput(missionInput == null ? Map.of() : missionInput);
         ExecutionBinding missionBinding = baseBinding.withMission(mission);
         try
         {

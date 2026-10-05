@@ -287,6 +287,14 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
                             + definition.source().diagnosticName()));
         Map<String, YamlSkillDefinition> definitions = new LinkedHashMap<>();
         documents.definitions().forEach(definition -> definitions.put(definition.manifest().getName(), definition));
+        Map<String, SkillInputContract> receiverContracts = new LinkedHashMap<>();
+        fixedJavaCapabilities.forEach(capability -> receiverContracts.put(capability.name(), capability.inputContract()));
+        contracts.forEach((definition, contract) -> receiverContracts.put(definition.manifest().getName(), contract));
+        for (var definition : documents.definitions()) {
+            var bindingIssues = ai.loomspan.internal.runtime.input.ChildInputBindingDeclarations.validate(
+                    contracts.get(definition), definition.allowedSkillConstraints(), receiverContracts);
+            bindingIssues.forEach(message -> issues.add(error(definition, "allowed_skills.input_bindings", message)));
+        }
         Map<String, String> schemas = new LinkedHashMap<>();
         Set<String> resolved = new HashSet<>();
         for (YamlSkillDefinition definition : documents.definitions())

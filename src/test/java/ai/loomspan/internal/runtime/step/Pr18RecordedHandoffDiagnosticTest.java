@@ -87,7 +87,7 @@ class Pr18RecordedHandoffDiagnosticTest {
         var metadata = new CapabilityMetadata("yaml:compareOptions", "compareOptions", childManifest.getDescription(),
                 SkillExecutionDescriptor.from(config), null, args -> null, CapabilityKind.YAML_SKILL,
                 CapabilityToolDescriptor.generic("compareOptions", childManifest.getDescription()), contract, null);
-        BoundCapability tool = new BoundCapability(metadata, (args,taskId) -> { throw new AssertionError("capture must not execute tool"); });
+        BoundCapability tool = new BoundCapability(metadata, java.util.List.of(), (args,taskId, sourceResults) -> { throw new AssertionError("capture must not execute tool"); });
         Map<String,String> assignment = (Map<String,String>)data.get("task");
         List<PlanTask> tasks = new ArrayList<>();
         for (Map<String,String> row : (List<Map<String,String>>)data.get("tasks")) {

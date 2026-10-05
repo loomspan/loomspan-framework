@@ -35,6 +35,43 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class YamlSkillCatalogTests {
 
     @Test
+    void acceptsParentInputBindingsWithObjectPointersForPlanningChildren() {
+        String yaml = forwardingYaml().replace("    max_tasks: 1", "    max_tasks: 1\n    input_bindings:\n      /caseId: {from: input, path: /requestId}");
+        var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(
+                List.of(new SkillDocument("bound-parent", yaml)), false);
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions()).hasSize(1);
+        var binding = checked.definitions().getFirst().allowedSkillConstraints().getFirst().inputBindings().getFirst();
+        assertThat(binding.destination().pointer()).isEqualTo("/caseId");
+        assertThat(binding.sourcePath().pointer()).isEqualTo("/requestId");
+        assertThat(binding.sourceKind()).isEqualTo(ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT);
+    }
+
+    @TestFactory
+    java.util.stream.Stream<DynamicTest> rejectsMalformedInputBindingDeclarations() {
+        Map<String, String> invalid = Map.ofEntries(
+                Map.entry("null bindings", "null"),
+                Map.entry("wrong source", "{/id: {from: foreign, path: /id}}"),
+                Map.entry("missing path", "{/id: {from: input}}"),
+                Map.entry("null path", "{/id: {from: input, path: null}}"),
+                Map.entry("numeric path", "{/id: {from: input, path: 12}}"),
+                Map.entry("input skill", "{/id: {from: input, path: /id, skill: producer}}"),
+                Map.entry("missing producer", "{/id: {from: child_result, path: /id}}"),
+                Map.entry("unknown field", "{/id: {from: input, path: /id, field: value}}"),
+                Map.entry("nonpointer destination", "{id: {from: input, path: /id}}"),
+                Map.entry("invalid escape", "{/a~2: {from: input, path: /id}}"),
+                Map.entry("root destination", "{'': {from: input, path: /id}}"),
+                Map.entry("overlap", "{/a: {from: input, path: /id}, /a/b: {from: input, path: /id}}"),
+                Map.entry("duplicate YAML", "{/a: {from: input, path: /id}, /a: {from: input, path: /other}}"));
+        return invalid.entrySet().stream().map(entry -> DynamicTest.dynamicTest(entry.getKey(), () -> {
+            String yaml = forwardingYaml().replace("    max_tasks: 1", "    max_tasks: 1\n    input_bindings: " + entry.getValue());
+            var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(List.of(new SkillDocument("invalid-binding", yaml)), false);
+            assertThat(checked.definitions()).isEmpty();
+            assertThat(checked.issues()).hasSize(1);
+        }));
+    }
+
+    @Test
     void acceptsPlanningOutputFromForUniqueRequiredDirectChild() {
         LoomspanProperties properties = forwardingProperties();
         YamlSkillCatalog catalog = new YamlSkillCatalog(properties);
@@ -623,7 +660,7 @@ class YamlSkillCatalogTests {
                     assertThat(definition.allowedSkillConstraints().get(1).maxTasks()).isEqualTo(3);
                     assertThat(definition.allowedSkillConstraints().get(2).required()).isFalse();
                     assertThatThrownBy(() -> definition.allowedSkillConstraints()
-                            .add(new AllowedSkillConstraint("other", null, null, false)))
+                            .add(new AllowedSkillConstraint("other", null, null, false, java.util.List.of())))
                             .isInstanceOf(UnsupportedOperationException.class);
                 });
     }

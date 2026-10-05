@@ -17,6 +17,86 @@ class SkillInputValidatorTest {
     private final SkillInputValidator validator = new SkillInputValidator();
 
     @Test
+    void exactPolicyUsesLiteralKeysAndKeepsCompleteReceivingConstraints() {
+        var contract = new SkillInputContractResolver().resolveJavaCapability("""
+                {"type":"object","properties":{"a.b":{"type":"integer"},"a":{"type":"object",
+                 "properties":{"b":{"type":"integer"}},"additionalProperties":false},
+                 "bound":{"type":"object","properties":{"kind":{"type":"string","enum":["accepted"]}},
+                 "required":["kind"],"additionalProperties":false}},"additionalProperties":false}
+                """);
+        var accepted = validator.validateExact(Map.of("a.b", 1, "a", Map.of("b", "2"),
+                "bound", Map.of("kind", "accepted")), contract, List.of(List.of("a.b"), List.of("bound")));
+        assertThat(accepted.valid()).isTrue();
+        assertThat(((Map<?,?>) accepted.normalizedInput().get("a")).get("b")).isEqualTo(2);
+        assertThat(validator.validateExact(Map.of("a.b", "1"), contract, List.of(List.of("a.b"))).valid()).isFalse();
+        for (Map<String,Object> invalid : List.<Map<String,Object>>of(Map.of(), Map.of("kind", "wrong"),
+                Map.of("kind", "accepted", "extra", "forbidden")))
+            assertThat(validator.validateExact(Map.of("bound", invalid), contract, List.of(List.of("bound"))).valid()).isFalse();
+        var typedNull = new LinkedHashMap<String,Object>();
+        typedNull.put("a.b", null);
+        assertThat(validator.validateExact(typedNull, contract, List.of(List.of("a.b"))).valid()).isFalse();
+        assertThat(validator.validateExact(Map.of("bound", Map.of("number", Double.POSITIVE_INFINITY)),
+                SkillInputContract.genericObject(), List.of(List.of("bound", "number"))).valid()).isFalse();
+    }
+
+    @Test
+    void exactBoundSubtreesRejectCoercionAndRetainDatesAndNumbers() {
+        var contract = new SkillInputContractResolver().resolveJavaCapability("""
+                {"type":"object","properties":{"bound":{"type":"object","properties":{
+                 "integer":{"type":"integer"},"number":{"type":"number"},
+                 "flag":{"type":"boolean"},"date":{"type":"string","format":"date"}},
+                 "required":["integer","number","flag","date"],"additionalProperties":false},
+                 "unbound":{"type":"integer"}},"required":["bound","unbound"],"additionalProperties":false}
+                """);
+        var bound = Map.<String,Object>of("integer", new java.math.BigInteger("999999999999999999999999"),
+                "number", new java.math.BigDecimal("1.234567890123456789"), "flag", true, "date", "1/2/2026");
+        var valid = validator.validateExact(Map.of("bound", bound, "unbound", "42"), contract, List.of(List.of("bound")));
+        assertThat(valid.valid()).isTrue();
+        assertThat(valid.normalizedInput().get("bound")).isEqualTo(bound);
+        assertThat(valid.normalizedInput().get("unbound")).isEqualTo(42);
+        for (String field : List.of("integer", "number", "flag")) {
+            var invalid = new LinkedHashMap<>(bound);
+            invalid.put(field, "true".equals(field) ? "true" : "1");
+            assertThat(validator.validateExact(Map.of("bound", invalid, "unbound", "42"), contract,
+                    List.of(List.of("bound"))).valid()).isFalse();
+        }
+        var nonfinite = new LinkedHashMap<>(bound);
+        nonfinite.put("number", Double.NaN);
+        assertThat(validator.validateExact(Map.of("bound", nonfinite, "unbound", "42"), contract,
+                List.of(List.of("bound"))).valid()).isFalse();
+        var invalidDate = new LinkedHashMap<>(bound);
+        invalidDate.put("date", "2/30/2026");
+        assertThat(validator.validateExact(Map.of("bound", invalidDate, "unbound", "42"), contract,
+                List.of(List.of("bound"))).valid()).isFalse();
+        var ordinary = validator.validate(Map.of("bound", bound, "unbound", "42"), contract);
+        assertThat(((Map<?,?>) ordinary.normalizedInput().get("bound")).get("date")).isEqualTo("2026-01-02");
+    }
+
+    @Test
+    void exactNullAtRequiredUnconstrainedLeafDiffersFromAbsentAndContainersAreDetached() {
+        var contract = new SkillInputContractResolver().resolveJavaCapability("""
+                {"type":"object","properties":{"literal.dot":{},"rows":{"type":"array"}},
+                 "required":["literal.dot"],"additionalProperties":true}
+                """);
+        var input = new LinkedHashMap<String,Object>();
+        input.put("literal.dot", null);
+        var mutableChild = new LinkedHashMap<String,Object>(Map.of("value", "original"));
+        input.put("rows", new java.util.ArrayList<>(List.of(mutableChild)));
+        input.put("open", mutableChild);
+        var valid = validator.validateExact(input, contract, List.of(List.of("literal.dot")));
+        assertThat(valid.valid()).isTrue();
+        assertThat(valid.normalizedInput()).containsEntry("literal.dot", null);
+        mutableChild.put("value", "changed");
+        assertThat(valid.normalizedInput().get("open")).isEqualTo(Map.of("value", "original"));
+        assertThat(valid.normalizedInput().get("rows")).isEqualTo(List.of(Map.of("value", "original")));
+        input.remove("literal.dot");
+        assertThat(validator.validateExact(input, contract, List.of(List.of("literal.dot"))).valid()).isFalse();
+        var generic = validator.validate(input, SkillInputContract.genericObject());
+        mutableChild.put("value", "changed again");
+        assertThat(generic.normalizedInput().get("open")).isEqualTo(Map.of("value", "changed"));
+    }
+
+    @Test
     void descriptionsDoNotChangeValidationOrNormalization() {
         var resolver = new SkillInputContractResolver();
         String schema = """

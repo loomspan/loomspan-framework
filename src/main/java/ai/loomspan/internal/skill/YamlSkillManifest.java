@@ -183,6 +183,13 @@ public class YamlSkillManifest
 
         private Boolean required;
 
+        @JsonProperty("input_bindings")
+        private Map<String, InputBindingManifest> inputBindings = Map.of();
+        public Map<String, InputBindingManifest> getInputBindings() { return inputBindings; }
+        public void setInputBindings(Map<String, InputBindingManifest> value) {
+            inputBindings = value == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(value));
+        }
+
         public AllowedSkillManifest()
         {
         }
@@ -234,6 +241,19 @@ public class YamlSkillManifest
         {
             this.required = required;
         }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+    public static final class InputBindingManifest {
+        private String from;
+        private String path;
+        private String skill;
+        public String getFrom() { return from; }
+        public void setFrom(String value) { from = value; }
+        public String getPath() { return path; }
+        public void setPath(String value) { path = value; }
+        public String getSkill() { return skill; }
+        public void setSkill(String value) { skill = value; }
     }
 
     public List<String> getRbacRoles()

@@ -7,6 +7,9 @@ import ai.loomspan.internal.core.PlanStatus;
 import ai.loomspan.internal.core.PlanTask;
 import ai.loomspan.internal.core.PlanTaskStatus;
 import ai.loomspan.internal.runtime.tool.BoundCapability;
+import ai.loomspan.internal.runtime.input.ChildInputBinding;
+import ai.loomspan.internal.runtime.input.ObjectFieldPath;
+
 import ai.loomspan.internal.skill.YamlSkillManifest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -32,6 +35,30 @@ class StepPromptBuilderTest {
 
     private static BoundCapability contractAwareTool(String name, String inputSchema, String contractSchema) {
         return contractAware(name, inputSchema, contractSchema);
+    }
+
+    @Test
+    void compactAndVerboseAssignedGuidanceUseSameProjectedContract() {
+        String schema = """
+                {"type":"object","properties":{"context":{"type":"object",
+                 "properties":{"evidence":{"type":"object"},"reasoning":{"type":"string"}},
+                 "required":["evidence"],"additionalProperties":false}},"required":["context"],"additionalProperties":false}
+                """;
+        var binding = new ChildInputBinding(ObjectFieldPath.parse("/context/evidence", false),
+                ChildInputBinding.SourceKind.INPUT, ObjectFieldPath.parse("/source", true), null);
+        var tool = new BoundCapability(mockTool("invoiceParser", schema).metadata(), List.of(binding),
+                (arguments, taskId, sources) -> "unused");
+        assertThat(tool.metadata().inputContract().schema().required()).contains("context");
+        assertThat(tool.argumentContract().schema().required()).isEmpty();
+        var effective = LoomspanJacksonCodecs.defaults().planningJson().readTree(tool.inputSchema());
+        assertThat(effective.path("properties").path("context").path("properties").path("evidence").asBoolean(true)).isFalse();
+        for (boolean verbose : List.of(false, true)) {
+            String prompt = buildPromptForCurrentMode(createTwoTaskPlan(), "objective", null, 1,
+                    List.of(), null, List.of(tool), false, verbose, null);
+            assertThat(prompt).contains("Supply only unbound arguments", "Bound destinations: [/context/evidence]",
+                    "Effective model argument schema: " + tool.inputSchema());
+            assertThat(prompt).doesNotContain("Required fields: [evidence]", "Required fields: [context]");
+        }
     }
 
     @Test

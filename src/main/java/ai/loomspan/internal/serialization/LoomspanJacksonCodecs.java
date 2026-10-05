@@ -30,6 +30,7 @@ public final class LoomspanJacksonCodecs
         this.applicationConversion = Objects.requireNonNull(applicationConversion,
                 "applicationConversion must not be null");
         this.skillYaml = YAMLMapper.builder().findAndAddModules()
+                .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
         this.planningJson = JsonMapper.builder().findAndAddModules()
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();

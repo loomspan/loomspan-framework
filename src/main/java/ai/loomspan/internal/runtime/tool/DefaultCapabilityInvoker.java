@@ -1,6 +1,9 @@
 package ai.loomspan.internal.runtime.tool;
 
 import ai.loomspan.internal.core.LoomspanSession;
+import ai.loomspan.internal.core.MissionContext;
+import ai.loomspan.internal.runtime.input.ChildInputBinding;
+import ai.loomspan.internal.runtime.input.ChildInputBindingAssembler;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.ExecutionFrame;
@@ -26,7 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public class DefaultCapabilityInvoker implements CapabilityInvoker, CapabilityBindingFactory
+public class DefaultCapabilityInvoker implements CapabilityBindingFactory
 {
     private final CapabilityExecutionRouter capabilityExecutionRouter;
     private final PlanningService planningService;
@@ -63,20 +66,26 @@ public class DefaultCapabilityInvoker implements CapabilityInvoker, CapabilityBi
         Objects.requireNonNull(session, "session must not be null");
         Objects.requireNonNull(definition, "definition must not be null");
         Objects.requireNonNull(capabilities, "capabilities must not be null");
-        return capabilities.stream()
-                .map(capability -> new BoundCapability(capability,
-                        (arguments, linkedTaskId) -> invoke(
-                                capability, arguments, session, definition, authentication, linkedTaskId)))
-                .toList();
+        MissionContext owner = definition.allowedSkillConstraints().stream().anyMatch(child -> !child.inputBindings().isEmpty())
+                ? ExecutionBindingScope.requireCurrent().requireMission() : null;
+        return capabilities.stream().map(capability -> {
+            List<ChildInputBinding> bindings = definition.allowedSkillConstraints().stream()
+                    .filter(constraint -> constraint.name().equals(capability.name()))
+                    .findFirst().map(constraint -> constraint.inputBindings()).orElse(List.of());
+            return new BoundCapability(capability, bindings,
+                    (arguments, linkedTaskId, sourceResults) -> invoke(capability, arguments, session,
+                            authentication, linkedTaskId, owner, bindings, sourceResults));
+        }).toList();
     }
 
-    @Override
-    public Object invoke(CapabilityMetadata capability,
+    private Object invoke(CapabilityMetadata capability,
             Map<String, Object> arguments,
             LoomspanSession session,
-            YamlSkillDefinition definition,
             @Nullable Authentication authentication,
-            @Nullable String boundTaskId)
+            @Nullable String boundTaskId,
+            MissionContext owner,
+            List<ChildInputBinding> bindings,
+            List<MissionContext.CompletedTaskResult> sourceResults)
     {
         Map<String, Object> safeArguments = arguments == null ? Map.of() : arguments;
         String currentSkillName = currentSkillName(session);
@@ -88,11 +97,55 @@ public class DefaultCapabilityInvoker implements CapabilityInvoker, CapabilityBi
             linkedTaskId = planningService.markToolStarted(session, capability).orElse(null);
         }
 
+        ChildInputBindingAssembler.Assembly assembly;
+        try {
+            if (bindings.isEmpty()) {
+                assembly = new ChildInputBindingAssembler.Assembly(safeArguments, List.of(), List.of());
+            } else {
+                if (ExecutionBindingScope.requireCurrent().requireMission() != owner)
+                    throw new IllegalStateException("Binding source owner differs from current mission");
+                for (ChildInputBinding binding : bindings) {
+                    if (binding.sourceKind() != ChildInputBinding.SourceKind.CHILD_RESULT) continue;
+                    var plan = owner.currentPlan().orElseThrow(() -> new IllegalStateException("binding_source_unavailable: No accepted parent plan"));
+                    var producers = plan.tasks().stream().filter(task -> binding.skill().equals(task.capabilityName())).toList();
+                    if (producers.size() != 1)
+                        throw new IllegalStateException((producers.isEmpty() ? "binding_source_unavailable" : "binding_source_ambiguous")
+                                + ": Expected unique direct producer '" + binding.skill() + "'");
+                    var producer = producers.getFirst();
+                    if (producer.status() != ai.loomspan.internal.core.PlanTaskStatus.COMPLETED
+                            || sourceResults.stream().noneMatch(result -> result.taskId().equals(producer.taskId())
+                                    && result.skillName().equals(binding.skill())))
+                        throw new IllegalStateException("binding_source_unavailable: Producer task '" + producer.taskId() + "' has no accepted earlier result");
+                }
+                assembly = new ChildInputBindingAssembler().assemble(safeArguments, bindings,
+                        owner.input(), sourceResults, owner.missionFrameId());
+                var receiving = new ai.loomspan.internal.runtime.input.SkillInputValidator()
+                        .validateExact(assembly.arguments(), capability.inputContract(), assembly.exactPaths());
+                if (!receiving.valid()) throw new ai.loomspan.api.SkillInputValidationException(
+                        "binding_assembled_input_invalid: Invalid assembled input for '" + capability.name() + "'",
+                        receiving.issues().stream().map(issue -> new ai.loomspan.api.SkillInputValidationIssue(
+                                issue.path(), issue.code(), issue.message())).toList());
+                assembly = new ChildInputBindingAssembler.Assembly(receiving.normalizedInput(),
+                        assembly.exactPaths(), assembly.provenance());
+            }
+        } catch (RuntimeException failure) {
+            sessionUsageService.recordToolOutcome(session, currentSkillName, capability.name(), "failure");
+            LinkedHashMap<String, Object> evidence = new LinkedHashMap<>();
+            evidence.put("arguments", safeArguments);
+            evidence.put("inputBindings", bindings);
+            if (owner != null) evidence.put("parentMissionFrameId", owner.missionFrameId());
+            evidence.put("message", failure.getMessage());
+            executionStateService.logToolFailure(session, new ToolTraceContext(capability.name(), linkedTaskId,
+                    linkedTaskId == null), evidence);
+            executionStateService.recordFailure(session, failure, evidence);
+            throw failure;
+        }
+        safeArguments = assembly.arguments();
         ExecutionFrame toolFrame = executionStateService.openFrame(
                 session,
                 TraceFrameType.TOOL_INVOCATION,
                 capability.name(),
-                toolFrameParameters(safeArguments, linkedTaskId));
+                toolFrameParameters(safeArguments, linkedTaskId, assembly.provenance()));
 
         String toolFrameStatus = "completed";
         Throwable toolFailure = null;
@@ -115,7 +168,9 @@ public class DefaultCapabilityInvoker implements CapabilityInvoker, CapabilityBi
                         null));
             }
 
-            Object result = capabilityExecutionRouter.execute(capability, safeArguments, session, authentication);
+            Object result = bindings.isEmpty()
+                    ? capabilityExecutionRouter.execute(capability, safeArguments, session, authentication)
+                    : capabilityExecutionRouter.executeAssembled(capability, safeArguments, session, authentication, assembly.exactPaths());
             if (linkedTaskId != null && boundTaskId == null)
             {
                 planningService.markToolCompleted(session, linkedTaskId, capability.name());
@@ -174,10 +229,11 @@ public class DefaultCapabilityInvoker implements CapabilityInvoker, CapabilityBi
         }
     }
 
-    private Map<String, Object> toolFrameParameters(Map<String, Object> arguments, @Nullable String linkedTaskId)
+    private Map<String, Object> toolFrameParameters(Map<String, Object> arguments, @Nullable String linkedTaskId, List<Map<String, Object>> provenance)
     {
         LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("arguments", arguments);
+        if (!provenance.isEmpty()) parameters.put("inputBindings", provenance);
 
         if (linkedTaskId != null)
         {

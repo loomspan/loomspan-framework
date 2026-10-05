@@ -10,6 +10,9 @@ import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import ai.loomspan.internal.runtime.input.AcceptedResultDecoder;
+import ai.loomspan.internal.runtime.input.DeepInputValues;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -29,6 +32,8 @@ public final class MissionContext
     private final LinkedHashSet<String> successfulDirectSkills = new LinkedHashSet<>();
     private final Deque<String> executionSummary = new ArrayDeque<>();
     private @Nullable ExecutionPlan plan;
+    private Map<String, Object> input = Map.of();
+    private boolean inputCaptured;
     private final LinkedHashMap<String, CompletedTaskResult> completedTaskResults = new LinkedHashMap<>();
     private @Nullable LinterOutcome lastLinterOutcome;
     private @Nullable OutputSchemaOutcome lastOutputSchemaOutcome;
@@ -60,6 +65,15 @@ public final class MissionContext
     public String missionFrameId() { return missionFrameId; }
     public Optional<MissionContext> parent() { return Optional.ofNullable(parent); }
     public MissionLifecycle lifecycle() { return lifecycle; }
+
+    public synchronized void captureInput(Map<String, Object> validatedInput)
+    {
+        if (inputCaptured) throw new IllegalStateException("Mission input already captured");
+        input = DeepInputValues.immutableMap(validatedInput);
+        inputCaptured = true;
+    }
+
+    public synchronized Map<String, Object> input() { return input; }
 
     public synchronized Optional<ExecutionPlan> currentPlan()
     {
@@ -130,14 +144,30 @@ public final class MissionContext
         }
     }
 
-    public record CompletedTaskResult(String taskId, String skillName, String result)
+    public static final class CompletedTaskResult
     {
-        public CompletedTaskResult
+        private final String taskId;
+        private final String skillName;
+        private final String result;
+        private final Object decodedResult;
+
+        public CompletedTaskResult(String taskId, String skillName, String result)
         {
-            taskId = requireNonBlank(taskId, "taskId");
-            skillName = requireNonBlank(skillName, "skillName");
-            Objects.requireNonNull(result, "result must not be null");
+            this.taskId = requireNonBlank(taskId, "taskId");
+            this.skillName = requireNonBlank(skillName, "skillName");
+            this.result = Objects.requireNonNull(result, "result must not be null");
+            this.decodedResult = new AcceptedResultDecoder().decode(result);
         }
+        @com.fasterxml.jackson.annotation.JsonProperty public String taskId() { return taskId; }
+        @com.fasterxml.jackson.annotation.JsonProperty public String skillName() { return skillName; }
+        @com.fasterxml.jackson.annotation.JsonProperty public String result() { return result; }
+        @com.fasterxml.jackson.annotation.JsonIgnore public Object decodedResult() { return decodedResult; }
+        @Override public boolean equals(Object other) {
+            return other instanceof CompletedTaskResult entry && taskId.equals(entry.taskId)
+                    && skillName.equals(entry.skillName) && result.equals(entry.result);
+        }
+        @Override public int hashCode() { return Objects.hash(taskId, skillName, result); }
+        @Override public String toString() { return "CompletedTaskResult[taskId=" + taskId + ", skillName=" + skillName + ", result=" + result + "]"; }
     }
 
     public synchronized Optional<LinterOutcome> lastLinterOutcome()

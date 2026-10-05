@@ -19,16 +19,23 @@ public class SkillInputValidator
 {
     public SkillInputValidationResult validate(Map<String, Object> input, SkillInputContract contract)
     {
+        return validateExact(input, contract, List.of());
+    }
+
+    /** Validates full receiving inputs without normalizing author-bound subtrees. */
+    public SkillInputValidationResult validateExact(Map<String, Object> input, SkillInputContract contract,
+            List<List<String>> exactPaths)
+    {
         Objects.requireNonNull(contract, "contract must not be null");
         Map<String, Object> safeInput = input == null ? Map.of() : input;
 
-        if (contract.isGeneric())
+        if (contract.isGeneric() && exactPaths.isEmpty())
         {
-            return new SkillInputValidationResult(true, immutableMap(safeInput), List.of());
+            return new SkillInputValidationResult(true, DeepInputValues.immutableMap(safeInput), List.of());
         }
 
         List<SkillInputValidationIssue> issues = new ArrayList<>();
-        Object normalized = validateNode(safeInput, contract.schema(), "", issues);
+        Object normalized = validateNode(safeInput, contract.schema(), "", issues, new ExactPolicy(List.of(), exactPaths));
         Map<String, Object> normalizedMap = normalized instanceof Map<?, ?> map
                 ? castMap(map)
                 : Map.of();
@@ -45,17 +52,17 @@ public class SkillInputValidator
     private Object validateNode(Object value,
             SkillInputSchemaNode schema,
             String path,
-            List<SkillInputValidationIssue> issues)
+            List<SkillInputValidationIssue> issues, ExactPolicy policy)
     {
         return switch (schema.type())
         {
             case SkillInputSchemaNode.ANY_TYPE -> validateUnconstrained(value, path, issues);
-            case "object" -> validateObject(value, schema, path, issues);
-            case "array" -> validateArray(value, schema, path, issues);
-            case "integer" -> validateInteger(value, schema, path, issues);
-            case "number" -> validateNumber(value, schema, path, issues);
-            case "boolean" -> validateBoolean(value, schema, path, issues);
-            case "string" -> validateString(value, schema, path, issues);
+            case "object" -> validateObject(value, schema, path, issues, policy);
+            case "array" -> validateArray(value, schema, path, issues, policy);
+            case "integer" -> validateInteger(value, schema, path, issues, policy);
+            case "number" -> validateNumber(value, schema, path, issues, policy);
+            case "boolean" -> validateBoolean(value, schema, path, issues, policy);
+            case "string" -> validateString(value, schema, path, issues, policy);
             case "attachment" -> validateAttachment(value, schema, path, issues);
             default -> {
                 issues.add(issue(path, "unsupported_schema_type",
@@ -127,7 +134,7 @@ public class SkillInputValidator
     private Object validateObject(Object value,
             SkillInputSchemaNode schema,
             String path,
-            List<SkillInputValidationIssue> issues)
+            List<SkillInputValidationIssue> issues, ExactPolicy policy)
     {
         if (!(value instanceof Map<?, ?> mapValue))
         {
@@ -138,7 +145,9 @@ public class SkillInputValidator
         LinkedHashMap<String, Object> normalized = new LinkedHashMap<>();
         for (String required : schema.required())
         {
-            if (!mapValue.containsKey(required) || mapValue.get(required) == null)
+            if (!mapValue.containsKey(required) || (mapValue.get(required) == null
+                    && !(policy.child(required).exact() && schema.properties().get(required) != null
+                        && SkillInputSchemaNode.ANY_TYPE.equals(schema.properties().get(required).type()))))
             {
                 issues.add(issue(join(path, required), "missing_required", "Required field is missing.", null));
             }
@@ -157,24 +166,40 @@ public class SkillInputValidator
                 {
                     normalized.put(
                             fieldName,
-                            validateNode(entry.getValue(), schema.additionalPropertiesSchema(), join(path, fieldName), issues));
+                            validateNode(entry.getValue(), schema.additionalPropertiesSchema(), join(path, fieldName), issues, policy.child(fieldName)));
                 }
                 else
                 {
-                    normalized.put(fieldName, entry.getValue());
+                    normalized.put(fieldName, policy.child(fieldName).exact()
+                            ? validateUnconstrained(entry.getValue(), join(path, fieldName), issues)
+                            : validateOpenBranch(entry.getValue(), join(path, fieldName), issues, policy.child(fieldName)));
                 }
                 continue;
             }
-            normalized.put(fieldName, validateNode(entry.getValue(), child, join(path, fieldName), issues));
+            normalized.put(fieldName, validateNode(entry.getValue(), child, join(path, fieldName), issues, policy.child(fieldName)));
         }
 
         return immutableMap(normalized);
     }
 
+    private Object validateOpenBranch(Object value, String path,
+            List<SkillInputValidationIssue> issues, ExactPolicy policy)
+    {
+        if (policy.exact()) return validateUnconstrained(value, path, issues);
+        if (value instanceof Map<?, ?> map)
+        {
+            Map<String, Object> copied = new LinkedHashMap<>();
+            map.forEach((key, child) -> copied.put((String) key,
+                    validateOpenBranch(child, join(path, (String) key), issues, policy.child((String) key))));
+            return immutableMap(copied);
+        }
+        return DeepInputValues.immutableCopy(value);
+    }
+
     private Object validateArray(Object value,
             SkillInputSchemaNode schema,
             String path,
-            List<SkillInputValidationIssue> issues)
+            List<SkillInputValidationIssue> issues, ExactPolicy policy)
     {
         if (!(value instanceof List<?> listValue))
         {
@@ -183,12 +208,13 @@ public class SkillInputValidator
         }
         if (schema.items() == null)
         {
-            return immutableList(new ArrayList<>(listValue));
+            return policy.exact() ? validateUnconstrained(listValue, path, issues)
+                    : DeepInputValues.immutableCopy(listValue);
         }
         List<Object> normalized = new ArrayList<>();
         for (int i = 0; i < listValue.size(); i++)
         {
-            normalized.add(validateNode(listValue.get(i), schema.items(), path + "[" + i + "]", issues));
+            normalized.add(validateNode(listValue.get(i), schema.items(), path + "[" + i + "]", issues, policy.child(Integer.toString(i))));
         }
         return immutableList(normalized);
     }
@@ -196,14 +222,14 @@ public class SkillInputValidator
     private Object validateInteger(Object value,
             SkillInputSchemaNode schema,
             String path,
-            List<SkillInputValidationIssue> issues)
+            List<SkillInputValidationIssue> issues, ExactPolicy policy)
     {
         if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long
                 || value instanceof java.math.BigInteger)
         {
             return value;
         }
-        if (value instanceof String text)
+        if (!policy.exact() && value instanceof String text)
         {
             try
             {
@@ -227,13 +253,18 @@ public class SkillInputValidator
     private Object validateNumber(Object value,
             SkillInputSchemaNode schema,
             String path,
-            List<SkillInputValidationIssue> issues)
+            List<SkillInputValidationIssue> issues, ExactPolicy policy)
     {
         if (value instanceof Number)
         {
+            if (policy.exact() && ((value instanceof Double d && !Double.isFinite(d))
+                    || (value instanceof Float f && !Float.isFinite(f))))
+            {
+                issues.add(issue(path, "type_mismatch", "Expected finite number input.", value));
+            }
             return value;
         }
-        if (value instanceof String text)
+        if (!policy.exact() && value instanceof String text)
         {
             try
             {
@@ -252,13 +283,13 @@ public class SkillInputValidator
     private Object validateBoolean(Object value,
             SkillInputSchemaNode schema,
             String path,
-            List<SkillInputValidationIssue> issues)
+            List<SkillInputValidationIssue> issues, ExactPolicy policy)
     {
         if (value instanceof Boolean)
         {
             return value;
         }
-        if (value instanceof String text)
+        if (!policy.exact() && value instanceof String text)
         {
             String normalized = text.trim().toLowerCase(Locale.ROOT);
             if ("true".equals(normalized))
@@ -279,7 +310,7 @@ public class SkillInputValidator
     private Object validateString(Object value,
             SkillInputSchemaNode schema,
             String path,
-            List<SkillInputValidationIssue> issues)
+            List<SkillInputValidationIssue> issues, ExactPolicy policy)
     {
         if (acceptsRuntimeRefValue(schema, value))
         {
@@ -296,13 +327,13 @@ public class SkillInputValidator
         }
         if ("date".equals(schema.format()))
         {
-            String normalized = normalizeDate(text);
+            String normalized = normalizeDate(text, policy.exact());
             if (normalized == null)
             {
                 issues.add(issue(path, "invalid_date_format", "Date must match YYYY-MM-DD or MM/DD/YYYY style input.", value));
                 return value;
             }
-            return normalized;
+            return policy.exact() ? text : normalized;
         }
         return text;
     }
@@ -337,7 +368,7 @@ public class SkillInputValidator
         return value;
     }
 
-    private String normalizeDate(String value)
+    private String normalizeDate(String value, boolean exact)
     {
         if (value == null || value.isBlank())
         {
@@ -346,8 +377,8 @@ public class SkillInputValidator
 
         List<DateTimeFormatter> formatters = List.of(
                 DateTimeFormatter.ISO_LOCAL_DATE,
-                DateTimeFormatter.ofPattern("M/d/uuuu"),
-                DateTimeFormatter.ofPattern("M-d-uuuu"));
+                dateFormatter("M/d/uuuu", exact),
+                dateFormatter("M-d-uuuu", exact));
 
         for (DateTimeFormatter formatter : formatters)
         {
@@ -360,6 +391,12 @@ public class SkillInputValidator
             }
         }
         return null;
+    }
+
+    private DateTimeFormatter dateFormatter(String pattern, boolean exact)
+    {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
+        return exact ? formatter.withResolverStyle(java.time.format.ResolverStyle.STRICT) : formatter;
     }
 
     private SkillInputValidationIssue issue(String path, String code, String message, Object rejectedValue)
@@ -381,4 +418,20 @@ public class SkillInputValidator
     {
         return parent == null || parent.isBlank() ? child : parent + "." + child;
     }
+    private record ExactPolicy(List<String> current, List<List<String>> roots)
+    {
+        boolean exact()
+        {
+            return roots.stream().anyMatch(root -> current.size() >= root.size()
+                    && current.subList(0, root.size()).equals(root));
+        }
+
+        ExactPolicy child(String token)
+        {
+            List<String> path = new ArrayList<>(current);
+            path.add(token);
+            return new ExactPolicy(List.copyOf(path), roots);
+        }
+    }
+
 }

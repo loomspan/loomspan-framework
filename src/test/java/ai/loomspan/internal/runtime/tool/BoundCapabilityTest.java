@@ -20,7 +20,7 @@ class BoundCapabilityTest
     void preservesExplicitNullArgumentsInAnImmutableDefensiveCopy()
     {
         AtomicReference<Map<String, Object>> observed = new AtomicReference<>();
-        BoundCapability capability = new BoundCapability(metadata(), (arguments, linkedTaskId) -> {
+        BoundCapability capability = new BoundCapability(metadata(), java.util.List.of(), (arguments, linkedTaskId, sourceResults) -> {
             observed.set(arguments);
             return null;
         });

@@ -64,6 +64,16 @@ protects required-field rejection. These provider-free regressions establish
 Framework behavior; they do not establish model argument quality or business
 scenario success.
 
+## Declared binding evidence
+
+For [declared child input bindings](input-bindings.md), raw model actions preserve
+only model-authored arguments. Tool-frame `arguments` retains complete effective
+receiving input; `inputBindings` identifies destination, source kind/path, exact
+owning-parent mission frame and accepted source task/skill without copying payloads
+into provenance. Source, override and assembled-contract failures remain distinct
+and occur before child dispatch. Existing canonical evidence and the derived
+journal's established field-name redaction retain their usual policies.
+
 ## Trace identity
 
 `entrySkill` is the exact registered name of the top-level Java, REST, or model-backed YAML skill whose invocation owns the session. Loomspan records it before execution begins, keeps it unchanged across nested skill invocations, and exposes it in Trace Catalog and Trace Detail without requiring artifact acquisition. It is a recorded fact: it does not prove that the skill is still registered or that it is more important than nested work.

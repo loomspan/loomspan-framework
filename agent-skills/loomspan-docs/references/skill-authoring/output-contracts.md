@@ -20,7 +20,7 @@ The root schema MUST have `type: object`. Supported node types are `object`, `ar
 | Combine, interpret, or change child results | Omit `output_from`; author a parent `output_schema` when structured output is required | The parent synthesizes and owns its final-output validation. |
 | Orchestrate work while one direct child already supplies the complete intended answer | `output_from: {skill: finish}` | Runtime returns that accepted task's existing Framework String unchanged after all accepted work succeeds. |
 
-Forwarding retains model planning, input preparation, explicit child arguments, dependencies, and genuine orchestration duties. Authors SHOULD reconsider a wrapper with no additional responsibility. Do not instruct a forwarding parent to copy, quote, or reconstruct the child's answer.
+Forwarding retains model planning, input preparation, explicit unbound child arguments, [author-declared input bindings](input-bindings.md), dependencies, and genuine orchestration duties. Authors SHOULD reconsider a wrapper with no additional responsibility. Do not instruct a forwarding parent to copy, quote, or reconstruct the child's answer.
 
 ## Forwarding declaration and completion
 

@@ -35,7 +35,7 @@ This topic does not define the complete pure-YAML `input_schema` language.
 - `Map<String, Object>` does not infer keys, property names, or domain constraints. Scalars, nested objects, arrays, and JSON null values may appear under its string keys.
 - Typed maps remain typed. Existing string, integer, number, boolean, enum, DTO, required-field, coercion, and closed-object rules apply to each entry value.
 - Planner examples and verbose rules label unconstrained leaves as `any JSON value`. An open generic map is not a no-argument tool.
-- Root invocation and child tool publication use the same reflected contract. Java does not declare a YAML `input_schema`.
+- Root invocation and receiving validation use the same reflected contract. A planning parent with [declared input bindings](input-bindings.md) publishes a separate projected argument contract for that child call. Java does not declare a YAML `input_schema`.
 - A root captures its complete skill generation before object conversion and input validation. That captured contract remains authoritative for the admitted invocation and all descendants; a later generation affects only later roots.
 
 Minimal Java skill:
@@ -56,8 +56,7 @@ The exact callable name is `rankTransportOptions`; use it in `SkillTemplate` or 
 Assigned-tool examples illustrate declared structure; they are not actual argument
 values. Optional declared fields may be omitted. Both compact and verbose guidance
 list required and optional fields at each object location, including objects inside
-arrays and schema-constrained additional values. Child requirements apply when the
-containing object is supplied; they do not make an optional parent required.
+arrays and schema-constrained additional values. For ordinary unbound input, child requirements apply when the containing object is supplied. A binding creates its ancestors; remaining required unbound siblings then become required model contributions. See [declared bindings](input-bindings.md).
 
 - At `$` (top level), a closed rule permits only that object's listed keys. Nested
   closed rules apply only at their stated paths. An empty closed root requires `{}`.

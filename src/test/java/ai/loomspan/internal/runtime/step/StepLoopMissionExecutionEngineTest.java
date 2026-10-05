@@ -36,6 +36,9 @@ import ai.loomspan.internal.runtime.planning.PlanningService;
 import ai.loomspan.internal.runtime.state.DefaultExecutionStateService;
 import ai.loomspan.internal.runtime.tool.DefaultCapabilityInvoker;
 import ai.loomspan.internal.runtime.tool.BoundCapability;
+import ai.loomspan.internal.runtime.input.ChildInputBinding;
+import ai.loomspan.internal.runtime.input.ObjectFieldPath;
+
 import ai.loomspan.internal.runtime.usage.ModelUsageExtractor;
 import ai.loomspan.internal.runtime.usage.NoOpSessionUsageService;
 import ai.loomspan.internal.runtime.usage.SessionUsageSnapshot;
@@ -98,6 +101,45 @@ class StepLoopMissionExecutionEngineTest {
             new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
 
     @Test
+    void boundOverrideCorrectionKeepsProjectedGuidanceAndInvokesOnlyAcceptedSiblingAction() {
+        String schema = """
+                {"type":"object","properties":{"context":{"type":"object",
+                 "properties":{"evidence":{},"reasoning":{"type":"string"}},"required":["evidence"],"additionalProperties":true}},
+                 "required":["context"],"additionalProperties":false}
+                """;
+        var binding = new ChildInputBinding(ObjectFieldPath.parse("/context/evidence", false),
+                ChildInputBinding.SourceKind.INPUT, ObjectFieldPath.parse("/source", true), null);
+        for (String override : List.of("{\"context\":{\"evidence\":\"equal\"}}", "{\"context\":{\"evidence\":null}}",
+                "{\"context\":\"scalar\"}", "{\"context\":null}")) {
+            String rejected = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":" + override + "}";
+            var client = new SequenceChatClient(rejected,
+                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{\"context\":{\"reasoning\":\"new\"}}}",
+                    "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
+            var calls = new AtomicInteger();
+            var tool = new BoundCapability(toolWithSchema("invoiceParser", schema, "unused").metadata(), List.of(binding),
+                    (arguments, taskId, sources) -> {
+                        assertThat(client.systemMessagesSeen()).hasSize(2);
+                        assertThat(arguments).isEqualTo(Map.of("context", Map.of("reasoning", "new")));
+                        calls.incrementAndGet();
+                        return "accepted";
+                    });
+            var state = new DefaultExecutionStateService(FIXED_CLOCK);
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("binding-correction-" + override.hashCode(), "entry", 3);
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
+                        session, definition(), "Review source", Map.of("source", "equal"), client, List.of(tool))).isEqualTo("Finished");
+            }
+            assertThat(calls).hasValue(1);
+            for (String request : client.systemMessagesSeen().subList(0, 2))
+                assertThat(request).contains("Supply only unbound arguments", "Effective model argument schema: " + tool.inputSchema())
+                        .doesNotContain("Required fields: [evidence]", "Required fields: [context]");
+            assertThat(client.systemMessagesSeen().get(1)).contains("YOUR PREVIOUS ACTION WAS INVALID");
+            assertThat(client.userMessagesSeen().get(1)).contains("Binding override", "/context/evidence");
+            assertThat(CorrectionEvidenceFixtures.decodedStepCandidate(client.userMessagesSeen().get(1))).isEqualTo(rejected);
+        }
+    }
+
+    @Test
     void forwardsSelectedTaskResultWithoutFinalModelCall() {
         DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
         PlanningService planning = new InitializingPlanningService(state, singleTaskPlan());
@@ -149,13 +191,13 @@ class StepLoopMissionExecutionEngineTest {
         AtomicReference<String> unexpectedFinal = new AtomicReference<>();
         var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser", "t-2", "expenseLookup", "t-3", "optional"), unexpectedFinal);
         var selected = tool("invoiceParser", "x".repeat(8000) + " selected");
-        var sibling = new BoundCapability(tool("expenseLookup", "unused").metadata(), (arguments, taskId) -> {
+        var sibling = new BoundCapability(tool("expenseLookup", "unused").metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> {
             siblingStarted.countDown();
             try { assertThat(release.await(3, TimeUnit.SECONDS)).isTrue(); }
             catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
             return "sibling";
         });
-        var optional = new BoundCapability(tool("optional", "unused").metadata(), (arguments, taskId) -> { later.incrementAndGet(); return "optional"; });
+        var optional = new BoundCapability(tool("optional", "unused").metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> { later.incrementAndGet(); return "optional"; });
         var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("join-forward", "rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor(); ExecutorService caller = Executors.newSingleThreadExecutor()) {
             Future<String> result = caller.submit(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
@@ -558,8 +600,8 @@ class StepLoopMissionExecutionEngineTest {
             SequenceChatClient chatClient = new SequenceChatClient(rejected, valid,
                     "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
             AtomicInteger calls = new AtomicInteger();
-            BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                    (arguments, taskId) -> {
+            BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                    (arguments, taskId, sourceResults) -> {
                         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
                         calls.incrementAndGet();
                         assertThat(arguments).containsEntry("rawText", payload);
@@ -593,8 +635,8 @@ class StepLoopMissionExecutionEngineTest {
         String malformed = CorrectionEvidenceFixtures.equipmentComparison("MALFORMED") + "}";
         SequenceChatClient chatClient = new SequenceChatClient(malformed, malformed);
         AtomicInteger calls = new AtomicInteger();
-        BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> { calls.incrementAndGet(); return "unexpected"; });
+        BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> { calls.incrementAndGet(); return "unexpected"; });
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("brace-exhaustion", "test.entry", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor())
         {
@@ -620,8 +662,8 @@ class StepLoopMissionExecutionEngineTest {
             SequenceChatClient client = new SequenceChatClient(rejected,
                     LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(action));
             AtomicInteger toolCalls = new AtomicInteger();
-            BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                    (arguments, taskId) -> { toolCalls.incrementAndGet(); return "unexpected"; });
+            BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                    (arguments, taskId, sourceResults) -> { toolCalls.incrementAndGet(); return "unexpected"; });
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("invalid-corrected-" + invalidField, "test.entry", 3);
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 StepLoopMissionExecutionEngine engine = engine(state, planning, executor, definition());
@@ -729,8 +771,8 @@ class StepLoopMissionExecutionEngineTest {
                 """);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-failure", "test.entry", 3);
         IllegalStateException expectedFailure = new IllegalStateException("parser exploded");
-        BoundCapability failingCapability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability failingCapability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     throw expectedFailure;
                 });
 
@@ -837,8 +879,8 @@ class StepLoopMissionExecutionEngineTest {
                     "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{\"rawText\":\"INV-1\"}}",
                     first, second, terminal);
             AtomicInteger toolCalls = new AtomicInteger();
-            BoundCapability tool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                    (arguments, taskId) -> { toolCalls.incrementAndGet(); return "AUTHORITATIVE_RESULT"; });
+            BoundCapability tool = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                    (arguments, taskId, sourceResults) -> { toolCalls.incrementAndGet(); return "AUTHORITATIVE_RESULT"; });
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("large-final-" + pass, "test.entry", 3);
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 StepLoopMissionExecutionEngine engine = engine(state, planning, executor, definition);
@@ -869,8 +911,8 @@ class StepLoopMissionExecutionEngineTest {
         SequenceChatClient client = new SequenceChatClient(rejected);
         client.failureAfterResponses = contextFailure;
         AtomicInteger toolCalls = new AtomicInteger();
-        BoundCapability tool = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> { toolCalls.incrementAndGet(); return "unexpected"; });
+        BoundCapability tool = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> { toolCalls.incrementAndGet(); return "unexpected"; });
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-context-limit", "test.entry", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(state, planning, executor, definitionWithPrompt());
@@ -1178,8 +1220,8 @@ class StepLoopMissionExecutionEngineTest {
                     "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{\"count\":2}}",
                     "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
             AtomicInteger calls = new AtomicInteger();
-            BoundCapability tool = new BoundCapability(toolWithSchema("invoiceParser", schema, "unused").metadata(),
-                    (arguments, taskId) -> {
+            BoundCapability tool = new BoundCapability(toolWithSchema("invoiceParser", schema, "unused").metadata(), java.util.List.of(),
+                    (arguments, taskId, sourceResults) -> {
                         assertThat(client.systemMessagesSeen()).hasSize(2);
                         assertThat(arguments).isEqualTo(validArguments);
                         calls.incrementAndGet();
@@ -1238,8 +1280,8 @@ class StepLoopMissionExecutionEngineTest {
             SequenceChatClient client = new SequenceChatClient(rejected, valid,
                     "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
             AtomicInteger calls = new AtomicInteger();
-            BoundCapability tool = new BoundCapability(toolWithSchema("invoiceParser", schema, "unused").metadata(),
-                    (arguments, taskId) -> {
+            BoundCapability tool = new BoundCapability(toolWithSchema("invoiceParser", schema, "unused").metadata(), java.util.List.of(),
+                    (arguments, taskId, sourceResults) -> {
                         assertThat(client.systemMessagesSeen()).hasSize(2);
                         assertThat(arguments).isEqualTo(validArguments);
                         calls.incrementAndGet();
@@ -1628,8 +1670,8 @@ class StepLoopMissionExecutionEngineTest {
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
                 "t-1", "invoiceParser",
                 "t-2", forwarding ? "expenseLookup" : "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     retainedMission.set(ExecutionBindingScope.requireCurrent().requireMission());
                     if (!"t-2".equals(taskId)) return "early-" + taskId;
                     lateWorkerStarted.countDown();
@@ -1659,8 +1701,8 @@ class StepLoopMissionExecutionEngineTest {
             StepLoopMissionExecutionEngine engine = engine(
                     stateService, planningService, missionExecutor, definition, Duration.ofMillis(100));
 
-            assertThatThrownBy(() -> executeMission(engine, session, definition, model, forwarding ? List.of(capability, new BoundCapability(tool("expenseLookup", "unused").metadata(),
-                            (arguments, taskId) -> capability.invoke(arguments, taskId))) : List.of(capability)))
+            assertThatThrownBy(() -> executeMission(engine, session, definition, model, forwarding ? List.of(capability, new BoundCapability(tool("expenseLookup", "unused").metadata(), java.util.List.of(),
+                            (arguments, taskId, sourceResults) -> capability.invoke(arguments, taskId))) : List.of(capability)))
                     .isInstanceOf(LoomspanMissionTimeoutException.class);
             assertThat(lateWorkerStarted.await(2, TimeUnit.SECONDS)).isTrue();
             assertThat(retainedMission.get().completedTaskResults()).containsExactly(
@@ -1703,8 +1745,8 @@ class StepLoopMissionExecutionEngineTest {
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
                 "t-1", "invoiceParser",
                 "t-2", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId)) return "first-complete";
                     lateMemberStarted.countDown();
                     while (releaseLateMember.getCount() > 0)
@@ -1774,8 +1816,8 @@ class StepLoopMissionExecutionEngineTest {
                 "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
         CountDownLatch capabilityStarted = new CountDownLatch(1);
         AtomicBoolean interrupted = new AtomicBoolean();
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     capabilityStarted.countDown();
                     try
                     {
@@ -1812,8 +1854,8 @@ class StepLoopMissionExecutionEngineTest {
         SequenceChatClient model = new SequenceChatClient(
                 "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
         AtomicBoolean interrupted = new AtomicBoolean();
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     try
                     {
                         new CountDownLatch(1).await();
@@ -1940,8 +1982,8 @@ class StepLoopMissionExecutionEngineTest {
         CountDownLatch bothStarted = new CountDownLatch(2);
         AtomicInteger invocations = new AtomicInteger();
         Set<Object> workerBranches = ConcurrentHashMap.newKeySet();
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     invocations.incrementAndGet();
                     workerBranches.add(ExecutionBindingScope.requireCurrent().branch());
                     ExecutionPlan admitted = stateService.currentPlan().orElseThrow();
@@ -2023,8 +2065,8 @@ class StepLoopMissionExecutionEngineTest {
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
                 "t-1", "invoiceParser",
                 "t-2", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     callbackThreads.add(Thread.currentThread());
                     taskOrder.add(taskId);
                     return "result-" + taskId;
@@ -2090,8 +2132,8 @@ class StepLoopMissionExecutionEngineTest {
             return delegate.call(request);
         };
         String padding = "x".repeat(1800);
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> padding + "COMPLETE_" + taskId);
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> padding + "COMPLETE_" + taskId);
         var definition = definitionWithConcurrency(concurrent);
         var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("snapshot-" + concurrent, "test.entry", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -2117,8 +2159,8 @@ class StepLoopMissionExecutionEngineTest {
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
                 "t-1", "invoiceParser",
                 "t-2", "invoiceParser"), finalPrompt);
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId))
                     {
                         try
@@ -2192,8 +2234,8 @@ class StepLoopMissionExecutionEngineTest {
                 "t-1", "invoiceParser",
                 "t-2", "invoiceParser",
                 "t-3", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId))
                     {
                         try
@@ -2254,8 +2296,8 @@ class StepLoopMissionExecutionEngineTest {
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
                 "t-1", "invoiceParser",
                 "t-2", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId))
                     {
                         try
@@ -2303,8 +2345,8 @@ class StepLoopMissionExecutionEngineTest {
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
                 "t-1", "invoiceParser",
                 "t-2", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId))
                     {
                         try
@@ -2356,8 +2398,8 @@ class StepLoopMissionExecutionEngineTest {
                 "t-1", "invoiceParser",
                 "t-2", "invoiceParser",
                 "t-3", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId))
                     {
                         bothGroupMembersStarted.countDown();
@@ -2429,8 +2471,8 @@ class StepLoopMissionExecutionEngineTest {
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
                 "t-1", "invoiceParser",
                 "t-2", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     if ("t-2".equals(taskId))
                     {
                         secondFailed.countDown();
@@ -2562,13 +2604,13 @@ class StepLoopMissionExecutionEngineTest {
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Mission complete"}
                 """);
         List<String> invocationOrder = new ArrayList<>();
-        BoundCapability invoiceParser = new BoundCapability(tool("invoiceParser", "parsed").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability invoiceParser = new BoundCapability(tool("invoiceParser", "parsed").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     invocationOrder.add(taskId);
                     return "parsed";
                 });
-        BoundCapability expenseLookup = new BoundCapability(tool("expenseLookup", "matches").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability expenseLookup = new BoundCapability(tool("expenseLookup", "matches").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     invocationOrder.add(taskId);
                     return "matches";
                 });
@@ -2620,7 +2662,7 @@ class StepLoopMissionExecutionEngineTest {
                 """);
         AtomicReference<Map<String, Object>> observedArguments = new AtomicReference<>();
         BoundCapability template = tool("invoiceParser", "unused");
-        BoundCapability capability = new BoundCapability(template.metadata(), (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(template.metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> {
             observedArguments.set(arguments);
             return "parsed";
         });
@@ -2650,8 +2692,8 @@ class StepLoopMissionExecutionEngineTest {
                                 List.of(), List.of(), "batch", null)));
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         AtomicInteger invocations = new AtomicInteger();
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(),
-                (arguments, taskId) -> {
+        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                (arguments, taskId, sourceResults) -> {
                     invocations.incrementAndGet();
                     return "done";
                 });
@@ -3019,26 +3061,26 @@ class StepLoopMissionExecutionEngineTest {
 
     private static BoundCapability tool(String name, String result) {
         return new BoundCapability(
-                ai.loomspan.testkit.TestBoundCapabilities.capability(name).metadata(),
-                (arguments, linkedTaskId) -> result);
+                ai.loomspan.testkit.TestBoundCapabilities.capability(name).metadata(), java.util.List.of(),
+                (arguments, linkedTaskId, sourceResults) -> result);
     }
 
     private static BoundCapability toolWithSchema(String name, String inputSchema, String result) {
         return new BoundCapability(
-                ai.loomspan.testkit.TestBoundCapabilities.capability(name, inputSchema).metadata(),
-                (arguments, linkedTaskId) -> result);
+                ai.loomspan.testkit.TestBoundCapabilities.capability(name, inputSchema).metadata(), java.util.List.of(),
+                (arguments, linkedTaskId, sourceResults) -> result);
     }
 
     private static BoundCapability toolWithContract(String name, String inputSchema, String contractSchema, String result) {
         return new BoundCapability(
-                ai.loomspan.testkit.TestBoundCapabilities.contractAware(name, inputSchema, contractSchema).metadata(),
-                (arguments, linkedTaskId) -> result);
+                ai.loomspan.testkit.TestBoundCapabilities.contractAware(name, inputSchema, contractSchema).metadata(), java.util.List.of(),
+                (arguments, linkedTaskId, sourceResults) -> result);
     }
 
     private static BoundCapability failingTool(String name) {
         return new BoundCapability(
-                ai.loomspan.testkit.TestBoundCapabilities.capability(name).metadata(),
-                (arguments, linkedTaskId) -> { throw new IllegalStateException("parser exploded"); });
+                ai.loomspan.testkit.TestBoundCapabilities.capability(name).metadata(), java.util.List.of(),
+                (arguments, linkedTaskId, sourceResults) -> { throw new IllegalStateException("parser exploded"); });
     }
 
     private static BoundCapability realToolCallback(DefaultExecutionStateService stateService,

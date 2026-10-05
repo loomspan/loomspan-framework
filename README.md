@@ -99,6 +99,12 @@ still completes all accepted work, then returns that child's existing text
 unchanged without a parent synthesis request. See [output contracts](agent-skills/loomspan-docs/references/skill-authoring/output-contracts.md)
 for syntax, schema ownership, and model/Java/REST examples.
 
+A planning parent can declare `input_bindings` under each allowed child to copy
+validated parent input or one accepted direct-child result into the child's input.
+The model supplies only unbound arguments; Framework preserves selected values
+and validates the unchanged complete receiving contract. See [declared child input bindings](agent-skills/loomspan-docs/references/skill-authoring/input-bindings.md)
+for complete schemas, object pointers, dependencies and diagnostics.
+
 ## Choose your integration
 
 - **Embedded Java:** add the Spring Boot starter and invoke skills in your

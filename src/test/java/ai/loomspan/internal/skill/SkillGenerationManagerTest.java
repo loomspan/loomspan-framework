@@ -40,6 +40,63 @@ import static org.mockito.Mockito.when;
 class SkillGenerationManagerTest
 {
     @Test
+    void validatesBindingGraphsAndKnownSchemasWithoutGuessingProducerOutput(@TempDir Path directory) {
+        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of());
+        SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), new StaticListableBeanFactory());
+        manager.afterSingletonsInstantiated();
+        String parent = """
+                name: parent
+                description: parent
+                model: model
+                planning_mode: true
+                input_schema:
+                  type: object
+                  properties:
+                    requestId: {type: string}
+                  required: [requestId]
+                  additionalProperties: false
+                allowed_skills:
+                  - name: producer
+                    max_tasks: 1
+                  - name: consumer
+                    input_bindings:
+                      /caseId: {from: input, path: /requestId}
+                      /data: {from: child_result, skill: producer, path: /undeclaredOutput}
+                """;
+        var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\n");
+        var consumer = new SkillDocument("consumer", """
+                name: consumer
+                description: consumer
+                model: model
+                input_schema:
+                  type: object
+                  properties:
+                    caseId: {type: string}
+                    data: {type: object}
+                  required: [caseId, data]
+                  additionalProperties: false
+                """);
+        assertThat(manager.validate(List.of(new SkillDocument("parent", parent), producer, consumer)).valid()).isTrue();
+        Map<String, String> bad = Map.of(
+                "unknown producer", parent.replace("skill: producer", "skill: other"),
+                "self", parent.replace("skill: producer", "skill: consumer"),
+                "impossible count", parent.replace("max_tasks: 1", "max_tasks: 0"),
+                "missing input field", parent.replace("path: /requestId", "path: /absent"),
+                "closed target", parent.replace("/caseId:", "/absent:"),
+                "scalar target ancestor", parent.replace("/caseId:", "/caseId/child:"));
+        for (var entry : bad.entrySet()) {
+            var validation = manager.validate(List.of(new SkillDocument("parent", entry.getValue()), producer, consumer));
+            assertThat(validation.valid()).as(entry.getKey()).isFalse();
+            assertThat(validation.issues()).anyMatch(issue -> issue.fieldPath().equals("allowed_skills.input_bindings"));
+        }
+        String cycle = parent.replace("    max_tasks: 1", "    max_tasks: 1\n    input_bindings:\n      /data: {from: child_result, skill: consumer, path: ''}");
+        assertThat(manager.validate(List.of(new SkillDocument("parent", cycle), producer, consumer)).issues())
+                .anyMatch(issue -> issue.message().contains("cyclic"));
+    }
+
+    @Test
     void resolvesForwardingMetadataThroughChainsWithoutInheritingEvidence(@TempDir Path directory) {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));

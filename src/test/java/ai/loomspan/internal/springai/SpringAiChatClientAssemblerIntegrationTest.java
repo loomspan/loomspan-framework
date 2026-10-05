@@ -163,7 +163,7 @@ class SpringAiChatClientAssemblerIntegrationTest
                 new CapabilityToolDescriptor("lookup", "Look up",
                         "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}", null),
                 SkillInputContract.genericObject(), null);
-        return new BoundCapability(metadata, (arguments, task) -> {
+        return new BoundCapability(metadata, java.util.List.of(), (arguments, task, sourceResults) -> {
             executions.incrementAndGet();
             observedArguments.set(arguments);
             return "looked-up-" + arguments.get("value");

@@ -32,6 +32,7 @@ Scalar entries and scalar flow lists are invalid. An unconstrained child is stil
 | `min_tasks` | No | `0` | Minimum generated plan tasks bound to `name`. |
 | `max_tasks` | No | Unbounded | Maximum generated plan tasks bound to `name`; zero is allowed. |
 | `required` | No | `false` | When true, makes the effective minimum at least one. |
+| `input_bindings` | No | None | [Declared child input bindings](input-bindings.md); requires explicit planning mode. Result producers are conditionally unique when a consumer is planned. |
 
 The effective minimum is `max(min_tasks if present else 0, required == true ? 1 : 0)`. Therefore `required: false` does not negate `min_tasks`, and `max_tasks: 1` permits zero or one task.
 
@@ -47,7 +48,7 @@ Loomspan renders every non-default bound in the initial planning prompt. After e
 
 A child with a positive effective minimum MUST already be in the authorized visible tool list. Otherwise planning fails before the model call. Maximum-only and unconstrained invisible children do not make the plan impossible and do not trigger this preflight. Constraints never expand visibility or bypass RBAC.
 
-On the first count violation, Loomspan records `PLAN_VALIDATION_FAILED`, adds feedback with the exact child, bound, and actual count, records `PLAN_RETRY_REQUESTED`, and makes one corrective planning attempt. Count feedback composes with evidence-coverage feedback in that same retry. If either validator still fails, planning terminates before `PLAN_CREATED`, plan storage, or execution. Minimum and maximum failures use `PLAN_TASK_MINIMUM_NOT_MET` and `PLAN_TASK_MAXIMUM_EXCEEDED`.
+On the first count violation, Loomspan records `PLAN_VALIDATION_FAILED`, adds feedback with the exact child, bound, and actual count, records `PLAN_RETRY_REQUESTED`, and makes one corrective planning attempt. Count feedback composes with evidence-coverage and declared-binding dependency feedback in that same retry. If either validator still fails, planning terminates before `PLAN_CREATED`, plan storage, or execution. Minimum and maximum failures use `PLAN_TASK_MINIMUM_NOT_MET` and `PLAN_TASK_MAXIMUM_EXCEEDED`.
 
 ## Designated result task
 

@@ -816,7 +816,7 @@ class PlanningServiceTest {
                 session,
                 "check invoice duplicates",
                 null,
-                constrainedDefinition(new AllowedSkillConstraint("expenseLookup", 1, 2, false)),
+                constrainedDefinition(new AllowedSkillConstraint("expenseLookup", 1, 2, false, java.util.List.of())),
                 chatClient,
                 List.of(toolCallback("invoiceParser", "parse"), toolCallback("expenseLookup", "lookup")))
                 .orElseThrow();
@@ -841,6 +841,49 @@ class PlanningServiceTest {
     }
 
     @Test
+    void bindingDependenciesUseOneCorrectionAndPreserveExplicitProducerEdges() {
+        DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
+        DefaultPlanningService planningService = new DefaultPlanningService(stateService);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("binding-retry", "test.entry", 3);
+        String invalid = correctedMultiToolPlanJson().replace("[\"t-1\"]", "[]");
+        String corrected = correctedMultiToolPlanJson().replace("[\"t-2\"]", "[\"t-1\", \"t-2\"]");
+        SequencePlanningChatClient chatClient = new SequencePlanningChatClient(invalid, corrected);
+        var binding = new ai.loomspan.internal.runtime.input.ChildInputBinding(
+                ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/evidence", false),
+                ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.CHILD_RESULT,
+                ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("", true), "invoiceParser");
+        var definition = constrainedDefinition(new AllowedSkillConstraint("expenseLookup", null, null, false, List.of(binding)));
+        ExecutionPlan accepted = initializePlan(planningService, session, "check invoice", null, definition, chatClient,
+                List.of(toolCallback("invoiceParser", "parse"), toolCallback("expenseLookup", "lookup"))).orElseThrow();
+        assertThat(accepted.tasks().getLast().dependsOn()).contains("t-1", "t-2");
+        assertThat(chatClient.systemMessagesSeen()).hasSize(2);
+        assertThat(chatClient.systemMessagesSeen().getFirst()).contains("Declared child input dependencies", "exactly one", "Generate only inputs");
+        assertThat(chatClient.systemMessagesSeen().getLast()).contains("Input binding dependency", "explicitly depend");
+        assertThat(readRecords(session)).filteredOn(record -> record.recordType() == TraceRecordType.PLAN_RETRY_REQUESTED)
+                .singleElement().satisfies(record -> assertThat(record.metadata()).containsEntry("issueCodes", List.of("input-binding-dependency")));
+    }
+
+    @Test
+    void exhaustedBindingDependenciesStoreNoPlan() {
+        DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
+        DefaultPlanningService planningService = new DefaultPlanningService(stateService);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("binding-exhausted", "test.entry", 3);
+        String invalid = correctedMultiToolPlanJson().replace("[\"t-1\"]", "[]");
+        SequencePlanningChatClient chatClient = new SequencePlanningChatClient(invalid, invalid);
+        var binding = new ai.loomspan.internal.runtime.input.ChildInputBinding(
+                ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/evidence", false),
+                ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.CHILD_RESULT,
+                ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("", true), "invoiceParser");
+        assertThatThrownBy(() -> initializePlan(planningService, session, "check invoice", null,
+                constrainedDefinition(new AllowedSkillConstraint("expenseLookup", null, null, false, List.of(binding))), chatClient,
+                List.of(toolCallback("invoiceParser", "parse"), toolCallback("expenseLookup", "lookup"))))
+                .hasMessageContaining("Input binding dependency");
+        assertThat(chatClient.systemMessagesSeen()).hasSize(2);
+        assertThat(currentPlan(stateService, session)).isEmpty();
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.PLAN_CREATED);
+    }
+
+    @Test
     void rejectsSecondConstraintViolationWithoutStoringPlan() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
@@ -852,7 +895,7 @@ class PlanningServiceTest {
                 session,
                 "check invoice duplicates",
                 null,
-                constrainedDefinition(new AllowedSkillConstraint("expenseLookup", 1, null, false)),
+                constrainedDefinition(new AllowedSkillConstraint("expenseLookup", 1, null, false, java.util.List.of())),
                 chatClient,
                 List.of(toolCallback("invoiceParser", "parse"), toolCallback("expenseLookup", "lookup"))))
                 .hasMessageContaining("Plan validation failed")
@@ -874,7 +917,7 @@ class PlanningServiceTest {
                 session,
                 "check invoice duplicates",
                 null,
-                constrainedDefinition(new AllowedSkillConstraint("expenseLookup", null, null, true)),
+                constrainedDefinition(new AllowedSkillConstraint("expenseLookup", null, null, true, java.util.List.of())),
                 chatClient,
                 List.of(toolCallback("invoiceParser", "parse"))))
                 .hasMessageContaining("expenseLookup")
@@ -890,7 +933,7 @@ class PlanningServiceTest {
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(weakSingleToolPlanJson());
 
         initializePlan(planningService, session, "check invoice", null,
-                constrainedDefinition(new AllowedSkillConstraint("expenseLookup", null, 1, false)),
+                constrainedDefinition(new AllowedSkillConstraint("expenseLookup", null, 1, false, java.util.List.of())),
                 chatClient, List.of(toolCallback("invoiceParser", "parse")));
 
         assertThat(chatClient.systemMessagesSeen()).hasSize(1);
@@ -1132,7 +1175,7 @@ class PlanningServiceTest {
 
             assertThatThrownBy(() -> initializePlan(planningService,
                     session, "check invoice", null,
-                    constrainedDefinition(new AllowedSkillConstraint("expenseLookup", 1, null, false)),
+                    constrainedDefinition(new AllowedSkillConstraint("expenseLookup", 1, null, false, java.util.List.of())),
                     chatClient,
                     List.of(toolCallback("invoiceParser", "parse"), toolCallback("expenseLookup", "lookup"))))
                     .hasMessageContaining("Plan validation failed");
@@ -1415,7 +1458,8 @@ class PlanningServiceTest {
                         constraint.name(), constraint.minTasks(), constraint.maxTasks(), constraint.required()))
                 .toList());
         return new YamlSkillDefinition(
-                new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+                new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION,
+                ai.loomspan.internal.runtime.evidence.EvidenceContract.empty(), null, List.of(constraints));
     }
 
     private static YamlSkillDefinition rootDefinitionWithPrompt(String prompt) {

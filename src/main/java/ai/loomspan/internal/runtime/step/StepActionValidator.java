@@ -150,7 +150,10 @@ final class StepActionValidator
             return StepValidationResult.ok();
         }
 
-        SkillInputContract contract = matchingTool.get().metadata().inputContract();
+        Map<String, Object> supplied = action.toolArguments() == null ? Map.of() : action.toolArguments();
+        List<String> bindingIssues = matchingTool.get().validateModelArguments(supplied);
+        if (!bindingIssues.isEmpty()) return StepValidationResult.rejected("Binding override: " + String.join("; ", bindingIssues));
+        SkillInputContract contract = matchingTool.get().argumentContract();
         if (contract.isGeneric())
         {
             return StepValidationResult.ok();

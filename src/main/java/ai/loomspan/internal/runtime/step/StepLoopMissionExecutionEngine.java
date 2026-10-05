@@ -349,6 +349,10 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         ExecutionPlan acceptedPlan = executionStateService.currentPlan()
                 .orElseThrow(() -> new IllegalStateException(
                         "Plan disappeared before step-loop execution for skill '" + skillName + "'"));
+        List<String> bindingDependencyIssues = new ai.loomspan.internal.runtime.planning.PlanInputBindingDependencyValidator()
+                .validate(acceptedPlan, definition.allowedSkillConstraints());
+        if (!bindingDependencyIssues.isEmpty())
+            throw new IllegalStateException("binding_plan_dependency: " + String.join("; ", bindingDependencyIssues));
         String selectedSkill = definition.outputFromSkill();
         PlanTask selectedTask = null;
         if (selectedSkill != null) {
@@ -940,7 +944,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
 
                 return switch (action.stepAction())
                 {
-                    case CALL_TOOL -> executeToolAction(session, action, visibleTools, stepFrame, stepNumber, trustedIdentity);
+                    case CALL_TOOL -> executeToolAction(session, action, visibleTools, stepFrame, stepNumber, trustedIdentity, completedTaskResults);
                     case FINAL_RESPONSE -> {
                         String finalResponse = serializeFinalResponse(action.finalResponse());
                         executionStateService.recordStepEvent(session, stepFrame, TraceRecordType.STEP_COMPLETED,
@@ -1046,7 +1050,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             List<BoundCapability> visibleTools,
             ExecutionFrame stepFrame,
             int stepNumber,
-            Map<String, Object> trustedIdentity)
+            Map<String, Object> trustedIdentity,
+            List<CompletedTaskResult> sourceResults)
     {
         BoundCapability toolCallback = visibleTools.stream()
                 .filter(t -> t != null && action.toolName().equals(t.name()))
@@ -1057,8 +1062,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         String toolResult;
         try
         {
-            Object rawResult = toolCallback.invoke(
-                    action.toolArguments() == null ? Map.of() : action.toolArguments(), action.taskId());
+            Object rawResult = toolCallback.invokeAssigned(
+                    action.toolArguments() == null ? Map.of() : action.toolArguments(), action.taskId(), sourceResults);
 
             toolResult = rawResult == null ? "null" : String.valueOf(rawResult);
         }

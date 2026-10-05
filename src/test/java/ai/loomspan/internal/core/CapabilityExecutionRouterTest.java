@@ -26,6 +26,35 @@ import static org.mockito.Mockito.when;
 class CapabilityExecutionRouterTest {
 
     @Test
+    void assembledBoundValuesFailBeforeDispatchWithoutCoercionAndStillRequireAuthorization() {
+        var coordinator = mock(ExecutionCoordinator.class);
+        var router = new CapabilityExecutionRouter(new StaticListableBeanFactory(java.util.Map.of("executionCoordinator", coordinator))
+                .getBeanProvider(ExecutionCoordinator.class), new DefaultAccessGuard());
+        var session = new LoomspanSession("bound-dispatch", "entry", 3);
+        var contract = new SkillInputContractResolver().resolveJavaCapability("""
+                {"type":"object","properties":{"count":{"type":"integer"}},"required":["count"],"additionalProperties":false}
+                """);
+        var metadata = new CapabilityMetadata("java:bound", "bound", "bound", SkillExecutionDescriptor.none(),
+                ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(), arguments -> "unused", CapabilityKind.JAVA_SKILL,
+                CapabilityToolDescriptor.generic("bound", "bound"), contract, null);
+        var binding = new ai.loomspan.internal.runtime.input.ChildInputBinding(
+                ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/count", false),
+                ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT,
+                ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/source", true), null);
+        var assembled = new ai.loomspan.internal.runtime.input.ChildInputBindingAssembler().assemble(Map.of(), List.of(binding),
+                Map.of("source", "123"), List.of(), "parent");
+        assertThatThrownBy(() -> router.executeAssembled(metadata, assembled.arguments(), session, null, assembled.exactPaths()))
+                .isInstanceOf(ai.loomspan.api.SkillInputValidationException.class).hasMessageContaining("binding_assembled_input_invalid");
+        var denied = new CapabilityMetadata("java:bound-denied", "bound-denied", "bound", SkillExecutionDescriptor.none(),
+                ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")), arguments -> "unused",
+                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("bound-denied", "bound"), contract, null);
+        assertThatThrownBy(() -> router.executeAssembled(denied, Map.of("count", 123), session,
+                UsernamePasswordAuthenticationToken.authenticated("user", "pw", AuthorityUtils.createAuthorityList("ROLE_OTHER")),
+                assembled.exactPaths())).isInstanceOf(AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(coordinator);
+    }
+
+    @Test
     void routesNestedYamlSynchronouslyUsingCurrentParentBinding() {
         RefResolver refResolver = mock(RefResolver.class);
         ExecutionCoordinator coordinator = mock(ExecutionCoordinator.class);

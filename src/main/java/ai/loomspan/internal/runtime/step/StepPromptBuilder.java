@@ -229,7 +229,7 @@ final class StepPromptBuilder
             return null;
         }
 
-        SkillInputContract contract = tool.metadata().inputContract();
+        SkillInputContract contract = tool.argumentContract();
         if (contract.isGeneric())
         {
             return null;
@@ -242,7 +242,8 @@ final class StepPromptBuilder
         return """
                 Task %s / tool %s:
                 %s
-                """.formatted(task.taskId(), task.capabilityName(), INPUT_PROMPT_RENDERER.renderToolArgumentsExample(contract, detailLevel));
+                """.formatted(task.taskId(), task.capabilityName(), INPUT_PROMPT_RENDERER.renderToolArgumentsExample(contract, detailLevel)
+                        + (tool.inputBindings().isEmpty() ? "" : "\nFramework supplies declared bound fields. Supply only unbound arguments. Bound destinations: " + tool.inputBindings().stream().map(binding -> binding.destination().pointer()).toList() + "\nEffective model argument schema: " + tool.inputSchema()));
     }
 
     private static boolean useVerboseDetail(SkillInputSchemaNode schema)
