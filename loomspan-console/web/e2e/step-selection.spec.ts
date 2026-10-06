@@ -8,11 +8,9 @@ test("step boundaries share a fill and the selected activity owns the outline", 
   const fixture = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../loomspan-console-fixtures/traces/planned-tool-success.ndjson");
   const records = fs.readFileSync(fixture, "utf8").trim().split("\n").flatMap((line) => {
     const record = JSON.parse(line);
-    if (record.frameId !== "step") return [record];
+    if (record.frameId !== "step" || record.recordType !== "FRAME_CLOSED") return [record];
     const event = { ...record, metadata: { stepNumber: 1, readyTasks: 1 }, data: { planStatus: "VALID" } };
-    return record.recordType === "FRAME_OPENED"
-      ? [record, { ...event, recordType: "STEP_STARTED" }]
-      : [{ ...event, recordType: "STEP_COMPLETED" }, record];
+    return [{ ...event, recordType: "STEP_COMPLETED" }, record];
   });
   const trace = records.map((record, index) => JSON.stringify({ ...record, sequence: index + 1 })).join("\n") + "\n";
   await page.goto(consoleProcess.pairingUrl);
