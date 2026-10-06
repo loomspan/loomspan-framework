@@ -14,6 +14,40 @@ receiving input contract remains authoritative; the calling model generates only
 unbound arguments under a separate projected contract. Binding grants no access
 and does not change invocation limits or the captured configuration generation.
 
+## Automatic assigned dispatch
+
+After the model produces an accepted plan, Framework constructs CALL_TOOL with
+the exact assigned task/capability and empty model arguments when the receiving
+contract proves that the model has no input contribution. No execution mode or
+additional YAML flag is needed. Eligibility is specific to this parent's bindings.
+
+| Receiving contract after bindings | Parent dispatch |
+| --- | --- |
+| Explicit closed object; every possible root property wholly bound | Framework |
+| Explicit closed zero-property object | Framework |
+| Any optional or required unbound property | Model |
+| Open additional properties, generic or absent schema | Model |
+| Nested binding destination, such as `/context/value` | Model (conservative presence/omission fallback) |
+| Unsupported/reference/composition/default/constant/conditional or ambiguous schema shape | Model |
+
+Whole bound objects and arrays MAY qualify; their exact values still come from
+the source. Framework never synthesizes defaults, constants, nulls or ancestor
+objects to establish eligibility. Binding all required fields alone is insufficient.
+Unknown raw schema keywords remain proof exclusions even inside bound subtrees.
+
+Both origins use the normal assigned validator, invocation-time source assembly,
+complete receiving-input validation, caller access and lifecycle checks. Missing,
+ambiguous or invalid bound sources fail before child execution without a parent
+model repair request. Framework dispatch still consumes one task step and normal
+tool/child limits; a plan does not supply business authorization or approval.
+This rule adds no conditional task selection, skipping, or side-effect retry.
+
+A model-backed child still performs its own planning/reasoning and output
+validation/correction. Only the parent's dispatch request disappears. Actual
+request-specific advisors/hooks and model/provider usage run only for real sends.
+See [planning](planning-concurrency.md#execution-behavior),
+[limits](execution-limits.md), and [dispatch observations](traces-and-debugging.md#assigned-dispatch-observations).
+
 ## Declaration and paths
 
 Each destination key MUST be a nonempty object JSON Pointer. Each source record
@@ -122,6 +156,13 @@ input contains the renamed `caseId`, complete original records and accepted
 `data` assessment. After all accepted work succeeds, `output_from` forwards the
 consumer's exact retained String without parent synthesis or duplicate output
 validation. Read [output contracts](output-contracts.md) for forwarding ownership.
+
+The producer's only possible input `/caseId` is wholly bound under a closed
+contract, so its parent dispatch is automatic. Its own model assessment still
+runs. The consumer retains parent model dispatch: optional `candidateReasoning`
+permits a contribution, and its nested binding destinations are conservatively
+excluded. The same producer under a parent that leaves `/caseId` unbound needs
+model arguments again.
 
 ## Two contracts and dependencies
 

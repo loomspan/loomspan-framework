@@ -59,6 +59,20 @@ The validator reports all non-cascading issues with stable codes. It does not re
 
 ## Execution behavior
 
+An accepted assignment with a proven contribution-free input contract uses
+automatic Framework dispatch; other assignments retain model action generation
+and correction. See [input bindings](input-bindings.md#automatic-assigned-dispatch)
+for the exact eligibility rule. This changes neither admission, grouping, joins,
+task order nor generation capture. Every assignment still costs one `max_steps`
+slot, even when no parent model request is sent. Business approval and caller
+authorization remain independent invocation checks.
+
+`StepLoopMissionExecutionEngineTest#fullyBoundAssignedTaskSkipsParentDispatchModelInteraction`
+and `DeclaredChildInputBindingsIntegrationTest` protect dispatch reduction;
+`forwardingWaitsForWholeSelectedUnitAndLaterWork`,
+`taskReturningAfterTimeoutDoesNotStartFinalSynthesis`, and
+`ConcurrentGroupedExecutionIntegrationTest` cover direct/mixed scheduling and cutoff.
+
 The coordinator partitions the accepted plan once, visits execution units in task-list order, and assigns every task to exactly its accepted `taskId` and `capabilityName`. A worker may correct an invalid action only for that same assignment; it cannot select another ready task or synthesize the final response. Ordinary final synthesis is offered only after every accepted task is complete. An explicit `output_from` parent instead forwards its designated accepted task result after that same complete-success boundary; it cannot return early when the selected task finishes.
 
 Assigned-step, step user-message, and final-synthesis prompts preserve substantive mission objective text, including skill-name references and text after generated-looking prefixes. Overall mission context is background for the assigned worker; its actionable contract remains the exact assigned child task, tool, and arguments, with an explicit prohibition on calling the parent mission skill. Ordinary `SkillTemplate` invocations construct mission wording directly and deliver structured business input through the existing canonical-input user-message path. Input values are not embedded in that generated objective or copied into the step system prompt. Final synthesis cannot call any tool. This prompt guidance does not establish improved live-model accuracy.

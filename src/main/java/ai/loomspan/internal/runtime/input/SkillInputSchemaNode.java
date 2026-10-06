@@ -17,7 +17,8 @@ public record SkillInputSchemaNode(
         boolean runtimeRefCapable,
         boolean attachment,
         String attachmentMediaType,
-        List<String> allowedContentTypes)
+        List<String> allowedContentTypes,
+        boolean dispatchProofSupported)
 {
     public static final String ANY_TYPE = "__loomspan_any__";
 
@@ -39,10 +40,11 @@ public record SkillInputSchemaNode(
             List<String> enumValues,
             String description,
             String format,
-            boolean runtimeRefCapable)
+            boolean runtimeRefCapable,
+            boolean dispatchProofSupported)
     {
         this(type, properties, required, additionalProperties, additionalPropertiesSchema, items, enumValues,
-                description, format, runtimeRefCapable, false, null, List.of());
+                description, format, runtimeRefCapable, false, null, List.of(), dispatchProofSupported);
     }
 
     public SkillInputSchemaNode(String type,
@@ -53,9 +55,10 @@ public record SkillInputSchemaNode(
             List<String> enumValues,
             String description,
             String format,
-            boolean runtimeRefCapable)
+            boolean runtimeRefCapable,
+            boolean dispatchProofSupported)
     {
-        this(type, properties, required, additionalProperties, null, items, enumValues, description, format, runtimeRefCapable, false, null, List.of());
+        this(type, properties, required, additionalProperties, null, items, enumValues, description, format, runtimeRefCapable, false, null, List.of(), dispatchProofSupported);
     }
 
     public boolean isObject()

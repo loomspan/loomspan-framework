@@ -27,6 +27,100 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Actual supported facade/dispatch with local provider responses. */
 class DeclaredChildInputBindingsIntegrationTest {
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"success", "missing", "approval", "revoked", "tool-quota", "provider-quota"})
+    void directDispatchRetainsFailureAccessApprovalAndRealRequestBudgets(String scenario) throws Exception {
+        Path skills = Files.createDirectory(directory.resolve("direct"));
+        String root = """
+                name: root
+                description: Assign approved work
+                model: local
+                planning_mode: true
+                max_steps: 1
+                prompt: ROOT
+                input_schema:
+                  type: object
+                  properties:
+                    requestId: {type: string}
+                  additionalProperties: false
+                allowed_skills:
+                  - name: producer
+                    required: true
+                    max_tasks: 1
+                    input_bindings:
+                      /caseId: {from: input, path: /requestId}
+                output_from: {skill: producer}
+                """;
+        if (scenario.equals("tool-quota")) {
+            root = root.replace("max_steps: 1", "max_steps: 2").replace("output_from: {skill: producer}", "output_from: {skill: consumer}")
+                    .replace("output_from:", "  - {name: consumer, required: true, max_tasks: 1}\noutput_from:");
+            Files.writeString(skills.resolve("consumer.yaml"), """
+                    name: consumer
+                    description: Second explicit task
+                    rest: true
+                    input_schema: {type: object, additionalProperties: false}
+                    """);
+        }
+        Files.writeString(skills.resolve("root.yaml"), root);
+        Files.writeString(skills.resolve("producer.yaml"), producer(scenario.equals("provider-quota") ? "model" : "rest") + "rbac_roles: [ALLOWED]\n");
+        var revoked = new java.util.concurrent.atomic.AtomicBoolean();
+        var authentication = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "caller", "unused", org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("ROLE_ALLOWED")) {
+            @Override public Collection<org.springframework.security.core.GrantedAuthority> getAuthorities() {
+                return revoked.get() ? List.of() : super.getAuthorities();
+            }
+        };
+        var sends = new java.util.concurrent.atomic.AtomicInteger();
+        var sideEffects = new java.util.concurrent.atomic.AtomicInteger();
+        var observerCalls = new java.util.concurrent.atomic.AtomicInteger();
+        try (MockWebServer server = new MockWebServer()) {
+            server.setDispatcher(new Dispatcher() {
+                @Override public MockResponse dispatch(RecordedRequest request) {
+                    sends.incrementAndGet();
+                    String system = JSON.readTree(request.getBody().readUtf8()).path("messages").get(0).path("content").asText();
+                    assertThat(system).contains("Create an ordered flight plan");
+                    if (scenario.equals("revoked")) revoked.set(true);
+                    return response(JSON.writeValueAsString(Map.of("capabilityName", "root", "createdAt", "2026-10-04T00:00:00Z",
+                            "status", "VALID", "tasks", scenario.equals("tool-quota")
+                                    ? List.of(task("producer", List.of()), task("consumer", List.of("producer")))
+                                    : List.of(task("producer", List.of())))));
+                }
+            });
+            server.start();
+            new ApplicationContextRunner().withUserConfiguration(App.class).withBean(RestSkillHandler.class, () -> invocation -> {
+                if (invocation.skillName().equals("producer")) assertThat(invocation.input()).containsEntry("caseId", "case-one");
+                if (scenario.equals("approval")) throw new org.springframework.security.access.AccessDeniedException("Explicit application approval absent");
+                sideEffects.incrementAndGet();
+                return "COMPLETE";
+            }).withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
+                    "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=" + server.url("/v1"),
+                    "loomspan.connections.local.api-key=local-test", "loomspan.connections.local.provider-retry.enabled=false",
+                    "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=deterministic",
+                    "loomspan.session.quotas.max-model-calls=1", "loomspan.session.quotas.max-provider-attempts=1",
+                    "loomspan.session.quotas.max-tool-invocations=1")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        var strategy = context.getBeanProvider(org.springframework.security.core.context.SecurityContextHolderStrategy.class)
+                                .getIfAvailable(org.springframework.security.core.context.SecurityContextHolder::getContextHolderStrategy);
+                        strategy.setContext(new org.springframework.security.core.context.SecurityContextImpl(authentication));
+                        try {
+                            var template = context.getBean(SkillTemplate.class);
+                            Map<String, Object> input = scenario.equals("missing") ? Map.of() : Map.of("requestId", "case-one");
+                            if (scenario.equals("success")) assertThat(template.invoke("root", input, view -> observerCalls.incrementAndGet())).isEqualTo("COMPLETE");
+                            else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("root", input, view -> observerCalls.incrementAndGet()))
+                                    .hasStackTraceContaining(switch (scenario) {
+                                        case "missing" -> "binding_source_unavailable";
+                                        case "approval" -> "Explicit application approval absent";
+                                        case "revoked" -> "denied";
+                                        default -> "quota";
+                                    });
+                        } finally { strategy.clearContext(); }
+                    });
+        }
+        assertThat(sends).hasValue(1);
+        assertThat(sideEffects).hasValue(scenario.equals("success") || scenario.equals("tool-quota") ? 1 : 0);
+        assertThat(observerCalls).hasValue(1);
+    }
     private static final ObjectMapper JSON = JsonMapper.builder()
             .enable(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)
             .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
@@ -80,6 +174,9 @@ class DeclaredChildInputBindingsIntegrationTest {
         AtomicReference<Map<String,Object>> received = new AtomicReference<>();
         AtomicReference<Throwable> failure = new AtomicReference<>();
         var modelProducerCalls = new java.util.concurrent.atomic.AtomicInteger();
+        var plannerCalls = new java.util.concurrent.atomic.AtomicInteger();
+        var consumerDispatchCalls = new java.util.concurrent.atomic.AtomicInteger();
+        var consumerReasoningCalls = new java.util.concurrent.atomic.AtomicInteger();
         List<Map<String,Object>> actions = Collections.synchronizedList(new ArrayList<>());
         List<String> requests = Collections.synchronizedList(new ArrayList<>());
         List<Object> records = new ArrayList<>();
@@ -94,12 +191,15 @@ class DeclaredChildInputBindingsIntegrationTest {
                         JsonNode wire=JSON.readTree(body);
                         String system=wire.path("messages").get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan")) {
+                            plannerCalls.incrementAndGet();
                             assertThat(system).contains("Declared child input dependencies", "exactly one", "Generate only inputs");
                             return response(JSON.writeValueAsString(Map.of("capabilityName","root","createdAt","2026-10-04T00:00:00Z",
                                     "status","VALID","tasks",List.of(task("producer",List.of()),task("consumer",List.of("producer"))))));
                         }
                         if (system.contains("coordinator-assigned task")) {
                             String child=system.contains("Exact capability/tool: producer") ? "producer" : "consumer";
+                            assertThat(child).isEqualTo("consumer");
+                            consumerDispatchCalls.incrementAndGet();
                             Map<String,Object> args=child.equals("consumer") && reasoning
                                     ? Map.of("context",Map.of("candidateReasoning","new reasoning")) : Map.of();
                             actions.add(args);
@@ -111,6 +211,7 @@ class DeclaredChildInputBindingsIntegrationTest {
                             return response(JSON.writeValueAsString(Map.of("data",assessment("case-one"))));
                         }
                         assertThat(system).contains("CONSUMER");
+                        consumerReasoningCalls.incrementAndGet();
                         String user=wire.path("messages").get(wire.path("messages").size()-1).path("content").asText();
                         int start=user.indexOf("{"); int end=user.lastIndexOf("}");
                         received.set(JSON.readValue(user.substring(start,end+1),Map.class));
@@ -138,7 +239,11 @@ class DeclaredChildInputBindingsIntegrationTest {
                 assertThat(result).isEqualTo(consumerKind.equals("java") ? JSON.writeValueAsString("COMPLETE") : "COMPLETE");
             });
         }
-        assertThat(failure.get()).isNull(); assertThat(actions).hasSize(2);
+        assertThat(failure.get()).isNull(); assertThat(actions).hasSize(1);
+        assertThat(plannerCalls).hasValue(1);
+        assertThat(consumerDispatchCalls).hasValue(1);
+        assertThat(consumerReasoningCalls).hasValue(consumerKind.equals("model") ? 1 : 0);
+        assertThat(requests).hasSize(2 + (producerKind.equals("model") ? 2 : 0) + (consumerKind.equals("model") ? 1 : 0));
         assertThat(modelProducerCalls).hasValue(producerKind.equals("model") ? 2 : 0);
         assertThat(actions).allSatisfy(args -> assertThat(JSON.writeValueAsString(args)).doesNotContain("900719925474099", "source", "case-one"));
         assertThat(received.get()).containsEntry("caseId","case-one");

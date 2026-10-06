@@ -603,13 +603,15 @@ class ConcurrentGroupedExecutionIntegrationTest
     private static CapabilityMetadata yamlCapability(String name, boolean mapped,
             Function<Map<String, Object>, Object> invocation)
     {
+        String schema = "{\"type\":\"object\",\"additionalProperties\":false}";
         return new CapabilityMetadata(
                 "yaml:" + name,
                 name,
                 name,
                 SkillExecutionDescriptor.from(CONFIG), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of("ALLOWED")),
                 invocation::apply, mapped ? CapabilityKind.JAVA_SKILL : CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic(name, name), null);
+                new CapabilityToolDescriptor(name, name, schema, null),
+                new ai.loomspan.internal.runtime.input.SkillInputContractResolver().resolveFromToolSchema(schema), null);
     }
 
     private static Authentication allowedAuthentication()

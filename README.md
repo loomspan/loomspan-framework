@@ -110,7 +110,13 @@ for complete schemas, source ownership and failure semantics.
 A planning parent can declare `input_bindings` under each allowed child to copy
 validated parent input or one accepted direct-child result into the child's input.
 The model supplies only unbound arguments; Framework preserves selected values
-and validates the unchanged complete receiving contract. See [declared child input bindings](agent-skills/loomspan-docs/references/skill-authoring/input-bindings.md)
+and validates the unchanged complete receiving contract. When a closed object's
+possible root fields are all wholly bound, or its explicit closed contract has no
+fields, Framework constructs the accepted assigned call without a parent dispatch
+model request. Optional unbound fields, open/unknown contracts, unsupported shapes
+and nested binding destinations retain model dispatch. Planning and a model-backed
+child's own reasoning still run; authorization and task/tool limits still apply.
+See [declared child input bindings](agent-skills/loomspan-docs/references/skill-authoring/input-bindings.md)
 for complete schemas, object pointers, dependencies and diagnostics.
 
 ## Choose your integration

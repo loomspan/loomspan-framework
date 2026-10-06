@@ -16,7 +16,8 @@ type ModelDetail =
 
 type ModelCacheEntry = { loading: boolean; error?: string; detail?: ModelDetail };
 type RawCacheEntry = { loading: boolean; error?: string; json?: string };
-type StepDetail = { stepNumber: number; readyTasks: number; planStatus: string; skillName: string };
+type DispatchDetail = { taskId?: string; toolName?: string; dispatchOrigin?: string; dispatchReason?: string };
+type StepDetail = DispatchDetail & { stepNumber: number; readyTasks: number; planStatus: string; skillName: string };
 type StepCacheEntry = { loading: boolean; error?: string; detail?: StepDetail };
 type StepActionKind = "proposed" | "validated" | "rejected";
 type RecordSeverity = "normal" | "warning" | "error";
@@ -72,7 +73,7 @@ function recordSeverity(record: TraceRecord, linkedFailure?: TraceFailure): Reco
   if (linkedFailure || errorRecordTypes.has(record.type)) return "error";
   return record.validationStatus === "retrying" || record.validationStatus === "exhausted" || warningRecordTypes.has(record.type) ? "warning" : "normal";
 }
-type StepActionDetail = {
+type StepActionDetail = DispatchDetail & {
   kind: StepActionKind;
   skillName: string;
   stepNumber: number;
@@ -280,6 +281,16 @@ function parseStepStartedDetail(rawRecord: string, route: string): StepDetail {
     readyTasks: metadata.readyTasks,
     planStatus: data.planStatus,
     skillName: route.slice(0, separator),
+    ...dispatchDetail(metadata),
+  };
+}
+
+function dispatchDetail(metadata: Record<string, unknown>): DispatchDetail {
+  return {
+    taskId: optionalNonemptyString(metadata.assignedTaskId),
+    toolName: optionalNonemptyString(metadata.capabilityName),
+    dispatchOrigin: optionalNonemptyString(metadata.dispatchOrigin),
+    dispatchReason: optionalNonemptyString(metadata.dispatchReason),
   };
 }
 
@@ -355,7 +366,7 @@ function parseStepActionDetail(rawRecord: string, route: string, kind: StepActio
     if (typeof metadata.stepAction !== "string" || metadata.stepAction.length === 0) {
       throw new Error("Validated action record did not identify the accepted action type.");
     }
-    return { kind, ...routeDetail, actionType: metadata.stepAction };
+    return { kind, ...routeDetail, ...dispatchDetail(metadata), actionType: metadata.stepAction };
   }
 
   if (typeof metadata.reason !== "string" || metadata.reason.length === 0) {
@@ -376,6 +387,7 @@ function parseStepActionDetail(rawRecord: string, route: string, kind: StepActio
   return {
     kind,
     ...routeDetail,
+    ...dispatchDetail(metadata),
     actionType: optionalNonemptyString(data.stepAction),
     reason: metadata.reason,
     earlierRejectedAttempts: metadata.retry as number | undefined,
@@ -417,7 +429,7 @@ async function findProposedAction(traceId: string, record: TraceRecord, source: 
 
 async function readStepActionDetail(traceId: string, record: TraceRecord, kind: StepActionKind, source: TraceSource): Promise<StepActionDetail> {
   let detail = parseStepActionDetail(await readCompleteRecord(traceId, record.sequence, source), record.route, kind);
-  if (kind !== "proposed") {
+  if (kind !== "proposed" && detail.dispatchOrigin !== "framework") {
     const proposed = await findProposedAction(traceId, record, source);
     if (proposed && proposed.detail.actionType === detail.actionType) {
       detail = {
@@ -688,6 +700,8 @@ function StepActionDetailView({ detail }: { detail: StepActionDetail }) {
       {detail.actionType && <div><dt>Action</dt><dd>{humanizeAction(detail.actionType)}</dd></div>}
       {detail.taskId && <div><dt>Task ID</dt><dd>{detail.taskId}</dd></div>}
       {detail.toolName && <div><dt>Tool</dt><dd>{detail.toolName}</dd></div>}
+      {detail.dispatchOrigin && <div><dt>Dispatch</dt><dd>{detail.dispatchOrigin === "framework" ? "Framework dispatch" : "Model dispatch"}</dd></div>}
+      {detail.dispatchReason && <div><dt>Dispatch reason</dt><dd>{detail.dispatchReason}</dd></div>}
       {detail.earlierRejectedAttempts !== undefined && <div><dt>Earlier rejected attempts</dt><dd>{detail.earlierRejectedAttempts}</dd></div>}
       {detail.exhausted !== undefined && <div><dt>Retries exhausted</dt><dd>{detail.exhausted ? "Yes" : "No"}</dd></div>}
     </dl>
@@ -695,7 +709,7 @@ function StepActionDetailView({ detail }: { detail: StepActionDetail }) {
     {detail.kind === "validated" && <p className="trace-step-note">The runtime accepted this action for execution. This does not mean the tool ran or succeeded.{detail.proposedSequence !== undefined && <> Proposed action: record {detail.proposedSequence}.</>}</p>}
     {detail.kind === "rejected" && <div className="trace-action-rejection">
       <p><strong>Reason:</strong> {detail.reason}</p>
-      <p className="trace-step-note">The runtime rejected this proposal before execution. A later record may contain the planner's corrected action.</p>
+      <p className="trace-step-note">{detail.dispatchOrigin === "framework" ? "The runtime rejected the Framework action before execution." : "The runtime rejected this proposal before execution. A later record may contain the model's corrected action."}</p>
       {detail.rawResponse && <><h5>Model response excerpt</h5><pre>{detail.rawResponse}</pre></>}
     </div>}
   </>;
@@ -1178,8 +1192,12 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
                       <div><dt>Step</dt><dd>{stepEntry.detail.stepNumber}</dd></div>
                       <div><dt>Ready tasks</dt><dd>{stepEntry.detail.readyTasks}</dd></div>
                       <div><dt>Plan status</dt><dd>{stepEntry.detail.planStatus.toLowerCase().replaceAll("_", " ")}</dd></div>
+                      {stepEntry.detail.taskId && <div><dt>Assigned task</dt><dd>{stepEntry.detail.taskId}</dd></div>}
+                      {stepEntry.detail.toolName && <div><dt>Capability</dt><dd>{stepEntry.detail.toolName}</dd></div>}
+                      {stepEntry.detail.dispatchOrigin && <div><dt>Dispatch</dt><dd>{stepEntry.detail.dispatchOrigin === "framework" ? "Framework dispatch" : "Model dispatch"}</dd></div>}
+                      {stepEntry.detail.dispatchReason && <div><dt>Dispatch reason</dt><dd>{stepEntry.detail.dispatchReason}</dd></div>}
                     </dl>
-                    <p className="trace-step-note">No task or action has been selected yet. That decision is recorded by the later STEP_ACTION_PROPOSED record.</p>
+                    <p className="trace-step-note">{stepEntry.detail.taskId ? "The accepted plan selected this assignment. Dispatch does not mean the capability ran or succeeded." : "Final synthesis follows completion of the accepted tasks."}</p>
                   </>}
                 </div>
               </td>

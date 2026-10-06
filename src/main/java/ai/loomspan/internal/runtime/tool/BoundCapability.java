@@ -40,6 +40,7 @@ public final class BoundCapability
     public String outputSchema() { return metadata.tool().outputSchema(); }
     public String inputSchema() { return inputBindings.isEmpty() ? metadata.tool().inputSchema() : projection.inputSchema(); }
     public SkillInputContract argumentContract() { return projection.argumentContract(); }
+    public ChildInputBindingProjection.DispatchEligibility dispatchEligibility() { return projection.dispatchEligibility(); }
     public List<ChildInputBinding> inputBindings() { return inputBindings; }
     public List<String> validateModelArguments(Map<String, Object> arguments) { return projection.validateModelArguments(arguments); }
 

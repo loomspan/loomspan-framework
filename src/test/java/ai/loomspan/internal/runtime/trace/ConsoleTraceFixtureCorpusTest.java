@@ -756,6 +756,15 @@ class ConsoleTraceFixtureCorpusTest
     {
         assertToolLifecycleFixture("planned-tool-success", "TOOL_CALL_COMPLETED", false, "task-lookup");
         assertToolLifecycleFixture("unplanned-tool-failure", "TOOL_CALL_FAILED", true, null);
+        var direct = parseLines(fixtureRoot().resolve("traces/planned-tool-success.ndjson"));
+        assertThat(direct).noneMatch(record -> record.path("recordType").asText().startsWith("MODEL_")
+                || record.path("recordType").asText().equals("STEP_ACTION_PROPOSED"));
+        assertThat(direct).filteredOn(record -> record.path("recordType").asText().equals("STEP_STARTED"))
+                .singleElement().satisfies(record -> {
+                    assertThat(record.at("/metadata/dispatchOrigin").asText()).isEqualTo("framework");
+                    assertThat(record.at("/metadata/dispatchReason").asText()).isEqualTo("eligible");
+                    assertThat(record.at("/metadata/assignedTaskId").asText()).isEqualTo("task-lookup");
+                });
     }
 
     private static void assertToolLifecycleFixture(
@@ -1662,6 +1671,16 @@ class ConsoleTraceFixtureCorpusTest
         branch.push(root);
         appendFrame(handle, TraceRecordType.FRAME_OPENED, step, CLOCK.instant().plusSeconds(1));
         branch.push(step);
+        if (!fail)
+        {
+            Map<String, Object> dispatch = ordered("stepNumber", 1, "readyTasks", 1,
+                    "assignedTaskId", "task-lookup", "capabilityName", "lookupCustomer",
+                    "dispatchOrigin", "framework", "dispatchReason", "eligible");
+            handle.append(TraceRecordType.STEP_STARTED, step, TraceFrameType.STEP_EXECUTION, dispatch, ordered("planStatus", "VALID"));
+            Map<String, Object> validated = new LinkedHashMap<>(dispatch);
+            validated.put("stepAction", "CALL_TOOL");
+            handle.append(TraceRecordType.STEP_ACTION_VALIDATED, step, TraceFrameType.STEP_EXECUTION, validated, Map.of());
+        }
         appendFrame(handle, TraceRecordType.FRAME_OPENED, tool, CLOCK.instant().plusSeconds(2));
         branch.push(tool);
 

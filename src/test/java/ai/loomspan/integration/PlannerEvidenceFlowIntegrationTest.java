@@ -352,7 +352,9 @@ class PlannerEvidenceFlowIntegrationTest {
             Files.writeString(output.resolve(label + "-sources.json"), JSON.writeValueAsString(sources));
         }
         assertThat(capture.failure.get()).isNull();
-        assertThat(capture.requests).hasSize(expanded ? 15 : 10);
+        // The reflected zero-input Java source is assigned directly; all evidence-bearing model requests remain.
+        assertThat(capture.requests).hasSize(expanded ? 14 : 9);
+        assertThat(capture.requests).noneMatch(request -> request.contains("Exact capability/tool: sourceA"));
         return capture;
     }
 

@@ -76,6 +76,29 @@ journal's established field-name redaction retain their usual policies.
 
 ## Trace identity
 
+### Assigned dispatch observations
+
+STEP_STARTED records the accepted `assignedTaskId`, `capabilityName`,
+`dispatchOrigin` (`framework` or `model`) and bounded `dispatchReason`:
+`eligible`, `unbound_input_remains`, `open_or_unknown_contract`, or
+`unsupported_or_ambiguous_shape`. Consult these authoritative fields instead
+of inferring origin from a missing model frame. They survive binding failures
+before a tool frame exists. Final synthesis is a separate completion step.
+
+Framework dispatch records normal validated action and task/tool terminal facts,
+complete delivered input and binding provenance. It produces no parent model
+frame, proposed model action, request/response, raw response, usage or correction
+for the eliminated interaction. Actual model-backed child frames and usage remain.
+Model-request-specific advisors/hooks see only real sends. Console step/action
+details display the trusted assignment and dispatch; accepted action is not proof
+that the child succeeded. Supported observers retain ordinary task/tool/skill
+lifecycles and contain only actual model events. The existing journal exception
+continues unchanged.
+
+Executable anchors: `StepLoopMissionExecutionEngineTest`,
+`DeclaredChildInputBindingsIntegrationTest`, `ConsoleTraceFixtureCorpusTest`,
+and Console `TraceRecords.step.test.tsx` / `TraceRecords.stepAction.test.tsx`.
+
 `entrySkill` is the exact registered name of the top-level Java, REST, or model-backed YAML skill whose invocation owns the session. Loomspan records it before execution begins, keeps it unchanged across nested skill invocations, and exposes it in Trace Catalog and Trace Detail without requiring artifact acquisition. It is a recorded fact: it does not prove that the skill is still registered or that it is more important than nested work.
 
 `TRACE_STARTED.metadata.generationId` records the complete skill and execution-configuration generation captured by the root. Live execution and finalized trace diagnostics carry the same process-local ID, including when old work finishes after a newer publication. Its trace persistence and run-start limit snapshot come from that captured generation. Use the ID to distinguish which complete version a current execution used, not as a durable content hash, chronological ordering, or historical catalog key. See [the application reload contract](../java-api/skill-reload.md).

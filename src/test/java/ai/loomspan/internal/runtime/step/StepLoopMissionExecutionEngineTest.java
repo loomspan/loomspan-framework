@@ -97,7 +97,69 @@ import static org.mockito.Mockito.when;
 
 class StepLoopMissionExecutionEngineTest {
 
+    @Test
+    void fullyBoundAssignedTaskSkipsParentDispatchModelInteraction() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var model = new SequenceChatClient("{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
+        var binding = new ChildInputBinding(ObjectFieldPath.parse("/value", false),
+                ChildInputBinding.SourceKind.INPUT, ObjectFieldPath.parse("/source", true), null);
+        var calls = new AtomicInteger();
+        var tool = new BoundCapability(toolWithSchema("invoiceParser",
+                "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}},\"required\":[\"value\"],\"additionalProperties\":false}", "unused").metadata(),
+                List.of(binding), (arguments, taskId, sources) -> {
+                    assertThat(arguments).isEmpty();
+                    assertThat(taskId).isEqualTo("t-1");
+                    calls.incrementAndGet();
+                    return "exact child result";
+                });
+        var session = TestLoomspanSessions.withId("direct-dispatch", "entry", 3);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
+                    session, definition(), "Review source", Map.of("source", "exact"), model, List.of(tool))).isEqualTo("Finished");
+        }
+        assertThat(calls).hasValue(1);
+        assertThat(model.systemMessagesSeen()).hasSize(1).allSatisfy(prompt -> assertThat(prompt).doesNotContain("--- ASSIGNED TASK ---"));
+        assertThat(readRecords(session)).noneMatch(record -> "rootVisibleSkill#step-1-model".equals(record.route())
+                || "rootVisibleSkill#step-1".equals(record.route()) && record.recordType() == TraceRecordType.STEP_ACTION_PROPOSED);
+        assertThat(readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.STEP_STARTED))
+                .anySatisfy(record -> assertThat(record.metadata()).containsEntry("dispatchOrigin", "framework")
+                        .containsEntry("dispatchReason", "eligible").containsEntry("assignedTaskId", "t-1"));
+    }
+
     private static final String BLOCK_UNTIL_INTERRUPTED = "__block_until_interrupted__";
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void directDispatchRechecksCancellationAndInterruptionAfterValidationBeforeInvocation(boolean cancel) {
+        var sideEffects = new AtomicInteger();
+        var reachedBoundary = new AtomicBoolean();
+        var state = new DefaultExecutionStateService(FIXED_CLOCK) {
+            @Override public void recordStepEvent(LoomspanSession session, ai.loomspan.internal.core.ExecutionFrame frame,
+                    TraceRecordType type, Map<String, Object> metadata, Object payload) {
+                super.recordStepEvent(session, frame, type, metadata, payload);
+                if (type == TraceRecordType.STEP_ACTION_VALIDATED && "framework".equals(metadata.get("dispatchOrigin"))) {
+                    reachedBoundary.set(true);
+                    if (cancel) {
+                        var binding = ExecutionBindingScope.requireCurrent();
+                        var failure = new IllegalStateException("cancel at dispatch boundary");
+                        binding.requireMission().lifecycle().beginCancellation(binding, failure,
+                                () -> recordFailure(session, failure, Map.of("message", failure.getMessage())), false);
+                    } else Thread.currentThread().interrupt();
+                }
+            }
+        };
+        var tool = new BoundCapability(directTool("invoiceParser", "unused").metadata(), List.of(),
+                (arguments, taskId, sources) -> { sideEffects.incrementAndGet(); return "unexpected"; });
+        var session = TestLoomspanSessions.withId("direct-boundary-" + cancel, "entry", 3);
+        var model = new SequenceChatClient();
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
+                    session, definition(), model, List.of(tool))).isInstanceOf(RuntimeException.class);
+        }
+        assertThat(reachedBoundary).isTrue();
+        assertThat(sideEffects).hasValue(0);
+        assertThat(model.systemMessagesSeen()).isEmpty();
+    }
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-03-15T12:00:00Z"), ZoneOffset.UTC);
     private static final EffectiveSkillExecutionConfiguration EXECUTION_CONFIGURATION =
             new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
@@ -192,14 +254,14 @@ class StepLoopMissionExecutionEngineTest {
         AtomicInteger later = new AtomicInteger();
         AtomicReference<String> unexpectedFinal = new AtomicReference<>();
         var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser", "t-2", "expenseLookup", "t-3", "optional"), unexpectedFinal);
-        var selected = tool("invoiceParser", "x".repeat(8000) + " selected");
+        var selected = directTool("invoiceParser", "x".repeat(8000) + " selected");
         var sibling = new BoundCapability(tool("expenseLookup", "unused").metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> {
             siblingStarted.countDown();
             try { assertThat(release.await(3, TimeUnit.SECONDS)).isTrue(); }
             catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
             return "sibling";
         });
-        var optional = new BoundCapability(tool("optional", "unused").metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> { later.incrementAndGet(); return "optional"; });
+        var optional = new BoundCapability(directTool("optional", "unused").metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> { later.incrementAndGet(); return "optional"; });
         var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("join-forward", "rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor(); ExecutorService caller = Executors.newSingleThreadExecutor()) {
             Future<String> result = caller.submit(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
@@ -363,11 +425,11 @@ class StepLoopMissionExecutionEngineTest {
             catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
             return "sibling";
         });
-        var optional = new BoundCapability(tool("optional", "unused").metadata(), List.of(), (arguments, taskId, sources) -> { later.incrementAndGet(); return "later"; });
+        var optional = new BoundCapability(directTool("optional", "unused").metadata(), List.of(), (arguments, taskId, sources) -> { later.incrementAndGet(); return "later"; });
         var session = TestLoomspanSessions.withId("join-assembly", "rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor(); ExecutorService caller = Executors.newSingleThreadExecutor()) {
             Future<String> result = caller.submit(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
-                    session, definition, model, List.of(tool("invoiceParser", "exact answer"), sibling, optional)));
+                    session, definition, model, List.of(directTool("invoiceParser", "exact answer"), sibling, optional)));
             try {
                 assertThat(held.await(5, TimeUnit.SECONDS)).isTrue();
                 assertThat(result.isDone()).isFalse(); assertThat(later).hasValue(0);
@@ -2105,7 +2167,7 @@ class StepLoopMissionExecutionEngineTest {
                 "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
         CountDownLatch capabilityStarted = new CountDownLatch(1);
         AtomicBoolean interrupted = new AtomicBoolean();
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability capability = new BoundCapability(directTool("invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     capabilityStarted.countDown();
                     try
@@ -2132,7 +2194,7 @@ class StepLoopMissionExecutionEngineTest {
 
         assertThat(capabilityStarted.getCount()).isZero();
         assertThat(interrupted).isTrue();
-        assertThat(model.systemMessagesSeen()).hasSize(1);
+        assertThat(model.systemMessagesSeen()).isEmpty();
     }
 
     @Test
@@ -2143,7 +2205,7 @@ class StepLoopMissionExecutionEngineTest {
         SequenceChatClient model = new SequenceChatClient(
                 "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
         AtomicBoolean interrupted = new AtomicBoolean();
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability capability = new BoundCapability(directTool("invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     try
                     {
@@ -2169,7 +2231,7 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(interrupted).isTrue();
-        assertThat(model.systemMessagesSeen()).hasSize(1);
+        assertThat(model.systemMessagesSeen()).isEmpty();
         assertThat(readRecords(session).stream()
                 .filter(record -> record.recordType() == TraceRecordType.ERROR_RECORDED))
                 .singleElement()
@@ -2194,7 +2256,7 @@ class StepLoopMissionExecutionEngineTest {
             StepLoopMissionExecutionEngine engine = engine(
                     stateService, planningService, missionExecutor, definition, Duration.ofMillis(250));
             assertThatThrownBy(() -> executeMission(engine, session, definition, model,
-                    List.of(tool("invoiceParser", "unused"))))
+                    List.of(directTool("invoiceParser", "unused"))))
                     .isInstanceOf(LoomspanMissionTimeoutException.class);
             assertThat(missionExecutor.firstGroupMemberSubmitted()).isTrue();
             assertThat(missionExecutor.submissions()).isEqualTo(2);
@@ -2224,7 +2286,7 @@ class StepLoopMissionExecutionEngineTest {
 
             assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding,
                     () -> executeMission(engine, session, definition, model,
-                            List.of(tool("invoiceParser", "completed-before-rejection")))))
+                            List.of(directTool("invoiceParser", "completed-before-rejection")))))
                     .isSameAs(rejection);
             assertThat(missionExecutor.submissions()).isEqualTo(3);
         }
@@ -2271,7 +2333,7 @@ class StepLoopMissionExecutionEngineTest {
         CountDownLatch bothStarted = new CountDownLatch(2);
         AtomicInteger invocations = new AtomicInteger();
         Set<Object> workerBranches = ConcurrentHashMap.newKeySet();
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability capability = new BoundCapability(directTool("invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     invocations.incrementAndGet();
                     workerBranches.add(ExecutionBindingScope.requireCurrent().branch());
@@ -3346,6 +3408,10 @@ class StepLoopMissionExecutionEngineTest {
         }
         return new ExecutionPlan(planId, "rootVisibleSkill", Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID, tasks);
+    }
+
+    private static BoundCapability directTool(String name, String result) {
+        return toolWithSchema(name, "{\"type\":\"object\",\"additionalProperties\":false}", result);
     }
 
     private static BoundCapability tool(String name, String result) {

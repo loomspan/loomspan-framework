@@ -48,11 +48,11 @@ function renderStep() {
 
 beforeEach(() => getRawRecordRangeMock.mockReset());
 
-test("shows authoritative step-start facts without attributing a future task", async () => {
+test("shows authoritative assigned Framework dispatch without a model frame", async () => {
   getRawRecordRangeMock.mockResolvedValue(range(JSON.stringify({
     recordType: "STEP_STARTED",
     route: "handleBilling#step-1",
-    metadata: { stepNumber: 1, readyTasks: 3 },
+    metadata: { stepNumber: 1, readyTasks: 3, assignedTaskId: "<task>", capabilityName: "lookup", dispatchOrigin: "framework", dispatchReason: "eligible" },
     data: { planStatus: "VALID" },
   })));
   renderStep();
@@ -65,8 +65,12 @@ test("shows authoritative step-start facts without attributing a future task", a
   expect(within(details).getByText("3")).toBeVisible();
   expect(details).toHaveTextContent("Plan status");
   expect(details).toHaveTextContent("valid");
-  expect(details).toHaveTextContent("No task or action has been selected yet");
-  expect(details).toHaveTextContent("STEP_ACTION_PROPOSED");
+  expect(details).toHaveTextContent("<task>");
+  expect(details).toHaveTextContent("lookup");
+  expect(details).toHaveTextContent("Framework dispatch");
+  expect(details).toHaveTextContent("eligible");
+  expect(details).toHaveTextContent("accepted plan selected this assignment");
+  expect(details.querySelector("task")).toBeNull();
   expect(getRawRecordRangeMock).toHaveBeenCalledWith("trace-1", 88, undefined, "TARGET");
 });
 

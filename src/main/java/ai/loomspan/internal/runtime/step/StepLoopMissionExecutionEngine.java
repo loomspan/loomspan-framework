@@ -820,6 +820,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         if (assignment != null)
         {
             metadata.put("assignedTaskId", assignment.task().taskId());
+            metadata.put("capabilityName", assignment.task().capabilityName());
             metadata.put("effectiveConcurrency", assignment.effectiveConcurrency());
             if (assignment.task().parallelGroup() != null)
             {
@@ -854,6 +855,15 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
     {
         boolean finalResponseOnly = assignment == null;
         Map<String, Object> trustedIdentity = trustedStepIdentity(plan, assignment, stepNumber);
+        var eligibility = assignment == null ? null : visibleTools.stream()
+                .filter(tool -> tool != null && tool.name().equals(assignment.task().capabilityName()))
+                .findFirst().map(BoundCapability::dispatchEligibility).orElse(null);
+        boolean frameworkDispatch = eligibility != null && eligibility.eligible();
+        if (assignment != null)
+        {
+            trustedIdentity = mergeMetadata(trustedIdentity, Map.of("dispatchOrigin", frameworkDispatch ? "framework" : "model",
+                    "dispatchReason", eligibility == null ? "open_or_unknown_contract" : eligibility.reason()));
+        }
         ExecutionFrame stepFrame = executionStateService.openFrame(
                 session,
                 TraceFrameType.STEP_EXECUTION,
@@ -870,6 +880,21 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         boolean forceVerboseToolArgumentGuidance = false;
         try
         {
+            if (frameworkDispatch)
+            {
+                lastAction = StepAction.callTool(assignment.task().taskId(), assignment.task().capabilityName(), Map.of());
+                var validation = StepActionValidator.validateAssigned(lastAction, plan, assignment.task(), visibleTools);
+                if (!validation.valid())
+                {
+                    executionStateService.recordStepEvent(session, stepFrame, TraceRecordType.STEP_ACTION_REJECTED,
+                            mergeMetadata(trustedIdentity, Map.of("reason", validation.rejectionReason())), Map.of("stepAction", "CALL_TOOL"));
+                    throw new IllegalStateException("Framework dispatch validation failed: " + validation.rejectionReason());
+                }
+                executionStateService.recordStepEvent(session, stepFrame, TraceRecordType.STEP_ACTION_VALIDATED,
+                        mergeMetadata(trustedIdentity, Map.of("stepAction", "CALL_TOOL")), Map.of());
+                return invokeAssignedAction(session, lastAction, visibleTools, plan, assignment, lifecycle,
+                        stepFrame, stepNumber, trustedIdentity, completedTaskResults);
+            }
             int invalidActionRetryCount = 0;
             int linterAttempt = 1;
             int outputSchemaAttempt = 1;
@@ -992,7 +1017,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
 
                 return switch (action.stepAction())
                 {
-                    case CALL_TOOL -> executeToolAction(session, action, visibleTools, stepFrame, stepNumber, trustedIdentity, completedTaskResults);
+                    case CALL_TOOL -> invokeAssignedAction(session, action, visibleTools, plan, assignment, lifecycle,
+                            stepFrame, stepNumber, trustedIdentity, completedTaskResults);
                     case FINAL_RESPONSE -> {
                         String finalResponse = assembledResponse == null ? serializeFinalResponse(action.finalResponse()) : assembledResponse;
                         executionStateService.recordStepEvent(session, stepFrame, TraceRecordType.STEP_COMPLETED,
@@ -1091,6 +1117,17 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         payload.put("attachmentCount", renderedInput.attachments().size());
         payload.putAll(promptTraceMetadata);
         return Map.copyOf(payload);
+    }
+
+    private StepResult invokeAssignedAction(LoomspanSession session, StepAction action, List<BoundCapability> visibleTools,
+            ExecutionPlan plan, AssignedTaskExecution assignment, MissionLifecycle lifecycle, ExecutionFrame stepFrame,
+            int stepNumber, Map<String, Object> trustedIdentity, List<CompletedTaskResult> sourceResults)
+    {
+        lifecycle.requireOpenForNewWork(ExecutionBindingScope.requireCurrent());
+        if (Thread.currentThread().isInterrupted()) throw new IllegalStateException("Assigned task invocation interrupted.");
+        var validation = StepActionValidator.validateAssigned(action, plan, assignment.task(), visibleTools);
+        if (!validation.valid()) throw new IllegalStateException("Assigned task is no longer executable: " + validation.rejectionReason());
+        return executeToolAction(session, action, visibleTools, stepFrame, stepNumber, trustedIdentity, sourceResults);
     }
 
     private StepResult executeToolAction(LoomspanSession session,

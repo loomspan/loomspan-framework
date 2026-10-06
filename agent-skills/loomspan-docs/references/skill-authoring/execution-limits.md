@@ -33,6 +33,14 @@ loomspan:
     persistence: ONERROR # NEVER, ONERROR, or ALWAYS
 ```
 
+[Automatic assigned dispatch](input-bindings.md#automatic-assigned-dispatch)
+removes only eligible parent model calls and their physical provider attempts.
+Actual planning, child reasoning, final synthesis and provider retries still
+consume their configured budgets. Each accepted task still consumes its step
+slot, tool invocation and applicable skill/depth budgets. Request-specific hooks
+run only for actual model requests; independent authorization, lifecycle and
+application approval checks still apply before side effects.
+
 ## Application shutdown
 
 `loomspan.shutdown.timeout` defaults to `30s` and must be positive. When the owning

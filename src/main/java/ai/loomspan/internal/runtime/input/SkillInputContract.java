@@ -18,7 +18,7 @@ public record SkillInputContract(
     {
         return new SkillInputContract(
                 SkillInputContractKind.GENERIC,
-                new SkillInputSchemaNode("object", Map.of(), List.of(), Boolean.TRUE, null, null, List.of(), null, null, false));
+                new SkillInputSchemaNode("object", Map.of(), List.of(), Boolean.TRUE, null, null, List.of(), null, null, false, true));
     }
 
     public boolean isGeneric()

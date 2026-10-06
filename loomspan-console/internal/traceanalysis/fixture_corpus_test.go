@@ -581,6 +581,34 @@ func TestProcessorPublishesOnlyValidatedTraceStartedEntrySkill(t *testing.T) {
 	}
 }
 
+func TestFrameworkDispatchFixtureKeepsAuthoritativeRawEvidenceWithoutModelCall(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(fixtureRoot(t), "traces", "planned-tool-success.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, line := range bytes.Split(bytes.TrimSpace(raw), []byte("\n")) {
+		var record map[string]any
+		if err := json.Unmarshal(line, &record); err != nil {
+			t.Fatal(err)
+		}
+		kind := record["recordType"].(string)
+		if strings.HasPrefix(kind, "MODEL_") || kind == "STEP_ACTION_PROPOSED" {
+			t.Fatalf("invented model evidence: %s", kind)
+		}
+		if kind == "STEP_STARTED" {
+			metadata := record["metadata"].(map[string]any)
+			if metadata["dispatchOrigin"] != "framework" || metadata["dispatchReason"] != "eligible" || metadata["assignedTaskId"] != "task-lookup" || metadata["capabilityName"] != "lookupCustomer" {
+				t.Fatalf("dispatch identity: %#v", metadata)
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("missing direct step")
+	}
+}
+
 func TestToolLifecycleFixturesExposeOneCanonicalStartAndTerminalRecord(t *testing.T) {
 	root := fixtureRoot(t)
 	cases := []struct {

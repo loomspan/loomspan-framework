@@ -11,14 +11,39 @@ import java.util.Map;
 public final class ChildInputBindingProjection {
     private final List<ChildInputBinding> bindings;
     private final SkillInputContract argumentContract;
+    private final DispatchEligibility dispatchEligibility;
     public ChildInputBindingProjection(SkillInputContract receivingContract, List<ChildInputBinding> bindings) {
         this.bindings = List.copyOf(bindings);
         this.argumentContract = bindings.isEmpty() ? receivingContract : new SkillInputContract(
                 SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
                 project(receivingContract.schema(), bindings.stream().map(b -> b.destination().tokens()).toList()));
+        this.dispatchEligibility = proveDispatch(receivingContract);
     }
     public SkillInputContract argumentContract() { return argumentContract; }
     public List<ChildInputBinding> bindings() { return bindings; }
+    public DispatchEligibility dispatchEligibility() { return dispatchEligibility; }
+    public record DispatchEligibility(boolean eligible, String reason) {}
+    private DispatchEligibility proveDispatch(SkillInputContract receiving) {
+        var root = receiving.schema();
+        if (!supportedTree(root) || bindings.stream().anyMatch(binding -> binding.destination().tokens().size() != 1))
+            return new DispatchEligibility(false, "unsupported_or_ambiguous_shape");
+        if (receiving.isGeneric() || !root.isObject() || root.allowsAdditionalProperties())
+            return new DispatchEligibility(false, "open_or_unknown_contract");
+        if (root.runtimeRefCapable() || root.isAttachment())
+            return new DispatchEligibility(false, "unsupported_or_ambiguous_shape");
+        var projected = argumentContract.schema();
+        if (!projected.properties().isEmpty() || !projected.required().isEmpty())
+            return new DispatchEligibility(false, "unbound_input_remains");
+        if (!new SkillInputValidator().validate(Map.of(), argumentContract).valid() || !validateModelArguments(Map.of()).isEmpty())
+            return new DispatchEligibility(false, "unsupported_or_ambiguous_shape");
+        return new DispatchEligibility(true, "eligible");
+    }
+    private static boolean supportedTree(SkillInputSchemaNode node) {
+        return node.dispatchProofSupported() && !node.isUnconstrained()
+                && node.properties().values().stream().allMatch(ChildInputBindingProjection::supportedTree)
+                && (node.items() == null || supportedTree(node.items()))
+                && (node.additionalPropertiesSchema() == null || supportedTree(node.additionalPropertiesSchema()));
+    }
     public String inputSchema() {
         var mapper = LoomspanJacksonCodecs.defaults().schemaTree();
         var resolver = new SkillInputContractResolver(mapper);
@@ -73,6 +98,6 @@ public final class ChildInputBindingProjection {
         }
         return new SkillInputSchemaNode(node.isUnconstrained() ? "object" : node.type(), properties, List.copyOf(required),
                 node.additionalProperties(), node.additionalPropertiesSchema(), node.items(), node.enumValues(),
-                node.description(), node.format(), node.runtimeRefCapable(), node.attachment(), node.attachmentMediaType(), node.allowedContentTypes());
+                node.description(), node.format(), node.runtimeRefCapable(), node.attachment(), node.attachmentMediaType(), node.allowedContentTypes(), node.dispatchProofSupported());
     }
 }

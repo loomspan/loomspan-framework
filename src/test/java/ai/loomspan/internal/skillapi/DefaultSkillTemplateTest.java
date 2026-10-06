@@ -503,14 +503,14 @@ class DefaultSkillTemplateTest {
                         SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
                         new SkillInputSchemaNode(
                                 "object",
-                                Map.of("payload", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false)),
+                                Map.of("payload", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
                                 List.of("payload"),
                                 Boolean.FALSE,
                                 null,
                                 List.of(),
                                 null,
                                 null,
-                                false)),
+                                false, true)),
                 null);
         registry.register("invoiceParser", yamlSkill);
         when(router.execute(eq(yamlSkill), eq(Map.of("payload", "hello")), any(), eq(null))).thenReturn("\"ok\"");
@@ -609,14 +609,14 @@ class DefaultSkillTemplateTest {
                         SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
                         new SkillInputSchemaNode(
                                 "object",
-                                Map.of("payload", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false)),
+                                Map.of("payload", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
                                 List.of("payload"),
                                 Boolean.FALSE,
                                 null,
                                 List.of(),
                                 null,
                                 null,
-                                false)),
+                                false, true)),
                 null);
     }
 

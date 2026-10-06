@@ -65,6 +65,22 @@ beforeEach(() => {
   getTraceRecordsMock.mockReset();
 });
 
+test("shows a Framework validated action directly without inventing a proposal", async () => {
+  getRawRecordRangeMock.mockResolvedValue(range({
+    metadata: { stepAction: "CALL_TOOL", assignedTaskId: "<assigned>", capabilityName: "write", dispatchOrigin: "framework", dispatchReason: "eligible" },
+    data: {},
+  }));
+  renderRecord(record(95, "STEP_ACTION_VALIDATED"));
+  const details = await screen.findByRole("region", { name: "Action details for record 95" });
+  expect(details).toHaveTextContent("Framework dispatch");
+  expect(details).toHaveTextContent("eligible");
+  expect(details).toHaveTextContent("<assigned>");
+  expect(details).toHaveTextContent("write");
+  expect(details).not.toHaveTextContent("Proposed action");
+  expect(details.querySelector("assigned")).toBeNull();
+  expect(getTraceRecordsMock).not.toHaveBeenCalled();
+});
+
 test("shows the proposed task and tool without claiming execution", async () => {
   getRawRecordRangeMock.mockResolvedValueOnce(range({
     metadata: { taskId: "task-lookup-customer", stepAction: "CALL_TOOL", toolName: "lookupCustomer" },

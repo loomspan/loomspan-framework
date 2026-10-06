@@ -206,8 +206,8 @@ class SkillGenerationExecutionIntegrationTest
                 SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
                 new SkillInputSchemaNode("object",
                         Map.of(requiredField, new SkillInputSchemaNode("string", Map.of(), List.of(), null,
-                                null, List.of(), null, null, false)),
-                        List.of(requiredField), Boolean.FALSE, null, List.of(), null, null, false));
+                                null, List.of(), null, null, false, true)),
+                        List.of(requiredField), Boolean.FALSE, null, List.of(), null, null, false, true));
         return new CapabilityMetadata(id, "invoiceParser", "Invoice parser",
                 SkillExecutionDescriptor.none(), policy, arguments -> "unused", CapabilityKind.JAVA_SKILL,
                 CapabilityToolDescriptor.generic("invoiceParser", "Invoice parser"), input, null);

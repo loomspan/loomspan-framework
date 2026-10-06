@@ -157,26 +157,26 @@ class SkillInputValidatorTest {
                 new SkillInputSchemaNode(
                         "object",
                         Map.of(
-                                "payload", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false),
-                                "count", new SkillInputSchemaNode("integer", Map.of(), List.of(), null, null, List.of(), null, null, false),
-                                "mode", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of("A", "B"), null, null, false),
+                                "payload", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false, true),
+                                "count", new SkillInputSchemaNode("integer", Map.of(), List.of(), null, null, List.of(), null, null, false, true),
+                                "mode", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of("A", "B"), null, null, false, true),
                                 "options", new SkillInputSchemaNode(
                                         "object",
-                                        Map.of("enabled", new SkillInputSchemaNode("boolean", Map.of(), List.of(), null, null, List.of(), null, null, false)),
+                                        Map.of("enabled", new SkillInputSchemaNode("boolean", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
                                         List.of("enabled"),
                                         Boolean.FALSE,
                                         null,
                                         List.of(),
                                         null,
                                         null,
-                                        false)),
+                                        false, true)),
                         List.of("payload", "options"),
                         Boolean.FALSE,
                         null,
                         List.of(),
                         null,
                         null,
-                        false));
+                        false, true));
 
         SkillInputValidationResult result = validator.validate(Map.of(
                 "payload", "hello",
@@ -197,14 +197,14 @@ class SkillInputValidatorTest {
                 SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
                 new SkillInputSchemaNode(
                         "object",
-                        Map.of("invoiceDate", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, "date", false)),
+                        Map.of("invoiceDate", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, "date", false, true)),
                         List.of("invoiceDate"),
                         Boolean.FALSE,
                         null,
                         List.of(),
                         null,
                         null,
-                        false));
+                        false, true));
 
         SkillInputValidationResult accepted = validator.validate(Map.of("invoiceDate", "3/30/2026"), contract);
         SkillInputValidationResult rejected = validator.validate(Map.of("invoiceDate", "2026-03-30T10:15:00"), contract);
@@ -229,14 +229,14 @@ class SkillInputValidatorTest {
                 SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
                 new SkillInputSchemaNode(
                         "object",
-                        Map.of("optionalField", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false)),
+                        Map.of("optionalField", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
                         List.of(),
                         Boolean.TRUE,
                         null,
                         List.of(),
                         null,
                         null,
-                        false));
+                        false, true));
 
         java.util.LinkedHashMap<String, Object> input = new java.util.LinkedHashMap<>();
         input.put("optionalField", null);
@@ -263,14 +263,14 @@ class SkillInputValidatorTest {
                                 List.of(),
                                 "Provide a ref:// URI for binary content or an inline string value when appropriate.",
                                 null,
-                                true)),
+                                true, true)),
                         List.of("payload"),
                         Boolean.FALSE,
                         null,
                         List.of(),
                         null,
                         null,
-                        false));
+                        false, true));
 
         SkillInputValidationResult result = validator.validate(
                 Map.of("payload", new ByteArrayResource(new byte[]{1, 2, 3})),
@@ -295,14 +295,14 @@ class SkillInputValidatorTest {
                                 List.of(),
                                 "This help text mentions ref:// but is not a runtime binding contract.",
                                 null,
-                                false)),
+                                false, true)),
                         List.of("payload"),
                         Boolean.FALSE,
                         null,
                         List.of(),
                         null,
                         null,
-                        false));
+                        false, true));
 
         SkillInputValidationResult result = validator.validate(
                 Map.of("payload", new ByteArrayResource(new byte[]{1, 2, 3})),
@@ -323,19 +323,19 @@ class SkillInputValidatorTest {
                                 Map.of(),
                                 List.of(),
                                 null,
-                                new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false),
+                                new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false, true),
                                 null,
                                 List.of(),
                                 null,
                                 null,
-                                false)),
+                                false, true)),
                         List.of("payload"),
                         Boolean.FALSE,
                         null,
                         List.of(),
                         null,
                         null,
-                        false));
+                        false, true));
 
         LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("vendor", "Acme");
@@ -355,14 +355,14 @@ class SkillInputValidatorTest {
                 SkillInputContract.SkillInputContractKind.JAVA_REFLECTED,
                 new SkillInputSchemaNode(
                         "object",
-                        Map.of("count", new SkillInputSchemaNode("integer", Map.of(), List.of(), null, null, List.of(), null, null, false)),
+                        Map.of("count", new SkillInputSchemaNode("integer", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
                         List.of("count"),
                         Boolean.FALSE,
                         null,
                         List.of(),
                         null,
                         null,
-                        false));
+                        false, true));
 
         SkillInputValidationResult result = validator.validate(Map.of("count", "5000000000"), contract);
 
@@ -376,14 +376,14 @@ class SkillInputValidatorTest {
                 SkillInputContract.SkillInputContractKind.JAVA_REFLECTED,
                 new SkillInputSchemaNode(
                         "object",
-                        Map.of("values", new SkillInputSchemaNode("array", Map.of(), List.of(), null, null, List.of(), null, null, false)),
+                        Map.of("values", new SkillInputSchemaNode("array", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
                         List.of("values"),
                         Boolean.FALSE,
                         null,
                         List.of(),
                         null,
                         null,
-                        false));
+                        false, true));
 
         SkillInputValidationResult result = validator.validate(Map.of("values", List.of("alpha", 2, true)), contract);
 
@@ -410,14 +410,14 @@ class SkillInputValidatorTest {
                                 false,
                                 true,
                                 "image",
-                                List.of("image/jpeg"))),
+                                List.of("image/jpeg"), true)),
                         List.of("image"),
                         Boolean.FALSE,
                         null,
                         List.of(),
                         null,
                         null,
-                        false));
+                        false, true));
 
         Resource resource = new ByteArrayResource(new byte[]{1, 2, 3});
         assertThat(validator.validate(Map.of("image", "ref://forms/ticket.jpg"), contract).valid()).isTrue();
@@ -490,7 +490,7 @@ class SkillInputValidatorTest {
         return new SkillInputContract(
                 SkillInputContract.SkillInputContractKind.JAVA_REFLECTED,
                 new SkillInputSchemaNode("object", Map.of("value", child), List.of(), Boolean.FALSE,
-                        null, List.of(), null, null, false));
+                        null, List.of(), null, null, false, true));
     }
 
     private SkillInputSchemaNode anyNode()
@@ -500,6 +500,6 @@ class SkillInputValidatorTest {
 
     private SkillInputSchemaNode node(String type)
     {
-        return new SkillInputSchemaNode(type, Map.of(), List.of(), null, null, List.of(), null, null, false);
+        return new SkillInputSchemaNode(type, Map.of(), List.of(), null, null, List.of(), null, null, false, true);
     }
 }

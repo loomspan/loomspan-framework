@@ -95,7 +95,7 @@ public class SkillInputContractResolver
                 false,
                 "attachment".equals(manifest.getType()),
                 manifest.getMediaType(),
-                manifest.getAllowedContentTypes());
+                manifest.getAllowedContentTypes(), true);
     }
 
     public SkillInputSchemaNode fromJsonSchema(String inputSchema)
@@ -188,7 +188,32 @@ public class SkillInputContractResolver
                 runtimeRefCapable,
                 attachment,
                 attachmentMediaType,
-                allowedContentTypes);
+                allowedContentTypes, proofSupported(schema));
+    }
+
+    /** Retain raw-schema uncertainty before the ordinary typed resolver discards keywords. */
+    private boolean proofSupported(JsonNode schema)
+    {
+        if (!schema.isObject()) return false;
+        var vocabulary = java.util.Set.of("type", "properties", "required", "additionalProperties", "items", "enum",
+                "description", "title", "$schema", "format", "x-loomspan-runtime-ref-capable", "x-loomspan-attachment",
+                "x-loomspan-media-type", "x-loomspan-allowed-content-types");
+        for (var field : schema.properties())
+        {
+            if (!vocabulary.contains(field.getKey())) return false;
+            JsonNode value = field.getValue();
+            switch (field.getKey())
+            {
+                case "type" -> { if (!value.isTextual() || !java.util.Set.of("object", "array", "string", "integer", "number", "boolean", "attachment").contains(value.asText())) return false; }
+                case "properties" -> { if (!value.isObject()) return false; for (var child : value.properties()) if (!proofSupported(child.getValue())) return false; }
+                case "items" -> { if (!proofSupported(value)) return false; }
+                case "additionalProperties" -> { if (!value.isBoolean() && !proofSupported(value)) return false; }
+                case "required", "enum", "x-loomspan-allowed-content-types" -> { if (!value.isArray()) return false; for (var element : value) if (!element.isTextual()) return false; }
+                case "x-loomspan-runtime-ref-capable", "x-loomspan-attachment" -> { if (!value.isBoolean()) return false; }
+                default -> { if (!value.isTextual()) return false; }
+            }
+        }
+        return true;
     }
 
     private Map<String, Object> toJsonSchemaNode(SkillInputSchemaNode schema)
