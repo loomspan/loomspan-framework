@@ -24,7 +24,7 @@ public class SkillInputPromptRenderer
                 && contract.schema().additionalPropertiesSchema() == null
                 && !contract.schema().allowsAdditionalProperties())
         {
-            StringBuilder builder = new StringBuilder("{}\n(Note: This tool takes no arguments. You must pass an empty object.)");
+            StringBuilder builder = new StringBuilder("{}\n(This closed argument object has no declared fields. You must pass an empty object.)");
             appendDescriptions(builder, contract.schema());
             return builder.toString();
         }

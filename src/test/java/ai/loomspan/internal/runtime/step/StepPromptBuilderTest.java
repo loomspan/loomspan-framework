@@ -9,6 +9,7 @@ import ai.loomspan.internal.core.PlanTaskStatus;
 import ai.loomspan.internal.runtime.tool.BoundCapability;
 import ai.loomspan.internal.runtime.input.ChildInputBinding;
 import ai.loomspan.internal.runtime.input.ObjectFieldPath;
+import ai.loomspan.internal.runtime.input.SkillInputValidator;
 
 import ai.loomspan.internal.skill.YamlSkillManifest;
 import org.junit.jupiter.api.Test;
@@ -73,9 +74,127 @@ class StepPromptBuilderTest {
             int end = prompt.indexOf("\n}", start) + 2;
             assertThat(LoomspanJacksonCodecs.defaults().planningJson().readTree(prompt.substring(start, end)).isObject()).isTrue();
             assertThat(prompt.substring(start, end)).doesNotContain("<");
-            assertThat(prompt).contains("illustrative only");
         }
-        assertThat(assigned).contains("required by the assigned tool contract", "include every required argument");
+        assertThat(assigned).contains("Action envelope illustration", "makes no claim that {} satisfies this contract");
+        assertThat(finalPrompt).contains("illustrative only");
+    }
+
+    @Test
+    void contractSpecificGuidanceAgreesWithValidationInNormalAndVerboseVariants() {
+        String full = """
+                {"type":"object","properties":{"caseId":{"type":"string"},"payload":{"type":"string"}},
+                 "required":["caseId","payload"],"additionalProperties":false}
+                """;
+        var partial = boundTool(full, "/caseId");
+        var fullyBound = new BoundCapability(partial.metadata(), List.of(binding("/caseId"), binding("/payload")),
+                (arguments, taskId, sources) -> "unused");
+        var zero = mockTool("invoiceParser", "{\"type\":\"object\",\"additionalProperties\":false}");
+        var retainedZero = mockTool("invoiceParser", "{\"type\":\"object\",\"additionalProperties\":false,\"x-loomspan-runtime-ref-capable\":true}");
+        var optionalPlain = mockTool("invoiceParser", "{\"type\":\"object\",\"properties\":{\"note\":{\"type\":\"string\"}},\"additionalProperties\":false}");
+        var optional = boundTool("""
+                {"type":"object","properties":{"caseId":{"type":"string"},"context":{"type":"object"}},
+                 "required":["caseId"],"additionalProperties":false}
+                """, "/caseId");
+        for (boolean verbose : List.of(false, true)) {
+            assertThat(assignedPrompt(fullyBound, verbose)).contains("Use toolArguments: {} exactly", "Framework supplies all arguments through bindings")
+                    .doesNotContain("This tool takes no arguments", "Replace it with the real arguments");
+            assertThat(assignedPrompt(zero, verbose)).contains("Use toolArguments: {} exactly", "This tool takes no arguments")
+                    .doesNotContain("Framework supplies", "Replace it with the real arguments");
+            assertThat(assignedPrompt(retainedZero, verbose)).contains("Use toolArguments: {} exactly", "This tool takes no arguments")
+                    .doesNotContain("Include optional contributions", "Framework supplies");
+            assertThat(assignedPrompt(optionalPlain, verbose)).contains("toolArguments: {} is valid", "Optional declared fields: [note]")
+                    .doesNotContain("Framework supplies");
+            assertThat(assignedPrompt(optional, verbose)).contains("toolArguments: {} is valid", "Include optional contributions",
+                    "does not override a task instruction", "Additional fields are allowed with any JSON value")
+                    .doesNotContain("candidateReasoning", "Required fields: [caseId]", "Framework supplies all arguments");
+            assertThat(assignedPrompt(partial, verbose)).contains("required unbound arguments at the top level: [\"payload\"]",
+                    "empty argument object is incomplete", "Bound destinations: [/caseId]")
+                    .doesNotContain("toolArguments: {} is valid", "Required fields: [caseId", "\"caseId\": \"<string>\"");
+        }
+        for (var tool : List.of(fullyBound, zero, optional)) {
+            assertThat(new SkillInputValidator().validate(Map.of(), tool.argumentContract()).valid()).isTrue();
+            assertThat(tool.validateModelArguments(Map.of())).isEmpty();
+        }
+        assertThat(new SkillInputValidator().validate(Map.of(), partial.argumentContract()).valid()).isFalse();
+        assertThat(new SkillInputValidator().validate(Map.of("payload", "data"), partial.argumentContract()).valid()).isTrue();
+        assertThat(optional.validateModelArguments(Map.of("caseId", "same"))).isNotEmpty();
+        assertThat(fullyBound.dispatchEligibility().eligible()).isTrue();
+        assertThat(zero.dispatchEligibility().eligible()).isTrue();
+        assertThat(optional.dispatchEligibility().eligible()).isFalse();
+        assertThat(retainedZero.dispatchEligibility().eligible()).isFalse();
+    }
+
+    @Test
+    void nestedOptionalityAndOpenBoundDestinationsKeepTheirExactContractMeaning() {
+        var nested = boundTool("""
+                {"type":"object","properties":{"context":{"type":"object","properties":{
+                 "evidence":{"type":"string"},"notes":{"type":"object","properties":{"reason":{"type":"string"}},
+                 "required":["reason"],"additionalProperties":false}},"required":["evidence"],
+                 "additionalProperties":{"type":"integer"}}},"required":["context"],"additionalProperties":false}
+                """, "/context/evidence");
+        for (boolean verbose : List.of(false, true)) {
+            String prompt = assignedPrompt(nested, verbose);
+            assertThat(prompt).contains("toolArguments: {} is valid", "At `$.context.notes`: Required fields: [reason]",
+                    "Required child fields do not require an optional parent", "Additional fields are allowed; each unlisted field value must be a integer",
+                    "Do not reproduce or override bound destinations, including inside open objects", "Bound destinations: [/context/evidence]");
+            assertThat(prompt).doesNotContain("Required fields: [context]", "Required fields: [notes]", "\"evidence\": \"<string>\"");
+        }
+        var validator = new SkillInputValidator();
+        assertThat(validator.validate(Map.of(), nested.argumentContract()).valid()).isTrue();
+        assertThat(validator.validate(Map.of("context", Map.of("extra", 1)), nested.argumentContract()).valid()).isTrue();
+        assertThat(validator.validate(Map.of("context", Map.of("extra", "bad")), nested.argumentContract()).valid()).isFalse();
+        assertThat(validator.validate(Map.of("context", Map.of("notes", Map.of())), nested.argumentContract()).valid()).isFalse();
+        assertThat(validator.validate(java.util.Collections.singletonMap("context", null), nested.argumentContract()).valid()).isFalse();
+        assertThat(nested.validateModelArguments(Map.of("context", Map.of("evidence", "override")))).isNotEmpty();
+        assertThat(nested.validateModelArguments(Map.of("context", "scalar"))).isNotEmpty();
+    }
+
+    @Test
+    void bindingCreatedOptionalAncestorRequiresItsUnboundRequiredSibling() {
+        var tool = boundTool("""
+                {"type":"object","properties":{"context":{"type":"object","properties":{
+                 "evidence":{"type":"string"},"reason":{"type":"string"}},"required":["evidence","reason"],
+                 "additionalProperties":false}},"additionalProperties":false}
+                """, "/context/evidence");
+        for (boolean verbose : List.of(false, true)) {
+            assertThat(assignedPrompt(tool, verbose)).contains("required unbound arguments at the top level: [\"context\"]",
+                    "At `$.context`: Required fields: [reason]", "empty argument object is incomplete")
+                    .doesNotContain("toolArguments: {} is valid", "Required fields: [evidence");
+        }
+        assertThat(new SkillInputValidator().validate(Map.of(), tool.argumentContract()).valid()).isFalse();
+        assertThat(new SkillInputValidator().validate(Map.of("context", Map.of("reason", "new reasoning")), tool.argumentContract()).valid()).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"type\":\"object\"}",
+            "{\"type\":\"object\",\"additionalProperties\":false,\"minProperties\":1}",
+            "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"anyOf\":[{\"required\":[\"x\"]}]}"})
+    void unknownAndUnsupportedShapesGetNeutralGuidance(String schema) {
+        var tool = mockTool("invoiceParser", schema);
+        for (boolean verbose : List.of(false, true)) {
+            assertThat(assignedPrompt(tool, verbose)).contains("Follow the effective argument contract", "makes no claim that {} satisfies this contract",
+                    "Effective model argument schema: " + schema)
+                    .doesNotContain("toolArguments: {} is valid", "Use toolArguments: {} exactly", "Required fields:", "This tool takes no arguments");
+        }
+    }
+
+    private static ChildInputBinding binding(String destination) {
+        return new ChildInputBinding(ObjectFieldPath.parse(destination, false), ChildInputBinding.SourceKind.INPUT,
+                ObjectFieldPath.parse("/source", true), null);
+    }
+
+    private static BoundCapability boundTool(String schema, String destination) {
+        return new BoundCapability(mockTool("invoiceParser", schema).metadata(), List.of(binding(destination)),
+                (arguments, taskId, sources) -> "unused");
+    }
+
+    private String assignedPrompt(BoundCapability tool, boolean verbose) {
+        String prompt = buildPromptForCurrentMode(createTwoTaskPlan(), "Put useful new reasoning under context.candidateReasoning when requested.",
+                null, 1, List.of(), null, List.of(tool), false, verbose, null);
+        assertThat(prompt).contains("Exact capability/tool: invoiceParser", "\"taskId\": \"t-1\"", "\"stepAction\": \"CALL_TOOL\"", "Return raw JSON only");
+        assertThat(prompt).contains("Put useful new reasoning under context.candidateReasoning when requested.");
+        assertThat(prompt).doesNotContain("The empty toolArguments object is illustrative only", "include every required argument");
+        return prompt.replace("Put useful new reasoning under context.candidateReasoning when requested.", "objective");
     }
 
     @Test

@@ -9,6 +9,8 @@ import ai.loomspan.internal.outputschema.OutputSchemaPromptAugmentor;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.runtime.input.SkillInputPromptRenderer;
 import ai.loomspan.internal.runtime.input.SkillInputSchemaNode;
+import ai.loomspan.internal.runtime.input.SkillInputValidator;
+import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import ai.loomspan.internal.skill.YamlSkillManifest;
 import ai.loomspan.internal.runtime.tool.BoundCapability;
 import org.springframework.lang.Nullable;
@@ -98,6 +100,8 @@ final class StepPromptBuilder
                 --- YOUR TASK ---
                 Return ONLY valid JSON - no markdown, no explanation, no code fences.
 
+                Action envelope illustration (argument requirements are specified above):
+
                 {
                   "stepAction": "CALL_TOOL",
                   "taskId": %s,
@@ -105,8 +109,8 @@ final class StepPromptBuilder
                   "toolArguments": {}
                 }
 
-                The empty toolArguments object is illustrative only. Replace it with the real arguments
-                required by the assigned tool contract above; include every required argument.
+                Follow the argument guidance above for toolArguments. The envelope illustration
+                does not supply missing required arguments or override the skill/task instructions.
 
                 Rules:
                 - Return CALL_TOOL for exactly the assigned task and tool shown above.
@@ -230,20 +234,59 @@ final class StepPromptBuilder
         }
 
         SkillInputContract contract = tool.argumentContract();
-        if (contract.isGeneric())
-        {
-            return null;
-        }
-
         SkillInputPromptRenderer.DetailLevel detailLevel = forceVerboseToolArgumentGuidance || useVerboseDetail(contract.schema())
                 ? SkillInputPromptRenderer.DetailLevel.VERBOSE
                 : SkillInputPromptRenderer.DetailLevel.COMPACT;
 
+        boolean summarized = !contract.isGeneric() && supportsSummary(contract.schema()) && contract.schema().isObject();
+        boolean emptyValid = summarized && new SkillInputValidator().validate(Map.of(), contract).valid()
+                && tool.validateModelArguments(Map.of()).isEmpty();
+        boolean closedEmpty = summarized && contract.schema().properties().isEmpty()
+                && !contract.schema().allowsAdditionalProperties();
+        String guidance;
+        if (tool.dispatchEligibility().eligible() || (closedEmpty && emptyValid))
+        {
+            guidance = "Use toolArguments: {} exactly. " + (tool.inputBindings().isEmpty()
+                    ? "This tool takes no arguments."
+                    : "Framework supplies all arguments through bindings. Do not reproduce bound fields.");
+        }
+        else if (emptyValid)
+        {
+            guidance = "toolArguments: {} is valid. Include optional contributions needed by the skill/task instructions; "
+                    + "contract optionality does not override a task instruction requesting a contribution.";
+        }
+        else if (summarized && !contract.schema().required().isEmpty())
+        {
+            guidance = "Supply the required unbound arguments at the top level: "
+                    + LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(contract.schema().required().stream().sorted().toList())
+                    + ". Follow the scoped nested requirements below. The envelope's empty argument object is incomplete.";
+        }
+        else
+        {
+            guidance = "Follow the effective argument contract and skill/task instructions. Supply only unbound arguments. "
+                    + "The envelope illustration makes no claim that {} satisfies this contract.";
+        }
+        String structure = summarized ? INPUT_PROMPT_RENDERER.renderToolArgumentsExample(contract, detailLevel) : "";
+        String ownership = tool.inputBindings().isEmpty() ? "" : "\nFramework supplies declared bound fields. Supply only unbound arguments. "
+                + "Do not reproduce or override bound destinations, including inside open objects. Bound destinations: "
+                + tool.inputBindings().stream().map(binding -> binding.destination().pointer()).toList();
+        String effectiveSchema = summarized && tool.inputBindings().isEmpty()
+                ? new SkillInputContractResolver().toJsonSchema(contract) : tool.inputSchema();
         return """
                 Task %s / tool %s:
                 %s
-                """.formatted(task.taskId(), task.capabilityName(), INPUT_PROMPT_RENDERER.renderToolArgumentsExample(contract, detailLevel)
-                        + (tool.inputBindings().isEmpty() ? "" : "\nFramework supplies declared bound fields. Supply only unbound arguments. Bound destinations: " + tool.inputBindings().stream().map(binding -> binding.destination().pointer()).toList() + "\nEffective model argument schema: " + tool.inputSchema()));
+                """.formatted(task.taskId(), task.capabilityName(), guidance + ownership
+                        + (structure.isBlank() ? "" : "\n" + structure)
+                        + "\nEffective model argument schema: " + effectiveSchema);
+    }
+
+    // Reuse the resolver's conservative vocabulary proof; unsupported shapes must not receive a partial summary.
+    private static boolean supportsSummary(SkillInputSchemaNode schema)
+    {
+        return schema.dispatchProofSupported()
+                && schema.properties().values().stream().allMatch(StepPromptBuilder::supportsSummary)
+                && (schema.items() == null || supportsSummary(schema.items()))
+                && (schema.additionalPropertiesSchema() == null || supportsSummary(schema.additionalPropertiesSchema()));
     }
 
     private static boolean useVerboseDetail(SkillInputSchemaNode schema)

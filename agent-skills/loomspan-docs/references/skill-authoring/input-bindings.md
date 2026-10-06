@@ -173,6 +173,29 @@ it needs no required model contribution. If it was originally optional but a
 binding creates it, unbound required siblings MUST be supplied. Initial and
 corrective requests use these same projected rules.
 
+Generated assigned-task guidance distinguishes required unbound input from optional
+contributions and Framework-owned input. When contribution-free dispatch is proven,
+a rendered prompt requires `toolArguments: {}` and explains the bindings; an
+explicit zero-input tool without bindings is described as taking no arguments.
+Eligible tasks still dispatch automatically without a parent model request.
+When the supported effective contract accepts `{}` but permits contributions,
+guidance says `{}` is valid and keeps those contributions optional under the
+contract. This does not override authored instructions requesting useful optional
+content. Names mentioned only in prompt conventions, such as
+`context.candidateReasoning` in an open context object, do not become declared or
+required schema fields. Required unbound fields are identified at the root and
+through scoped nested rules. Unknown or unsupported shapes receive neutral
+effective-contract guidance without a promise that `{}` is valid or a partial
+required-field summary. Bound destinations remain prohibited within open objects.
+The JSON action envelope is illustrative; it is incomplete when required model
+arguments remain. These same rules apply to ordinary and verbose correction prompts.
+
+`StepPromptBuilderTest#contractSpecificGuidanceAgreesWithValidationInNormalAndVerboseVariants`,
+`nestedOptionalityAndOpenBoundDestinationsKeepTheirExactContractMeaning`,
+`bindingCreatedOptionalAncestorRequiresItsUnboundRequiredSibling`, and
+`unknownAndUnsupportedShapesGetNeutralGuidance` compare guidance with unchanged
+projection/validation semantics. They do not establish improved live model accuracy.
+
 The model MUST NOT provide a bound destination, even an equal value or null, nor
 a scalar/null/array ancestor that prevents insertion. Ancestor objects holding
 only permitted unbound siblings are accepted. Framework never discards a conflict.

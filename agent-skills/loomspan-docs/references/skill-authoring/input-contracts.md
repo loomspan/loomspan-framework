@@ -68,7 +68,13 @@ arrays and schema-constrained additional values. For ordinary unbound input, chi
   keys from nested properties. `<key>` is an illustrative key, not a required name.
 - Generic contracts omit structured guidance. Verbose correction adds type detail
   while retaining the same object boundaries as ordinary compact guidance.
-- Nonblank authored descriptions appear once per described node in a separate
+- Assigned-task guidance explicitly distinguishes required unbound fields, optional
+  contributions for contracts that accept `{}`, and exact-empty arguments for
+  proven contribution-free tools. Unknown/unsupported summaries retain neutral
+  guidance. Read [declared bindings](input-bindings.md#two-contracts-and-dependencies)
+  for ownership and optional authored contributions; examples never override task
+  instructions or make bound destinations model-owned.
+- For supported structured summaries, nonblank authored descriptions appear once per described node in a separate
   section in both compact and verbose assigned-tool guidance, including corrective
   requests. This shared resolved-contract behavior also covers declared YAML
   inputs. Root/object descriptions, properties, array items and typed additional
@@ -77,6 +83,8 @@ arrays and schema-constrained additional values. For ordinary unbound input, chi
   punctuation and literal key characters through escaping. Blank or absent
   descriptions add no text. A described empty closed root retains its empty-object
   rule; generic contracts still omit structured guidance.
+  Unknown/unsupported shapes retain their schema text and authored descriptions
+  without a structured field summary.
 
 These are descriptions of the resolved contract, not new validation or dataflow
 rules. Skill instructions must identify required business data, including any

@@ -72,7 +72,7 @@ class SkillInputPromptRendererTest
         {
             assertThat(renderer.renderToolArgumentsExample(resolver.resolveJavaCapability(
                     "{\"type\":\"object\",\"additionalProperties\":false}"), mode))
-                    .isEqualTo("{}\n(Note: This tool takes no arguments. You must pass an empty object.)");
+                    .isEqualTo("{}\n(This closed argument object has no declared fields. You must pass an empty object.)");
             assertThat(renderer.renderToolArgumentsExample(resolver.resolveJavaCapability(
                     "{\"type\":\"object\",\"description\":\"Nothing to supply\",\"additionalProperties\":false}"), mode))
                     .contains("must pass an empty object", "Description at \"$\": \"Nothing to supply\"");

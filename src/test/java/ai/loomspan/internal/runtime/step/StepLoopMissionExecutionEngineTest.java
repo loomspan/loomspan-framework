@@ -1546,6 +1546,11 @@ class StepLoopMissionExecutionEngineTest {
                 .contains("YOUR PREVIOUS ACTION WAS INVALID")
                 .contains("At `$` (top level): Required fields: [rawText]")
                 .contains("`$.rawText` must be a string");
+        for (String assigned : chatClient.systemMessagesSeen().subList(0, 2)) {
+            assertThat(assigned).contains("required unbound arguments at the top level: [\"rawText\"]",
+                    "empty argument object is incomplete", "\"taskId\": \"t-1\"", "\"toolName\": \"invoiceParser\"")
+                    .doesNotContain("The empty toolArguments object is illustrative only", "toolArguments: {} is valid");
+        }
     }
 
     @Test
