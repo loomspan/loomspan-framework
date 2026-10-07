@@ -9,7 +9,7 @@ for another driver.
 
 ## Obtain the starter
 
-The example matches this checkout's `1.0.0-beta.8`. This is a development
+The example matches this checkout's `1.0.0-beta.9-SNAPSHOT`. This is a development
 coordinate, not a claim that the artifact is available from Maven Central.
 For a source evaluation, first run in the matching framework checkout:
 
@@ -45,7 +45,7 @@ Create `pom.xml` in a new directory outside the framework checkout:
     <dependency>
       <groupId>ai.loomspan</groupId>
       <artifactId>loomspan-spring-boot-starter</artifactId>
-      <version>1.0.0-beta.8</version>
+      <version>1.0.0-beta.9-SNAPSHOT</version>
     </dependency>
   </dependencies>
   <build>

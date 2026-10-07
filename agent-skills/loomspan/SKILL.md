@@ -4,7 +4,7 @@ description: Orient developers in the Loomspan ecosystem and route requests to a
 license: Apache-2.0
 metadata:
   loomspan-component: framework
-  loomspan-version: "1.0.0-beta.8"
+  loomspan-version: "1.0.0-beta.9-SNAPSHOT"
 ---
 
 # Loomspan orientation

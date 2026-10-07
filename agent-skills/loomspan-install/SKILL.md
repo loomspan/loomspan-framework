@@ -4,7 +4,7 @@ description: Select and install or update exact version-aligned Loomspan guidanc
 license: Apache-2.0
 metadata:
   loomspan-component: framework
-  loomspan-version: "1.0.0-beta.8"
+  loomspan-version: "1.0.0-beta.9-SNAPSHOT"
 ---
 
 # Install version-aligned Loomspan guidance
