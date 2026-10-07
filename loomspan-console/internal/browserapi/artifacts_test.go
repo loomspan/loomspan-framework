@@ -891,17 +891,19 @@ func TestArtifactRawDownloadStreamsWithUndeclaredLength(t *testing.T) {
 // cancellation. It tracks Close calls so tests can assert the upstream
 // stream was released.
 type ctxBlockedReader struct {
-	ctx    context.Context
-	closed atomic.Bool
+	ctx         context.Context
+	readStarted chan struct{}
+	closed      chan struct{}
 }
 
 func (r *ctxBlockedReader) Read(_ []byte) (int, error) {
+	close(r.readStarted)
 	<-r.ctx.Done()
 	return 0, r.ctx.Err()
 }
 
 func (r *ctxBlockedReader) Close() error {
-	r.closed.Store(true)
+	close(r.closed)
 	return nil
 }
 
@@ -909,7 +911,8 @@ func (r *ctxBlockedReader) Close() error {
 // the operation context, so cancellation interrupts the read. It exposes the
 // last stream's reader so tests can assert Close was called.
 type blockingArtifactProbeClient struct {
-	lastReader atomic.Pointer[ctxBlockedReader]
+	lastReader  atomic.Pointer[ctxBlockedReader]
+	readStarted chan struct{}
 }
 
 func (*blockingArtifactProbeClient) Probe(context.Context, applicationclient.Credential) (applicationclient.Instance, error) {
@@ -928,7 +931,7 @@ func (*blockingArtifactProbeClient) OpenActivity(context.Context, string, string
 }
 
 func (c *blockingArtifactProbeClient) OpenArtifact(ctx context.Context, _, _ string, _ applicationclient.Credential) (*applicationclient.ArtifactStream, error) {
-	reader := &ctxBlockedReader{ctx: ctx}
+	reader := &ctxBlockedReader{ctx: ctx, readStarted: c.readStarted, closed: make(chan struct{})}
 	c.lastReader.Store(reader)
 	return applicationclient.NewTestArtifactStream(
 		reader,
@@ -945,7 +948,7 @@ func TestArtifactRawDownloadStopsOnClientCancellation(t *testing.T) {
 	registry := browserauth.NewRegistry(nil, bytes.NewReader(entropy))
 	sessionID, _ := registry.CreateSession(context.Background())
 	policy, _ := NewPolicy("127.0.0.1:7943", "http://127.0.0.1:7943", "")
-	probeClient := &blockingArtifactProbeClient{}
+	probeClient := &blockingArtifactProbeClient{readStarted: make(chan struct{})}
 	targetContext, _ := target.New(func(applicationclient.Address) (target.ProbeClient, error) {
 		return probeClient, nil
 	}, func() (target.ScopeID, error) { return "scope-1", nil }, nil)
@@ -964,6 +967,7 @@ func TestArtifactRawDownloadStopsOnClientCancellation(t *testing.T) {
 		Target:     targetContext,
 	})
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	request := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:7943/api/console/v1/artifacts/trace-1/raw", nil)
 	request = request.WithContext(ctx)
 	request.Host = "127.0.0.1:7943"
@@ -976,22 +980,27 @@ func TestArtifactRawDownloadStopsOnClientCancellation(t *testing.T) {
 		router.ServeHTTP(response, request)
 		close(done)
 	}()
-	// Wait briefly for the handler to open the upstream stream before
-	// cancelling, so we can assert the stream is closed on cancellation.
-	time.Sleep(50 * time.Millisecond)
+	// Cancel only after the handler is blocked reading the upstream stream.
+	select {
+	case <-probeClient.readStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("raw download did not start reading the upstream stream")
+	}
 	cancel()
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("raw download did not stop after client cancellation")
 	}
-	// The handler's defer stream.Close() must release the upstream stream on
-	// cancellation, not leave it blocked forever.
+	// Cancellation can close the stream asynchronously. Handler completion
+	// does not imply that a concurrent Close has finished closing its body.
 	reader := probeClient.lastReader.Load()
 	if reader == nil {
 		t.Fatal("expected the probe client to have opened a stream")
 	}
-	if !reader.closed.Load() {
+	select {
+	case <-reader.closed:
+	case <-time.After(5 * time.Second):
 		t.Fatal("upstream stream was not closed after client cancellation")
 	}
 }

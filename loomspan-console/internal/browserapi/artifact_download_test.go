@@ -658,20 +658,31 @@ func TestRawDownloadCancellationAndScopeRotationCloseUpstream(t *testing.T) {
 	// Use the blocking probe client that blocks on the operation context.
 	// When the client cancels, the stream should be interrupted and the
 	// upstream stream must be closed (via the handler's defer stream.Close()).
-	client := &blockingArtifactProbeClient{}
+	client := &blockingArtifactProbeClient{readStarted: make(chan struct{})}
 	router, cookie := downloadTestRouter(t, client)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	request := downloadRequest(cookie, "trace-1").WithContext(ctx)
 	response := httptest.NewRecorder()
 
-	// Cancel after a short delay to simulate client disconnect.
+	done := make(chan struct{})
 	go func() {
-		time.Sleep(50 * time.Millisecond)
-		cancel()
+		router.ServeHTTP(response, request)
+		close(done)
 	}()
 
-	router.ServeHTTP(response, request)
+	select {
+	case <-client.readStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("raw download did not start reading the upstream stream")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("raw download did not stop after client cancellation")
+	}
 	// The response should not hang; the stream should be interrupted.
 	// We don't assert a specific status code because the cancellation
 	// may occur after or before the response is committed.
@@ -680,7 +691,11 @@ func TestRawDownloadCancellationAndScopeRotationCloseUpstream(t *testing.T) {
 	if reader == nil {
 		t.Fatal("expected the probe client to have opened a stream")
 	}
-	if !reader.closed.Load() {
+	// The cancellation callback may still be closing the body after the
+	// handler returns; wait for actual resource cleanup.
+	select {
+	case <-reader.closed:
+	case <-time.After(5 * time.Second):
 		t.Fatal("upstream stream was not closed after client cancellation")
 	}
 }
