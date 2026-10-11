@@ -22,7 +22,6 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +29,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(OutputCaptureExtension.class)
-class SensitiveConnectionDataRedactionTest {
+class ConnectionDiagnosticFidelityTest {
 
     private static final String API_KEY = "SENTINEL-API-KEY";
     private static final String HEADER_VALUE = "SENTINEL-HEADER-VALUE";
@@ -38,7 +37,7 @@ class SensitiveConnectionDataRedactionTest {
     private static final String CREDENTIAL_URI = "file:SENTINEL-CREDENTIAL-PATH.json";
 
     @Test
-    void secretsAndTransportDetailsStayOutOfOwnedOutput(CapturedOutput output) throws Exception {
+    void constructionCauseRemainsVerbatimAlongsideStructuredIdentity(CapturedOutput output) throws Exception {
         LoomspanProperties.ConnectionProperties connection = new LoomspanProperties.ConnectionProperties();
         connection.setDriver(AiDriver.OPENAI);
         connection.setApiKey(API_KEY);
@@ -53,6 +52,9 @@ class SensitiveConnectionDataRedactionTest {
                 "framework-model", "safe-connection", AiDriver.OPENAI, "provider-model", null);
         ModelExecutionIdentity identity = ModelExecutionIdentity.from(configuration);
         String serializedMetadata = new ObjectMapper().writeValueAsString(identity.metadata());
+        assertThat(identity.metadata()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "frameworkModel", "framework-model", "connection", "safe-connection",
+                "driver", "OPENAI", "providerModel", "provider-model"));
         String descriptor = SkillExecutionDescriptor.from(configuration).toString();
 
         SimpleMeterRegistry meters = new SimpleMeterRegistry();
@@ -79,8 +81,8 @@ class SensitiveConnectionDataRedactionTest {
                 connection.toString(), gemini.toString(), registryFailure, serializedMetadata,
                 descriptor, meterTags, output.getAll());
         assertThat(allOwnedOutput)
-                .doesNotContain(API_KEY, HEADER_VALUE, BASE_URL, CREDENTIAL_URI)
-                .contains("safe-connection", "OPENAI", "loomspan.connections.sensitive.base-url");
+                .contains(API_KEY, HEADER_VALUE, BASE_URL, CREDENTIAL_URI,
+                        "safe-connection", "OPENAI", "loomspan.connections.sensitive.base-url");
     }
 
     private static String registryFailure(LoomspanProperties.ConnectionProperties connection) {

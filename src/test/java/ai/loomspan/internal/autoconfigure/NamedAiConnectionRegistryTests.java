@@ -7,6 +7,7 @@ import ai.loomspan.internal.provider.ProviderConnectionRuntime;
 import ai.loomspan.internal.provider.ProviderFailureDetails;
 import ai.loomspan.internal.provider.ProviderRetryPolicy;
 import ai.loomspan.internal.springai.SpringAiProviderIntegration;
+import ai.loomspan.internal.typesafe.TypeSafeClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.DisposableBean;
@@ -21,6 +22,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
+import static org.mockito.Mockito.doThrow;
 
 class NamedAiConnectionRegistryTests {
 
@@ -91,7 +93,8 @@ class NamedAiConnectionRegistryTests {
     void genericGeminiConstructionFailureNamesOnlyApplicableSettings() {
         SpringAiProviderIntegration integration = mock(SpringAiProviderIntegration.class);
         LoomspanProperties.ConnectionProperties properties = geminiConnection();
-        when(integration.create("gemini", properties)).thenThrow(new IllegalArgumentException("unsafe detail"));
+        var original = new IllegalArgumentException("original construction detail");
+        when(integration.create("gemini", properties)).thenThrow(original);
 
         assertThatThrownBy(() -> new NamedAiConnectionRegistry(Map.of("gemini", properties), integration))
                 .hasMessageContaining("loomspan.connections.gemini.api-key")
@@ -100,8 +103,116 @@ class NamedAiConnectionRegistryTests {
                 .hasMessageContaining("loomspan.connections.gemini.gemini.location")
                 .hasMessageContaining("loomspan.connections.gemini.gemini.credentials-uri")
                 .hasMessageNotContaining("loomspan.connections.gemini.base-url")
-                .hasMessageNotContaining("unsafe detail")
-                .hasNoCause();
+                .hasCause(original)
+                .satisfies(failure -> assertThat(failure.getCause()).isSameAs(original));
+    }
+
+    @Test
+    void constructionFailureRetainsCleanupFailuresAndContinuesClosing() throws Exception {
+        for (boolean safe : new boolean[] {true, false}) {
+            var integration = mock(SpringAiProviderIntegration.class);
+            var connections = new LinkedHashMap<String, LoomspanProperties.ConnectionProperties>();
+            var first = mock(ChatModel.class, withSettings().extraInterfaces(DisposableBean.class));
+            var second = mock(ChatModel.class, withSettings().extraInterfaces(DisposableBean.class));
+            var third = mock(ChatModel.class, withSettings().extraInterfaces(DisposableBean.class));
+            var firstCleanup = new IllegalStateException("first cleanup failed");
+            var secondCleanup = new IllegalStateException("second cleanup failed");
+            doThrow(firstCleanup).when((DisposableBean) first).destroy();
+            doThrow(secondCleanup).when((DisposableBean) second).destroy();
+            for (String name : new String[] {"first", "second", "third", "failed"})
+                connections.put(name, connection("http://example.test"));
+            when(integration.create("first", connections.get("first"))).thenReturn(runtime(first));
+            when(integration.create("second", connections.get("second"))).thenReturn(runtime(second));
+            when(integration.create("third", connections.get("third"))).thenReturn(runtime(third));
+            RuntimeException original = safe ? new SafeAiConnectionConfigurationException("configuration failure")
+                    : new IllegalArgumentException("construction failure");
+            when(integration.create("failed", connections.get("failed"))).thenThrow(original);
+            Throwable failure = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> new NamedAiConnectionRegistry(connections, integration));
+            assertThat(failure.getSuppressed()).containsExactly(firstCleanup);
+            assertThat(firstCleanup.getSuppressed()).containsExactly(secondCleanup);
+            if (safe) assertThat(failure).isSameAs(original);
+            else assertThat(failure.getCause()).isSameAs(original);
+            verify((DisposableBean) first).destroy();
+            verify((DisposableBean) second).destroy();
+            verify((DisposableBean) third).destroy();
+        }
+    }
+
+    @Test
+    void nativeConstructionOwnershipClosesAcquiredResources() throws Exception {
+        var integration = mock(SpringAiProviderIntegration.class);
+        var properties = new LoomspanProperties.ConnectionProperties();
+        properties.setDriver(AiDriver.TYPESAFE);
+        properties.setApiKey("fixture-key");
+        var connections = new LinkedHashMap<String, LoomspanProperties.ConnectionProperties>();
+        connections.put("native", properties);
+        connections.put("failed", connection("http://example.test"));
+        // Observe the actual Apache resource via its existing builder, without adding a factory SPI.
+        try (var clients = org.mockito.Mockito.mockStatic(org.apache.hc.client5.http.impl.classic.HttpClients.class,
+                org.mockito.Mockito.CALLS_REAL_METHODS)) {
+            var apache = new java.util.concurrent.atomic.AtomicReference<org.apache.hc.client5.http.impl.classic.CloseableHttpClient>();
+            var builder = org.mockito.Mockito.spy(org.apache.hc.client5.http.impl.classic.HttpClients.custom());
+            org.mockito.Mockito.doAnswer(call -> {
+                var built = (org.apache.hc.client5.http.impl.classic.CloseableHttpClient) call.callRealMethod();
+                apache.set(built);
+                return built;
+            }).when(builder).build();
+            clients.when(org.apache.hc.client5.http.impl.classic.HttpClients::custom).thenReturn(builder);
+            var original = new IllegalStateException("later construction failed");
+            when(integration.create("failed", connections.get("failed"))).thenThrow(original);
+            assertThatThrownBy(() -> new NamedAiConnectionRegistry(connections, integration)).hasCause(original);
+            assertThat(apache.get()).isNotNull();
+            assertThatThrownBy(() -> apache.get().execute(new org.apache.hc.client5.http.classic.methods.HttpGet(
+                    "http://127.0.0.1:1"), response -> response.getCode()))
+                    .hasStackTraceContaining("Connection pool shut down");
+        }
+    }
+
+    @Test
+    void nativeAllocationClosesWhenRuntimeConstructionFails() throws Exception {
+        var original = new IllegalStateException("runtime construction failed");
+        var properties = new LoomspanProperties.ConnectionProperties() {
+            private int reads;
+            @Override public AiDriver getDriver() {
+                if (++reads == 2) throw original;
+                return AiDriver.TYPESAFE;
+            }
+        };
+        properties.setApiKey("fixture-key");
+        try (var clients = org.mockito.Mockito.mockStatic(org.apache.hc.client5.http.impl.classic.HttpClients.class,
+                org.mockito.Mockito.CALLS_REAL_METHODS)) {
+            var apache = new java.util.concurrent.atomic.AtomicReference<org.apache.hc.client5.http.impl.classic.CloseableHttpClient>();
+            var builder = org.mockito.Mockito.spy(org.apache.hc.client5.http.impl.classic.HttpClients.custom());
+            org.mockito.Mockito.doAnswer(call -> {
+                var built = (org.apache.hc.client5.http.impl.classic.CloseableHttpClient) call.callRealMethod();
+                apache.set(built);
+                return built;
+            }).when(builder).build();
+            clients.when(org.apache.hc.client5.http.impl.classic.HttpClients::custom).thenReturn(builder);
+            Throwable failure = org.assertj.core.api.Assertions.catchThrowable(() ->
+                    new NamedAiConnectionRegistry(Map.of("native", properties), mock(SpringAiProviderIntegration.class)));
+            assertThat(apache.get()).isNotNull();
+            assertThatThrownBy(() -> apache.get().execute(new org.apache.hc.client5.http.classic.methods.HttpGet(
+                    "http://127.0.0.1:1"), response -> response.getCode()))
+                    .hasStackTraceContaining("Connection pool shut down");
+            assertThat(failure).hasCause(original);
+            apache.get().close();
+        }
+    }
+
+    @Test
+    void invalidNativeRetrySettingsFailBeforeAllocatingTransport() {
+        var properties = new LoomspanProperties.ConnectionProperties() {
+            @Override public LoomspanProperties.ProviderRetryProperties getProviderRetry() { return null; }
+        };
+        properties.setDriver(AiDriver.TYPESAFE);
+        properties.setApiKey("fixture-key");
+        try (var clients = org.mockito.Mockito.mockConstruction(TypeSafeClient.class)) {
+            assertThatThrownBy(() -> new NamedAiConnectionRegistry(Map.of("native", properties),
+                    mock(SpringAiProviderIntegration.class))).hasRootCauseMessage("properties must not be null");
+            assertThat(clients.constructed()).isEmpty();
+        }
     }
 
     private static ProviderConnectionRuntime runtime(ChatModel model) {

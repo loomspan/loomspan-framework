@@ -75,6 +75,8 @@ class ConsoleTraceFixtureCorpusTest
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-24T12:00:00Z"), ZoneOffset.UTC);
     private static final Set<String> VALID = Set.of(
             "native-evaluation-success",
+            "native-evaluation-malformed-response",
+            "native-evaluation-provider-failure",
             "single-attempt-success",
             "java-root-success",
             "assembled-input-result",
@@ -193,6 +195,37 @@ class ConsoleTraceFixtureCorpusTest
             expected.add("expected/" + name + ".json");
         });
         assertThat(fileNames(fixtureRoot())).containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    @Order(2)
+    void nativeFailureCorpusPreservesRawResponseAndBoundedProviderEvidence() throws Exception
+    {
+        for (String name : List.of("native-evaluation-malformed-response", "native-evaluation-provider-failure")) {
+            List<JsonNode> records = parseLines(fixtureRoot().resolve("traces/" + name + ".ndjson"));
+            JsonNode request = records.stream().filter(node -> "MODEL_REQUEST_SENT".equals(node.path("recordType").asText())).findFirst().orElseThrow();
+            assertThat(request.at("/data/request/state/Authorization").asText()).isEqualTo("kept");
+            assertThat(request.at("/data/request/state/token").asText()).isEqualTo("kept verbatim");
+            assertThat(request.at("/data/request/model").asText()).isEqualTo("jev-latest");
+            assertThat(records.getLast().at("/metadata/outcome").asText()).isEqualTo("FAILED");
+            assertThat(records.getLast().at("/metadata/terminalFailureId").asText()).isEqualTo("failure-native");
+            if (name.equals("native-evaluation-malformed-response")) {
+                JsonNode response = records.stream().filter(node -> "MODEL_RESPONSE_RECEIVED".equals(node.path("recordType").asText())).findFirst().orElseThrow();
+                assertThat(response.at("/data/rawBody").asText()).isEqualTo("<broken>\nAuthorization=kept token=kept verbatim 🧭");
+                assertThat(response.at("/metadata/usage/precision").asText()).isEqualTo("UNAVAILABLE");
+                assertThat(records).noneMatch(node -> "MODEL_ATTEMPT_FAILED".equals(node.path("recordType").asText()));
+            } else {
+                JsonNode failure = records.stream().filter(node -> "MODEL_ATTEMPT_FAILED".equals(node.path("recordType").asText())).findFirst().orElseThrow();
+                assertThat(failure.at("/metadata/httpStatus").asInt()).isEqualTo(401);
+                assertThat(failure.at("/metadata/retryDecision").asText()).isEqualTo("DO_NOT_RETRY");
+                assertThat(failure.at("/metadata/attemptId").asText()).isEqualTo(request.at("/metadata/attemptId").asText());
+                JsonNode diagnostic = failure.at("/data/diagnostics/0");
+                assertThat(diagnostic.path("truncated").asBoolean()).isTrue();
+                assertThat(diagnostic.path("captureLimitBytes").asInt()).isEqualTo(64);
+                assertThat(diagnostic.path("text").asText().getBytes(StandardCharsets.UTF_8)).hasSize(64);
+                assertThat(records).noneMatch(node -> "MODEL_RESPONSE_RECEIVED".equals(node.path("recordType").asText()));
+            }
+        }
     }
 
     @Test
@@ -983,6 +1016,35 @@ class ConsoleTraceFixtureCorpusTest
                 terminalFailureId = session.recordFailure(fixtureFailure("validation exhausted"),
                         Map.of("message", "validation exhausted"), null);
                 attributed = terminal = new Usage(11, 4);
+                outcome = "FAILED";
+            }
+            case "native-evaluation-malformed-response", "native-evaluation-provider-failure" -> {
+                var metadata = attempt("native-retry", "native-attempt", 1,
+                        ordered("driver", "TYPESAFE", "connection", "native", "providerModel", "jev-latest"));
+                handle.append(TraceRecordType.MODEL_REQUEST_SENT, metadata,
+                        ordered("payloadType", "evaluation", "endpoint", "https://api.typesafe.ai/v1/systemone", "requestedModel", "jev-latest",
+                                "request", ordered("state", ordered("Authorization", "kept", "token", "kept verbatim"), "model", "jev-latest",
+                                        "questions", ordered("healthy", ordered("type", "noul", "instructions", "Is this healthy?")))));
+                if (name.equals("native-evaluation-malformed-response")) {
+                    var responseMetadata = new LinkedHashMap<String, Object>(metadata);
+                    responseMetadata.put("usage", usage(Usage.ZERO, "UNAVAILABLE"));
+                    handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED, responseMetadata,
+                            ordered("payloadType", "evaluation", "endpoint", "https://api.typesafe.ai/v1/systemone", "requestedModel", "jev-latest",
+                                    "rawBody", "<broken>\nAuthorization=kept token=kept verbatim 🧭"));
+                    terminalFailureId = session.recordFailure(fixtureFailure("System One returned unreadable JSON"),
+                            Map.of("message", "System One returned unreadable JSON"), null);
+                } else {
+                    var failureMetadata = new LinkedHashMap<String, Object>(metadata);
+                    failureMetadata.putAll(ordered("failureClassification", "PERMANENT", "failureCategory", "AUTHENTICATION",
+                            "retryDecision", "DO_NOT_RETRY", "retryDelayMillis", 0, "retryDelaySource", "NONE", "httpStatus", 401));
+                    // A bounded reader-state fixture; actual 1MiB transport capture is covered by invocation tests.
+                    handle.append(TraceRecordType.MODEL_ATTEMPT_FAILED, failureMetadata,
+                            ordered("diagnostics", List.of(ordered("kind", "PROVIDER_ERROR", "contentType", "text/plain; charset=utf-8",
+                                    "text", "Authorization=kept token=kept verbatim " + "x".repeat(25),
+                                    "truncated", true, "captureLimitBytes", 64))));
+                    terminalFailureId = session.recordFailure(fixtureFailure("System One HTTP 401"),
+                            failureMetadata, null);
+                }
                 outcome = "FAILED";
             }
             case "native-evaluation-success" -> {
@@ -2035,6 +2097,7 @@ class ConsoleTraceFixtureCorpusTest
             case "unplanned-tool-failure" -> "failure-tool";
             case "timeout-step-failure" -> "failure-timeout-step";
             case "terminal-provider-failure-actionable" -> "failure-terminal-provider";
+            case "native-evaluation-malformed-response", "native-evaluation-provider-failure" -> "failure-native";
             default -> throw new IllegalStateException("Unexpected fixture failure for " + name);
         };
     }
@@ -2408,7 +2471,13 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
-            case "native-evaluation-success" -> List.of(expectedAttempt(name, "native-retry", "native-attempt", 1));
+            case "native-evaluation-success", "native-evaluation-malformed-response" -> List.of(expectedAttempt(name, "native-retry", "native-attempt", 1));
+            case "native-evaluation-provider-failure" -> List.of(ordered(
+                    "retrySequenceId", "native-retry", "attemptId", "native-attempt", "attemptNumber", 1,
+                    "attemptReason", "INITIAL", "providerAttemptNumber", 1, "outcome", "FAILED",
+                    "failureClassification", "PERMANENT", "failureCategory", "AUTHENTICATION",
+                    "retryDecision", "DO_NOT_RETRY", "retryDelayMillis", 0, "retryDelaySource", "NONE", "httpStatus", 401,
+                    "usage", Usage.ZERO.asMap(), "usageComplete", false));
             case "forwarded-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1));
             case "assembled-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1), expectedAttempt(name, "retry-assembly", "attempt-assembly", 1));
             case "nested-forwarded-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1),
@@ -2496,6 +2565,8 @@ class ConsoleTraceFixtureCorpusTest
     private static boolean usageComplete(String name)
     {
         return !name.equals("unavailable-usage")
+                && !name.equals("native-evaluation-malformed-response")
+                && !name.equals("native-evaluation-provider-failure")
                 && !name.equals("missing-response-usage")
                 && !name.equals("timeout-step-failure")
                 && !name.equals("terminal-provider-failure-actionable")
@@ -2517,7 +2588,8 @@ class ConsoleTraceFixtureCorpusTest
             };
             case "validation-exhaustion" -> attemptId.equals("attempt-1") ? new Usage(6, 2) : new Usage(5, 2);
             case "unavailable-usage", "missing-response-usage", "runtime-terminal-failure", "runtime-terminal-abort",
-                    "forwarded-child-result", "nested-forwarded-child-result", "assembled-child-result" -> Usage.ZERO;
+                    "forwarded-child-result", "nested-forwarded-child-result", "assembled-child-result",
+                    "native-evaluation-malformed-response", "native-evaluation-provider-failure" -> Usage.ZERO;
             case "unattributed-usage" -> new Usage(10, 4, 16);
             case "nonterminal-error-then-success" -> new Usage(5, 2);
             case "chunked-payload", "chunked-json-payload" -> new Usage(2, 1);

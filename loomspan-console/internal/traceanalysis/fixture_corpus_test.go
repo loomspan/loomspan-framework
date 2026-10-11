@@ -121,6 +121,119 @@ func TestNativeEvaluationFixturePreservesRequestAndChunkedEnvelopeEvidence(t *te
 	}
 }
 
+func TestNativeEvaluationFailureFixturesPreserveLogicalContentAndAttemptFacts(t *testing.T) {
+	for _, name := range []string{"native-evaluation-malformed-response", "native-evaluation-provider-failure"} {
+		t.Run(name, func(t *testing.T) {
+			traceBytes, err := os.ReadFile(filepath.Join(fixtureRoot(t), "traces", name+".ndjson"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := newServiceTestHarnessForOutcomeAndVersion(t, "trace-"+name, string(traceBytes), "FAILED", fixtureCompatibilityVersion)
+			page, domain := h.service.QueryRecords(context.Background(), targetEvidence(h.scopeID), RecordQuery{
+				Handle: h.handle, Representation: RecordRepresentationLogical, PageSize: 10,
+				Filter: RecordFilter{Types: []string{string(RecordModelRequestSent), string(RecordModelResponseReceived), string(RecordModelAttemptFailed)}},
+			})
+			if domain != nil || len(page.Items) != 2 {
+				t.Fatalf("native records=%+v domain=%v", page, domain)
+			}
+			for _, record := range page.Items {
+				if record.Content == nil || !record.Content.Available || !record.Content.Complete {
+					t.Fatalf("native content=%+v", record)
+				}
+				read, failure := h.service.ReadContentRange(context.Background(), targetEvidence(h.scopeID), RangeRequest{Handle: h.handle, ContentRef: record.Content.ContentRef, MaxBytes: 7})
+				if failure != nil || !read.HasMore {
+					t.Fatalf("native first range=%+v failure=%v", read, failure)
+				}
+				content := append([]byte{}, read.Content...)
+				for read.HasMore {
+					read, failure = h.service.ReadContentRange(context.Background(), targetEvidence(h.scopeID), RangeRequest{Handle: h.handle, ContentRef: record.Content.ContentRef, ContinueCursor: read.NextCursor, MaxBytes: 7})
+					if failure != nil {
+						t.Fatal(failure)
+					}
+					content = append(content, read.Content...)
+				}
+				var payload map[string]json.RawMessage
+				if err := json.Unmarshal(content, &payload); err != nil {
+					t.Fatal(err)
+				}
+				if record.Type == string(RecordModelRequestSent) {
+					want := `{"state":{"Authorization":"kept","token":"kept verbatim"},"model":"jev-latest","questions":{"healthy":{"type":"noul","instructions":"Is this healthy?"}}}`
+					if string(payload["request"]) != want || string(payload["requestedModel"]) != `"jev-latest"` || string(payload["endpoint"]) != `"https://api.typesafe.ai/v1/systemone"` {
+						t.Fatalf("native request=%s", content)
+					}
+				} else if name == "native-evaluation-malformed-response" {
+					var rawBody string
+					if err := json.Unmarshal(payload["rawBody"], &rawBody); err != nil {
+						t.Fatal(err)
+					}
+					if rawBody != "<broken>\nAuthorization=kept token=kept verbatim 🧭" || payload["envelope"] != nil {
+						t.Fatalf("native malformed content=%s", content)
+					}
+				} else {
+					var diagnostics []struct {
+						Text              string
+						Truncated         bool
+						CaptureLimitBytes int
+					}
+					if err := json.Unmarshal(payload["diagnostics"], &diagnostics); err != nil {
+						t.Fatal(err)
+					}
+					if len(diagnostics) != 1 || !diagnostics[0].Truncated || diagnostics[0].CaptureLimitBytes != 64 || diagnostics[0].Text != "Authorization=kept token=kept verbatim "+strings.Repeat("x", 25) {
+						t.Fatalf("native provider diagnostics=%s", content)
+					}
+				}
+			}
+			attempts, domain := h.service.QueryAttempts(context.Background(), targetEvidence(h.scopeID), AttemptQuery{Handle: h.handle, PageSize: 10})
+			if domain != nil || len(attempts.Items) != 1 {
+				t.Fatalf("native attempts=%+v domain=%v", attempts, domain)
+			}
+			attempt := attempts.Items[0]
+			if attempt.AttemptID != "native-attempt" || attempt.RetrySequenceID != "native-retry" || attempt.AttemptNumber != 1 || attempt.UsageComplete {
+				t.Fatalf("native attempt=%+v", attempt)
+			}
+			if name == "native-evaluation-provider-failure" {
+				if attempt.Outcome != "FAILED" || attempt.HTTPStatus != 401 || attempt.RetryDecision != "DO_NOT_RETRY" {
+					t.Fatalf("native failed attempt=%+v", attempt)
+				}
+			} else if attempt.Outcome != "SUCCEEDED" {
+				t.Fatalf("native HTTP-success attempt=%+v", attempt)
+			}
+			failures, domain := h.service.QueryFailures(context.Background(), targetEvidence(h.scopeID), FailureQuery{Handle: h.handle, PageSize: 10})
+			if domain != nil || len(failures.Items) != 1 || !failures.Items[0].Terminal || failures.Items[0].FailureID != "failure-native" {
+				t.Fatalf("native terminal failure=%+v domain=%v", failures, domain)
+			}
+		})
+	}
+}
+
+func TestNativeEvaluationAbsentContentRemainsUnavailableReaderState(t *testing.T) {
+	traceBytes, err := os.ReadFile(filepath.Join(fixtureRoot(t), "traces", "native-evaluation-malformed-response.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Exercise the current absent-data reader representation, not a producer capture setting.
+	lines := strings.Split(strings.TrimSpace(string(traceBytes)), "\n")
+	for index, line := range lines {
+		var physical map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(line), &physical); err != nil {
+			t.Fatal(err)
+		}
+		if string(physical["recordType"]) == `"MODEL_RESPONSE_RECEIVED"` {
+			delete(physical, "data")
+			updated, err := json.Marshal(physical)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lines[index] = string(updated)
+		}
+	}
+	h := newServiceTestHarnessForOutcomeAndVersion(t, "trace-native-evaluation-malformed-response", strings.Join(lines, "\n")+"\n", "FAILED", fixtureCompatibilityVersion)
+	page, domain := h.service.QueryRecords(context.Background(), targetEvidence(h.scopeID), RecordQuery{Handle: h.handle, Representation: RecordRepresentationLogical, InlineContent: true, PageSize: 10, Filter: RecordFilter{Types: []string{string(RecordModelResponseReceived)}}})
+	if domain != nil || len(page.Items) != 1 || page.Items[0].Content != nil {
+		t.Fatalf("absent native response fabricated content=%+v domain=%v", page, domain)
+	}
+}
+
 func TestCanonicalConcurrentFixtureMatchesTransitionsPrefixesAndOverlap(t *testing.T) {
 	root := fixtureRoot(t)
 	traceBytes, err := os.ReadFile(filepath.Join(root, "traces", "canonical-concurrent-contract.ndjson"))

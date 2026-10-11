@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.Arguments;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
@@ -110,6 +112,185 @@ class TypeSafeSkillIntegrationTest {
                 .getFirst()
                 .path("metadata")
                 .path("sessionUsageSnapshot");
+    }
+
+    private static JsonNode logicalData(List<JsonNode> trace, JsonNode record) throws Exception {
+        if (!record.at("/metadata/payloadChunked").asBoolean()) return record.path("data");
+        var chunks = records(trace, "PAYLOAD_CHUNK_APPENDED").stream()
+                .filter(chunk -> chunk.at("/metadata/payloadId").equals(record.at("/metadata/payloadId")))
+                .sorted(Comparator.comparingInt(chunk -> chunk.at("/metadata/chunkIndex").intValue())).toList();
+        assertThat(chunks).hasSize(record.at("/metadata/chunkCount").intValue());
+        var content = new StringBuilder();
+        for (int i = 0; i < chunks.size(); i++) {
+            assertThat(chunks.get(i).at("/metadata/chunkIndex").intValue()).isEqualTo(i);
+            content.append(chunks.get(i).path("data").asText());
+        }
+        return JSON.readTree(content.toString());
+    }
+
+    private static java.util.stream.Stream<Arguments> nativeTerminalCases() {
+        return java.util.stream.Stream.of("/", "/api/").flatMap(prefix ->
+                java.util.stream.Stream.of(400, 401, 403, 404, 302).map(status -> Arguments.of(prefix, status)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("nativeTerminalCases")
+    void nativeTerminalHttpErrorsDoNotRetryOrAccountErrorUsage(String prefix, int status) throws Exception {
+        assertNativeHttpFailure(prefix, status, true, 1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/", "/api/"})
+    void disabledNativeRetryMakesOneSend(String prefix) throws Exception {
+        assertNativeHttpFailure(prefix, 529, false, 1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/", "/api/"})
+    void nativeRetryExhaustionStopsAtConfiguredAttempts(String prefix) throws Exception {
+        assertNativeHttpFailure(prefix, 529, true, 2);
+    }
+
+    private void assertNativeHttpFailure(String prefix, int status, boolean enabled, int attempts) throws Exception {
+        String error = "{\"usage\":{\"input_tokens\":2,\"output_tokens\":3},\"token\":\"business evidence\"}";
+        try (MockWebServer server = new MockWebServer()) {
+            for (int i = 0; i < attempts; i++) server.enqueue(new MockResponse().setResponseCode(status)
+                    .setHeader("Location", server.url("/follow-up")).setBody(error));
+            server.enqueue(success("{\"answers\":{\"sentinel\":true}}"));
+            runner(server, prefix, leaf()).withPropertyValues(
+                    "loomspan.connections.native.provider-retry.enabled=" + enabled,
+                    "loomspan.connections.native.provider-retry.max-attempts=2",
+                    "loomspan.connections.native.provider-retry.initial-backoff=0ms",
+                    "loomspan.connections.native.provider-retry.max-backoff=0ms",
+                    "loomspan.connections.native.provider-retry.jitter=0").run(context -> {
+                assertThat(context).hasNotFailed();
+                assertThatThrownBy(() -> invoke(context.getBean(SkillTemplate.class), input("A")))
+                        .isInstanceOf(SkillException.class).hasStackTraceContaining("HTTP " + status);
+                var trace = traces(context);
+                var requests = records(trace, "MODEL_REQUEST_SENT");
+                var failures = records(trace, "MODEL_ATTEMPT_FAILED");
+                assertThat(requests).hasSize(attempts);
+                assertThat(failures).hasSize(attempts);
+                assertThat(records(trace, "MODEL_RESPONSE_RECEIVED")).isEmpty();
+                for (int i = 0; i < attempts; i++) {
+                    var failure = failures.get(i);
+                    assertThat(failure.at("/metadata/httpStatus").intValue()).isEqualTo(status);
+                    assertThat(failure.at("/metadata/failureClassification").asText())
+                            .isEqualTo(status == 529 ? "TRANSIENT" : "PERMANENT");
+                    String category = switch (status) {
+                        case 401 -> "AUTHENTICATION";
+                        case 403 -> "AUTHORIZATION";
+                        case 529 -> "PROVIDER_OVERLOADED";
+                        default -> "INVALID_REQUEST";
+                    };
+                    assertThat(failure.at("/metadata/failureCategory").asText()).isEqualTo(category);
+                    assertThat(failure.at("/metadata/retryDecision").asText()).isEqualTo(
+                            i < attempts - 1 ? "RETRY" : status == 529 && enabled ? "ATTEMPTS_EXHAUSTED" : "DO_NOT_RETRY");
+                    assertThat(failure.at("/metadata/attemptId")).isEqualTo(requests.get(i).at("/metadata/attemptId"));
+                    assertThat(failure.at("/metadata/providerAttemptNumber").intValue()).isEqualTo(i + 1);
+                    assertThat(failure.at("/data/diagnostics/1/text").asText()).isEqualTo(error);
+                    assertThat(requests.get(i).at("/data/request")).isEqualTo(requests.getFirst().at("/data/request"));
+                }
+                var counts = usage(trace);
+                assertThat(counts.path("providerAttempts").intValue()).isEqualTo(attempts);
+                for (String field : List.of("modelCalls", "promptUnits", "completionUnits", "totalUnits"))
+                    assertThat(counts.path(field).intValue()).as(field).isZero();
+                assertThat(records(trace, "TRACE_COMPLETED").getFirst().at("/metadata/outcome").asText())
+                        .isEqualTo("FAILED");
+            });
+            assertThat(server.getRequestCount()).isEqualTo(attempts);
+            String firstBody = null;
+            for (int i = 0; i < attempts; i++) {
+                var request = server.takeRequest(2, TimeUnit.SECONDS);
+                assertThat(request.getMethod()).isEqualTo("POST");
+                assertThat(request.getPath()).isEqualTo(prefix + "v1/systemone");
+                String body = request.getBody().readUtf8();
+                if (firstBody == null) firstBody = body;
+                assertThat(body).isEqualTo(firstBody);
+                assertThat(JSON.readTree(body).path("model").asText()).isEqualTo("typesafe/jev-verbatim");
+            }
+        }
+    }
+
+    private static java.util.stream.Stream<Arguments> nativeUsageCases() {
+        return java.util.stream.Stream.of(
+                Arguments.of("", false, 0, 0), Arguments.of("null", false, 0, 0),
+                Arguments.of("42", false, 0, 0), Arguments.of("{}", false, 0, 0),
+                Arguments.of("{\"input_tokens\":2}", false, 0, 0),
+                Arguments.of("{\"input_tokens\":2,\"output_tokens\":3,\"cost\":0.25,\"extra\":{\"token\":\"kept\"}}", true, 2, 3),
+                Arguments.of("{\"input_tokens\":0,\"output_tokens\":0}", true, 0, 0),
+                Arguments.of("{\"input_tokens\":1.0,\"output_tokens\":2}", false, 0, 0),
+                Arguments.of("{\"input_tokens\":1.5,\"output_tokens\":2}", false, 0, 0),
+                Arguments.of("{\"input_tokens\":\"1\",\"output_tokens\":2}", false, 0, 0),
+                Arguments.of("{\"input_tokens\":-1,\"output_tokens\":2}", false, 0, 0),
+                Arguments.of("{\"input_tokens\":2147483648,\"output_tokens\":0}", false, 0, 0),
+                Arguments.of("{\"input_tokens\":2147483647,\"output_tokens\":1}", false, 0, 0));
+    }
+
+    @ParameterizedTest
+    @MethodSource("nativeUsageCases")
+    void nativeUsagePrecisionAndResponseAccountingRemainExactOrUnavailable(
+            String nativeUsage, boolean exact, int prompt, int completion) throws Exception {
+        String envelope = "{\"answers\":{}" + (nativeUsage.isEmpty() ? "" : ",\"usage\":" + nativeUsage) + "}";
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(success(envelope));
+            runner(server, "/api/", leaf()).run(context -> {
+                assertThat(context).hasNotFailed();
+                assertThat(invoke(context.getBean(SkillTemplate.class), input("A"))).isEqualTo("{}");
+                var trace = traces(context);
+                assertThat(records(trace, "MODEL_REQUEST_SENT")).hasSize(1);
+                assertThat(records(trace, "MODEL_RESPONSE_RECEIVED")).hasSize(1);
+                var response = records(trace, "MODEL_RESPONSE_RECEIVED").getFirst();
+                assertThat(response.at("/data/envelope")).isEqualTo(JSON.readTree(envelope));
+                assertThat(response.at("/metadata/usage/precision").asText()).isEqualTo(exact ? "EXACT" : "UNAVAILABLE");
+                var counts = usage(trace);
+                assertThat(counts.path("providerAttempts").intValue()).isEqualTo(1);
+                assertThat(counts.path("modelCalls").intValue()).isEqualTo(1);
+                assertThat(counts.path("promptUnits").intValue()).isEqualTo(prompt);
+                assertThat(counts.path("completionUnits").intValue()).isEqualTo(completion);
+                assertThat(counts.path("totalUnits").intValue()).isEqualTo(prompt + completion);
+                assertThat(counts.path("exactModelResponses").intValue()).isEqualTo(exact ? 1 : 0);
+                assertThat(counts.path("unavailableModelResponses").intValue()).isEqualTo(exact ? 0 : 1);
+                assertThat(counts.path("heuristicModelResponses").intValue()).isZero();
+            });
+            assertThat(server.getRequestCount()).isEqualTo(1);
+            assertThat(JSON.readTree(server.takeRequest().getBody().readUtf8()).path("questions").size()).isEqualTo(3);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/", "/api/"})
+    void oversizedNativeErrorRetainsBoundedTruthfulEvidenceOnBothRoutes(String prefix) throws Exception {
+        String error = "distinctive-prefix:" + "é".repeat(600_000) + ":distinctive-suffix";
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(new MockResponse().setResponseCode(400).setBody(error));
+            runner(server, prefix, leaf()).run(context -> {
+                assertThat(context).hasNotFailed();
+                assertThatThrownBy(() -> invoke(context.getBean(SkillTemplate.class), input("A")))
+                        .isInstanceOf(SkillException.class);
+                var trace = traces(context);
+                assertThat(records(trace, "MODEL_REQUEST_SENT")).hasSize(1);
+                assertThat(records(trace, "MODEL_ATTEMPT_FAILED")).hasSize(1);
+                var failure = records(trace, "MODEL_ATTEMPT_FAILED").getFirst();
+                var diagnostic = logicalData(trace, failure).at("/diagnostics/1");
+                assertThat(diagnostic.path("text").asText()).startsWith("distinctive-prefix:")
+                        .doesNotContain("distinctive-suffix", "\uFFFD");
+                assertThat(diagnostic.path("text").asText().getBytes(java.nio.charset.StandardCharsets.UTF_8).length)
+                        .isLessThanOrEqualTo(1024 * 1024);
+                assertThat(diagnostic.path("truncated").asBoolean()).isTrue();
+                assertThat(diagnostic.path("captureLimitBytes").intValue()).isEqualTo(1024 * 1024);
+                assertThat(failure.at("/metadata/httpStatus").intValue()).isEqualTo(400);
+                assertThat(failure.at("/metadata/retryDecision").asText()).isEqualTo("DO_NOT_RETRY");
+                var request = records(trace, "MODEL_REQUEST_SENT").getFirst();
+                assertThat(request.at("/data/endpoint").asText()).endsWith(prefix + "v1/systemone");
+                assertThat(failure.at("/metadata/attemptId")).isEqualTo(request.at("/metadata/attemptId"));
+                assertThat(records(trace, "MODEL_RESPONSE_RECEIVED")).isEmpty();
+                assertThat(usage(trace).path("providerAttempts").intValue()).isEqualTo(1);
+                for (String field : List.of("modelCalls", "promptUnits", "completionUnits", "totalUnits"))
+                    assertThat(usage(trace).path(field).intValue()).as(field).isZero();
+            });
+            assertThat(server.getRequestCount()).isEqualTo(1);
+        }
     }
 
     @ParameterizedTest

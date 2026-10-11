@@ -134,6 +134,30 @@ test("reconstructs chunked native evaluation content", async () => {
   expect(getContentRangeMock).toHaveBeenCalledTimes(2);
 });
 
+test("keeps absent native response evidence unavailable", async () => {
+  // Reader-state evidence: absence does not imply a producer capture setting.
+  renderRecords([record(63, "MODEL_RESPONSE_RECEIVED")]);
+  fireEvent.click(screen.getByRole("button", { name: "Response" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Model content is unavailable");
+  expect(getContentRangeMock).not.toHaveBeenCalled();
+  expect(getRawRecordRangeMock).not.toHaveBeenCalled();
+  expect(screen.queryByRole("heading", { name: "user" })).toBeNull();
+});
+
+test("does not display partial native response evidence when continuation fails", async () => {
+  const payload = JSON.stringify({ payloadType: "evaluation", rawBody: "<broken> Authorization=kept token=kept verbatim" });
+  getContentRangeMock
+    .mockResolvedValueOnce(range(payload.slice(0, 50), { actualEnd: 50, totalLength: payload.length, hasMore: true, nextCursor: "next" }))
+    .mockRejectedValueOnce(new Error("native continuation unavailable"));
+  renderRecords([record(64, "MODEL_RESPONSE_RECEIVED", "incomplete-native")]);
+  fireEvent.click(screen.getByRole("button", { name: "Response" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("native continuation unavailable");
+  expect(screen.queryByText(/Authorization=kept/)).toBeNull();
+  expect(screen.queryByRole("heading", { name: "user" })).toBeNull();
+  expect(getContentRangeMock).toHaveBeenCalledTimes(2);
+  expect(getRawRecordRangeMock).not.toHaveBeenCalled();
+});
+
 test("shows context in rows and expanded content while retaining UUIDs only in raw records", async () => {
   const value = record(56, "MODEL_RESPONSE_RECEIVED");
   value.route = "hotelSelection#step-3-model";

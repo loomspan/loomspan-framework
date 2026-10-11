@@ -328,6 +328,24 @@ proves private Score levels/results and stable catalog metadata during overlappi
 local calls. Existing Choice/reload and retry fixtures protect generation capture
 and reuse of one resolved request.
 
+`TypeSafeSkillIntegrationTest#nativeTerminalHttpErrorsDoNotRetryOrAccountErrorUsage`,
+`#disabledNativeRetryMakesOneSend`, and
+`#nativeRetryExhaustionStopsAtConfiguredAttempts` protect physical send/attempt
+cardinality, failure taxonomy, unchanged requests and zero error-body accounting
+on both prefixes. `#nativeUsagePrecisionAndResponseAccountingRemainExactOrUnavailable`
+protects exact/zero and unusable native usage through public invocation of a mixed
+batch. `#oversizedNativeErrorRetainsBoundedTruthfulEvidenceOnBothRoutes` protects
+bounded UTF-8 error evidence and explicit truncation separately from large results.
+
+Construction diagnostics retain the original cause and any suppressed cleanup
+failures. `NamedAiConnectionRegistryTests#constructionFailureRetainsCleanupFailuresAndContinuesClosing`
+protects cleanup continuation and diagnostic chains;
+`#nativeConstructionOwnershipClosesAcquiredResources` and
+`#nativeAllocationClosesWhenRuntimeConstructionFails` observe actual Apache pool
+closure. These are framework test anchors, not application extension points.
+`ConnectionDiagnosticFidelityTest#constructionCauseRemainsVerbatimAlongsideStructuredIdentity`
+protects retained construction details alongside structured model identity.
+
 `TypeSafeDeclaration`, `TypeSafeDeclarationTests`, and `YamlSkillCatalog` own
 declaration/substitution/schema checks. `TypeSafeClient`, `TypeSafeExecutor`, and
 `TypeSafeClientTest` protect actual HTTP route, headers, retry ownership, response
@@ -336,6 +354,16 @@ exercises public direct/child dispatch, controls, forwarding, and captured
 generations using deterministic local provider fixtures. `ConsoleRestFixtureCorpusTest`,
 `ConsoleTraceFixtureCorpusTest`, Go observability/MCP/corpus tests and
 `TraceRecords.model.test.tsx` protect coordinated diagnostic consumption.
+
+`ConsoleTraceFixtureCorpusTest#nativeFailureCorpusPreservesRawResponseAndBoundedProviderEvidence`
+and Go `TestNativeEvaluationFailureFixturesPreserveLogicalContentAndAttemptFacts`
+protect `native-evaluation-malformed-response` and
+`native-evaluation-provider-failure`: raw response text, retained business keys,
+HTTP-success versus terminal extraction failure, failed attempts and truncated
+provider evidence. Go `TestNativeEvaluationAbsentContentRemainsUnavailableReaderState`
+and the focused `TraceRecords.model.test.tsx`/`TraceAttemptDiagnostics.test.tsx`
+cases protect unavailable, incomplete and explicitly truncated reader evidence.
+Absent content is a reader state; it does not describe a new producer setting.
 
 These are fixture/source-backed mechanics, not evidence of live model accuracy,
 identical judgments between routes, or acceptance of every locally valid criterion.

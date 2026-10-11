@@ -69,27 +69,27 @@ is PR 27.4. PR 26's separate chat response-size change is not a prerequisite.
 
 ## Acceptance criteria
 
-- [ ] Both configuration examples construct the correct endpoint, Bearer credential,
+- [x] Both configuration examples construct the correct endpoint, Bearer credential,
   verbatim model ID, and shared request shape; custom headers work and missing keys,
   invalid URLs, Authorization overrides, and incompatible options are rejected.
-- [ ] Controlled HTTP fixtures preserve full mixed answers, empty/extended answers,
+- [x] Controlled HTTP fixtures preserve full mixed answers, empty/extended answers,
   native metadata, and unexpected answer values. Unreadable JSON or missing/null/non-object
   answers fail extraction without retries, repair, or fabricated results.
-- [ ] A 529-then-success case follows enabled bounded retry policy; terminal errors,
+- [x] A 529-then-success case follows enabled bounded retry policy; terminal errors,
   exhausted attempts, disabled retries, redirects, and cancellation produce no hidden
   sends. Every send has a reservation/trace; existing chat classification stays unchanged.
-- [ ] Exact, exact-zero, partial, missing, invalid/overflow usage and extraction-failure
+- [x] Exact, exact-zero, partial, missing, invalid/overflow usage and extraction-failure
   accounting follow the stated precision/write boundaries without estimates, duplicate
   accounting, question multiplication, or error-body usage ingestion.
-- [ ] Real-client fixtures verify configured timeouts, cancellation during HTTP/backoff,
+- [x] Real-client fixtures verify configured timeouts, cancellation during HTTP/backoff,
   late-write rejection, and registry cleanup including construction failure; late responses
   cannot revive cancelled success. Timeout documentation matches observed settings.
-- [ ] Each route preserves a valid response larger than 1 MiB; oversized error evidence
+- [x] Each route preserves a valid response larger than 1 MiB; oversized error evidence
   is bounded and truthfully marked without applying that limit to successful results.
-- [ ] Current Console trace detail and affected wire consumers read native request,
+- [x] Current Console trace detail and affected wire consumers read native request,
   envelope, and malformed response evidence as soon as emitted; no chat-only assumptions,
   canonical content rewriting, or deferred consumer repair remains.
-- [ ] Focused shared-contract and route-specific fixtures pass, as does
+- [x] Focused shared-contract and route-specific fixtures pass, as does
   `LoomspanPublicSurfaceArchitectureTest` for production-type changes. Recheck live API
   documentation during implementation; any credentialed live checks are reported separately
   from fixture evidence and do not silently narrow the accepted Score/request contract.
@@ -110,3 +110,23 @@ is PR 27.4. PR 26's separate chat response-size change is not a prerequisite.
   rejects compatibility bridges, legacy readers, and dual trace formats. Update all
   affected consumers together. Preserve supported existing chat behavior and deliberately
   maintain API allowlists/documentation/checks for any necessary public changes.
+
+## Execution notes
+
+2026-10-11: User approved the Full 5-Step Pipeline. Steps 1–4 completed against
+baseline `4552dff89b6928089e829a58b0f24a504d99064f`; independent Step 5 review is next.
+Baseline already contained native provider execution. This change corrects registry
+construction ownership/cause/cleanup evidence and adds acceptance-level HTTP,
+accounting and coordinated Java/Go/TS native trace assurance. Accepted provider
+request/result contracts, public API/SPI, configuration, trace representation,
+compatibility marker and derived-journal exception remain unchanged.
+
+Governing evidence: research `../research/2026-10-11-PR-27.3-typesafe-provider-execution.md`,
+implementation plan `../plans/2026-10-11-PR-27.3-typesafe-provider-execution.md`, and
+testing plan `../plans/2026-10-11-PR-27.3-typesafe-provider-execution-testing.md`.
+Plans record red tests, repaired new-fixture/obsolete-test failures and exact
+verification receipts. Final `.\mvnw.cmd clean test` passed: 1,577 tests, no
+failures/errors, 2 existing opt-in PR 18 diagnostics skipped. Console full Go,
+typecheck, production build and 533 web tests passed. Official TypeSafe,
+OpenRouter and pinned Apache docs were rechecked; credentialed provider smoke
+and accuracy checks were not run and remain optional. No commit was requested.

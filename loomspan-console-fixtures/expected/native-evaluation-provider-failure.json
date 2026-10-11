@@ -1,0 +1,63 @@
+{
+  "case" : "native-evaluation-provider-failure",
+  "valid" : true,
+  "traceId" : "trace-native-evaluation-provider-failure",
+  "sessionId" : "session-native-evaluation-provider-failure",
+  "outcome" : "FAILED",
+  "terminalFailureId" : "failure-native",
+  "attributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "terminalUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : false,
+  "attempts" : [ {
+    "retrySequenceId" : "native-retry",
+    "attemptId" : "native-attempt",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "FAILED",
+    "failureClassification" : "PERMANENT",
+    "failureCategory" : "AUTHENTICATION",
+    "retryDecision" : "DO_NOT_RETRY",
+    "retryDelayMillis" : 0,
+    "retryDelaySource" : "NONE",
+    "httpStatus" : 401,
+    "usage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "usageComplete" : false
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "native-retry",
+    "usage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "usageComplete" : false
+  } ],
+  "validationLinks" : [ ],
+  "frames" : [ ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}
