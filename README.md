@@ -51,7 +51,9 @@ When you are ready to integrate, ask your assistant to follow
 [loomspan-install](agent-skills/loomspan-install/SKILL.md). It selects guidance for
 your runtime version; reading the current README does not establish compatibility
 with an older release. Installing guidance and connecting Console MCP are separate
-setup steps; see [setup and integration choices](docs/setup.md).
+setup steps; see [setup and integration choices](docs/setup.md). The
+[adoption journey](docs/README.md#adoption-journey) gives your assistant the next
+action and observable completion checks from assessment through runtime inspection.
 
 ## From customer report to engineering triage
 

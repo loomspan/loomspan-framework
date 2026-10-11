@@ -1,8 +1,30 @@
 # Loomspan documentation
 
-Start with the [project overview](../README.md). These documents help application
-developers evaluate Loomspan, choose an integration, and set up their environment.
-They can be read directly or by an AI assistant.
+Start with the [project overview](../README.md). Loomspan documentation is AI first:
+an assistant uses this map to select version-matched instructions, perform a task,
+and verify its result with the developer. The same Markdown remains readable and
+usable directly by humans.
+
+## Adoption journey
+
+Read the overview and architecture for assessment, then load only the instructions
+needed for the selected task. Establish the runtime version before relying on
+version-sensitive contracts. Main describes the current development revision;
+for a release, use its exact tag. Record the source commit for snapshot evaluations.
+
+| Stage | Assistant's next action | Evidence of completion |
+| --- | --- | --- |
+| Evaluate | Read [architecture](architecture.md) and [setup](setup.md); relate the tradeoffs to the application's task and runtime boundary. | An integration choice and stated assumptions. |
+| Select and install guidance | Follow [loomspan-install](../agent-skills/loomspan-install/SKILL.md) for the chosen exact runtime. | Installed names, component versions, source revisions and scope, or a specific host/source limitation. |
+| Run a first skill | Follow the [Java quickstart](quickstart-java.md), or the exact Sidecar revision's setup guidance. | A successful invocation and observed output; compilation alone is insufficient. |
+| Inspect execution | For embedded Java, use the quickstart's [servlet bridge](quickstart-java.md#continue-with-console), then [Console setup](console-setup.md). | Console connects to the selected target; the assistant discovers its MCP tools and retrieves execution evidence. |
+| Develop the application | Route through [loomspan](../agent-skills/loomspan/SKILL.md), loading the relevant authoring/API references or Console playbook. | Application behavior is checked against its contracts and runtime evidence. |
+
+Guidance installation, runtime invocation, and MCP connectivity are separate
+results. Report each as completed, unavailable, or unverified from actual evidence.
+An assistant host without skill installation or local MCP access can still consult
+matching Markdown; it must report which execution or inspection steps it cannot
+perform. The developer can complete those steps using the same documents.
 
 | Decision or setup task | Document |
 | --- | --- |
@@ -38,5 +60,6 @@ workflows may use skills while their background and decisions live here. Each
 contract should have one authoritative home; link to it rather than copy it.
 
 Application development and framework development are different audiences.
-Repository implementation, packaging, and release procedures do not belong in the
-application getting-started path and are outside this documentation map.
+Repository implementation, packaging, and release procedures have a separate
+[maintainer entrypoint](maintainers/README.md). Use that entrypoint for framework
+changes; application Agent Skills do not carry the contributor workflow.

@@ -145,6 +145,12 @@ as urgent customer impact, treat the deployment as a possible cause rather than 
 proven one, and suggest correlating payment and order records and checking retry
 behavior. It should ask for affected order identifiers and timestamps.
 
+In this checkout, the command-line run also logs that observability is disabled
+because a servlet application is required, and validator deprecation warnings
+for the connection/model maps. These warnings do not prevent invocation. Check
+the printed result and process outcome; use the servlet continuation below when
+you need Console inspection.
+
 This first skill reasons over the supplied report; it does not query those systems.
 Wording and accuracy are model-dependent. Add application capabilities when the
 workflow needs to gather evidence, as described below.
@@ -154,6 +160,58 @@ If startup fails, check the exact dependency, environment variables, alias, and
 and model in the diagnostic and consult the
 [connection troubleshooting reference](../agent-skills/loomspan-docs/references/skill-authoring/model-selection-and-connections.md).
 The example uses default [execution limits](../agent-skills/loomspan-docs/references/skill-authoring/execution-limits.md).
+
+## Continue with Console
+
+To inspect this same skill through Console, turn the example into a local servlet
+application. Add this dependency to the application's existing `dependencies`:
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-webmvc</artifactId>
+</dependency>
+```
+
+Replace only `main` in `DemoApplication` so the application stays running after
+the existing `ApplicationRunner` prints its result:
+
+```java
+public static void main(String[] args) {
+    SpringApplication.run(DemoApplication.class, args);
+}
+```
+
+Add these settings to `application.yml`, merging the entries into the existing
+`loomspan` mapping rather than creating a second one:
+
+```yaml
+server:
+  address: 127.0.0.1
+  port: 8081
+loomspan:
+  observability:
+    enabled: true
+    auth:
+      api-key: ${LOOMSPAN_OBSERVABILITY_API_KEY}
+    completion-grace-ttl: 15m
+```
+
+Generate and set the application key as described in [Console setup](console-setup.md).
+Keep the provider environment variables from the first run, then run
+`mvn spring-boot:run` again. This makes another provider request. The invocation
+prints its result and the server remains available at `http://127.0.0.1:8081`.
+No application execution HTTP endpoint is needed: the existing runner invokes
+the skill once on startup.
+
+Connect the matching Console to that address within the 15-minute completion
+grace, then follow [verification and first inspection](console-setup.md#verify-and-inspect).
+The invocation finishes before Console connects, so inspect a finalized trace;
+an empty active-execution list is expected. Grace makes the completed artifact
+temporarily available even when the default `ONERROR` persistence policy does not
+retain a successful trace. Stop the application when finished. This optional
+configuration is for local evaluation; use your application's normal listener
+and access configuration when integrating it.
 
 ## Develop further
 
@@ -165,6 +223,5 @@ The example uses default [execution limits](../agent-skills/loomspan-docs/refere
 - Define [structured outputs](../agent-skills/loomspan-docs/references/skill-authoring/output-contracts.md)
   and [authorization](../agent-skills/loomspan-docs/references/skill-authoring/authorization.md)
   for your application's contract.
-- For a long-running servlet application, use [Console setup](console-setup.md)
-  to enable runtime investigation. This command-line example does not expose the
-  servlet observability API.
+- Use the [Console continuation](#continue-with-console) to inspect the first
+  skill, or [Console setup](console-setup.md) for an existing servlet application.

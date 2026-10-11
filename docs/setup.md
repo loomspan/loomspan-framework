@@ -18,11 +18,16 @@ owner's published sources.
 ## Configure model access
 
 Model-backed YAML skills select a named model alias. The alias selects a named
-connection and a provider model ID. Supported drivers are `openai`, `anthropic`,
+connection and a provider model ID. Supported chat drivers are `openai`, `anthropic`,
 `gemini`, and `ollama`. Supply credentials and endpoint configuration for the
 chosen service; Loomspan does not inherit `spring.ai.*` settings.
 
-The quickstart shows one connection. For additional providers, gateways, retry
+Native TypeSafe Choice, Noul, and Score leaves use the separate `typesafe` driver
+with direct TypeSafe or OpenRouter System One access. Use the
+[TypeSafe reference](../agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md)
+for their declarations and connections; chat driver settings do not configure them.
+
+The quickstart shows one chat connection. For additional providers, gateways, retry
 policies, and timeouts, use the authoritative
 [connection reference](../agent-skills/loomspan-docs/references/skill-authoring/model-selection-and-connections.md).
 Compatibility with an OpenAI-style endpoint is feature-specific; do not assume
@@ -56,3 +61,16 @@ Use loomspan-docs to integrate invocation and error handling in my Java service.
 
 Runtime investigation also requires a configured Console MCP connection. Follow
 [Console setup](console-setup.md); installing its skill alone does not connect it.
+
+For an assistant-led integration, use this request after choosing the runtime:
+
+```text
+Use the selected exact Loomspan runtime version and matching documentation.
+Follow loomspan-install to install the complete guidance set in supported project
+scope, reporting installed versions, source revisions and any host limitations.
+Then follow the matching runtime's quickstart to implement and run one skill.
+Report the observed invocation result separately from installation status.
+For embedded Java runtime inspection, follow the servlet bridge and Console setup,
+verify the installed MCP tools, and inspect the resulting execution. If local MCP
+access is unavailable, explain the browser inspection steps and the evidence gap.
+```

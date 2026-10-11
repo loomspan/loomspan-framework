@@ -3,7 +3,14 @@
 Use a Console package matching the framework's coordinated version. Follow the
 [Console runtime package guide](../loomspan-console/release/README.md) to start it.
 This setup applies to a running servlet application; the command-line quickstart
-does not expose HTTP endpoints.
+does not expose HTTP endpoints until you apply its
+[servlet continuation](quickstart-java.md#continue-with-console).
+
+For a release, obtain the package for your operating system from the matching
+framework release tag's assets and verify its checksum as described in the runtime
+package guide. For a snapshot source evaluation, build Console from the same
+framework commit using the [Console build instructions](../loomspan-console/README.md#canonical-production-commands).
+A matching snapshot version string alone does not identify the same source build.
 
 ## Enable the target observability API
 
@@ -71,3 +78,33 @@ For ongoing investigation, use the
 [trace debugging reference](../agent-skills/loomspan-docs/references/skill-authoring/traces-and-debugging.md).
 For direct adapter diagnosis, see the
 [observability HTTP reference](../agent-skills/loomspan-docs/references/skill-authoring/observability-http.md).
+
+## Verify and inspect
+
+1. In the paired browser, select **Connect** for the intended application address
+   and key. Check its connection and compatibility result. Include any servlet
+   context path in the target address.
+2. Ask your assistant to discover its installed Console MCP tools and call
+   `LOOMSPAN_get_runtime`. Verify that the intended target is selected and inspect
+   authentication and compatibility facts. A browser connection alone does not
+   prove the assistant's MCP connection works.
+3. Ask it to follow `loomspan-console` to find the recent `triageSupportRequest`
+   execution and inspect its finalized trace. Use returned `traceId` values;
+   distinguish the observed outcome, captured content and usage from an inference
+   about the quality of the triage brief. For your own application, select the
+   relevant skill and execution instead.
+
+```text
+Use loomspan-console to verify the selected target and inspect the recent
+triageSupportRequest execution. Discover the installed tools, check runtime
+status, then use the matching playbook to retrieve the finalized trace.
+Report its outcome, traceId, recorded model interaction and available usage.
+Distinguish recorded facts from your interpretation and identify missing evidence.
+```
+
+If MCP tools are missing, check the assistant host's connection and refresh
+requirements. If that host cannot reach the local listener, use Console's browser
+trace views and report that assistant evidence retrieval is unavailable. If the
+artifact has expired or the application restarted, rerun the example and reconnect
+within its completion grace; absence of an artifact does not establish execution
+failure. Use the Console skill's playbooks for precise runtime and trace errors.
