@@ -949,10 +949,10 @@ class ModelAttemptCallAdvisorIntegrationTest
         {
             server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
                     {"id":"error-1","object":"chat.completion","created":1,"model":"routed-model",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"unsafe partial"},
+                     "choices":[{"index":0,"message":{"role":"assistant","content":"unsafe partial%s"},
                        "finish_reason":"error","error":{"message":"overloaded","code":"E_OVERLOAD",
                        "metadata":{"error_type":"provider_overloaded"}}}]}
-                    """));
+                    """.formatted("x".repeat(1024 * 1024 + 1))));
             server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
                     {"id":"success-2","object":"chat.completion","created":2,"model":"routed-model",
                      "choices":[{"index":0,"message":{"role":"assistant","content":"recovered"},"finish_reason":"stop"}],

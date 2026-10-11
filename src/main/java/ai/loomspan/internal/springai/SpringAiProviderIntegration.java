@@ -206,11 +206,7 @@ public final class SpringAiProviderIntegration
         byte[] bytes;
         try (body; InputStream stream = body.byteStream())
         {
-            bytes = stream.readNBytes(DIAGNOSTIC_LIMIT_BYTES + 1);
-        }
-        if (bytes.length > DIAGNOSTIC_LIMIT_BYTES)
-        {
-            throw decodingFailure("OpenRouter response exceeded diagnostic capture limit", bytes, true);
+            bytes = stream.readAllBytes();
         }
         inspectOpenRouterBody(bytes);
         return response.newBuilder().body(okhttp3.ResponseBody.create(contentType, bytes)).build();
@@ -223,7 +219,7 @@ public final class SpringAiProviderIntegration
         {
             if (!"error".equals(choice.path("finish_reason").asText())) continue;
             JsonNode error = choice.path("error");
-            if (!error.isObject()) throw decodingFailure("Malformed OpenRouter error completion", bytes, false);
+            if (!error.isObject()) throw decodingFailure("Malformed OpenRouter error completion", bytes);
             String type = text(error.path("metadata").path("error_type"));
             String code = text(error.path("code"));
             if (code == null) code = text(error.path("provider_code"));
@@ -233,7 +229,7 @@ public final class SpringAiProviderIntegration
                     ? ProviderFailureClassification.TRANSIENT : ProviderFailureClassification.PERMANENT;
             throw new ProviderCallException("OpenRouter returned an error completion",
                     new ProviderFailureDetails(classification, category, 200, null, type, code, summary,
-                            List.of(diagnostic(bytes, false))));
+                            List.of(diagnostic(bytes, bytes.length > DIAGNOSTIC_LIMIT_BYTES))));
         }
     }
 
@@ -394,59 +390,16 @@ public final class SpringAiProviderIntegration
                 List.of(diagnostic(bytes, truncated)));
     }
 
-    ClientHttpResponse inspectOpenRouter(ClientHttpResponse response) throws IOException
+    private ProviderCallException decodingFailure(String message, byte[] body)
     {
-        if (!response.getStatusCode().is2xxSuccessful()) return response;
-        byte[] bytes = response.getBody().readNBytes(DIAGNOSTIC_LIMIT_BYTES + 1);
-        if (bytes.length > DIAGNOSTIC_LIMIT_BYTES)
-        {
-            response.close();
-            throw decodingFailure("OpenRouter response exceeded diagnostic capture limit", bytes, true);
-        }
-        try
-        {
-            JsonNode root = objectMapper.readTree(bytes);
-            for (JsonNode choice : root.path("choices"))
-            {
-                if ("error".equals(choice.path("finish_reason").asText()))
-                {
-                    JsonNode error = choice.path("error");
-                    if (!error.isObject()) throw decodingFailure("Malformed OpenRouter error completion", bytes, false);
-                    String type = text(error.path("metadata").path("error_type"));
-                    String code = text(error.path("code"));
-                    if (code == null) code = text(error.path("provider_code"));
-                    String summary = text(error.path("message"));
-                    ProviderFailureCategory category = category(type);
-                    ProviderFailureClassification classification = retryableOpenRouter(type)
-                            ? ProviderFailureClassification.TRANSIENT : ProviderFailureClassification.PERMANENT;
-                    response.close();
-                    throw new ProviderCallException("OpenRouter returned an error completion",
-                            new ProviderFailureDetails(classification, category, 200, null, type, code, summary,
-                                    List.of(diagnostic(bytes, false))));
-                }
-            }
-        }
-        catch (ProviderCallException ex) { throw ex; }
-        catch (RuntimeException ex)
-        {
-            response.close();
-            throw decodingFailure("Unable to decode OpenRouter response", bytes, false);
-        }
-        return new BufferedClientHttpResponse(response, bytes);
-    }
-
-    private ProviderCallException decodingFailure(String message, byte[] body, boolean truncated)
-    {
-        byte[] bounded = body.length <= DIAGNOSTIC_LIMIT_BYTES ? body : java.util.Arrays.copyOf(body, DIAGNOSTIC_LIMIT_BYTES);
         return new ProviderCallException(message,
                 new ProviderFailureDetails(ProviderFailureClassification.PERMANENT,
                         ProviderFailureCategory.CLIENT_DECODING, 200, null, null, null, message,
-                        List.of(diagnostic(bounded, truncated))));
+                        List.of(diagnostic(body, body.length > DIAGNOSTIC_LIMIT_BYTES))));
     }
 
     private static Map<String, Object> diagnostic(byte[] body, boolean truncated)
     {
-        // TODO: Scrub sensitive provider diagnostic content at this capture/emission boundary.
         String text = new String(body, StandardCharsets.UTF_8);
         byte[] encoded = text.getBytes(StandardCharsets.UTF_8);
         if (encoded.length > DIAGNOSTIC_LIMIT_BYTES)
@@ -550,12 +503,4 @@ public final class SpringAiProviderIntegration
         }
     }
 
-    private record BufferedClientHttpResponse(ClientHttpResponse delegate, byte[] bytes) implements ClientHttpResponse
-    {
-        @Override public org.springframework.http.HttpStatusCode getStatusCode() throws IOException { return delegate.getStatusCode(); }
-        @Override public String getStatusText() throws IOException { return delegate.getStatusText(); }
-        @Override public void close() { delegate.close(); }
-        @Override public InputStream getBody() { return new ByteArrayInputStream(bytes); }
-        @Override public org.springframework.http.HttpHeaders getHeaders() { return delegate.getHeaders(); }
-    }
 }

@@ -16,10 +16,6 @@ import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.client.ClientHttpResponse;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.MediaType;
@@ -266,7 +262,7 @@ class SpringAiProviderIntegrationTest
     void openRouterDiagnosticCaptureIsBoundedAtOneMebibyte() throws Exception
     {
         int limit = SpringAiProviderIntegration.DIAGNOSTIC_LIMIT_BYTES;
-        for (int bodySize : new int[] { limit, limit + 1 })
+        for (int bodySize : new int[] { limit - 1, limit, limit + 1, limit * 2 })
         {
             try (MockWebServer server = new MockWebServer())
             {
@@ -287,9 +283,13 @@ class SpringAiProviderIntegrationTest
                 var details = runtime.failureTranslator().translate(failure);
 
                 assertThat(failure).isNotNull();
+                assertThat(details.classification()).isEqualTo(ProviderFailureClassification.TRANSIENT);
+                assertThat(details.category()).isEqualTo(ProviderFailureCategory.PROVIDER_OVERLOADED);
+                assertThat(details.providerErrorCode()).isEqualTo("E_OVERLOAD");
                 assertThat(server.getRequestCount()).isEqualTo(1);
                 assertThat(details.diagnostics()).singleElement().satisfies(diagnostic ->
                 {
+                    assertThat(diagnostic.get("text")).isEqualTo(openRouterErrorBody(bodySize).substring(0, Math.min(bodySize, limit)));
                     assertThat(diagnostic.get("captureLimitBytes")).isEqualTo(limit);
                     assertThat(((String) diagnostic.get("text")).getBytes(java.nio.charset.StandardCharsets.UTF_8))
                             .hasSizeLessThanOrEqualTo(limit);
@@ -300,54 +300,116 @@ class SpringAiProviderIntegrationTest
     }
 
     @Test
-    void rejectedOpenRouterResponsesAreClosed() throws Exception
+    void validResponsesPreserveContentToolsAndMetadataAcrossProfilesAndDiagnosticBoundary() throws Exception
     {
-        String errorCompletion = openRouterErrorBody(512);
-        CloseAwareResponse error = new CloseAwareResponse(errorCompletion.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        assertThat(catchThrowable(() -> integration.inspectOpenRouter(error))).isNotNull();
-        assertThat(error.closed).isTrue();
-
-        CloseAwareResponse oversized = new CloseAwareResponse(
-                "x".repeat(SpringAiProviderIntegration.DIAGNOSTIC_LIMIT_BYTES + 1)
-                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        assertThat(catchThrowable(() -> integration.inspectOpenRouter(oversized))).isNotNull();
-        assertThat(oversized.closed).isTrue();
-
-        CloseAwareResponse malformed = new CloseAwareResponse("not-json".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        assertThat(catchThrowable(() -> integration.inspectOpenRouter(malformed))).isNotNull();
-        assertThat(malformed.closed).isTrue();
+        int limit = SpringAiProviderIntegration.DIAGNOSTIC_LIMIT_BYTES;
+        for (boolean openRouter : new boolean[] {false, true})
+        {
+            for (int size : new int[] {limit - 1, limit, limit + 1, limit * 2})
+            {
+                String content = "answer-" + "x".repeat(size / 2 - 500) + "-answer-end";
+                String arguments = "{\"value\":\"" + "y".repeat(size / 2 - 500) + "-argument-end\"}";
+                String json = new tools.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of(
+                        "id", "complete-response", "object", "chat.completion", "created", 1,
+                        "model", "routed-model", "choices", java.util.List.of(java.util.Map.of(
+                                "index", 0, "finish_reason", "tool_calls", "message", java.util.Map.of(
+                                        "role", "assistant", "content", content, "tool_calls", java.util.List.of(
+                                                java.util.Map.of("id", "call-1", "type", "function", "function",
+                                                        java.util.Map.of("name", "lookup", "arguments", arguments)))))),
+                        "usage", java.util.Map.of("prompt_tokens", 2, "completion_tokens", 3, "total_tokens", 5)));
+                // Pad outside the object so each fixture has an exact UTF-8 byte size.
+                json += " ".repeat(size - json.length());
+                try (MockWebServer server = new MockWebServer())
+                {
+                    server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody(json));
+                    var properties = openAi();
+                    properties.setBaseUrl(server.url("/v1").toString());
+                    if (openRouter)
+                    {
+                        var options = new LoomspanProperties.OpenAiOptions();
+                        options.setCompatibilityProfile(LoomspanProperties.OpenAiCompatibilityProfile.OPENROUTER);
+                        properties.setOpenai(options);
+                    }
+                    var response = integration.create("test", properties).chatModel().call(new Prompt("hello",
+                            OpenAiChatOptions.builder().model("routed-model").build()));
+                    assertThat(response.getResult().getOutput().getText()).isEqualTo(content);
+                    assertThat(response.getResult().getOutput().getToolCalls()).singleElement().satisfies(tool ->
+                    {
+                        assertThat(tool.id()).isEqualTo("call-1");
+                        assertThat(tool.name()).isEqualTo("lookup");
+                        assertThat(tool.arguments()).isEqualTo(arguments);
+                    });
+                    assertThat(response.getMetadata().getId()).isEqualTo("complete-response");
+                    assertThat(response.getMetadata().getModel()).isEqualTo("routed-model");
+                    assertThat(response.getMetadata().getUsage().getTotalTokens()).isEqualTo(5);
+                    assertThat(response.getResult().getMetadata().getFinishReason()).isEqualTo("TOOL_CALLS");
+                    assertThat(server.getRequestCount()).isEqualTo(1);
+                }
+            }
+        }
     }
 
     @Test
-    void oversizedStreamingOpenRouterResponseIsReadOnlyToTheBoundAndClosed()
+    void inspectedResponsesReleaseOriginalStreamOnSuccessAndFailure() throws Exception
     {
         int limit = SpringAiProviderIntegration.DIAGNOSTIC_LIMIT_BYTES;
-        GuardedOversizedInputStream stream = new GuardedOversizedInputStream(limit * 16L);
+        String success = "{\"choices\":[{\"finish_reason\":\"stop\"}],\"padding\":\"" + "x".repeat(limit + 1) + "\"}";
+        for (String json : new String[] {success, openRouterErrorBody(limit * 2), "not-json",
+                "{\"choices\":[{\"finish_reason\":\"error\"}]}",
+                "{\"padding\":\"" + "x".repeat(limit + 1) + "\",\"choices\":[{\"finish_reason\":\"error\"}]}"})
+        {
+            TrackingInputStream stream = new TrackingInputStream(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            Response response = streamingResponse(stream);
+            if (json.equals(success))
+            {
+                try (Response inspected = integration.inspectOpenRouter(response))
+                {
+                    assertThat(inspected.body().string()).isEqualTo(json);
+                }
+            }
+            else
+            {
+                Throwable failure = catchThrowable(() -> integration.inspectOpenRouter(response));
+                assertThat(failure).isNotNull();
+                if (json.contains("finish_reason"))
+                {
+                    var details = ((ProviderCallException) failure).details();
+                    assertThat(details.category()).isEqualTo(json.contains("provider_overloaded")
+                            ? ProviderFailureCategory.PROVIDER_OVERLOADED : ProviderFailureCategory.CLIENT_DECODING);
+                    assertThat(details.diagnostics()).singleElement().satisfies(diagnostic ->
+                            assertThat(diagnostic.get("truncated")).isEqualTo(json.length() > limit));
+                }
+            }
+            assertThat(stream.closed).isTrue();
+            assertThat(stream.available()).isZero();
+        }
+    }
+
+    @Test
+    void inspectionReadFailureClosesOriginalStream()
+    {
+        TrackingInputStream stream = new TrackingInputStream(new byte[0])
+        {
+            @Override public synchronized int read(byte[] bytes, int offset, int length)
+            {
+                throw new java.io.UncheckedIOException(new IOException("failed read"));
+            }
+        };
+        assertThat(catchThrowable(() -> integration.inspectOpenRouter(streamingResponse(stream)))).isNotNull();
+        assertThat(stream.closed).isTrue();
+    }
+
+    private static Response streamingResponse(InputStream stream)
+    {
         ResponseBody body = new ResponseBody()
         {
             private final BufferedSource source = Okio.buffer(Okio.source(stream));
-
             @Override public MediaType contentType() { return MediaType.get("application/json"); }
             @Override public long contentLength() { return -1; }
             @Override public BufferedSource source() { return source; }
         };
-        Response response = new Response.Builder()
-                .request(new Request.Builder().url("https://openrouter.example/v1/chat/completions").build())
-                .protocol(Protocol.HTTP_1_1)
-                .code(200)
-                .message("OK")
-                .body(body)
-                .build();
-
-        Throwable failure = catchThrowable(() -> integration.inspectOpenRouter(response));
-
-        assertThat(failure).isInstanceOf(ProviderCallException.class);
-        assertThat(stream.closed).isTrue();
-        assertThat(stream.bytesRead)
-                .as("the buffered source may read one segment ahead, but never the complete streaming body")
-                .isGreaterThanOrEqualTo(limit + 1L)
-                .isLessThanOrEqualTo(limit + 8192L);
-        assertThat(stream.bytesRead).isLessThan(stream.virtualLength);
+        return new Response.Builder().request(new Request.Builder().url("https://openrouter.example/v1/chat/completions").build())
+                .protocol(Protocol.HTTP_1_1).code(200).message("OK").body(body).build();
     }
 
     private static LoomspanProperties.ConnectionProperties gemini()
@@ -380,56 +442,10 @@ class SpringAiProviderIntegrationTest
         return prefix + "x".repeat(padding) + suffix;
     }
 
-    private static final class CloseAwareResponse implements ClientHttpResponse
+    private static class TrackingInputStream extends ByteArrayInputStream
     {
-        private final byte[] body;
-        private boolean closed;
-
-        private CloseAwareResponse(byte[] body)
-        {
-            this.body = body;
-        }
-
-        @Override public HttpStatusCode getStatusCode() { return HttpStatus.OK; }
-        @Override public String getStatusText() { return "OK"; }
+        boolean closed;
+        private TrackingInputStream(byte[] bytes) { super(bytes); }
         @Override public void close() { closed = true; }
-        @Override public InputStream getBody() { return new ByteArrayInputStream(body); }
-        @Override public HttpHeaders getHeaders() { return new HttpHeaders(); }
-    }
-
-    private static final class GuardedOversizedInputStream extends InputStream
-    {
-        private final long virtualLength;
-        private long bytesRead;
-        private boolean closed;
-
-        private GuardedOversizedInputStream(long virtualLength)
-        {
-            this.virtualLength = virtualLength;
-        }
-
-        @Override
-        public int read(byte[] bytes, int offset, int length)
-        {
-            if (bytesRead >= virtualLength) return -1;
-            int count = (int) Math.min(length, virtualLength - bytesRead);
-            java.util.Arrays.fill(bytes, offset, offset + count, (byte) 'x');
-            bytesRead += count;
-            return count;
-        }
-
-        @Override
-        public int read()
-        {
-            if (bytesRead >= virtualLength) return -1;
-            bytesRead++;
-            return 'x';
-        }
-
-        @Override
-        public void close()
-        {
-            closed = true;
-        }
     }
 }

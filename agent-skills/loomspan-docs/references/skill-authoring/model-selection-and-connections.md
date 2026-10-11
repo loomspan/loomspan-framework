@@ -63,7 +63,7 @@ The OpenAI and Anthropic drivers use Spring AI 2's official SDK-backed clients. 
 
 The removed OpenAI completion-path override and Anthropic completion-path/version/beta fields have no aliases or fallback behavior and fail strict startup binding. Move any supported Anthropic beta/custom values to `headers`; choose a complete compatible `base-url` instead of overriding a completion path.
 
-OpenRouter error-completion handling is enabled only by `openai.compatibility-profile: openrouter`; Loomspan does not infer it from a connection name or URL. This profile rejects `finish_reason: error` responses, including any partial assistant content, and preserves bounded provider diagnostics for tracing.
+OpenRouter error-completion handling is enabled only by `openai.compatibility-profile: openrouter`; Loomspan does not infer it from a connection name or URL. This profile rejects `finish_reason: error` responses, including any partial assistant content, and preserves bounded provider diagnostics for tracing. The 1 MiB provider-error diagnostic capture limit bounds retained failure evidence, with explicit `truncated` and `captureLimitBytes` metadata; it does not limit successful response size. The profile inspects the complete response for embedded errors and preserves successful answer content, tool arguments, and response metadata. Parsing, provider/model constraints, and existing timeout/cancellation behavior still apply.
 
 Every connection owns a `provider-retry` policy. Defaults are enabled, three total unchanged-request attempts, 500 ms initial backoff, a 2.0 multiplier, a 5 s cap, and 0.2 jitter. Skills select only the model alias and cannot declare or override this policy. The session-wide `loomspan.session.quotas.max-provider-attempts` safeguard defaults to 192; zero disables that quota.
 
@@ -129,6 +129,10 @@ The identical bounded guidance is recorded on every failed physical attempt, inc
 - Retry/profile ownership: `LoomspanPropertiesTest`, `ProviderRetryDeciderTest`,
   `SpringAiProviderIntegrationTest`, `ConnectionProtocolTest`, and
   `ModelAttemptCallAdvisorIntegrationTest`.
+- Response acceptance versus diagnostic capture: `SpringAiProviderIntegration#inspectOpenRouter`,
+  `SpringAiProviderIntegrationTest#validResponsesPreserveContentToolsAndMetadataAcrossProfilesAndDiagnosticBoundary`,
+  `#openRouterDiagnosticCaptureIsBoundedAtOneMebibyte`, and
+  `#inspectedResponsesReleaseOriginalStreamOnSuccessAndFailure`.
 - Request options and tool-loop assembly: `SpringAiChatOptionsContributorTest` and `SpringAiChatClientAssemblerIntegrationTest`.
 - Wire behavior: `ConnectionProtocolTest`.
 - Call budgets/default transport phases: `LoomspanProperties#validateRequestTimeout`,
