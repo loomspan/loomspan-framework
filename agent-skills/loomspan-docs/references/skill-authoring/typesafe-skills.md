@@ -49,14 +49,26 @@ loomspan:
   models:
     typesafeDefault:
       connection: typesafeDirect
-      provider-model: jev-latest
+      provider-model: ${TYPESAFE_MODEL_ID}
     chatDefault:
       connection: chat
       provider-model: gpt-4.1
 ```
 
-For OpenRouter, point `typesafeDefault.connection` to `typesafeRouter` and set
-`provider-model` to the exact System One model ID supported by that account.
+Set `TYPESAFE_MODEL_ID` to the exact direct System One model ID supported by your
+account. To switch the alias to OpenRouter, replace only its model mapping:
+
+```yaml
+loomspan:
+  models:
+    typesafeDefault:
+      connection: typesafeRouter
+      provider-model: ${OPENROUTER_TYPESAFE_MODEL_ID}
+```
+
+Set `OPENROUTER_TYPESAFE_MODEL_ID` to the route-specific System One ID supported
+by that account. Keep both connection declarations above; credentials remain
+connection properties. The leaf YAML and invocation input stay unchanged.
 Loomspan sends that ID verbatim; it does not discover models, add a namespace,
 or try fallback models. A TypeSafe leaf MUST select a `typesafe` connection;
 ordinary chat YAML MUST select a chat driver.
@@ -151,7 +163,8 @@ may be a string, object, array, or null. No inter-question dependency is support
 | `score` | Required ordered array of 1–10 descriptions, each string, object, array, or null | `score`, distribution `confidence`, indexed `probabilities`, and provider `legend` |
 
 Provider probability/confidence values are described on a 0–1 scale. Choice and
-Score confidence describes the distribution and is not recomputed from the
+Score confidence describes the distribution, not the probability that a judgment
+is factually correct, and is not recomputed from the
 selected candidate. Score uses zero-based levels, with an expected score range
 from 0 through level count minus one; its result need not be an integer. These
 describe provider outputs and do not install Loomspan answer checks.
@@ -265,6 +278,93 @@ remain runtime checks. Source lookup is exact and never silently omits a missing
 probability key. [Output contracts](output-contracts.md) owns forwarding and
 assembly rules.
 
+## Fixed criteria and selected-answer bindings
+
+Save this complete alternative leaf as `skills/assessFixedContact.yaml`. These
+candidate labels and levels are illustrative author data, not framework defaults
+or automatic business actions. It uses the same connections as the dynamic leaf:
+
+```yaml
+name: assessFixedContact
+description: Evaluate a contact using fixed author-supplied criteria.
+model: typesafeDefault
+input_schema:
+  type: object
+  properties:
+    context: {type: object, additionalProperties: true}
+  required: [context]
+  additionalProperties: false
+typesafe:
+  state: "${/input/context}"
+  questions:
+    department:
+      type: choice
+      criteria:
+        billing: Charges
+        technical: Checkout failures
+    repeat:
+      type: noul
+      criteria:
+        "true": The contact reports a previous support attempt.
+        "false": The contact reports no previous support attempt.
+    severity:
+      type: score
+      instructions: Assess how much observed functionality is lost.
+      criteria: [All functions available, A critical operation is blocked]
+```
+
+Invoke directly with `skills.invoke("assessFixedContact", Map.of("context",
+Map.of("message", "Again: checkout failed. Browsing works.")))`. Each primitive
+is independently usable by retaining just its question in either complete leaf;
+single-question results still have that question's name at the root.
+
+Save this separately as `skills/summarizeContact.yaml`. It binds input to the
+fixed leaf and assembles selected values into an ordinary parent output contract:
+
+```yaml
+name: summarizeContact
+description: Extract selected contact judgments without a synthesis call.
+model: chatDefault
+planning_mode: true
+max_steps: 1
+prompt: Have assessFixedContact assess this contact and extract its judgments.
+input_schema:
+  type: object
+  properties:
+    context: {type: object, additionalProperties: true}
+  required: [context]
+  additionalProperties: false
+allowed_skills:
+  - name: assessFixedContact
+    required: true
+    max_tasks: 1
+    input_bindings:
+      /context: {from: input, path: /context}
+output_schema:
+  type: object
+  properties:
+    department: {type: string, enum: [billing, technical]}
+    repeatProbability: {type: number}
+    severity: {type: number}
+    technicalProbability: {type: number}
+  required: [department, repeatProbability, severity, technicalProbability]
+  additionalProperties: false
+output_bindings:
+  /department: {from: child_result, skill: assessFixedContact, path: /department/choice}
+  /repeatProbability: {from: child_result, skill: assessFixedContact, path: /repeat/noul}
+  /severity: {from: child_result, skill: assessFixedContact, path: /severity/score}
+  /technicalProbability: {from: child_result, skill: assessFixedContact, path: /department/probabilities/technical}
+```
+
+Invoke `summarizeContact` with the same `context` input as the fixed direct leaf.
+This parent validates the selected values against its receiving output schema;
+the leaf's descriptive schema does not validate the complete native answer.
+Changing the destination enum to disjoint values fails registration. A missing
+`technical` probability or an actual selected value outside the receiving enum
+fails assembly at invocation. Dynamic candidates cannot establish fixed enum or
+probability-key guarantees at registration. Bindings do not impose correctness,
+probability ranges, confidence gates, routing, or actions.
+
 ## Transport, usage, and observation
 
 Apache HttpClient 5.6.1 owns the shared native transport, with automatic retries
@@ -277,13 +377,22 @@ socket inactivity from `SocketConfig.DEFAULT`. A configured value sets response
 and connection socket timeout, leaving connect/lease at three minutes.
 The mission deadline remains authoritative across sending, reading, and backoff.
 Cancellation aborts the native request; late writes follow existing lifecycle gates.
+Cancellation cannot retract an inference already accepted remotely or guarantee
+that the provider stops work or billing. A retry may repeat remote inference;
+there is no exactly-once inference guarantee.
 
 The existing provider-retry policy repeats the same captured resolved request.
+Both routes use this same Framework retry owner and mission-wide provider-attempt
+budget; Apache adds no retries. See [connection retry policy](model-selection-and-connections.md)
+for settings, defaults and backoff.
 HTTP 529 is transient overload; invalid envelope extraction is terminal.
 Successful responses have no additional Loomspan body byte ceiling, including
 valid answers larger than 1 MiB on either route. Parser constraints, available
 memory, provider limits, and timeouts still apply. HTTP error evidence alone is
 bounded at 1 MiB with explicit truncation metadata.
+Response acceptance is independent of diagnostic capture: disabling or truncating
+capture does not impose an answer-size limit or change extraction. Inspect the
+returned capture state before claiming that request or envelope content is complete.
 
 Successful HTTP responses are accounted once while writable, even when answers
 extraction subsequently fails. Nonnegative JSON integer `usage.input_tokens` and
@@ -369,10 +478,18 @@ Absent content is a reader state; it does not describe a new producer setting.
 protects actual discovered and supplied registration through authenticated catalog
 routes, original YAML, generated schema, and verbatim opaque labels.
 `TypeSafeSkillIntegrationTest#publishedTypeSafeExamplesExecuteDirectAndFullyBoundForwardingParent`
-protects the complete named result, captured generation, direct/child canonical
-frames, shared provider accounting, and forwarding without synthesis.
+loads the published connection mappings and all four complete skill declarations
+on both local route prefixes. It protects fixed/dynamic mixed batches, selected
+answer assembly, verbatim model IDs, complete named results, captured generation,
+direct/child canonical frames, shared accounting, and forwarding without synthesis.
 `#nestedNativeFailureRetainsSharedAccountingWithoutSubstitute` protects denied
 children and exhaustion of the provider budget shared with parent planning.
+`SkillGenerationManagerTest#nativeSchemasEnterExistingBindingCompatibilityAndCapturedCatalogs`
+protects fixed disjoint-enum, singleton-type and number-to-integer registration
+rejections and dynamic-schema deferral.
+`DeclaredOutputBindingsPlanningIntegrationTest#nativePassthroughIsEnforcedOnlyByConsumingBindingContract`
+protects receiving-enum rejection and exact missing/case-mismatched probability
+paths for fixed and dynamic criteria at invocation.
 
 These are fixture/source-backed mechanics, not evidence of live model accuracy,
 identical judgments between routes, or acceptance of every locally valid criterion.

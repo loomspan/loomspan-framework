@@ -275,6 +275,22 @@ The read-only tool surface is:
 - `LOOMSPAN_read_trace_artifact` for optional exact raw NDJSON forensics.
 
 Ordinary MCP `tools/list` is the inventory for these thirteen tools.
+TypeSafe leaves use the existing catalog and skill-detail views: their source is
+`TYPESAFE`, with original YAML, source location and generated descriptive schemas.
+Use `LOOMSPAN_list_skills` and `LOOMSPAN_get_skill` for the same metadata. Supplied
+source labels are opaque application data, not guaranteed filesystem paths.
+Native evaluations use the existing JSON/text trace content views rather than
+chat messages. Request evidence contains the resolved state/questions, endpoint
+and requested model; response evidence contains the provider envelope (including
+available served-model/usage metadata), or malformed `rawBody`. Failed attempts
+retain provider failure evidence and retry facts. Query record descriptors, then
+read selected `contentRef` values with `LOOMSPAN_read_trace_content`; follow
+continuations/ranges and respect disabled, truncated, incomplete or unavailable
+capture states. Captured probabilities and distribution confidence do not prove
+correctness. See the framework's
+[TypeSafe authoring guidance](../agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md)
+for setup, invocation and binding semantics.
+
 `LOOMSPAN_get_runtime` reports current Console/target status and deliberately
 contains no capability inventory. Installed tool availability remains distinct
 from target authentication, compatibility, live availability, and evidence

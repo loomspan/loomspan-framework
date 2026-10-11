@@ -65,6 +65,7 @@ references required by the interpretation:
 | Where was time or usage spent? | `DETAILED` frames, using duration or usage order when useful; preserve direct, descendant, inclusive, and unknown values. |
 | What model, tool, or structured content was recorded? | Descriptor-first `LOOMSPAN_query_trace_records` narrowed to the relevant types, then read only selected `contentRef` values. Captured thought is not automatically the final output. |
 | Why does this nested skill path exist? | Frame hierarchy first, then only the exact registered skill YAML needed to explain the selected path. |
+| What TypeSafe skill is registered, and what did it evaluate? | `LOOMSPAN_list_skills` / `LOOMSPAN_get_skill` for `TYPESAFE` source, unchanged YAML, locations and generated schema; then native evaluation record descriptors and selected content reads. See [TypeSafe inspection](references/debugging-playbooks.md#wf-typesafe-evaluation). |
 
 Tool arguments are exact. Use `pageSize`, not `limit`; trace outcome filtering
 uses the `outcomes` array, not `status`; record selectors belong under

@@ -2,6 +2,26 @@
 
 These playbooks define goals and stopping conditions, not exact tool sequences.
 
+## WF-TYPESAFE-EVALUATION
+
+Discover the registered leaf through `LOOMSPAN_list_skills`, then inspect its
+`LOOMSPAN_get_skill` detail for `TYPESAFE` source, original YAML, location and
+descriptive output schema. Opaque supplied source labels are not filesystem
+provenance; TypeSafe entries have no Java bean/method location.
+Resolve the execution's trace and frame, then query request/response/failure
+record descriptors. Native `payloadType: evaluation` content contains resolved
+state/questions, endpoint and requested model, complete provider envelope with
+available served model, or malformed `rawBody`; it does not contain chat messages.
+Read selected content references through the ordinary JSON/text content path.
+Follow chunks/ranges and preserve explicit truncation, disabled capture and
+unavailable/incomplete evidence. Acceptance of an answer does not imply complete
+diagnostic capture. Distinguish HTTP success from terminal answer extraction
+failure, recovered attempts from terminal failures, and exact token usage from
+unavailable usage. Response-based model-call counts are not billing totals.
+Stop when captured evaluation and failure mechanics are explained. Distribution
+confidence is not correctness, and Noul reports probability of yes. Do not infer
+identical route judgments or live provider accuracy from deterministic fixtures.
+
 ## WF-FAILED-EXECUTION
 
 Establish the final outcome and terminal failure link, then inspect the linked

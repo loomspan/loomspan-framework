@@ -127,7 +127,13 @@ through the same `SkillTemplate` or composed as children of chat skills. The
 Leaves validate the resolved request and return the entire named `answers`
 object as JSON text. Their generated output schema is descriptive metadata;
 answers are preserved without validation or repair. See the [complete TypeSafe
-setup, direct invocation and parent example](agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md).
+setup, route switching, fixed/dynamic mixed batches, direct invocation, selected
+answer bindings and forwarding parents](agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md).
+Model IDs are sent verbatim and credentials belong to connections. Existing
+Console catalog/details and MCP expose `TYPESAFE` source identity, original YAML,
+source locations and generated schemas; native request/response/failure content
+uses the existing JSON/text trace views. Capture availability and distribution
+confidence do not establish judgment correctness or live parity between routes.
 
 - **Embedded Java:** add the Spring Boot starter and invoke skills in your
   application. This revision targets Java 21+, Spring Boot 4.1, and Spring AI 2;

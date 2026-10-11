@@ -706,8 +706,9 @@ class TypeSafeSkillIntegrationTest {
         }
     }
 
-    @Test
-    void publishedTypeSafeExamplesExecuteDirectAndFullyBoundForwardingParent() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"typesafeDirect", "typesafeRouter"})
+    void publishedTypeSafeExamplesExecuteDirectAndFullyBoundForwardingParent(String route) throws Exception {
         String docs =
                 Files.readString(
                         Path.of(
@@ -718,9 +719,16 @@ class TypeSafeSkillIntegrationTest {
                         .matcher(docs);
         List<String> blocks = new ArrayList<>();
         while (yamlMatcher.find()) blocks.add(yamlMatcher.group(1));
-        assertThat(blocks).hasSize(3);
+        assertThat(blocks).hasSize(6);
         var yaml = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().skillYaml();
         JsonNode config = yaml.readTree(blocks.get(0));
+        if (route.equals("typesafeRouter")) {
+            ((tools.jackson.databind.node.ObjectNode) config.at("/loomspan/models"))
+                    .set("typesafeDefault", yaml.readTree(blocks.get(1)).at("/loomspan/models/typesafeDefault"));
+        }
+        String requestedModel = route.equals("typesafeDirect") ? "jev-fixture-direct" : "typesafe/jev-fixture-router";
+        ((tools.jackson.databind.node.ObjectNode) config.at("/loomspan/models/typesafeDefault"))
+                .put("provider-model", requestedModel);
         var jsonMatcher =
                 java.util.regex.Pattern.compile(
                                 "```json\\R(.*?)```", java.util.regex.Pattern.DOTALL)
@@ -743,7 +751,9 @@ class TypeSafeSkillIntegrationTest {
                         public MockResponse dispatch(RecordedRequest request) {
                             try {
                                 JsonNode body = JSON.readTree(request.getBody().readUtf8());
-                                if (request.getPath().equals("/v1/systemone")) {
+                                if (request.getPath().endsWith("/v1/systemone")) {
+                                    assertThat(request.getPath()).isEqualTo(route.equals("typesafeDirect") ? "/v1/systemone" : "/api/v1/systemone");
+                                    assertThat(body.path("model").asText()).isEqualTo(requestedModel);
                                     assertThat(body.get("state"))
                                             .isEqualTo(
                                                     JSON.valueToTree(
@@ -761,10 +771,12 @@ class TypeSafeSkillIntegrationTest {
                                 assertThat(request.getPath()).isEqualTo("/v1/chat/completions");
                                 assertThat(body.at("/messages/0/content").asText())
                                         .contains("Create an ordered flight plan");
+                                boolean assembly = body.toString().contains("assessFixedContact");
+                                String child = assembly ? "assessFixedContact" : "assessContact";
                                 Map<String, Object> task = new LinkedHashMap<>();
-                                task.put("taskId", "assessContact");
+                                task.put("taskId", child);
                                 task.put("title", "Assess contact");
-                                task.put("capabilityName", "assessContact");
+                                task.put("capabilityName", child);
                                 task.put("intent", "Assess contact");
                                 task.put("status", "PENDING");
                                 task.put("dependsOn", List.of());
@@ -775,7 +787,7 @@ class TypeSafeSkillIntegrationTest {
                                         JSON.writeValueAsString(
                                                 Map.of(
                                                         "capabilityName",
-                                                        "assessReportedContact",
+                                                        assembly ? "summarizeContact" : "assessReportedContact",
                                                         "createdAt",
                                                         "2026-10-10T00:00:00Z",
                                                         "status",
@@ -851,10 +863,12 @@ class TypeSafeSkillIntegrationTest {
                                         reloader.prepare(
                                                 List.of(
                                                         new SkillDocument(
-                                                                "published leaf", blocks.get(1)),
+                                                                "published leaf", blocks.get(2)),
                                                         new SkillDocument(
                                                                 "published parent",
-                                                                blocks.get(2)))));
+                                                                blocks.get(3)),
+                                                        new SkillDocument("published fixed leaf", blocks.get(4)),
+                                                        new SkillDocument("published binding parent", blocks.get(5)))));
                                 var template = context.getBean(SkillTemplate.class);
                                 String generation = reloader.snapshot().generationId();
                                 assertThat(template.invoke("assessContact", documentedInput, v -> sessionIds.add(v.sessionId())))
@@ -902,9 +916,17 @@ class TypeSafeSkillIntegrationTest {
                                                         .skill("assessContact")
                                                         .orElseThrow()
                                                         .outputSchema());
+                                Map<String, Object> fixedInput = Map.of("context", documentedInput.get("context"));
+                                assertThat(template.invoke("assessFixedContact", fixedInput)).isEqualTo(retained);
+                                assertThat(JSON.readTree(template.invoke("summarizeContact", fixedInput)))
+                                        .isEqualTo(JSON.valueToTree(Map.of(
+                                                "department", "technical",
+                                                "repeatProbability", 0.9,
+                                                "severity", 0.75,
+                                                "technicalProbability", 0.9)));
                             });
             assertThat(failure.get()).isNull();
-            assertThat(server.getRequestCount()).isEqualTo(3);
+            assertThat(server.getRequestCount()).isEqualTo(6);
         }
     }
 

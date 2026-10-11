@@ -76,3 +76,37 @@ deferring prerequisite wire compatibility or redesigning those surfaces.
 - **Reassessment triggers:** New serialized/API behavior, missing prerequisite consumer
   integration, authorization/lifecycle fixes, or material product uncertainty requires
   Full 5-Step Pipeline reassessment rather than broadening this completion ticket silently.
+
+## Execution notes
+
+- Developer approved Fast-Track 2-Step Pipeline — Implementation & Review with
+  `proceed` after Step 0. The initial working tree was clean. No research or plan
+  artifacts are required for this approved route; independent Step 5 review remains
+  required.
+- Contract assessment: this change documents existing configuration/manifest and
+  application invocation behavior and existing ephemeral Console/MCP diagnostics.
+  It changes no production types, supported API/SPI, configuration semantics,
+  serialized boundary, authorization, lifecycle, compatibility marker or Java-to-Go
+  protocol. No shim or additional extension point is needed.
+- Skill-authoring impact is affected. Matching checkout executable evidence was
+  inventoried before consulting the repository `loomspan-docs` skill and routed
+  references. Existing runtime claims were aligned; incomplete fixed-criteria,
+  selected-answer binding, explicit route-switch and consumer-inspection examples
+  were documentation drift. The guide and coverage/routing now complete those
+  topics without changing behavior.
+- The complete setup uses account-supplied environment model IDs on each route,
+  rather than implying an illustrative model ID is a current service default.
+  Both connection declarations keep credentials in connection configuration.
+  Switching the alias preserves the same skill documents and business inputs;
+  the route-specific ID may change and is sent verbatim.
+- Published YAML is parsed from the guide by the deterministic integration test.
+  It registers the dynamic/fixed mixed leaves, forwarding parent and selected-answer
+  binding parent, then invokes them through `SkillTemplate` on both local prefixes.
+  Local fixture endpoints, credentials and model IDs replace provider values only
+  for verification. Fixtures establish mechanics, not live provider acceptance,
+  accuracy, identical judgments or billing. No live-provider check was performed.
+- Consumer guidance reuses delivered catalog/detail and JSON/text trace views and
+  the existing MCP tools. No UI, dashboard, visualization, metadata API, routing,
+  confidence gate, automated action, generalized schema/template or new quota was
+  introduced. Canonical fidelity and the existing derived-journal exception remain
+  unchanged.
