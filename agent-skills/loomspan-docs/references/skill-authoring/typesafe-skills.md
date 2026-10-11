@@ -191,6 +191,10 @@ finite numbers, or Booleans; null/objects/arrays fail rather than being stringif
 Leading/trailing whitespace counts as literal content. `$${` emits literal `${`.
 Inserted input is never rescanned, and YAML folding/newlines are retained as parsed.
 `${ENV_VAR}`, malformed expressions, and invalid tilde escapes fail registration.
+The first `}` closes an expression; nested `${` openers fail registration.
+A key containing `}` cannot be addressed directly in an expression: select its
+containing object as a whole value instead. Escaped `$${` openers remain literal
+even when the following text would otherwise be malformed.
 This is scoped path substitution, not configuration expansion or an expression
 engine.
 
@@ -306,6 +310,23 @@ generation. Reload affects new roots; active children/retries retain old resourc
 Concurrent calls resolve private criteria without changing catalog metadata.
 
 ## Evidence and limits
+
+Focused `TypeSafeDeclarationTests` anchors protect the authoring edges:
+`strictNativeManifestParsingRejectsDuplicateAndUnknownFields` covers strict YAML;
+`parsedYamlScalarFidelityAndResolvedCopiesRemainExact` covers parsed text and
+detached request capture; `optionalPrimitiveFieldsPreserveOmissionNullAndPartialCriteria`
+covers optional primitive forms; `exactGrammarAndCollisionScopeRemainBounded`
+covers expression/pointer limits and name collisions; and
+`descriptiveSchemasStayFixedAcrossDynamicInvocationsAndDefensiveCopies` covers the
+complete descriptive schema table. These checks exercise
+`TypeSafeDeclaration#tokens`, `#resolve`, `#validate`, and `#deriveSchema`.
+
+`TypeSafeSkillIntegrationTest#acceptedNormalizedAndExactBoundInputsProduceEqualNativeRequests`
+proves ordinary normalization versus exact bound transfer through public invocation.
+`TypeSafeSkillIntegrationTest#concurrentDynamicScoreLevelsStayPrivateAndMetadataRemainsStable`
+proves private Score levels/results and stable catalog metadata during overlapping
+local calls. Existing Choice/reload and retry fixtures protect generation capture
+and reuse of one resolved request.
 
 `TypeSafeDeclaration`, `TypeSafeDeclarationTests`, and `YamlSkillCatalog` own
 declaration/substitution/schema checks. `TypeSafeClient`, `TypeSafeExecutor`, and

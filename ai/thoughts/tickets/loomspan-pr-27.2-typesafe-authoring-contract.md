@@ -62,24 +62,44 @@ agent. Provider execution is PR 27.3; callable registration integration is PR 27
 
 ## Acceptance criteria
 
-- [ ] Valid leaf declarations and mixed batches parse, while incompatible fields,
+- [x] Valid leaf declarations and mixed batches parse, while incompatible fields,
   unknown fields, invalid shapes, attachments, and case collisions fail at the
   specified boundary, including null/false/empty incompatible declarations.
-- [ ] The exact-resolution walkthroughs preserve structured values, escapes, Unicode,
+- [x] The exact-resolution walkthroughs preserve structured values, escapes, Unicode,
   whitespace, nulls, and inserted literal markers; malformed syntax fails registration,
   missing optional values and invalid runtime traversal fail before provider execution.
-- [ ] Fixed and dynamic Choice/Noul/Score criteria obey the same shape rules, including
+- [x] Fixed and dynamic Choice/Noul/Score criteria obey the same shape rules, including
   singleton Choice/Score, null Score levels, partial Noul criteria, and the Noul
   instructions/outcome requirement. No coercion, fabricated criteria, or renumbering occurs.
-- [ ] Non-finite/non-JSON inputs fail; equal accepted normalized inputs resolve equally
+- [x] Non-finite/non-JSON inputs fail; equal accepted normalized inputs resolve equally
   while ordinary versus author-bound input validation retains its existing distinction.
-- [ ] Generated schemas match the mixed-batch example and fixed/dynamic schema table,
+- [x] Generated schemas match the mixed-batch example and fixed/dynamic schema table,
   remain unchanged across concurrent different criteria, and use existing schema
   representations suitable for current catalog/tool/binding consumers.
-- [ ] Focused contract checks cover shared semantics without credentials; no generic
+- [x] Focused contract checks cover shared semantics without credentials; no generic
   template/schema infrastructure, static path proof, answer validator, or shared
   binding redesign is introduced. Production-type changes pass
   `LoomspanPublicSurfaceArchitectureTest`.
+
+## Execution notes
+
+- User approved the Full 5-Step Pipeline with `proceed`. Initial checkout was clean.
+  Research, implementation/testing plans, contract tests and the routed authoring
+  topic are this ticket's changes; no unrelated work was altered.
+- Step 4 established acceptance assurance over the existing contract. New YAML,
+  scalar fidelity, optional primitive, grammar/collision, schema, exact-bound input
+  and concurrent Score tests passed without a production edit or demonstrated
+  defect. Conditional pre-fix failure evidence is therefore not applicable.
+- Fresh final focused verification passed: 64 tests, zero failures/errors/skips in
+  `TypeSafeDeclarationTests`, `TypeSafeSkillIntegrationTest`, `SkillInputValidatorTest`
+  and `LoomspanPublicSurfaceArchitectureTest`. `git diff --check` passed. The
+  implementation plan records exact commands and acceptance evidence.
+- Evidence uses local deterministic providers and current production source;
+  it establishes no live-provider accuracy or acceptance claim. Documentation is
+  aligned after adding precise grammar limits and stable test anchors. No supported
+  API/SPI, Java-to-Go protocol, or shared binding/schema policy changed.
+- Acceptance checkmarks record completed implementation verification. Fresh
+  independent Step 5 review is the remaining pipeline completion gate.
 
 ## Execution profile
 

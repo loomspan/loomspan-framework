@@ -716,6 +716,293 @@ class TypeSafeSkillIntegrationTest {
     }
 
     @Test
+    void concurrentDynamicScoreLevelsStayPrivateAndMetadataRemainsStable() throws Exception {
+        String document =
+                """
+name: judgment
+description: Score caller-supplied levels
+model: selected
+input_schema: {type: object, additionalProperties: true}
+typesafe:
+  state: '${/input/marker}'
+  questions:
+    severity: {type: score, criteria: '${/input/levels}'}
+""";
+        Map<String, Object> firstInput =
+                Map.of(
+                        "marker",
+                        "three",
+                        "levels",
+                        Arrays.asList(null, Map.of("text", "middle"), List.of("high")));
+        Map<String, Object> secondInput =
+                Map.of(
+                        "marker",
+                        "five",
+                        "levels",
+                        Arrays.asList(
+                                "lowest",
+                                null,
+                                Map.of("text", "medium"),
+                                List.of("higher"),
+                                "highest"));
+        CountDownLatch arrived = new CountDownLatch(2), release = new CountDownLatch(1);
+        Map<String, JsonNode> captured = new ConcurrentHashMap<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        try (MockWebServer server = new MockWebServer()) {
+            server.setDispatcher(
+                    new Dispatcher() {
+                        @Override
+                        public MockResponse dispatch(RecordedRequest request) {
+                            try {
+                                var wire = JSON.readTree(request.getBody().readUtf8());
+                                captured.put(wire.get("state").asText(), wire);
+                                arrived.countDown();
+                                if (!release.await(5, TimeUnit.SECONDS))
+                                    throw new AssertionError("release missing");
+                                return success(
+                                        JSON.writeValueAsString(
+                                                Map.of(
+                                                        "answers",
+                                                        Map.of(
+                                                                "marker",
+                                                                wire.get("state"),
+                                                                "levels",
+                                                                wire.at(
+                                                                        "/questions/severity/criteria"),
+                                                                "extension",
+                                                                Map.of("unrestricted", -5)))));
+                            } catch (Throwable error) {
+                                failure.compareAndSet(null, error);
+                                return new MockResponse().setResponseCode(500);
+                            }
+                        }
+                    });
+            runner(server, "/", document)
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                var catalog = context.getBean(SkillCatalog.class);
+                                var schema = catalog.skill("judgment").orElseThrow().outputSchema();
+                                var template = context.getBean(SkillTemplate.class);
+                                try (var threads = Executors.newFixedThreadPool(2)) {
+                                    var first = threads.submit(() -> invoke(template, firstInput));
+                                    var second =
+                                            threads.submit(() -> invoke(template, secondInput));
+                                    try {
+                                        assertThat(arrived.await(5, TimeUnit.SECONDS)).isTrue();
+                                        assertThat(
+                                                        catalog.skill("judgment")
+                                                                .orElseThrow()
+                                                                .outputSchema())
+                                                .isEqualTo(schema);
+                                        for (var input : List.of(firstInput, secondInput)) {
+                                            assertThat(
+                                                            captured.get(input.get("marker"))
+                                                                    .at(
+                                                                            "/questions/severity/criteria"))
+                                                    .isEqualTo(
+                                                            JSON.valueToTree(input.get("levels")));
+                                        }
+                                    } finally {
+                                        release.countDown();
+                                    }
+                                    for (var pair :
+                                            List.of(
+                                                    Map.entry(firstInput, first),
+                                                    Map.entry(secondInput, second))) {
+                                        var result =
+                                                JSON.readTree(
+                                                        pair.getValue().get(5, TimeUnit.SECONDS));
+                                        assertThat(result.get("marker").asText())
+                                                .isEqualTo(pair.getKey().get("marker"));
+                                        assertThat(result.get("levels"))
+                                                .isEqualTo(
+                                                        JSON.valueToTree(
+                                                                pair.getKey().get("levels")));
+                                        assertThat(result.at("/extension/unrestricted").intValue())
+                                                .isEqualTo(-5);
+                                    }
+                                } finally {
+                                    release.countDown();
+                                }
+                                assertThat(catalog.skill("judgment").orElseThrow().outputSchema())
+                                        .isEqualTo(schema);
+                            });
+            assertThat(failure.get()).isNull();
+            assertThat(server.getRequestCount()).isEqualTo(2);
+        }
+    }
+
+    @Test
+    void acceptedNormalizedAndExactBoundInputsProduceEqualNativeRequests() throws Exception {
+        String document =
+                """
+name: judgment
+description: Judge a numeric value
+model: selected
+input_schema:
+  type: object
+  properties: {count: {type: integer}}
+  required: [count]
+  additionalProperties: false
+typesafe:
+  state: {count: '${/input/count}'}
+  questions: {q: {type: noul, instructions: decide}}
+""";
+        String parent =
+                """
+name: boundJudgment
+description: Forward an exact caller value
+model: planner
+planning_mode: true
+max_steps: 1
+prompt: Have judgment evaluate the supplied value.
+input_schema:
+  type: object
+  properties: {payload: {type: object, additionalProperties: true}}
+  required: [payload]
+  additionalProperties: false
+allowed_skills:
+  - name: judgment
+    required: true
+    max_tasks: 1
+    input_bindings:
+      /count: {from: input, path: /payload/count}
+output_from: {skill: judgment}
+""";
+        List<JsonNode> nativeRequests = new CopyOnWriteArrayList<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        try (MockWebServer server = new MockWebServer()) {
+            server.setDispatcher(
+                    new Dispatcher() {
+                        @Override
+                        public MockResponse dispatch(RecordedRequest request) {
+                            try {
+                                if (request.getPath().equals("/v1/systemone")) {
+                                    nativeRequests.add(JSON.readTree(request.getBody().readUtf8()));
+                                    return success("{\"answers\":{}}");
+                                }
+                                assertThat(request.getPath()).isEqualTo("/v1/chat/completions");
+                                Map<String, Object> task = new LinkedHashMap<>();
+                                task.put("taskId", "judge");
+                                task.put("title", "Judge value");
+                                task.put("capabilityName", "judgment");
+                                task.put("intent", "Judge value");
+                                task.put("status", "PENDING");
+                                task.put("dependsOn", List.of());
+                                task.put("expectedOutputs", List.of("judgment"));
+                                task.put("parallelGroup", null);
+                                task.put("note", "");
+                                String plan =
+                                        JSON.writeValueAsString(
+                                                Map.of(
+                                                        "capabilityName",
+                                                        "boundJudgment",
+                                                        "createdAt",
+                                                        "2026-10-10T00:00:00Z",
+                                                        "status",
+                                                        "VALID",
+                                                        "tasks",
+                                                        List.of(task)));
+                                return success(
+                                        JSON.writeValueAsString(
+                                                Map.of(
+                                                        "id",
+                                                        "fixture",
+                                                        "object",
+                                                        "chat.completion",
+                                                        "created",
+                                                        1,
+                                                        "model",
+                                                        "gpt-4.1",
+                                                        "choices",
+                                                        List.of(
+                                                                Map.of(
+                                                                        "index",
+                                                                        0,
+                                                                        "message",
+                                                                        Map.of(
+                                                                                "role",
+                                                                                "assistant",
+                                                                                "content",
+                                                                                plan),
+                                                                        "finish_reason",
+                                                                        "stop")),
+                                                        "usage",
+                                                        Map.of(
+                                                                "prompt_tokens",
+                                                                1,
+                                                                "completion_tokens",
+                                                                1,
+                                                                "total_tokens",
+                                                                2))));
+                            } catch (Throwable error) {
+                                failure.compareAndSet(null, error);
+                                return new MockResponse().setResponseCode(500);
+                            }
+                        }
+                    });
+            runner(server, "/", document)
+                    .withPropertyValues(
+                            "loomspan.connections.chat.driver=openai",
+                            "loomspan.connections.chat.api-key=fixture",
+                            "loomspan.connections.chat.base-url=" + server.url("/v1"),
+                            "loomspan.models.planner.connection=chat",
+                            "loomspan.models.planner.provider-model=gpt-4.1")
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                var reloader = context.getBean(SkillReloader.class);
+                                reloader.publish(
+                                        reloader.prepare(
+                                                List.of(
+                                                        new SkillDocument("leaf", document),
+                                                        new SkillDocument("parent", parent))));
+                                var template = context.getBean(SkillTemplate.class);
+                                assertThat(invoke(template, Map.of("count", "3"))).isEqualTo("{}");
+                                assertThat(
+                                                template.invoke(
+                                                        "boundJudgment",
+                                                        Map.of("payload", Map.of("count", 3)),
+                                                        view -> sessionIds.add(view.sessionId())))
+                                        .isEqualTo("{}");
+                                assertThat(nativeRequests).hasSize(2);
+                                assertThat(nativeRequests.get(0)).isEqualTo(nativeRequests.get(1));
+                                assertThat(
+                                                nativeRequests
+                                                        .get(0)
+                                                        .at("/state/count")
+                                                        .isIntegralNumber())
+                                        .isTrue();
+                                sessionIds.clear();
+                                assertThatThrownBy(
+                                                () ->
+                                                        template.invoke(
+                                                                "boundJudgment",
+                                                                Map.of(
+                                                                        "payload",
+                                                                        Map.of("count", "3")),
+                                                                view ->
+                                                                        sessionIds.add(
+                                                                                view.sessionId())))
+                                        .isInstanceOf(SkillException.class);
+                                assertThat(nativeRequests).hasSize(2);
+                                var rejectedTrace = traces(context);
+                                assertThat(records(rejectedTrace, "MODEL_REQUEST_SENT"))
+                                        .hasSize(1)
+                                        .noneMatch(
+                                                record ->
+                                                        record.at("/data/payloadType")
+                                                                .asText()
+                                                                .equals("evaluation"));
+                                assertThat(usage(rejectedTrace).path("providerAttempts").intValue())
+                                        .isEqualTo(1);
+                            });
+            assertThat(failure.get()).isNull();
+        }
+    }
+
+    @Test
     void ordinaryInputNormalizationPrecedesNativeResolution() throws Exception {
         String document =
                 leaf().replace(
