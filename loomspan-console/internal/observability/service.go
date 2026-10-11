@@ -283,7 +283,7 @@ func validateSkillSummary(skill SkillSummary) error {
 		return errors.New("skill identity is missing")
 	}
 	switch skill.Source {
-	case "YAML", "REST":
+	case "YAML", "REST", "TYPESAFE":
 		if strings.TrimSpace(skill.SourcePath) == "" || skill.BeanName != "" || skill.Method != "" {
 			return fmt.Errorf("%s skill requires sourcePath and must not contain Java locations", skill.Source)
 		}
@@ -292,7 +292,7 @@ func validateSkillSummary(skill SkillSummary) error {
 			return errors.New("Java skill requires beanName and method and must not contain sourcePath")
 		}
 	default:
-		return errors.New("skill source must be YAML, REST or JAVA")
+		return errors.New("skill source must be YAML, REST, TYPESAFE or JAVA")
 	}
 	return nil
 }
@@ -311,7 +311,7 @@ func validateSkillDetail(skill SkillDetail, requestedName string) error {
 	if skill.RegisteredName != requestedName {
 		return errors.New("registered name does not match the requested resource")
 	}
-	if (skill.Source == "YAML" || skill.Source == "REST") && skill.Yaml == "" {
+	if (skill.Source == "YAML" || skill.Source == "REST" || skill.Source == "TYPESAFE") && skill.Yaml == "" {
 		return errors.New("skill YAML is missing")
 	}
 	if skill.Source == "JAVA" && skill.Yaml != "" {

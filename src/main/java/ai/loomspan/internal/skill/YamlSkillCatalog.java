@@ -333,6 +333,15 @@ public class YamlSkillCatalog implements InitializingBean
             return new YamlSkillDefinition(resource, manifest, null, EvidenceContract.empty(), source, List.of());
         }
 
+        if (manifest.isTypesafeDeclared()) {
+            if (manifest.getInputSchema() == null) throw invalidNamedSkill(resource, manifest, "input_schema", "is required for TypeSafe skills");
+            rejectTypeSafeAttachments(resource, manifest, manifest.getInputSchema(), "input_schema");
+            if (!StringUtils.hasText(manifest.getModel())) throw invalidNamedSkill(resource, manifest, "model", "required field is missing or blank");
+            var model = resolveModelCatalogEntry(resource, manifest);
+            var connection = modelsProperties.getConnections().get(model.getConnection());
+            if (connection == null || !"TYPESAFE".equals(connection.getDriver().name())) throw invalidNamedSkill(resource, manifest, "model", "TypeSafe skill requires a typesafe driver connection");
+            return new YamlSkillDefinition(resource, manifest, new EffectiveSkillExecutionConfiguration(manifest.getModel(), model.getConnection(), connection.getDriver(), model.getProviderModel(), null), EvidenceContract.empty(), source, List.of());
+        }
         validateConcurrency(resource, manifest);
         if (!StringUtils.hasText(manifest.getModel()))
         {
@@ -343,6 +352,7 @@ public class YamlSkillCatalog implements InitializingBean
         validateLinter(resource, manifest);
 
         LoomspanProperties.ModelCatalogEntry catalogEntry = resolveModelCatalogEntry(resource, manifest);
+        if ("TYPESAFE".equals(modelsProperties.getConnections().get(catalogEntry.getConnection()).getDriver().name())) throw invalidNamedSkill(resource, manifest, "model", "chat YAML skill cannot use a typesafe driver connection");
         String effectiveThinkingLevel = resolveEffectiveThinkingLevel(manifest, catalogEntry);
 
         if (!catalogEntry.supportsThinkingLevel(effectiveThinkingLevel))
@@ -417,6 +427,7 @@ public class YamlSkillCatalog implements InitializingBean
                 throw invalidNamedSkill(resource, skillName, "mapping",
                         "mapping is no longer supported; declare the Java skill once with @SkillMethod and remove its YAML wrapper");
             }
+            validateRawTypeSafe(resource, root, skillName);
             validateRawRest(resource, root, skillName);
             validateRawConcurrency(resource, root, skillName);
             validateRawOutputBindings(resource, root, skillName);
@@ -444,6 +455,22 @@ public class YamlSkillCatalog implements InitializingBean
         {
             throw new DocumentReadException("Failed to read YAML skill from " + describe(resource), ex);
         }
+    }
+
+    private void validateRawTypeSafe(Resource resource, JsonNode root, String skillName) {
+        if (!root.has("typesafe")) return;
+        for (String field : List.of("rest", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
+            if (root.has(field)) throw invalidNamedSkill(resource, skillName, field, "field is not allowed for TypeSafe skills; remove it");
+        try { ai.loomspan.internal.typesafe.TypeSafeDeclaration.compile(root.get("typesafe")); }
+        catch (ai.loomspan.internal.typesafe.TypeSafeDeclaration.ValidationException ex) {
+            throw invalidNamedSkill(resource, skillName, ex.path(), ex.detail());
+        }
+    }
+
+    private void rejectTypeSafeAttachments(Resource resource, YamlSkillManifest manifest, YamlSkillManifest.InputSchemaManifest schema, String path) {
+        if ("attachment".equals(schema.getType())) throw invalidNamedSkill(resource, manifest, path, "attachment nodes are not supported for TypeSafe skills");
+        schema.getProperties().forEach((name, child) -> rejectTypeSafeAttachments(resource, manifest, child, path + ".properties." + name));
+        if (schema.getItems() != null) rejectTypeSafeAttachments(resource, manifest, schema.getItems(), path + ".items");
     }
 
     private void validateRawOutputFrom(Resource resource, JsonNode root, String skillName)

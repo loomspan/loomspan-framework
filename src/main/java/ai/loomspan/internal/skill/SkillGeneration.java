@@ -52,8 +52,9 @@ public final class SkillGeneration implements AutoCloseable
                 throw new IllegalArgumentException("definition key must match manifest name");
             CapabilityMetadata metadata = this.capabilities.get(entry.getKey());
             if (metadata == null || (metadata.kind() != ai.loomspan.internal.core.CapabilityKind.YAML_SKILL
-                    && metadata.kind() != ai.loomspan.internal.core.CapabilityKind.REST_SKILL))
-                throw new IllegalArgumentException("definition must have matching YAML or REST capability '"
+                    && metadata.kind() != ai.loomspan.internal.core.CapabilityKind.REST_SKILL
+                    && metadata.kind() != ai.loomspan.internal.core.CapabilityKind.TYPESAFE_SKILL))
+                throw new IllegalArgumentException("definition must have matching YAML, REST or TYPESAFE capability '"
                         + entry.getKey() + "'");
         }
         List<CapabilityMetadata> ordered = this.capabilities.values().stream()

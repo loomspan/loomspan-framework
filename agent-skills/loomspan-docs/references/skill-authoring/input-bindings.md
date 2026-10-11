@@ -9,7 +9,7 @@ coverage: source-verified
 
 Use `input_bindings` on a structured `allowed_skills` entry of an explicit
 `planning_mode: true` parent to transfer authoritative values into a direct child.
-Model, annotation-only Java, and REST children use the same feature. The complete
+Model, TypeSafe, annotation-only Java, and REST children use the same feature. The complete
 receiving input contract remains authoritative; the calling model generates only
 unbound arguments under a separate projected contract. Binding grants no access
 and does not change invocation limits or the captured configuration generation.
@@ -212,6 +212,15 @@ correction with structure, counts and evidence. Same-unit sources fail even with
 before a consumer. See [planning concurrency](planning-concurrency.md).
 
 ## Exact values and failures
+
+For a [TypeSafe child](typesafe-skills.md), bindings assemble and validate the same
+receiving input before native request substitution. Ordinary direct input may
+normalize a numeric string; the bound subtree must already have the exact numeric
+type. Native state/instructions/criteria references can traverse arrays, but
+parent binding pointers retain the object-only rules above. Returned named answers
+are the result root: select `/department/choice` without an `/answers` prefix.
+Fixed descriptive output metadata helps existing registration checks; dynamic
+criteria and actual destination values retain runtime checks.
 
 Sources come from immutable owning-parent input and accepted pre-unit results.
 Corrections retain their assignment and snapshot. Nested and concurrent parents

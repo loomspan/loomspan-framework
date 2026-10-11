@@ -13,10 +13,10 @@ Use this document to establish shared vocabulary and choose the broad shape of a
 
 ## Core Model
 
-Loomspan combines model-driven YAML skills, application-handled YAML REST leaves, and deterministic Java `@SkillMethod` skills. Each declaration is one callable capability. An LLM-backed skill reasons about its mission and can invoke only the direct child skills exposed to it.
+Loomspan combines model-driven YAML skills, native TypeSafe evaluation leaves, application-handled YAML REST leaves, and deterministic Java `@SkillMethod` skills. Each declaration is one callable capability. An LLM-backed skill reasons about its mission and can invoke only the direct child skills exposed to it.
 
 ```text
-Application code -> Java, REST, or model-backed YAML entry skill
+Application code -> Java, REST, TypeSafe, or model-backed YAML entry skill
 YAML planner -> YAML specialist -> Java @SkillMethod or REST leaf
 ```
 
@@ -26,7 +26,7 @@ Not every tree needs every level. Java skills can be roots without a model; a si
 
 A YAML manifest's `name` or a Java annotation's `name` is the single callable identity. An omitted or empty Java annotation name uses the canonical method name. Every name MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$`: 1–64 ASCII characters, beginning with a letter or underscore. Names are case-sensitive and are never trimmed, sanitized, normalized, truncated, or aliased. Descriptive lowerCamelCase is recommended, but underscores and uppercase starts are valid.
 
-Use the exact name in `SkillTemplate`, `allowed_skills`, plan targets, evidence expressions, provider tool definitions, metrics, and traces. Duplicate names across Java, REST, and model-backed YAML fail startup and identify both declarations. Relevant lazy Java beans are discovered before the initial complete skill generation is built. Every child reference must resolve within that complete generation; authorization filtering does not make missing names valid.
+Use the exact name in `SkillTemplate`, `allowed_skills`, plan targets, evidence expressions, provider tool definitions, metrics, and traces. Duplicate names across Java, REST, TypeSafe, and model-backed YAML fail startup and identify both declarations. Relevant lazy Java beans are discovered before the initial complete skill generation is built. Every child reference must resolve within that complete generation; authorization filtering does not make missing names valid.
 
 Each root invocation captures one immutable, complete declaration and execution generation before input conversion or validation. Its input contracts, definitions, local child surface, models, connections, limits, and trace policy remain coherent for the full nested and parallel invocation tree. An application can prepare and publish a complete new generation through the public `SkillReloader`; publication affects only roots captured afterward, not running or admitted work. Skill YAML syntax does not change. Applications can register for safe retirement of superseded published generations to remove generation-keyed resources during normal operation; see [two-stage application updates](../java-api/skill-reload.md). There is no historical-invocation API.
 
@@ -34,9 +34,19 @@ Bean names, YAML source labels, and declared method signatures are diagnostic lo
 
 ## Capability types
 
+### TypeSafe evaluation leaf
+
+A [TypeSafe leaf](typesafe-skills.md) declares fixed Choice, Noul, or Score
+questions and a native model alias. It evaluates the validated input without chat
+planning/tools, returns the full named provider answers as JSON text, and exposes
+generated descriptive output metadata. It can be an entry or a normal parent's
+child. It has no authored output validator or repair loop; applications own the
+meaning and use of the judgments. Existing mission, authorization, quota, and
+captured-generation boundaries still apply.
+
 ### Entry skill
 
-An entry is any registered Java, REST, or model-backed YAML skill invoked through `SkillTemplate`. The facade accepts a map or an object convertible to a map, validates its effective input contract, and creates a fresh session. Callers SHOULD understand the entry contract without understanding the tree below it.
+An entry is any registered Java, REST, TypeSafe, or model-backed YAML skill invoked through `SkillTemplate`. The facade accepts a map or an object convertible to a map, validates its effective input contract, and creates a fresh session. Callers SHOULD understand the entry contract without understanding the tree below it.
 
 ### Model-backed YAML skill
 
@@ -63,7 +73,7 @@ Optional primitive parameters are invalid because omission binds null; use refer
 
 Java roots and children participate in the common skill mission lifecycle. Java executes without a framework model request and shares bounded mission timeout, interruption, and late-write cutoff handling. A successful child contributes its exact name at the parent tool boundary; a denial or failure contributes no success. The parent mission resumes on every exit.
 
-Console's catalog shows `YAML`, `REST`, or `Java` explicitly. YAML and REST details show the source label and original YAML; Java details show the bean and deterministic declared method signature. Pagination and links use only the registered name.
+Console's catalog shows `YAML`, `REST`, `TYPESAFE`, or `Java` explicitly. YAML, REST, and TypeSafe details show the source label and original YAML; Java details show the bean and deterministic declared method signature. Pagination and links use only the registered name.
 
 ## Root, Planner, Specialist, and Leaf Are Roles
 
@@ -79,7 +89,7 @@ A YAML skill can be a root in one tree and a nested specialist in another if its
 
 ## Visibility Is Local
 
-`allowed_skills` defines the candidate child Java, REST, or model-backed YAML skills for one LLM-backed skill. It is not transitive.
+`allowed_skills` defines the candidate child Java, REST, TypeSafe, or model-backed YAML skills for one LLM-backed skill. It is not transitive.
 
 If a root allows `investigateNetwork`, and `investigateNetwork` allows `checkDns`, the root sees `investigateNetwork`; it does not automatically see `checkDns`.
 
@@ -173,7 +183,7 @@ Do not automatically treat repeated business inputs as runtime metadata. Explici
 - `YamlSkillCatalog` validates model-backed manifests and rejects legacy mappings. `SkillGenerationManager#prepare` assembles and validates a detached complete generation; `ExecutionBinding` carries that exact generation through execution.
 - `DefaultSkillVisibilityResolver` filters the local shared child surface. `CapabilityExecutionRouter` and `ExecutionCoordinator` own dispatch and common isolated mission boundaries.
 - `SupportedSurfaceIntegrationTest` demonstrates application methods called through the supported facade.
-- `DefaultRegisteredSkillCatalogTest`, `ConsoleRestFixtureCorpusTest`, and Console component tests cover all three diagnostic source variants.
+- `DefaultRegisteredSkillCatalogTest`, `ConsoleRestFixtureCorpusTest`, and Console component tests cover all four diagnostic source variants.
 
 ## Coverage Boundary
 

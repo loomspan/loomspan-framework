@@ -115,12 +115,13 @@ public final class SpringAiProviderIntegration
     public ProviderConnectionRuntime create(String connectionName, LoomspanProperties.ConnectionProperties properties)
     {
         ProviderRetryPolicy retry = ProviderRetryPolicy.from(properties.getProviderRetry());
-        return new ProviderConnectionRuntime(switch (properties.getDriver())
+        return ProviderConnectionRuntime.chat(switch (properties.getDriver())
         {
             case OPENAI -> openAi(properties);
             case ANTHROPIC -> anthropic(properties);
             case GEMINI -> gemini(connectionName, properties);
             case OLLAMA -> ollama(properties);
+            case TYPESAFE -> throw new IllegalArgumentException("Native evaluations do not construct a ChatModel");
         }, properties.getDriver(), AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP, retry, this::translate);
     }
 

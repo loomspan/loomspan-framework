@@ -1,0 +1,840 @@
+package ai.loomspan.integration;
+
+import static org.assertj.core.api.Assertions.*;
+
+import ai.loomspan.api.*;
+import ai.loomspan.internal.skill.SkillGenerationManager;
+
+import okhttp3.mockwebserver.*;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+import java.nio.file.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
+
+/** Public facade, actual native HTTP and captured-generation evidence. */
+class TypeSafeSkillIntegrationTest {
+    private static final ObjectMapper JSON = new ObjectMapper();
+    @TempDir Path directory;
+    private final List<String> sessionIds = new CopyOnWriteArrayList<>();
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableAutoConfiguration
+    static class App {}
+
+    private String leaf() {
+        return """
+               name: judgment
+               description: Evaluate a mixed batch
+               model: selected
+               input_schema:
+                 type: object
+                 additionalProperties: true
+               typesafe:
+                 state: ${/input}
+                 questions:
+                   classification:
+                     type: choice
+                     criteria: ${/input/candidates}
+                   severity:
+                     type: score
+                     criteria: [null, {description: high}]
+                   escalation:
+                     type: noul
+                     criteria: {'true': [requested]}
+               """;
+    }
+
+    private ApplicationContextRunner runner(MockWebServer server, String prefix, String document)
+            throws Exception {
+        Path skills = Files.createDirectories(directory.resolve(UUID.randomUUID().toString()));
+        Files.writeString(skills.resolve("judgment.yaml"), document);
+        return new ApplicationContextRunner()
+                .withUserConfiguration(App.class)
+                .withPropertyValues(
+                        "spring.main.web-application-type=none",
+                        "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
+                        "loomspan.connections.native.driver=typesafe",
+                        "loomspan.connections.native.base-url=" + server.url(prefix),
+                        "loomspan.connections.native.api-key=fixture-account-key",
+                        "loomspan.connections.native.headers.X-Account=fixture-account",
+                        "loomspan.connections.native.provider-retry.enabled=false",
+                        "loomspan.models.selected.connection=native",
+                        "loomspan.models.selected.provider-model=typesafe/jev-verbatim",
+                        "loomspan.execution-trace.persistence=always",
+                        "loomspan.session.mission-timeout=10s");
+    }
+
+    private static MockResponse success(String envelope) {
+        return new MockResponse().setHeader("Content-Type", "application/json").setBody(envelope);
+    }
+
+    private static Map<String, Object> input(String candidate) {
+        return Map.of("caseId", candidate, "candidates", Map.of(candidate, List.of("description")));
+    }
+
+    private String invoke(SkillTemplate template, Map<String, Object> input) {
+        return template.invoke("judgment", input, view -> sessionIds.add(view.sessionId()));
+    }
+
+    private List<JsonNode> traces(org.springframework.context.ApplicationContext context)
+            throws Exception {
+        List<JsonNode> records = new ArrayList<>();
+        Path temp = Path.of(System.getProperty("java.io.tmpdir"));
+        for (String id : sessionIds)
+            try (var files = Files.newDirectoryStream(temp, id + ".*.execution-trace.ndjson")) {
+                for (Path file : files)
+                    for (String line : Files.readAllLines(file))
+                        if (!line.isBlank()) records.add(JSON.readTree(line));
+            }
+        return records;
+    }
+
+    private static List<JsonNode> records(List<JsonNode> trace, String type) {
+        return trace.stream().filter(r -> r.path("recordType").asText().equals(type)).toList();
+    }
+
+    private static JsonNode usage(List<JsonNode> trace) {
+        return records(trace, "TRACE_COMPLETED")
+                .getFirst()
+                .path("metadata")
+                .path("sessionUsageSnapshot");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/", "/api/"})
+    void completeExtendedAndLargeAnswersPassThroughBothRoutePrefixes(String prefix)
+            throws Exception {
+        String large = "x".repeat(1024 * 1024 + 128);
+        String answers =
+                JSON.writeValueAsString(
+                        Map.of(
+                                "classification",
+                                Map.of(
+                                        "choice",
+                                        "UNDECLARED",
+                                        "confidence",
+                                        -3,
+                                        "extra",
+                                        List.of(1, 2)),
+                                "unexpected",
+                                large,
+                                "severity",
+                                Map.of("legend", Map.of("0", List.of("structured")))));
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(
+                    success(
+                            "{\"answers\":"
+                                    + answers
+                                    + ",\"usage\":{\"input_tokens\":0,\"output_tokens\":0},\"model\":\"served\"}"));
+            runner(server, prefix, leaf())
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                assertThat(
+                                                context.getBean(SkillCatalog.class)
+                                                        .skill("judgment")
+                                                        .orElseThrow()
+                                                        .kind())
+                                        .isEqualTo(SkillKind.TYPESAFE);
+                                var entry =
+                                        context.getBean(SkillGenerationManager.class)
+                                                .active()
+                                                .registeredSkillCatalog()
+                                                .find("judgment")
+                                                .orElseThrow();
+                                assertThat(entry.source()).isEqualTo("TYPESAFE");
+                                assertThat(entry.yaml()).isEqualTo(leaf());
+                                assertThat(entry.sourcePath()).endsWith("judgment.yaml");
+                                assertThat(entry.beanName()).isNull();
+                                assertThat(entry.method()).isNull();
+                                assertThat(entry.outputSchema())
+                                        .isEqualTo(
+                                                context.getBean(SkillCatalog.class)
+                                                        .skill("judgment")
+                                                        .orElseThrow()
+                                                        .outputSchema());
+                                String result =
+                                        invoke(
+                                                context.getBean(SkillTemplate.class),
+                                                input("Original"));
+                                assertThat(JSON.readTree(result)).isEqualTo(JSON.readTree(answers));
+                                assertThat(result.length()).isGreaterThan(1024 * 1024);
+                                var trace = traces(context);
+                                assertThat(records(trace, "MODEL_REQUEST_SENT")).hasSize(1);
+                                assertThat(records(trace, "MODEL_RESPONSE_RECEIVED")).hasSize(1);
+                                assertThat(usage(trace).path("modelCalls").intValue()).isEqualTo(1);
+                                assertThat(usage(trace).path("exactModelResponses").intValue())
+                                        .isEqualTo(1);
+                                assertThat(usage(trace).path("heuristicModelResponses").intValue())
+                                        .isZero();
+                            });
+            RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
+            assertThat(request.getPath())
+                    .isEqualTo(prefix.equals("/") ? "/v1/systemone" : "/api/v1/systemone");
+            assertThat(request.getHeader("Authorization")).isEqualTo("Bearer fixture-account-key");
+            assertThat(request.getHeader("X-Account")).isEqualTo("fixture-account");
+            var wire = JSON.readTree(request.getBody().readUtf8());
+            assertThat(wire.path("model").asText()).isEqualTo("typesafe/jev-verbatim");
+            assertThat(wire.at("/questions/severity/criteria/0").isNull()).isTrue();
+            assertThat(wire.at("/questions/classification/criteria/Original").isArray()).isTrue();
+            assertThat(server.getRequestCount()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void invalidResolvedRequestsAndDeniedRolesConsumeNoProviderAttempt() throws Exception {
+        try (MockWebServer server = new MockWebServer()) {
+            runner(server, "/", leaf())
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                var template = context.getBean(SkillTemplate.class);
+                                assertThatThrownBy(() -> invoke(template, Map.of()))
+                                        .hasStackTraceContaining("missing input reference");
+                                assertThatThrownBy(
+                                                () ->
+                                                        invoke(
+                                                                template,
+                                                                Map.of(
+                                                                        "candidates",
+                                                                        Map.of(
+                                                                                "A", "yes", "a",
+                                                                                "no"))))
+                                        .hasStackTraceContaining("collides");
+                                var trace = traces(context);
+                                assertThat(records(trace, "MODEL_REQUEST_SENT")).isEmpty();
+                                for (var completion : records(trace, "TRACE_COMPLETED"))
+                                    assertThat(
+                                                    completion
+                                                            .at(
+                                                                    "/metadata/sessionUsageSnapshot/providerAttempts")
+                                                            .intValue())
+                                            .isZero();
+                            });
+            runner(server, "/", leaf() + "rbac_roles: [ALLOWED]\n")
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                assertThatThrownBy(
+                                                () ->
+                                                        invoke(
+                                                                context.getBean(
+                                                                        SkillTemplate.class),
+                                                                input("A")))
+                                        .hasStackTraceContaining("denied");
+                            });
+            assertThat(server.getRequestCount()).isZero();
+        }
+    }
+
+    @Test
+    void overloadRetryUsesSameResolvedRequestAndAccountsOneSuccessfulResponse() throws Exception {
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(new MockResponse().setResponseCode(529).setBody("provider overloaded"));
+            server.enqueue(
+                    success("{\"answers\":{},\"usage\":{\"input_tokens\":2,\"output_tokens\":3}}"));
+            runner(server, "/", leaf())
+                    .withPropertyValues(
+                            "loomspan.connections.native.provider-retry.enabled=true",
+                            "loomspan.connections.native.provider-retry.max-attempts=2",
+                            "loomspan.connections.native.provider-retry.initial-backoff=0ms",
+                            "loomspan.connections.native.provider-retry.max-backoff=0ms",
+                            "loomspan.connections.native.provider-retry.jitter=0")
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                assertThat(invoke(context.getBean(SkillTemplate.class), input("A")))
+                                        .isEqualTo("{}");
+                                var trace = traces(context);
+                                assertThat(records(trace, "MODEL_REQUEST_SENT")).hasSize(2);
+                                assertThat(records(trace, "MODEL_ATTEMPT_FAILED")).hasSize(1);
+                                assertThat(
+                                                records(trace, "MODEL_ATTEMPT_FAILED")
+                                                        .getFirst()
+                                                        .at("/metadata/failureCategory")
+                                                        .asText())
+                                        .isEqualTo("PROVIDER_OVERLOADED");
+                                var providerDiagnostic =
+                                        records(trace, "MODEL_ATTEMPT_FAILED")
+                                                .getFirst()
+                                                .at("/data/diagnostics/1");
+                                assertThat(providerDiagnostic.path("kind").asText())
+                                        .isEqualTo("PROVIDER_ERROR");
+                                assertThat(providerDiagnostic.path("text").asText())
+                                        .isEqualTo("provider overloaded");
+                                assertThat(providerDiagnostic.path("contentType").asText())
+                                        .isNotBlank();
+                                assertThat(providerDiagnostic.path("captureLimitBytes").intValue())
+                                        .isEqualTo(1024 * 1024);
+                                var counts = usage(trace);
+                                assertThat(counts.path("providerAttempts").intValue()).isEqualTo(2);
+                                assertThat(counts.path("modelCalls").intValue()).isEqualTo(1);
+                                assertThat(counts.path("promptUnits").intValue()).isEqualTo(2);
+                                assertThat(counts.path("completionUnits").intValue()).isEqualTo(3);
+                                assertThat(counts.path("totalUnits").intValue()).isEqualTo(5);
+                            });
+            assertThat(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8())
+                    .isEqualTo(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "not JSON",
+                "null",
+                "[]",
+                "42",
+                "\"scalar\"",
+                "{}",
+                "{\"answers\":null}",
+                "{\"answers\":[]}",
+                "{\"answers\":\"text\"}"
+            })
+    void extractionFailuresAreTerminalButSuccessfulHttpUsageIsRecorded(String envelope)
+            throws Exception {
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(success(envelope));
+            runner(server, "/", leaf())
+                    .withPropertyValues(
+                            "loomspan.connections.native.provider-retry.enabled=true",
+                            "loomspan.connections.native.provider-retry.max-attempts=3")
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                assertThatThrownBy(
+                                                () ->
+                                                        invoke(
+                                                                context.getBean(
+                                                                        SkillTemplate.class),
+                                                                input("A")))
+                                        .isInstanceOf(SkillException.class);
+                                var trace = traces(context);
+                                var response = records(trace, "MODEL_RESPONSE_RECEIVED").getFirst();
+                                assertThat(response.at("/data/payloadType").asText())
+                                        .isEqualTo("evaluation");
+                                if (envelope.equals("not JSON"))
+                                    assertThat(response.at("/data/rawBody").asText())
+                                            .isEqualTo(envelope);
+                                else
+                                    assertThat(response.at("/data/envelope"))
+                                            .isEqualTo(JSON.readTree(envelope));
+                                var counts = usage(trace);
+                                assertThat(counts.path("modelCalls").intValue()).isEqualTo(1);
+                                assertThat(counts.path("unavailableModelResponses").intValue())
+                                        .isEqualTo(1);
+                                assertThat(counts.path("heuristicModelResponses").intValue())
+                                        .isZero();
+                            });
+            assertThat(server.getRequestCount()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void extractionFailureRetainsExactSuccessfulHttpUsage() throws Exception {
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(
+                    success(
+                            "{\"answers\":null,\"usage\":{\"input_tokens\":2,\"output_tokens\":3}}"));
+            runner(server, "/", leaf())
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                assertThatThrownBy(
+                                                () ->
+                                                        invoke(
+                                                                context.getBean(
+                                                                        SkillTemplate.class),
+                                                                input("A")))
+                                        .isInstanceOf(SkillException.class);
+                                var counts = usage(traces(context));
+                                assertThat(counts.path("modelCalls").intValue()).isEqualTo(1);
+                                assertThat(counts.path("exactModelResponses").intValue())
+                                        .isEqualTo(1);
+                                assertThat(counts.path("promptUnits").intValue()).isEqualTo(2);
+                                assertThat(counts.path("completionUnits").intValue()).isEqualTo(3);
+                                assertThat(counts.path("totalUnits").intValue()).isEqualTo(5);
+                            });
+            assertThat(server.getRequestCount()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void providerAttemptQuotaPreventsRetrySend() throws Exception {
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(new MockResponse().setResponseCode(529).setBody("overloaded"));
+            runner(server, "/", leaf())
+                    .withPropertyValues(
+                            "loomspan.connections.native.provider-retry.enabled=true",
+                            "loomspan.connections.native.provider-retry.max-attempts=3",
+                            "loomspan.connections.native.provider-retry.initial-backoff=0ms",
+                            "loomspan.connections.native.provider-retry.max-backoff=0ms",
+                            "loomspan.session.quotas.max-provider-attempts=1")
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                assertThatThrownBy(
+                                                () ->
+                                                        invoke(
+                                                                context.getBean(
+                                                                        SkillTemplate.class),
+                                                                input("A")))
+                                        .hasStackTraceContaining("quota");
+                            });
+            assertThat(server.getRequestCount()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void concurrentDynamicCriteriaAndRunningGenerationStayIndependentAcrossReload()
+            throws Exception {
+        CountDownLatch arrived = new CountDownLatch(2), release = new CountDownLatch(1);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        try (MockWebServer server = new MockWebServer()) {
+            server.setDispatcher(
+                    new Dispatcher() {
+                        @Override
+                        public MockResponse dispatch(RecordedRequest request) {
+                            try {
+                                var wire = JSON.readTree(request.getBody().readUtf8());
+                                if (wire.get("state").isObject()) {
+                                    arrived.countDown();
+                                    if (!release.await(5, TimeUnit.SECONDS))
+                                        throw new AssertionError("release missing");
+                                }
+                                return success(
+                                        JSON.writeValueAsString(
+                                                Map.of(
+                                                        "answers",
+                                                        Map.of(
+                                                                "observed",
+                                                                wire.get("state"),
+                                                                "criteria",
+                                                                wire.at(
+                                                                        "/questions/classification/criteria")))));
+                            } catch (Throwable error) {
+                                failure.compareAndSet(null, error);
+                                return new MockResponse().setResponseCode(500);
+                            }
+                        }
+                    });
+            runner(server, "/api", leaf())
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                var template = context.getBean(SkillTemplate.class);
+                                var oldSchema =
+                                        context.getBean(SkillCatalog.class)
+                                                .skill("judgment")
+                                                .orElseThrow()
+                                                .outputSchema();
+                                var oldGeneration = context.getBean(SkillGenerationManager.class).active();
+                                var oldClient = oldGeneration.runtime().connection("native").nativeClient();
+                                var reloader = context.getBean(SkillReloader.class);
+                                var retired = new CountDownLatch(1);
+                                try (var listener = reloader.onGenerationRetired(id -> {
+                                            if (id.equals(oldGeneration.id())) retired.countDown();
+                                        });
+                                        var threads = Executors.newFixedThreadPool(2)) {
+                                    var first = threads.submit(() -> invoke(template, input("A")));
+                                    var second = threads.submit(() -> invoke(template, input("B")));
+                                    try {
+                                        assertThat(arrived.await(5, TimeUnit.SECONDS)).isTrue();
+                                        reloader.publish(
+                                                reloader.prepare(
+                                                        List.of(
+                                                                new SkillDocument(
+                                                                        " opaque | Source ",
+                                                                        leaf().replace(
+                                                                                        "state:"
+                                                                                            + " ${/input}",
+                                                                                        "state:"
+                                                                                            + " 'new"
+                                                                                            + " ${/input/caseId}'")))));
+                                        var supplied =
+                                                context.getBean(SkillGenerationManager.class)
+                                                        .active()
+                                                        .registeredSkillCatalog()
+                                                        .find("judgment")
+                                                        .orElseThrow();
+                                        assertThat(supplied.source()).isEqualTo("TYPESAFE");
+                                        assertThat(supplied.sourcePath())
+                                                .isEqualTo(" opaque | Source ");
+                                        assertThat(supplied.beanName()).isNull();
+                                        assertThat(supplied.method()).isNull();
+                                        assertThat(supplied.yaml())
+                                                .isEqualTo(
+                                                        leaf().replace(
+                                                                        "state: ${/input}",
+                                                                        "state: 'new"
+                                                                            + " ${/input/caseId}'"));
+                                        assertThat(
+                                                        JSON.readTree(invoke(template, input("C")))
+                                                                .get("observed")
+                                                                .asText())
+                                                .isEqualTo("new C");
+                                        assertThat(retired.getCount()).isEqualTo(1);
+                                    } finally {
+                                        release.countDown();
+                                    }
+                                    assertThat(
+                                                    JSON.readTree(first.get(5, TimeUnit.SECONDS))
+                                                            .at("/criteria/A")
+                                                            .isArray())
+                                            .isTrue();
+                                    assertThat(
+                                                    JSON.readTree(second.get(5, TimeUnit.SECONDS))
+                                                            .at("/criteria/B")
+                                                            .isArray())
+                                            .isTrue();
+                                    assertThat(
+                                                    JSON.readTree(first.get())
+                                                            .at("/observed/caseId")
+                                                            .asText())
+                                            .isEqualTo("A");
+                                    assertThat(
+                                                    JSON.readTree(second.get())
+                                                            .at("/observed/caseId")
+                                                            .asText())
+                                            .isEqualTo("B");
+                                    assertThat(
+                                                    context.getBean(SkillCatalog.class)
+                                                            .skill("judgment")
+                                                            .orElseThrow()
+                                                            .outputSchema())
+                                            .isEqualTo(oldSchema);
+                                    assertThat(retired.await(5, TimeUnit.SECONDS)).isTrue();
+                                    assertThatThrownBy(() -> oldClient.send("{}", null))
+                                            .hasStackTraceContaining("shut down");
+                                }
+                            });
+            assertThat(failure.get()).isNull();
+            assertThat(server.getRequestCount()).isEqualTo(3);
+        }
+    }
+
+    @Test
+    void publishedTypeSafeExamplesExecuteDirectAndFullyBoundForwardingParent() throws Exception {
+        String docs =
+                Files.readString(
+                        Path.of(
+                                "agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md"));
+        var yamlMatcher =
+                java.util.regex.Pattern.compile(
+                                "```yaml\\R(.*?)```", java.util.regex.Pattern.DOTALL)
+                        .matcher(docs);
+        List<String> blocks = new ArrayList<>();
+        while (yamlMatcher.find()) blocks.add(yamlMatcher.group(1));
+        assertThat(blocks).hasSize(3);
+        var yaml = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().skillYaml();
+        JsonNode config = yaml.readTree(blocks.get(0));
+        var jsonMatcher =
+                java.util.regex.Pattern.compile(
+                                "```json\\R(.*?)```", java.util.regex.Pattern.DOTALL)
+                        .matcher(docs);
+        assertThat(jsonMatcher.find()).isTrue();
+        String retained = JSON.writeValueAsString(JSON.readTree(jsonMatcher.group(1)));
+        Map<String, Object> documentedInput =
+                Map.of(
+                        "context",
+                        Map.of("message", "Again: checkout failed. Browsing works."),
+                        "candidates",
+                        Map.of("billing", "Charges", "technical", "Checkout failures"),
+                        "levels",
+                        List.of("All functions available", "A critical operation is blocked"));
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        try (MockWebServer server = new MockWebServer()) {
+            server.setDispatcher(
+                    new Dispatcher() {
+                        @Override
+                        public MockResponse dispatch(RecordedRequest request) {
+                            try {
+                                JsonNode body = JSON.readTree(request.getBody().readUtf8());
+                                if (request.getPath().equals("/v1/systemone")) {
+                                    assertThat(body.get("state"))
+                                            .isEqualTo(
+                                                    JSON.valueToTree(
+                                                            documentedInput.get("context")));
+                                    assertThat(body.at("/questions/department/criteria"))
+                                            .isEqualTo(
+                                                    JSON.valueToTree(
+                                                            documentedInput.get("candidates")));
+                                    assertThat(body.at("/questions/severity/criteria"))
+                                            .isEqualTo(
+                                                    JSON.valueToTree(
+                                                            documentedInput.get("levels")));
+                                    return success("{\"answers\":" + retained + "}");
+                                }
+                                assertThat(request.getPath()).isEqualTo("/v1/chat/completions");
+                                assertThat(body.at("/messages/0/content").asText())
+                                        .contains("Create an ordered flight plan");
+                                Map<String, Object> task = new LinkedHashMap<>();
+                                task.put("taskId", "assessContact");
+                                task.put("title", "Assess contact");
+                                task.put("capabilityName", "assessContact");
+                                task.put("intent", "Assess contact");
+                                task.put("status", "PENDING");
+                                task.put("dependsOn", List.of());
+                                task.put("expectedOutputs", List.of("assessment"));
+                                task.put("parallelGroup", null);
+                                task.put("note", "");
+                                String plan =
+                                        JSON.writeValueAsString(
+                                                Map.of(
+                                                        "capabilityName",
+                                                        "assessReportedContact",
+                                                        "createdAt",
+                                                        "2026-10-10T00:00:00Z",
+                                                        "status",
+                                                        "VALID",
+                                                        "tasks",
+                                                        List.of(task)));
+                                return success(
+                                        JSON.writeValueAsString(
+                                                Map.of(
+                                                        "id",
+                                                        "fixture",
+                                                        "object",
+                                                        "chat.completion",
+                                                        "created",
+                                                        1,
+                                                        "model",
+                                                        "gpt-4.1",
+                                                        "choices",
+                                                        List.of(
+                                                                Map.of(
+                                                                        "index",
+                                                                        0,
+                                                                        "message",
+                                                                        Map.of(
+                                                                                "role",
+                                                                                "assistant",
+                                                                                "content",
+                                                                                plan),
+                                                                        "finish_reason",
+                                                                        "stop")),
+                                                        "usage",
+                                                        Map.of(
+                                                                "prompt_tokens",
+                                                                1,
+                                                                "completion_tokens",
+                                                                1,
+                                                                "total_tokens",
+                                                                2))));
+                            } catch (Throwable error) {
+                                failure.compareAndSet(null, error);
+                                return new MockResponse().setResponseCode(500);
+                            }
+                        }
+                    });
+            for (String connection : List.of("typesafeDirect", "typesafeRouter", "chat")) {
+                var entry =
+                        (tools.jackson.databind.node.ObjectNode)
+                                config.at("/loomspan/connections/" + connection);
+                entry.put("api-key", "documented-fixture-key");
+                entry.put(
+                        "base-url",
+                        server.url(
+                                        connection.equals("chat")
+                                                ? "/v1"
+                                                : connection.equals("typesafeRouter")
+                                                        ? "/api"
+                                                        : "/")
+                                .toString());
+            }
+            List<String> properties = new ArrayList<>();
+            flattenProperties(config, "", properties);
+            properties.add("spring.main.web-application-type=none");
+            properties.add("loomspan.skills.locations=" + directory.toUri() + "*.yaml");
+            new ApplicationContextRunner()
+                    .withUserConfiguration(App.class)
+                    .withPropertyValues(properties.toArray(String[]::new))
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                var reloader = context.getBean(SkillReloader.class);
+                                reloader.publish(
+                                        reloader.prepare(
+                                                List.of(
+                                                        new SkillDocument(
+                                                                "published leaf", blocks.get(1)),
+                                                        new SkillDocument(
+                                                                "published parent",
+                                                                blocks.get(2)))));
+                                var template = context.getBean(SkillTemplate.class);
+                                assertThat(template.invoke("assessContact", documentedInput))
+                                        .isEqualTo(retained);
+                                AtomicReference<SkillExecutionView> view = new AtomicReference<>();
+                                assertThat(
+                                                template.invoke(
+                                                        "assessReportedContact",
+                                                        documentedInput,
+                                                        view::set))
+                                        .isEqualTo(retained);
+                                assertThat(view.get().events())
+                                        .anyMatch(event -> event.type().equals("RESULT_FORWARDED"));
+                                assertThat(
+                                                reloader.snapshot()
+                                                        .skill("assessReportedContact")
+                                                        .orElseThrow()
+                                                        .outputSchema())
+                                        .isEqualTo(
+                                                reloader.snapshot()
+                                                        .skill("assessContact")
+                                                        .orElseThrow()
+                                                        .outputSchema());
+                            });
+            assertThat(failure.get()).isNull();
+            assertThat(server.getRequestCount()).isEqualTo(3);
+        }
+    }
+
+    private static void flattenProperties(JsonNode node, String path, List<String> properties) {
+        if (node.isObject())
+            node.properties()
+                    .forEach(
+                            entry ->
+                                    flattenProperties(
+                                            entry.getValue(),
+                                            path.isEmpty()
+                                                    ? entry.getKey()
+                                                    : path + "." + entry.getKey(),
+                                            properties));
+        else properties.add(path + "=" + node.asText());
+    }
+
+    @Test
+    void ordinaryInputNormalizationPrecedesNativeResolution() throws Exception {
+        String document =
+                leaf().replace(
+                                "additionalProperties: true",
+                                "additionalProperties: true\n"
+                                        + "  properties: {count: {type: number}}\n"
+                                        + "  required: [count]");
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(success("{\"answers\":{}}"));
+            server.enqueue(success("{\"answers\":{}}"));
+            runner(server, "/", document)
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                var template = context.getBean(SkillTemplate.class);
+                                assertThat(
+                                                invoke(
+                                                        template,
+                                                        Map.of(
+                                                                "count",
+                                                                "3",
+                                                                "candidates",
+                                                                Map.of("A", "yes"))))
+                                        .isEqualTo("{}");
+                                assertThat(
+                                                invoke(
+                                                        template,
+                                                        Map.of(
+                                                                "count",
+                                                                3,
+                                                                "candidates",
+                                                                Map.of("A", "yes"))))
+                                        .isEqualTo("{}");
+                            });
+            JsonNode first =
+                    JSON.readTree(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8());
+            JsonNode second =
+                    JSON.readTree(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8());
+            assertThat(first.at("/state/count").isNumber()).isTrue();
+            assertThat(first.at("/state/count").doubleValue()).isEqualTo(3);
+            assertThat(second.at("/state/count").doubleValue()).isEqualTo(3);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"caller", "shutdown"})
+    void callerInterruptionAndFrameworkShutdownCancelPendingNativeRequest(String mode)
+            throws Exception {
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(success("{\"answers\":{}}").setHeadersDelay(3, TimeUnit.SECONDS));
+            runner(server, "/", leaf())
+                    .withPropertyValues("loomspan.shutdown.timeout=100ms")
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                var template = context.getBean(SkillTemplate.class);
+                                AtomicReference<Thread> caller = new AtomicReference<>();
+                                try (var executor = Executors.newSingleThreadExecutor()) {
+                                    var pending =
+                                            executor.submit(
+                                                    () -> {
+                                                        caller.set(Thread.currentThread());
+                                                        return invoke(template, input("A"));
+                                                    });
+                                    assertThat(server.takeRequest(2, TimeUnit.SECONDS)).isNotNull();
+                                    long start = System.nanoTime();
+                                    if (mode.equals("caller")) caller.get().interrupt();
+                                    else context.close();
+                                    assertThatThrownBy(() -> pending.get(2, TimeUnit.SECONDS))
+                                            .isInstanceOf(ExecutionException.class);
+                                    assertThat(
+                                                    TimeUnit.NANOSECONDS.toMillis(
+                                                            System.nanoTime() - start))
+                                            .isLessThan(2500);
+                                    assertThat(records(traces(context), "MODEL_RESPONSE_RECEIVED"))
+                                            .isEmpty();
+                                }
+                            });
+            assertThat(server.getRequestCount()).isEqualTo(1);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void missionCutoffAbortsNativeWaitAndPreventsLateResponseAccounting(boolean backoff)
+            throws Exception {
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(
+                    backoff
+                            ? new MockResponse().setResponseCode(529).setBody("overloaded")
+                            : success(
+                                            "{\"answers\":{},\"usage\":{\"input_tokens\":2,\"output_tokens\":3}}")
+                                    .setHeadersDelay(3, TimeUnit.SECONDS));
+            runner(server, "/", leaf())
+                    .withPropertyValues(
+                            "loomspan.session.mission-timeout=300ms",
+                            "loomspan.connections.native.provider-retry.enabled=true",
+                            "loomspan.connections.native.provider-retry.initial-backoff=5s",
+                            "loomspan.connections.native.provider-retry.max-backoff=5s",
+                            "loomspan.connections.native.provider-retry.jitter=0")
+                    .run(
+                            context -> {
+                                assertThat(context).hasNotFailed();
+                                long start = System.nanoTime();
+                                assertThatThrownBy(
+                                                () ->
+                                                        invoke(
+                                                                context.getBean(
+                                                                        SkillTemplate.class),
+                                                                input("A")))
+                                        .isInstanceOf(SkillException.class);
+                                assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start))
+                                        .isLessThan(2500);
+                                assertThat(records(traces(context), "MODEL_RESPONSE_RECEIVED"))
+                                        .isEmpty();
+                                assertThat(usage(traces(context)).path("modelCalls").intValue())
+                                        .isZero();
+                            });
+            assertThat(server.getRequestCount()).isEqualTo(1);
+        }
+    }
+}

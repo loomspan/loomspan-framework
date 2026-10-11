@@ -152,11 +152,12 @@ class ConsoleRestFixtureCorpusTest
 
         result.put("instance-status.json", new ObservabilityDtos.InstanceStatus(
                 "11111111-1111-4111-8111-111111111111", "1.0.0-beta.9-SNAPSHOT", OBSERVED, true,
-                3, 1, 1, TracePersistencePolicy.ONERROR, Duration.ofMinutes(15), Duration.ofHours(24)));
+                4, 1, 1, TracePersistencePolicy.ONERROR, Duration.ofMinutes(15), Duration.ofHours(24)));
         result.put("skills-page.json", new ObservabilityDtos.Page<>(List.of(skill,
                 new ObservabilityDtos.SkillSummary("FetchDns", "REST", "classpath:/skills/fetch-dns.yaml",
                         null, null, "skills/FetchDns"), new ObservabilityDtos.SkillSummary(
-                "LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", "skills/LookupDns")), false, null, OBSERVED));
+                "LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", "skills/LookupDns"),
+                new ObservabilityDtos.SkillSummary("EvaluateDns", "TYPESAFE", "opaque label", null, null, "skills/EvaluateDns")), false, null, OBSERVED));
         result.put("skill-detail.json", new ObservabilityDtos.SkillDetail(
                 "CheckDns", "YAML", "classpath:/skills/check-dns.yaml", null, null, "# DNS check\r\nname: CheckDns\r\n", null));
         result.put("skill-java-detail.json", new ObservabilityDtos.SkillDetail(
@@ -164,6 +165,16 @@ class ConsoleRestFixtureCorpusTest
         result.put("skill-rest-detail.json", new ObservabilityDtos.SkillDetail(
                 "FetchDns", "REST", "opaque label", null, null,
                 "# REST DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application handler\r\nrest: true\r\n", null));
+        String nativeYaml = "name: EvaluateDns\ndescription: Evaluate DNS evidence\nmodel: evaluation\ninput_schema: {type: object}\n"
+                + "typesafe:\n  state: '${/input}'\n  questions:\n    healthy: {type: noul, instructions: 'Is DNS healthy?'}\n";
+        var nativeDeclaration = ai.loomspan.internal.typesafe.TypeSafeDeclaration.compile(
+                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().skillYaml().readTree(nativeYaml).get("typesafe"));
+        var nativeSchema = nativeDeclaration.outputSchema();
+        // The same schema metadata representation used by generation tool/catalog publication.
+        var manifest = new ai.loomspan.internal.skill.YamlSkillManifest();
+        manifest.setName("EvaluateDns"); manifest.setDescription("Evaluate DNS evidence");
+        result.put("skill-typesafe-detail.json", new ObservabilityDtos.SkillDetail("EvaluateDns", "TYPESAFE", "opaque label", null, null,
+                nativeYaml, JSON.writeValueAsString(schemaMetadata(nativeSchema))));
         result.put("forwarding-skill-detail.json", new ObservabilityDtos.SkillDetail(
                 "prepareReport", "YAML", "opaque forwarding label", null, null,
                 "name: prepareReport\nmodel: local\ndescription: Prepare report\nplanning_mode: true\n"
@@ -179,6 +190,21 @@ class ConsoleRestFixtureCorpusTest
                 List.of(skill), true, "eyJ2ZXJzaW9uIjoxfQ", OBSERVED.plusSeconds(1)));
         problems(result);
         activeExecutionContracts(result, usage, limits);
+        return result;
+    }
+
+    private static Map<String, Object> schemaMetadata(ai.loomspan.internal.skill.YamlSkillManifest.OutputSchemaManifest schema) {
+        var result = new LinkedHashMap<String, Object>();
+        if (schema.getType() != null) result.put("type", schema.getType());
+        if (schema.getDescription() != null) result.put("description", schema.getDescription());
+        if (schema.getProperties() != null && !schema.getProperties().isEmpty()) {
+            var properties = new LinkedHashMap<String, Object>();
+            schema.getProperties().forEach((key, child) -> properties.put(key, schemaMetadata(child)));
+            result.put("properties", properties);
+        }
+        if (schema.getRequired() != null && !schema.getRequired().isEmpty()) result.put("required", schema.getRequired());
+        if (schema.getEnumValues() != null && !schema.getEnumValues().isEmpty()) result.put("enum", schema.getEnumValues());
+        if (schema.getAdditionalProperties() != null) result.put("additionalProperties", schema.getAdditionalProperties());
         return result;
     }
 

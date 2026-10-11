@@ -11,6 +11,7 @@ import { recordContext } from "./recordContext";
 type Props = { traceId?: string; source?: TraceSource; scopeGeneration?: number; verifyScope?: (response: TraceRange) => Promise<TraceRange>; records: TraceRecord[]; frames?: TraceFrame[]; failures: TraceFailure[]; selectedRecordSequence?: number; selectedFailureId?: string; activeContentRecordSequence?: number; contentRange?: TraceRange; contentPending?: boolean; contentError?: string; onSelectRecord: (record: TraceRecord) => void; onSelectFailure: (failureId: string) => void; onSelectPlan?: (planId: string, transitionSequence?: number) => void; onContent: (contentRef: string, recordSequence: number) => void; onNextContent?: () => void; onClearContent?: () => void; onArtifactUnavailable?: (error: unknown) => void };
 
 type ModelDetail =
+  | { kind: "evaluation"; content: string }
   | { kind: "request"; messages: { role: string; text: string }[] }
   | { kind: "response"; content: string };
 
@@ -230,6 +231,9 @@ function parseModelDetail(kind: "request" | "response", value: unknown): ModelDe
     throw new Error(`Model ${kind} data was not a JSON object.`);
   }
   const fields = value as Record<string, unknown>;
+  if (fields.payloadType === "evaluation") {
+    return { kind: "evaluation", content: JSON.stringify(fields, null, 2) };
+  }
   if (kind === "request") {
     if (!Array.isArray(fields.messages)) {
       throw new Error("Model request data did not contain messages.");
@@ -397,7 +401,7 @@ function parseStepActionDetail(rawRecord: string, route: string, kind: StepActio
 }
 
 function ModelDetailView({ detail }: { detail: ModelDetail }) {
-  if (detail.kind === "response") return <pre>{detail.content}</pre>;
+  if (detail.kind === "response" || detail.kind === "evaluation") return <pre>{detail.content}</pre>;
   return <div className="trace-model-messages">
     {detail.messages.map((message, index) => <section className="trace-model-message" key={`${message.role}-${index}`}>
       <h5>{message.role.toLowerCase().replaceAll("_", " ")}</h5>

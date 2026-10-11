@@ -61,6 +61,9 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.autoconfigure.AiDriver");
 
     private static final Map<String, String> TECHNICALLY_PUBLIC_INTERNAL_TYPES = Map.ofEntries(
+            Map.entry("ai.loomspan.internal.typesafe.TypeSafeDeclaration", "Public only for framework-owned immutable native declaration and schema collaboration."),
+            Map.entry("ai.loomspan.internal.typesafe.TypeSafeClient", "Public only for framework-owned concrete native connection lifecycle."),
+            Map.entry("ai.loomspan.internal.typesafe.TypeSafeExecutor", "Public only for framework-owned captured mission evaluation dispatch."),
             Map.entry("ai.loomspan.internal.outputvalidation.OutputValidationPolicy", "Public only for shared framework-owned advisor and execution policy mechanics."),
             Map.entry("ai.loomspan.internal.outputvalidation.OutputValidationFeedback", "Public only for shared framework-owned path-specific validation feedback."),
             Map.entry("ai.loomspan.internal.release.LoomspanReleaseVersion", "Public only for framework-owned release metadata collaboration."),

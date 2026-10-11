@@ -4,7 +4,7 @@ import ai.loomspan.api.SkillKind;
 
 public enum CapabilityKind
 {
-    YAML_SKILL(SkillKind.YAML), REST_SKILL(SkillKind.REST), JAVA_SKILL(SkillKind.JAVA);
+    YAML_SKILL(SkillKind.YAML), REST_SKILL(SkillKind.REST), JAVA_SKILL(SkillKind.JAVA), TYPESAFE_SKILL(SkillKind.TYPESAFE);
 
     private final SkillKind publicKind;
 

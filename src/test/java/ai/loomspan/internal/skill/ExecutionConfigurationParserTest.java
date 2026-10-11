@@ -15,6 +15,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ExecutionConfigurationParserTest
 {
     @Test
+    void nativeCandidateCapturesAccountReferencesAndProtocolOptions() {
+        String yaml = CANDIDATE.replace("driver: openai", "driver: typesafe\n      base-url: https://openrouter.ai/api/\n      request-timeout: 240ms");
+        var parsed = ExecutionConfigurationParser.parse(new ExecutionConfiguration(yaml),
+                Map.of("provider.key", "fixture-native-key", "tenant.header", "fixture-header"));
+        var connection = parsed.properties().getConnections().get("primary");
+        assertThat(connection.getDriver()).isEqualTo(ai.loomspan.autoconfigure.AiDriver.TYPESAFE);
+        assertThat(connection.getBaseUrl()).isEqualTo("https://openrouter.ai/api/");
+        assertThat(connection.getRequestTimeout()).isEqualTo(java.time.Duration.ofMillis(240));
+        assertThat(connection.getApiKey()).isEqualTo("fixture-native-key");
+        assertThat(connection.getHeaders()).containsEntry("X-Tenant", "fixture-header");
+        assertThat(parsed.properties().getModels().get("selected").getProviderModel()).isEqualTo("compact");
+    }
+
+    @Test
     void rejectsInvalidRequestTimeoutWithSafeFullPath()
     {
         for (String value : java.util.List.of("0ms", "-1ms", "PT0.000999999S", "PT0.0015S",

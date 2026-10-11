@@ -21,6 +21,7 @@ public final class SpringAiChatOptionsContributor
             case ANTHROPIC -> anthropic(configuration);
             case GEMINI -> gemini(configuration);
             case OLLAMA -> OllamaChatOptions.builder().model(configuration.providerModel());
+            case TYPESAFE -> throw new IllegalArgumentException("Native evaluations do not accept chat options");
         };
     }
 

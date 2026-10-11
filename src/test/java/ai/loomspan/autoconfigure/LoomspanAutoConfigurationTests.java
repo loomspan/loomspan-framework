@@ -298,7 +298,7 @@ class LoomspanAutoConfigurationTests {
 
     @Test
     void doesNotBackOffWhenApplicationRegistersInternalModelResolver() {
-        SkillChatModelResolver unsupportedResolver = (skillName, configuration) -> new ai.loomspan.internal.provider.ProviderConnectionRuntime(
+        SkillChatModelResolver unsupportedResolver = (skillName, configuration) -> ai.loomspan.internal.provider.ProviderConnectionRuntime.chat(
                 Mockito.mock(ChatModel.class), AiDriver.OPENAI,
                 ai.loomspan.internal.provider.AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
                 ai.loomspan.internal.provider.ProviderRetryPolicy.from(new LoomspanProperties.ProviderRetryProperties()),

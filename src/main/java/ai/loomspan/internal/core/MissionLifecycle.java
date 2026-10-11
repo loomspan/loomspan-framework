@@ -41,6 +41,7 @@ public final class MissionLifecycle
     private long deadlineNanos = Long.MAX_VALUE;
     private volatile @Nullable Future<?> owningFuture;
     private final Set<Future<?>> frameworkFutures = ConcurrentHashMap.newKeySet();
+    private final Set<Future<?>> physicalFutures = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean frameworkCutOff = new AtomicBoolean();
     private volatile long frameworkDeadlineNanos = Long.MAX_VALUE;
     private final AtomicReference<Throwable> frameworkCause = new AtomicReference<>();
@@ -133,6 +134,26 @@ public final class MissionLifecycle
         }
         finally { lock.unlock(); }
         if (ready != null) ready.run();
+    }
+
+    /** Registers a transport cancellation handle with the same cancellation boundary as mission work. */
+    public void registerPhysicalFuture(Future<?> future)
+    {
+        Objects.requireNonNull(future);
+        boolean cancel;
+        lock.lock();
+        try {
+            physicalFutures.add(future);
+            frameworkFutures.add(future);
+            cancel = state != State.OPEN || frameworkCutOff.get();
+        } finally { lock.unlock(); }
+        if (cancel) future.cancel(true);
+    }
+
+    public void unregisterPhysicalFuture(Future<?> future)
+    {
+        physicalFutures.remove(future);
+        frameworkFutures.remove(future);
     }
 
     public List<AdmittedTask> admitUnit(ExecutionBinding binding, List<AssignedTaskExecution> assignments,
@@ -451,6 +472,7 @@ public final class MissionLifecycle
     private List<Future<?>> cancellableFuturesLocked(boolean includeOwning)
     {
         List<Future<?>> futures = new ArrayList<>();
+        futures.addAll(physicalFutures);
         if (includeOwning && owningFuture != null && !owningFuture.isDone()) futures.add(owningFuture);
         for (AdmittedTask task : admitted)
         {

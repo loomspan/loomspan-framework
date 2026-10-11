@@ -27,6 +27,79 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Actual supported facade/dispatch with local provider responses. */
 class DeclaredChildInputBindingsIntegrationTest {
+    @org.junit.jupiter.api.Test
+    void nativeLeafReceivesDynamicBindingsWithExactReceiverValidationAndOrdinaryDirectNormalization() throws Exception {
+        Path skills = Files.createDirectory(directory.resolve("native-binding"));
+        String nativeLeaf = """
+                name: evaluation
+                description: Evaluate normalized evidence
+                model: native
+                input_schema:
+                  type: object
+                  properties:
+                    amount: {type: number}
+                    candidates: {type: object, additionalProperties: true}
+                  required: [amount, candidates]
+                  additionalProperties: false
+                typesafe:
+                  state: ${/input}
+                  questions:
+                    category: {type: choice, criteria: '${/input/candidates}'}
+                    severity: {type: score, criteria: [null]}
+                    yes: {type: noul, instructions: 'Evaluate amount ${/input/amount}'}
+                """;
+        Files.writeString(skills.resolve("evaluation.yaml"), nativeLeaf);
+        Files.writeString(skills.resolve("root.yaml"), """
+                name: root
+                description: Bind native business input
+                model: local
+                planning_mode: true
+                max_steps: 1
+                input_schema: {type: object, additionalProperties: true}
+                allowed_skills:
+                  - name: evaluation
+                    required: true
+                    max_tasks: 1
+                    input_bindings:
+                      /amount: {from: input, path: /amount}
+                      /candidates: {from: input, path: /candidates}
+                output_from: {skill: evaluation}
+                """);
+        var nativeBodies = new ArrayList<String>();
+        try (var server = new MockWebServer()) {
+            server.setDispatcher(new Dispatcher() {
+                @Override public MockResponse dispatch(RecordedRequest request) {
+                    if (request.getPath().equals("/api/v1/systemone")) {
+                        nativeBodies.add(request.getBody().readUtf8());
+                        return new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"answers\":{}}");
+                    }
+                    return response(JSON.writeValueAsString(Map.of("capabilityName", "root", "createdAt", "2026-10-10T00:00:00Z",
+                            "status", "VALID", "tasks", List.of(task("evaluation", List.of())))));
+                }
+            });
+            server.start();
+            new ApplicationContextRunner().withUserConfiguration(App.class).withPropertyValues(
+                    "spring.main.web-application-type=none", "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
+                    "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=" + server.url("/v1"),
+                    "loomspan.connections.local.api-key=fixture", "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=planner",
+                    "loomspan.connections.native.driver=typesafe", "loomspan.connections.native.base-url=" + server.url("/api"),
+                    "loomspan.connections.native.api-key=fixture", "loomspan.models.native.connection=native", "loomspan.models.native.provider-model=jev"
+            ).run(context -> {
+                assertThat(context).hasNotFailed();
+                var template = context.getBean(SkillTemplate.class);
+                var candidates = Map.of("KeepCase", Map.of("description", "original"));
+                assertThat(template.invoke("evaluation", Map.of("amount", "4", "candidates", candidates))).isEqualTo("{}");
+                assertThat(template.invoke("root", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{}");
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("root", Map.of("amount", "4", "candidates", candidates)))
+                        .hasStackTraceContaining("binding_assembled_input_invalid");
+                assertThat(nativeBodies).hasSize(2);
+                assertThat(JSON.readTree(nativeBodies.getFirst())).isEqualTo(JSON.readTree(nativeBodies.getLast()));
+                assertThat(JSON.readTree(nativeBodies.getFirst()).at("/questions/category/criteria/KeepCase/description").asText()).isEqualTo("original");
+            });
+            assertThat(server.getRequestCount()).isEqualTo(4);
+        }
+    }
+
     @ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"success", "missing", "approval", "revoked", "tool-quota", "provider-quota"})
     void directDispatchRetainsFailureAccessApprovalAndRealRequestBudgets(String scenario) throws Exception {

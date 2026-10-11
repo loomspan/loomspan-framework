@@ -98,7 +98,7 @@ public class ExecutionCoordinator
         if (!baseBinding.generation().owns(rootCapability))
             throw new IllegalArgumentException("Capability '" + rootCapability.name()
                     + "' does not belong to the current skill generation");
-        YamlSkillDefinition definition = rootCapability.kind() == CapabilityKind.YAML_SKILL
+        YamlSkillDefinition definition = rootCapability.kind() == CapabilityKind.YAML_SKILL || rootCapability.kind() == CapabilityKind.TYPESAFE_SKILL
                 ? requireYamlSkill(baseBinding, rootCapability.name()) : null;
         MissionContext parentMission = baseBinding.mission();
         boolean topLevelInvocation = parentMission == null;
@@ -151,6 +151,8 @@ public class ExecutionCoordinator
         try
         {
             accessGuard.checkAccess(rootCapability, session, authentication);
+            if (rootCapability.kind() == CapabilityKind.TYPESAFE_SKILL)
+                return missionWorkExecutor.executeEvaluation(session, definition, missionInput == null ? Map.of() : missionInput);
             if (rootCapability.kind() == CapabilityKind.JAVA_SKILL
                     || rootCapability.kind() == CapabilityKind.REST_SKILL)
             {

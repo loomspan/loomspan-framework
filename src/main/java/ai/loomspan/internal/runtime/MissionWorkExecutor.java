@@ -123,6 +123,14 @@ public final class MissionWorkExecutor
         }
     }
 
+    public String executeEvaluation(LoomspanSession session, ai.loomspan.internal.skill.YamlSkillDefinition definition,
+            Map<String, Object> input)
+    {
+        return execute(session, definition.manifest().getName(), () ->
+                new ai.loomspan.internal.typesafe.TypeSafeExecutor(executionStateService, sessionUsageService)
+                        .execute(definition, input, session));
+    }
+
     private void cleanupFrames(LoomspanSession session, PhysicalBranchContext branch,
             ai.loomspan.internal.core.MissionContext mission, MissionLifecycle.Cutoff cutoff)
     {

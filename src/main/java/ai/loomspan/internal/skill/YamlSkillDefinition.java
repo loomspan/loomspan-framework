@@ -92,7 +92,7 @@ public record YamlSkillDefinition(
 
     public YamlSkillManifest.OutputSchemaManifest outputSchema()
     {
-        return copyValue(manifest.getOutputSchema(), YamlSkillManifest.OutputSchemaManifest.class);
+        return typesafe() ? typeSafeDeclaration().outputSchema() : copyValue(manifest.getOutputSchema(), YamlSkillManifest.OutputSchemaManifest.class);
     }
 
     /** Exact direct child selected for runtime result forwarding, or null for synthesis. */
@@ -155,6 +155,13 @@ public record YamlSkillDefinition(
         return !hasDeclaredInputSchema();
     }
 
+    public boolean typesafe() { return manifest.isTypesafeDeclared(); }
+
+    public ai.loomspan.internal.typesafe.TypeSafeDeclaration typeSafeDeclaration() {
+        if (!typesafe()) throw new IllegalStateException("Skill has no TypeSafe declaration");
+        return manifest.compiledTypesafe();
+    }
+
     public boolean rest()
     {
         return isRestManifest(manifest);
@@ -210,7 +217,11 @@ public record YamlSkillDefinition(
         {
             throw new NullPointerException("manifest must not be null");
         }
-        YamlSkillManifest copy = COPY_MAPPER.convertValue(source, YamlSkillManifest.class);
+        tools.jackson.databind.node.ObjectNode tree = COPY_MAPPER.valueToTree(source);
+        tree.remove("typesafe");
+        YamlSkillManifest copy = COPY_MAPPER.treeToValue(tree, YamlSkillManifest.class);
+        // Share the immutable compiled declaration while detaching its mutable authored JSON.
+        copy.copyTypesafeFrom(source);
         copy.restoreDeclaredFields(source.declaredFields());
         return copy;
     }

@@ -79,7 +79,7 @@ class DefaultSkillChatModelResolverTests {
     }
 
     private static ProviderConnectionRuntime runtime(ChatModel model) {
-        return new ProviderConnectionRuntime(model, AiDriver.OPENAI, AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
+        return ProviderConnectionRuntime.chat(model, AiDriver.OPENAI, AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
                 ProviderRetryPolicy.from(new LoomspanProperties.ProviderRetryProperties()), ignored -> ProviderFailureDetails.unknown());
     }
 }

@@ -324,7 +324,7 @@ class LoomspanPropertiesTest {
             properties.setConnections(java.util.Map.of(driver.name().toLowerCase(), connection));
             assertThatThrownBy(properties::afterPropertiesSet)
                     .hasMessageContaining(".headers")
-                    .hasMessageContaining("only supported for drivers OPENAI and ANTHROPIC");
+                    .hasMessageContaining("only supported for drivers OPENAI, ANTHROPIC and TYPESAFE");
         }
     }
 

@@ -1,7 +1,7 @@
 # Loomspan Framework
 
 Loomspan brings AI reasoning into applications through reusable **skills**. A skill
-can reason with a language model, call a Java service, or delegate an operation
+can reason with a language model, evaluate TypeSafe primitives, call a Java service, or delegate an operation
 to an application-owned REST integration. Compose those capabilities into a
 hierarchy so a model can break down a task while your application controls which
 operations it can use.
@@ -13,7 +13,7 @@ duplicate.
 ## Why Loomspan?
 
 - **Combine reasoning with application code.** Use model-backed YAML skills,
-  annotated Java methods, and REST leaves in the same skill tree.
+  TypeSafe Choice/Noul/Score evaluations, annotated Java methods, and REST leaves in the same skill tree.
 - **Let the model plan within explicit boundaries.** Declare allowed child
   skills, validate inputs and structured outputs, and apply authorization policies.
 - **Bound execution.** Configure mission deadlines, nesting limits, and usage
@@ -121,6 +121,14 @@ for complete schemas, object pointers, dependencies and diagnostics.
 
 ## Choose your integration
 
+TypeSafe Choice, Noul, and Score can be registered as leaf skills and invoked
+through the same `SkillTemplate` or composed as children of chat skills. The
+`typesafe` driver supports direct TypeSafe and OpenRouter System One accounts.
+Leaves validate the resolved request and return the entire named `answers`
+object as JSON text. Their generated output schema is descriptive metadata;
+answers are preserved without validation or repair. See the [complete TypeSafe
+setup, direct invocation and parent example](agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md).
+
 - **Embedded Java:** add the Spring Boot starter and invoke skills in your
   application. This revision targets Java 21+, Spring Boot 4.1, and Spring AI 2;
   building with Maven requires 3.9+.
@@ -129,7 +137,7 @@ for complete schemas, object pointers, dependencies and diagnostics.
   separate runtime. Its repository covers setup, versions, and integration guidance.
 
 Model-backed skills need a named connection using the OpenAI, Anthropic, Gemini,
-or Ollama driver. Java and REST leaves can execute without a framework model call.
+or Ollama driver. Native TypeSafe leaves require the `typesafe` driver. Java and REST leaves can execute without a framework model call.
 
 Loomspan is **in beta**. Supported Java APIs and documented configuration can
 change between betas, including breaking changes. Pin an exact version and review
@@ -150,8 +158,10 @@ change between betas, including breaking changes. Pin an exact version and revie
 The supported Java API is the closed allowlist in `ai.loomspan.api`, summarized
 in the [public API reference](agent-skills/loomspan-docs/references/java-api/compatibility-and-boundaries.md).
 The catalog descriptor is `SkillDescriptor(name, description, kind, inputSchema,
-outputSchema)`; nullable `outputSchema` describes effective output shape, including
-forwarding chains, without adding parent or Java/REST output validation. This
+outputSchema)`; `SkillKind` includes `YAML`, `JAVA`, `REST`, and `TYPESAFE`.
+Nullable `outputSchema` describes effective output shape, including
+forwarding chains and native descriptive schemas, without adding parent,
+TypeSafe, or Java/REST output validation. This
 revision uses only the five-argument constructor. `RestSkillHandler` is the sole supported Java SPI. Types under `internal` and
 `autoconfigure` are not application extension APIs; Loomspan does not expose an
 internal bean-replacement contract.

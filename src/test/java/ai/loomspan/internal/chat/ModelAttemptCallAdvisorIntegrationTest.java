@@ -493,7 +493,7 @@ class ModelAttemptCallAdvisorIntegrationTest
             calls.incrementAndGet();
             throw authenticationFailure;
         };
-        ProviderConnectionRuntime runtime = new ProviderConnectionRuntime(
+        ProviderConnectionRuntime runtime = ProviderConnectionRuntime.chat(
                 model,
                 AiDriver.OPENAI,
                 AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
@@ -658,7 +658,7 @@ class ModelAttemptCallAdvisorIntegrationTest
         ProviderFailureTranslator translator = new SpringAiProviderIntegration(new DefaultResourceLoader())
                 .create("openai", properties)
                 .failureTranslator();
-        ProviderConnectionRuntime runtime = new ProviderConnectionRuntime(
+        ProviderConnectionRuntime runtime = ProviderConnectionRuntime.chat(
                 model,
                 AiDriver.OPENAI,
                 AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
@@ -739,7 +739,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                 null,
                 "Provider temporarily unavailable",
                 List.of());
-        ProviderConnectionRuntime runtime = new ProviderConnectionRuntime(
+        ProviderConnectionRuntime runtime = ProviderConnectionRuntime.chat(
                 model,
                 AiDriver.OPENAI,
                 AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
@@ -867,7 +867,7 @@ class ModelAttemptCallAdvisorIntegrationTest
         ProviderFailureDetails transientFailure = new ProviderFailureDetails(
                 ProviderFailureClassification.TRANSIENT, ProviderFailureCategory.SERVER_ERROR,
                 503, null, null, null, null, List.of());
-        ProviderConnectionRuntime runtime = new ProviderConnectionRuntime(model, AiDriver.OPENAI,
+        ProviderConnectionRuntime runtime = ProviderConnectionRuntime.chat(model, AiDriver.OPENAI,
                 AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
                 new ProviderRetryPolicy(true, 3, java.time.Duration.ofSeconds(30), 2.0d,
                         java.time.Duration.ofSeconds(30), 0.0d), ignored -> transientFailure);
@@ -1028,13 +1028,13 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         LoomspanProperties.ProviderRetryProperties retry = new LoomspanProperties.ProviderRetryProperties();
         retry.setEnabled(false);
-        return new ProviderConnectionRuntime(model, AiDriver.OPENAI, AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
+        return ProviderConnectionRuntime.chat(model, AiDriver.OPENAI, AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
                 ProviderRetryPolicy.from(retry), ignored -> ProviderFailureDetails.unknown());
     }
 
     private static ProviderConnectionRuntime retryingRuntime(ChatModel model, ProviderFailureDetails details)
     {
-        return new ProviderConnectionRuntime(model, AiDriver.OPENAI, AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
+        return ProviderConnectionRuntime.chat(model, AiDriver.OPENAI, AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
                 new ProviderRetryPolicy(true, 2, java.time.Duration.ZERO, 2.0d, java.time.Duration.ZERO, 0.0d),
                 ignored -> details);
     }

@@ -19,6 +19,66 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DeclaredOutputBindingsPlanningIntegrationTest {
+    @ParameterizedTest @ValueSource(strings={"allowed", "disallowed", "missing-probability", "case-source"})
+    void nativePassthroughIsEnforcedOnlyByConsumingBindingContract(String scenario) throws Exception {
+        boolean probability = scenario.contains("probability") || scenario.equals("case-source");
+        String pointer = probability ? "/category/probabilities/" + (scenario.equals("case-source") ? "KeepCase" : "A") : "/category/choice";
+        String output = probability ? "type: number" : "type: string, enum: [A, Z]";
+        Files.writeString(directory.resolve("root.yaml"), """
+                name: root
+                description: Assemble one named native answer
+                model: local
+                planning_mode: true
+                max_steps: 1
+                allowed_skills: [{name: evaluation, required: true, max_tasks: 1}]
+                output_schema:
+                  type: object
+                  properties:
+                    selected: {%s}
+                  required: [selected]
+                  additionalProperties: false
+                output_bindings:
+                  /selected: {from: child_result, skill: evaluation, path: %s}
+                """.formatted(output, pointer));
+        Files.writeString(directory.resolve("evaluation.yaml"), """
+                name: evaluation
+                description: Native producer
+                model: native
+                input_schema: {type: object}
+                typesafe:
+                  state: ${/input}
+                  questions:
+                    category: {type: choice, criteria: {%s}}
+                """.formatted(scenario.equals("case-source") ? "KeepCase: null" : "A: null, B: null"));
+        var calls = new AtomicInteger();
+        try (var server = new MockWebServer()) {
+            server.setDispatcher(new Dispatcher() {
+                @Override public MockResponse dispatch(RecordedRequest request) {
+                    calls.incrementAndGet();
+                    if (request.getPath().equals("/api/v1/systemone")) {
+                        String answer = scenario.equals("allowed") ? "{\"choice\":\"A\"}" : scenario.equals("disallowed") ? "{\"choice\":\"B\"}"
+                                : scenario.equals("case-source") ? "{\"probabilities\":{\"keepcase\":0.8}}" : "{\"probabilities\":{}}";
+                        return new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"answers\":{\"category\":"+answer+"}}");
+                    }
+                    return response(JSON.writeValueAsString(Map.of("capabilityName", "root", "createdAt", "2026-10-10T00:00:00Z", "status", "VALID", "tasks", List.of(task("evaluation")))));
+                }
+            }); server.start();
+            new ApplicationContextRunner().withUserConfiguration(App.class).withPropertyValues(
+                    "spring.main.web-application-type=none", "loomspan.skills.locations=" + directory.toUri() + "*.yaml",
+                    "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=" + server.url("/v1"),
+                    "loomspan.connections.local.api-key=fixture", "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=planner",
+                    "loomspan.connections.native.driver=typesafe", "loomspan.connections.native.base-url=" + server.url("/api"),
+                    "loomspan.connections.native.api-key=fixture", "loomspan.models.native.connection=native", "loomspan.models.native.provider-model=jev"
+            ).run(context -> {
+                assertThat(context).hasNotFailed(); var template = context.getBean(SkillTemplate.class);
+                if (scenario.equals("allowed")) assertThat(JSON.readTree(template.invoke("root", Map.of())).path("selected").asText()).isEqualTo("A");
+                else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("root", Map.of()))
+                        .hasStackTraceContaining(probability ? "binding_source_unavailable" : "binding_output_validation");
+            });
+            assertThat(calls).hasValue(2);
+        }
+    }
+
     private static final JsonMapper JSON = JsonMapper.builder().build();
     @TempDir Path directory;
     @Configuration(proxyBeanMethods = false) @EnableAutoConfiguration static class App {}

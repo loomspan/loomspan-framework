@@ -31,7 +31,7 @@ public final class DefaultRegisteredSkillCatalog implements RegisteredSkillCatal
         {
             String name = metadata.name();
             RegisteredSkillEntry entry;
-            if (metadata.kind() == CapabilityKind.YAML_SKILL || metadata.kind() == CapabilityKind.REST_SKILL)
+            if (metadata.kind() == CapabilityKind.YAML_SKILL || metadata.kind() == CapabilityKind.REST_SKILL || metadata.kind() == CapabilityKind.TYPESAFE_SKILL)
             {
                 var definition = Objects.requireNonNull(definitions.get(name), "manifest registration must have a definition");
                 entry = new RegisteredSkillEntry(name,

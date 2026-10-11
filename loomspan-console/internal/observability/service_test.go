@@ -75,7 +75,7 @@ func TestObservabilityServiceReturnsSkillPageFromFixture(t *testing.T) {
 	if domain != nil {
 		t.Fatal(domain)
 	}
-	if len(page.Items) != 3 || page.Items[0].RegisteredName != "CheckDns" || page.Items[1].Source != "REST" {
+	if len(page.Items) != 4 || page.Items[0].RegisteredName != "CheckDns" || page.Items[1].Source != "REST" || page.Items[3].Source != "TYPESAFE" {
 		t.Fatalf("unexpected page: %#v", page)
 	}
 	if page.HasMore {
@@ -105,7 +105,7 @@ func TestObservabilityServiceReturnsInstanceStatusFromFixture(t *testing.T) {
 	if status.InstanceID != "11111111-1111-4111-8111-111111111111" {
 		t.Fatalf("unexpected instance ID: %s", status.InstanceID)
 	}
-	if status.RegisteredSkillCount != 3 {
+	if status.RegisteredSkillCount != 4 {
 		t.Fatalf("unexpected skill count: %d", status.RegisteredSkillCount)
 	}
 	if status.TargetScopeID != "scope-1" {
@@ -371,8 +371,8 @@ func TestObservabilityServiceAgainstHTTPTestServer(t *testing.T) {
 	if domain != nil {
 		t.Fatal(domain)
 	}
-	if len(page.Items) != 3 {
-		t.Fatalf("expected 3 items, got %d", len(page.Items))
+	if len(page.Items) != 4 {
+		t.Fatalf("expected 4 items, got %d", len(page.Items))
 	}
 }
 

@@ -28,7 +28,12 @@ public final class NamedAiConnectionRegistry
             ProviderConnectionRuntime runtime = null;
             try
             {
-                runtime = integration.create(name, properties);
+                runtime = properties.getDriver() == ai.loomspan.autoconfigure.AiDriver.TYPESAFE
+                        ? new ProviderConnectionRuntime(null, new ai.loomspan.internal.typesafe.TypeSafeClient(properties),
+                                properties.getDriver(), ai.loomspan.internal.provider.AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
+                                ai.loomspan.internal.provider.ProviderRetryPolicy.from(properties.getProviderRetry()),
+                                ai.loomspan.internal.typesafe.TypeSafeClient::translate)
+                        : integration.create(name, properties);
                 if (runtime.attemptOwnership() != ai.loomspan.internal.provider.AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP
                         && properties.getProviderRetry().isEnabled())
                 {
@@ -98,7 +103,7 @@ public final class NamedAiConnectionRegistry
         Exception failure = null;
         for (ProviderConnectionRuntime runtime : models.values())
         {
-            Object model = runtime.chatModel();
+            Object model = runtime.nativeClient() != null ? runtime.nativeClient() : runtime.chatModel();
             try
             {
                 if (model instanceof DisposableBean disposableBean) disposableBean.destroy();

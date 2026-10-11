@@ -23,7 +23,7 @@ void validate(String skillName, Object input);
 void validate(String skillName, Map<String, Object> input);
 ```
 
-`skillName` MUST identify a registered Java, REST, or model-backed YAML skill by its exact name.
+`skillName` MUST identify a registered Java, REST, TypeSafe, or model-backed YAML skill by its exact name.
 For Java, this is the annotation name or the canonical method name when omitted.
 Bean names and method signatures are diagnostics, never invocation aliases.
 
@@ -50,6 +50,12 @@ The return value is text. A caller that requires machine-readable output
 SHOULD give the producing model YAML skill an `output_schema` and then parse the returned JSON
 according to the application's own boundary policy. Java results use Jackson
 serialization and do not have a YAML output schema.
+
+[TypeSafe leaves](../skill-authoring/typesafe-skills.md) use the same String facade:
+the complete named `answers` object becomes JSON text without a provider-envelope
+wrapper. Their generated schema is descriptive and does not validate or repair
+answers. Root pre-checks validate input/access only; native substitution and
+resolved-request checks run during invocation before any provider attempt.
 
 An explicit planning `output_from` parent returns its designated accepted direct
 child task's existing String unchanged after every accepted task succeeds. It

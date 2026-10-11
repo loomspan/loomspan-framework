@@ -124,6 +124,7 @@ export type InstanceStatus = {
 type SkillLocation =
   | { source: "YAML"; sourcePath: string; beanName?: never; method?: never }
   | { source: "REST"; sourcePath: string; beanName?: never; method?: never }
+  | { source: "TYPESAFE"; sourcePath: string; beanName?: never; method?: never }
   | { source: "JAVA"; sourcePath?: never; beanName: string; method: string };
 
 export type SkillSummary = SkillLocation & {
@@ -134,6 +135,7 @@ export type SkillSummary = SkillLocation & {
 export type SkillDetail = { targetScopeId: string; registeredName: string; outputSchema: string | null } & (
   | { source: "YAML"; sourcePath: string; yaml: string; beanName?: never; method?: never }
   | { source: "REST"; sourcePath: string; yaml: string; beanName?: never; method?: never }
+  | { source: "TYPESAFE"; sourcePath: string; yaml: string; beanName?: never; method?: never }
   | { source: "JAVA"; beanName: string; method: string; sourcePath?: never; yaml?: never }
 );
 

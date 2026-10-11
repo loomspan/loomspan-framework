@@ -29,6 +29,7 @@ public class DefaultSkillChatModelResolver implements SkillChatModelResolver
                     + "' (driver " + configuration.driver() + ", framework model '" + configuration.frameworkModel()
                     + "') required by skill '" + skillName + "'");
         }
+        chatModel.requireChatModel();
         return chatModel;
     }
 }

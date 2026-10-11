@@ -9,12 +9,14 @@ coverage: source-verified
 
 Inject `SkillCatalog` to read one eager startup snapshot. Its `generationId()` is the opaque process-local identity of that generation. `skills()` is immutable and
 sorted by exact registered name; `skill(name)` performs exact lookup and returns empty
-when absent. Every registered YAML, Java, and REST skill is included even when restricted.
+when absent. Every registered YAML, Java, REST, and TypeSafe skill is included even when restricted.
 Each `SkillDescriptor` has five components: `name`, `description`, `kind`,
 `inputSchema`, and nullable `outputSchema`. `inputSchema` is the exact registered
 JSON input-schema string shown to models. `outputSchema` is normalized effective
-output metadata: the ordinary model producer's shape, inherited through a
+output metadata: the ordinary model producer's shape or a TypeSafe leaf's generated
+descriptive schema, inherited through a
 forwarding chain, or null for Java, REST and model producers without a schema.
+Native descriptive metadata does not validate or repair TypeSafe answers.
 Child-local evidence annotations are omitted from metadata; it does not install
 a parent validator or guarantee factual correctness. See [output contracts](../skill-authoring/output-contracts.md). The catalog has no refresh or
 replacement contract and discovery is not authorization. For current discovery after publication, call `SkillReloader.snapshot()`; the injected catalog never changes. See [skill-reload.md](skill-reload.md).

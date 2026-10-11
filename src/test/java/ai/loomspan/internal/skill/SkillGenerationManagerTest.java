@@ -40,6 +40,59 @@ import static org.mockito.Mockito.when;
 class SkillGenerationManagerTest
 {
     @Test
+    void nativeSchemasEnterExistingBindingCompatibilityAndCapturedCatalogs(@TempDir Path directory) {
+        var properties = loadingProperties(directory);
+        var connection = new LoomspanProperties.ConnectionProperties(); connection.setDriver(AiDriver.TYPESAFE); connection.setApiKey("fixture");
+        properties.getConnections().put("native", connection);
+        var model = new LoomspanProperties.ModelCatalogEntry(); model.setConnection("native"); model.setProviderModel("jev"); properties.getModels().put("native", model);
+        var javaSkills = mock(SkillMethodBeanPostProcessor.class); when(javaSkills.capabilities()).thenReturn(List.of());
+        var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties), new SkillInputContractResolver(), new StaticListableBeanFactory());
+        manager.afterSingletonsInstantiated();
+        String leaf = """
+                name: producer
+                description: Evaluate
+                model: native
+                input_schema: {type: object}
+                typesafe:
+                  state: ${/input}
+                  questions:
+                    category: {type: choice, criteria: {A: null, B: null}}
+                    severity: {type: score, criteria: [low, high]}
+                """;
+        String parent = """
+                name: parent
+                description: Bind named answers
+                model: model
+                planning_mode: true
+                allowed_skills: [{name: producer, max_tasks: 1}]
+                output_schema:
+                  type: object
+                  properties:
+                    result: {type: string, enum: [A, Z]}
+                  required: [result]
+                  additionalProperties: false
+                output_bindings:
+                  /result: {from: child_result, skill: producer, path: /category/choice}
+                """;
+        var producer = new SkillDocument("opaque native label", leaf);
+        assertThat(manager.validate(List.of(new SkillDocument("parent", parent), producer)).valid()).isTrue();
+        var generation = manager.prepare(List.of(new SkillDocument("parent", parent), producer));
+        var schema = generation.capability("producer").tool().outputSchema();
+        assertThat(generation.skillCatalog().skill("producer").orElseThrow().outputSchema()).isEqualTo(schema);
+        assertThat(generation.registeredSkillCatalog().find("producer").orElseThrow().outputSchema()).isEqualTo(schema);
+        assertThat(generation.registeredSkillCatalog().find("producer").orElseThrow().sourcePath()).isEqualTo("opaque native label");
+        assertThat(generation.registeredSkillCatalog().find("producer").orElseThrow().yaml()).isEqualTo(leaf);
+        for (String invalid : List.of(parent.replace("enum: [A, Z]", "enum: [Z]"),
+                parent.replace("enum: [A, Z]", "enum: [score]").replace("path: /category/choice", "path: /category/type"),
+                parent.replace("type: string, enum: [A, Z]", "type: integer").replace("path: /category/choice", "path: /severity/score"))) {
+            assertThat(manager.validate(List.of(new SkillDocument("parent", invalid), producer)).issues())
+                    .anyMatch(issue -> issue.fieldPath().equals("output_bindings"));
+        }
+        var dynamic = new SkillDocument("dynamic", leaf.replace("criteria: {A: null, B: null}", "criteria: '${/input/options}'"));
+        assertThat(manager.validate(List.of(new SkillDocument("parent", parent.replace("enum: [A, Z]", "enum: [Z]")), dynamic)).valid()).isTrue();
+    }
+
+    @Test
     void validatesOutputBindingPathsTypesAndProducerCountsAgainstCompleteGeneration(@TempDir Path directory) {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of());

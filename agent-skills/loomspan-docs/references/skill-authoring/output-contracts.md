@@ -9,6 +9,11 @@ coverage: source-verified
 
 ## Applicability
 
+[TypeSafe leaves](typesafe-skills.md) have a generated descriptive output schema
+and return the complete provider answers without answer validation or repair.
+The authored `output_schema` rules below apply to ordinary chat skills. A parent
+can bind from or forward a TypeSafe child's result under the existing rules.
+
 Use this topic to choose final synthesis, declared output assembly with `output_bindings`, or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract gives the model provider-neutral instructions, validates the returned JSON exactly, and can drive semantic retries. Java skills have no YAML `output_schema`; their returned-value behavior is Jackson serialization of the Java result.
 
 The root schema MUST have `type: object`. Supported node types are `object`, `array`, `string`, `integer`, `number`, and `boolean`.
@@ -173,6 +178,13 @@ Missing paths differ from explicit null. Unavailable, ambiguous, failed, cross-i
 Implementation evidence: `OutputBindingProjection`, `OutputBindingComposition`, `ChildInputBindingAssembler`, `PlanOutputBindingProducerValidator`, and the ordinary and step mission engines. `OutputBindingCompositionTest` protects projection, ownership conflicts and exact insertion; `OutputBindingIsolationTest` protects concurrent/nested invocation and generation snapshots. `DeclaredOutputBindingsOrdinaryIntegrationTest` and `DeclaredOutputBindingsPlanningIntegrationTest` exercise facade completion and correction, including model/Java/REST sources. `ConsoleTraceFixtureCorpusTest` exports current Java assembly authority for Console readers.
 
 ## Effective output metadata
+
+TypeSafe producers expose a declaration-derived schema, inherited unchanged by
+forwarding chains. Fixed criteria supply fixed Choice/probability keys; dynamic
+criteria keep maps open without specializing catalog metadata per call. Native
+answers, including empty/extended objects, are not validated against that schema.
+Parent output-binding registration uses the same partial compatibility checks;
+actual selected values remain subject to the destination's runtime contract.
 
 Public `SkillDescriptor.outputSchema()`, planner tool descriptions, and Console skill detail expose nullable normalized JSON-object schema text from the captured complete generation. Ordinary model skills expose their authored output shape; forwarding parents derive it through their selected-child chain. Shape, constraints, descriptions and provider-neutral `nullable` semantics are retained, while child-local `evidence` annotations are omitted. This text describes Loomspan's supported schema vocabulary; it is not a provider-native JSON Schema response format.
 

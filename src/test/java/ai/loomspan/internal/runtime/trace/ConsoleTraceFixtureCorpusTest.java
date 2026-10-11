@@ -74,6 +74,7 @@ class ConsoleTraceFixtureCorpusTest
     private static final ObjectMapper JSON = JsonMapper.builder().findAndAddModules().build();
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-24T12:00:00Z"), ZoneOffset.UTC);
     private static final Set<String> VALID = Set.of(
+            "native-evaluation-success",
             "single-attempt-success",
             "java-root-success",
             "assembled-input-result",
@@ -983,6 +984,22 @@ class ConsoleTraceFixtureCorpusTest
                         Map.of("message", "validation exhausted"), null);
                 attributed = terminal = new Usage(11, 4);
                 outcome = "FAILED";
+            }
+            case "native-evaluation-success" -> {
+                var metadata = attempt("native-retry", "native-attempt", 1,
+                        ordered("driver", "TYPESAFE", "connection", "native", "providerModel", "jev-latest"));
+                handle.append(TraceRecordType.MODEL_REQUEST_SENT, metadata,
+                        ordered("payloadType", "evaluation", "endpoint", "https://api.typesafe.ai/v1/systemone", "requestedModel", "jev-latest",
+                                "request", ordered("state", ordered("Authorization", "kept", "text", "evidence"), "model", "jev-latest",
+                                        "questions", ordered("healthy", ordered("type", "noul", "instructions", "Is this healthy?")))));
+                var responseMetadata = new LinkedHashMap<String, Object>(metadata);
+                responseMetadata.put("usage", ordered("promptUnits", 2, "completionUnits", 1, "totalUnits", 3, "precision", "EXACT"));
+                handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED, responseMetadata,
+                        ordered("payloadType", "evaluation", "endpoint", "https://api.typesafe.ai/v1/systemone", "requestedModel", "jev-latest",
+                                "servedModel", "jev-fixture", "envelope", ordered("model", "jev-fixture", "answers",
+                                        ordered("healthy", ordered("type", "noul", "noul", 0.75, "extension", "x".repeat(5000))),
+                                        "usage", ordered("input_tokens", 2, "output_tokens", 1))));
+                attributed = terminal = new Usage(2, 1);
             }
             case "unavailable-usage" -> appendAttempt(
                     handle, "retry-1", "attempt-1", 1, 0, 0, "UNAVAILABLE");
@@ -2391,6 +2408,7 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "native-evaluation-success" -> List.of(expectedAttempt(name, "native-retry", "native-attempt", 1));
             case "forwarded-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1));
             case "assembled-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1), expectedAttempt(name, "retry-assembly", "attempt-assembly", 1));
             case "nested-forwarded-child-result" -> List.of(expectedAttempt(name, "retry-report-plan", "attempt-report-plan", 1),
@@ -2489,6 +2507,7 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "native-evaluation-success" -> new Usage(2, 1);
             case "advisor-retry" -> attemptId.equals("attempt-1") ? new Usage(10, 4) : new Usage(8, 3);
             case "nested-retry-sequences" -> switch (attemptId)
             {
@@ -2672,6 +2691,7 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "native-evaluation-success" -> new Usage(2, 1);
             case "single-attempt-success" -> new Usage(10, 4);
             case "advisor-retry" -> new Usage(18, 7);
             case "nested-retry-sequences" -> new Usage(12, 4);
@@ -2688,6 +2708,7 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "native-evaluation-success" -> List.of(expectedPayload(4, "payload-1", "application/json", 2));
             case "chunked-payload" -> List.of(expectedPayload(3, "payload-1", "text/plain", 2));
             case "chunked-json-payload" -> List.of(expectedPayload(3, "payload-1", "application/json", 2));
             case "recovered-provider-attempt-diagnostic" ->

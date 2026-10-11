@@ -9,7 +9,7 @@ public record RegisteredSkillEntry(String registeredName, String source, String 
     public RegisteredSkillEntry
     {
         validateLocation(registeredName, source, sourcePath, beanName, method);
-        if ("YAML".equals(source) || "REST".equals(source)) Objects.requireNonNull(yaml, "yaml must not be null");
+        if ("YAML".equals(source) || "REST".equals(source) || "TYPESAFE".equals(source)) Objects.requireNonNull(yaml, "yaml must not be null");
         else if (yaml != null) throw new IllegalArgumentException("Java skills must not contain YAML");
     }
 
@@ -26,7 +26,7 @@ public record RegisteredSkillEntry(String registeredName, String source, String 
     public static void validateLocation(String name, String source, String path, String bean, String method)
     {
         requireNonBlank(name, "registeredName");
-        if ("YAML".equals(source) || "REST".equals(source))
+        if ("YAML".equals(source) || "REST".equals(source) || "TYPESAFE".equals(source))
         {
             requireNonBlank(path, "sourcePath");
             if (bean != null || method != null) throw new IllegalArgumentException(source + " skills must not contain Java locations");
@@ -37,7 +37,7 @@ public record RegisteredSkillEntry(String registeredName, String source, String 
             requireNonBlank(method, "method");
             if (path != null) throw new IllegalArgumentException("Java skills must not contain sourcePath");
         }
-        else throw new IllegalArgumentException("source must be YAML, REST or JAVA");
+        else throw new IllegalArgumentException("source must be YAML, REST, TYPESAFE or JAVA");
     }
 
     private static void requireNonBlank(String value, String name)

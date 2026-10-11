@@ -14,7 +14,7 @@ Application code MAY depend on the twenty-three types in the closed
 
 | Type | Supported purpose |
 | --- | --- |
-| `SkillTemplate` | Validate or invoke a named Java, REST, or model-backed YAML skill |
+| `SkillTemplate` | Validate or invoke a named Java, REST, TypeSafe, or model-backed YAML skill |
 | `SkillInvocationHandoff` | Atomically transfer a prepared root invocation to framework ownership |
 | `AdmittedSkillInvocation` | Read the captured generation ID, execute once, or release an already-admitted root invocation |
 | `SkillReloader` | Prepare, publish, or snapshot a complete skill generation |
@@ -26,7 +26,7 @@ Application code MAY depend on the twenty-three types in the closed
 | `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog and close it if unused |
 | `SkillCatalog` | Discover an immutable startup, prepared-candidate, or current snapshot of registered skills |
 | `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
-| `SkillKind` | Distinguish YAML, Java, and REST registrations |
+| `SkillKind` | Distinguish YAML, Java, REST, and TYPESAFE registrations |
 | `SkillExecutionView` | Observe the completed invocation session |
 | `SkillExecutionEvent` | Read a current-version diagnostic event |
 | `SkillMethod` | Mark an application bean method as a directly callable Java skill |
@@ -43,6 +43,11 @@ still use the narrowest type needed: inject or mock `SkillTemplate`, use the
 annotations on application-owned beans, and consume the public value records.
 
 ## Compatibility Changes in This Revision
+
+`SkillKind.TYPESAFE` adds native evaluation identity. Applications with exhaustive
+enum switches must handle the new value. Existing `SkillTemplate` String results
+and the five-component descriptor remain unchanged; no typed evaluation facade
+or additional SPI is introduced. See [TypeSafe authoring](../skill-authoring/typesafe-skills.md).
 
 `ExecutionConfiguration` and the `(documents, configuration)` validation and preparation overloads let a host publish model connections, aliases, limits, and tracing with skills. `PreparedSkillUpdate.close()` is a default method for source and binary compatibility with existing implementations; framework candidates release unpublished provider resources when closed. The application YAML key for trace persistence moved from top-level `execution-trace.persistence` to `loomspan.execution-trace.persistence` without an alias. Consumers must update that YAML key when adopting this revision. Existing skill-only overloads remain supported and copy the active execution settings. See [two-stage skill updates](skill-reload.md).
 

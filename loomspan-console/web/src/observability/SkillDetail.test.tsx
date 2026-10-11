@@ -46,6 +46,19 @@ beforeEach(() => {
   route.navigate.mockReset();
 });
 
+test("TypeSafe detail retains source label, original declaration and descriptive schema", async () => {
+  const yaml = "name: CheckDns\ntypesafe:\n  state: ${/input}\n  questions:\n    ready: {type: noul, instructions: Ready?}\n";
+  const schema = '{"type":"object","properties":{"ready":{"type":"object"}}}';
+  vi.mocked(getSkillDetail).mockResolvedValue({ targetScopeId: "scope-1", registeredName: "CheckDns", source: "TYPESAFE", sourcePath: "opaque <label>", yaml, outputSchema: schema });
+  render(<SkillDetailView />);
+  expect(await screen.findByText("TYPESAFE")).toBeInTheDocument();
+  expect(screen.getByText("opaque <label>")).toBeInTheDocument();
+  expect(screen.getByLabelText("Skill YAML source").textContent).toBe(yaml);
+  expect(document.querySelector('pre[aria-label="Effective output schema"]')?.textContent).toBe(schema);
+  expect(screen.queryByText("Bean")).toBeNull();
+  expect(screen.queryByText("Method")).toBeNull();
+});
+
 test("stale skill deep link resets before requesting the identifier", async () => {
   route.scope = "scope-old";
   render(<SkillDetailView />);

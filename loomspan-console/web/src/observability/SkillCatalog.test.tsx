@@ -36,6 +36,7 @@ test("skill catalog renders items in a table", () => {
   view.current.skills.items = [
     { registeredName: "CheckDns", source: "YAML", sourcePath: "/skills/check_dns.yaml" },
     { registeredName: "FetchDns", source: "REST", sourcePath: "/skills/fetch_dns.yaml" },
+    { registeredName: "EvaluateDns", source: "TYPESAFE", sourcePath: "opaque <label>" },
     { registeredName: "BuildProject", source: "JAVA", beanName: "buildSkills", method: "public java.lang.String example.Build.build(java.lang.String,boolean)" },
   ];
   render(<SkillCatalog />);
@@ -44,6 +45,8 @@ test("skill catalog renders items in a table", () => {
   expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
   expect(screen.getByText("YAML")).toBeInTheDocument();
   expect(screen.getByText("REST")).toBeInTheDocument();
+  expect(screen.getByText("TYPESAFE")).toBeInTheDocument();
+  expect(screen.getByText("opaque <label>")).toBeInTheDocument();
   expect(screen.getByText("Java")).toBeInTheDocument();
   expect(screen.getByText("example.Build.build()")).toBeInTheDocument();
   expect(screen.queryByText(/buildSkills:/)).toBeNull();

@@ -1,0 +1,63 @@
+{
+  "case" : "native-evaluation-success",
+  "valid" : true,
+  "traceId" : "trace-native-evaluation-success",
+  "sessionId" : "session-native-evaluation-success",
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 2,
+    "completionUnits" : 1,
+    "totalUnits" : 3
+  },
+  "terminalUsage" : {
+    "promptUnits" : 2,
+    "completionUnits" : 1,
+    "totalUnits" : 3
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ {
+    "retrySequenceId" : "native-retry",
+    "attemptId" : "native-attempt",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "usageComplete" : true
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "native-retry",
+    "usage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "usageComplete" : true
+  } ],
+  "validationLinks" : [ ],
+  "frames" : [ ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 2,
+    "completionUnits" : 1,
+    "totalUnits" : 3
+  },
+  "payloads" : [ {
+    "logicalRecordSequence" : 4,
+    "payloadId" : "payload-1",
+    "contentType" : "application/json",
+    "chunkCount" : 2
+  } ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

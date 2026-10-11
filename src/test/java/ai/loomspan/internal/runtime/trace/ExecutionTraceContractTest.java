@@ -374,7 +374,7 @@ class ExecutionTraceContractTest {
         QueueChatModel model = new QueueChatModel(responses);
         LoomspanProperties.ProviderRetryProperties retry = new LoomspanProperties.ProviderRetryProperties();
         retry.setEnabled(false);
-        ProviderConnectionRuntime runtime = new ProviderConnectionRuntime(
+        ProviderConnectionRuntime runtime = ProviderConnectionRuntime.chat(
                 model,
                 AiDriver.OPENAI,
                 AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,

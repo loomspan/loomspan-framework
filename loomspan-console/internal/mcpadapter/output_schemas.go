@@ -288,17 +288,16 @@ func skillSourceSchema(detail bool) *jsonschema.Schema {
 		return map[string]*jsonschema.Schema{"registeredName": compactString(), "source": {Type: "string", Enum: []any{source}}, "sourcePath": compactString()}
 	}
 	yamlProps := manifestProps("YAML")
-	restProps := manifestProps("REST")
+	yamlProps["source"].Enum = []any{"YAML", "REST", "TYPESAFE"}
 	yamlRequired := []string{"registeredName", "source", "sourcePath"}
 	if detail {
 		yamlProps["yaml"] = compactString()
-		restProps["yaml"] = compactString()
 		yamlRequired = append(yamlRequired, "yaml")
 	}
 	javaProps := map[string]*jsonschema.Schema{"registeredName": compactString(), "source": {Type: "string", Enum: []any{"JAVA"}}, "beanName": compactString(), "method": compactString()}
 	javaRequired := []string{"registeredName", "source", "beanName", "method"}
 	if detail {
-		for _, props := range []map[string]*jsonschema.Schema{yamlProps, restProps, javaProps} {
+		for _, props := range []map[string]*jsonschema.Schema{yamlProps, javaProps} {
 			props["outputSchema"] = &jsonschema.Schema{Types: []string{"string", "null"}}
 		}
 		yamlRequired = append(yamlRequired, "outputSchema")
@@ -306,7 +305,6 @@ func skillSourceSchema(detail bool) *jsonschema.Schema {
 	}
 	return &jsonschema.Schema{AnyOf: []*jsonschema.Schema{
 		compactObject(yamlRequired, yamlProps, true),
-		compactObject(yamlRequired, restProps, true),
 		compactObject(javaRequired, javaProps, true),
 	}}
 }

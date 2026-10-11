@@ -55,14 +55,15 @@ class DesignatedChildResultIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"model", "java", "rest", "no-schema"})
+    @ValueSource(strings = {"model", "java", "rest", "no-schema", "native", "native-empty"})
     void forwardsModelJavaAndRestResultsThroughSkillTemplate(String kind) throws Exception {
         Capture capture = run(kind, false);
         assertThat(capture.result).isEqualTo(expected(kind));
         assertThat(capture.laterCalls.get()).isEqualTo(1);
         assertThat(capture.requests).noneMatch(body -> body.contains("All required plan tasks are already COMPLETE"));
-        assertThat(capture.producerCalls.get()).isEqualTo(kind.equals("model") ? 2 : kind.equals("no-schema") ? 1 : 0);
+        assertThat(capture.producerCalls.get()).isEqualTo(kind.equals("model") ? 2 : kind.equals("no-schema") || kind.startsWith("native") ? 1 : 0);
         assertThat(capture.observed.get()).isNotNull();
+        if (kind.startsWith("native")) assertThat(capture.observed.get().events()).anyMatch(event -> event.type().equals("RESULT_FORWARDED"));
     }
 
     @Test
@@ -83,6 +84,16 @@ class DesignatedChildResultIntegrationTest {
         assertThat(capture.laterCalls.get()).isEqualTo(1);
     }
 
+    @Test
+    void nativeForwardingPropagatesChildFailureWithoutFabricatingAResult() throws Exception {
+        Capture capture = run("native-failure", false);
+        assertThat(capture.result).isNull();
+        assertThat(capture.observed.get().events()).noneMatch(event -> event.type().equals("RESULT_FORWARDED"));
+        assertThat(capture.requests).noneMatch(body -> body.contains("All required plan tasks are already COMPLETE"));
+        assertThat(capture.producerCalls).hasValue(1);
+        assertThat(capture.laterCalls).hasValue(0);
+    }
+
     private Capture run(String kind, boolean chain) throws Exception {
         Path skills = Files.createDirectory(directory.resolve("skills"));
         String rootYaml = parent("root", chain ? "middle" : "producer", true);
@@ -91,6 +102,16 @@ class DesignatedChildResultIntegrationTest {
         if (chain) write(skills, "middle", parent("middle", "producer", false));
         write(skills, "later", "name: later\ndescription: Complete later accepted work\nrest: true\n");
         if (kind.equals("rest") || kind.equals("synthesis")) write(skills, "producer", "name: producer\ndescription: Produce report\nrest: true\n");
+        if (kind.startsWith("native")) write(skills, "producer", """
+                name: producer
+                description: Evaluate native report
+                model: native
+                input_schema: {type: object}
+                typesafe:
+                  state: ${/input}
+                  questions:
+                    report: {type: noul, instructions: Evaluate report}
+                """);
         if (kind.equals("model") || kind.equals("no-schema")) write(skills, "producer", """
                 name: producer
                 description: Produce the complete report
@@ -112,6 +133,12 @@ class DesignatedChildResultIntegrationTest {
                     try {
                         String body = request.getBody().readUtf8();
                         capture.requests.add(body);
+                        if (request.getPath().equals("/api/v1/systemone")) {
+                            capture.producerCalls.incrementAndGet();
+                            assertThat(JSON.readTree(body).path("model").asText()).isEqualTo("jev-fixture");
+                            if (kind.equals("native-failure")) return new MockResponse().setResponseCode(401).setBody("account rejected");
+                            return new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"answers\":" + expected(kind) + "}");
+                        }
                         assertThat(request.getPath()).isEqualTo("/v1/chat/completions");
                         JsonNode wire = JSON.readTree(body);
                         String system = wire.path("messages").get(0).path("content").asText();
@@ -163,6 +190,11 @@ class DesignatedChildResultIntegrationTest {
                             "loomspan.connections.local.provider-retry.enabled=false",
                             "loomspan.models.local.connection=local",
                             "loomspan.models.local.provider-model=deterministic",
+                            "loomspan.connections.native.driver=typesafe",
+                            "loomspan.connections.native.base-url=" + server.url("/api"),
+                            "loomspan.connections.native.api-key=native-test",
+                            "loomspan.models.native.connection=native",
+                            "loomspan.models.native.provider-model=jev-fixture",
                             "loomspan.session.mission-timeout=30s");
             if (kind.equals("java")) runner = runner.withBean(JavaReport.class, JavaReport::new);
             runner.run(context -> {
@@ -173,8 +205,13 @@ class DesignatedChildResultIntegrationTest {
                     assertThat(JSON.readTree(schema).path("properties").path("report").path("type").asText()).isEqualTo("string");
                     assertThat(schema).isEqualTo(catalog.skill("producer").orElseThrow().outputSchema());
                     if (chain) assertThat(schema).isEqualTo(catalog.skill("middle").orElseThrow().outputSchema());
+                } else if (kind.startsWith("native")) {
+                    assertThat(schema).isEqualTo(catalog.skill("producer").orElseThrow().outputSchema());
+                    assertThat(JSON.readTree(schema).at("/properties/report/type").asText()).isEqualTo("object");
                 } else assertThat(schema).isNull();
-                capture.result = context.getBean(SkillTemplate.class).invoke("root", Map.of(), capture.observed::set);
+                if (kind.equals("native-failure")) org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        context.getBean(SkillTemplate.class).invoke("root", Map.of(), capture.observed::set)).hasStackTraceContaining("401");
+                else capture.result = context.getBean(SkillTemplate.class).invoke("root", Map.of(), capture.observed::set);
             });
         }
         assertThat(capture.failure.get()).isNull();
@@ -312,6 +349,8 @@ class DesignatedChildResultIntegrationTest {
             case "model" -> MODEL_RESULT;
             case "java" -> JSON.writeValueAsString(JAVA_RESULT);
             case "rest" -> REST_RESULT;
+            case "native" -> "{\"report\":{\"type\":\"noul\",\"noul\":0.5,\"extension\":\"kept\"}}";
+            case "native-empty" -> "{}";
             default -> " \nUNSTRUCTURED_REPORT \u5b8c\u6574\n ";
         };
     }

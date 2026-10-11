@@ -81,6 +81,46 @@ type fixtureActivePrefix struct {
 
 const fixtureCompatibilityVersion = "1.0.0-beta.9-SNAPSHOT"
 
+func TestNativeEvaluationFixturePreservesRequestAndChunkedEnvelopeEvidence(t *testing.T) {
+	traceBytes, err := os.ReadFile(filepath.Join(fixtureRoot(t), "traces", "native-evaluation-success.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newServiceTestHarnessForVersion(t, "trace-native-evaluation-success", string(traceBytes), fixtureCompatibilityVersion)
+	page, domain := h.service.QueryRecords(context.Background(), targetEvidence(h.scopeID), RecordQuery{
+		Handle: h.handle, Representation: RecordRepresentationLogical, PageSize: 10,
+		Filter: RecordFilter{Types: []string{string(RecordModelRequestSent), string(RecordModelResponseReceived)}},
+	})
+	if domain != nil || len(page.Items) != 2 {
+		t.Fatalf("native records=%+v domain=%v", page, domain)
+	}
+	for _, record := range page.Items {
+		if record.Content == nil || !record.Content.Available || !record.Content.Complete {
+			t.Fatalf("native content descriptor=%+v", record)
+		}
+		read, failure := h.service.ReadContentRange(context.Background(), targetEvidence(h.scopeID), RangeRequest{Handle: h.handle, ContentRef: record.Content.ContentRef, MaxBytes: MaxRangeBytes})
+		if failure != nil || read.HasMore {
+			t.Fatalf("native range=%+v failure=%v", read, failure)
+		}
+		var payload map[string]json.RawMessage
+		if err := json.Unmarshal(read.Content, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if string(payload["payloadType"]) != `"evaluation"` || string(payload["requestedModel"]) != `"jev-latest"` || string(payload["endpoint"]) != `"https://api.typesafe.ai/v1/systemone"` {
+			t.Fatalf("native identity=%s", read.Content)
+		}
+		if record.Type == string(RecordModelRequestSent) {
+			if !bytes.Contains(payload["request"], []byte(`"Authorization":"kept"`)) {
+				t.Fatalf("native state changed: %s", read.Content)
+			}
+		} else {
+			if !record.IsEnvelope || string(payload["servedModel"]) != `"jev-fixture"` || !bytes.Contains(payload["envelope"], []byte(`"noul":0.75`)) {
+				t.Fatalf("native envelope evidence=%s", read.Content)
+			}
+		}
+	}
+}
+
 func TestCanonicalConcurrentFixtureMatchesTransitionsPrefixesAndOverlap(t *testing.T) {
 	root := fixtureRoot(t)
 	traceBytes, err := os.ReadFile(filepath.Join(root, "traces", "canonical-concurrent-contract.ndjson"))

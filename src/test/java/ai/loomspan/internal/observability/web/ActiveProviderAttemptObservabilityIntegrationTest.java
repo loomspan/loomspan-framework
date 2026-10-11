@@ -88,7 +88,7 @@ class ActiveProviderAttemptObservabilityIntegrationTest
         ProviderFailureDetails transientFailure = new ProviderFailureDetails(
                 ProviderFailureClassification.TRANSIENT, ProviderFailureCategory.SERVER_ERROR,
                 503, null, null, null, "Provider temporarily unavailable", List.of());
-        ProviderConnectionRuntime runtime = new ProviderConnectionRuntime(
+        ProviderConnectionRuntime runtime = ProviderConnectionRuntime.chat(
                 model, AiDriver.OPENAI, AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
                 new ProviderRetryPolicy(true, 2, Duration.ZERO, 2.0d, Duration.ZERO, 0.0d),
                 ignored -> transientFailure);

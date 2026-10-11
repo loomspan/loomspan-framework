@@ -90,7 +90,7 @@ class SpringAiObservationIntegrationTest
             properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
             var providerRuntime = new SpringAiProviderIntegration(new DefaultResourceLoader(), registry)
                     .create("openai", properties);
-            var runtime = new ProviderConnectionRuntime(providerRuntime.chatModel(), AiDriver.OPENAI,
+            var runtime = ProviderConnectionRuntime.chat(providerRuntime.chatModel(), AiDriver.OPENAI,
                     AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
                     ProviderRetryPolicy.from(properties.getProviderRetry()),
                     ignored -> new ProviderFailureDetails(ProviderFailureClassification.TRANSIENT,
