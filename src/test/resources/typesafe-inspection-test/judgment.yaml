@@ -1,0 +1,9 @@
+# Native discovered fixture
+name: judgment
+description: Native inspection evidence
+model: native
+input_schema: {type: object}
+typesafe:
+  state: original
+  questions:
+    category: {type: choice, criteria: {A: null}}

@@ -365,6 +365,15 @@ and the focused `TraceRecords.model.test.tsx`/`TraceAttemptDiagnostics.test.tsx`
 cases protect unavailable, incomplete and explicitly truncated reader evidence.
 Absent content is a reader state; it does not describe a new producer setting.
 
+`TypeSafeRegisteredInspectionIntegrationTest#discoveredAndSuppliedNativeMetadataTraverseAuthenticatedRoutes`
+protects actual discovered and supplied registration through authenticated catalog
+routes, original YAML, generated schema, and verbatim opaque labels.
+`TypeSafeSkillIntegrationTest#publishedTypeSafeExamplesExecuteDirectAndFullyBoundForwardingParent`
+protects the complete named result, captured generation, direct/child canonical
+frames, shared provider accounting, and forwarding without synthesis.
+`#nestedNativeFailureRetainsSharedAccountingWithoutSubstitute` protects denied
+children and exhaustion of the provider budget shared with parent planning.
+
 These are fixture/source-backed mechanics, not evidence of live model accuracy,
 identical judgments between routes, or acceptance of every locally valid criterion.
 No typed public TypeSafe facade, provider extension SPI, automatic business

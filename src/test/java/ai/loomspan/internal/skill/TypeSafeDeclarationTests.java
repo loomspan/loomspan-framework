@@ -17,6 +17,31 @@ import java.util.Map;
 
 class TypeSafeDeclarationTests {
     @Test
+    void incompatibleModelAliasesRejectBeforeRegistration() {
+        var props = new LoomspanProperties();
+        for (var driver : List.of(ai.loomspan.autoconfigure.AiDriver.OPENAI, ai.loomspan.autoconfigure.AiDriver.TYPESAFE)) {
+            var connection = new LoomspanProperties.ConnectionProperties();
+            connection.setDriver(driver);
+            connection.setApiKey("fixture");
+            props.getConnections().put(driver.name(), connection);
+            var model = new LoomspanProperties.ModelCatalogEntry();
+            model.setConnection(driver.name());
+            model.setProviderModel("fixture");
+            props.getModels().put(driver.name(), model);
+        }
+        var catalog = new YamlSkillCatalog(props);
+        for (String document : List.of(
+                "name: nativeLeaf\ndescription: Native\nmodel: OPENAI\ninput_schema: {type: object}\ntypesafe: {state: literal, questions: {q: {type: noul, instructions: decide}}}\n",
+                "name: chatLeaf\ndescription: Chat\nmodel: TYPESAFE\nprompt: decide\n")) {
+            var checked = catalog.checkedSupplied(List.of(new SkillDocument("incompatible alias", document)), false);
+            assertThat(checked.definitions()).isEmpty();
+            assertThat(checked.issues()).hasSize(1);
+            assertThat(checked.issues().getFirst().fieldPath()).isEqualTo("model");
+            assertThat(checked.issues().getFirst().toString()).contains("typesafe driver connection");
+        }
+    }
+
+    @Test
     void strictNativeManifestParsingRejectsDuplicateAndUnknownFields() {
         var props = new LoomspanProperties();
         var connection = new LoomspanProperties.ConnectionProperties();

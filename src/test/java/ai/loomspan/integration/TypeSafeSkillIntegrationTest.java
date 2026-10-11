@@ -837,6 +837,7 @@ class TypeSafeSkillIntegrationTest {
             }
             List<String> properties = new ArrayList<>();
             flattenProperties(config, "", properties);
+            properties.add("loomspan.execution-trace.persistence=always");
             properties.add("spring.main.web-application-type=none");
             properties.add("loomspan.skills.locations=" + directory.toUri() + "*.yaml");
             new ApplicationContextRunner()
@@ -855,17 +856,42 @@ class TypeSafeSkillIntegrationTest {
                                                                 "published parent",
                                                                 blocks.get(2)))));
                                 var template = context.getBean(SkillTemplate.class);
-                                assertThat(template.invoke("assessContact", documentedInput))
+                                String generation = reloader.snapshot().generationId();
+                                assertThat(template.invoke("assessContact", documentedInput, v -> sessionIds.add(v.sessionId())))
                                         .isEqualTo(retained);
                                 AtomicReference<SkillExecutionView> view = new AtomicReference<>();
                                 assertThat(
                                                 template.invoke(
                                                         "assessReportedContact",
                                                         documentedInput,
-                                                        view::set))
+                                                        v -> { view.set(v); sessionIds.add(v.sessionId()); }))
                                         .isEqualTo(retained);
                                 assertThat(view.get().events())
                                         .anyMatch(event -> event.type().equals("RESULT_FORWARDED"));
+                                var all = traces(context);
+                                assertThat(records(all, "TRACE_STARTED")).hasSize(2).allSatisfy(
+                                        record -> assertThat(record.at("/metadata/generationId").asText()).isEqualTo(generation));
+                                for (String id : sessionIds) {
+                                    var trace = all.stream().filter(record -> record.path("sessionId").asText().equals(id)).toList();
+                                    boolean nested = id.equals(view.get().sessionId());
+                                    var requests = records(trace, "MODEL_REQUEST_SENT");
+                                    assertThat(requests).hasSize(nested ? 2 : 1);
+                                    var nativeRequest = requests.stream().filter(record -> record.at("/data/payloadType").asText().equals("evaluation")).toList();
+                                    assertThat(nativeRequest).hasSize(1);
+                                    var request = nativeRequest.getFirst();
+                                    assertThat(request.path("frameId").asText()).isNotBlank();
+                                    assertThat(request.at("/data/request/state")).isEqualTo(JSON.valueToTree(documentedInput.get("context")));
+                                    assertThat(records(trace, "FRAME_OPENED")).anySatisfy(frame -> {
+                                        assertThat(frame.path("frameId")).isEqualTo(request.path("frameId"));
+                                        assertThat(frame.path("route").asText()).isEqualTo("assessContact");
+                                    });
+                                    var response = records(trace, "MODEL_RESPONSE_RECEIVED").stream().filter(record -> record.path("frameId").equals(request.path("frameId"))).toList();
+                                    assertThat(response).hasSize(1);
+                                    assertThat(logicalData(trace, response.getFirst()).at("/envelope/answers")).isEqualTo(JSON.readTree(retained));
+                                    assertThat(usage(trace).path("providerAttempts").intValue()).isEqualTo(nested ? 2 : 1);
+                                    assertThat(usage(trace).path("toolInvocations").intValue()).isEqualTo(nested ? 1 : 0);
+                                    assertThat(records(trace, "RESULT_FORWARDED")).hasSize(nested ? 1 : 0);
+                                }
                                 assertThat(
                                                 reloader.snapshot()
                                                         .skill("assessReportedContact")
@@ -1180,6 +1206,65 @@ output_from: {skill: judgment}
                                         .isEqualTo(1);
                             });
             assertThat(failure.get()).isNull();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"budget", "denied"})
+    void nestedNativeFailureRetainsSharedAccountingWithoutSubstitute(String scenario) throws Exception {
+        String document = """
+                name: judgment
+                description: Native judgment
+                model: selected
+                input_schema:
+                  type: object
+                  properties: {candidates: {type: object, additionalProperties: true}}
+                  required: [candidates]
+                  additionalProperties: false
+                typesafe:
+                  state: ${/input}
+                  questions: {q: {type: choice, criteria: '${/input/candidates}'}}
+                """ + (scenario.equals("denied") ? "rbac_roles: [ALLOWED]\n" : "");
+        String parent = """
+                name: parent
+                description: Forward native result
+                model: planner
+                planning_mode: true
+                max_steps: 1
+                input_schema: {type: object, additionalProperties: true}
+                allowed_skills:
+                  - name: judgment
+                    required: true
+                    max_tasks: 1
+                    input_bindings:
+                      /candidates: {from: input, path: /candidates}
+                output_from: {skill: judgment}
+                """;
+        try (var server = new MockWebServer()) {
+            var task = Map.of("taskId", "judge", "title", "Judge", "capabilityName", "judgment", "intent", "Judge", "status", "PENDING", "dependsOn", List.of(), "expectedOutputs", List.of("result"));
+            String plan = JSON.writeValueAsString(Map.of("capabilityName", "parent", "createdAt", "2026-10-11T00:00:00Z", "status", "VALID", "tasks", List.of(task)));
+            server.enqueue(success(JSON.writeValueAsString(Map.of("id", "fixture", "object", "chat.completion", "created", 1, "model", "planner", "choices", List.of(
+                    Map.of("index", 0, "message", Map.of("role", "assistant", "content", plan), "finish_reason", "stop")), "usage", Map.of("prompt_tokens", 1, "completion_tokens", 1, "total_tokens", 2)))));
+            runner(server, "/", document).withPropertyValues(
+                    "loomspan.connections.chat.driver=openai", "loomspan.connections.chat.api-key=fixture",
+                    "loomspan.connections.chat.base-url=" + server.url("/v1"), "loomspan.connections.chat.provider-retry.enabled=false",
+                    "loomspan.models.planner.connection=chat", "loomspan.models.planner.provider-model=planner",
+                    "loomspan.session.quotas.max-provider-attempts=" + (scenario.equals("budget") ? 1 : 10))
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        var reloader = context.getBean(SkillReloader.class);
+                        reloader.publish(reloader.prepare(List.of(new SkillDocument("leaf", document), new SkillDocument("parent", parent))));
+                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("parent", Map.of("candidates", Map.of("A", "first")), v -> sessionIds.add(v.sessionId())))
+                                .isInstanceOf(SkillException.class)
+                                .hasStackTraceContaining(scenario.equals("budget") ? "MAX_PROVIDER_ATTEMPTS" : "judgment");
+                        var trace = traces(context);
+                        assertThat(records(trace, "MODEL_REQUEST_SENT")).noneMatch(record -> record.at("/data/payloadType").asText().equals("evaluation"));
+                        assertThat(records(trace, "RESULT_FORWARDED")).isEmpty();
+                        assertThat(usage(trace).path("providerAttempts").intValue()).isEqualTo(scenario.equals("budget") ? 1 : 0);
+                        assertThat(usage(trace).path("modelCalls").intValue()).isEqualTo(scenario.equals("budget") ? 1 : 0);
+                    });
+            assertThat(server.getRequestCount()).isEqualTo(scenario.equals("budget") ? 1 : 0);
+            if (server.getRequestCount() > 0) assertThat(server.takeRequest().getPath()).isEqualTo("/v1/chat/completions");
         }
     }
 

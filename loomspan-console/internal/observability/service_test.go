@@ -2,6 +2,7 @@ package observability
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -290,6 +291,30 @@ func TestObservabilityServiceReturnsSkillDetailFromFixture(t *testing.T) {
 	}
 	if detail.RegisteredName != "CheckDns" || detail.Yaml == "" {
 		t.Fatalf("unexpected detail: %#v", detail)
+	}
+}
+
+func TestObservabilityServicePreservesNativeDetailFixture(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "loomspan-console-fixtures", "application-rest", "skill-typesafe-detail.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var expected SkillDetail
+	if err := json.Unmarshal(fixture, &expected); err != nil {
+		t.Fatal(err)
+	}
+	client := &fakeGetClient{body: fixture, instanceID: "11111111-1111-4111-8111-111111111111"}
+	targetContext := setupTargetWithCredential(t, client)
+	scope, domain := targetContext.Capture()
+	if domain != nil {
+		t.Fatal(domain)
+	}
+	detail, domain := New().GetSkill(context.Background(), scope, expected.RegisteredName)
+	if domain != nil {
+		t.Fatal(domain)
+	}
+	if detail.Source != "TYPESAFE" || detail.SourcePath != expected.SourcePath || detail.Yaml != expected.Yaml || detail.OutputSchema == nil || *detail.OutputSchema != *expected.OutputSchema {
+		t.Fatalf("expected=%#v actual=%#v", expected, detail)
 	}
 }
 

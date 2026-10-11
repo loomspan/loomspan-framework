@@ -186,6 +186,12 @@ answers, including empty/extended objects, are not validated against that schema
 Parent output-binding registration uses the same partial compatibility checks;
 actual selected values remain subject to the destination's runtime contract.
 
+`DeclaredOutputBindingsPlanningIntegrationTest#nativePassthroughIsEnforcedOnlyByConsumingBindingContract`
+protects fixed and dynamic Choice receiver enums, accepted singleton `type`
+bindings, and exact missing/cased probability lookup. Dynamic values register
+against open metadata and fail at the receiving runtime contract when incompatible;
+fully bound success and failure require no final synthesis or repair request.
+
 Public `SkillDescriptor.outputSchema()`, planner tool descriptions, and Console skill detail expose nullable normalized JSON-object schema text from the captured complete generation. Ordinary model skills expose their authored output shape; forwarding parents derive it through their selected-child chain. Shape, constraints, descriptions and provider-neutral `nullable` semantics are retained, while child-local `evidence` annotations are omitted. This text describes Loomspan's supported schema vocabulary; it is not a provider-native JSON Schema response format.
 
 Java, REST, and model producers without a schema leave this metadata null, never a fabricated `{}`. Derived metadata is immutable and does not become a parent's authored validator, evidence requirement, linter, or retry policy. The actual model producer retains its own validation and correction; Java/REST do not gain output-validation guarantees. Metadata and structured validation do not establish factual correctness.

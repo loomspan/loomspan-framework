@@ -43,6 +43,36 @@ func TestBrowserAndMCPPreserveSameSkillFacts(t *testing.T) {
 	}
 }
 
+func TestBrowserAndMCPPreserveNativeSummaryFacts(t *testing.T) {
+	body := []byte(`{"items":[{"registeredName":"native","source":"TYPESAFE","sourcePath":" opaque ../ Native: <label> "}],"hasMore":false,"nextCursor":null,"observedAt":"2026-10-11T00:00:00Z"}`)
+	options := newMCPTestOptions(t, func(string) ([]byte, error) { return body, nil })
+	_, envelope, err := handleListSkills(context.Background(), options, listSkillsInput{})
+	if err != nil || envelope.Result == nil {
+		t.Fatalf("envelope=%#v err=%v", envelope, err)
+	}
+	if len(envelope.Result.Items) != 1 {
+		t.Fatalf("unexpected items: %#v", envelope.Result.Items)
+	}
+	item := envelope.Result.Items[0]
+	if item.Source != "TYPESAFE" || item.RegisteredName != "native" || item.SourcePath != " opaque ../ Native: <label> " {
+		t.Fatalf("summary changed: %#v", item)
+	}
+	encoded, err := json.Marshal(item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(encoded, &fields); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"yaml", "outputSchema", "beanName", "method"} {
+		if _, found := fields[name]; found {
+			t.Fatalf("summary contains %s: %s", name, encoded)
+		}
+	}
+	validateTypedEnvelope(t, "typesafe-list", skillListOutputSchema(), *envelope.Result)
+}
+
 // WF-SE-R2/WF-SE-R6/WF-SE-R9/WF-SE-R10: compare every bounded active
 // execution fact, while deliberately excluding completed-history claims.
 func TestBrowserAndMCPPreserveSameActiveExecutionFacts(t *testing.T) {

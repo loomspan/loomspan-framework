@@ -23,20 +23,25 @@ class DefaultSkillCatalogTest
         List<CapabilityMetadata> capabilities = List.of(
                 metadata("beta", CapabilityKind.JAVA_SKILL, "{\"type\":\"object\"}", SkillAccessPolicy.unrestricted()),
                 metadata("Alpha", CapabilityKind.YAML_SKILL, yamlSchema, SkillAccessPolicy.yamlRoles(java.util.Set.of("ADMIN"))),
-                metadata("restLeaf", CapabilityKind.REST_SKILL, restSchema, SkillAccessPolicy.denied()));
+                metadata("restLeaf", CapabilityKind.REST_SKILL, restSchema, SkillAccessPolicy.denied()),
+                metadata("nativeLeaf", CapabilityKind.TYPESAFE_SKILL, yamlSchema, SkillAccessPolicy.unrestricted()));
 
         DefaultSkillCatalog catalog = new DefaultSkillCatalog("test-generation", capabilities);
 
         assertThat(catalog.generationId()).isEqualTo("test-generation");
 
         assertThat(catalog.skills()).extracting(descriptor -> descriptor.name())
-                .containsExactly("Alpha", "beta", "restLeaf");
+                .containsExactly("Alpha", "beta", "nativeLeaf", "restLeaf");
         assertThat(catalog.skills()).extracting(descriptor -> descriptor.kind())
-                .containsExactly(SkillKind.YAML, SkillKind.JAVA, SkillKind.REST);
+                .containsExactly(SkillKind.YAML, SkillKind.JAVA, SkillKind.TYPESAFE, SkillKind.REST);
         assertThat(catalog.skill("Alpha")).get().extracting(descriptor -> descriptor.inputSchema())
                 .isEqualTo(yamlSchema);
         assertThat(catalog.skill("restLeaf")).get().extracting(descriptor -> descriptor.inputSchema())
                 .isEqualTo(restSchema);
+        assertThat(catalog.skill("nativeLeaf")).get().extracting(descriptor -> descriptor.inputSchema())
+                .isEqualTo(yamlSchema);
+        assertThat(catalog.skill("nativeLeaf")).get().extracting(descriptor -> descriptor.outputSchema())
+                .isEqualTo(yamlSchema);
         assertThat(catalog.skill("missing")).isEmpty();
         assertThatThrownBy(() -> catalog.skills().clear()).isInstanceOf(UnsupportedOperationException.class);
     }
@@ -58,6 +63,6 @@ class DefaultSkillCatalogTest
     {
         return new CapabilityMetadata("test:" + name + ":" + kind, name, "Description " + name,
                 SkillExecutionDescriptor.none(), accessPolicy, arguments -> "ok", kind,
-                new CapabilityToolDescriptor(name, "Description " + name, schema, null), null);
+                new CapabilityToolDescriptor(name, "Description " + name, schema, kind == CapabilityKind.TYPESAFE_SKILL ? schema : null), null);
     }
 }
