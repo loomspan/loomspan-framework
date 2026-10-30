@@ -140,6 +140,22 @@ catalogs are immutable, sorted, unfiltered metadata with no resource lease or
 execution reservation. Pass `descriptor.name()` directly to invocation/validation
 or handoff; the catalog does not authorize or pin that later admission.
 
+Every root invocation and handoff freshly captures exactly the namespace generations
+reached by the entry's declared child graph, including optional and role-restricted
+branches. Missing dependencies, foreign Private targets, invalid bindings, or changed
+prepared forwarding contracts reject before execution. Unrelated broken skills do not
+block entry. Entry RBAC is checked without eagerly authorizing children; Private permits
+authorized direct host entry. Retained work keeps its captured generations and visibility
+across replacement, removal, and recreation. Handoff's `generationId()` identifies only
+the entry generation and has no ownership side effects.
+
+`SkillTemplate.validate()` checks the same captured dependency policy, input, and entry
+RBAC with temporary leases, then releases them. It creates no session, invokes no
+skill/provider, and reserves no root. Later invocation can fail after dependency,
+authentication, or lifecycle changes; use handoff when reserved admission is needed.
+Admission leases already constructed runtimes. It is not a transaction over external
+systems. Cross-namespace child dispatch and observation integration remain PRs 27.4–27.5.
+
 A prepared update's ID and snapshot identify its candidate, not its base.
 Validation allocates no generation and errors leave candidate metadata incomplete.
 Changing a namespace name means creating another namespace, updating references

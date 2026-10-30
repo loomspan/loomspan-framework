@@ -198,6 +198,26 @@ Public `SkillDescriptor.outputSchema()`, planner tool descriptions, and Console 
 
 Java, REST, and model producers without a schema leave this metadata null, never a fabricated `{}`. Derived metadata is immutable and does not become a parent's authored validator, evidence requirement, linter, or retry policy. The actual model producer retains its own validation and correction; Java/REST do not gain output-validation guarantees. Metadata and structured validation do not establish factual correctness.
 
+### Prepared contracts and fresh admission
+
+Catalogs describe immutable prepared contracts even when current dependencies make an
+entry inadmissible. Admission and root validation recompute reachable effective outputs
+and existing binding/forwarding constraints against captured targets without changing
+catalog metadata. They compare schema structures: formatting and object-key order alone
+do not change the contract. There is no dependency-revision or historical-child-schema pin.
+
+A fully forwarded output change, including an added field or a change through multiple
+forwarding hops, requires republication of each affected caller. Ordinary child schema
+changes can pass, and an unrelated added bound-child output field can pass, when declared
+constraints and caller-derived contracts still hold. Input/output bindings retain their
+existing partial static checks and runtime obligations; this is no general compatibility
+engine. Caller publication checks its own target base only: deleting a dependency, making
+it Private, or changing its contract after caller preparation does not make publication
+stale, but can reject subsequent admission. Prior admitted work retains its old graph.
+
+Evidence: `SkillDependencyValidator#checkAdmission`, `SkillAdmissionContractsTest`, and
+`SkillReachableAdmissionTest`. Child dispatch and observation consumers remain PRs 27.4–27.5.
+
 ## Presence and nullability
 
 Presence belongs to the parent object's `required` list. Nullability belongs to the selected child node's `nullable` value. They are independent.
@@ -288,6 +308,6 @@ Fixed Java methods remain assigned to their original namespace across replacemen
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
-and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+and installation plus retained reachable admission; cross-namespace child dispatch follows in PR 27.4.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

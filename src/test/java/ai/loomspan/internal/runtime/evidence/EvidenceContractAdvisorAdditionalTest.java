@@ -48,7 +48,7 @@ class EvidenceContractAdvisorAdditionalTest
                 "{\"result\":\"network issue\"}",
                 "{\"result\":\"network issue\"}"));
 
-        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session ->
+        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
         {
             return TestExecutionBindings.callWithCurrentSessionMission(() -> {
                 ExecutionBindingScope.requireCurrent().requireMission().recordSuccessfulDirectSkill("classifyIncident");
@@ -89,7 +89,7 @@ class EvidenceContractAdvisorAdditionalTest
         var candidates = new ArrayList<String>();
         for (int attempt = 0; attempt <= budget; attempt++) candidates.add(terminalPass && attempt == budget ? "{}" : "{\"claim\":\"FULL_CANDIDATE\"}");
         var chain = new RecordingChain(candidates);
-        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session ->
+        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 TestExecutionBindings.callWithCurrentSessionMission(() -> {
                     if (terminalPass) assertThat(advisor.adviseCall(request(), chain).chatResponse().getResult().getOutput().getText()).isEqualTo("{}");
                     else assertThatThrownBy(() -> advisor.adviseCall(request(), chain)).isInstanceOf(LoomspanEvidenceValidationException.class)

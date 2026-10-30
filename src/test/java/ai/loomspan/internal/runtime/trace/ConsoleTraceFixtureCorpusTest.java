@@ -1912,7 +1912,7 @@ class ConsoleTraceFixtureCorpusTest
             String skillName,
             String missionFrameId)
     {
-        return new ExecutionBinding(
+        return ai.loomspan.testkit.TestSkillGenerations.binding(
                 session,
                 new MissionContext(session, skillName, missionFrameId, null),
                 branch,

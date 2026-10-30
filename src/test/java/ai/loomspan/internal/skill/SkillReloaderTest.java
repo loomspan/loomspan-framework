@@ -62,7 +62,7 @@ class SkillReloaderTest {
         f.reloader.remove("default", absent.generationId());
         f.manager.afterSingletonsInstantiated();
         assertThatThrownBy(() -> f.reloader.snapshot("default")).isInstanceOf(SkillReloadException.class);
-        assertThatThrownBy(() -> f.manager.capture("default")).isInstanceOf(SkillReloadException.class);
+        assertThatThrownBy(() -> f.manager.capture(SkillIdentity.parse("default-root"))).isInstanceOf(SkillReloadException.class);
         assertThatThrownBy(() -> f.reloader.remove("default", absent.generationId())).isInstanceOf(SkillReloadException.class);
     }
 
@@ -168,7 +168,7 @@ class SkillReloaderTest {
     }
 
     @Test void removalRetainsOwnersAndCallbacksRunOutsideRegistryMonitor() throws Exception {
-        var f=new Fixture(null); var owner=f.manager.capture("default");String old=owner.generation().id();
+        var f=new Fixture(null); f.reloader.publish(f.reloader.prepare("default", List.of(model("root")), MODEL)); var owner=f.manager.capture(SkillIdentity.parse("default-root"));String old=owner.snapshot().entryGeneration().id();
         var delivered=new CopyOnWriteArrayList<String>();var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
         f.reloader.onGenerationRetired(id->{entered.countDown();await(release);delivered.add(id);});
         f.reloader.onGenerationRetired(id->{throw new IllegalStateException("isolated listener");});

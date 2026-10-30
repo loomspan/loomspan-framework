@@ -87,7 +87,7 @@ class DefaultSkillTemplateTest {
         SecurityContextHolder.getContext().setAuthentication(captured);
         Map<String, Object> mutableInput = new LinkedHashMap<>();
         mutableInput.put("payload", "hello");
-        var admitted = handoff.handoff("invoiceParser", mutableInput);
+        var admitted = handoff.handoff("default-invoiceParser", mutableInput);
         String generationId = admitted.generationId();
         assertThat(generationId).isEqualTo(registry.manager().active("default").id()).isNotBlank();
         mutableInput.clear();
@@ -103,7 +103,7 @@ class DefaultSkillTemplateTest {
         assertThat(admitted.generationId()).isEqualTo(generationId);
         assertThatThrownBy(admitted::invoke)
                 .isInstanceOf(SkillException.class)
-                .hasMessage("Skill 'invoiceParser' execution failed.");
+                .hasMessage("Skill 'default-invoiceParser' execution failed.");
         lifecycle.destroy();
     }
 
@@ -111,7 +111,7 @@ class DefaultSkillTemplateTest {
     void releasedAndCutOffHandoffsCannotExecute()
     {
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
-        registry.register("invoiceParser", yamlSkillMetadata());
+        registry.register("default-invoiceParser", yamlSkillMetadata());
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         var context = new StaticApplicationContext();
         var executor = Executors.newSingleThreadExecutor();
@@ -124,7 +124,7 @@ class DefaultSkillTemplateTest {
         DefaultSkillInvocationHandoff handoff = new DefaultSkillInvocationHandoff(
                 new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                         new SkillInputValidator(), new SkillRoleEvaluator(null, null), null), lifecycle);
-        var released = handoff.handoff("invoiceParser", Map.of("payload", "hello"));
+        var released = handoff.handoff("default-invoiceParser", Map.of("payload", "hello"));
         String generationId = released.generationId();
         assertThat(generationId).isNotBlank();
         released.release();
@@ -132,7 +132,7 @@ class DefaultSkillTemplateTest {
         assertThat(released.generationId()).isEqualTo(generationId);
         assertThatThrownBy(released::invoke).isInstanceOf(SkillException.class);
 
-        var cutOff = handoff.handoff("invoiceParser", Map.of("payload", "hello"));
+        var cutOff = handoff.handoff("default-invoiceParser", Map.of("payload", "hello"));
         assertThat(cutOff.generationId()).isEqualTo(generationId);
         lifecycle.stop();
         assertThat(((AtomicReference<?>) org.springframework.test.util.ReflectionTestUtils
@@ -168,7 +168,7 @@ class DefaultSkillTemplateTest {
         var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         var admitted = new DefaultSkillInvocationHandoff(template, lifecycle)
-                .handoff("invoiceParser", Map.of("payload", "hello"));
+                .handoff("default-invoiceParser", Map.of("payload", "hello"));
         String id = admitted.generationId();
         try (var readers = Executors.newVirtualThreadPerTaskExecutor())
         {
@@ -214,7 +214,7 @@ class DefaultSkillTemplateTest {
                 new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         CapabilityMetadata yamlSkill = yamlSkillMetadata();
-        registry.register("invoiceParser", yamlSkill);
+        registry.register("default-invoiceParser", yamlSkill);
         var authentication = new UsernamePasswordAuthenticationToken(
                 "alice",
                 "n/a",
@@ -228,7 +228,7 @@ class DefaultSkillTemplateTest {
                     return "\"ok\"";
                 });
 
-        template.invoke("invoiceParser", Map.of("payload", "hello"));
+        template.invoke("default-invoiceParser", Map.of("payload", "hello"));
 
         assertThat(observedAuthentication.get()).isSameAs(authentication);
     }
@@ -240,7 +240,7 @@ class DefaultSkillTemplateTest {
         AccessDeniedException failure = new AccessDeniedException("denied");
         when(router.execute(any(), any(), any(), eq(null))).thenThrow(failure);
 
-        assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of("payload", "hello")))
+        assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of("payload", "hello")))
                 .isSameAs(failure);
     }
 
@@ -251,7 +251,7 @@ class DefaultSkillTemplateTest {
         SkillException failure = new SkillException("safe");
         when(router.execute(any(), any(), any(), eq(null))).thenThrow(failure);
 
-        assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of("payload", "hello")))
+        assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of("payload", "hello")))
                 .isSameAs(failure);
     }
 
@@ -270,12 +270,12 @@ class DefaultSkillTemplateTest {
         AtomicReference<SkillExecutionView> observed = new AtomicReference<>();
 
         assertThatThrownBy(() -> template.invoke(
-                "invoiceParser", Map.of("payload", "hello"), view -> {
+                "default-invoiceParser", Map.of("payload", "hello"), view -> {
                     observerCalls.incrementAndGet();
                     observed.set(view);
                 }))
                 .isInstanceOf(SkillException.class)
-                .hasMessage("Skill 'invoiceParser' execution failed.")
+                .hasMessage("Skill 'default-invoiceParser' execution failed.")
                 .hasCause(failure);
         assertThat(observerCalls).hasValue(1);
         assertThat(observed.get().events()).extracting(event -> event.type())
@@ -290,32 +290,32 @@ class DefaultSkillTemplateTest {
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         CapabilityMetadata restricted = new CapabilityMetadata(
-                "yaml:invoiceParser", "invoiceParser", "Invoice parser",
+                "yaml:invoiceParser", "default-invoiceParser", "Invoice parser",
                 SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")),
                 noopInvoker(), CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("invoiceParser", "Invoice parser"),
+                CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"),
                 yamlSkillMetadata().inputContract(), null);
-        registry.register("invoiceParser", restricted);
+        registry.register("default-invoiceParser", restricted);
         LoomspanSessionRunner sessionRunner = mock(LoomspanSessionRunner.class);
         DefaultSkillTemplate template = new DefaultSkillTemplate(
                 registry.manager(), router,
                 sessionRunner,
                 new ObjectMapper(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
 
-        assertThatThrownBy(() -> template.validate("invoiceParser", Map.of("payload", "hello")))
+        assertThatThrownBy(() -> template.validate("default-invoiceParser", Map.of("payload", "hello")))
                 .isInstanceOf(AccessDeniedException.class)
-                .hasMessage("Access denied for capability 'invoiceParser'");
+                .hasMessage("Access denied for capability 'default-invoiceParser'");
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 "alice", "n/a", List.of(new SimpleGrantedAuthority("ROLE_ALLOWED"))));
 
         ai.loomspan.internal.core.LoomspanSession existingSession =
                 new ai.loomspan.internal.core.LoomspanSession(4, "existing");
         ai.loomspan.internal.core.ExecutionBinding existingBinding =
-                ai.loomspan.internal.core.ExecutionBinding.sessionOnly(existingSession, ai.loomspan.testkit.TestSkillGenerations.empty());
+                ai.loomspan.internal.core.ExecutionBinding.sessionOnly(existingSession, ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()));
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(existingBinding, () -> {
-            template.validate("invoiceParser", Map.of("payload", "hello"));
-            template.validate("invoiceParser", new InvoiceRequest("hello"));
+            template.validate("default-invoiceParser", Map.of("payload", "hello"));
+            template.validate("default-invoiceParser", new InvoiceRequest("hello"));
             assertThat(ai.loomspan.internal.core.ExecutionBindingScope.requireCurrent()).isSameAs(existingBinding);
         });
 
@@ -330,9 +330,9 @@ class DefaultSkillTemplateTest {
         DefaultSkillTemplate template = templateWithRegisteredSkill(router);
 
         Throwable validateInputFailure = org.assertj.core.api.Assertions.catchThrowable(
-                () -> template.validate("invoiceParser", Map.of()));
+                () -> template.validate("default-invoiceParser", Map.of()));
         Throwable invokeInputFailure = org.assertj.core.api.Assertions.catchThrowable(
-                () -> template.invoke("invoiceParser", Map.of()));
+                () -> template.invoke("default-invoiceParser", Map.of()));
         assertThat(validateInputFailure).isInstanceOf(SkillInputValidationException.class);
         assertThat(invokeInputFailure).isInstanceOf(SkillInputValidationException.class);
         assertThat(validateInputFailure.getMessage()).isEqualTo(invokeInputFailure.getMessage());
@@ -340,11 +340,11 @@ class DefaultSkillTemplateTest {
                 .isEqualTo(((SkillInputValidationException) invokeInputFailure).getIssues());
 
         Throwable validateConversionFailure = org.assertj.core.api.Assertions.catchThrowable(
-                () -> template.validate("missing", (Object) "not-an-object"));
+                () -> template.validate("default-invoiceParser", (Object) "not-an-object"));
         Throwable invokeConversionFailure = org.assertj.core.api.Assertions.catchThrowable(
-                () -> template.invoke("missing", (Object) "not-an-object"));
+                () -> template.invoke("default-invoiceParser", (Object) "not-an-object"));
         assertThat(validateConversionFailure).isInstanceOf(SkillException.class)
-                .hasMessage("Skill 'missing' execution failed.")
+                .hasMessage("Skill 'default-invoiceParser' execution failed.")
                 .hasCauseInstanceOf(RuntimeException.class);
         assertThat(invokeConversionFailure).isInstanceOf(SkillException.class)
                 .hasMessage(validateConversionFailure.getMessage())
@@ -357,21 +357,21 @@ class DefaultSkillTemplateTest {
     {
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
-        registry.register("generic", new CapabilityMetadata(
-                "yaml:generic", "generic", "Generic", SkillExecutionDescriptor.none(),
+        registry.register("default-generic", new CapabilityMetadata(
+                "yaml:generic", "default-generic", "Generic", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(), noopInvoker(),
-                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("generic", "Generic"), null));
+                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("default-generic", "Generic"), null));
         DefaultSkillTemplate template = new DefaultSkillTemplate(
                 registry.manager(), router, new LoomspanSessionRunner(4), new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
 
-        template.validate("generic", (Map<String, Object>) null);
-        assertThatThrownBy(() -> template.validate("generic", (Object) null))
+        template.validate("default-generic", (Map<String, Object>) null);
+        assertThatThrownBy(() -> template.validate("default-generic", (Object) null))
                 .isInstanceOf(SkillInputValidationException.class)
                 .hasMessage("Skill input must not be null.");
-        assertThatThrownBy(() -> template.validate("missing", Map.of()))
+        assertThatThrownBy(() -> template.validate("default-missing", Map.of()))
                 .isInstanceOf(SkillException.class)
-                .hasMessage("Unknown skill 'missing'");
+                .hasMessage("Unknown skill 'default-missing'");
         verify(router, never()).execute(any(), any(), any(), any());
     }
 
@@ -384,7 +384,7 @@ class DefaultSkillTemplateTest {
         IllegalArgumentException observerFailure = new IllegalArgumentException("observer failed");
         when(router.execute(any(), any(), any(), eq(null))).thenThrow(executionFailure);
 
-        assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of("payload", "hello"), view -> {
+        assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of("payload", "hello"), view -> {
             throw observerFailure;
         }))
                 .isInstanceOf(SkillException.class)
@@ -430,11 +430,11 @@ class DefaultSkillTemplateTest {
                 new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
                 new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), strategy);
-        registry.register("invoiceParser", yamlSkillMetadata());
+        registry.register("default-invoiceParser", yamlSkillMetadata());
 
-        assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of("payload", "hello")))
+        assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of("payload", "hello")))
                 .isInstanceOf(SkillException.class)
-                .hasMessage("Skill 'invoiceParser' execution failed.")
+                .hasMessage("Skill 'default-invoiceParser' execution failed.")
                 .hasCause(failure);
         verify(router, never()).execute(any(), any(), any(), any());
     }
@@ -446,7 +446,7 @@ class DefaultSkillTemplateTest {
         AssertionError failure = new AssertionError("fatal");
         when(router.execute(any(), any(), any(), eq(null))).thenThrow(failure);
 
-        assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of("payload", "hello")))
+        assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of("payload", "hello")))
                 .isSameAs(failure);
     }
 
@@ -520,12 +520,12 @@ class DefaultSkillTemplateTest {
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         CapabilityMetadata yamlSkill = new CapabilityMetadata(
                 "yaml:invoiceParser",
-                "invoiceParser",
+                "default-invoiceParser",
                 "Invoice parser",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 noopInvoker(),
                 CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("invoiceParser", "Invoice parser"),
+                CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"),
                 new SkillInputContract(
                         SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
                         new SkillInputSchemaNode(
@@ -539,23 +539,23 @@ class DefaultSkillTemplateTest {
                                 null,
                                 false, true)),
                 null);
-        registry.register("invoiceParser", yamlSkill);
+        registry.register("default-invoiceParser", yamlSkill);
         when(router.execute(eq(yamlSkill), eq(Map.of("payload", "hello")), any(), eq(null))).thenReturn("\"ok\"");
 
-        assertThatThrownBy(() -> template.invoke("invoiceParser", (Object) null))
+        assertThatThrownBy(() -> template.invoke("default-invoiceParser", (Object) null))
                 .isInstanceOf(SkillInputValidationException.class);
-        assertThatThrownBy(() -> template.invoke("invoiceParser", (Map<String, Object>) null))
+        assertThatThrownBy(() -> template.invoke("default-invoiceParser", (Map<String, Object>) null))
                 .isInstanceOf(SkillInputValidationException.class);
 
         AtomicReference<SkillExecutionView> observed = new AtomicReference<>();
-        String result = template.invoke("invoiceParser", Map.of("payload", "hello"), observed::set);
+        String result = template.invoke("default-invoiceParser", Map.of("payload", "hello"), observed::set);
 
         assertThat(result).isEqualTo("\"ok\"");
         assertThat(observed.get()).isNotNull();
         assertThat(observed.get().sessionId()).isNotBlank();
         assertThat(observed.get().events()).isNotNull();
 
-        assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of(), observed::set))
+        assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of(), observed::set))
                 .isInstanceOf(SkillInputValidationException.class);
         verify(router, never()).execute(eq(yamlSkill), eq(Map.of()), any(), eq(null));
     }
@@ -571,10 +571,10 @@ class DefaultSkillTemplateTest {
                 new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         CapabilityMetadata yamlSkill = yamlSkillMetadata();
-        registry.register("invoiceParser", yamlSkill);
+        registry.register("default-invoiceParser", yamlSkill);
         when(router.execute(eq(yamlSkill), eq(Map.of("payload", "hello")), any(), eq(null))).thenReturn("\"ok\"");
 
-        String result = template.invoke("invoiceParser", new InvoiceRequest("hello"));
+        String result = template.invoke("default-invoiceParser", new InvoiceRequest("hello"));
 
         assertThat(result).isEqualTo("\"ok\"");
         verify(router).execute(eq(yamlSkill), eq(Map.of("payload", "hello")), any(), eq(null));
@@ -591,10 +591,10 @@ class DefaultSkillTemplateTest {
                 new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         CapabilityMetadata yamlSkill = yamlSkillMetadata();
-        registry.register("invoiceParser", yamlSkill);
+        registry.register("default-invoiceParser", yamlSkill);
         when(router.execute(eq(yamlSkill), eq(Map.of("payload", "hello")), any(), eq(null))).thenReturn("\"ok\"");
 
-        assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of("payload", "hello"), view -> {
+        assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of("payload", "hello"), view -> {
             throw new IllegalStateException("observer failed");
         }))
                 .isInstanceOf(IllegalStateException.class)
@@ -613,10 +613,10 @@ class DefaultSkillTemplateTest {
                 new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         CapabilityMetadata yamlSkill = yamlSkillMetadata();
-        registry.register("invoiceParser", yamlSkill);
+        registry.register("default-invoiceParser", yamlSkill);
         AtomicBoolean observerCalled = new AtomicBoolean(false);
 
-        assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of(), view -> observerCalled.set(true)))
+        assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of(), view -> observerCalled.set(true)))
                 .isInstanceOf(SkillInputValidationException.class);
 
         assertThat(observerCalled.get()).isFalse();
@@ -626,12 +626,12 @@ class DefaultSkillTemplateTest {
     private CapabilityMetadata yamlSkillMetadata() {
         return new CapabilityMetadata(
                 "yaml:invoiceParser",
-                "invoiceParser",
+                "default-invoiceParser",
                 "Invoice parser",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 noopInvoker(),
                 CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("invoiceParser", "Invoice parser"),
+                CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"),
                 new SkillInputContract(
                         SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
                         new SkillInputSchemaNode(
@@ -649,7 +649,7 @@ class DefaultSkillTemplateTest {
 
     private DefaultSkillTemplate templateWithRegisteredSkill(CapabilityExecutionRouter router) {
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
-        registry.register("invoiceParser", yamlSkillMetadata());
+        registry.register("default-invoiceParser", yamlSkillMetadata());
         return new DefaultSkillTemplate(
                 registry.manager(),
                 router,

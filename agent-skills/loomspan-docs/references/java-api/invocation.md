@@ -24,7 +24,7 @@ void validate(String skillName, Map<String, Object> input);
 ```
 
 `skillName` MUST identify a registered Java, REST, TypeSafe, or model-backed YAML skill by its exact name.
-For Java, combine its owning annotation namespace with the local annotation name (or canonical method name when omitted). Pass a catalog descriptor name unchanged. Root boundary integration is completed in PR 27.3.
+For Java, combine its owning annotation namespace with the local annotation name (or canonical method name when omitted). Pass a catalog descriptor name unchanged. Every overload uses the shared qualified parser: namespace case normalizes, local-name case remains exact, namespace length is at most 32 and total identity length at most 64. Missing namespaces fail without creation.
 Bean names and method signatures are diagnostics, never invocation aliases.
 
 ```java
@@ -54,7 +54,7 @@ serialization and do not have a YAML output schema.
 [TypeSafe leaves](../skill-authoring/typesafe-skills.md) use the same String facade:
 the complete named `answers` object becomes JSON text without a provider-envelope
 wrapper. Their generated schema is descriptive and does not validate or repair
-answers. Root pre-checks validate input/access only; native substitution and
+answers. Root pre-checks validate reachable dependencies, input and entry access; native substitution and
 resolved-request checks run during invocation before any provider attempt.
 
 An explicit planning `output_from` parent returns its designated accepted direct
@@ -81,7 +81,7 @@ when the skill deliberately takes no fields.
 
 Input is validated before a session is run. Invalid input does not execute the
 skill and does not call the observer. `validate` additionally checks root authorization
-using the calling authentication without creating a session or reserving admission;
+using the calling authentication and the same reachable dependency checks, with temporary leases and without creating a session or reserving admission;
 see [catalog and validation](catalog-and-validation.md).
 
 ## Invocation Lifecycle
@@ -93,11 +93,13 @@ session so authorization is evaluated with the caller's security context.
 Preparation preserves the overload-specific error order. The lifecycle is:
 
 ```text
-Object input -> reject null -> convert with Jackson -> resolve the exact skill -> prepared map
-Map input -> resolve the exact skill -> normalize an allowed null map to {} -> prepared map
-prepared map -> validate the skill input contract
-    -> capture the calling authentication
-    -> create and execute a new root session
+qualified target -> parse and capture reachable generations/leases atomically with publication
+Object input -> reject null -> convert with Jackson -> prepared map
+Map input -> normalize an allowed null map to {} -> prepared map
+prepared map -> validate the entry input contract
+    -> revalidate captured reachable dependency contracts outside the registry lock
+    -> capture the calling authentication and check entry RBAC
+    -> reserve admission, create and execute a new root session
     -> finalize available execution history and restore the execution binding
     -> build the public execution view
     -> call the optional observer with available completed history
@@ -122,7 +124,7 @@ exposing events, or when defining exception handling.
 Inject `SkillInvocationHandoff` when an application must transfer a request to
 Loomspan while holding its own dispatch gate, then execute it after releasing
 that gate. `handoff(name, object)` and `handoff(name, map)` perform the same
-exact lookup, conversion, and input validation as direct invocation, capture
+qualified parsing, reachable snapshot checks, conversion, input validation and entry RBAC as direct invocation, capture
 the current Spring Security authentication, and atomically reserve one root.
 They do not create a session, submit work, invoke an observer, or wait.
 
@@ -143,7 +145,7 @@ try {
 }
 ```
 
-`generationId()` returns the nonblank, process-local ID captured during preparation, before object conversion and input validation. A newer generation may be active when handoff returns, but this handle and its nested REST work use the captured ID. The ID remains stable after execution, failure, release, retirement, or cutoff; concurrent reads do not claim or extend the admission. It is not a durable snapshot identifier. Stage and retain the application-owned generation-to-snapshot mapping according to application policy before admitting traffic, and record correlation before invocation. A missing mapping must be handled explicitly because cleanup can remove it after ownership ends, including cutoff, while the handle still exposes the ID. `release()` in `finally` covers lookup and recording failures and is harmless after invocation claims the admission.
+`generationId()` returns the nonblank, process-local entry namespace generation ID captured during preparation, before object conversion and input validation. A newer generation may be active when handoff returns, but this handle retains the entire captured association, including dependency visibility. Cross-namespace child dispatch is completed in PR 27.4. The ID remains stable after execution, failure, release, retirement, or cutoff; concurrent reads do not claim or extend the admission. It is not a durable snapshot identifier. Stage and retain the application-owned generation-to-snapshot mapping according to application policy before admitting traffic, and record correlation before invocation. A missing mapping must be handled explicitly because cleanup can remove it after ownership ends, including cutoff, while the handle still exposes the ID. `release()` in `finally` covers lookup and recording failures and is harmless after invocation claims the admission.
 
 The handle is single-use. Exactly one invocation, explicit idempotent release,
 or framework cutoff can win; a losing invocation fails as `SkillException`
@@ -154,6 +156,26 @@ prior security context is restored. Mission timeout accounting begins when
 ordinary mission work is submitted. If shutdown has begun, a pending handle may
 start only during the remaining single framework budget and is invalidated at
 cutoff. Finalization and observer delivery remain within root ownership.
+
+## Reachable retention and nesting
+
+Capture traverses every declared child transitively, including optional or role-restricted
+branches. Java skills are leaves. It retains each reached whole generation once and
+ignores unrelated skills and namespaces. Dependency checks rerun existing visibility,
+forwarding, binding and planning rules before execution; foreign targets must be Public.
+Snapshot membership does not permit calling undeclared children. Admission does not
+construct runtimes or provider clients and is not a transaction over external systems.
+
+Validation releases temporary ownership on every outcome. Admitted and queued work
+retain their association through replacement/removal/recreation. Abandonment and failure
+release ownership through the existing lifecycle; a timeout response does not release
+resources while physical mission work still owns them. Each actual root creates a fresh
+session. Nested fresh or admitted root execution is rejected; validation and handoff
+preparation inside an active execution remain allowed.
+
+Evidence: `SkillReachableAdmissionTest`, `SkillAdmissionSnapshotTest`, and
+`SkillAdmissionContractsTest`; `DefaultSkillTemplate`, `SkillGenerationManager`,
+`SkillDependencyValidator`, and `FrameworkExecutionLifecycle` own these boundaries.
 
 ## Application Tests
 

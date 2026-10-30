@@ -92,7 +92,7 @@ relevant topic set.
 | Topic | Coverage | Notes |
 | --- | --- | --- |
 | Supported public types | Source-verified | Exact twenty-four-type allowlist and package boundaries |
-| Catalog and pre-checks | Catalog foundation source-verified | Explicit namespace acquisition, immutable qualified metadata, malformed/foreign lookup, candidate IDs; active registry/removal implemented; reachable admission integration follows in PR 27.3 |
+| Catalog and pre-checks | Catalog foundation source-verified | Explicit namespace acquisition, immutable qualified metadata, malformed/foreign lookup, candidate IDs; active registry/removal implemented; fresh reachable admission and temporary validation are covered by SkillReachableAdmissionTest |
 | Two-stage skill updates | Source-verified | Complete skill and execution candidate, environment or host-map credential references, frozen generation, process-local ID, one-shot publication, candidate disposal, safe retirement callback, and application-owned readiness and cleanup |
 | Skill invocation | Source-verified | Direct invocation plus atomic single-use handoff with captured generation ID, input normalization and validation, result, session, security context, and observer timing |
 | Java skill annotations | Source-verified | Exact shared names, direct root/child invocation, proxy constraints, and supported application usage; detailed reflected input shapes live in `skill-authoring` |
@@ -108,4 +108,4 @@ relevant topic set.
 - **SHOULD / SHOULD NOT** identifies the recommended application default.
 - **MAY** identifies an optional supported choice.
 
-Publication coverage: complete namespace management, captured metadata preparation, Private startup and removal/recreation are implemented and covered by `SkillReloaderTest`, `SkillDependencyValidatorTest` and `NamespaceStartupIntegrationTest`. Reachable execution snapshot/admission, cross-namespace dispatch and observation integration remain PRs 27.3–27.5.
+Publication coverage: complete namespace management, captured metadata preparation, Private startup and removal/recreation are implemented and covered by `SkillReloaderTest`, `SkillDependencyValidatorTest` and `NamespaceStartupIntegrationTest`. Reachable snapshot/admission and temporary validation are covered by `SkillAdmissionSnapshotTest`, `SkillAdmissionContractsTest`, and `SkillReachableAdmissionTest`. Cross-namespace dispatch and observation integration remain PRs 27.4-27.5.

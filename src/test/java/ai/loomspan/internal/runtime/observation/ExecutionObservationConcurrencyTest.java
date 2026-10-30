@@ -35,7 +35,7 @@ class ExecutionObservationConcurrencyTest
         {
             for (int index = 0; index < SESSION_COUNT; index++)
             {
-                futures.add(executor.submit(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session ->
+                futures.add(executor.submit(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 {
                     ready.countDown();
                     try

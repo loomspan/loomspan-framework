@@ -82,6 +82,26 @@ Fixed Java methods remain assigned to their original namespace across replacemen
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
-and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+and installation plus retained reachable admission; cross-namespace child dispatch follows in PR 27.4.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.
+
+## Root dependency checks and entry access
+
+Host root arguments alone choose the namespace. Input/model arguments cannot override it.
+An authorized host may directly enter a Private namespace; Private controls foreign
+reference edges independently of entry RBAC. Public does not imply anonymous entry,
+management rights or database access. Host entry authorization remains the host's duty.
+
+Admission and temporary validation traverse all declared reachable branches before skill
+execution. Same-namespace edges pass visibility; every foreign target must be captured
+Public, including a callback into a Private entry. Missing/Private/incompatible optional
+branches reject even if the caller lacks that child's role. This does not eagerly check
+child RBAC, predict branches, or grant access to unrelated skills in a retained namespace.
+Entry RBAC is checked with the operation's captured authentication; actual child role
+checks remain execution boundaries. Already admitted work retains old visibility after
+replacement/removal/recreation. PR 27.4 completes independent dispatch/context checks.
+
+Evidence: `SkillDependencyValidator#visit`, `DefaultSkillTemplate#authorize`,
+`SkillAdmissionSnapshotTest#validatesEveryIncomingEdgeEvenWhenItsTargetWasAlreadyVisited`,
+and `SkillReachableAdmissionTest#optionalRestrictedChildrenAreCapturedWithoutEagerRbacAndValidationNeverReserves`.

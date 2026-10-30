@@ -245,10 +245,10 @@ class SkillGenerationManagerTest
         for (String name : List.of("javaParent", "fixedJava", "restParent", "restLeaf", "plainParent", "plain"))
             assertThat(generation.skillCatalog().skill("default-" + name).orElseThrow().outputSchema()).isNull();
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, generation);
-        var captured = manager.capture("default");
+        var captured = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("default-outer"));
         var replacement = manager.prepare(manager.capturePreparation("default"), List.of(forwardingDocument("outer", "fixedJava")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, replacement);
-        assertThat(captured.generation().skillCatalog().skill("default-outer").orElseThrow().outputSchema()).isEqualTo(schema);
+        assertThat(captured.snapshot().entryGeneration().skillCatalog().skill("default-outer").orElseThrow().outputSchema()).isEqualTo(schema);
         assertThat(manager.active("default").skillCatalog().skill("default-outer").orElseThrow().outputSchema()).isNull();
         captured.lease().close();
     }
@@ -333,15 +333,15 @@ class SkillGenerationManagerTest
                     quotas:
                       max-provider-attempts: %d
                 """;
-        SkillGeneration first = manager.prepare(manager.capturePreparation("default"), List.of(), new ExecutionConfiguration(template.formatted(3, 4)), ai.loomspan.api.NamespaceVisibility.PRIVATE, Map.of("host.key", "key-A"));
+        SkillGeneration first = manager.prepare(manager.capturePreparation("default"), List.of(new SkillDocument("leaf", "name: leaf\ndescription: fixture\nmodel: chosen\n")), new ExecutionConfiguration(template.formatted(3, 4)), ai.loomspan.api.NamespaceVisibility.PRIVATE, Map.of("host.key", "key-A"));
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, first);
-        var owner = manager.capture("default");
+        var owner = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("default-leaf"));
         SkillGeneration second = manager.prepare(manager.capturePreparation("default"), List.of(), new ExecutionConfiguration(template.formatted(7, 9)), ai.loomspan.api.NamespaceVisibility.PRIVATE, Map.of("host.key", "key-B"));
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, second);
-        assertThat(owner.generation().runtime().properties().getConnections().get("primary").getApiKey())
+        assertThat(owner.snapshot().entryGeneration().runtime().properties().getConnections().get("primary").getApiKey())
                 .isEqualTo("key-A");
-        assertThat(owner.generation().runtime().properties().getSession().getMaxDepth()).isEqualTo(3);
-        assertThat(owner.generation().runtime().properties().getSession().getQuotas().getMaxProviderAttempts())
+        assertThat(owner.snapshot().entryGeneration().runtime().properties().getSession().getMaxDepth()).isEqualTo(3);
+        assertThat(owner.snapshot().entryGeneration().runtime().properties().getSession().getQuotas().getMaxProviderAttempts())
                 .isEqualTo(4);
         assertThat(manager.active("default").runtime().properties().getConnections().get("primary").getApiKey())
                 .isEqualTo("key-B");
@@ -362,14 +362,14 @@ class SkillGenerationManagerTest
         manager.afterSingletonsInstantiated();
         var firstRegistry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
         var secondRegistry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
-        SkillGeneration first = new SkillGeneration("default", "first", Map.of(), Map.of(), null, null,
+        SkillGeneration first = new SkillGeneration("default", "first", Map.of("default-leaf", ai.loomspan.testkit.TestSkillGenerations.leaf()), Map.of(), null, null,
                 new ExecutionRuntime(new LoomspanProperties(), ai.loomspan.internal.core.TracePersistencePolicy.ONERROR,
                         firstRegistry));
         SkillGeneration second = new SkillGeneration("default", "second", Map.of(), Map.of(), null, null,
                 new ExecutionRuntime(new LoomspanProperties(), ai.loomspan.internal.core.TracePersistencePolicy.ONERROR,
                         secondRegistry));
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, first);
-        var captured = manager.capture("default");
+        var captured = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("default-leaf"));
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, second);
         org.mockito.Mockito.verifyNoInteractions(firstRegistry);
         captured.lease().close();

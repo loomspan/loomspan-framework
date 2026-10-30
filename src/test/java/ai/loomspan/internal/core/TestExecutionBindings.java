@@ -25,7 +25,7 @@ public final class TestExecutionBindings
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         branch.push(new ExecutionFrame(missionFrameId, null, OperationType.CAPABILITY,
                 TraceFrameType.ROOT_MISSION, session.entrySkill(), Map.of(), Instant.now()));
-        return new ExecutionBinding(session, mission, branch, generation);
+        return ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, branch, generation);
     }
 
     public static <T> T callWithSession(LoomspanSession session, Callable<T> action)
@@ -49,7 +49,7 @@ public final class TestExecutionBindings
     {
         try
         {
-            return ExecutionBindingScope.callWith(ExecutionBinding.sessionOnly(session, generation), action);
+            return ExecutionBindingScope.callWith(ExecutionBinding.sessionOnly(session, ai.loomspan.testkit.TestSkillGenerations.snapshot(generation)), action);
         }
         catch (RuntimeException | Error ex)
         {

@@ -9,6 +9,7 @@ import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.SkillIdentity;
 import ai.loomspan.internal.skill.SkillGeneration;
 import ai.loomspan.internal.skill.SkillGenerationManager;
+import ai.loomspan.internal.skill.SkillAdmissionSnapshot;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.runtime.input.SkillInputValidationResult;
 import ai.loomspan.internal.runtime.input.SkillInputValidator;
@@ -114,12 +115,12 @@ public class DefaultSkillTemplate implements SkillTemplate
 
     PreparedInput prepareObject(String skillName, Object input)
     {
-        SkillGenerationManager.Capture captured = generationManager.capture(rootNamespace(skillName));
+        SkillGenerationManager.Capture captured = captureRoot(skillName);
         try
         {
             if (input == null)
                 throw new SkillInputValidationException("Skill input must not be null.", List.of());
-            return prepareMap(captured, skillName, objectMapper.convertValue(input, MAP_TYPE));
+            return prepareMap(captured, captured.snapshot().entry().toString(), objectMapper.convertValue(input, MAP_TYPE));
         }
         catch (AccessDeniedException | SkillException ex)
         {
@@ -140,13 +141,15 @@ public class DefaultSkillTemplate implements SkillTemplate
 
     PreparedInput prepareMap(String skillName, Map<String, Object> input)
     {
-        return prepareMap(generationManager.capture(rootNamespace(skillName)), skillName, input);
+        var captured = captureRoot(skillName);
+        return prepareMap(captured, captured.snapshot().entry().toString(), input);
     }
 
-    private static String rootNamespace(String skillName)
+    private SkillGenerationManager.Capture captureRoot(String skillName)
     {
-        try { return SkillIdentity.parse(skillName).namespace(); }
-        catch (IllegalArgumentException ex)
+        try { return generationManager.capture(SkillIdentity.parse(skillName)); }
+        catch (SkillException ex) { throw ex; }
+        catch (RuntimeException ex)
         {
             throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
         }
@@ -156,7 +159,7 @@ public class DefaultSkillTemplate implements SkillTemplate
     {
         try
         {
-            SkillGeneration generation = captured.generation();
+            SkillGeneration generation = captured.snapshot().entryGeneration();
             CapabilityMetadata capability = requireSkill(generation, skillName);
             SkillInputContract contract = capability.inputContract();
             SkillInputValidationResult validation = inputValidator.validate(normalizeNullInput(input, contract), contract);
@@ -167,7 +170,8 @@ public class DefaultSkillTemplate implements SkillTemplate
                         .toList();
                 throw new SkillInputValidationException(buildValidationMessage(skillName, validation), issues);
             }
-            return new PreparedInput(generation, capability, validation, captured.lease());
+            generationManager.validateAdmission(captured.snapshot());
+            return new PreparedInput(captured.snapshot(), capability, validation, captured.lease());
         }
         catch (AccessDeniedException | SkillException ex)
         {
@@ -191,7 +195,7 @@ public class DefaultSkillTemplate implements SkillTemplate
         try
         {
             Authentication authentication = securityContextStrategy.getContext().getAuthentication();
-            roleEvaluator.checkAccess(prepared.capability().name(), prepared.capability().accessPolicy(), authentication);
+            authorize(prepared, authentication);
         }
         catch (AccessDeniedException | SkillException ex)
         {
@@ -216,6 +220,7 @@ public class DefaultSkillTemplate implements SkillTemplate
         try
         {
             authentication = currentAuthentication();
+            authorize(prepared, authentication);
         }
         catch (AccessDeniedException | SkillException ex)
         {
@@ -249,10 +254,10 @@ public class DefaultSkillTemplate implements SkillTemplate
             };
             return admittedRoot == null
                     ? sessionRunner.callWithNewSession(
-                            prepared.capability().name(), prepared.generation(), authentication,
+                            prepared.capability().name(), prepared.snapshot(), authentication,
                             prepared.lease(), action, completion)
                     : sessionRunner.callWithAdmittedSession(
-                            prepared.capability().name(), prepared.generation(), authentication, admittedRoot, action, completion);
+                            prepared.capability().name(), prepared.snapshot(), authentication, admittedRoot, action, completion);
         }
         catch (LoomspanSessionRunner.CompletionPhaseFailure ex)
         {
@@ -271,6 +276,11 @@ public class DefaultSkillTemplate implements SkillTemplate
     Authentication currentAuthentication()
     {
         return securityContextStrategy.getContext().getAuthentication();
+    }
+
+    void authorize(PreparedInput prepared, Authentication authentication)
+    {
+        roleEvaluator.checkAccess(prepared.capability().name(), prepared.capability().accessPolicy(), authentication);
     }
 
     private String executeValidated(CapabilityMetadata capability,
@@ -321,7 +331,7 @@ public class DefaultSkillTemplate implements SkillTemplate
         return "Invalid input for skill '" + skillName + "': " + detail;
     }
 
-    record PreparedInput(SkillGeneration generation, CapabilityMetadata capability,
+    record PreparedInput(SkillAdmissionSnapshot snapshot, CapabilityMetadata capability,
             SkillInputValidationResult validation, SkillGenerationManager.OwnerLease lease)
     {
     }

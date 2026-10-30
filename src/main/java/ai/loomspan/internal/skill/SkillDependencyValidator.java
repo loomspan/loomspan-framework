@@ -39,7 +39,6 @@ final class SkillDependencyValidator {
             ai.loomspan.api.NamespaceVisibility visibility, Map<String, SkillGeneration> external)
     {
         List<SkillValidationIssue> issues = new ArrayList<>(documents.issues());
-        Map<YamlSkillDefinition, SkillInputContract> contracts = new LinkedHashMap<>();
         LinkedHashMap<String, CapabilityMetadata> names = new LinkedHashMap<>();
         for (CapabilityMetadata javaCapability : fixedJavaCapabilities.stream().filter(cap -> cap.identity().namespace().equals(namespace)).toList())
             names.put(javaCapability.name(), javaCapability);
@@ -57,6 +56,37 @@ final class SkillDependencyValidator {
                 definitions.putAll(generation.definitions());
             }
         });
+        return checkGraph(namespace, documents, visibility, external, names, definitions, issues);
+    }
+
+    void checkAdmission(SkillAdmissionSnapshot snapshot) {
+        var names = new LinkedHashMap<String, CapabilityMetadata>();
+        var definitions = new LinkedHashMap<String, YamlSkillDefinition>();
+        snapshot.generations().values().forEach(generation -> {
+            generation.capabilities().forEach(capability -> names.put(capability.name(), capability));
+            definitions.putAll(generation.definitions());
+        });
+        var root = definitions.get(snapshot.entry().toString());
+        var documents = new YamlSkillCatalog.CheckedDocuments(root == null ? List.of() : List.of(root), List.of());
+        var checked = checkGraph(snapshot.entry().namespace(), documents, snapshot.entryGeneration().visibility(),
+                snapshot.generations(), names, definitions, new ArrayList<>());
+        checked.requireValid();
+        var mapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion();
+        for (var definition : checked.contracts().keySet()) {
+            String name = definition.identity().toString();
+            String prepared = names.get(name).tool().outputSchema();
+            String recomputed = checked.outputSchemas().get(name);
+            if (!Objects.equals(prepared == null ? null : mapper.readTree(prepared),
+                    recomputed == null ? null : mapper.readTree(recomputed)))
+                throw new IllegalStateException("Prepared output contract changed for skill '" + name + "'; republish its namespace");
+        }
+    }
+
+    private CheckedSet checkGraph(String namespace, YamlSkillCatalog.CheckedDocuments documents,
+            ai.loomspan.api.NamespaceVisibility visibility, Map<String, SkillGeneration> external,
+            Map<String, CapabilityMetadata> names, Map<String, YamlSkillDefinition> definitions,
+            List<SkillValidationIssue> issues) {
+        Map<YamlSkillDefinition, SkillInputContract> contracts = new LinkedHashMap<>();
         List<YamlSkillDefinition> reachable = new ArrayList<>();
         Set<String> visited = new HashSet<>();
         for (YamlSkillDefinition root : documents.definitions())

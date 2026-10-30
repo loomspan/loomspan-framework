@@ -48,13 +48,29 @@ raw YAML, prompts and original evidence expression text remain unchanged. Renami
 a namespace means creating another namespace, updating references explicitly, and
 removing the old namespace; there is no identity-preserving rename or inheritance.
 
-**Sequential implementation boundary:** PR 27.1 establishes parsing, immutable
-namespace generations/catalogs and Java ownership. Active multi-namespace startup
-and publication integration is PR 27.2; root admission, model/child dispatch and
-observation integration follow in PRs 27.3-27.5. Guidance for those later paths
-states the series contract, not completed integration coverage in this slice.
+**Sequential implementation boundary:** Namespace parsing, startup, publication/removal,
+and retained reachable root admission are implemented through PR 27.3. Cross-namespace
+child dispatch and observation integration remain PRs 27.4–27.5.
 
-Each root invocation captures one immutable, complete declaration and execution generation before input conversion or validation. Its input contracts, definitions, local child surface, models, connections, limits, and trace policy remain coherent for the full nested and parallel invocation tree. An application can prepare and publish a complete new generation through the public `SkillReloader`; publication affects only roots captured afterward, not running or admitted work. Authored references must use the qualified syntax above. Applications can register for safe retirement of superseded published generations to remove generation-keyed resources during normal operation; see [two-stage application updates](../java-api/skill-reload.md). There is no historical-invocation API.
+Each root captures an immutable association of exactly the namespace generations reached
+by its declared child graph, before input conversion or validation. Every declared branch
+counts, including optional and role-restricted children; Java skills are leaves. Each
+reached whole generation is retained once, but unrelated skills are not traversed and
+unrelated namespaces are not retained. Definitions, contracts, models, connections,
+limits and captured visibility remain stable across publication, removal and recreation.
+
+Existing dependency validators check the captured graph outside the publication lock.
+Broken reachable dependencies reject before execution; unrelated broken skills do not.
+Validation uses the same checks with temporary leases and reserves no execution.
+Publication may succeed after dependency-only changes while new admission fails; catalogs
+continue describing prepared contracts. See [output contracts](output-contracts.md#effective-output-metadata).
+Retaining a reached generation can retain unused resources, and traversal can contend
+with publication. Admission constructs no runtime/client and does not make external
+systems transactional. Applications can observe retirement for generation-keyed cleanup;
+see [two-stage application updates](../java-api/skill-reload.md). There is no historical-invocation API.
+
+Evidence: `SkillGenerationManager#capture`, `SkillDependencyValidator#checkAdmission`,
+`SkillAdmissionSnapshotTest`, and `SkillReachableAdmissionTest`.
 
 Bean names, YAML source labels, and declared method signatures are diagnostic locations, never a second callable identity. File-loaded YAML has a file-derived label; application-supplied `SkillDocument` YAML has its exact arbitrary `sourceName` label, which need not resemble a path or have an extension. Neither changes manifest `name` or `allowed_skills` resolution. The inspection wire field remains named `sourcePath`. Any YAML `mapping` key, including null, empty, or scalar forms, is rejected with annotation-only guidance.
 
@@ -134,7 +150,7 @@ When an LLM-backed YAML skill invokes another LLM-backed YAML skill:
 - the child uses its own model, prompt, allowed skills, plan, and property-level output evidence requirements;
 - the child owns an isolated plan and successful-direct-skill set, and the exact parent mission resumes after the child returns or fails;
 - the parent observes the child capability result, not the child's internal tool surface or evidence ledger.
-- every child and parallel worker uses the exact generation captured by the root, even if a newer generation becomes active.
+- every branch preserves the root's authoritative retained namespace association, even if a newer generation becomes active; cross-namespace dispatch integration follows in PR 27.4.
 
 This isolation is intentional. A parent contract should describe the child capability it invokes rather than coupling itself to the child's internal leaves.
 
@@ -223,6 +239,6 @@ Fixed Java methods remain assigned to their original namespace across replacemen
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
-and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+and installation plus retained reachable admission; cross-namespace child dispatch follows in PR 27.4.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

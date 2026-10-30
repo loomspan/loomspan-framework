@@ -348,7 +348,7 @@ class MissionLifecycleTest
     {
         LoomspanSession session = parent == null ? new LoomspanSession("session-" + id, id, 8) : parent.session();
         MissionContext mission = new MissionContext(session, id, "mission-" + id, parent, nanoTime);
-        return new ExecutionBinding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
+        return ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
     }
 
     private static AssignedTaskExecution assignment(String id, int step)

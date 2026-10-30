@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import tools.jackson.databind.ObjectMapper;
-import ai.loomspan.internal.skill.SkillGeneration;
+import ai.loomspan.internal.skill.SkillAdmissionSnapshot;
 
 public class LoomspanSessionRunner
 {
@@ -204,53 +204,53 @@ public class LoomspanSessionRunner
         this.generationTraceRetention = completionGraceRetention;
     }
 
-    public void runWithNewSession(String entrySkill, SkillGeneration generation, Consumer<LoomspanSession> action)
+    public void runWithNewSession(String entrySkill, SkillAdmissionSnapshot snapshot, Consumer<LoomspanSession> action)
     {
-        runWithNewSession(entrySkill, generation, null, action);
+        runWithNewSession(entrySkill, snapshot, null, action);
     }
 
-    public void runWithNewSession(String entrySkill, SkillGeneration generation,
+    public void runWithNewSession(String entrySkill, SkillAdmissionSnapshot snapshot,
             @Nullable Authentication authentication, Consumer<LoomspanSession> action)
     {
         Objects.requireNonNull(action, "action must not be null");
-        executeRoot(entrySkill, authentication, generation, session -> { action.accept(session); return null; },
+        executeRoot(entrySkill, authentication, snapshot, session -> { action.accept(session); return null; },
                 (ignored, session, failure) -> null);
     }
 
-    public <T> T callWithNewSession(String entrySkill, SkillGeneration generation, Function<LoomspanSession, T> action)
+    public <T> T callWithNewSession(String entrySkill, SkillAdmissionSnapshot snapshot, Function<LoomspanSession, T> action)
     {
-        return callWithNewSession(entrySkill, generation, null, action);
+        return callWithNewSession(entrySkill, snapshot, null, action);
     }
 
-    public <T> T callWithNewSession(String entrySkill, SkillGeneration generation,
+    public <T> T callWithNewSession(String entrySkill, SkillAdmissionSnapshot snapshot,
             @Nullable Authentication authentication, Function<LoomspanSession, T> action)
     {
-        return callWithNewSession(entrySkill, generation, authentication, action,
+        return callWithNewSession(entrySkill, snapshot, authentication, action,
                 (result, session, failure) -> result);
     }
 
-    public <T, R> R callWithNewSession(String entrySkill, SkillGeneration generation,
+    public <T, R> R callWithNewSession(String entrySkill, SkillAdmissionSnapshot snapshot,
             @Nullable Authentication authentication,
             Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
     {
-        return executeRoot(entrySkill, authentication, generation, null, action, completion);
+        return executeRoot(entrySkill, authentication, snapshot, null, action, completion);
     }
 
-    public <T, R> R callWithNewSession(String entrySkill, SkillGeneration generation,
+    public <T, R> R callWithNewSession(String entrySkill, SkillAdmissionSnapshot snapshot,
             @Nullable Authentication authentication, AutoCloseable generationOwner,
             Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
     {
-        return executeRoot(entrySkill, authentication, generation, generationOwner, action, completion);
+        return executeRoot(entrySkill, authentication, snapshot, generationOwner, action, completion);
     }
 
     private <T, R> R executeRoot(String entrySkill, @Nullable Authentication authentication,
-            SkillGeneration generation, Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
+            SkillAdmissionSnapshot snapshot, Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
     {
-        return executeRoot(entrySkill, authentication, generation, null, action, completion);
+        return executeRoot(entrySkill, authentication, snapshot, null, action, completion);
     }
 
     private <T, R> R executeRoot(String entrySkill, @Nullable Authentication authentication,
-            SkillGeneration generation, @Nullable AutoCloseable generationOwner,
+            SkillAdmissionSnapshot snapshot, @Nullable AutoCloseable generationOwner,
             Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
     {
         Objects.requireNonNull(action, "action must not be null");
@@ -262,7 +262,7 @@ public class LoomspanSessionRunner
             closeOwner(generationOwner);
             throw ex;
         }
-        try { return executeAdmittedRoot(entrySkill, authentication, generation, root, action, completion); }
+        try { return executeAdmittedRoot(entrySkill, authentication, snapshot, root, action, completion); }
         finally { if (root == null) closeOwner(generationOwner); }
     }
 
@@ -273,23 +273,24 @@ public class LoomspanSessionRunner
         catch (Exception ex) { throw new IllegalStateException("Generation ownership release failed", ex); }
     }
 
-    public <T, R> R callWithAdmittedSession(String entrySkill, SkillGeneration generation,
+    public <T, R> R callWithAdmittedSession(String entrySkill, SkillAdmissionSnapshot snapshot,
             @Nullable Authentication authentication,
             FrameworkExecutionLifecycle.AdmittedRoot root,
             Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
     {
         Objects.requireNonNull(root, "root must not be null");
-        return executeAdmittedRoot(entrySkill, authentication, generation, root, action, completion);
+        return executeAdmittedRoot(entrySkill, authentication, snapshot, root, action, completion);
     }
 
     private <T, R> R executeAdmittedRoot(String entrySkill, @Nullable Authentication authentication,
-            SkillGeneration generation,
+            SkillAdmissionSnapshot snapshot,
             @Nullable FrameworkExecutionLifecycle.AdmittedRoot root,
             Function<LoomspanSession, T> action, RootCompletion<T, R> completion)
     {
         Objects.requireNonNull(action, "action must not be null");
         Objects.requireNonNull(completion, "completion must not be null");
-        Objects.requireNonNull(generation, "generation must not be null");
+        Objects.requireNonNull(snapshot, "snapshot must not be null");
+        var generation = snapshot.entryGeneration();
         if (root != null && !root.claimExecution())
             throw new java.util.concurrent.RejectedExecutionException(
                     "Loomspan invocation admission is no longer executable");
@@ -324,7 +325,7 @@ public class LoomspanSessionRunner
             T result;
             try
             {
-                result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session, generation), () ->
+                result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session, snapshot), () ->
                 {
                     Throwable failure = null;
                     try { return action.apply(session); }

@@ -295,17 +295,40 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         }
     }
 
-    public Capture capture(String namespace)
+    public Capture capture(SkillIdentity entry)
     {
-        String owner = SkillIdentity.normalizeNamespace(namespace);
+        Objects.requireNonNull(entry, "entry must not be null");
         synchronized (generationMonitor)
         {
-            SkillGeneration generation = active.get(owner);
-            if (generation == null) throw new SkillReloadException("No active namespace '" + owner + "'");
-            PublishedGeneration state = published.get(generation.id());
-            state.owners++;
-            return new Capture(generation, new OwnerLease(state));
+            if (destroyed) throw new SkillReloadException("Framework has shut down");
+            Map<String, SkillGeneration> selected = new LinkedHashMap<>();
+            var pending = new java.util.ArrayDeque<SkillIdentity>();
+            var visited = new java.util.HashSet<SkillIdentity>();
+            pending.add(entry);
+            while (!pending.isEmpty()) {
+                var identity = pending.removeFirst();
+                var generation = selected.computeIfAbsent(identity.namespace(), namespace -> {
+                    var current = active.get(namespace);
+                    if (current == null) throw new SkillReloadException("No active namespace '" + namespace + "'");
+                    return current;
+                });
+                if (generation.capability(identity.toString()) == null)
+                    throw new ai.loomspan.api.SkillException("Unknown skill '" + identity + "'");
+                if (!visited.add(identity)) continue;
+                var definition = generation.definition(identity.toString());
+                if (definition != null) definition.allowedSkills().forEach(child -> pending.add(SkillIdentity.parse(child)));
+            }
+            var snapshot = new SkillAdmissionSnapshot(entry, selected);
+            var states = selected.values().stream().map(generation -> published.get(generation.id())).toList();
+            var owner = new OwnerLease(states);
+            states.forEach(state -> state.owners++);
+            return new Capture(snapshot, owner);
         }
+    }
+
+    /** Expensive policy checks use retained immutable metadata, outside the registry monitor. */
+    public void validateAdmission(SkillAdmissionSnapshot snapshot) {
+        new SkillDependencyValidator(inputs, fixedJavaCapabilities, fixedRestHandlerBeanNames).checkAdmission(snapshot);
     }
 
     public void deliveryEnabled(BooleanSupplier condition)
@@ -379,25 +402,28 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         private Registration(Consumer<String> listener) { this.listener = listener; }
     }
 
-    public record Capture(SkillGeneration generation, OwnerLease lease) {}
+    public record Capture(SkillAdmissionSnapshot snapshot, OwnerLease lease) {}
 
     public final class OwnerLease implements AutoCloseable
     {
-        private final PublishedGeneration state;
+        private final List<PublishedGeneration> states;
         private final AtomicBoolean closed = new AtomicBoolean();
 
-        private OwnerLease(PublishedGeneration state) { this.state = state; }
+        private OwnerLease(List<PublishedGeneration> states) { this.states = states; }
 
         @Override public void close()
         {
             if (!closed.compareAndSet(false, true)) return;
-            Retirement retirement;
+            List<Retirement> retirements = new ArrayList<>();
             synchronized (generationMonitor)
             {
-                state.owners--;
-                retirement = selectIfRetired(state);
+                for (var state : states) {
+                    state.owners--;
+                    var retirement = selectIfRetired(state);
+                    if (retirement != null) retirements.add(retirement);
+                }
             }
-            dispatch(retirement);
+            retirements.forEach(SkillGenerationManager::dispatch);
         }
     }
 

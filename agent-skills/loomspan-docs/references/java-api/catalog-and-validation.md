@@ -31,8 +31,7 @@ Child-local evidence annotations are omitted from metadata; it does not install
 a parent validator or guarantee factual correctness. See [output contracts](../skill-authoring/output-contracts.md). Retain a catalog as metadata or acquire another through `SkillReloader.snapshot(namespace)` for current discovery. Discovery is not authorization. See [skill-reload.md](skill-reload.md).
 
 Use `SkillTemplate.validate(name, map)` or `validate(name, object)` before asynchronous
-dispatch. Both perform the same exact lookup, conversion, contract validation, safe error
-mapping, and root role-policy evaluation used by invocation preparation. A null Object is
+dispatch. Both freshly capture the entry's entire declared reachable graph and perform the same qualified parsing, conversion, input/dependency contract checks, error mapping, and entry role-policy evaluation used by invocation preparation. A null Object is
 always rejected before conversion; a null Map is accepted only for generic or
 empty-permitting contracts. Authorization denial remains an unwrapped Spring Security
 `AccessDeniedException` with the capability name.
@@ -40,8 +39,11 @@ empty-permitting contracts. Authorization denial remains an unwrapped Spring Sec
 Validation is advisory. It creates no session, trace, execution binding, observer callback,
 model/skill execution, or quota use and reserves no lifecycle admission. Invocation repeats
 input and access enforcement and can still be denied by changed authentication, shutdown,
-or execution-time policy. Only the root is pre-checked; nested authorization remains an
-execution outcome.
+or execution-time policy. Every declared reachable branch is checked for existence, captured namespace visibility,
+forwarding, bindings and planning constraints, including optional/role-restricted branches.
+Only entry RBAC is pre-checked; child role authorization remains an execution outcome.
+Temporary leases are released on success or failure, so dependency deletion, visibility or
+contract changes can invalidate later invocation even after validation succeeded.
 
 When atomic ownership transfer is required, use `SkillInvocationHandoff` rather
 than `validate`: handoff prepares the input and reserves one lifecycle admission,
@@ -49,8 +51,8 @@ while execution still enforces authorization with the authentication captured at
 handoff. See [invocation.md](invocation.md).
 
 Pass `descriptor.name()` directly to invocation, validation or handoff; do not split
-it or reconstruct a local alias. PR 27.2 implements active-registry/removal integration;
-PR 27.3 verifies descriptor-driven root admission.
+it or reconstruct a local alias. A retained catalog continues describing its prepared contracts; it never pins later
+validation, invocation or handoff. Each operation captures the then-current active view.
 
 ## Source Anchors
 
@@ -69,6 +71,8 @@ Fixed Java methods remain assigned to their original namespace across replacemen
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
-and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+and installation plus retained reachable admission; cross-namespace child dispatch follows in PR 27.4.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.
+
+Admission evidence: `SkillReachableAdmissionTest#allRootOverloadsUseFreshQualifiedTargetsAcrossReplacementRemovalAndRecreation` and `#optionalRestrictedChildrenAreCapturedWithoutEagerRbacAndValidationNeverReserves`.

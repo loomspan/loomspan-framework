@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 public interface AdmittedSkillInvocation
 {
     /**
-     * Returns the nonblank, process-local ID of the generation captured during preparation,
+     * Returns the nonblank, process-local ID of the entry namespace generation captured during preparation,
      * before input conversion and validation. The ID remains available after execution,
      * failure, release, or framework cutoff, even if a newer generation is published.
      * Reading it has no admission or ownership side effects and does not guarantee that an

@@ -224,9 +224,7 @@ class SupportedSurfaceIntegrationTest
                                     "default-supportedRestLeaf", Map.of("message", "denied"), rejectedView::set)))
                                     .isInstanceOf(AccessDeniedException.class)
                                     .hasMessage("Access denied for capability 'default-supportedRestLeaf'");
-                            assertThat(rejectedView.get()).isNotNull();
-                            assertThat(rejectedView.get().events()).extracting(event -> event.type())
-                                    .contains("ERROR");
+                            assertThat(rejectedView.get()).isNull();
                             assertThat(SupportedSkillConfiguration.handlerCalls).hasValue(authorizedCalls + 1);
                         }
                         finally {

@@ -309,7 +309,7 @@ class TypeSafeClientTest {
             var mission =
                     new ai.loomspan.internal.core.MissionContext(session, "judge", "native", null);
             var binding =
-                    new ai.loomspan.internal.core.ExecutionBinding(
+                    ai.loomspan.testkit.TestSkillGenerations.binding(
                             session,
                             mission,
                             new ai.loomspan.internal.core.PhysicalBranchContext(session),

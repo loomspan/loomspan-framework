@@ -43,6 +43,7 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
         try
         {
             Authentication authentication = template.currentAuthentication();
+            template.authorize(prepared, authentication);
             return new DefaultAdmittedSkillInvocation(
                     skillName, prepared, authentication, lifecycle.admitRoot(prepared.lease()));
         }
@@ -76,7 +77,7 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
                 FrameworkExecutionLifecycle.AdmittedRoot root)
         {
             this.skillName = skillName;
-            this.generationId = prepared.generation().id();
+            this.generationId = prepared.snapshot().entryGeneration().id();
             this.payload = new AtomicReference<>(new Payload(skillName, prepared, authentication));
             this.root = root;
             root.onPendingTermination(() -> payload.set(null));

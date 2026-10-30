@@ -81,7 +81,7 @@ class CapabilityExecutionRouterTest {
 
         MissionContext parent = new MissionContext(session, "test.entry", "parent-frame", null);
         Object result = ExecutionBindingScope.supplyWith(
-                new ExecutionBinding(session, parent, new PhysicalBranchContext(session), generation(capability)),
+                ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, new PhysicalBranchContext(session), generation(capability)),
                 () -> router.execute(capability, Map.of("topic", "mars"), session, null));
 
         assertThat(result).isEqualTo("child result");
@@ -149,7 +149,7 @@ class CapabilityExecutionRouterTest {
 
         MissionContext parent = new MissionContext(session, "test.entry", "parent-frame", null);
         Object result = ExecutionBindingScope.supplyWith(
-                new ExecutionBinding(session, parent, new PhysicalBranchContext(session), generation(capability)),
+                ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, new PhysicalBranchContext(session), generation(capability)),
                 () -> router.execute(capability, Map.of("topic", "mars"), session, null));
 
         assertThat(result).isEqualTo("child result");
@@ -221,7 +221,7 @@ class CapabilityExecutionRouterTest {
         MissionContext parent = new MissionContext(session, "test.entry", "parent-frame", null);
         parent.recordSuccessfulDirectSkill("parsed_invoice");
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
-        Object result = ExecutionBindingScope.supplyWith(new ExecutionBinding(session, parent, branch, generation(capability)), () -> {
+        Object result = ExecutionBindingScope.supplyWith(ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, branch, generation(capability)), () -> {
             ExecutionFrame parentFrame = stateService.openMissionFrame(session, "parent.visible.skill", Map.of("objective", "parent"));
             try {
                 return router.execute(capability, Map.of("topic", "mars"), session, null);
@@ -273,7 +273,7 @@ class CapabilityExecutionRouterTest {
 
         MissionContext parent = new MissionContext(session, "test.entry", "parent-frame", null);
         Object result = ExecutionBindingScope.supplyWith(
-                new ExecutionBinding(session, parent, new PhysicalBranchContext(session), generation(capability)),
+                ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, new PhysicalBranchContext(session), generation(capability)),
                 () -> router.execute(capability, Map.of("invoiceId", "INV-7"), session, null));
 
         assertThat(result).isEqualTo("child result");
@@ -325,7 +325,7 @@ class CapabilityExecutionRouterTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         CapabilityExecutionRouter router = javaRouter(capability, refResolver);
-        Object result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session, generation(capability)),
+        Object result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session, ai.loomspan.testkit.TestSkillGenerations.snapshot(generation(capability))),
                 () -> router.execute(capability, Map.of("payload", payload), session, null));
 
         assertThat(result).isEqualTo("binary-result");
@@ -370,7 +370,7 @@ class CapabilityExecutionRouterTest {
                 "options", List.of(Map.of("identifier", "ref://artifacts/missing-option.txt")));
 
         CapabilityExecutionRouter router = javaRouter(capability, refResolver);
-        Object result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session, generation(capability)),
+        Object result = ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session, ai.loomspan.testkit.TestSkillGenerations.snapshot(generation(capability))),
                 () -> router.execute(capability, input, session, null));
 
         assertThat(result).isEqualTo("unchanged");

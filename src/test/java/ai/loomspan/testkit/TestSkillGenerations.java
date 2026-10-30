@@ -23,6 +23,25 @@ public final class TestSkillGenerations
 
     public static SkillGeneration empty() { return EMPTY; }
 
+    public static CapabilityMetadata leaf() {
+        return new CapabilityMetadata("test:leaf", "default-leaf", "fixture",
+                ai.loomspan.internal.core.SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),
+                input -> "ok", ai.loomspan.internal.core.CapabilityKind.JAVA_SKILL,
+                ai.loomspan.internal.core.CapabilityToolDescriptor.generic("default-leaf", "fixture"),
+                new ai.loomspan.internal.core.SkillSource(null, "fixture", "leaf()"));
+    }
+
+    public static ai.loomspan.internal.skill.SkillAdmissionSnapshot snapshot(SkillGeneration generation) {
+        return new ai.loomspan.internal.skill.SkillAdmissionSnapshot(
+                new ai.loomspan.internal.core.SkillIdentity(generation.namespace(), "test"), Map.of(generation.namespace(), generation));
+    }
+
+    public static ai.loomspan.internal.core.ExecutionBinding binding(ai.loomspan.internal.core.LoomspanSession session,
+            ai.loomspan.internal.core.MissionContext mission, ai.loomspan.internal.core.PhysicalBranchContext branch,
+            SkillGeneration generation) {
+        return new ai.loomspan.internal.core.ExecutionBinding(session, mission, branch, generation, snapshot(generation));
+    }
+
     public static SkillGeneration of(CapabilityMetadata... capabilities)
     {
         LinkedHashMap<String, CapabilityMetadata> byName = new LinkedHashMap<>();

@@ -218,7 +218,7 @@ class ExecutionCoordinatorTest {
         var generations = registry.manager();
         var retired = new java.util.concurrent.CopyOnWriteArrayList<String>();
         generations.onGenerationRetired(retired::add);
-        var captured = generations.capture("default");
+        var captured = generations.capture(SkillIdentity.parse(rest.name()));
         var lifecycle = new FrameworkExecutionLifecycle(new StaticApplicationContext(),
                 Duration.ofSeconds(1), Executors.newSingleThreadExecutor());
         var root = lifecycle.admitRoot(captured.lease());
@@ -250,7 +250,7 @@ class ExecutionCoordinatorTest {
             assertThatThrownBy(() -> coordinator.execute("restLookup", "lookup", session, null))
                     .isInstanceOf(IllegalStateException.class).hasMessage("frame-open-failed");
             root.completeExecution();
-            assertThat(retired).containsExactly(captured.generation().id());
+            assertThat(retired).containsExactly(captured.snapshot().entryGeneration().id());
         }
         finally { lifecycle.destroy(); }
     }
@@ -753,7 +753,7 @@ class ExecutionCoordinatorTest {
         LoomspanSession session = new LoomspanSession("session-nested", "top.entry", 3);
         MissionContext parent = new MissionContext(session, "top.entry", "parent-frame", null);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
-        String response = ExecutionBindingScope.supplyWith(new ExecutionBinding(session, parent, branch,
+        String response = ExecutionBindingScope.supplyWith(ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, branch,
                 registry.generation(catalog)), () -> {
             ExecutionFrame parentFrame = stateService.openMissionFrame(session, "parent.visible.skill", Map.of("objective", "parent"));
             stateService.recordSuccessfulSkill("invoiceParser", "task-1", false);

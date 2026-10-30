@@ -33,11 +33,13 @@ class FrameworkExecutionLifecycleTest
         var context = new StaticApplicationContext();
         var executor = Executors.newSingleThreadExecutor();
         var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(1), executor);
-        var manager = new TestCapabilityRegistry().manager();
+        var fixture = new TestCapabilityRegistry();
+        fixture.register("default-leaf", ai.loomspan.testkit.TestSkillGenerations.leaf());
+        var manager = fixture.manager();
         var retired = new CopyOnWriteArrayList<String>();
         manager.onGenerationRetired(retired::add);
-        var captured = manager.capture("default");
-        String oldId = captured.generation().id();
+        var captured = manager.capture(SkillIdentity.parse("default-leaf"));
+        String oldId = captured.snapshot().entryGeneration().id();
         var root = lifecycle.admitRoot(captured.lease());
         var session = new LoomspanSession("retirement", "entry", 8);
         session.attachAdmittedRoot(root);
@@ -148,7 +150,7 @@ class FrameworkExecutionLifecycleTest
                 NoOpExecutionObservationHandleFactory.INSTANCE, trace::create, lifecycle);
         var observerEntered = new AtomicBoolean();
         Thread caller = Thread.ofVirtual().start(() -> runner.callWithNewSession(
-                "entry", ai.loomspan.testkit.TestSkillGenerations.empty(), null,
+                "entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), null,
                 session -> "done", (result, session, failure) -> {
                     observerEntered.set(true);
                     assertThat(lifecycle.activeRootCount()).isOne();
@@ -180,7 +182,7 @@ class FrameworkExecutionLifecycleTest
         var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.ALWAYS, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, trace::create, lifecycle);
         Thread caller = Thread.ofVirtual().start(
-                () -> runner.runWithNewSession("entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session -> { }));
+                () -> runner.runWithNewSession("entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> { }));
         assertThat(trace.awaitCompletionAppend(1, TimeUnit.SECONDS)).isTrue();
 
         long started = System.nanoTime();
@@ -375,7 +377,7 @@ class FrameworkExecutionLifecycleTest
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
                 new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
 
-        String value = runner.callWithNewSession("entry", ai.loomspan.testkit.TestSkillGenerations.empty(), null, session -> "done", (result, session, failure) -> {
+        String value = runner.callWithNewSession("entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), null, session -> "done", (result, session, failure) -> {
             assertThat(ExecutionBindingScope.current()).isEmpty();
             assertThat(lifecycle.activeRootCount()).isOne();
             return result;
@@ -404,7 +406,7 @@ class FrameworkExecutionLifecycleTest
         AtomicBoolean bindingWasRestored = new AtomicBoolean();
         AtomicLong rootsDuringCompletion = new AtomicLong();
 
-        assertThatThrownBy(() -> runner.callWithNewSession("entry", ai.loomspan.testkit.TestSkillGenerations.empty(), null, session -> {
+        assertThatThrownBy(() -> runner.callWithNewSession("entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), null, session -> {
             throw failure;
         }, (result, session, completionFailure) -> {
             callbacks.incrementAndGet();
@@ -447,7 +449,7 @@ class FrameworkExecutionLifecycleTest
         Thread caller = Thread.ofVirtual().start(() -> {
             try
             {
-                runner.callWithNewSession("entry", ai.loomspan.testkit.TestSkillGenerations.empty(), null, session -> {
+                runner.callWithNewSession("entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), null, session -> {
                     throw failure;
                 }, (result, session, observedFailure) -> {
                     completionThread.set(Thread.currentThread());
@@ -502,7 +504,7 @@ class FrameworkExecutionLifecycleTest
         var session = new LoomspanSession("late-mission", "entry", 3);
         session.attachAdmittedRoot(root);
         var mission = new MissionContext(session, "entry", "frame", null, nanoTime::get);
-        var binding = new ExecutionBinding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
+        var binding = ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
 
         MissionLifecycle.PrimaryCancellation cancellation = mission.lifecycle().beginCancellation(
                 binding, new IllegalStateException("local"), () -> "failure", false);
@@ -661,7 +663,7 @@ class FrameworkExecutionLifecycleTest
         var session = new LoomspanSession("blocked-writer", "entry", 3);
         session.attachAdmittedRoot(root);
         var mission = new MissionContext(session, "entry", "frame", null);
-        var binding = new ExecutionBinding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
+        var binding = ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
         var writerEntered = new CountDownLatch(1);
         var releaseWriter = new CountDownLatch(1);
         var writerFailure = new AtomicReference<Throwable>();

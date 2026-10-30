@@ -34,7 +34,7 @@ class OutputValidationAdvisorOrderingTest {
                 "{\"result\":3}", "{\"result\":\"BAD\"}", "{\"result\":\"GOOD\"}"));
         ChatModel model = prompt -> { requests.add(prompt); return new ChatResponse(List.of(new Generation(new AssistantMessage(candidates.remove())))); };
         var records = new ArrayList<TraceRecord>();
-        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.empty(), session ->
+        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
             TestExecutionBindings.callWithCurrentSessionMission(() -> {
                 var client = ChatClient.builder(model).defaultAdvisors(new DefaultSkillAdvisorResolver(new DefaultExecutionStateService(Clock.systemUTC())).resolve(definition)).build();
                 assertThat(client.prompt().user("Return JSON").call().content()).isEqualTo("{\"result\":\"GOOD\"}");
