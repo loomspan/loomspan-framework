@@ -13,6 +13,7 @@ import (
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/applicationclient"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
 )
 
@@ -434,5 +435,28 @@ func TestRecentWithSessionFilterPaginatesCorrectly(t *testing.T) {
 	}
 	if nextCursor != "" {
 		t.Fatalf("expected no continuation for suffix query, got %s", nextCursor)
+	}
+}
+
+func TestBaselineCapturedGenerationsDoNotAliasLoaderOrReaders(t *testing.T) {
+	service := NewService(context.Background())
+	defer service.Close()
+	scope := target.Scope{ID: "scope"}
+	service.scope = &scope
+	generations := map[string]string{"orders": "entry", "tax": "retired-target"}
+	service.SetBaselineLoader(func(context.Context, target.Scope) (Baseline, *consolecore.Error) {
+		return Baseline{Executions: []observability.ActiveExecution{{EntryNamespace: "orders", GenerationID: "entry", NamespaceGenerationIDs: generations}}}, nil
+	})
+	if _, domain := service.refreshBaseline(context.Background(), scope); domain != nil {
+		t.Fatal(domain)
+	}
+	generations["tax"] = "loader mutation"
+	first := service.Baseline()
+	if first.Executions[0].NamespaceGenerationIDs["tax"] != "retired-target" {
+		t.Fatal("loader mutation changed captured identity")
+	}
+	first.Executions[0].NamespaceGenerationIDs["orders"] = "reader mutation"
+	if service.Baseline().Executions[0].NamespaceGenerationIDs["orders"] != "entry" {
+		t.Fatal("reader mutation changed captured entry identity")
 	}
 }

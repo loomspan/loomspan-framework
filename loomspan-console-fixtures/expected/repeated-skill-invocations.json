@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-repeated-skill-invocations",
   "sessionId" : "session-repeated-skill-invocations",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-repeated-skill-invocations",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-repeated-skill-invocations"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {
@@ -89,7 +95,7 @@
       "completionUnits" : 3,
       "totalUnits" : 8
     },
-    "route" : "root.skill"
+    "route" : "default-root_skill"
   }, {
     "frameId" : "skill-1",
     "parentFrameId" : "root",
@@ -111,7 +117,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "root.skill"
+    "route" : "default-root_skill"
   }, {
     "frameId" : "skill-2",
     "parentFrameId" : "root",
@@ -133,7 +139,7 @@
       "completionUnits" : 2,
       "totalUnits" : 5
     },
-    "route" : "root.skill"
+    "route" : "default-root_skill"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

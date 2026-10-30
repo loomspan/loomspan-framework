@@ -56,8 +56,8 @@ class OutputBindingCompositionTest {
     @Test void exactChildValuesPlainTextArraysAndProvenanceRemainDetached() {
         var array=schema("array");array.setItems(schema("integer"));
         var root=object(Map.of("numbers",array,"text",schema("string")),"numbers","text");
-        var bindings=List.of(new ChildInputBinding(ObjectFieldPath.parse("/numbers",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("/values",true),"one"),new ChildInputBinding(ObjectFieldPath.parse("/text",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("",true),"two"));
-        var accepted=List.of(new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task1","one","{\"values\":[900719925474099312345,2]}"),new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task2","two","Plain text {not parsed}"));
+        var bindings=List.of(new ChildInputBinding(ObjectFieldPath.parse("/numbers",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("/values",true),"default-one"),new ChildInputBinding(ObjectFieldPath.parse("/text",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("",true),"default-two"));
+        var accepted=List.of(new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task1","default-one","{\"values\":[900719925474099312345,2]}"),new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task2","default-two","Plain text {not parsed}"));
         var composition=new OutputBindingComposition(root,bindings,Map.of(),accepted,"owner",LoomspanJacksonCodecs.defaults().schemaTree());
         var result=composition.composeEmpty();
         assertThat(result.validation().valid()).isTrue();
@@ -94,10 +94,10 @@ class OutputBindingCompositionTest {
     }
     @Test void unavailableChildAndMissingSubtreeNeverBecomeModelOwnedFallbacks() {
         var root=object(Map.of("value",schema("string"),"summary",schema("string")),"value","summary");
-        var binding=new ChildInputBinding(ObjectFieldPath.parse("/value",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("/missing",true),"producer");
+        var binding=new ChildInputBinding(ObjectFieldPath.parse("/value",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("/missing",true),"default-producer");
         assertThatThrownBy(()->new OutputBindingComposition(root,List.of(binding),Map.of(),List.of(),"owner",LoomspanJacksonCodecs.defaults().schemaTree()))
                 .hasMessageContaining("binding_source_unavailable");
-        assertThatThrownBy(()->new OutputBindingComposition(root,List.of(binding),Map.of(),List.of(new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task","producer","{}")),"owner",LoomspanJacksonCodecs.defaults().schemaTree()))
+        assertThatThrownBy(()->new OutputBindingComposition(root,List.of(binding),Map.of(),List.of(new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task","default-producer","{}")),"owner",LoomspanJacksonCodecs.defaults().schemaTree()))
                 .hasMessageContaining("binding_source_unavailable").hasMessageContaining("/missing");
     }
 }

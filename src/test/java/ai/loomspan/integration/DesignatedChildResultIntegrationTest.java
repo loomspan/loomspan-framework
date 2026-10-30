@@ -97,7 +97,7 @@ class DesignatedChildResultIntegrationTest {
     private Capture run(String kind, boolean chain) throws Exception {
         Path skills = Files.createDirectory(directory.resolve("skills"));
         String rootYaml = parent("root", chain ? "middle" : "producer", true);
-        if (kind.equals("synthesis")) rootYaml = rootYaml.replace("output_from: {skill: producer}\n", "").replace("max_steps: 2", "max_steps: 3");
+        if (kind.equals("synthesis")) rootYaml = rootYaml.replace("output_from: {skill: default-producer}\n", "").replace("max_steps: 2", "max_steps: 3");
         write(skills, "root", rootYaml);
         if (chain) write(skills, "middle", parent("middle", "producer", false));
         write(skills, "later", "name: later\ndescription: Complete later accepted work\nrest: true\n");
@@ -149,15 +149,15 @@ class DesignatedChildResultIntegrationTest {
                             List<Object> tasks = new ArrayList<>();
                             tasks.add(task(child, List.of()));
                             if (!middle) tasks.add(task("later", List.of(child)));
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", parent,
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-" + parent,
                                     "createdAt", "2026-10-04T00:00:00Z", "status", "VALID", "tasks", tasks)));
                         }
                         if (system.contains("coordinator-assigned task")) {
-                            var matcher = Pattern.compile("Exact capability/tool: (\\w+)").matcher(system);
+                            var matcher = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
                             assertThat(matcher.find()).isTrue();
                             String child = matcher.group(1);
                             return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL",
-                                    "taskId", child, "toolName", child, "toolArguments", Map.of())));
+                                    "taskId", child.substring("default-".length()), "toolName", child, "toolArguments", Map.of())));
                         }
                         if (kind.equals("synthesis") && system.contains("All required plan tasks are already COMPLETE"))
                             return response(JSON.writeValueAsString(Map.of("stepAction", "FINAL_RESPONSE", "finalResponse", Map.of("report", "PARENT_SYNTHESIS"))));
@@ -175,11 +175,11 @@ class DesignatedChildResultIntegrationTest {
             server.start();
             ApplicationContextRunner runner = new ApplicationContextRunner().withUserConfiguration(App.class)
                     .withBean(RestSkillHandler.class, () -> invocation -> {
-                        if (invocation.skillName().equals("later")) {
+                        if (invocation.skillName().equals("default-later")) {
                             capture.laterCalls.incrementAndGet();
                             return "LATER_WORK_COMPLETE";
                         }
-                        assertThat(invocation.skillName()).isEqualTo("producer");
+                        assertThat(invocation.skillName()).isEqualTo("default-producer");
                         return REST_RESULT;
                     })
                     .withPropertyValues("spring.main.web-application-type=none",
@@ -200,18 +200,18 @@ class DesignatedChildResultIntegrationTest {
             runner.run(context -> {
                 assertThat(context).hasNotFailed();
                 var catalog = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
-                String schema = catalog.skill("root").orElseThrow().outputSchema();
+                String schema = catalog.skill("default-root").orElseThrow().outputSchema();
                 if (kind.equals("model")) {
                     assertThat(JSON.readTree(schema).path("properties").path("report").path("type").asText()).isEqualTo("string");
-                    assertThat(schema).isEqualTo(catalog.skill("producer").orElseThrow().outputSchema());
-                    if (chain) assertThat(schema).isEqualTo(catalog.skill("middle").orElseThrow().outputSchema());
+                    assertThat(schema).isEqualTo(catalog.skill("default-producer").orElseThrow().outputSchema());
+                    if (chain) assertThat(schema).isEqualTo(catalog.skill("default-middle").orElseThrow().outputSchema());
                 } else if (kind.startsWith("native")) {
-                    assertThat(schema).isEqualTo(catalog.skill("producer").orElseThrow().outputSchema());
+                    assertThat(schema).isEqualTo(catalog.skill("default-producer").orElseThrow().outputSchema());
                     assertThat(JSON.readTree(schema).at("/properties/report/type").asText()).isEqualTo("object");
                 } else assertThat(schema).isNull();
                 if (kind.equals("native-failure")) org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-                        context.getBean(SkillTemplate.class).invoke("root", Map.of(), capture.observed::set)).hasStackTraceContaining("401");
-                else capture.result = context.getBean(SkillTemplate.class).invoke("root", Map.of(), capture.observed::set);
+                        context.getBean(SkillTemplate.class).invoke("default-root", Map.of(), capture.observed::set)).hasStackTraceContaining("401");
+                else capture.result = context.getBean(SkillTemplate.class).invoke("default-root", Map.of(), capture.observed::set);
             });
         }
         assertThat(capture.failure.get()).isNull();
@@ -252,11 +252,11 @@ class DesignatedChildResultIntegrationTest {
                         boolean newer = system.contains("newProducer") || system.contains("PRODUCER_new");
                         String producer = newer ? "newProducer" : "oldProducer";
                         if (system.contains("Create an ordered flight plan"))
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", "root", "createdAt", "2026-10-04T00:00:00Z",
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-04T00:00:00Z",
                                     "status", "VALID", "tasks", List.of(task(producer, List.of())))));
                         if (system.contains("coordinator-assigned task"))
                             return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", producer,
-                                    "toolName", producer, "toolArguments", Map.of("marker", marker))));
+                                    "toolName", "default-" + producer, "toolArguments", Map.of("marker", marker))));
                         assertThat(system).contains("PRODUCER_");
                         if (marker.equals("held")) { heldProducer.countDown(); await(releaseProducer); }
                         else if (!reload) { parallelProducers.countDown(); await(parallelProducers); }
@@ -279,11 +279,11 @@ class DesignatedChildResultIntegrationTest {
                         SkillTemplate facade = context.getBean(SkillTemplate.class);
                         SkillReloader reloader = context.getBean(SkillReloader.class);
                         SkillCatalog capturedCatalog = reloader.snapshot("default");
-                        String oldSchema = capturedCatalog.skill("root").orElseThrow().outputSchema();
+                        String oldSchema = capturedCatalog.skill("default-root").orElseThrow().outputSchema();
                         assertThat(oldSchema).contains("oldReport");
                         try (var executor = Executors.newFixedThreadPool(2)) {
                             if (reload) {
-                                var oldResult = executor.submit(() -> facade.invoke("root", Map.of("marker", "held")));
+                                var oldResult = executor.submit(() -> facade.invoke("default-root", Map.of("marker", "held")));
                                 try {
                                     await(heldProducer);
                                     try (var update = reloader.prepare("default", List.of(
@@ -292,14 +292,14 @@ class DesignatedChildResultIntegrationTest {
                                         reloader.publish(update);
                                     }
                                     assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(capturedCatalog.generationId());
-                                    assertThat(reloader.snapshot("default").skill("root").orElseThrow().outputSchema()).contains("newReport");
-                                    assertThat(capturedCatalog.skill("root").orElseThrow().outputSchema()).isEqualTo(oldSchema);
-                                    assertThat(JSON.readTree(facade.invoke("root", Map.of("marker", "fresh"))).path("newReport").asText()).isEqualTo("fresh");
+                                    assertThat(reloader.snapshot("default").skill("default-root").orElseThrow().outputSchema()).contains("newReport");
+                                    assertThat(capturedCatalog.skill("default-root").orElseThrow().outputSchema()).isEqualTo(oldSchema);
+                                    assertThat(JSON.readTree(facade.invoke("default-root", Map.of("marker", "fresh"))).path("newReport").asText()).isEqualTo("fresh");
                                 } finally { releaseProducer.countDown(); }
                                 assertThat(JSON.readTree(oldResult.get(15, TimeUnit.SECONDS)).path("oldReport").asText()).isEqualTo("held");
                             } else {
-                                var a = executor.submit(() -> facade.invoke("root", Map.of("marker", "A")));
-                                var b = executor.submit(() -> facade.invoke("root", Map.of("marker", "B")));
+                                var a = executor.submit(() -> facade.invoke("default-root", Map.of("marker", "A")));
+                                var b = executor.submit(() -> facade.invoke("default-root", Map.of("marker", "B")));
                                 assertThat(JSON.readTree(a.get(15, TimeUnit.SECONDS)).path("oldReport").asText()).isEqualTo("A");
                                 assertThat(JSON.readTree(b.get(15, TimeUnit.SECONDS)).path("oldReport").asText()).isEqualTo("B");
                             }
@@ -337,11 +337,11 @@ class DesignatedChildResultIntegrationTest {
                 planning_mode: true
                 max_steps: %d
                 prompt: %s. Determine the scope and supply explicit child arguments; complete all accepted work.
-                output_from: {skill: %s}
+                output_from: {skill: default-%s}
                 allowed_skills:
-                  - {name: %s, required: true, max_tasks: 1}
+                  - {name: default-%s, required: true, max_tasks: 1}
                 """.formatted(name, later ? 2 : 1, name.equals("middle") ? "MIDDLE_ORCHESTRATION" : "ROOT_ORCHESTRATION", child, child)
-                + (later ? "  - {name: later, required: true, max_tasks: 1}\n" : "");
+                + (later ? "  - {name: default-later, required: true, max_tasks: 1}\n" : "");
     }
 
     private static String expected(String kind) {
@@ -362,7 +362,7 @@ class DesignatedChildResultIntegrationTest {
     private static Map<String, Object> task(String child, List<String> dependencies) {
         Map<String, Object> task = new LinkedHashMap<>();
         task.put("taskId", child); task.put("title", child); task.put("status", "PENDING");
-        task.put("capabilityName", child); task.put("intent", "Fulfill assigned responsibility");
+        task.put("capabilityName", "default-" + child); task.put("intent", "Fulfill assigned responsibility");
         task.put("dependsOn", dependencies); task.put("expectedOutputs", List.of("complete result"));
         task.put("parallelGroup", null); task.put("note", "");
         return task;

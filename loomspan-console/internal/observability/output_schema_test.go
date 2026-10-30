@@ -2,6 +2,7 @@ package observability
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -40,6 +41,11 @@ func TestForwardingSkillDetailFixturePreservesDerivedMetadataAndSource(t *testin
 	}
 	if detail.OutputSchema == nil || detail.Yaml == "" {
 		t.Fatalf("forwarding detail missing schema or original source: %#v", detail)
+	}
+	if detail.RegisteredName != "default-prepareReport" ||
+		!strings.Contains(detail.Yaml, "name: default-finishReport,") ||
+		!strings.Contains(detail.Yaml, "output_from: {skill: default-finishReport}") {
+		t.Fatalf("forwarding fixture must use canonical skill references: %#v", detail)
 	}
 	if err := validateSkillDetail(detail, detail.RegisteredName); err != nil {
 		t.Fatal(err)

@@ -21,6 +21,7 @@ import (
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/release"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/skillidentity"
 )
 
 // Processor is the required artifact.Processor implementation for the current
@@ -122,6 +123,8 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 	var configuredLimits *ConfiguredLimits
 	var entrySkill string
 	var generationID string
+	var entryNamespace string
+	var namespaceGenerationIDs map[string]string
 	var lastSeq int64
 	var sawStart bool
 
@@ -202,11 +205,23 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 			if !valid {
 				return invalidityError(CategoryUnsupportedValue, scopeID)
 			}
-			entrySkill, _ = extractEntrySkill(rec)
+			entrySkill, valid = extractEntrySkill(rec)
+			if !valid {
+				return invalidityError(CategoryUnsupportedValue, scopeID)
+			}
 			generationID, valid = extractGenerationID(rec)
 			if !valid {
 				return invalidityError(CategoryUnsupportedValue, scopeID)
 			}
+			entryNamespace, namespaceGenerationIDs, valid = extractNamespaceCapture(rec, entrySkill, generationID)
+			if !valid {
+				return invalidityError(CategoryUnsupportedValue, scopeID)
+			}
+
+		}
+
+		if !validateExecutingOwner(rec, namespaceGenerationIDs) {
+			return invalidityError(CategoryUnsupportedValue, scopeID)
 		}
 
 		// Record-address index row.
@@ -483,6 +498,7 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 		}
 	}
 	m := manifest{
+		EntrySkill: entrySkill, GenerationID: generationID, EntryNamespace: entryNamespace, NamespaceGenerationIDs: namespaceGenerationIDs,
 		Schema:             manifestSchemaV1,
 		TraceID:            validator.traceID,
 		SessionID:          validator.sessionID,
@@ -514,6 +530,7 @@ func (processor *Processor) Process(req artifact.ProcessRequest) (result artifac
 		Metadata: artifact.TraceMetadata{
 			TraceID: validator.traceID, SessionID: validator.sessionID,
 			EntrySkill: entrySkill, GenerationID: generationID,
+			EntryNamespace: entryNamespace, NamespaceGenerationIDs: namespaceGenerationIDs,
 			Outcome: string(outcome), FinalizedAt: completionRec.Timestamp,
 			PersistencePolicy: completionRec.metadataStringOrEmpty("persistencePolicy"),
 		},
@@ -882,4 +899,45 @@ var _ artifact.ImportProcessor = (*Processor)(nil)
 
 func payloadStorageError(scopeID string, cause error) *consolecore.Error {
 	return storageError(scopeID, diagnostics.Annotate(cause, diagnostics.Facts{Cause: "storage_read", Stage: "payload"}))
+}
+
+func extractNamespaceCapture(rec *Record, skill, generation string) (string, map[string]string, bool) {
+	fields, ok := decodeUniqueObject(rec.Metadata)
+	if !ok {
+		return "", nil, false
+	}
+	var namespace string
+	if json.Unmarshal(fields["entryNamespace"], &namespace) != nil {
+		return "", nil, false
+	}
+	raw, ok := decodeUniqueObject(fields["namespaceGenerationIds"])
+	if !ok {
+		return "", nil, false
+	}
+	generations := make(map[string]string, len(raw))
+	for name, value := range raw {
+		var id string
+		if json.Unmarshal(value, &id) != nil {
+			return "", nil, false
+		}
+		generations[name] = id
+	}
+	return namespace, generations, skillidentity.ValidCapture(skill, namespace, generation, generations)
+}
+
+func validateExecutingOwner(rec *Record, generations map[string]string) bool {
+	fields, ok := decodeUniqueObject(rec.Metadata)
+	if !ok {
+		return false
+	}
+	ns, hasNS := fields["executingNamespace"]
+	gen, hasGen := fields["executingGenerationId"]
+	if !hasNS && !hasGen {
+		return true
+	}
+	if !hasNS || !hasGen {
+		return false
+	}
+	var namespace, generation string
+	return json.Unmarshal(ns, &namespace) == nil && json.Unmarshal(gen, &generation) == nil && skillidentity.ValidOwner(namespace, generation, generations)
 }

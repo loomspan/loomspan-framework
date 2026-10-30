@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-single-attempt-success",
   "sessionId" : "session-single-attempt-success",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-single-attempt-success",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-single-attempt-success"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "configuredLimits" : {

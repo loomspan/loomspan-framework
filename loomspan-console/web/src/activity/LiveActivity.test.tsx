@@ -77,7 +77,7 @@ function makeExecution(
     updatedAt: "2026-07-25T12:05:00Z",
     elapsedMillis: 305_000,
     entrySkill,
-    generationId: "generation-fixture",
+    generationId: "generation-fixture", entryNamespace: "default", namespaceGenerationIds: { default: "generation-fixture" },
     status: "ACTIVE",
     phase: "EXECUTING",
     summary: "Running",

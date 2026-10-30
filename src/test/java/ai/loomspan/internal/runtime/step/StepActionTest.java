@@ -16,10 +16,10 @@ class StepActionTest {
 
     @Test
     void callTool_factoryMethod_setsFields() {
-        StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of("input", "text"));
+        StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of("input", "text"));
         assertThat(action.stepAction()).isEqualTo(StepActionType.CALL_TOOL);
         assertThat(action.taskId()).isEqualTo("t-1");
-        assertThat(action.toolName()).isEqualTo("invoiceParser");
+        assertThat(action.toolName()).isEqualTo("default-invoiceParser");
         assertThat(action.toolArguments()).containsEntry("input", "text");
         assertThat(action.finalResponse()).isNull();
     }
@@ -39,12 +39,12 @@ class StepActionTest {
 
     @Test
     void callTool_json_roundTrips() throws JacksonException {
-        StepAction original = StepAction.callTool("t-1", "invoiceParser", Map.of("input", "text"));
+        StepAction original = StepAction.callTool("t-1", "default-invoiceParser", Map.of("input", "text"));
         String json = objectMapper.writeValueAsString(original);
         StepAction deserialized = objectMapper.readValue(json, StepAction.class);
         assertThat(deserialized.stepAction()).isEqualTo(StepActionType.CALL_TOOL);
         assertThat(deserialized.taskId()).isEqualTo("t-1");
-        assertThat(deserialized.toolName()).isEqualTo("invoiceParser");
+        assertThat(deserialized.toolName()).isEqualTo("default-invoiceParser");
     }
 
     @Test
@@ -65,14 +65,14 @@ class StepActionTest {
                 {
                   "stepAction": "CALL_TOOL",
                   "taskId": "t-1",
-                  "toolName": "invoiceParser",
+                  "toolName": "default-invoiceParser",
                   "toolArguments": {"rawText": "INV-001 Acme $100"}
                 }
                 """;
         StepAction action = objectMapper.readValue(modelJson, StepAction.class);
         assertThat(action.stepAction()).isEqualTo(StepActionType.CALL_TOOL);
         assertThat(action.taskId()).isEqualTo("t-1");
-        assertThat(action.toolName()).isEqualTo("invoiceParser");
+        assertThat(action.toolName()).isEqualTo("default-invoiceParser");
         assertThat(action.toolArguments()).containsEntry("rawText", "INV-001 Acme $100");
     }
 
@@ -95,7 +95,7 @@ class StepActionTest {
                 {
                   "stepAction": "CALL_TOOL",
                   "taskId": "t-1",
-                  "toolName": "invoiceParser",
+                  "toolName": "default-invoiceParser",
                   "toolArguments": {},
                   "extraField": "should be ignored"
                 }

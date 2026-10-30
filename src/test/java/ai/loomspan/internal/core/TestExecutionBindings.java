@@ -24,7 +24,7 @@ public final class TestExecutionBindings
         MissionContext mission = new MissionContext(session, session.entrySkill(), missionFrameId, null);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         branch.push(new ExecutionFrame(missionFrameId, null, OperationType.CAPABILITY,
-                TraceFrameType.ROOT_MISSION, session.entrySkill(), Map.of(), Instant.now()));
+                TraceFrameType.ROOT_MISSION, session.entrySkill(), Map.of(), Instant.now(), null, null));
         return ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, branch, generation);
     }
 
@@ -49,7 +49,7 @@ public final class TestExecutionBindings
     {
         try
         {
-            return ExecutionBindingScope.callWith(ExecutionBinding.sessionOnly(session, ai.loomspan.testkit.TestSkillGenerations.snapshot(generation)), action);
+            return ExecutionBindingScope.callWith(ExecutionBinding.sessionOnly(session, new ai.loomspan.internal.skill.SkillAdmissionSnapshot(SkillIdentity.parse(session.entrySkill()), Map.of(generation.namespace(), generation))), action);
         }
         catch (RuntimeException | Error ex)
         {
@@ -69,7 +69,7 @@ public final class TestExecutionBindings
                 outer.session(), outer.session().entrySkill(), missionFrameId, outer.mission());
         ExecutionFrame frame = new ExecutionFrame(missionFrameId,
                 outer.branch().leaf().map(ExecutionFrame::frameId).orElse(null), OperationType.CAPABILITY,
-                TraceFrameType.ROOT_MISSION, outer.session().entrySkill(), Map.of(), Instant.now());
+                TraceFrameType.ROOT_MISSION, outer.session().entrySkill(), Map.of(), Instant.now(), null, null);
         outer.branch().push(frame);
         try
         {

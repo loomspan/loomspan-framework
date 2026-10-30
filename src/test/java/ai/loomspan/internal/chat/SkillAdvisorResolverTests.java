@@ -88,7 +88,7 @@ class SkillAdvisorResolverTests {
         CallAdvisor advisor = (CallAdvisor) failingResolver.resolve(definition(true)).getFirst();
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() ->
                         advisor.adviseCall(request("Write YAML"), new RecordingChain(List.of("bad", "OK"))))))
                 .isInstanceOf(IllegalStateException.class)
@@ -105,7 +105,7 @@ class SkillAdvisorResolverTests {
 
     private YamlSkillDefinition definition(boolean withLinter, boolean withOutputSchema, boolean withEvidenceContract) {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName(withLinter ? "lintedSkill" : "plain.skill");
+        manifest.setName(withLinter ? "lintedSkill" : "plain_skill");
         manifest.setDescription(manifest.getName());
         manifest.setModel("gpt-5");
         if (withOutputSchema) {
@@ -114,7 +114,7 @@ class SkillAdvisorResolverTests {
             YamlSkillManifest.OutputSchemaManifest vendorName = new YamlSkillManifest.OutputSchemaManifest();
             vendorName.setType("string");
             if (withEvidenceContract) {
-                vendorName.setEvidence("invoiceParser");
+                vendorName.setEvidence("default-invoiceParser");
             }
             schema.setProperties(java.util.Map.of("vendorName", vendorName));
             schema.setRequired(java.util.List.of("vendorName"));
@@ -138,7 +138,7 @@ class SkillAdvisorResolverTests {
                 new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium"),
                 withEvidenceContract
                         ? ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(
-                                java.util.Map.of("vendorName", "invoiceParser"))
+                                java.util.Map.of("vendorName", "default-invoiceParser"))
                         : EvidenceContract.empty());
     }
 

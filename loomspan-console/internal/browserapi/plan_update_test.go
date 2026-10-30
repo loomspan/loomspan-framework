@@ -13,7 +13,7 @@ import (
 
 func updateRecord(note string) traceanalysis.RecordSummary {
 	changes := []traceanalysis.PlanFieldChange{{TaskID: "task-1", Field: "note", Before: nil, After: &note}}
-	return traceanalysis.RecordSummary{Sequence: 20, Type: "PLAN_UPDATED", Facts: traceanalysis.RecordFacts{Plan: &traceanalysis.PlanReference{PlanID: "plan-1", CapabilityName: "investigateNetwork"}, PlanUpdate: &traceanalysis.PlanUpdate{PreviousSequence: 10, Availability: "AVAILABLE", Changes: &changes}}, Content: &traceanalysis.ContentDescriptor{ContentRef: "content-ref", Available: true}}
+	return traceanalysis.RecordSummary{Sequence: 20, Type: "PLAN_UPDATED", Facts: traceanalysis.RecordFacts{Plan: &traceanalysis.PlanReference{PlanID: "plan-1", CapabilityName: "default-investigateNetwork"}, PlanUpdate: &traceanalysis.PlanUpdate{PreviousSequence: 10, Availability: "AVAILABLE", Changes: &changes}}, Content: &traceanalysis.ContentDescriptor{ContentRef: "content-ref", Available: true}}
 }
 
 func TestBrowserRecordAdmissionPreservesCompleteComparisons(t *testing.T) {

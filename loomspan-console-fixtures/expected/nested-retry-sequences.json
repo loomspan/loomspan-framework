@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-nested-retry-sequences",
   "sessionId" : "session-nested-retry-sequences",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-nested-retry-sequences",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-nested-retry-sequences"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {

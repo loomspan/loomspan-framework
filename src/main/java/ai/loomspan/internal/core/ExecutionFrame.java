@@ -11,7 +11,9 @@ public record ExecutionFrame(
         TraceFrameType traceFrameType,
         String route,
         Map<String, Object> parameters,
-        Instant openedAt)
+        Instant openedAt,
+        String executingNamespace,
+        String executingGenerationId)
 {
     public ExecutionFrame
     {
@@ -21,6 +23,14 @@ public record ExecutionFrame(
         route = requireNonBlank(route, "route");
         parameters = parameters == null ? Map.of() : Map.copyOf(parameters);
         openedAt = Objects.requireNonNull(openedAt, "openedAt must not be null");
+        if ((executingNamespace == null) != (executingGenerationId == null))
+            throw new IllegalArgumentException("executing namespace and generation must be present together");
+        if (executingNamespace != null)
+        {
+            if (!SkillIdentity.normalizeNamespace(executingNamespace).equals(executingNamespace))
+                throw new IllegalArgumentException("executingNamespace must be canonical");
+            executingGenerationId = requireNonBlank(executingGenerationId, "executingGenerationId");
+        }
     }
 
     private static String requireNonBlank(String value, String fieldName)

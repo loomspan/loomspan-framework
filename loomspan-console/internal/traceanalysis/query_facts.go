@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/artifact"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
@@ -53,6 +54,7 @@ func (service *Service) GetSummary(ctx context.Context, scopeID evidence.Referen
 
 	success = true
 	return TraceSummary{
+		EntrySkill: m.EntrySkill, GenerationID: m.GenerationID, EntryNamespace: m.EntryNamespace, NamespaceGenerationIDs: maps.Clone(m.NamespaceGenerationIDs),
 		Context:            traceCtx,
 		Outcome:            m.Outcome,
 		TerminalFailureID:  m.TerminalFailureID,

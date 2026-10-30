@@ -17,21 +17,21 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
     @Test void fullInputAssemblyMakesNoProviderRequest() throws Exception {
         run(false,(template,calls)-> {
             var events=new ArrayList<ai.loomspan.api.SkillExecutionEvent>();
-            var output=template.invoke("comparison",Map.of("assessment",Map.of("exact","original")),view->events.addAll(view.events()));
+            var output=template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")),view->events.addAll(view.events()));
             assertThat(output).contains("\"assessment\":{\"exact\":\"original\"}");assertThat(calls.get()).isZero();
             assertThat(events).filteredOn(event->event.type().equalsIgnoreCase("RESULT_ASSEMBLED")).hasSize(1);
         });
     }
     @Test void mixedOverrideCorrectionRequestsOnlyUnboundFieldsAndRetainsInputEvidence() throws Exception {
         run(true,(template,calls)-> {
-            var output=template.invoke("comparison",Map.of("assessment",Map.of("exact","original")));
+            var output=template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")));
             assertThat(output).contains("\"assessment\":{\"exact\":\"original\"}","\"summary\":\"reasoned\"");assertThat(calls.get()).isEqualTo(2);
         });
     }
     @Test void concurrentInputOnlyRootsKeepDistinctSourcesWithoutProviderWork() throws Exception {
         run(false,(template,calls)-> {
-            var first=java.util.concurrent.CompletableFuture.supplyAsync(()->template.invoke("comparison",Map.of("assessment",Map.of("id","first"))));
-            var second=java.util.concurrent.CompletableFuture.supplyAsync(()->template.invoke("comparison",Map.of("assessment",Map.of("id","second"))));
+            var first=java.util.concurrent.CompletableFuture.supplyAsync(()->template.invoke("default-comparison",Map.of("assessment",Map.of("id","first"))));
+            var second=java.util.concurrent.CompletableFuture.supplyAsync(()->template.invoke("default-comparison",Map.of("assessment",Map.of("id","second"))));
             assertThat(first.join()).contains("first").doesNotContain("second");
             assertThat(second.join()).contains("second").doesNotContain("first");
             assertThat(calls.get()).isZero();
@@ -40,7 +40,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
     @Test void boundOnlyLinterFailureIsTerminalWithoutProviderFallbackOrAssemblyEvent() throws Exception {
         run(false,"linter:\n  type: regex\n  max_retries: 2\n  regex:\n    pattern: '^NEVER$'\n",null,(template,calls)-> {
             var events=new ArrayList<ai.loomspan.api.SkillExecutionEvent>();
-            assertThatThrownBy(()->template.invoke("comparison",Map.of("assessment",Map.of("exact","original")),view->events.addAll(view.events())))
+            assertThatThrownBy(()->template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")),view->events.addAll(view.events())))
                     .hasStackTraceContaining("binding_linter_validation");
             assertThat(calls.get()).isZero();
             assertThat(events).isNotEmpty().noneMatch(event->event.type().equalsIgnoreCase("RESULT_ASSEMBLED"));
@@ -53,9 +53,9 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
     @Test void heldCorrectionRetainsCapturedBindingGenerationAcrossReload() throws Exception {
         var reload=new java.util.concurrent.atomic.AtomicReference<Runnable>();
         run(true,"",reload,(template,calls)-> {
-            var original=template.invoke("comparison",Map.of("assessment",Map.of("exact","original")));
+            var original=template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")));
             assertThat(original).contains("assessment","original").doesNotContain("replacement");
-            var replacement=template.invoke("comparison",Map.of("replacement",Map.of("exact","original")));
+            var replacement=template.invoke("default-comparison",Map.of("replacement",Map.of("exact","original")));
             assertThat(replacement).contains("replacement","original").doesNotContain("assessment");
             assertThat(calls.get()).isEqualTo(3);
         });
@@ -71,7 +71,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                 output_bindings:
                   /assessment: {from: input, path: /assessment}
                 """,List.of("{\"extra\":\"reasoned\"}"),body->assertThat(body).doesNotContain("$.assessment \u2014 object"),(template,calls)-> {
-            assertThat(template.invoke("comparison",Map.of("assessment",Map.of("exact","original")))).contains("original","extra","reasoned");
+            assertThat(template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")))).contains("original","extra","reasoned");
             assertThat(calls.get()).isEqualTo(1);
         });
     }
@@ -87,7 +87,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                 output_bindings:
                   /assessment: {from: input, path: /assessment}
                 """,List.of("{}"),body->assertThat(body).contains("optionalExplanation", "optional", "nullable"),(template,calls)-> {
-            assertThat(template.invoke("comparison",Map.of("assessment",Map.of("exact","original")))).contains("original").doesNotContain("optionalExplanation");
+            assertThat(template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")))).contains("original").doesNotContain("optionalExplanation");
             assertThat(calls.get()).isEqualTo(1);
         });
     }
@@ -96,7 +96,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
             assertThat(body).contains("$.context \u2014 object, required", "$.context.summary \u2014 string, required");
             assertThat(body).doesNotContain("$.context.assessment \u2014 object");
         },(template,calls)-> {
-            assertThat(template.invoke("comparison",Map.of("assessment",Map.of("exact","original")))).contains("context","reasoned","original");
+            assertThat(template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")))).contains("context","reasoned","original");
             assertThat(calls.get()).isEqualTo(2);
         });
     }
@@ -104,7 +104,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
     @org.junit.jupiter.params.provider.ValueSource(strings={"{\"CONTEXT\":{\"ASSESSMENT\":{\"exact\":\"original\"},\"summary\":\"bad\"}}","{\"context\":null}","{\"context\":[]}"})
     void aliasesAndBlockingAncestorsUseBoundedCorrection(String override) throws Exception {
         custom(nestedContract(),List.of(override,"{\"context\":{\"summary\":\"reasoned\"}}"),body->assertThat(body).contains("Framework supplies these output destinations"),(template,calls)-> {
-            assertThat(template.invoke("comparison",Map.of("assessment",Map.of("exact","original")))).contains("original","reasoned").doesNotContain("bad");
+            assertThat(template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")))).contains("original","reasoned").doesNotContain("bad");
             assertThat(calls.get()).isEqualTo(2);
         });
     }
@@ -121,7 +121,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                   /count: {from: input, path: /assessment/count}
                 """,List.of(),body->{throw new AssertionError("Unexpected model fallback");},(template,calls)-> {
             var events=new ArrayList<ai.loomspan.api.SkillExecutionEvent>();
-            assertThatThrownBy(()->template.invoke("comparison",Map.of("assessment",Map.of("count","uncoerced")),view->events.addAll(view.events())))
+            assertThatThrownBy(()->template.invoke("default-comparison",Map.of("assessment",Map.of("count","uncoerced")),view->events.addAll(view.events())))
                     .hasStackTraceContaining("binding_output_validation");
             assertThat(calls.get()).isZero();
             assertThat(events).isNotEmpty().noneMatch(event->event.type().equalsIgnoreCase("RESULT_ASSEMBLED"));
@@ -129,11 +129,11 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
     }
     @Test void immutableBoundEvidenceFailureHasNoProviderFallbackOrAssembly() throws Exception {
         custom("""
-                allowed_skills: [{name: producer}]
+                allowed_skills: [{name: default-producer}]
                 output_schema:
                   type: object
                   properties:
-                    assessment: {type: object, additionalProperties: true, evidence: producer}
+                    assessment: {type: object, additionalProperties: true, evidence: default-producer}
                     summary: {type: string}
                   required: [assessment, summary]
                   additionalProperties: false
@@ -141,7 +141,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                   /assessment: {from: input, path: /assessment}
                 """,List.of(),body->{throw new AssertionError("Unexpected model fallback");},(template,calls)-> {
             var events=new ArrayList<ai.loomspan.api.SkillExecutionEvent>();
-            assertThatThrownBy(()->template.invoke("comparison",Map.of("assessment",Map.of("exact","original")),view->events.addAll(view.events())))
+            assertThatThrownBy(()->template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")),view->events.addAll(view.events())))
                     .hasStackTraceContaining("binding_evidence_validation");
             assertThat(calls.get()).isZero();
             assertThat(events).isNotEmpty().noneMatch(event->event.type().equalsIgnoreCase("RESULT_ASSEMBLED"));
@@ -169,9 +169,9 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                 """,List.of("{\"summary\":\"BAD\"}", corrected ? "{\"summary\":\"GOOD\"}" : "{\"summary\":\"BAD\"}"),
                 body -> assertThat(body).contains("Framework supplies these output destinations"), (template,calls) -> {
                     var events = new ArrayList<ai.loomspan.api.SkillExecutionEvent>();
-                    if (corrected) assertThat(template.invoke("comparison", Map.of("assessment",Map.of("exact","original")), view -> events.addAll(view.events())))
+                    if (corrected) assertThat(template.invoke("default-comparison", Map.of("assessment",Map.of("exact","original")), view -> events.addAll(view.events())))
                             .contains("original", "GOOD");
-                    else assertThatThrownBy(() -> template.invoke("comparison", Map.of("assessment",Map.of("exact","original")), view -> events.addAll(view.events())))
+                    else assertThatThrownBy(() -> template.invoke("default-comparison", Map.of("assessment",Map.of("exact","original")), view -> events.addAll(view.events())))
                             .hasStackTraceContaining("binding_linter_validation");
                     assertThat(calls).hasValue(2);
                     assertThat(events.stream().filter(event -> event.type().equalsIgnoreCase("RESULT_ASSEMBLED"))).hasSize(corrected ? 1 : 0);

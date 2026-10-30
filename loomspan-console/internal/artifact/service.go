@@ -244,6 +244,7 @@ func (service *Service) Acquire(ctx context.Context, scope target.Scope, traceID
 		if result.err != nil && ctx.Err() == nil && !diagnostics.Extract(result.err).Expected {
 			diagnostics.Link(diagnostics.WithScope(ctx, string(scope.ID)), ent.acquireCtx)
 		}
+		result.artifact.Metadata = result.artifact.Metadata.Clone()
 		return result.artifact, result.err
 	case <-ctx.Done():
 		service.mu.Lock()
@@ -452,7 +453,7 @@ func (service *Service) Lookup(ref evidence.Reference, traceID string) (LookupRe
 	return LookupResult{
 		Owner:                   owner,
 		Handle:                  entry.handle,
-		Metadata:                entry.metadata,
+		Metadata:                entry.metadata.Clone(),
 		LocalAvailable:          true,
 		ApplicationAvailability: entry.applicationAvailability,
 		AcquiredAt:              entry.acquisitionTime,
@@ -591,7 +592,7 @@ func (service *Service) buildAcquiredArtifactLocked(entry *entry) AcquiredArtifa
 	return AcquiredArtifact{
 		Owner:         entry.key.owner,
 		Handle:        entry.handle,
-		Metadata:      entry.metadata,
+		Metadata:      entry.metadata.Clone(),
 		LocalBytes:    entry.localBytes,
 		AcquiredAt:    entry.acquisitionTime,
 		LastUsedAt:    entry.lastUsedAt,

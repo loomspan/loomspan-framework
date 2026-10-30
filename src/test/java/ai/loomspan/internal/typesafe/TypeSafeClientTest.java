@@ -305,9 +305,9 @@ class TypeSafeClientTest {
             server.enqueue(new MockResponse().setBody("released"));
             var session =
                     ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                            "cancel-native", "judge", 8);
+                            "cancel-native", "default-judge", 8);
             var mission =
-                    new ai.loomspan.internal.core.MissionContext(session, "judge", "native", null);
+                    new ai.loomspan.internal.core.MissionContext(session, "default-judge", "native", null);
             var binding =
                     ai.loomspan.testkit.TestSkillGenerations.binding(
                             session,

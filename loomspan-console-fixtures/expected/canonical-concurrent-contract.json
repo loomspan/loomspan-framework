@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-canonical-concurrent-contract",
   "sessionId" : "session-canonical-concurrent-contract",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-canonical-concurrent-contract",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-canonical-concurrent-contract"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {
@@ -45,7 +51,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "test.entry"
+    "route" : "default-test_entry"
   }, {
     "frameId" : "concurrent-planning",
     "parentFrameId" : "concurrent-root",
@@ -67,7 +73,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "test.entry#planning"
+    "route" : "default-test_entry#planning"
   }, {
     "frameId" : "step-d",
     "parentFrameId" : "concurrent-root",
@@ -89,7 +95,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "worker.d"
+    "route" : "default-worker_d"
   }, {
     "frameId" : "step-e",
     "parentFrameId" : "concurrent-root",
@@ -111,7 +117,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "worker.e"
+    "route" : "default-worker_e"
   }, {
     "frameId" : "step-f",
     "parentFrameId" : "concurrent-root",
@@ -133,7 +139,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "worker.f"
+    "route" : "default-worker_f"
   }, {
     "frameId" : "nested-planning-f",
     "parentFrameId" : "step-f",
@@ -155,7 +161,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "worker.f#planning"
+    "route" : "default-worker_f#planning"
   }, {
     "frameId" : "step-b",
     "parentFrameId" : "concurrent-root",
@@ -177,7 +183,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "worker.b"
+    "route" : "default-worker_b"
   }, {
     "frameId" : "nested-planning-b",
     "parentFrameId" : "step-b",
@@ -199,7 +205,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "worker.b#planning"
+    "route" : "default-worker_b#planning"
   }, {
     "frameId" : "step-a",
     "parentFrameId" : "concurrent-root",
@@ -221,7 +227,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "worker.a"
+    "route" : "default-worker_a"
   }, {
     "frameId" : "model-a",
     "parentFrameId" : "step-a",
@@ -243,7 +249,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "worker.a#model"
+    "route" : "default-worker_a#model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,
@@ -436,7 +442,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "test.entry"
+        "route" : "default-test_entry"
       } ]
     } ]
   }, {
@@ -450,7 +456,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "test.entry"
+        "route" : "default-test_entry"
       } ]
     } ]
   }, {
@@ -464,15 +470,15 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "test.entry"
+        "route" : "default-test_entry"
       }, {
         "frameId" : "step-f",
         "frameType" : "STEP_EXECUTION",
-        "route" : "worker.f"
+        "route" : "default-worker_f"
       }, {
         "frameId" : "nested-planning-f",
         "frameType" : "PLANNING",
-        "route" : "worker.f#planning"
+        "route" : "default-worker_f#planning"
       } ]
     } ]
   }, {
@@ -486,7 +492,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "test.entry"
+        "route" : "default-test_entry"
       } ]
     } ]
   }, {
@@ -500,7 +506,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "test.entry"
+        "route" : "default-test_entry"
       } ]
     } ]
   }, {
@@ -514,15 +520,15 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "test.entry"
+        "route" : "default-test_entry"
       }, {
         "frameId" : "step-b",
         "frameType" : "STEP_EXECUTION",
-        "route" : "worker.b"
+        "route" : "default-worker_b"
       }, {
         "frameId" : "nested-planning-b",
         "frameType" : "PLANNING",
-        "route" : "worker.b#planning"
+        "route" : "default-worker_b#planning"
       } ]
     }, {
       "planId" : "concurrent-plan",
@@ -533,15 +539,15 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "test.entry"
+        "route" : "default-test_entry"
       }, {
         "frameId" : "step-a",
         "frameType" : "STEP_EXECUTION",
-        "route" : "worker.a"
+        "route" : "default-worker_a"
       }, {
         "frameId" : "model-a",
         "frameType" : "MODEL_CALL",
-        "route" : "worker.a#model"
+        "route" : "default-worker_a#model"
       } ]
     } ]
   }, {
@@ -555,15 +561,15 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "test.entry"
+        "route" : "default-test_entry"
       }, {
         "frameId" : "step-a",
         "frameType" : "STEP_EXECUTION",
-        "route" : "worker.a"
+        "route" : "default-worker_a"
       }, {
         "frameId" : "model-a",
         "frameType" : "MODEL_CALL",
-        "route" : "worker.a#model"
+        "route" : "default-worker_a#model"
       } ]
     } ]
   }, {
@@ -577,7 +583,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "test.entry"
+        "route" : "default-test_entry"
       } ]
     } ]
   }, {
@@ -591,7 +597,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "test.entry"
+        "route" : "default-test_entry"
       } ]
     } ]
   }, {

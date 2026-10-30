@@ -24,6 +24,8 @@ final class ExecutionProjectionState
     Instant startedAt;
     final String entrySkill;
     String generationId;
+    String entryNamespace;
+    Map<String, String> namespaceGenerationIds;
     String phase = "STARTING";
     String summary = "Execution started";
     SessionUsageSnapshot usage = SessionUsageSnapshot.empty();

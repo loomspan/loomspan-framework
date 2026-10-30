@@ -25,9 +25,9 @@ class NdjsonExecutionTraceReaderTest {
 
     @Test
     void reconstructsChunkedPayloadsByPayloadId() throws Exception {
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle(
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                 "chunked-session",
-                "test.entry",
+                "default-test_entry",
                 TracePersistencePolicy.ALWAYS,
                 Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC));
 
@@ -60,7 +60,7 @@ class NdjsonExecutionTraceReaderTest {
                     "frame-1",
                     null,
                     null,
-                    "rootVisibleSkill",
+                    "default-rootVisibleSkill",
                     "main",
                     java.util.Map.of(
                             "payloadId", "payload-1",
@@ -77,7 +77,7 @@ class NdjsonExecutionTraceReaderTest {
                     "frame-1",
                     null,
                     null,
-                    "rootVisibleSkill",
+                    "default-rootVisibleSkill",
                     "main",
                     java.util.Map.of("payloadId", "payload-1", "chunkIndex", 2, "chunkCount", 3, "contentType", "text/plain"),
                     OBJECT_MAPPER.getNodeFactory().textNode("gamma"));
@@ -90,7 +90,7 @@ class NdjsonExecutionTraceReaderTest {
                     "frame-1",
                     null,
                     null,
-                    "rootVisibleSkill",
+                    "default-rootVisibleSkill",
                     "main",
                     java.util.Map.of("payloadId", "payload-1", "chunkIndex", 0, "chunkCount", 3, "contentType", "text/plain"),
                     OBJECT_MAPPER.getNodeFactory().textNode("alpha"));
@@ -103,7 +103,7 @@ class NdjsonExecutionTraceReaderTest {
                     "frame-1",
                     null,
                     null,
-                    "rootVisibleSkill",
+                    "default-rootVisibleSkill",
                     "main",
                     java.util.Map.of("payloadId", "payload-1", "chunkIndex", 1, "chunkCount", 3, "contentType", "text/plain"),
                     OBJECT_MAPPER.getNodeFactory().textNode("beta"));
@@ -142,7 +142,7 @@ class NdjsonExecutionTraceReaderTest {
                     "frame-1",
                     null,
                     null,
-                    "rootVisibleSkill",
+                    "default-rootVisibleSkill",
                     "main",
                     java.util.Map.of(
                             "payloadId", "payload-1",
@@ -178,7 +178,7 @@ class NdjsonExecutionTraceReaderTest {
                     "frame-1",
                     null,
                     null,
-                    "rootVisibleSkill",
+                    "default-rootVisibleSkill",
                     "main",
                     java.util.Map.of(),
                     OBJECT_MAPPER.getNodeFactory().textNode("ok"));
@@ -213,7 +213,7 @@ class NdjsonExecutionTraceReaderTest {
                         "frame-" + index,
                         null,
                         null,
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         "main",
                         java.util.Map.of("index", index),
                         OBJECT_MAPPER.getNodeFactory().textNode("payload-" + index));

@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-repeated-search-content",
   "sessionId" : "session-repeated-search-content",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-repeated-search-content",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-repeated-search-content"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {

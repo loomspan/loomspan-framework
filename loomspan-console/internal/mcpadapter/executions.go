@@ -3,6 +3,7 @@ package mcpadapter
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
@@ -155,6 +156,16 @@ func appendExecutionText(writer *lineWriter, prefix string, execution executionD
 	writer.integer(prefix+"elapsedMillis", execution.ElapsedMillis)
 	writer.quoted(prefix+"entrySkill", execution.EntrySkill)
 	writer.quoted(prefix+"generationId", execution.GenerationID)
+	writer.quoted(prefix+"entryNamespace", execution.EntryNamespace)
+	namespaces := make([]string, 0, len(execution.NamespaceGenerationIDs))
+	for namespace := range execution.NamespaceGenerationIDs {
+		namespaces = append(namespaces, namespace)
+	}
+	sort.Strings(namespaces)
+	for _, namespace := range namespaces {
+		writer.quoted(prefix+"namespaceGenerationIds."+namespace, execution.NamespaceGenerationIDs[namespace])
+	}
+
 	writer.quoted(prefix+"status", execution.Status)
 	writer.quoted(prefix+"phase", execution.Phase)
 	writer.integer(prefix+"activeBranches.count", int64(len(execution.ActiveBranches)))

@@ -65,7 +65,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                         .isNotNull()
                         .hasMessageContaining("field 'output_schema.properties.likelyCause.evidence'")
                         .hasMessageContaining("column 1")
-                        .hasMessageContaining("skill 'checkDns' is not a direct allowed child"));
+                        .hasMessageContaining("skill 'default-checkDns' is not a direct allowed child"));
     }
 
     @Test
@@ -87,7 +87,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/evidence-contract-ambiguous-case-child-skill.yaml")
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
-                        .hasMessageContaining("skill 'INVOICEPARSER' is not a direct allowed child")
+                        .hasMessageContaining("skill 'default-INVOICEPARSER' is not a direct allowed child")
                         .hasMessageNotContaining("did you mean"));
     }
 
@@ -110,7 +110,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("field 'output_schema.properties.vendorName.evidence'")
-                        .hasMessageContaining("column 18")
+                        .hasMessageContaining("column 26")
                         .hasMessageContaining("expected a skill name or '('"));
     }
 
@@ -122,7 +122,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("field 'output_schema.properties.vendorName.evidence'")
-                        .hasMessageContaining("column 15")
+                        .hasMessageContaining("column 23")
                         .hasMessageContaining("expected 'and', 'or', or end of expression"));
     }
 
@@ -134,10 +134,10 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context.getBean(YamlSkillCatalog.class)
-                            .getSkill("evidenceOperatorSubstringSkill")
+                            .getSkill("default-evidenceOperatorSubstringSkill")
                             .evidenceContract()
                             .canonicalExpressionForClaim("result"))
-                            .isEqualTo("androidCheck and (orderLookup or candyParser)");
+                            .isEqualTo("default-androidCheck and (default-orderLookup or default-candyParser)");
                 });
     }
 }

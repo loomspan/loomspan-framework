@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-recovered-provider-attempt-diagnostic",
   "sessionId" : "session-recovered-provider-attempt-diagnostic",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-recovered-provider-attempt-diagnostic",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-recovered-provider-attempt-diagnostic"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {
@@ -86,7 +92,7 @@
       "completionUnits" : 2,
       "totalUnits" : 6
     },
-    "route" : "recoverProviderCall"
+    "route" : "default-recoverProviderCall"
   }, {
     "frameId" : "model",
     "parentFrameId" : "root",
@@ -108,7 +114,7 @@
       "completionUnits" : 2,
       "totalUnits" : 6
     },
-    "route" : "recoverProviderCall#model"
+    "route" : "default-recoverProviderCall#model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

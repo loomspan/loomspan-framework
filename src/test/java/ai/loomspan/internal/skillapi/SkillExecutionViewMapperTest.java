@@ -60,7 +60,7 @@ class SkillExecutionViewMapperTest
     @Test
     void refusesToMapSessionWithoutRetainedFinalizedHistory()
     {
-        LoomspanSession session = new LoomspanSession(3, "entry");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(3, "entry");
 
         assertThatThrownBy(() -> mapper.map(session))
                 .isInstanceOf(IllegalStateException.class)

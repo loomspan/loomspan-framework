@@ -89,8 +89,12 @@ export function CurrentExecutionSummary({
               <dd>{execution.entrySkill}</dd>
             </div>
             <div className="summary-fact identifier">
-              <dt>Generation</dt>
+              <dt>Entry generation</dt>
               <dd>{execution.generationId}</dd>
+            </div>
+            <div className="summary-fact identifier">
+              <dt>Captured generations</dt>
+              <dd>{Object.entries(execution.namespaceGenerationIds).map(([namespace, generation]) => `${namespace}: ${generation}`).join(", ")}</dd>
             </div>
             <div className="summary-fact">
               <dt>Phase</dt>

@@ -40,9 +40,9 @@ class ExecutionCoordinatorMissionContextIntegrationTest
     {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         YamlSkillCatalog catalog = mock(YamlSkillCatalog.class);
-        when(catalog.getSkill("rootSkill")).thenReturn(definition("rootSkill"));
+        when(catalog.getSkill("default-rootSkill")).thenReturn(definition("default-rootSkill"));
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
-        registry.register("rootSkill", capability("rootSkill"));
+        registry.register("default-rootSkill", capability("default-rootSkill"));
         MissionExecutionEngine engine = (session, definition, objective, missionInput, model, tools, planning, authentication) ->
                 "complete";
         ExecutionCoordinator coordinator = new ExecutionCoordinator(
@@ -57,14 +57,14 @@ class ExecutionCoordinatorMissionContextIntegrationTest
                 (value, session) -> value,
                 new ai.loomspan.internal.security.ScopedAuthentication(null),
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-        LoomspanSession session = TestLoomspanSessions.withId("retained-reset", "rootSkill", 3);
+        LoomspanSession session = TestLoomspanSessions.withId("retained-reset", "default-rootSkill", 3);
         session.replaceRetainedRootState(
-                plan("stale-plan", "rootSkill"),
-                linter("rootSkill", LinterOutcomeStatus.RETRYING),
-                output("rootSkill"));
+                plan("stale-plan", "default-rootSkill"),
+                linter("default-rootSkill", LinterOutcomeStatus.RETRYING),
+                output("default-rootSkill"));
 
         assertThat(TestExecutionBindings.callWithGeneration(session, registry.generation(catalog),
-                () -> coordinator.execute("rootSkill", "objective", session, null))).isEqualTo("complete");
+                () -> coordinator.execute("default-rootSkill", "objective", session, null))).isEqualTo("complete");
 
         assertThat(session.getExecutionPlanSnapshot()).isNull();
         assertThat(session.getLastLinterOutcome()).isEmpty();
@@ -77,7 +77,7 @@ class ExecutionCoordinatorMissionContextIntegrationTest
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         YamlSkillCatalog catalog = mock(YamlSkillCatalog.class);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
-        for (String name : List.of("rootSkill", "childSkill", "grandchildSkill"))
+        for (String name : List.of("default-rootSkill", "default-childSkill", "default-grandchildSkill"))
         {
             when(catalog.getSkill(name)).thenReturn(definition(name));
             registry.register(name, capability(name));
@@ -86,47 +86,47 @@ class ExecutionCoordinatorMissionContextIntegrationTest
         AtomicReference<ExecutionCoordinator> coordinatorRef = new AtomicReference<>();
         AtomicReference<MissionContext> rootRef = new AtomicReference<>();
         AtomicReference<MissionContext> childRef = new AtomicReference<>();
-        ExecutionPlan rootPlan = plan("root-plan", "rootSkill");
-        ExecutionPlan childPlan = plan("child-plan", "childSkill");
-        LinterOutcome grandchildLinter = linter("grandchildSkill", LinterOutcomeStatus.RETRYING);
-        LinterOutcome laterRootLinter = linter("rootSkill", LinterOutcomeStatus.PASSED);
-        OutputSchemaOutcome childOutput = output("childSkill");
+        ExecutionPlan rootPlan = plan("root-plan", "default-rootSkill");
+        ExecutionPlan childPlan = plan("child-plan", "default-childSkill");
+        LinterOutcome grandchildLinter = linter("default-grandchildSkill", LinterOutcomeStatus.RETRYING);
+        LinterOutcome laterRootLinter = linter("default-rootSkill", LinterOutcomeStatus.PASSED);
+        OutputSchemaOutcome childOutput = output("default-childSkill");
 
         MissionExecutionEngine engine = (session, definition, objective, missionInput, model, tools, planning, authentication) ->
         {
             MissionContext current = ExecutionBindingScope.requireCurrent().requireMission();
-            return switch (definition.manifest().getName())
+            return switch (definition.identity().toString())
             {
-                case "rootSkill" ->
+                case "default-rootSkill" ->
                 {
                     rootRef.set(current);
                     stateService.storePlan(rootPlan);
-                    stateService.recordSuccessfulSkill("rootEvidence", null, true);
+                    stateService.recordSuccessfulSkill("default-rootEvidence", null, true);
                     assertThatThrownBy(() -> coordinatorRef.get().execute(
-                            "childSkill", "child objective", session, authentication))
+                            "default-childSkill", "child objective", session, authentication))
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessageContaining("grandchild failed");
                     assertThat(ExecutionBindingScope.requireCurrent().requireMission()).isSameAs(current);
                     assertThat(current.currentPlan()).containsSame(rootPlan);
-                    assertThat(current.successfulDirectSkills()).containsExactly("rootEvidence");
+                    assertThat(current.successfulDirectSkills()).containsExactly("default-rootEvidence");
                     assertThat(current.lastLinterOutcome()).containsSame(grandchildLinter);
                     assertThat(current.lastOutputSchemaOutcome()).containsSame(childOutput);
                     stateService.recordLinterOutcome(session, laterRootLinter);
                     yield "root complete";
                 }
-                case "childSkill" ->
+                case "default-childSkill" ->
                 {
                     childRef.set(current);
                     assertThat(current.parent()).containsSame(rootRef.get());
                     assertThat(current.currentPlan()).isEmpty();
                     assertThat(current.successfulDirectSkills()).isEmpty();
                     stateService.storePlan(childPlan);
-                    stateService.recordSuccessfulSkill("childEvidence", null, true);
+                    stateService.recordSuccessfulSkill("default-childEvidence", null, true);
                     stateService.recordOutputSchemaOutcome(session, childOutput);
-                    coordinatorRef.get().execute("grandchildSkill", "grandchild objective", session, authentication);
+                    coordinatorRef.get().execute("default-grandchildSkill", "grandchild objective", session, authentication);
                     throw new AssertionError("grandchild failure should propagate");
                 }
-                case "grandchildSkill" ->
+                case "default-grandchildSkill" ->
                 {
                     assertThat(current.parent()).containsSame(childRef.get());
                     assertThat(current.currentPlan()).isEmpty();
@@ -151,10 +151,10 @@ class ExecutionCoordinatorMissionContextIntegrationTest
                 new ai.loomspan.internal.security.ScopedAuthentication(null),
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
         coordinatorRef.set(coordinator);
-        LoomspanSession session = TestLoomspanSessions.withId("three-level", "rootSkill", 5);
+        LoomspanSession session = TestLoomspanSessions.withId("three-level", "default-rootSkill", 5);
 
         assertThat(TestExecutionBindings.callWithGeneration(session, registry.generation(catalog),
-                () -> coordinator.execute("rootSkill", "root objective", session, null))).isEqualTo("root complete");
+                () -> coordinator.execute("default-rootSkill", "root objective", session, null))).isEqualTo("root complete");
         assertThat(ExecutionBindingScope.current()).isEmpty();
         assertThat(session.getExecutionPlanSnapshot()).isSameAs(rootPlan);
         assertThat(session.getLastLinterOutcome()).containsSame(laterRootLinter);
@@ -165,9 +165,16 @@ class ExecutionCoordinatorMissionContextIntegrationTest
     private static YamlSkillDefinition definition(String name)
     {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName(name);
+        manifest.setName(ai.loomspan.internal.core.SkillIdentity.parse(name).localName());
         manifest.setDescription(name);
         manifest.setModel("gpt-5");
+        String child = switch (name) {
+            case "default-rootSkill" -> "default-childSkill";
+            case "default-childSkill" -> "default-grandchildSkill";
+            default -> null;
+        };
+        if (child != null) manifest.setAllowedSkills(List.of(
+                new YamlSkillManifest.AllowedSkillManifest(child, null, null, null)));
         return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, CONFIG);
     }
 

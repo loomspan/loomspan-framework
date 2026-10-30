@@ -111,7 +111,7 @@ func TestEveryInstalledToolRepresentativeOutputsValidateAgainstBothSchemas(t *te
 			validateTypedEnvelope(t, "executions-list", executionListOutputSchema(), executionListResult{ObservedAt: now, Items: []executionListItemDTO{}})
 		}},
 		{"execution-detail", func(t *testing.T) {
-			validateTypedEnvelope(t, "execution-detail", executionDetailOutputSchema(), executionDetailResult{ObservedAt: now, Execution: executionDetailDTO{SessionID: "session", TraceID: "trace", Status: "RUNNING", Phase: "STEP", ActiveBranches: []activeBranchDTO{}}})
+			validateTypedEnvelope(t, "execution-detail", executionDetailOutputSchema(), executionDetailResult{ObservedAt: now, Execution: executionDetailDTO{EntrySkill: "orders-search", GenerationID: "entry-id", EntryNamespace: "orders", NamespaceGenerationIDs: map[string]string{"orders": "entry-id", "tax": "target-id"}, SessionID: "session", TraceID: "trace", Status: "RUNNING", Phase: "STEP", ActiveBranches: []activeBranchDTO{}}})
 		}},
 		{"activity", func(t *testing.T) {
 			validateTypedEnvelope(t, "activity", activityOutputSchema(), activityResult{ObservedAt: now, Items: []activityDTO{}})
@@ -121,7 +121,7 @@ func TestEveryInstalledToolRepresentativeOutputsValidateAgainstBothSchemas(t *te
 		}},
 		{"trace-summary", func(t *testing.T) {
 			terminalFailureID := "failure-terminal"
-			validateTypedEnvelope(t, "trace-summary", traceSummaryOutputSchema(), getTraceResult{Evidence: evidence, Summary: traceSummaryDTO{Outcome: "FAILED", TerminalFailureID: &terminalFailureID, RecordCountsByType: map[string]int64{}, RootFrameIDs: []string{"root"}, UsageComplete: true}})
+			validateTypedEnvelope(t, "trace-summary", traceSummaryOutputSchema(), getTraceResult{Evidence: evidence, Summary: traceSummaryDTO{EntrySkill: "orders-search", GenerationID: "entry-id", EntryNamespace: "orders", NamespaceGenerationIDs: map[string]string{"orders": "entry-id", "tax": "target-id"}, Outcome: "FAILED", TerminalFailureID: &terminalFailureID, RecordCountsByType: map[string]int64{}, RootFrameIDs: []string{"root"}, UsageComplete: true}})
 		}},
 		{"frames", func(t *testing.T) {
 			validateTypedEnvelope(t, "frames", frameQueryOutputSchema(), queryFramesResult{Evidence: evidence, Projection: "COMPACT", Items: []frameDTO{}})

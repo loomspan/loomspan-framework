@@ -3,6 +3,7 @@ package browserapi
 import (
 	"encoding/base64"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -66,7 +67,7 @@ func (router *Router) traceAnalysisSummary(w http.ResponseWriter, r *http.Reques
 		writeEvidenceDomainError(w, s, d)
 		return
 	}
-	router.writeEvidenceJSON(w, s, summaryDTO{Source: s.Source, TargetScopeID: string(s.TargetScope), TraceID: v.Context.TraceID, SessionID: v.Context.SessionID, Outcome: v.Outcome, TerminalFailureID: v.TerminalFailureID, ConfiguredLimits: configuredLimitsDTOValue(v.ConfiguredLimits), RecordCount: v.RecordCount, FrameCount: v.FrameCount, PlanCount: v.PlanCount, AttemptCount: v.AttemptCount, RetryCount: v.RetryCount, ValidationCount: v.ValidationCount, FailureCount: v.FailureCount, PayloadCount: v.PayloadCount, GapCount: v.GapCount, UncertaintyCount: v.UncertaintyCount, RootFrameIDs: append([]string{}, v.RootFrameIDs...), AttributedUsage: usageDTOValue(v.AttributedUsage), TerminalUsage: usageDTOValue(v.TerminalUsage), UnattributedUsage: usageDTOValue(v.UnattributedUsage), UnframedAttributedUsage: usageDTOValue(v.UnframedAttributed), UsageComplete: v.UsageComplete})
+	router.writeEvidenceJSON(w, s, summaryDTO{EntrySkill: v.EntrySkill, GenerationID: v.GenerationID, EntryNamespace: v.EntryNamespace, NamespaceGenerationIDs: maps.Clone(v.NamespaceGenerationIDs), Source: s.Source, TargetScopeID: string(s.TargetScope), TraceID: v.Context.TraceID, SessionID: v.Context.SessionID, Outcome: v.Outcome, TerminalFailureID: v.TerminalFailureID, ConfiguredLimits: configuredLimitsDTOValue(v.ConfiguredLimits), RecordCount: v.RecordCount, FrameCount: v.FrameCount, PlanCount: v.PlanCount, AttemptCount: v.AttemptCount, RetryCount: v.RetryCount, ValidationCount: v.ValidationCount, FailureCount: v.FailureCount, PayloadCount: v.PayloadCount, GapCount: v.GapCount, UncertaintyCount: v.UncertaintyCount, RootFrameIDs: append([]string{}, v.RootFrameIDs...), AttributedUsage: usageDTOValue(v.AttributedUsage), TerminalUsage: usageDTOValue(v.TerminalUsage), UnattributedUsage: usageDTOValue(v.UnattributedUsage), UnframedAttributedUsage: usageDTOValue(v.UnframedAttributed), UsageComplete: v.UsageComplete})
 }
 
 func (router *Router) traceAnalysisPlans(w http.ResponseWriter, r *http.Request, _ string) {
@@ -442,6 +443,11 @@ func (router *Router) traceAnalysisRange(w http.ResponseWriter, r *http.Request,
 }
 
 type summaryDTO struct {
+	EntrySkill             string            `json:"entrySkill"`
+	GenerationID           string            `json:"generationId"`
+	EntryNamespace         string            `json:"entryNamespace"`
+	NamespaceGenerationIDs map[string]string `json:"namespaceGenerationIds"`
+
 	Source                  evidence.Source      `json:"source"`
 	TargetScopeID           string               `json:"targetScopeId,omitempty"`
 	TraceID                 string               `json:"traceId"`
@@ -521,24 +527,26 @@ func (value frameDTO) MarshalJSON() ([]byte, error) {
 }
 
 type recordDTO struct {
-	ResultForwarding *traceanalysis.ResultForwarding `json:"resultForwarding,omitempty"`
-	ResultAssembly   *traceanalysis.ResultAssembly   `json:"resultAssembly,omitempty"`
-	PlanUpdate       *planUpdateDTO                  `json:"planUpdate,omitempty"`
-	Sequence         int64                           `json:"sequence"`
-	Type             string                          `json:"type"`
-	FailureID        string                          `json:"failureId,omitempty"`
-	ValidationStatus string                          `json:"validationStatus,omitempty"`
-	FrameID          string                          `json:"frameId"`
-	ParentFrameID    string                          `json:"parentFrameId"`
-	FrameType        string                          `json:"frameType"`
-	Route            string                          `json:"route"`
-	ThreadName       string                          `json:"threadName"`
-	TimestampMillis  int64                           `json:"timestampMillis"`
-	Representation   string                          `json:"representation"`
-	IsChunk          bool                            `json:"isChunk"`
-	IsEnvelope       bool                            `json:"isEnvelope"`
-	Content          *contentDescriptorDTO           `json:"content,omitempty"`
-	Plan             *planReferenceDTO               `json:"plan,omitempty"`
+	ExecutingNamespace    string                          `json:"executingNamespace,omitempty"`
+	ExecutingGenerationID string                          `json:"executingGenerationId,omitempty"`
+	ResultForwarding      *traceanalysis.ResultForwarding `json:"resultForwarding,omitempty"`
+	ResultAssembly        *traceanalysis.ResultAssembly   `json:"resultAssembly,omitempty"`
+	PlanUpdate            *planUpdateDTO                  `json:"planUpdate,omitempty"`
+	Sequence              int64                           `json:"sequence"`
+	Type                  string                          `json:"type"`
+	FailureID             string                          `json:"failureId,omitempty"`
+	ValidationStatus      string                          `json:"validationStatus,omitempty"`
+	FrameID               string                          `json:"frameId"`
+	ParentFrameID         string                          `json:"parentFrameId"`
+	FrameType             string                          `json:"frameType"`
+	Route                 string                          `json:"route"`
+	ThreadName            string                          `json:"threadName"`
+	TimestampMillis       int64                           `json:"timestampMillis"`
+	Representation        string                          `json:"representation"`
+	IsChunk               bool                            `json:"isChunk"`
+	IsEnvelope            bool                            `json:"isEnvelope"`
+	Content               *contentDescriptorDTO           `json:"content,omitempty"`
+	Plan                  *planReferenceDTO               `json:"plan,omitempty"`
 }
 type contentDescriptorDTO struct {
 	Role              string `json:"role"`
@@ -784,6 +792,8 @@ func recordDTOValue(x traceanalysis.RecordSummary) recordDTO {
 		}
 		item.Content = &contentDescriptorDTO{Role: string(x.Content.Role), ContentType: x.Content.ContentType, Encoding: string(x.Content.Encoding), RetainedBytes: x.Content.RetainedBytes, Available: x.Content.Available, Complete: x.Content.Complete, InlineEligibility: x.Content.InlineEligibility, InlineOmission: string(x.Content.InlineOmission), ContentRef: x.Content.ContentRef, InlineContent: inline}
 	}
+	item.ExecutingNamespace = x.ExecutingNamespace
+	item.ExecutingGenerationID = x.ExecutingGenerationID
 	item.ResultForwarding = x.Facts.ResultForwarding
 	item.ResultAssembly = x.Facts.ResultAssembly
 	if x.Facts.Plan != nil {

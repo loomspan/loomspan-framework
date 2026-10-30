@@ -77,7 +77,7 @@ class ScheduledCompletionGraceRetentionTest
         Instant finalizedAt = clock.instant();
         var retained = retention.retainOrDelete(file, finalizedAt, "trace", "session").orElseThrow();
         FinalizedTraceArtifact artifact = new FinalizedTraceArtifact(
-                "trace", "session", "test.entry", "generation-test", TraceOutcome.SUCCEEDED, finalizedAt, file,
+                "trace", "session", "default-test_entry", "generation-test", "default", java.util.Map.of("default", "generation-test"), TraceOutcome.SUCCEEDED, finalizedAt, file,
                 retained.sizeBytes(), TracePersistencePolicy.NEVER, retained.expiresAt());
         CompletionGraceRetention.ArtifactLease lease = retention.acquire(artifact).orElseThrow();
         var task = org.mockito.ArgumentCaptor.forClass(Runnable.class);
@@ -104,7 +104,7 @@ class ScheduledCompletionGraceRetentionTest
                      new ScheduledCompletionGraceRetention(Duration.ofMinutes(1)))
         {
             FinalizedTraceArtifact artifact = new FinalizedTraceArtifact(
-                    "always", "session", "test.entry", "generation-test", TraceOutcome.SUCCEEDED, Instant.now(), file,
+                    "always", "session", "default-test_entry", "generation-test", "default", java.util.Map.of("default", "generation-test"), TraceOutcome.SUCCEEDED, Instant.now(), file,
                     Files.size(file), TracePersistencePolicy.ALWAYS, null);
             try (CompletionGraceRetention.ArtifactLease lease = retention.acquire(artifact).orElseThrow())
             {

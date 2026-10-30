@@ -25,6 +25,11 @@ type TraceContext struct {
 // counts, gaps, and uncertainties. Optional/unknown calculations are
 // represented explicitly; zero is a recorded value, not an absence marker.
 type TraceSummary struct {
+	EntrySkill             string
+	GenerationID           string
+	EntryNamespace         string
+	NamespaceGenerationIDs map[string]string
+
 	Context            TraceContext
 	Outcome            string
 	TerminalFailureID  *string
@@ -99,17 +104,19 @@ type FrameSummary struct {
 // and an optional inline payload. Representation reports whether the record is
 // the logical envelope (chunked payload root) or a physical framework record.
 type RecordSummary struct {
-	Context          TraceContext
-	Sequence         int64
-	Type             string
-	FailureID        string
-	ValidationStatus string
-	FrameID          string
-	ParentFrameID    string
-	FrameType        string
-	Route            string
-	ThreadName       string
-	TimestampMillis  int64
+	ExecutingNamespace    string
+	ExecutingGenerationID string
+	Context               TraceContext
+	Sequence              int64
+	Type                  string
+	FailureID             string
+	ValidationStatus      string
+	FrameID               string
+	ParentFrameID         string
+	FrameType             string
+	Route                 string
+	ThreadName            string
+	TimestampMillis       int64
 	// Representation is "logical" for chunked-payload envelopes and "physical"
 	// for framework records (including individual chunk records).
 	Representation string

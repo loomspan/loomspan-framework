@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-current-plan-semantic-evidence",
   "sessionId" : "session-current-plan-semantic-evidence",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-current-plan-semantic-evidence",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-current-plan-semantic-evidence"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {
@@ -108,7 +114,7 @@
       "completionUnits" : 3,
       "totalUnits" : 9
     },
-    "route" : "shared.skill"
+    "route" : "default-shared_skill"
   }, {
     "frameId" : "planning-primary",
     "parentFrameId" : "mission-root",
@@ -130,7 +136,7 @@
       "completionUnits" : 2,
       "totalUnits" : 6
     },
-    "route" : "shared.skill"
+    "route" : "default-shared_skill"
   }, {
     "frameId" : "nested-skill",
     "parentFrameId" : "mission-root",
@@ -152,7 +158,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "shared.skill"
+    "route" : "default-shared_skill"
   }, {
     "frameId" : "nested-mission",
     "parentFrameId" : "nested-skill",
@@ -174,7 +180,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "shared.skill"
+    "route" : "default-shared_skill"
   }, {
     "frameId" : "planning-nested",
     "parentFrameId" : "nested-mission",
@@ -196,7 +202,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "shared.skill"
+    "route" : "default-shared_skill"
   }, {
     "frameId" : "tool-current",
     "parentFrameId" : "mission-root",
@@ -218,7 +224,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "lookupIncident"
+    "route" : "default-lookupIncident"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

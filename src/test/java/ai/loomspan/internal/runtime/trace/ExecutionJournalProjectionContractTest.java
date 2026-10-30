@@ -35,11 +35,11 @@ class ExecutionJournalProjectionContractTest {
     void projectsCanonicalDeveloperFacingJournalFromRepresentativeTraceStream() {
         ExecutionPlan plan = new ExecutionPlan(
                 "plan-1",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-24T12:00:00Z"),
                 List.of(new PlanTask("task-1", "Deploy", PlanTaskStatus.PENDING, null)));
         LinterOutcome linterOutcome = new LinterOutcome(
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "regex",
                 2,
                 1,
@@ -47,7 +47,7 @@ class ExecutionJournalProjectionContractTest {
                 LinterOutcomeStatus.PASSED,
                 "Return fenced YAML only.");
         OutputSchemaOutcome outputSchemaOutcome = new OutputSchemaOutcome(
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 OutputSchemaFailureMode.INVALID_JSON,
                 2,
                 1,
@@ -63,7 +63,7 @@ class ExecutionJournalProjectionContractTest {
                         1,
                         TraceRecordType.PLAN_CREATED,
                         "mission-frame",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Map.of(
                                 "planId", "plan-1",
                                 "attemptId", "attempt-accepted",
@@ -90,21 +90,21 @@ class ExecutionJournalProjectionContractTest {
                         4,
                         TraceRecordType.LINTER_RECORDED,
                         "mission-frame",
-                        "rootVisibleSkill",
-                        Map.of("skillName", "rootVisibleSkill", "status", "PASSED"),
+                        "default-rootVisibleSkill",
+                        Map.of("skillName", "default-rootVisibleSkill", "status", "PASSED"),
                         linterOutcome),
                 record(
                         5,
                         TraceRecordType.STRUCTURED_OUTPUT_RECORDED,
                         "mission-frame",
-                        "rootVisibleSkill",
-                        Map.of("skillName", "rootVisibleSkill", "status", "EXHAUSTED"),
+                        "default-rootVisibleSkill",
+                        Map.of("skillName", "default-rootVisibleSkill", "status", "EXHAUSTED"),
                         outputSchemaOutcome),
                 record(
                         6,
                         TraceRecordType.ERROR_RECORDED,
                         "mission-frame",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Map.of("exceptionType", "java.lang.IllegalStateException"),
                         Map.of("message", "boom", "apiKey", "top-secret")))).getEntriesSnapshot();
 
@@ -119,7 +119,7 @@ class ExecutionJournalProjectionContractTest {
         assertThat(entries).extracting(JournalEntry::frameId)
                 .containsExactly("mission-frame", "tool-frame", "tool-frame", "mission-frame", "mission-frame", "mission-frame");
         assertThat(entries).extracting(JournalEntry::route)
-                .containsExactly("rootVisibleSkill", "deploy.service", "deploy.service", "rootVisibleSkill", "rootVisibleSkill", "rootVisibleSkill");
+                .containsExactly("default-rootVisibleSkill", "deploy.service", "deploy.service", "default-rootVisibleSkill", "default-rootVisibleSkill", "default-rootVisibleSkill");
         assertThat(entries.get(1).payload().get("details").get("arguments").get("token").textValue()).isEqualTo("[redacted]");
         assertThat(entries.get(1).payload().get("details").get("arguments").get("target").textValue()).isEqualTo("service-a");
         assertThat(entries.get(2).payload().get("details").get("result").textValue()).isEqualTo("ok");
@@ -181,10 +181,10 @@ class ExecutionJournalProjectionContractTest {
     void ignoresRawTraceRecordsThatAreNotPartOfTheDeveloperFacingProjection() {
         List<JournalEntry> entries = projector.project(List.of(
                 record(1, TraceRecordType.TRACE_STARTED, null, null, Map.of(), Map.of("sessionId", "session-1")),
-                record(2, TraceRecordType.FRAME_OPENED, "frame-1", "rootVisibleSkill", Map.of(), Map.of("openedAt", "2026-03-24T12:00:00Z")),
-                record(4, TraceRecordType.MODEL_REQUEST_SENT, "frame-1", "rootVisibleSkill", Map.of("segment", "mission"), Map.of("objective", "hello")),
-                record(5, TraceRecordType.MODEL_RESPONSE_RECEIVED, "frame-1", "rootVisibleSkill", Map.of("segment", "mission"), Map.of("content", "done")),
-                record(6, TraceRecordType.FRAME_CLOSED, "frame-1", "rootVisibleSkill", Map.of("status", "completed"), Map.of("closedAt", "2026-03-24T12:00:01Z")),
+                record(2, TraceRecordType.FRAME_OPENED, "frame-1", "default-rootVisibleSkill", Map.of(), Map.of("openedAt", "2026-03-24T12:00:00Z")),
+                record(4, TraceRecordType.MODEL_REQUEST_SENT, "frame-1", "default-rootVisibleSkill", Map.of("segment", "mission"), Map.of("objective", "hello")),
+                record(5, TraceRecordType.MODEL_RESPONSE_RECEIVED, "frame-1", "default-rootVisibleSkill", Map.of("segment", "mission"), Map.of("content", "done")),
+                record(6, TraceRecordType.FRAME_CLOSED, "frame-1", "default-rootVisibleSkill", Map.of("status", "completed"), Map.of("closedAt", "2026-03-24T12:00:01Z")),
                 record(7, TraceRecordType.TRACE_COMPLETED, null, null, Map.of("errored", false), null)
         )).getEntriesSnapshot();
 

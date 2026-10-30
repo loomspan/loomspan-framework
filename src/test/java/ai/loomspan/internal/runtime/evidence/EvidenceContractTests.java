@@ -30,35 +30,35 @@ class EvidenceContractTests {
     @Test
     void preservesDiagnosticClaimExpressionAndSkillOrder() {
         LinkedHashMap<String, String> requiredExpressions = new LinkedHashMap<>();
-        requiredExpressions.put("vendorName", "invoiceParser");
-        requiredExpressions.put("isDuplicate", "invoiceParser and expenseLookup");
+        requiredExpressions.put("vendorName", "default-invoiceParser");
+        requiredExpressions.put("isDuplicate", "default-invoiceParser and default-expenseLookup");
         EvidenceCoverageResult result = new EvidenceCoverageResult(
                 new LinkedHashSet<>(List.of("vendorName", "isDuplicate")),
                 requiredExpressions,
-                new LinkedHashSet<>(List.of("invoiceParser", "expenseLookup")),
+                new LinkedHashSet<>(List.of("default-invoiceParser", "default-expenseLookup")),
                 List.of());
 
         assertThat(result.evaluatedClaims()).containsExactly("vendorName", "isDuplicate");
         assertThat(result.requiredExpressions().keySet()).containsExactly("vendorName", "isDuplicate");
-        assertThat(result.satisfiedSkills()).containsExactly("invoiceParser", "expenseLookup");
+        assertThat(result.satisfiedSkills()).containsExactly("default-invoiceParser", "default-expenseLookup");
     }
 
     @Test
     void normalizesClaimsToolsAndPresentClaimLookups() throws Exception {
         EvidenceContract contract = TestEvidenceContracts.compiled(Map.of(
-                "vendorName", "invoiceParser",
-                "isDuplicate", "invoiceParser and expenseLookup"));
+                "vendorName", "default-invoiceParser",
+                "isDuplicate", "default-invoiceParser and default-expenseLookup"));
         EvidenceBackedOutputValidator validator = new EvidenceBackedOutputValidator();
 
-        assertThat(contract.canonicalExpressionForClaim("VENDORNAME")).isEqualTo("invoiceParser");
-        assertThat(contract.canonicalExpressionForClaim("isDuplicate")).isEqualTo("invoiceParser and expenseLookup");
+        assertThat(contract.canonicalExpressionForClaim("VENDORNAME")).isEqualTo("default-invoiceParser");
+        assertThat(contract.canonicalExpressionForClaim("isDuplicate")).isEqualTo("default-invoiceParser and default-expenseLookup");
 
         EvidenceCoverageResult result = validator.validate(
                 JsonMapper.builder().findAndAddModules().build().readTree("""
                         {"vendorName":"Acme","isDuplicate":false}
                         """),
                 contract,
-                Set.of("invoiceParser"));
+                Set.of("default-invoiceParser"));
         assertThat(result.complete()).isFalse();
         assertThat(result.issues()).singleElement()
                 .extracting(EvidenceCoverageIssue::claimName)
@@ -68,8 +68,8 @@ class EvidenceContractTests {
     @Test
     void evidenceAdvisorPreservesExistingSkillPromptOnRetry() {
         EvidenceContractCallAdvisor advisor = new EvidenceContractCallAdvisor(
-                "evidence.skill",
-                TestEvidenceContracts.compiled(Map.of("vendorName", "invoiceParser")),
+                "default-evidence_skill",
+                TestEvidenceContracts.compiled(Map.of("vendorName", "default-invoiceParser")),
                 new EvidenceBackedOutputValidator(),
                 1,
                 result -> {
@@ -82,7 +82,7 @@ class EvidenceContractTests {
                 "{\"vendorName\":\"Acme\"}",
                 "{}"));
 
-        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        new LoomspanSessionRunner(3).callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() -> {
             ChatClientResponse response = advisor.adviseCall(
                     request("Return JSON", "SKILL_PROMPT_SENTINEL\n\nBase instructions."),

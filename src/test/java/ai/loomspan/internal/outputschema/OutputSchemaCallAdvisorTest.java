@@ -59,7 +59,7 @@ class OutputSchemaCallAdvisorTest {
         assertThat(chain.requests.getFirst().prompt().getSystemMessage().getText())
                 .contains("Return JSON only.")
                 .contains("vendorName")
-                .doesNotContain("invoiceParser")
+                .doesNotContain("default-invoiceParser")
                 .doesNotContain("\"evidence\"");
         assertThat((OutputSchemaOutcome) response.context().get(OutputSchemaCallAdvisor.CONTEXT_KEY))
                 .extracting(OutputSchemaOutcome::status, OutputSchemaOutcome::retryCount)
@@ -148,7 +148,7 @@ class OutputSchemaCallAdvisorTest {
     void retriesWithCanonicalIssuesAfterSchemaMismatch() {
         OutputSchemaCallAdvisor advisor = advisor(1);
         RecordingChain chain = new RecordingChain(List.of(
-                "{\"companyName\":\"Acme\",\"totalAmount\":\"42.5\",\"evidence\":\"invoiceParser\"}",
+                "{\"companyName\":\"Acme\",\"totalAmount\":\"42.5\",\"evidence\":\"default-invoiceParser\"}",
                 "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
 
         ChatClientResponse response = advisor.adviseCall(request("Extract invoice"), chain);
@@ -164,7 +164,7 @@ class OutputSchemaCallAdvisorTest {
     @Test
     void rendersPreciseIssuesAndReportsOmittedCount() {
         OutputSchemaCallAdvisor advisor = new OutputSchemaCallAdvisor(
-                "outputSchemaSkill", wideSchema(), new OutputSchemaValidator(),
+                "default-outputSchemaSkill", wideSchema(), new OutputSchemaValidator(),
                 new OutputSchemaPromptAugmentor(), 1, outcome -> { });
         RecordingChain chain = new RecordingChain(List.of("{}", wideValidCandidate()));
 
@@ -196,7 +196,7 @@ class OutputSchemaCallAdvisorTest {
         schema.setProperties(properties);
         schema.setAdditionalProperties(false);
         OutputSchemaCallAdvisor advisor = new OutputSchemaCallAdvisor(
-                "outputSchemaSkill", schema, new OutputSchemaValidator(),
+                "default-outputSchemaSkill", schema, new OutputSchemaValidator(),
                 new OutputSchemaPromptAugmentor(), 1, outcome -> { });
         RecordingChain chain = new RecordingChain(List.of(candidate.toString(), "{}"));
 
@@ -379,7 +379,7 @@ class OutputSchemaCallAdvisorTest {
     @Test
     void includesFormatHintsInPromptGuidance() {
         OutputSchemaCallAdvisor advisor = new OutputSchemaCallAdvisor(
-                "outputSchemaSkill",
+                "default-outputSchemaSkill",
                 schemaWithDateFormat(),
                 new OutputSchemaValidator(),
                 new OutputSchemaPromptAugmentor(),
@@ -400,7 +400,7 @@ class OutputSchemaCallAdvisorTest {
     @Test
     void acceptsNullableSchemaFieldsAndMentionsNullabilityInPromptGuidance() {
         OutputSchemaCallAdvisor advisor = new OutputSchemaCallAdvisor(
-                "outputSchemaSkill",
+                "default-outputSchemaSkill",
                 nullableSchema(),
                 new OutputSchemaValidator(),
                 new OutputSchemaPromptAugmentor(),
@@ -456,7 +456,7 @@ class OutputSchemaCallAdvisorTest {
                 .isInstanceOf(LoomspanOutputSchemaValidationException.class)
                 .satisfies(ex -> {
                     LoomspanOutputSchemaValidationException failure = (LoomspanOutputSchemaValidationException) ex;
-                    assertThat(failure.getSkillName()).isEqualTo("outputSchemaSkill");
+                    assertThat(failure.getSkillName()).isEqualTo("default-outputSchemaSkill");
                     assertThat(failure.getRawOutput()).isEqualTo("still bad");
                     assertThat(failure.getAttemptCount()).isEqualTo(2);
                     assertThat(failure.getMaxRetries()).isEqualTo(1);
@@ -469,7 +469,7 @@ class OutputSchemaCallAdvisorTest {
     void recordsObservableOutcomeOnBoundSession() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         OutputSchemaCallAdvisor advisor = new OutputSchemaCallAdvisor(
-                "outputSchemaSkill",
+                "default-outputSchemaSkill",
                 schema(),
                 new OutputSchemaValidator(),
                 new OutputSchemaPromptAugmentor(),
@@ -479,7 +479,7 @@ class OutputSchemaCallAdvisorTest {
         RecordingChain chain = new RecordingChain(List.of("bad-json", "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() -> {
             ChatClientResponse response = advisor.adviseCall(request("Extract invoice"), chain);
 
@@ -501,7 +501,7 @@ class OutputSchemaCallAdvisorTest {
     void truncatesRecordedOutcomeIssuesToBoundedList() {
         List<OutputSchemaOutcome> recordedOutcomes = new ArrayList<>();
         OutputSchemaCallAdvisor advisor = new OutputSchemaCallAdvisor(
-                "outputSchemaSkill",
+                "default-outputSchemaSkill",
                 wideSchema(),
                 new OutputSchemaValidator(),
                 new OutputSchemaPromptAugmentor(),
@@ -530,8 +530,8 @@ class OutputSchemaCallAdvisorTest {
                 .isInstanceOf(LoomspanOutputSchemaValidationException.class);
 
         assertThat(output.getOut())
-                .contains("Output schema validation retry for skill 'outputSchemaSkill'")
-                .contains("Output schema validation exhausted for skill 'outputSchemaSkill'")
+                .contains("Output schema validation retry for skill 'default-outputSchemaSkill'")
+                .contains("Output schema validation exhausted for skill 'default-outputSchemaSkill'")
                 .contains("failureMode=INVALID_JSON");
     }
 
@@ -539,7 +539,7 @@ class OutputSchemaCallAdvisorTest {
     void recordsAdvisorMutationsOnTheActiveFrame() throws Exception {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         OutputSchemaCallAdvisor advisor = new OutputSchemaCallAdvisor(
-                "outputSchemaSkill",
+                "default-outputSchemaSkill",
                 schema(),
                 new OutputSchemaValidator(),
                 new OutputSchemaPromptAugmentor(),
@@ -549,7 +549,7 @@ class OutputSchemaCallAdvisorTest {
         RecordingChain chain = new RecordingChain(List.of("bad-json", "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() -> {
             var frame = stateService.openFrame(session, TraceFrameType.MODEL_CALL, "outputSchemaSkill#model", Map.of());
 
@@ -588,7 +588,7 @@ class OutputSchemaCallAdvisorTest {
     @Test
     void rethrowsManagedSessionRecorderFailures() {
         OutputSchemaCallAdvisor advisor = new OutputSchemaCallAdvisor(
-                "outputSchemaSkill",
+                "default-outputSchemaSkill",
                 schema(),
                 new OutputSchemaValidator(),
                 new OutputSchemaPromptAugmentor(),
@@ -599,14 +599,14 @@ class OutputSchemaCallAdvisorTest {
         RecordingChain chain = new RecordingChain(List.of("{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> advisor.adviseCall(request("Extract invoice"), chain)))
+        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> advisor.adviseCall(request("Extract invoice"), chain)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("boom");
     }
 
     private static OutputSchemaCallAdvisor advisor(int maxRetries) {
         return new OutputSchemaCallAdvisor(
-                "outputSchemaSkill",
+                "default-outputSchemaSkill",
                 schema(),
                 new OutputSchemaValidator(),
                 new OutputSchemaPromptAugmentor(),
@@ -640,7 +640,7 @@ class OutputSchemaCallAdvisorTest {
 
         YamlSkillManifest.OutputSchemaManifest vendorName = new YamlSkillManifest.OutputSchemaManifest();
         vendorName.setType("string");
-        vendorName.setEvidence("invoiceParser");
+        vendorName.setEvidence("default-invoiceParser");
 
         YamlSkillManifest.OutputSchemaManifest totalAmount = new YamlSkillManifest.OutputSchemaManifest();
         totalAmount.setType("number");

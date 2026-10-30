@@ -55,7 +55,7 @@ func (w *fakeComponentWriter) Close() error {
 
 // minimalValidTrace is a single-attempt success trace matching the Java fixture
 // corpus format. It is the smallest artifact the Phase 3 processor accepts.
-const minimalValidTrace = `{"traceId":"trace-t","sessionId":"session-t","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/t.ndjson","consoleCompatibilityVersion":"development","generationId":"generation-test"},"data":{"sessionId":"session-t"}}
+const minimalValidTrace = `{"traceId":"trace-t","sessionId":"session-t","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/t.ndjson","consoleCompatibilityVersion":"development","generationId":"generation-test","entrySkill":"default-test","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-test"}},"data":{"sessionId":"session-t"}}
 {"traceId":"trace-t","sessionId":"session-t","sequence":2,"timestamp":1784894400.000000000,"recordType":"MODEL_THOUGHT_CAPTURED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1},"data":{"messages":["user"]}}
 {"traceId":"trace-t","sessionId":"session-t","sequence":3,"timestamp":1784894400.000000000,"recordType":"MODEL_REQUEST_SENT","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1},"data":{"messages":["user"]}}
 {"traceId":"trace-t","sessionId":"session-t","sequence":4,"timestamp":1784894400.000000000,"recordType":"MODEL_RESPONSE_RECEIVED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1,"usage":{"promptUnits":10,"completionUnits":4,"totalUnits":14,"precision":"EXACT"}},"data":{"content":"fixture response"}}
@@ -320,7 +320,7 @@ func TestProcessorErrorPathDoesNotLeakValidatorGoroutines(t *testing.T) {
 	// Envelope declares a 2-chunk JSON payload, but only the first chunk
 	// arrives before a malformed record aborts the parse. The validator
 	// goroutine is started and must be cleaned up by the error path.
-	raw := `{"traceId":"t","sessionId":"s","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"consoleCompatibilityVersion":"development","generationId":"generation-test"},"data":null}` + "\n" +
+	raw := `{"traceId":"t","sessionId":"s","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"consoleCompatibilityVersion":"development","generationId":"generation-test","entrySkill":"default-test","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-test"}},"data":null}` + "\n" +
 		`{"traceId":"t","sessionId":"s","sequence":2,"timestamp":1784894400.000000000,"recordType":"STEP_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"payloadChunked":true,"payloadId":"p1","contentType":"application/json","chunkCount":2},"data":null}` + "\n" +
 		`{"traceId":"t","sessionId":"s","sequence":3,"timestamp":1784894400.000000000,"recordType":"PAYLOAD_CHUNK_APPENDED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"payloadId":"p1","chunkIndex":0,"chunkCount":2,"contentType":"application/json"},"data":"{\"a\":"}` + "\n" +
 		`{not-json}` + "\n"
@@ -349,5 +349,37 @@ func TestProcessorErrorPathDoesNotLeakValidatorGoroutines(t *testing.T) {
 	after := runtime.NumGoroutine()
 	if after > before {
 		t.Fatalf("goroutine leak: before=%d after=%d", before, after)
+	}
+}
+
+func TestProcessorRetainsCapturedNamespacesAndRejectsMalformedCapture(t *testing.T) {
+	captured := strings.Replace(minimalValidTrace, `"namespaceGenerationIds":{"default":"generation-test"}`, `"namespaceGenerationIds":{"default":"generation-test","tax":"old-target"}`, 1)
+	owner := `"executingNamespace":"tax","executingGenerationId":"old-target",`
+	captured = strings.Replace(captured, `"retrySequenceId":"retry-1"`, owner+`"retrySequenceId":"retry-1"`, 1)
+	result, domain := New().Process(artifact.ProcessRequest{Context: context.Background(), Metadata: artifact.TraceMetadata{TraceID: "trace-t"}, Raw: strings.NewReader(captured), Sink: &fakeSink{}})
+	if domain != nil {
+		t.Fatal(domain)
+	}
+	if result.Metadata.EntryNamespace != "default" || result.Metadata.GenerationID != "generation-test" || result.Metadata.NamespaceGenerationIDs["tax"] != "old-target" {
+		t.Fatalf("capture lost: %+v", result.Metadata)
+	}
+	cases := map[string]string{
+		"missing namespace":   strings.Replace(captured, `"entryNamespace":"default",`, "", 1),
+		"missing map":         strings.Replace(captured, `"namespaceGenerationIds":{"default":"generation-test","tax":"old-target"}`, `"namespaceGenerationIds":{}`, 1),
+		"entry mismatch":      strings.Replace(captured, `"entryNamespace":"default"`, `"entryNamespace":"tax"`, 1),
+		"wrong entry ID":      strings.Replace(captured, `"default":"generation-test"`, `"default":"other"`, 1),
+		"blank target ID":     strings.Replace(captured, `"tax":"old-target"`, `"tax":" "`, 1),
+		"duplicate namespace": strings.Replace(captured, `"tax":"old-target"`, `"tax":"old-target","tax":"other"`, 1),
+		"unknown owner":       strings.Replace(captured, `"executingNamespace":"tax"`, `"executingNamespace":"removed"`, 1),
+		"wrong owner ID":      strings.Replace(captured, `"executingGenerationId":"old-target"`, `"executingGenerationId":"new-target"`, 1),
+		"partial owner":       strings.Replace(captured, `"executingNamespace":"tax",`, "", 1),
+	}
+	for name, raw := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, domain := New().Process(artifact.ProcessRequest{Context: context.Background(), Metadata: artifact.TraceMetadata{TraceID: "trace-t"}, Raw: strings.NewReader(raw), Sink: &fakeSink{}})
+			if domain == nil || domain.Code != consolecore.CodeInvalidArtifact {
+				t.Fatalf("malformed capture accepted: %v", domain)
+			}
+		})
 	}
 }

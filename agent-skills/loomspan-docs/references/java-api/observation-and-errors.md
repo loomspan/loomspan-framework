@@ -36,6 +36,38 @@ canonical mission-frame records project into `SKILL_STARTED` and `SKILL_FINISHED
 events for both direct sources, so a Java- or REST-only root has a meaningful public observer
 view even without model or tool events.
 
+## Captured namespace identity
+
+An invocation produces one session, canonical trace/event sequence and completed
+observer view across its captured namespaces. Semantic skill references in events,
+lookups and displays are complete `namespace-localName` strings, preserving local
+case. Do not shorten them or reinterpret model/planning operation routes as skills.
+Unknown-origin diagnostics retain their existing null/unavailable identity.
+
+Canonical `TRACE_STARTED` metadata and existing live/finalized trace metadata carry
+`entryNamespace`, entry-scoped `generationId`, and `namespaceGenerationIds`, a
+snapshot map of all admitted reachable namespaces to their captured generation IDs.
+Known record owner facts use `executingNamespace` and `executingGenerationId` where
+execution context is represented. The map and record facts describe retained
+execution, even after current publication changes or removal/recreation. They are
+same-release diagnostics, not an additional supported Java snapshot API.
+
+`AdmittedSkillInvocation.generationId()` identifies the entry generation;
+`RestSkillInvocation.generationId()` identifies the executing REST target's
+captured generation. They may differ in a cross-namespace call. Public skill-call
+visibility grants neither observation nor configuration access. Host catalog
+metadata remains unfiltered under existing observation authorization, while
+runtime discovery enforces execution permissions.
+
+Console requires the same exact release marker for live connections and saved
+trace imports. `consoleCompatibilityVersion` comes from filtered
+`META-INF/loomspan-release.properties` using Maven `${project.version}`. A missing
+or different resolved release rejects. Matching `development` allows ordinary
+complete validation but promises no compatibility between development builds.
+There is no legacy reader, alternate counter, trace migration or historical
+readability promise. See [HTTP diagnostics](../skill-authoring/observability-http.md)
+and [trace interpretation](../skill-authoring/traces-and-debugging.md).
+
 ## Execution Events
 
 `SkillExecutionEvent` is a current-version diagnostic value with:
@@ -112,6 +144,12 @@ exceptions retain their established exception-to-text behavior; REST handler fai
 that adapter and reach the facade for the handling above.
 
 ## Source Anchors
+
+- `NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest` cover
+  captured namespace generation identity and coordinated current readers.
+- `NamespaceStartupIntegrationTest` executes embedded and managed caller flows
+  through supported APIs, including one completed observer after retained admission.
+
 
 - `SkillExecutionView.java` and `SkillExecutionEvent.java` define value
   validation and immutable copying.

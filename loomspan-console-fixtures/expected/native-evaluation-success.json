@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-native-evaluation-success",
   "sessionId" : "session-native-evaluation-success",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-native-evaluation-success",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-native-evaluation-success"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {

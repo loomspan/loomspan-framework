@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-advisor-retry",
   "sessionId" : "session-advisor-retry",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-advisor-retry",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-advisor-retry"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {

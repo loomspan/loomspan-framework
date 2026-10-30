@@ -79,37 +79,41 @@ type ConfiguredLimits struct {
 }
 
 type ActiveExecution struct {
-	TargetScopeID         string           `json:"targetScopeId"`
-	SessionID             string           `json:"sessionId"`
-	TraceID               string           `json:"traceId"`
-	LastCanonicalSequence int              `json:"lastCanonicalSequence"`
-	StartedAt             time.Time        `json:"startedAt"`
-	UpdatedAt             time.Time        `json:"updatedAt"`
-	ElapsedMillis         int64            `json:"elapsedMillis"`
-	EntrySkill            string           `json:"entrySkill"`
-	GenerationID          string           `json:"generationId"`
-	Status                string           `json:"status"`
-	Phase                 string           `json:"phase"`
-	Summary               string           `json:"summary"`
-	ActiveBranches        []ActiveBranch   `json:"activeBranches"`
-	Usage                 Usage            `json:"usage"`
-	ConfiguredLimits      ConfiguredLimits `json:"configuredLimits"`
+	TargetScopeID          string            `json:"targetScopeId"`
+	SessionID              string            `json:"sessionId"`
+	TraceID                string            `json:"traceId"`
+	LastCanonicalSequence  int               `json:"lastCanonicalSequence"`
+	StartedAt              time.Time         `json:"startedAt"`
+	UpdatedAt              time.Time         `json:"updatedAt"`
+	ElapsedMillis          int64             `json:"elapsedMillis"`
+	EntrySkill             string            `json:"entrySkill"`
+	GenerationID           string            `json:"generationId"`
+	EntryNamespace         string            `json:"entryNamespace"`
+	NamespaceGenerationIDs map[string]string `json:"namespaceGenerationIds"`
+	Status                 string            `json:"status"`
+	Phase                  string            `json:"phase"`
+	Summary                string            `json:"summary"`
+	ActiveBranches         []ActiveBranch    `json:"activeBranches"`
+	Usage                  Usage             `json:"usage"`
+	ConfiguredLimits       ConfiguredLimits  `json:"configuredLimits"`
 }
 
 type Trace struct {
-	TargetScopeID             string    `json:"targetScopeId"`
-	TraceID                   string    `json:"traceId"`
-	SessionID                 string    `json:"sessionId"`
-	EntrySkill                string    `json:"entrySkill"`
-	GenerationID              string    `json:"generationId"`
-	Outcome                   string    `json:"outcome"`
-	FinalizedAt               time.Time `json:"finalizedAt"`
-	SizeBytes                 int64     `json:"sizeBytes"`
-	PersistencePolicy         string    `json:"persistencePolicy"`
-	ApplicationTraceExpiresAt time.Time `json:"applicationTraceExpiresAt"`
-	LocalAvailable            bool      `json:"localAvailable"`
-	ArtifactHandle            string    `json:"artifactHandle,omitempty"`
-	ApplicationAvailability   string    `json:"applicationAvailability,omitempty"`
+	TargetScopeID             string            `json:"targetScopeId"`
+	TraceID                   string            `json:"traceId"`
+	SessionID                 string            `json:"sessionId"`
+	EntrySkill                string            `json:"entrySkill"`
+	GenerationID              string            `json:"generationId"`
+	EntryNamespace            string            `json:"entryNamespace"`
+	NamespaceGenerationIDs    map[string]string `json:"namespaceGenerationIds"`
+	Outcome                   string            `json:"outcome"`
+	FinalizedAt               time.Time         `json:"finalizedAt"`
+	SizeBytes                 int64             `json:"sizeBytes"`
+	PersistencePolicy         string            `json:"persistencePolicy"`
+	ApplicationTraceExpiresAt time.Time         `json:"applicationTraceExpiresAt"`
+	LocalAvailable            bool              `json:"localAvailable"`
+	ArtifactHandle            string            `json:"artifactHandle,omitempty"`
+	ApplicationAvailability   string            `json:"applicationAvailability,omitempty"`
 }
 
 type Page[T any] struct {

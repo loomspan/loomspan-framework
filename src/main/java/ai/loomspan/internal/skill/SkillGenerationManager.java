@@ -134,6 +134,17 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         }
     }
 
+    /** Existing host inspection is unfiltered and includes every active namespace. */
+    public ai.loomspan.internal.runtime.observation.catalog.RegisteredSkillCatalog registeredSkillCatalog()
+    {
+        java.util.List<ai.loomspan.internal.runtime.observation.catalog.RegisteredSkillCatalog> catalogs;
+        synchronized (generationMonitor)
+        {
+            catalogs = active.values().stream().map(SkillGeneration::registeredSkillCatalog).toList();
+        }
+        return new ai.loomspan.internal.runtime.observation.catalog.DefaultRegisteredSkillCatalog(catalogs);
+    }
+
     /** Immutable independently usable metadata; no runtime/client/invoker is read during validation. */
     public record PreparationView(String namespace, String baseId, Map<String, SkillGeneration> namespaces) {}
 

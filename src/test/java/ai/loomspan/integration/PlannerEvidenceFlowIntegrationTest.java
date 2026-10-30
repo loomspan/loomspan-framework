@@ -51,7 +51,7 @@ class PlannerEvidenceFlowIntegrationTest {
     @CsvSource({"true,true", "false,true", "true,false", "false,false"})
     void characterizesActualWireEvidence(boolean concurrent, boolean longResults) throws Exception {
         Capture capture = run(concurrent, longResults);
-        String assigned = capture.requestContaining("Exact capability/tool: assess");
+        String assigned = capture.requestContaining("Exact capability/tool: default-assess");
         String child = capture.requestContaining("ASSESS_ONLY_RECEIVED_INPUT");
         String terminal = capture.requestContaining("All required plan tasks are already COMPLETE");
         assertThat(assigned).contains("FACT_A_EARLY", "FACT_B_EARLY", "FACT_C_EARLY");
@@ -78,7 +78,7 @@ class PlannerEvidenceFlowIntegrationTest {
         Capture capture = run(true, true);
         org.assertj.core.api.SoftAssertions softly = new org.assertj.core.api.SoftAssertions();
         for (String source : List.of("A", "B", "C")) {
-            softly.assertThat(capture.requestContaining("Exact capability/tool: assess"))
+            softly.assertThat(capture.requestContaining("Exact capability/tool: default-assess"))
                     .as("assigned dependent request: " + source).contains("FACT_" + source + "_TAIL");
             softly.assertThat(capture.requestContaining("ASSESS_ONLY_RECEIVED_INPUT"))
                     .as("nested assessment input: " + source).contains("FACT_" + source + "_TAIL");
@@ -87,8 +87,8 @@ class PlannerEvidenceFlowIntegrationTest {
                 .as("native final synthesis").contains("FACT_N_TAIL");
         softly.assertAll();
 
-        String objective = "Fulfill the mission for skill 'root' using the provided mission input object.";
-        for (String request : List.of(capture.requestContaining("Exact capability/tool: assess"),
+        String objective = "Fulfill the mission for skill 'default-root' using the provided mission input object.";
+        for (String request : List.of(capture.requestContaining("Exact capability/tool: default-assess"),
                 capture.requestContaining("All required plan tasks are already COMPLETE"))) {
             JsonNode messages = JSON.readTree(request).path("messages");
             String system = messages.get(0).path("content").asText();
@@ -97,7 +97,7 @@ class PlannerEvidenceFlowIntegrationTest {
             assertThat(user).contains(objective, "\"caseId\" : \"local-case\"");
             assertThat(user.split("Canonical mission input:", -1)).hasSize(2);
         }
-        assertThat(JSON.readTree(capture.requestContaining("Exact capability/tool: assess"))
+        assertThat(JSON.readTree(capture.requestContaining("Exact capability/tool: default-assess"))
                 .path("messages").get(0).path("content").asText())
                 .contains("Overall mission context (non-actionable; execute only the assigned task below)",
                         "Do not call the parent mission skill");
@@ -113,7 +113,7 @@ class PlannerEvidenceFlowIntegrationTest {
     @CsvSource({"true,false", "true,true", "false,false"})
     void earlierResultsSurviveSevenCompletionsAndRepeatedSkillCalls(boolean concurrent, boolean reversed) throws Exception {
         Capture capture = run(concurrent, true, true, reversed);
-        String assigned = capture.requestContaining("Exact capability/tool: assess");
+        String assigned = capture.requestContaining("Exact capability/tool: default-assess");
         JsonNode records = evidenceRecords(assigned);
         assertThat(records.size()).isEqualTo(7);
         List<String> ids = List.of("sourceA", "B0", "B1", "B2", "B3", "B4", "sourceC");
@@ -121,15 +121,15 @@ class PlannerEvidenceFlowIntegrationTest {
             String id = ids.get(index);
             String source = id.equals("sourceA") ? "A" : id.equals("sourceC") ? "C" : id;
             assertThat(records.get(index).path("taskId").asText()).isEqualTo(id);
-            assertThat(records.get(index).path("skillName").asText()).isEqualTo(id.startsWith("B") ? "sourceB" : id);
+            assertThat(records.get(index).path("skillName").asText()).isEqualTo(id.startsWith("B") ? "default-sourceB" : "default-" + id);
             assertThat(records.get(index).path("result").asText())
                     .isEqualTo(JSON.writeValueAsString(Map.of("text", evidence(source, true))));
             assertThat(capture.requestContaining("ASSESS_ONLY_RECEIVED_INPUT")).contains("FACT_" + source + "_TAIL");
         }
         for (String request : capture.requests) {
             String system = JSON.readTree(request).path("messages").get(0).path("content").asText();
-            if (system.contains("coordinator-assigned task") && !system.contains("Exact capability/tool: assess")
-                    && !system.contains("Exact capability/tool: nested") && !system.contains("Exact capability/tool: nestedSource"))
+            if (system.contains("coordinator-assigned task") && !system.contains("Exact capability/tool: default-assess")
+                    && !system.contains("Exact capability/tool: default-nested") && !system.contains("Exact capability/tool: default-nestedSource"))
                 assertThat(system).doesNotContain("COMPLETED TASK EVIDENCE", "FACT_A_TAIL", "FACT_B0_TAIL", "FACT_C_TAIL");
         }
         String terminal = capture.requests.stream().filter(request -> request.contains("All required plan tasks are already COMPLETE"))
@@ -173,11 +173,11 @@ class PlannerEvidenceFlowIntegrationTest {
                   required: [facts]
                   additionalProperties: false
                 allowed_skills:
-                  - {name: sourceA, required: true, max_tasks: 1}
-                  - {name: sourceB, required: true, max_tasks: 5}
-                  - {name: sourceC, required: true, max_tasks: 1}
-                  - {name: assess, required: true, max_tasks: 1}
-                  - {name: nested, required: true, max_tasks: 1}
+                  - {name: default-sourceA, required: true, max_tasks: 1}
+                  - {name: default-sourceB, required: true, max_tasks: 5}
+                  - {name: default-sourceC, required: true, max_tasks: 1}
+                  - {name: default-assess, required: true, max_tasks: 1}
+                  - {name: default-nested, required: true, max_tasks: 1}
                 """.formatted(concurrent));
         Files.writeString(skills.resolve("assess.yaml"), """
                 name: assess
@@ -197,7 +197,7 @@ class PlannerEvidenceFlowIntegrationTest {
                 model: local
                 prompt: NESTED_COPY_SOURCE. Call nestedSource and return its exact complete result.
                 allowed_skills:
-                  - {name: nestedSource}
+                  - {name: default-nestedSource}
                 """);
         if (expanded) Files.writeString(skills.resolve("nested.yaml"), """
                 name: nested
@@ -214,7 +214,7 @@ class PlannerEvidenceFlowIntegrationTest {
                   required: [quote, citation]
                   additionalProperties: false
                 allowed_skills:
-                  - {name: nestedSource, required: true}
+                  - {name: default-nestedSource, required: true}
                 """);
         for (String name : List.of("sourceB", "sourceC", "nestedSource")) {
             Files.writeString(skills.resolve(name + ".yaml"), """
@@ -247,23 +247,23 @@ class PlannerEvidenceFlowIntegrationTest {
                             else {
                                 for (String id : ids) {
                                     Map<String, Object> task = task(id, List.of(), "sources");
-                                    if (id.startsWith("B")) task.put("capabilityName", "sourceB");
+                                    if (id.startsWith("B")) task.put("capabilityName", "default-sourceB");
                                     tasks.add(task);
                                 }
                                 tasks.add(task("assess", ids, null));
                                 tasks.add(task("nested", List.of("assess"), null));
                             }
-                            content = Map.of("capabilityName", nestedPlan ? "nested" : "root", "createdAt", "2026-10-01T00:00:00Z", "status", "VALID", "tasks", tasks);
+                            content = Map.of("capabilityName", nestedPlan ? "default-nested" : "default-root", "createdAt", "2026-10-01T00:00:00Z", "status", "VALID", "tasks", tasks);
                         } else if (text.contains("coordinator-assigned task")) {
                             String system = wire.path("messages").get(0).path("content").asText();
-                            var matcher = Pattern.compile("Exact capability/tool: (\\w+)").matcher(system);
+                            var matcher = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
                             assertThat(matcher.find()).isTrue();
                             String tool = matcher.group(1);
                             var idMatcher = Pattern.compile("--- ASSIGNED TASK ---\\nID: (\\w+)").matcher(system);
                             assertThat(idMatcher.find()).isTrue();
                             String id = idMatcher.group(1);
                             content = Map.of("stepAction", "CALL_TOOL", "taskId", id, "toolName", tool,
-                                    "toolArguments", tool.equals("assess") ? Map.of("upstream", facts(text),
+                                    "toolArguments", tool.equals("default-assess") ? Map.of("upstream", facts(text),
                                             "upstreamReference", Map.of("$ref", "sourceA.result")) : id.startsWith("B") ? Map.of("source", id) : Map.of());
                         } else if (text.contains("All required plan tasks are already COMPLETE")) {
                             if (expanded && text.contains("NESTED_PLANNER_PUBLIC_RETURN")) {
@@ -280,7 +280,7 @@ class PlannerEvidenceFlowIntegrationTest {
                                 if (message.path("role").asText().equals("tool")) toolResult = message.path("content");
                             if (toolResult == null) return response(Map.of("role", "assistant", "content", "", "tool_calls",
                                     List.of(Map.of("id", "call-nested", "type", "function", "function",
-                                            Map.of("name", "nestedSource", "arguments", "{}")))), "tool_calls");
+                                            Map.of("name", "default-nestedSource", "arguments", "{}")))), "tool_calls");
                             capture.nestedCompletion = toolResult.asText();
                             return response(Map.of("role", "assistant", "content", capture.nestedCompletion), "stop");
                         } else throw new AssertionError("Unexpected request: " + body);
@@ -305,7 +305,7 @@ class PlannerEvidenceFlowIntegrationTest {
                     .withBean(RestSkillHandler.class, () -> invocation -> {
                         if (Boolean.TRUE.equals(invocation.input().get("unrelated")))
                             return "UNRELATED_MISSION_SENTINEL";
-                        String id = invocation.skillName().equals("sourceB") ? String.valueOf(invocation.input().getOrDefault("source", "sourceB")) : invocation.skillName();
+                        String id = invocation.skillName().equals("default-sourceB") ? String.valueOf(invocation.input().getOrDefault("source", "sourceB")) : invocation.skillName().substring("default-".length());
                         String source = id.equals("sourceB") ? "B" : id.equals("sourceC") ? "C" : id.equals("nestedSource") ? "N" : id;
                         if (expanded && reversed && !id.equals("nestedSource")) {
                             admittedLeaves.countDown();
@@ -333,11 +333,11 @@ class PlannerEvidenceFlowIntegrationTest {
                         SkillTemplate facade = context.getBean(SkillTemplate.class);
                         // Public direct invocation returns full text; it is not a planner evidence reader.
                         if (!expanded) {
-                            assertThat(facade.invoke("sourceA", Map.of())).contains("FACT_A_TAIL");
-                            assertThat(facade.invoke("sourceB", Map.of())).contains("FACT_B_TAIL");
-                        } else assertThat(facade.invoke("sourceB", Map.of("unrelated", true))).isEqualTo("UNRELATED_MISSION_SENTINEL");
-                        capture.result = facade.invoke("root", Map.of("caseId", "local-case"), capture.observed::set);
-                        if (expanded) assertThat(facade.invoke("sourceB", Map.of("unrelated", true)))
+                            assertThat(facade.invoke("default-sourceA", Map.of())).contains("FACT_A_TAIL");
+                            assertThat(facade.invoke("default-sourceB", Map.of())).contains("FACT_B_TAIL");
+                        } else assertThat(facade.invoke("default-sourceB", Map.of("unrelated", true))).isEqualTo("UNRELATED_MISSION_SENTINEL");
+                        capture.result = facade.invoke("default-root", Map.of("caseId", "local-case"), capture.observed::set);
+                        if (expanded) assertThat(facade.invoke("default-sourceB", Map.of("unrelated", true)))
                                 .isEqualTo("UNRELATED_MISSION_SENTINEL");
                     });
         } finally {
@@ -354,7 +354,7 @@ class PlannerEvidenceFlowIntegrationTest {
         assertThat(capture.failure.get()).isNull();
         // The reflected zero-input Java source is assigned directly; all evidence-bearing model requests remain.
         assertThat(capture.requests).hasSize(expanded ? 14 : 9);
-        assertThat(capture.requests).noneMatch(request -> request.contains("Exact capability/tool: sourceA"));
+        assertThat(capture.requests).noneMatch(request -> request.contains("Exact capability/tool: default-sourceA"));
         return capture;
     }
 
@@ -377,7 +377,7 @@ class PlannerEvidenceFlowIntegrationTest {
     private static Map<String, Object> task(String name, List<String> dependencies, String group) {
         Map<String, Object> task = new LinkedHashMap<>();
         task.put("taskId", name); task.put("title", name); task.put("status", "PENDING");
-        task.put("capabilityName", name); task.put("intent", "Use complete evidence");
+        task.put("capabilityName", "default-" + name); task.put("intent", "Use complete evidence");
         task.put("dependsOn", dependencies); task.put("expectedOutputs", List.of("evidence"));
         task.put("parallelGroup", group); task.put("note", "");
         return task;

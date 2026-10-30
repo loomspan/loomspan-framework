@@ -63,7 +63,7 @@ class ExecutionCoordinatorLinterIntegrationTest {
                 "medium");
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("lintedSkill");
-        manifest.setDescription("lintedSkill");
+        manifest.setDescription("default-lintedSkill");
         manifest.setModel("gpt-5");
         manifest.setAllowedSkills(List.of());
         manifest.setPlanningMode(false);
@@ -81,12 +81,12 @@ class ExecutionCoordinatorLinterIntegrationTest {
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityMetadata metadata = new CapabilityMetadata(
                 "yaml:linted",
-                "lintedSkill",
-                "lintedSkill",
+                "default-lintedSkill",
+                "default-lintedSkill",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("lintedSkill", "lintedSkill"),
+                CapabilityToolDescriptor.generic("default-lintedSkill", "default-lintedSkill"),
                 null);
         registry.register(metadata.name(), metadata);
 
@@ -96,10 +96,10 @@ class ExecutionCoordinatorLinterIntegrationTest {
                 List.of("not ok", "OK: corrected"));
         ExecutionCoordinator coordinator = coordinator(catalog, registry,
                 (ignored, mode) -> chatClient, stateService);
-        LoomspanSession session = new LoomspanSession("session-1", "lintedSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-lintedSkill", 3);
 
         String response = TestExecutionBindings.callWithGeneration(session, registry.generation(catalog),
-                () -> coordinator.execute("lintedSkill", "Produce YAML", session, null));
+                () -> coordinator.execute("default-lintedSkill", "Produce YAML", session, null));
 
         assertThat(response).isEqualTo("OK: corrected");
         assertThat(chatClient.callCount).isEqualTo(2);
@@ -160,7 +160,7 @@ class ExecutionCoordinatorLinterIntegrationTest {
             super(new ai.loomspan.autoconfigure.LoomspanProperties(),
                     new ai.loomspan.autoconfigure.LoomspanProperties.Skills());
             this.definitions = java.util.Arrays.stream(definitions)
-                    .collect(java.util.stream.Collectors.toMap(definition -> definition.manifest().getName(), definition -> definition));
+                    .collect(java.util.stream.Collectors.toMap(definition -> definition.identity().toString(), definition -> definition));
         }
 
         @Override

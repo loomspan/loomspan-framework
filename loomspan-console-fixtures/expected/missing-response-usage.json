@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-missing-response-usage",
   "sessionId" : "session-missing-response-usage",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-missing-response-usage",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-missing-response-usage"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {

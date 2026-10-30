@@ -3,6 +3,7 @@ package mcpadapter
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -92,19 +93,21 @@ type activeBranchDTO struct {
 }
 
 type executionDetailDTO struct {
-	SessionID             string                         `json:"sessionId"`
-	TraceID               string                         `json:"traceId"`
-	LastCanonicalSequence int                            `json:"lastCanonicalSequence"`
-	StartedAt             time.Time                      `json:"startedAt"`
-	UpdatedAt             time.Time                      `json:"updatedAt"`
-	ElapsedMillis         int64                          `json:"elapsedMillis"`
-	EntrySkill            string                         `json:"entrySkill"`
-	GenerationID          string                         `json:"generationId"`
-	Status                string                         `json:"status"`
-	Phase                 string                         `json:"phase"`
-	ActiveBranches        []activeBranchDTO              `json:"activeBranches"`
-	Usage                 observability.Usage            `json:"usage"`
-	ConfiguredLimits      observability.ConfiguredLimits `json:"configuredLimits"`
+	SessionID              string                         `json:"sessionId"`
+	TraceID                string                         `json:"traceId"`
+	LastCanonicalSequence  int                            `json:"lastCanonicalSequence"`
+	StartedAt              time.Time                      `json:"startedAt"`
+	UpdatedAt              time.Time                      `json:"updatedAt"`
+	ElapsedMillis          int64                          `json:"elapsedMillis"`
+	EntrySkill             string                         `json:"entrySkill"`
+	GenerationID           string                         `json:"generationId"`
+	EntryNamespace         string                         `json:"entryNamespace"`
+	NamespaceGenerationIDs map[string]string              `json:"namespaceGenerationIds"`
+	Status                 string                         `json:"status"`
+	Phase                  string                         `json:"phase"`
+	ActiveBranches         []activeBranchDTO              `json:"activeBranches"`
+	Usage                  observability.Usage            `json:"usage"`
+	ConfiguredLimits       observability.ConfiguredLimits `json:"configuredLimits"`
 }
 
 type executionListResult struct {
@@ -284,6 +287,7 @@ func mapExecutionDetail(source observability.ActiveExecution) executionDetailDTO
 		LastCanonicalSequence: source.LastCanonicalSequence,
 		StartedAt:             source.StartedAt, UpdatedAt: source.UpdatedAt,
 		ElapsedMillis: source.ElapsedMillis, EntrySkill: source.EntrySkill, GenerationID: source.GenerationID,
+		EntryNamespace: source.EntryNamespace, NamespaceGenerationIDs: maps.Clone(source.NamespaceGenerationIDs),
 		Status: source.Status, Phase: source.Phase, ActiveBranches: branches,
 		Usage: source.Usage, ConfiguredLimits: source.ConfiguredLimits,
 	}

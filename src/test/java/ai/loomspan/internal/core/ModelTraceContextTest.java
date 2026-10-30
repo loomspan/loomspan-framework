@@ -67,7 +67,7 @@ class ModelTraceContextTest {
     private static ModelTraceContext context() {
         return new ModelTraceContext(
                 new ModelExecutionIdentity("test", "connection", AiDriver.OPENAI, "provider/model"),
-                "test.skill",
+                "default-test_skill",
                 "mission");
     }
 }

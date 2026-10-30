@@ -30,8 +30,8 @@ class DefaultSkillChatModelResolverTests {
         EffectiveSkillExecutionConfiguration routedConfiguration = new EffectiveSkillExecutionConfiguration(
                 "routed", "openrouter", AiDriver.OPENAI, "anthropic/sonnet", null);
 
-        assertThat(resolver.resolve("fastSkill", nativeConfiguration)).isSameAs(nativeRuntime);
-        assertThat(resolver.resolve("routedSkill", routedConfiguration)).isSameAs(routedRuntime);
+        assertThat(resolver.resolve("default-fastSkill", nativeConfiguration)).isSameAs(nativeRuntime);
+        assertThat(resolver.resolve("default-routedSkill", routedConfiguration)).isSameAs(routedRuntime);
     }
 
     @Test
@@ -40,9 +40,9 @@ class DefaultSkillChatModelResolverTests {
         ProviderConnectionRuntime sharedRuntime = runtime(shared);
         DefaultSkillChatModelResolver resolver = new DefaultSkillChatModelResolver(Map.of("openai-main", sharedRuntime));
 
-        assertThat(resolver.resolve("fastSkill", new EffectiveSkillExecutionConfiguration(
+        assertThat(resolver.resolve("default-fastSkill", new EffectiveSkillExecutionConfiguration(
                 "fast", "openai-main", AiDriver.OPENAI, "gpt-fast", null))).isSameAs(sharedRuntime);
-        assertThat(resolver.resolve("deepSkill", new EffectiveSkillExecutionConfiguration(
+        assertThat(resolver.resolve("default-deepSkill", new EffectiveSkillExecutionConfiguration(
                 "deep", "openai-main", AiDriver.OPENAI, "gpt-deep", "high"))).isSameAs(sharedRuntime);
     }
 
@@ -59,8 +59,8 @@ class DefaultSkillChatModelResolverTests {
         EffectiveSkillExecutionConfiguration childConfiguration = new EffectiveSkillExecutionConfiguration(
                 "child-model", "child-connection", AiDriver.OPENAI, "gpt-child", null);
 
-        assertThat(resolver.resolve("parentSkill", parentConfiguration)).isSameAs(parentRuntime);
-        assertThat(resolver.resolve("nestedChildSkill", childConfiguration)).isSameAs(childRuntime).isNotSameAs(parentRuntime);
+        assertThat(resolver.resolve("default-parentSkill", parentConfiguration)).isSameAs(parentRuntime);
+        assertThat(resolver.resolve("default-nestedChildSkill", childConfiguration)).isSameAs(childRuntime).isNotSameAs(parentRuntime);
     }
 
     @Test
@@ -70,9 +70,9 @@ class DefaultSkillChatModelResolverTests {
         EffectiveSkillExecutionConfiguration configuration = new EffectiveSkillExecutionConfiguration(
                 "local", "ollama-east", AiDriver.OLLAMA, "qwen3", null);
 
-        assertThatThrownBy(() -> resolver.resolve("invoiceParser", configuration))
+        assertThatThrownBy(() -> resolver.resolve("default-invoiceParser", configuration))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("invoiceParser")
+                .hasMessageContaining("default-invoiceParser")
                 .hasMessageContaining("local")
                 .hasMessageContaining("ollama-east")
                 .hasMessageContaining("OLLAMA");

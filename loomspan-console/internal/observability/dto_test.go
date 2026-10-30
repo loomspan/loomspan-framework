@@ -43,7 +43,7 @@ func TestSkillPageDecodesFromFixture(t *testing.T) {
 	if page.Items[3].Source != "TYPESAFE" || page.Items[3].SourcePath == "" {
 		t.Fatalf("missing TYPESAFE summary: %#v", page.Items[3])
 	}
-	if page.Items[0].RegisteredName != "CheckDns" {
+	if page.Items[0].RegisteredName != "default-CheckDns" {
 		t.Fatalf("unexpected registeredName: %s", page.Items[0].RegisteredName)
 	}
 	if page.HasMore {
@@ -62,7 +62,7 @@ func TestRestSkillDetailDecodesFromFixture(t *testing.T) {
 	if detail.Source != "REST" || detail.SourcePath != "opaque label" || !strings.Contains(detail.Yaml, "rest: true") {
 		t.Fatalf("unexpected REST detail: %#v", detail)
 	}
-	if err := validateSkillDetail(detail, "FetchDns"); err != nil {
+	if err := validateSkillDetail(detail, "default-FetchDns"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -86,7 +86,7 @@ func TestSkillDetailDecodesFromFixture(t *testing.T) {
 	if err := json.Unmarshal(body, &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.RegisteredName != "CheckDns" {
+	if detail.RegisteredName != "default-CheckDns" {
 		t.Fatalf("unexpected registeredName: %s", detail.RegisteredName)
 	}
 	if detail.Yaml == "" {
@@ -120,7 +120,7 @@ func TestActiveExecutionDetailDecodesFromFixture(t *testing.T) {
 	if exec.SessionID != "session-1" {
 		t.Fatalf("unexpected sessionId: %s", exec.SessionID)
 	}
-	if exec.EntrySkill != "CheckDns" {
+	if exec.EntrySkill != "default-CheckDns" {
 		t.Fatalf("unexpected entrySkill: %s", exec.EntrySkill)
 	}
 	if exec.Usage.SkillInvocations != 1 {
@@ -220,7 +220,7 @@ func TestActiveExecutionDecodesCanonicalActiveBranchesAndExplicitNulls(t *testin
 		"updatedAt":"2026-07-25T11:59:59Z",
 		"activeBranches":[{
 			"planId":null,"taskId":null,"stepNumber":null,"parallelGroup":null,"effectiveConcurrency":null,
-			"path":[{"frameId":"frame-root","frameType":"ROOT_MISSION","route":"CheckDns"}]
+			"path":[{"frameId":"frame-root","frameType":"ROOT_MISSION","route":"default-CheckDns"}]
 		}]
 	}`)
 	var execution ActiveExecution
@@ -235,14 +235,14 @@ func TestActiveExecutionDecodesCanonicalActiveBranchesAndExplicitNulls(t *testin
 		t.Fatalf("explicit null assignment changed: %#v", branch)
 	}
 	entry := branch.Path[0]
-	if entry.FrameID != "frame-root" || entry.FrameType != "ROOT_MISSION" || entry.Route != "CheckDns" {
+	if entry.FrameID != "frame-root" || entry.FrameType != "ROOT_MISSION" || entry.Route != "default-CheckDns" {
 		t.Fatalf("unexpected active-branch entry: %#v", entry)
 	}
 	encoded, err := json.Marshal(execution)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{`"planId":null`, `"taskId":null`, `"effectiveConcurrency":null`, `"frameId":"frame-root"`, `"frameType":"ROOT_MISSION"`, `"route":"CheckDns"`} {
+	for _, field := range []string{`"planId":null`, `"taskId":null`, `"effectiveConcurrency":null`, `"frameId":"frame-root"`, `"frameType":"ROOT_MISSION"`, `"route":"default-CheckDns"`} {
 		if !json.Valid(encoded) || !containsJSONField(encoded, field) {
 			t.Fatalf("encoded active execution does not preserve %s: %s", field, encoded)
 		}
@@ -367,7 +367,7 @@ func TestJavaSkillDetailFixtureHasOnlyJavaLocation(t *testing.T) {
 	if err := json.Unmarshal(readFixture(t, "skill-java-detail.json"), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if err := validateSkillDetail(detail, "LookupDns"); err != nil {
+	if err := validateSkillDetail(detail, "default-LookupDns"); err != nil {
 		t.Fatal(err)
 	}
 	if detail.Source != "JAVA" || detail.BeanName != "dnsSkills" || detail.Method != "example.DnsSkills.lookup(java.lang.String)" || detail.SourcePath != "" || detail.Yaml != "" {

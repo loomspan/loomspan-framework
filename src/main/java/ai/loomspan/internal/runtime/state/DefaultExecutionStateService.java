@@ -80,6 +80,25 @@ public class DefaultExecutionStateService implements ExecutionStateService
     {
         PhysicalBranchContext branch = binding.branch();
         Instant now = clock.instant();
+        // A skill frame's resolved target can differ from the source binding during opening.
+        String ownerNamespace = null;
+        String ownerGeneration = null;
+        if (traceFrameType == TraceFrameType.ROOT_MISSION || traceFrameType == TraceFrameType.SKILL_EXECUTION
+                || traceFrameType == TraceFrameType.TOOL_INVOCATION)
+        {
+            var target = binding.snapshot().generations().values().stream()
+                    .map(generation -> generation.capability(route)).filter(Objects::nonNull).findFirst();
+            if (target.isPresent())
+            {
+                ownerNamespace = target.orElseThrow().identity().namespace();
+                ownerGeneration = binding.snapshot().generation(ownerNamespace).id();
+            }
+        }
+        else if (binding.mission() != null && binding.generation().capability(binding.mission().skillName()) != null)
+        {
+            ownerNamespace = binding.currentNamespace();
+            ownerGeneration = binding.generation().id();
+        }
         ExecutionFrame frame = new ExecutionFrame(
                 traceFrameType == TraceFrameType.ROOT_MISSION
                         ? binding.requireMission().missionFrameId()
@@ -89,7 +108,7 @@ public class DefaultExecutionStateService implements ExecutionStateService
                 traceFrameType,
                 route,
                 parameters == null ? Map.of() : Map.copyOf(parameters),
-                now);
+                now, ownerNamespace, ownerGeneration);
 
         branch.push(frame);
         try

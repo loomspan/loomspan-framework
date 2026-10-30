@@ -19,7 +19,7 @@ class PhysicalBranchContextTest
     @Test
     void enforcesLifoAndDepthWithoutCorruptingThePath()
     {
-        PhysicalBranchContext branch = new PhysicalBranchContext(new LoomspanSession("branch", "entry", 2));
+        PhysicalBranchContext branch = new PhysicalBranchContext(ai.loomspan.internal.core.TestLoomspanSessions.create("branch", "default-entry", 2));
         ExecutionFrame root = frame("root", TraceFrameType.ROOT_MISSION);
         ExecutionFrame model = frame("model", TraceFrameType.MODEL_CALL);
         ExecutionFrame child = frame("child", TraceFrameType.SKILL_EXECUTION);
@@ -37,7 +37,7 @@ class PhysicalBranchContextTest
     @Test
     void closesAbsentFramesAsNoOpAndRollsBackOnlyCurrentLeaf()
     {
-        PhysicalBranchContext branch = new PhysicalBranchContext(new LoomspanSession("rollback", "entry", 4));
+        PhysicalBranchContext branch = new PhysicalBranchContext(ai.loomspan.internal.core.TestLoomspanSessions.create("rollback", "default-entry", 4));
         ExecutionFrame root = frame("root", TraceFrameType.ROOT_MISSION);
         ExecutionFrame child = frame("child", TraceFrameType.SKILL_EXECUTION);
         branch.push(root);
@@ -54,7 +54,7 @@ class PhysicalBranchContextTest
     @Test
     void returnsImmutableSnapshotsInBothDirections()
     {
-        PhysicalBranchContext branch = new PhysicalBranchContext(new LoomspanSession("snapshots", "entry", 4));
+        PhysicalBranchContext branch = new PhysicalBranchContext(ai.loomspan.internal.core.TestLoomspanSessions.create("snapshots", "default-entry", 4));
         ExecutionFrame root = frame("root", TraceFrameType.ROOT_MISSION);
         ExecutionFrame child = frame("child", TraceFrameType.SKILL_EXECUTION);
         branch.push(root);
@@ -71,11 +71,11 @@ class PhysicalBranchContextTest
     @Test
     void tracksLastNonEmptyDiagnosticOfEachType()
     {
-        PhysicalBranchContext branch = new PhysicalBranchContext(new LoomspanSession("diagnostics", "entry", 3));
+        PhysicalBranchContext branch = new PhysicalBranchContext(ai.loomspan.internal.core.TestLoomspanSessions.create("diagnostics", "default-entry", 3));
         LinterOutcome linter = new LinterOutcome(
-                "entry", "regex", 1, 0, 1, LinterOutcomeStatus.PASSED, "retry");
+                "default-entry", "regex", 1, 0, 1, LinterOutcomeStatus.PASSED, "retry");
         OutputSchemaOutcome output = new OutputSchemaOutcome(
-                "entry", null, 1, 0, 1, OutputSchemaOutcomeStatus.PASSED, List.of());
+                "default-entry", null, 1, 0, 1, OutputSchemaOutcomeStatus.PASSED, List.of());
         branch.recordLinterOutcome(linter);
         branch.recordOutputSchemaOutcome(output);
 
@@ -87,7 +87,7 @@ class PhysicalBranchContextTest
     @Test
     void forkRetainsImmutableAncestorPathAndOwnsOnlyLocalFrames()
     {
-        PhysicalBranchContext parent = new PhysicalBranchContext(new LoomspanSession("fork", "entry", 4));
+        PhysicalBranchContext parent = new PhysicalBranchContext(ai.loomspan.internal.core.TestLoomspanSessions.create("fork", "default-entry", 4));
         ExecutionFrame root = frame("root", TraceFrameType.ROOT_MISSION);
         ExecutionFrame coordinator = frame("coordinator", TraceFrameType.SKILL_EXECUTION);
         parent.push(root);
@@ -95,7 +95,7 @@ class PhysicalBranchContextTest
 
         PhysicalBranchContext fork = parent.fork();
         ExecutionFrame worker = new ExecutionFrame("worker", coordinator.frameId(), OperationType.SKILL,
-                TraceFrameType.STEP_EXECUTION, "worker", Map.of(), Instant.EPOCH);
+                TraceFrameType.STEP_EXECUTION, "worker", Map.of(), Instant.EPOCH, null, null);
         fork.push(worker);
 
         assertThat(fork.rootToLeafSnapshot()).containsExactly(root, coordinator, worker);
@@ -111,14 +111,14 @@ class PhysicalBranchContextTest
     @Test
     void forkStartsWithEmptyDiagnosticsAndDoesNotMutateParent()
     {
-        PhysicalBranchContext parent = new PhysicalBranchContext(new LoomspanSession("fork-diagnostics", "entry", 3));
+        PhysicalBranchContext parent = new PhysicalBranchContext(ai.loomspan.internal.core.TestLoomspanSessions.create("fork-diagnostics", "default-entry", 3));
         LinterOutcome parentOutcome = new LinterOutcome(
-                "entry", "regex", 1, 0, 1, LinterOutcomeStatus.PASSED, "parent");
+                "default-entry", "regex", 1, 0, 1, LinterOutcomeStatus.PASSED, "default-parent");
         parent.recordLinterOutcome(parentOutcome);
 
         PhysicalBranchContext fork = parent.fork();
         OutputSchemaOutcome workerOutcome = new OutputSchemaOutcome(
-                "entry", null, 1, 0, 1, OutputSchemaOutcomeStatus.PASSED, List.of());
+                "default-entry", null, 1, 0, 1, OutputSchemaOutcomeStatus.PASSED, List.of());
         fork.recordOutputSchemaOutcome(workerOutcome);
 
         assertThat(fork.lastLinterOutcome()).isEmpty();
@@ -136,7 +136,7 @@ class PhysicalBranchContextTest
                 TraceFrameType.TOOL_INVOCATION, TraceFrameType.STEP_EXECUTION))
         {
             PhysicalBranchContext branch = new PhysicalBranchContext(
-                    new LoomspanSession("excluded-" + excluded, "entry", 1));
+                    ai.loomspan.internal.core.TestLoomspanSessions.create("excluded-" + excluded, "default-entry", 1));
             branch.push(frame("root", TraceFrameType.ROOT_MISSION));
             branch.push(frame("excluded", excluded));
             assertThat(branch.depth()).isEqualTo(2);
@@ -145,7 +145,7 @@ class PhysicalBranchContextTest
         for (TraceFrameType counted : List.of(TraceFrameType.SKILL_EXECUTION, TraceFrameType.RETRY))
         {
             PhysicalBranchContext branch = new PhysicalBranchContext(
-                    new LoomspanSession("counted-" + counted, "entry", 1));
+                    ai.loomspan.internal.core.TestLoomspanSessions.create("counted-" + counted, "default-entry", 1));
             branch.push(frame("root", TraceFrameType.ROOT_MISSION));
             assertThatThrownBy(() -> branch.push(frame("counted", counted)))
                     .isInstanceOf(LoomspanStackOverflowException.class);
@@ -156,7 +156,7 @@ class PhysicalBranchContextTest
     void cleanupDrainTransfersOnlyLocalFramesLeafToRootExactlyOnce()
     {
         ExecutionBinding binding = TestExecutionBindings.missionBinding(
-                new LoomspanSession("drain", "entry", 8));
+                ai.loomspan.internal.core.TestLoomspanSessions.create("drain", "default-entry", 8));
         PhysicalBranchContext worker = binding.branch().fork();
         ExecutionFrame first = frame("first", TraceFrameType.STEP_EXECUTION);
         ExecutionFrame second = frame("second", TraceFrameType.TOOL_INVOCATION);
@@ -173,6 +173,6 @@ class PhysicalBranchContextTest
 
     private ExecutionFrame frame(String id, TraceFrameType type)
     {
-        return new ExecutionFrame(id, null, OperationType.SKILL, type, id, Map.of(), Instant.EPOCH);
+        return new ExecutionFrame(id, null, OperationType.SKILL, type, id, Map.of(), Instant.EPOCH, null, null);
     }
 }

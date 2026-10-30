@@ -20,6 +20,11 @@ const manifestSchemaV1 = "loomspan-trace-analysis-manifest-v1"
 // root references, terminal facts, component sizes, and index offsets. It is
 // written after every index is synced so a partial manifest is never published.
 type manifest struct {
+	EntrySkill             string            `json:"entrySkill"`
+	GenerationID           string            `json:"generationId"`
+	EntryNamespace         string            `json:"entryNamespace"`
+	NamespaceGenerationIDs map[string]string `json:"namespaceGenerationIds"`
+
 	Schema             string                           `json:"schema"`
 	TraceID            string                           `json:"traceId"`
 	SessionID          string                           `json:"sessionId"`

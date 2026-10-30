@@ -265,6 +265,11 @@ type uncertaintyResult struct {
 // only the category. It mirrors the Java fixture-corpus expected schema so the
 // Go fixture test can compare directly.
 type analysisResult struct {
+	EntrySkill             string            `json:"entrySkill,omitempty"`
+	GenerationID           string            `json:"generationId,omitempty"`
+	EntryNamespace         string            `json:"entryNamespace,omitempty"`
+	NamespaceGenerationIDs map[string]string `json:"namespaceGenerationIds,omitempty"`
+
 	Valid                   bool                `json:"valid"`
 	TraceID                 string              `json:"traceId,omitempty"`
 	SessionID               string              `json:"sessionId,omitempty"`

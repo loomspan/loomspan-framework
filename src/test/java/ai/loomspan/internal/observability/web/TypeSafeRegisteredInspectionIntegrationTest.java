@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "loomspan.observability.enabled=true",
     "loomspan.observability.auth.api-key=0123456789abcdef0123456789abcdef",
     "loomspan.skills.locations=classpath:/typesafe-inspection-test/*.yaml",
-    "loomspan.connections.native.driver=typesafe", "loomspan.connections.native.api-key=fixture",
+    "loomspan.connections.native.driver=typesafe", "loomspan.connections.native.api-key=fixture", "fixture.key=fixture",
     "loomspan.models.native.connection=native", "loomspan.models.native.provider-model=jev"
 })
 @AutoConfigureMockMvc
@@ -50,17 +50,17 @@ class TypeSafeRegisteredInspectionIntegrationTest {
                 .andReturn().getResponse().getContentAsString()).path("items");
         assertThat(summary.size()).isEqualTo(1);
         var item = summary.get(0);
-        assertThat(item.path("registeredName").asText()).isEqualTo("judgment");
+        assertThat(item.path("registeredName").asText()).isEqualTo("default-judgment");
         assertThat(item.path("source").asText()).isEqualTo("TYPESAFE");
         assertThat(item.path("sourcePath").asText()).isEqualTo(location).isNotBlank();
         for (String omitted : List.of("yaml", "outputSchema", "beanName", "method")) assertThat(item.has(omitted)).isFalse();
-        var detail = JSON.readTree(mvc.perform(get(ObservabilityApiPaths.SKILLS + "/judgment")
+        var detail = JSON.readTree(mvc.perform(get(ObservabilityApiPaths.SKILLS + "/default-judgment")
                 .header(ObservabilityApiKeyFilter.API_KEY_HEADER, KEY)).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
         assertThat(detail.path("source").asText()).isEqualTo("TYPESAFE");
         assertThat(detail.path("sourcePath").asText()).isEqualTo(location);
         assertThat(detail.path("yaml").asText()).isEqualTo(yaml);
-        assertThat(detail.path("outputSchema").asText()).isEqualTo(reloader.snapshot("default").skill("judgment").orElseThrow().outputSchema());
+        assertThat(detail.path("outputSchema").asText()).isEqualTo(reloader.snapshot("default").skill("default-judgment").orElseThrow().outputSchema());
         assertThat(detail.has("beanName")).isFalse();
         assertThat(detail.has("method")).isFalse();
     }

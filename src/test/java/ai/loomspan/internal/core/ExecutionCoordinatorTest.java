@@ -66,17 +66,17 @@ class ExecutionCoordinatorTest {
         var childInput = new java.util.concurrent.atomic.AtomicReference<Map<String, Object>>();
         ExecutionCoordinator coordinator = nullInputCoordinator(
                 (session, definition, objective, missionInput, model, tools, planning, authentication) -> {
-                    if (definition.manifest().getName().equals("parentSkill"))
+                    if (definition.identity().toString().equals("default-parentSkill"))
                         return String.valueOf(tools.getFirst().invoke(input, null));
                     childInput.set(missionInput);
                     return "compared";
                 });
-        LoomspanSession session = new LoomspanSession("null-child", "parentSkill", 3, null, TracePersistencePolicy.ALWAYS);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("null-child", "default-parentSkill", 3, null, TracePersistencePolicy.ALWAYS);
 
-        assertThat(coordinator.execute("parentSkill", "Compare equipment", session, null)).isEqualTo("compared");
+        assertThat(coordinator.execute("default-parentSkill", "Compare equipment", session, null)).isEqualTo("compared");
         assertThat(childInput.get()).isEqualTo(input);
-        TraceRecord parent = missionOpened(session, "parentSkill");
-        TraceRecord child = missionOpened(session, "compareOptions");
+        TraceRecord parent = missionOpened(session, "default-parentSkill");
+        TraceRecord child = missionOpened(session, "default-compareOptions");
         assertThat(child.parentFrameId()).isNotNull();
         assertThat(child.parentFrameId()).isNotEqualTo(child.frameId());
         assertThat(parent.parentFrameId()).isNull();
@@ -124,11 +124,11 @@ class ExecutionCoordinatorTest {
                     input.put("requiredInput", "later");
                     return "executed";
                 });
-        LoomspanSession session = new LoomspanSession("null-snapshot", "compareOptions", 3, null, TracePersistencePolicy.ALWAYS);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("null-snapshot", "default-compareOptions", 3, null, TracePersistencePolicy.ALWAYS);
 
-        assertThat(coordinator.execute("compareOptions", "Compare equipment", input, session, null)).isEqualTo("executed");
+        assertThat(coordinator.execute("default-compareOptions", "Compare equipment", input, session, null)).isEqualTo("executed");
         assertThat((tools.jackson.databind.JsonNode) new tools.jackson.databind.ObjectMapper().valueToTree(captured.get())).isEqualTo(expected);
-        assertThat(missionOpened(session, "compareOptions").data().path("missionInput")).isEqualTo(expected);
+        assertThat(missionOpened(session, "default-compareOptions").data().path("missionInput")).isEqualTo(expected);
     }
 
     @Test
@@ -140,14 +140,14 @@ class ExecutionCoordinatorTest {
         var childExecuted = new java.util.concurrent.atomic.AtomicBoolean();
         ExecutionCoordinator coordinator = nullInputCoordinator(
                 (session, definition, objective, missionInput, model, tools, planning, authentication) -> {
-                    if (definition.manifest().getName().equals("parentSkill"))
+                    if (definition.identity().toString().equals("default-parentSkill"))
                         return String.valueOf(tools.getFirst().invoke(input, null));
                     childExecuted.set(true);
                     return "unexpected";
                 });
-        LoomspanSession session = new LoomspanSession("null-validation", "parentSkill", 3, null, TracePersistencePolicy.ALWAYS);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("null-validation", "default-parentSkill", 3, null, TracePersistencePolicy.ALWAYS);
 
-        Throwable failure = catchThrowable(() -> coordinator.execute("parentSkill", "Compare equipment", session, null));
+        Throwable failure = catchThrowable(() -> coordinator.execute("default-parentSkill", "Compare equipment", session, null));
         assertThat(failure).isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
         assertThat(((ai.loomspan.api.SkillInputValidationException) failure).getIssues())
                 .anySatisfy(issue -> {
@@ -170,7 +170,7 @@ class ExecutionCoordinatorTest {
     private static ExecutionCoordinator nullInputCoordinator(MissionExecutionEngine engine)
     {
         var configuration = new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
-        YamlSkillManifest childManifest = manifest("compareOptions", List.of());
+        YamlSkillManifest childManifest = manifest("default-compareOptions", List.of());
         var root = new YamlSkillManifest.InputSchemaManifest();
         root.setType("object");
         root.setRequired(List.of("requiredInput"));
@@ -186,21 +186,21 @@ class ExecutionCoordinatorTest {
         required.setType("string");
         root.setProperties(Map.of("context", context, "requiredInput", required));
         childManifest.setInputSchema(root);
-        var parentDefinition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest("parentSkill", List.of("compareOptions")), configuration);
+        var parentDefinition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest("default-parentSkill", List.of("default-compareOptions")), configuration);
         var childDefinition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), childManifest, configuration);
         var catalog = new StubYamlSkillCatalog(parentDefinition, childDefinition);
         var registry = new TestCapabilityRegistry();
         var resolver = new ai.loomspan.internal.runtime.input.SkillInputContractResolver();
         for (YamlSkillDefinition definition : List.of(parentDefinition, childDefinition))
         {
-            String name = definition.manifest().getName();
+            String name = definition.identity().toString();
             registry.register(name, new CapabilityMetadata("yaml:" + name, name, name,
                     SkillExecutionDescriptor.from(configuration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                     arguments -> { throw new AssertionError("YAML must enter its mission engine"); }, CapabilityKind.YAML_SKILL,
                     CapabilityToolDescriptor.generic(name, name), resolver.resolveYamlCapability(definition), null));
         }
         return coordinator(catalog, registry,
-                (name, session, authentication) -> name.equals("parentSkill") ? List.of(registry.getCapability("compareOptions")) : List.of(),
+                (name, session, authentication) -> name.equals("default-parentSkill") ? List.of(registry.getCapability("default-compareOptions")) : List.of(),
                 new RecordingModelInteractionFactory(new FakeCoordinatorChatClient(null, "unused", null, false)),
                 (value, session) -> value, null, engine);
     }
@@ -209,10 +209,10 @@ class ExecutionCoordinatorTest {
     void failedMissionFrameOpenReleasesRetiredGeneration()
     {
         CapabilityMetadata rest = new CapabilityMetadata(
-                "rest:lookup", "restLookup", "REST lookup", SkillExecutionDescriptor.none(),
+                "rest:lookup", "default-restLookup", "REST lookup", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused", CapabilityKind.REST_SKILL,
-                CapabilityToolDescriptor.generic("restLookup", "REST lookup"), null);
+                CapabilityToolDescriptor.generic("default-restLookup", "REST lookup"), null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rest.name(), rest);
         var generations = registry.manager();
@@ -222,7 +222,7 @@ class ExecutionCoordinatorTest {
         var lifecycle = new FrameworkExecutionLifecycle(new StaticApplicationContext(),
                 Duration.ofSeconds(1), Executors.newSingleThreadExecutor());
         var root = lifecycle.admitRoot(captured.lease());
-        var session = new LoomspanSession("failed-frame", "restLookup", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.create("failed-frame", "default-restLookup", 3);
         session.attachAdmittedRoot(root);
         assertThat(root.claimExecution()).isTrue();
         ai.loomspan.testkit.TestSkillGenerations.activate(generations, ai.loomspan.testkit.TestSkillGenerations.empty());
@@ -247,7 +247,7 @@ class ExecutionCoordinatorTest {
 
         try
         {
-            assertThatThrownBy(() -> coordinator.execute("restLookup", "lookup", session, null))
+            assertThatThrownBy(() -> coordinator.execute("default-restLookup", "lookup", session, null))
                     .isInstanceOf(IllegalStateException.class).hasMessage("frame-open-failed");
             root.completeExecution();
             assertThat(retired).containsExactly(captured.snapshot().entryGeneration().id());
@@ -262,7 +262,7 @@ class ExecutionCoordinatorTest {
         var handlerAuthentication = new java.util.concurrent.atomic.AtomicReference<String>();
         var handlerInput = new java.util.concurrent.atomic.AtomicReference<Map<String, Object>>();
         CapabilityMetadata rest = new CapabilityMetadata(
-                "rest:lookup", "restLookup", "REST lookup", SkillExecutionDescriptor.none(),
+                "rest:lookup", "default-restLookup", "REST lookup", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("REST_USER")),
                 arguments -> {
                     handlerAuthentication.set(org.springframework.security.core.context.SecurityContextHolder
@@ -270,7 +270,7 @@ class ExecutionCoordinatorTest {
                     handlerInput.set(arguments);
                     return "resolved";
                 }, CapabilityKind.REST_SKILL,
-                CapabilityToolDescriptor.generic("restLookup", "REST lookup"), null);
+                CapabilityToolDescriptor.generic("default-restLookup", "REST lookup"), null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rest.name(), rest);
         ExecutionStateService state = fixedStateService();
@@ -286,10 +286,10 @@ class ExecutionCoordinatorTest {
         var caller = UsernamePasswordAuthenticationToken.authenticated(
                 "rest-caller", "unused", AuthorityUtils.createAuthorityList("ROLE_REST_USER"));
         LoomspanSession session = TestLoomspanSessions.withId(
-                "session-rest", "restLookup", 2, null, TracePersistencePolicy.ALWAYS);
+                "session-rest", "default-restLookup", 2, null, TracePersistencePolicy.ALWAYS);
 
         assertThat(coordinator.execute(
-                "restLookup", "Resolve the attachment", Map.of("attachment", "ref://attachment"), session, caller))
+                "default-restLookup", "Resolve the attachment", Map.of("attachment", "ref://attachment"), session, caller))
                 .isEqualTo("resolved");
         assertThat(handlerAuthentication).hasValue("rest-caller");
         assertThat(handlerInput.get()).containsEntry("attachment", resolved);
@@ -305,7 +305,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = plannedManifest("rootVisibleSkill", List.of("allowedVisibleSkill"));
+        YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
@@ -313,20 +313,20 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ROOT")),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child",
-                "allowedVisibleSkill",
+                "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "child", CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
+                CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -335,9 +335,9 @@ class ExecutionCoordinatorTest {
         FakeCoordinatorChatClient chatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "plan-root-rbac",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Instant.parse("2026-03-15T12:00:00Z"),
-                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "allowedVisibleSkill"))),
+                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "default-allowedVisibleSkill"))),
                 "unused",
                 "{\"value\":\"hello\"}");
 
@@ -350,19 +350,19 @@ class ExecutionCoordinatorTest {
                 null,
                 true);
 
-        LoomspanSession mismatched = new LoomspanSession("session-mismatch", "another.entry", 3);
-        assertThatThrownBy(() -> coordinator.execute("rootVisibleSkill", "Say hello", mismatched, null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Top-level capability name does not match session entry skill");
+        LoomspanSession mismatched = ai.loomspan.internal.core.TestLoomspanSessions.create("session-mismatch", "default-another_entry", 3);
+        assertThatThrownBy(() -> coordinator.execute("default-rootVisibleSkill", "Say hello", mismatched, null))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("current captured source");
         assertThat(ExecutionBindingScope.current()).isEmpty();
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3);
 
-        assertThatThrownBy(() -> coordinator.execute("rootVisibleSkill", "Say hello", session, null))
+        assertThatThrownBy(() -> coordinator.execute("default-rootVisibleSkill", "Say hello", session, null))
                 .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("rootVisibleSkill");
+                .hasMessageContaining("default-rootVisibleSkill");
         assertThat(java.util.Optional.ofNullable(session.getExecutionPlanSnapshot())).isEmpty();
-        assertThat(session.getJournalSnapshot()).filteredOn(entry -> entry.type() != JournalEntryType.SKILL_STARTED && entry.type() != JournalEntryType.SKILL_FINISHED).extracting(JournalEntry::type).containsExactly(JournalEntryType.ERROR);
+        assertThat(session.getJournalSnapshot()).isEmpty();
         assertThat(chatClient.systemMessagesSeen).isEmpty();
         assertThat(ExecutionBindingScope.current()).isEmpty();
     }
@@ -374,7 +374,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = plannedManifest("rootVisibleSkill", List.of("allowedVisibleSkill"));
+        YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
@@ -382,20 +382,20 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ROOT")),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child",
-                "allowedVisibleSkill",
+                "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "child", CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
+                CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -404,9 +404,9 @@ class ExecutionCoordinatorTest {
         FakeCoordinatorChatClient chatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "plan-root-rbac",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Instant.parse("2026-03-15T12:00:00Z"),
-                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "allowedVisibleSkill"))),
+                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "default-allowedVisibleSkill"))),
                 "unused",
                 "{\"value\":\"hello\"}");
 
@@ -419,14 +419,14 @@ class ExecutionCoordinatorTest {
                 null,
                 true);
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3);
         session.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
                 "user",
                 "pw",
                 AuthorityUtils.createAuthorityList("ROLE_ROOT")));
 
         var capturedAuthentication = session.getAuthentication().orElseThrow();
-        assertThat(coordinator.execute("rootVisibleSkill", "Say hello", session, null)).isEqualTo("unused");
+        assertThat(coordinator.execute("default-rootVisibleSkill", "Say hello", session, null)).isEqualTo("unused");
         assertThat(session.getAuthentication()).containsSame(capturedAuthentication);
         assertThat(java.util.Optional.ofNullable(session.getExecutionPlanSnapshot())).isPresent();
         assertThat(chatClient.systemMessagesSeen).isNotEmpty();
@@ -440,7 +440,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = plannedManifest("rootVisibleSkill", List.of("allowedVisibleSkill"));
+        YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
@@ -448,20 +448,20 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child",
-                "allowedVisibleSkill",
+                "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
+                CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -470,9 +470,9 @@ class ExecutionCoordinatorTest {
         FakeCoordinatorChatClient chatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "plan-1",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Instant.parse("2026-03-15T12:00:00Z"),
-                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "allowedVisibleSkill"))),
+                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "default-allowedVisibleSkill"))),
                 "mission complete",
                 "{\"value\":\"ref://artifacts/input.txt\"}");
         RecordingModelInteractionFactory factory = new RecordingModelInteractionFactory(chatClient);
@@ -489,9 +489,9 @@ class ExecutionCoordinatorTest {
                 null,
                 true);
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3);
         String response = coordinator.execute(
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "Say hello",
                 session,
                 UsernamePasswordAuthenticationToken.authenticated(
@@ -500,7 +500,7 @@ class ExecutionCoordinatorTest {
                         AuthorityUtils.createAuthorityList("ROLE_ALLOWED")));
 
         assertThat(response).isEqualTo("mission complete");
-        assertThat(factory.lastDefinition).isEqualTo(catalog.getSkill("rootVisibleSkill"));
+        assertThat(factory.lastDefinition).isEqualTo(catalog.getSkill("default-rootVisibleSkill"));
         assertThat(factory.lastDefinition.executionConfiguration()).isEqualTo(executionConfiguration);
         assertThat(java.util.Optional.ofNullable(session.getExecutionPlanSnapshot())).isPresent();
         assertThat(java.util.Optional.ofNullable(session.getExecutionPlanSnapshot()).orElseThrow().tasks()).extracting(PlanTask::status)
@@ -513,8 +513,8 @@ class ExecutionCoordinatorTest {
                         JournalEntryType.TOOL_CALL,
                         JournalEntryType.PLAN_UPDATED,
                         JournalEntryType.TOOL_RESULT);
-        assertThat(chatClient.toolNamesSeen).containsExactly("allowedVisibleSkill");
-        assertThat(chatClient.toolNamesByCall).containsExactly(List.of(), List.of("allowedVisibleSkill"));
+        assertThat(chatClient.toolNamesSeen).containsExactly("default-allowedVisibleSkill");
+        assertThat(chatClient.toolNamesByCall).containsExactly(List.of(), List.of("default-allowedVisibleSkill"));
         assertThat(chatClient.systemMessagesSeen).hasSize(2);
         assertThat(chatClient.systemMessagesSeen.get(1)).contains(
                 java.util.Optional.ofNullable(session.getExecutionPlanSnapshot()).orElseThrow().planId(),
@@ -541,7 +541,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = manifest("rootVisibleSkill", List.of("allowedVisibleSkill"));
+        YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
         manifest.setPlanningMode(false);
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
@@ -550,20 +550,20 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child",
-                "allowedVisibleSkill",
+                "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
+                CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -572,9 +572,9 @@ class ExecutionCoordinatorTest {
         FakeCoordinatorChatClient chatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "unused-plan",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Instant.parse("2026-03-15T12:00:00Z"),
-                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "allowedVisibleSkill"))),
+                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "default-allowedVisibleSkill"))),
                 "mission complete",
                 "{\"value\":\"hello\"}",
                 false);
@@ -589,15 +589,15 @@ class ExecutionCoordinatorTest {
                 null,
                 true);
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 3);
-        String response = coordinator.execute("rootVisibleSkill", "Say hello", session, null);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3);
+        String response = coordinator.execute("default-rootVisibleSkill", "Say hello", session, null);
 
         assertThat(response).isEqualTo("mission complete");
         assertThat(java.util.Optional.ofNullable(session.getExecutionPlanSnapshot())).isEmpty();
         assertThat(session.getJournalSnapshot()).filteredOn(entry -> entry.type() != JournalEntryType.SKILL_STARTED && entry.type() != JournalEntryType.SKILL_FINISHED).extracting(JournalEntry::type)
                 .containsExactly(JournalEntryType.UNPLANNED_TOOL_EXECUTION, JournalEntryType.TOOL_RESULT);
         assertThat(chatClient.systemMessagesSeen).containsExactly("Execute the mission using only the visible YAML tools when needed.");
-        assertThat(chatClient.toolNamesByCall).containsExactly(List.of("allowedVisibleSkill"));
+        assertThat(chatClient.toolNamesByCall).containsExactly(List.of("default-allowedVisibleSkill"));
     }
 
     @Test
@@ -607,7 +607,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = manifest("rootVisibleSkill", List.of());
+        YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
         manifest.setPlanningMode(true);
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
@@ -615,12 +615,12 @@ class ExecutionCoordinatorTest {
                 executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -649,7 +649,7 @@ class ExecutionCoordinatorTest {
                 new ai.loomspan.internal.security.ScopedAuthentication(null),
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
 
-        String response = coordinator.execute("rootVisibleSkill", "Say hello", new LoomspanSession("session-1", "rootVisibleSkill", 3), null);
+        String response = coordinator.execute("default-rootVisibleSkill", "Say hello", ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3), null);
 
         assertThat(response).isEqualTo("step loop complete");
         assertThat(factory.stepExecutionRequested).isTrue();
@@ -662,19 +662,19 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = manifest("rootVisibleSkill", List.of());
+        YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -703,7 +703,7 @@ class ExecutionCoordinatorTest {
                 new ai.loomspan.internal.security.ScopedAuthentication(null),
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
 
-        String response = coordinator.execute("rootVisibleSkill", "Say hello", new LoomspanSession("session-1", "rootVisibleSkill", 3), null);
+        String response = coordinator.execute("default-rootVisibleSkill", "Say hello", ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3), null);
 
         assertThat(response).isEqualTo("one shot complete");
         assertThat(factory.stepExecutionRequested).isFalse();
@@ -716,22 +716,27 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = manifest("rootVisibleSkill", List.of());
+        YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
-                executionConfiguration));
+                executionConfiguration), new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]),
+                manifest("default-top_entry", List.of("default-rootVisibleSkill")), executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
+        registry.register("default-top_entry", new CapabilityMetadata("yaml:parent", "default-top_entry", "parent",
+                SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),
+                input -> "unused", CapabilityKind.YAML_SKILL,
+                CapabilityToolDescriptor.generic("default-top_entry", "parent"), null));
 
         ExecutionStateService stateService = fixedStateService();
         MissionExecutionEngine assertingEngine = (session, definition, objective, missionInput, chatClient, visibleTools, planningEnabled, authentication) -> {
@@ -750,15 +755,15 @@ class ExecutionCoordinatorTest {
                 assertingEngine,
                 null);
 
-        LoomspanSession session = new LoomspanSession("session-nested", "top.entry", 3);
-        MissionContext parent = new MissionContext(session, "top.entry", "parent-frame", null);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-nested", "default-top_entry", 3);
+        MissionContext parent = new MissionContext(session, "default-top_entry", "parent-frame", null);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         String response = ExecutionBindingScope.supplyWith(ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, branch,
                 registry.generation(catalog)), () -> {
-            ExecutionFrame parentFrame = stateService.openMissionFrame(session, "parent.visible.skill", Map.of("objective", "parent"));
-            stateService.recordSuccessfulSkill("invoiceParser", "task-1", false);
+            ExecutionFrame parentFrame = stateService.openMissionFrame(session, "default-top_entry", Map.of("objective", "default-parent"));
+            stateService.recordSuccessfulSkill("default-invoiceParser", "task-1", false);
             try {
-                return coordinator.execute("rootVisibleSkill", "child objective", session, null);
+                return coordinator.execute("default-rootVisibleSkill", "child objective", session, null);
             }
             finally {
                 stateService.closeMissionFrame(session, parentFrame);
@@ -766,8 +771,8 @@ class ExecutionCoordinatorTest {
         });
 
         assertThat(response).isEqualTo("nested complete");
-        assertThat(session.entrySkill()).isEqualTo("top.entry");
-        assertThat(parent.successfulDirectSkills()).containsExactly("invoiceParser");
+        assertThat(session.entrySkill()).isEqualTo("default-top_entry");
+        assertThat(parent.successfulDirectSkills()).containsExactly("default-invoiceParser");
     }
 
     @Test
@@ -777,7 +782,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = manifest("rootVisibleSkill", List.of());
+        YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
         manifest.setPlanningMode(true);
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
@@ -785,12 +790,12 @@ class ExecutionCoordinatorTest {
                 executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -815,7 +820,7 @@ class ExecutionCoordinatorTest {
                 new ai.loomspan.internal.security.ScopedAuthentication(null),
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(fixedStateService(), java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
 
-        assertThatThrownBy(() -> coordinator.execute("rootVisibleSkill", "Say hello", new LoomspanSession("session-1", "rootVisibleSkill", 3), null))
+        assertThatThrownBy(() -> coordinator.execute("default-rootVisibleSkill", "Say hello", ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3), null))
                 .isInstanceOf(UnsupportedOperationException.class)
                 .hasMessageContaining("step execution unavailable");
     }
@@ -829,16 +834,16 @@ class ExecutionCoordinatorTest {
                 "medium");
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
-                manifest("rootVisibleSkill", List.of()),
+                manifest("default-rootVisibleSkill", List.of()),
                 executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -854,9 +859,9 @@ class ExecutionCoordinatorTest {
                 (value, session) -> value,
                 null,
                 failingMissionExecutionEngine);
-        LoomspanSession session = new LoomspanSession("session-top-level-failure", "rootVisibleSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-top-level-failure", "default-rootVisibleSkill", 3);
 
-        assertThatThrownBy(() -> coordinator.execute("rootVisibleSkill", "Say hello", session, null))
+        assertThatThrownBy(() -> coordinator.execute("default-rootVisibleSkill", "Say hello", session, null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("boom");
 
@@ -883,16 +888,16 @@ class ExecutionCoordinatorTest {
                 "medium");
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
-                manifest("rootVisibleSkill", List.of()),
+                manifest("default-rootVisibleSkill", List.of()),
                 executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -905,8 +910,8 @@ class ExecutionCoordinatorTest {
                 (value, session) -> value,
                 null);
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 3, null, TracePersistencePolicy.ALWAYS);
-        String response = coordinator.execute("rootVisibleSkill", "Say hello", session, null);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3, null, TracePersistencePolicy.ALWAYS);
+        String response = coordinator.execute("default-rootVisibleSkill", "Say hello", session, null);
 
         assertThat(response).isEqualTo("mission complete");
         TraceRecord rootFrameClosed = readTraceRecords(session).stream()
@@ -927,16 +932,16 @@ class ExecutionCoordinatorTest {
                 "medium");
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
-                attachmentManifest("rootVisibleSkill"),
+                attachmentManifest("default-rootVisibleSkill"),
                 executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -948,10 +953,10 @@ class ExecutionCoordinatorTest {
                 new RecordingModelInteractionFactory(new FakeCoordinatorChatClient(null, "unused", null, false)),
                 (value, session) -> value,
                 null);
-        LoomspanSession session = new LoomspanSession("session-attachment-redaction", "rootVisibleSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-attachment-redaction", "default-rootVisibleSkill", 3);
 
         assertThatThrownBy(() -> coordinator.execute(
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "Parse image",
                 Map.of("image", "data:image/jpeg;base64,SECRET_IMAGE_BYTES"),
                 session,
@@ -980,16 +985,16 @@ class ExecutionCoordinatorTest {
                 "medium");
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
-                manifest("rootVisibleSkill", List.of()),
+                manifest("default-rootVisibleSkill", List.of()),
                 executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -1019,10 +1024,10 @@ class ExecutionCoordinatorTest {
                 fixedPlanningService(stateService),
                 failingMissionExecutionEngine,
                 null);
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3);
 
         Throwable thrown = catchThrowable(() ->
-                coordinator.execute("rootVisibleSkill", "Say hello", session, null));
+                coordinator.execute("default-rootVisibleSkill", "Say hello", session, null));
 
         assertThat(thrown)
                 .isInstanceOf(IllegalStateException.class)
@@ -1048,7 +1053,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = manifest("rootVisibleSkill", List.of("allowedVisibleSkill"));
+        YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
         manifest.setPlanningMode(false);
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
@@ -1057,20 +1062,20 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child",
-                "allowedVisibleSkill",
+                "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
+                CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -1079,9 +1084,9 @@ class ExecutionCoordinatorTest {
         FakeCoordinatorChatClient chatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "unused-plan",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Instant.parse("2026-03-15T12:00:00Z"),
-                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "allowedVisibleSkill"))),
+                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "default-allowedVisibleSkill"))),
                 "mission complete",
                 "{\"value\":\"hello\"}",
                 false);
@@ -1095,14 +1100,14 @@ class ExecutionCoordinatorTest {
                 null,
                 true);
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3);
         session.replaceRetainedRootState(new ExecutionPlan(
                 "stale-plan",
-                "old.skill",
+                "default-old_skill",
                 Instant.parse("2026-03-14T12:00:00Z"),
                 List.of(new PlanTask("old-task", "Old work", PlanTaskStatus.IN_PROGRESS, "stale note"))), null, null);
 
-        String response = coordinator.execute("rootVisibleSkill", "Say hello", session, null);
+        String response = coordinator.execute("default-rootVisibleSkill", "Say hello", session, null);
 
         assertThat(response).isEqualTo("mission complete");
         assertThat(java.util.Optional.ofNullable(session.getExecutionPlanSnapshot())).isEmpty();
@@ -1117,7 +1122,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = plannedManifest("rootVisibleSkill", List.of("allowedVisibleSkill"));
+        YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
@@ -1125,22 +1130,22 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child",
-                "allowedVisibleSkill",
+                "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 args -> {
                     throw new IllegalStateException("tool exploded");
                 }, CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
+                CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -1149,9 +1154,9 @@ class ExecutionCoordinatorTest {
         FakeCoordinatorChatClient chatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "plan-2",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Instant.parse("2026-03-15T12:00:00Z"),
-                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "allowedVisibleSkill"))),
+                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "default-allowedVisibleSkill"))),
                 "unused",
                 "{\"value\":\"ref://artifacts/input.txt\"}");
         RecordingModelInteractionFactory factory = new RecordingModelInteractionFactory(chatClient);
@@ -1168,9 +1173,9 @@ class ExecutionCoordinatorTest {
                 null,
                 true);
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3);
 
-        assertThatThrownBy(() -> coordinator.execute("rootVisibleSkill", "Say hello", session, null))
+        assertThatThrownBy(() -> coordinator.execute("default-rootVisibleSkill", "Say hello", session, null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasRootCauseMessage("tool exploded");
         assertThat(java.util.Optional.ofNullable(session.getExecutionPlanSnapshot())).isPresent();
@@ -1193,8 +1198,8 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.ANTHROPIC,
                 "anthropic/claude-sonnet-4",
                 "medium");
-        YamlSkillManifest rootManifest = plannedManifest("rootVisibleSkill", List.of("childLlmSkill"));
-        YamlSkillManifest childManifest = plannedManifest("childLlmSkill", List.of("marsAnalyzer"));
+        YamlSkillManifest rootManifest = plannedManifest("default-rootVisibleSkill", List.of("default-childLlmSkill"));
+        YamlSkillManifest childManifest = plannedManifest("default-childLlmSkill", List.of("default-marsAnalyzer"));
         rootManifest.setPrompt("PARENT_PROMPT_SENTINEL");
         childManifest.setPrompt("CHILD_PROMPT_SENTINEL");
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(
@@ -1205,31 +1210,31 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(rootExecutionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child-llm",
-                "childLlmSkill",
+                "default-childLlmSkill",
                 "child llm",
                 SkillExecutionDescriptor.from(childExecutionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> {
                     throw new UnsupportedOperationException("should route through coordinator");
                 },
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("childLlmSkill", "child llm"),
+                CapabilityToolDescriptor.generic("default-childLlmSkill", "child llm"),
                 null);
         CapabilityMetadata marsAnalyzerMetadata = new CapabilityMetadata(
                 "yaml:mars-analyzer",
-                "marsAnalyzer",
+                "default-marsAnalyzer",
                 "mars analyzer",
                 SkillExecutionDescriptor.from(childExecutionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "analysis:" + arguments.get("topic"), CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("marsAnalyzer", "mars analyzer"), null);
+                CapabilityToolDescriptor.generic("default-marsAnalyzer", "mars analyzer"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -1239,17 +1244,17 @@ class ExecutionCoordinatorTest {
         FakeCoordinatorChatClient rootChatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "plan-root",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Instant.parse("2026-03-15T12:00:00Z"),
-                        List.of(toolTask("task-1", "Use childLlmSkill", "childLlmSkill"))),
+                        List.of(toolTask("task-1", "Use childLlmSkill", "default-childLlmSkill"))),
                 "root mission complete",
                 "{\"topic\":\"ref://artifacts/topic.txt\"}");
         FakeCoordinatorChatClient childChatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "plan-child",
-                        "childLlmSkill",
+                        "default-childLlmSkill",
                         Instant.parse("2026-03-15T12:01:00Z"),
-                        List.of(toolTask("child-task-1", "Use marsAnalyzer", "marsAnalyzer"))),
+                        List.of(toolTask("child-task-1", "Use marsAnalyzer", "default-marsAnalyzer"))),
                 "child mission complete",
                 "{\"topic\":\"mars\"}");
         MultiClientModelInteractionFactory factory = new MultiClientModelInteractionFactory(
@@ -1257,9 +1262,9 @@ class ExecutionCoordinatorTest {
                         rootExecutionConfiguration.frameworkModel(), rootChatClient,
                         childExecutionConfiguration.frameworkModel(), childChatClient));
         SkillVisibilityResolver visibilityResolver = (currentSkillName, sessionState, authentication) ->
-                "rootVisibleSkill".equals(currentSkillName)
+                "default-rootVisibleSkill".equals(currentSkillName)
                         ? List.of(childMetadata)
-                        : "childLlmSkill".equals(currentSkillName) ? List.of(marsAnalyzerMetadata) : List.of();
+                        : "default-childLlmSkill".equals(currentSkillName) ? List.of(marsAnalyzerMetadata) : List.of();
         RefResolver refResolver = (value, session) -> value instanceof String text && text.startsWith("ref://")
                 ? "resolved-content"
                 : value;
@@ -1281,13 +1286,13 @@ class ExecutionCoordinatorTest {
                 rootCoordinator,
                 true);
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 4);
-        String response = coordinator.execute("rootVisibleSkill", "Say hello", session, null);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 4);
+        String response = coordinator.execute("default-rootVisibleSkill", "Say hello", session, null);
 
         assertThat(response).isEqualTo("root mission complete");
         assertThat(factory.seenDefinitions).containsExactly(
-                catalog.getSkill("rootVisibleSkill"),
-                catalog.getSkill("childLlmSkill"));
+                catalog.getSkill("default-rootVisibleSkill"),
+                catalog.getSkill("default-childLlmSkill"));
         assertThat(factory.seenDefinitions).extracting(YamlSkillDefinition::executionConfiguration)
                 .containsExactly(rootExecutionConfiguration, childExecutionConfiguration);
         assertThat(rootChatClient.lastToolResult).isEqualTo("child mission complete");
@@ -1323,7 +1328,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = plannedManifest("rootVisibleSkill", List.of("allowedVisibleSkill"));
+        YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
@@ -1331,20 +1336,20 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child",
-                "allowedVisibleSkill",
+                "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")),
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
+                CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -1353,9 +1358,9 @@ class ExecutionCoordinatorTest {
         FakeCoordinatorChatClient chatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "plan-rbac",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Instant.parse("2026-03-15T12:00:00Z"),
-                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "allowedVisibleSkill"))),
+                        List.of(toolTask("task-1", "Use allowedVisibleSkill", "default-allowedVisibleSkill"))),
                 "unused",
                 "{\"value\":\"hello\"}");
 
@@ -1368,9 +1373,9 @@ class ExecutionCoordinatorTest {
                 null,
                 true);
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3);
 
-        assertThatThrownBy(() -> coordinator.execute("rootVisibleSkill", "Say hello", session, null))
+        assertThatThrownBy(() -> coordinator.execute("default-rootVisibleSkill", "Say hello", session, null))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
         assertThat(java.util.Optional.ofNullable(session.getExecutionPlanSnapshot())).isPresent();
@@ -1391,8 +1396,8 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5-mini",
                 "low");
-        YamlSkillManifest rootManifest = plannedManifest("rootVisibleSkill", List.of("childLlmSkill"));
-        YamlSkillManifest childManifest = plannedManifest("childLlmSkill", List.of("marsAnalyzer"));
+        YamlSkillManifest rootManifest = plannedManifest("default-rootVisibleSkill", List.of("default-childLlmSkill"));
+        YamlSkillManifest childManifest = plannedManifest("default-childLlmSkill", List.of("default-marsAnalyzer"));
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(
                 new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), rootManifest,
                         rootExecutionConfiguration),
@@ -1401,31 +1406,31 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(rootExecutionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child-llm",
-                "childLlmSkill",
+                "default-childLlmSkill",
                 "child llm",
                 SkillExecutionDescriptor.from(childExecutionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")),
                 arguments -> {
                     throw new UnsupportedOperationException("should route through coordinator");
                 },
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("childLlmSkill", "child llm"),
+                CapabilityToolDescriptor.generic("default-childLlmSkill", "child llm"),
                 null);
         CapabilityMetadata marsAnalyzerMetadata = new CapabilityMetadata(
                 "yaml:mars-analyzer",
-                "marsAnalyzer",
+                "default-marsAnalyzer",
                 "mars analyzer",
                 SkillExecutionDescriptor.from(childExecutionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")),
                 arguments -> "analysis:" + arguments.get("topic"), CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("marsAnalyzer", "mars analyzer"), null);
+                CapabilityToolDescriptor.generic("default-marsAnalyzer", "mars analyzer"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -1435,17 +1440,17 @@ class ExecutionCoordinatorTest {
         FakeCoordinatorChatClient rootChatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "plan-root",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Instant.parse("2026-03-15T12:00:00Z"),
-                        List.of(toolTask("task-1", "Use childLlmSkill", "childLlmSkill"))),
+                        List.of(toolTask("task-1", "Use childLlmSkill", "default-childLlmSkill"))),
                 "root mission complete",
                 "{\"topic\":\"mars\"}");
         FakeCoordinatorChatClient childChatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "plan-child",
-                        "childLlmSkill",
+                        "default-childLlmSkill",
                         Instant.parse("2026-03-15T12:01:00Z"),
-                        List.of(toolTask("child-task-1", "Use marsAnalyzer", "marsAnalyzer"))),
+                        List.of(toolTask("child-task-1", "Use marsAnalyzer", "default-marsAnalyzer"))),
                 "child mission complete",
                 "{\"topic\":\"mars\"}");
         MultiClientModelInteractionFactory factory = new MultiClientModelInteractionFactory(
@@ -1453,9 +1458,9 @@ class ExecutionCoordinatorTest {
                         rootExecutionConfiguration.frameworkModel(), rootChatClient,
                         childExecutionConfiguration.frameworkModel(), childChatClient));
         SkillVisibilityResolver visibilityResolver = (currentSkillName, sessionState, authentication) ->
-                "rootVisibleSkill".equals(currentSkillName)
+                "default-rootVisibleSkill".equals(currentSkillName)
                         ? List.of(childMetadata)
-                        : "childLlmSkill".equals(currentSkillName) ? List.of(marsAnalyzerMetadata) : List.of();
+                        : "default-childLlmSkill".equals(currentSkillName) ? List.of(marsAnalyzerMetadata) : List.of();
 
         ExecutionStateService stateService = fixedStateService();
         PlanningService planningService = fixedPlanningService(stateService);
@@ -1481,9 +1486,9 @@ class ExecutionCoordinatorTest {
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, java.time.Duration.ofSeconds(5), java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(), new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
         ExecutionCoordinator coordinator = coordinatorHolder[0];
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 4);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 4);
         String response = coordinator.execute(
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "Say hello",
                 session,
                 UsernamePasswordAuthenticationToken.authenticated(
@@ -1506,7 +1511,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = manifest("rootVisibleSkill", List.of());
+        YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
         manifest.setPlanningMode(false);
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
@@ -1515,12 +1520,12 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -1545,12 +1550,12 @@ class ExecutionCoordinatorTest {
                     missionExecutionEngine,
                     null);
 
-            LoomspanSession session = new LoomspanSession("session-timeout", "rootVisibleSkill", 3);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-timeout", "default-rootVisibleSkill", 3);
 
-            assertThatThrownBy(() -> coordinator.execute("rootVisibleSkill", "Wait forever", session, null))
+            assertThatThrownBy(() -> coordinator.execute("default-rootVisibleSkill", "Wait forever", session, null))
                     .isInstanceOf(LoomspanMissionTimeoutException.class)
                     .hasMessageContaining("session-timeout")
-                    .hasMessageContaining("rootVisibleSkill");
+                    .hasMessageContaining("default-rootVisibleSkill");
             assertThat(ExecutionBindingScope.current()).isEmpty();
             assertThat(java.util.Optional.ofNullable(session.getExecutionPlanSnapshot())).isEmpty();
 
@@ -1575,16 +1580,16 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = manifest("rootVisibleSkill", List.of());
+        YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
         manifest.setPlanningMode(false);
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]), manifest, executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
-                "yaml:root", "rootVisibleSkill", "root",
+                "yaml:root", "default-rootVisibleSkill", "root",
                 SkillExecutionDescriptor.from(executionConfiguration),
                 ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root", CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"), null);
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"), null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
 
@@ -1617,11 +1622,11 @@ class ExecutionCoordinatorTest {
                     },
                     (value, session) -> value, null, stateService, planningService,
                     missionExecutionEngine, null);
-            LoomspanSession session = new LoomspanSession("session-framework-cutoff", "rootVisibleSkill", 3);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-framework-cutoff", "default-rootVisibleSkill", 3);
             session.attachAdmittedRoot(admittedRoot);
 
             var invocation = callerExecutor.submit(
-                    () -> coordinator.execute("rootVisibleSkill", "Wait for cutoff", session, null));
+                    () -> coordinator.execute("default-rootVisibleSkill", "Wait for cutoff", session, null));
             assertThat(started.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
             frameworkLifecycle.closeAdmission();
             frameworkLifecycle.stop();
@@ -1655,18 +1660,18 @@ class ExecutionCoordinatorTest {
         String methodSchema = "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}";
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child",
-                "allowedVisibleSkill",
+                "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
-                new CapabilityToolDescriptor("allowedVisibleSkill", "child", methodSchema, null), null);
+                new CapabilityToolDescriptor("default-allowedVisibleSkill", "child", methodSchema, null), null);
 
         ExecutionStateService stateService = fixedStateService();
         PlanningService planningService = fixedPlanningService(stateService);
         ai.loomspan.internal.runtime.tool.BoundCapability callback = toolCallbackFactory((value, session) -> value, null, stateService, planningService)
                 .bind(
-                        new LoomspanSession("session-1", "rootVisibleSkill", 2),
-                        new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest("rootVisibleSkill", List.of()), executionConfiguration),
+                        ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 2),
+                        new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest("default-rootVisibleSkill", List.of()), executionConfiguration),
                         List.of(childMetadata),
                         null)
                 .getFirst();
@@ -1681,7 +1686,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        YamlSkillManifest manifest = plannedManifest("rootVisibleSkill", List.of("allowedVisibleSkill"));
+        YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
@@ -1689,20 +1694,20 @@ class ExecutionCoordinatorTest {
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("rootVisibleSkill", "root"),
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
                 "yaml:child",
-                "allowedVisibleSkill",
+                "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("allowedVisibleSkill", "child"), null);
+                CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -1711,11 +1716,11 @@ class ExecutionCoordinatorTest {
         FakeCoordinatorChatClient chatClient = new FakeCoordinatorChatClient(
                 new ExecutionPlan(
                         "plan-3",
-                        "rootVisibleSkill",
+                        "default-rootVisibleSkill",
                         Instant.parse("2026-03-15T12:00:00Z"),
                         List.of(
-                                toolTask("task-1", "Use allowedVisibleSkill for source A", "allowedVisibleSkill"),
-                                toolTask("task-2", "Use allowedVisibleSkill for source B", "allowedVisibleSkill"))),
+                                toolTask("task-1", "Use allowedVisibleSkill for source A", "default-allowedVisibleSkill"),
+                                toolTask("task-2", "Use allowedVisibleSkill for source B", "default-allowedVisibleSkill"))),
                 "mission complete",
                 "{\"value\":\"hello\"}");
 
@@ -1728,8 +1733,8 @@ class ExecutionCoordinatorTest {
                 null,
                 true);
 
-        LoomspanSession session = new LoomspanSession("session-1", "rootVisibleSkill", 3);
-        String response = coordinator.execute("rootVisibleSkill", "Say hello", session, null);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 3);
+        String response = coordinator.execute("default-rootVisibleSkill", "Say hello", session, null);
 
         assertThat(response).isEqualTo("mission complete");
         assertThat(java.util.Optional.ofNullable(session.getExecutionPlanSnapshot())).isPresent();
@@ -1744,7 +1749,7 @@ class ExecutionCoordinatorTest {
 
     private static YamlSkillManifest manifest(String name, List<String> allowedSkills) {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName(name);
+        manifest.setName(ai.loomspan.internal.core.SkillIdentity.parse(name).localName());
         manifest.setDescription(name);
         manifest.setModel("gpt-5");
         manifest.setAllowedSkills(allowedSkills.stream()
@@ -2011,7 +2016,7 @@ class ExecutionCoordinatorTest {
             super(new ai.loomspan.autoconfigure.LoomspanProperties(),
                     new ai.loomspan.autoconfigure.LoomspanProperties.Skills());
             this.definitions = java.util.Arrays.stream(definitions)
-                    .collect(java.util.stream.Collectors.toMap(definition -> definition.manifest().getName(), definition -> definition));
+                    .collect(java.util.stream.Collectors.toMap(definition -> definition.identity().toString(), definition -> definition));
         }
 
         @Override

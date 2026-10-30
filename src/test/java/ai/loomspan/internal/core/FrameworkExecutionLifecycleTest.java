@@ -41,9 +41,9 @@ class FrameworkExecutionLifecycleTest
         var captured = manager.capture(SkillIdentity.parse("default-leaf"));
         String oldId = captured.snapshot().entryGeneration().id();
         var root = lifecycle.admitRoot(captured.lease());
-        var session = new LoomspanSession("retirement", "entry", 8);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.create("retirement", "default-entry", 8);
         session.attachAdmittedRoot(root);
-        var parent = new MissionContext(session, "parent", "parent", null);
+        var parent = new MissionContext(session, "default-parent", "default-parent", null);
         var child = new MissionContext(session, "child", "child", parent);
         assertThat(root.claimExecution()).isTrue();
         parent.lifecycle().markOwningStarted();
@@ -350,7 +350,7 @@ class FrameworkExecutionLifecycleTest
         var executor = Executors.newSingleThreadExecutor();
         var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofMillis(25), executor);
         var root = lifecycle.admitRoot();
-        var session = new LoomspanSession("shutdown", "entry", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.create("shutdown", "default-entry", 3);
         session.attachAdmittedRoot(root);
         var mission = new MissionContext(session, "entry", "frame", null);
         var future = new FutureTask<Void>(() -> null);
@@ -501,7 +501,7 @@ class FrameworkExecutionLifecycleTest
                 context, Duration.ofNanos(50L), executor, nanoTime::get);
         var root = lifecycle.admitRoot();
         lifecycle.closeAdmission();
-        var session = new LoomspanSession("late-mission", "entry", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.create("late-mission", "default-entry", 3);
         session.attachAdmittedRoot(root);
         var mission = new MissionContext(session, "entry", "frame", null, nanoTime::get);
         var binding = ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
@@ -556,7 +556,7 @@ class FrameworkExecutionLifecycleTest
         var executor = Executors.newSingleThreadExecutor();
         var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(1), executor);
         var root = lifecycle.admitRoot();
-        var session = new LoomspanSession("interrupted-stop", "entry", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.create("interrupted-stop", "default-entry", 3);
         session.attachAdmittedRoot(root);
         var mission = new MissionContext(session, "entry", "frame", null);
         var future = new FutureTask<Void>(() -> null);
@@ -660,7 +660,7 @@ class FrameworkExecutionLifecycleTest
         var executor = Executors.newSingleThreadExecutor();
         var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofMillis(25), executor);
         var root = lifecycle.admitRoot();
-        var session = new LoomspanSession("blocked-writer", "entry", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.create("blocked-writer", "default-entry", 3);
         session.attachAdmittedRoot(root);
         var mission = new MissionContext(session, "entry", "frame", null);
         var binding = ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());

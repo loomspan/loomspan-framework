@@ -121,6 +121,9 @@ func TestAcquireRetainsProcessorValidatedGenerationID(t *testing.T) {
 	processor := newFakeProcessor()
 	validated := testTraceMetadata("trace-1", int64(len(data)))
 	validated.GenerationID = "generation-from-trace"
+	validated.EntrySkill = "orders-root"
+	validated.EntryNamespace = "orders"
+	validated.NamespaceGenerationIDs = map[string]string{"orders": "generation-from-trace", "tax": "old-target"}
 	processor.metadata = &validated
 	svc := newTestServiceWithProcessor(t, Config{MaxBytes: 1 << 20, IdleTTL: time.Hour},
 		loader, newFakeOpener(data, int64(len(data))), &manualTimerFactory{},
@@ -140,6 +143,17 @@ func TestAcquireRetainsProcessorValidatedGenerationID(t *testing.T) {
 	if lookup.Metadata.GenerationID != validated.GenerationID {
 		t.Fatalf("cached generation ID = %q, want %q", lookup.Metadata.GenerationID, validated.GenerationID)
 	}
+	if acquired.Metadata.EntryNamespace != "orders" || acquired.Metadata.EntrySkill != "orders-root" || acquired.Metadata.NamespaceGenerationIDs["tax"] != "old-target" {
+		t.Fatalf("lost canonical capture: %+v", acquired.Metadata)
+	}
+	acquired.Metadata.NamespaceGenerationIDs["tax"] = "caller mutation"
+	lookup.Metadata.NamespaceGenerationIDs["orders"] = "lookup mutation"
+	validated.NamespaceGenerationIDs["tax"] = "processor mutation"
+	again, domain := svc.Lookup(evidence.ForTarget(scope.ID), "trace-1")
+	if domain != nil || again.Metadata.NamespaceGenerationIDs["tax"] != "old-target" || again.Metadata.NamespaceGenerationIDs["orders"] != "generation-from-trace" {
+		t.Fatalf("capture aliases mutable input/output: %+v %v", again.Metadata, domain)
+	}
+
 }
 
 func TestAcquireTimestampIsImmutableOnReuseAndRenewedAfterRemoval(t *testing.T) {

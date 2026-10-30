@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-nonterminal-error-then-success",
   "sessionId" : "session-nonterminal-error-then-success",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-nonterminal-error-then-success",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-nonterminal-error-then-success"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {

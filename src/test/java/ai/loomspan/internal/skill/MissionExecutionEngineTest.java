@@ -66,7 +66,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = TestLoomspanSessions.withId("binding-success", "test.entry", 2);
+            LoomspanSession session = TestLoomspanSessions.withId("binding-success", "default-test_entry", 2);
             ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
             SimpleChatClient chatClient = new SimpleChatClient(null, "mission complete") {
                 @Override
@@ -94,7 +94,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = TestLoomspanSessions.withId("binding-failure", "test.entry", 2);
+            LoomspanSession session = TestLoomspanSessions.withId("binding-failure", "default-test_entry", 2);
             ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
             SimpleChatClient chatClient = new SimpleChatClient(null, "unused") {
                 @Override
@@ -123,7 +123,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-        LoomspanSession session = TestLoomspanSessions.withId("binding-rejected", "test.entry", 2);
+        LoomspanSession session = TestLoomspanSessions.withId("binding-rejected", "default-test_entry", 2);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
 
         ExecutionBindingScope.runWith(binding, () -> {
@@ -152,7 +152,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(30), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = TestLoomspanSessions.withId("binding-caller-interrupt", "test.entry", 2);
+            LoomspanSession session = TestLoomspanSessions.withId("binding-caller-interrupt", "default-test_entry", 2);
             ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
             SimpleChatClient chatClient = new SimpleChatClient(null, "unused") {
                 @Override
@@ -208,16 +208,16 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-test_entry", 2);
             ExecutionPlan plan = new ExecutionPlan(
                     "plan-1",
-                    "rootVisibleSkill",
+                    "default-rootVisibleSkill",
                     Instant.parse("2026-03-15T12:00:00Z"),
                     List.of(
-                            new PlanTask("task-1", "Use tool", PlanTaskStatus.PENDING, "allowedVisibleSkill", "Use tool", List.of(), List.of(), null, null),
+                            new PlanTask("task-1", "Use tool", PlanTaskStatus.PENDING, "default-allowedVisibleSkill", "Use tool", List.of(), List.of(), null, null),
                             new PlanTask("task-2", "Failed", PlanTaskStatus.FAILED, null)));
             MissionChatClient chatClient = new MissionChatClient("mission complete");
-            BoundCapability callback = ai.loomspan.testkit.TestBoundCapabilities.capability("allowedVisibleSkill");
+            BoundCapability callback = ai.loomspan.testkit.TestBoundCapabilities.capability("default-allowedVisibleSkill");
 
             when(planningService.initializePlan(eq(session), eq("hello"), eq(null), any(YamlSkillDefinition.class), eq(chatClient), any()))
                     .thenAnswer(invocation -> {
@@ -241,7 +241,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-test_entry", 2);
             MissionChatClient chatClient = new MissionChatClient("mission complete");
 
             String response = executeMission(engine, session, definition(), "hello", null, chatClient, List.of(), false, null);
@@ -261,7 +261,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-prompt", "test.entry", 2);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-prompt", "default-test_entry", 2);
             MissionChatClient chatClient = new MissionChatClient("mission complete");
 
             String response = executeMission(engine, session, definitionWithPrompt(), "hello", null, chatClient, List.of(), false, null);
@@ -286,8 +286,8 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-request-trace", "test.entry", 2);
-            BoundCapability callback = ai.loomspan.testkit.TestBoundCapabilities.capability("allowedVisibleSkill");
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-request-trace", "default-test_entry", 2);
+            BoundCapability callback = ai.loomspan.testkit.TestBoundCapabilities.capability("default-allowedVisibleSkill");
 
             String response = executeMission(engine,
                     session,
@@ -314,7 +314,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-attachment", "test.entry", 2);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-attachment", "default-test_entry", 2);
             MissionChatClient chatClient = new MissionChatClient("mission complete");
 
             String response = executeMission(engine,
@@ -348,7 +348,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-attachment-trace", "test.entry", 2);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-attachment-trace", "default-test_entry", 2);
             MissionChatClient chatClient = new MissionChatClient("mission complete");
             ExecutionPlan plan = new ExecutionPlan(
                     "plan-attachment",
@@ -400,7 +400,7 @@ class MissionExecutionEngineTest {
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
 
             assertThatThrownBy(() -> executeMission(engine,
-                    ai.loomspan.internal.core.TestLoomspanSessions.withId("session-provider-failure", "test.entry", 2),
+                    ai.loomspan.internal.core.TestLoomspanSessions.withId("session-provider-failure", "default-test_entry", 2),
                     attachmentDefinition(),
                     "Extract ticket",
                     Map.of("image", imageResource("ticket.jpg", "image bytes")),
@@ -427,7 +427,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofMillis(25), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-timeout", "test.entry", 2);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-timeout", "default-test_entry", 2);
             ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
             BlockingMissionChatClient chatClient = new BlockingMissionChatClient(interrupted);
 
@@ -507,7 +507,7 @@ class MissionExecutionEngineTest {
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofMillis(25), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "session-cleanup-failure", "test.entry", 2);
+                    "session-cleanup-failure", "default-test_entry", 2);
             ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
 
             assertThatThrownBy(() -> ExecutionBindingScope.runWith(binding, () -> executeMission(engine,
@@ -533,7 +533,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofMillis(25), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-timeout", "test.entry", 2);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-timeout", "default-test_entry", 2);
             MissionChatClient chatClient = new MissionChatClient("mission complete");
 
             assertThatThrownBy(() -> executeMission(engine,
@@ -586,7 +586,7 @@ class MissionExecutionEngineTest {
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofMillis(25), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
             LoomspanSession session = TestLoomspanSessions.withId(
-                    "session-planning-timeout-gate", "test.entry", 2);
+                    "session-planning-timeout-gate", "default-test_entry", 2);
 
             assertThatThrownBy(() -> executeMission(
                     engine, session, definition(), "hello", null, model, List.of(), true, null))
@@ -606,7 +606,7 @@ class MissionExecutionEngineTest {
                 planningService,
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-failure", "test.entry", 2);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-failure", "default-test_entry", 2);
 
             assertThatThrownBy(() -> executeMission(engine,
                     session,
@@ -651,7 +651,7 @@ class MissionExecutionEngineTest {
                 stateService,
                 new ai.loomspan.internal.runtime.MissionWorkExecutor(stateService, Duration.ofSeconds(5), missionExecutor, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "session-error", "test.entry", 2);
+                    "session-error", "default-test_entry", 2);
 
             assertThatThrownBy(() -> executeMission(engine,
                     session,

@@ -2,7 +2,7 @@
 audience: loomspan-application-developer
 status: development
 applies_to: bundled-loomspan-revision
-coverage: migrated-readme-contract
+coverage: source-verified
 ---
 
 # Observability HTTP diagnostics
@@ -40,6 +40,32 @@ their frame-open sequence, and an empty array means no frame is currently open.
 These live and finalized-trace shapes are same-version diagnostic contracts,
 not application APIs.
 
+## Canonical identity and captured generations
+
+The existing skills list/detail/count inspect all currently published namespace
+metadata, including Private and role-restricted skills, under the existing
+observation key. Names and lookups use complete canonical `namespace-localName`
+identities; equal local names in different namespaces remain distinct. Runtime
+discovery is independently execution-permission filtered. `PUBLIC` permits
+cross-namespace skill calls, not observation or configuration access. No namespace
+filter, enumeration route or additional observer role is supplied.
+
+Active and finalized trace metadata retain `entryNamespace` and the captured
+`namespaceGenerationIds` map; `generationId` remains entry-scoped. These values
+come from admission, rather than the current publication, and remain meaningful
+after removal/recreation. Canonical trace records carry known executing-owner
+facts as `executingNamespace`/`executingGenerationId` where applicable; operation
+routes and unknown-skill diagnostics retain their established meanings. One
+invocation remains one session, trace, sequence and completed observer flow.
+
+Live Console connections and saved complete traces require exact equality with
+Framework's `consoleCompatibilityVersion`, the release string derived from Maven
+`${project.version}` through filtered `META-INF/loomspan-release.properties`.
+Missing or unequal resolved release markers reject without inference. Matching
+`development` markers permit normal complete validation but do not promise
+compatibility between development builds. No alternate protocol counter, legacy
+reader or trace migration is provided.
+
 A successful download is
 `application/x-ndjson; charset=utf-8`, has the exact cataloged
 `Content-Length`, and uses a standards-encoded attachment disposition whose
@@ -60,6 +86,8 @@ download filenames never expose or derive from the internal artifact path.
 
 ## Verification anchors
 
+Namespace metadata and semantic agreement are exercised by
+`NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest`.
 The preserved contracts are exercised by `ObservabilityArtifactIntegrationTest`,
 `ObservabilityRestIntegrationTest`, and `ObservabilityHostSecurityIntegrationTest`.
 Use matching source when diagnosing an exact protocol edge case. Live branch

@@ -65,9 +65,9 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                 new DefaultSkillAdvisorResolver(stateService).resolve(definition),
                 List.of("not-json", "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
         ExecutionCoordinator coordinator = coordinator(definition, chatClient, stateService);
-        LoomspanSession session = new LoomspanSession("session-1", "outputSchemaSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-outputSchemaSkill", 3);
 
-        String response = coordinator.execute("outputSchemaSkill", "Extract invoice", session, null);
+        String response = coordinator.execute("default-outputSchemaSkill", "Extract invoice", session, null);
 
         assertThat(response).isEqualTo("{\"vendorName\":\"Acme\",\"totalAmount\":42.5}");
         assertThat(chatClient.callCount).isEqualTo(2);
@@ -104,9 +104,9 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                         "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}",
                         "{\"vendorName\":\"Acme\",\"totalAmount\":42.5,\"status\":\"OK\"}"));
         ExecutionCoordinator coordinator = coordinator(definition, chatClient, stateService);
-        LoomspanSession session = new LoomspanSession("session-2", "outputSchemaSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-2", "default-outputSchemaSkill", 3);
 
-        String response = coordinator.execute("outputSchemaSkill", "Extract invoice", session, null);
+        String response = coordinator.execute("default-outputSchemaSkill", "Extract invoice", session, null);
 
         assertThat(response).isEqualTo("{\"vendorName\":\"Acme\",\"totalAmount\":42.5,\"status\":\"OK\"}");
         assertThat(chatClient.callCount).isEqualTo(3);
@@ -131,8 +131,8 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                 List.of(rawJson));
         ExecutionCoordinator coordinator = coordinator(definition, chatClient, stateService);
 
-        LoomspanSession session = new LoomspanSession("session-3", "outputSchemaSkill", 3);
-        String response = coordinator.execute("outputSchemaSkill", "Extract invoice", session, null);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-3", "default-outputSchemaSkill", 3);
+        String response = coordinator.execute("default-outputSchemaSkill", "Extract invoice", session, null);
 
         assertThat(response).isEqualTo(rawJson);
     }
@@ -145,12 +145,12 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
         EffectiveSkillExecutionConfiguration executionConfiguration = definition.executionConfiguration();
         CapabilityMetadata metadata = new CapabilityMetadata(
                 "yaml:output-schema",
-                definition.manifest().getName(),
+                definition.identity().toString(),
                 definition.manifest().getDescription(),
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic(definition.manifest().getName(), definition.manifest().getDescription()),
+                CapabilityToolDescriptor.generic(definition.identity().toString(), definition.manifest().getDescription()),
                 null);
         registry.register(metadata.name(), metadata);
         PlanningService planningService = new DefaultPlanningService(stateService);
@@ -198,7 +198,7 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                 "medium");
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("outputSchemaSkill");
-        manifest.setDescription("outputSchemaSkill");
+        manifest.setDescription("default-outputSchemaSkill");
         manifest.setModel("gpt-5");
         manifest.setAllowedSkills(List.of());
         manifest.setPlanningMode(false);
@@ -245,7 +245,7 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
             super(new ai.loomspan.autoconfigure.LoomspanProperties(),
                     new ai.loomspan.autoconfigure.LoomspanProperties.Skills());
             this.definitions = java.util.Arrays.stream(definitions)
-                    .collect(java.util.stream.Collectors.toMap(definition -> definition.manifest().getName(), definition -> definition));
+                    .collect(java.util.stream.Collectors.toMap(definition -> definition.identity().toString(), definition -> definition));
         }
 
         @Override

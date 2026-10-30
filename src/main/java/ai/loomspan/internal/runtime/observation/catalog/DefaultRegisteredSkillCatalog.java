@@ -51,6 +51,20 @@ public final class DefaultRegisteredSkillCatalog implements RegisteredSkillCatal
         this.entries = java.util.Collections.unmodifiableNavigableMap(built);
     }
 
+    /** Copies immutable inspection entries from one coherent registry capture. */
+    public DefaultRegisteredSkillCatalog(java.util.Collection<RegisteredSkillCatalog> catalogs)
+    {
+        TreeMap<String, RegisteredSkillEntry> built = new TreeMap<>();
+        for (RegisteredSkillCatalog catalog : catalogs)
+            for (var summary : catalog.listAfter(null, Integer.MAX_VALUE))
+            {
+                var entry = catalog.find(summary.registeredName()).orElseThrow();
+                if (built.putIfAbsent(summary.registeredName(), entry) != null)
+                    throw new IllegalArgumentException("Duplicate registered skill name '" + summary.registeredName() + "'");
+            }
+        entries = java.util.Collections.unmodifiableNavigableMap(built);
+    }
+
     @Override
     public Optional<RegisteredSkillEntry> find(String registeredName)
     {

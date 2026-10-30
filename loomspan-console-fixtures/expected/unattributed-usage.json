@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-unattributed-usage",
   "sessionId" : "session-unattributed-usage",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-unattributed-usage",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-unattributed-usage"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {

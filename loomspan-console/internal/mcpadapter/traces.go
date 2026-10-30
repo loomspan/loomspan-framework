@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -582,7 +583,7 @@ func mapSummary(x traceanalysis.TraceSummary) traceSummaryDTO {
 	for recordType, count := range x.RecordCountsByType {
 		recordCounts[string(recordType)] = count
 	}
-	return traceSummaryDTO{Outcome: x.Outcome, TerminalFailureID: x.TerminalFailureID, ConfiguredLimits: x.ConfiguredLimits, RecordCount: x.RecordCount, RecordCountsByType: recordCounts, FrameCount: x.FrameCount, PlanCount: x.PlanCount, AttemptCount: x.AttemptCount, RetryCount: x.RetryCount, ValidationCount: x.ValidationCount, FailureCount: x.FailureCount, PayloadCount: x.PayloadCount, GapCount: x.GapCount, UncertaintyCount: x.UncertaintyCount, RootFrameIDs: nonNil(x.RootFrameIDs), AttributedUsage: usageValue(x.AttributedUsage), TerminalUsage: usageValue(x.TerminalUsage), UnattributedUsage: usageValue(x.UnattributedUsage), UnframedAttributedUsage: usageValue(x.UnframedAttributed), UsageComplete: x.UsageComplete}
+	return traceSummaryDTO{EntrySkill: x.EntrySkill, GenerationID: x.GenerationID, EntryNamespace: x.EntryNamespace, NamespaceGenerationIDs: maps.Clone(x.NamespaceGenerationIDs), Outcome: x.Outcome, TerminalFailureID: x.TerminalFailureID, ConfiguredLimits: x.ConfiguredLimits, RecordCount: x.RecordCount, RecordCountsByType: recordCounts, FrameCount: x.FrameCount, PlanCount: x.PlanCount, AttemptCount: x.AttemptCount, RetryCount: x.RetryCount, ValidationCount: x.ValidationCount, FailureCount: x.FailureCount, PayloadCount: x.PayloadCount, GapCount: x.GapCount, UncertaintyCount: x.UncertaintyCount, RootFrameIDs: nonNil(x.RootFrameIDs), AttributedUsage: usageValue(x.AttributedUsage), TerminalUsage: usageValue(x.TerminalUsage), UnattributedUsage: usageValue(x.UnattributedUsage), UnframedAttributedUsage: usageValue(x.UnframedAttributed), UsageComplete: x.UsageComplete}
 }
 func mapPlan(x traceanalysis.PlanSummary) planDTO {
 	tasks := make([]planTaskDTO, 0, len(x.Tasks))
@@ -658,6 +659,8 @@ func (value frameDTO) MarshalJSON() ([]byte, error) {
 }
 func mapRecord(x traceanalysis.RecordSummary) recordDTO {
 	out := recordDTO{Sequence: x.Sequence, Type: x.Type, FailureID: x.FailureID, ValidationStatus: x.ValidationStatus, FrameID: x.FrameID, ParentFrameID: x.ParentFrameID, FrameType: x.FrameType, Route: x.Route, TimestampMillis: x.TimestampMillis, Representation: x.Representation, Attempts: []attemptDTO{}, Retries: []retryDTO{}, Validations: []validationDTO{}, Failures: []failureDTO{}}
+	out.ExecutingNamespace = x.ExecutingNamespace
+	out.ExecutingGenerationID = x.ExecutingGenerationID
 	out.ResultForwarding = x.Facts.ResultForwarding
 	out.ResultAssembly = x.Facts.ResultAssembly
 	if x.Facts.Plan != nil {

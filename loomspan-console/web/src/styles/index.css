@@ -1728,6 +1728,10 @@ input[type="file"]::file-selector-button {
   white-space: normal;
 }
 
+.trace-record-owner {
+  display: block;
+}
+
 .trace-context-trigger {
   cursor: help;
   text-decoration: underline dotted;

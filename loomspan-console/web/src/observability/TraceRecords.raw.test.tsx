@@ -65,7 +65,7 @@ test.each([
   ["MODEL_ATTEMPT_FAILED", true, ["Read raw record", "Attempt diagnostics"]],
 ] as const)("orders generic actions before special actions for %s (content: %s)", (type, hasContent, expected) => {
   const value = record(type);
-  if (type.startsWith("PLAN_")) value.plan = { planId: "plan-1", capabilityName: "investigateNetwork" };
+  if (type.startsWith("PLAN_")) value.plan = { planId: "plan-1", capabilityName: "default-investigateNetwork" };
   if (hasContent) value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 2, available: true, complete: true, inlineEligibility: true, contentRef: "content-7" };
   renderRecord(value);
   const row = screen.getAllByRole("row")[1];
@@ -74,7 +74,7 @@ test.each([
 
 test("expands authoritative plan field changes without reading plan content", () => {
   const value = {
-    ...record("PLAN_UPDATED"), plan: { planId: "plan-1", capabilityName: "investigateNetwork" },
+    ...record("PLAN_UPDATED"), plan: { planId: "plan-1", capabilityName: "default-investigateNetwork" },
     planUpdate: { previousSequence: 3, availability: "AVAILABLE" as const, changes: [
       { taskId: "task-1", field: "status" as const, before: "PENDING", after: "IN_PROGRESS" },
       { taskId: "task-1", field: "note" as const, before: null, after: "<img src=x>\nhello" },
@@ -83,7 +83,7 @@ test("expands authoritative plan field changes without reading plan content", ()
   renderRecord(value);
   fireEvent.click(screen.getByRole("button", { name: "View diff" }));
   const detail = screen.getByRole("region", { name: "Plan diff for record 7" });
-  expect(detail).toHaveTextContent("Skill: investigateNetwork, Plan: plan-1");
+  expect(detail).toHaveTextContent("Skill: default-investigateNetwork, Plan: plan-1");
   expect(detail).toHaveTextContent("Record 3 → Record 7");
   expect(detail).toHaveTextContent("tasks[task-1].status");
   expect(detail.querySelector("dd")?.textContent).toBe('"PENDING" → "IN_PROGRESS"');
@@ -153,7 +153,7 @@ test("reports malformed raw JSON without displaying partial content", async () =
 test("plan creation navigation coexists with generic raw forensics", async () => {
   getRawRecordRangeMock.mockResolvedValue(range(JSON.stringify({ recordType: "PLAN_CREATED", data: { planId: "plan-1", tasks: [{ taskId: "task-1" }] } })));
   const value = record("PLAN_CREATED");
-  value.plan = { planId: "plan-1", capabilityName: "investigateNetwork" };
+  value.plan = { planId: "plan-1", capabilityName: "default-investigateNetwork" };
   const onSelectPlan = renderRecord(value);
 
   fireEvent.click(screen.getByRole("button", { name: "View finalized plan plan-1 from record 7" }));
@@ -181,7 +181,7 @@ test("plan updates navigate by exact plan and record sequence without reading co
 
 test.each(["missing", "limited", "unchanged", "changed"])("renders %s plan comparison evidence distinctly", (kind) => {
   const value = record("PLAN_UPDATED");
-  value.plan = { planId: "plan-1", capabilityName: "investigateNetwork" };
+  value.plan = { planId: "plan-1", capabilityName: "default-investigateNetwork" };
   if (kind === "limited") value.planUpdate = { previousSequence: 3, availability: "LIMIT_EXCEEDED" };
   if (kind === "unchanged") value.planUpdate = { previousSequence: 3, availability: "AVAILABLE", changes: [] };
   if (kind === "changed") value.planUpdate = { previousSequence: 3, availability: "AVAILABLE", changes: [
@@ -217,7 +217,7 @@ test.each(["missing", "limited", "unchanged", "changed"])("renders %s plan compa
 
 test("resets diff expansion when source, generation, or record evidence disappears", () => {
   const value = record("PLAN_UPDATED");
-  value.plan = { planId: "plan-1", capabilityName: "investigateNetwork" };
+  value.plan = { planId: "plan-1", capabilityName: "default-investigateNetwork" };
   value.planUpdate = { previousSequence: 3, availability: "AVAILABLE", changes: [] };
   const props = { traceId: "trace-1", records: [value], failures: [], onSelectRecord: vi.fn(), onSelectFailure: vi.fn(), onContent: vi.fn() };
   const view = render(<TraceRecords {...props} />);
@@ -264,4 +264,10 @@ test("shows exact assembly provenance and skipped final synthesis", () => {
   fireEvent.click(screen.getByRole("button", { name: "Hide assembly details" }));
   expect(screen.queryByRole("region", { name: "Assembly details for record 7" })).toBeNull();
   expect(getRawRecordRangeMock).not.toHaveBeenCalled();
+});
+
+
+test("record context displays the captured executing generation without changing its operation route", () => {
+ renderRecord({...record(),route:"orders-search#model",executingNamespace:"tax",executingGenerationId:"retired-target"});
+ expect(screen.getByText("tax: retired-target")).toBeInTheDocument();
 });

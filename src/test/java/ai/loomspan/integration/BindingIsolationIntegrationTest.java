@@ -38,12 +38,12 @@ class BindingIsolationIntegrationTest {
     void groupedBoundProducersJoinBeforeDeliveringExactInputs(boolean concurrent) throws Exception {
         Path skills = Files.createDirectory(directory.resolve("grouped"));
         String root = parent("root", false).replace("max_steps: 2", "max_steps: 3\nconcurrency: " + concurrent)
-                .replace("  - name: consumer", "  - name: secondProducer\n"
+                .replace("  - name: default-consumer", "  - name: default-secondProducer\n"
                         + "    required: true\n    max_tasks: 1\n    input_bindings:\n"
-                        + "      /marker: {from: input, path: /marker}\n  - name: consumer")
-                .replace("      /evidence: {from: child_result, skill: producer, path: /data}",
-                        "      /evidence: {from: child_result, skill: producer, path: /data}\n"
-                                + "      /secondEvidence: {from: child_result, skill: secondProducer, path: /data}");
+                        + "      /marker: {from: input, path: /marker}\n  - name: default-consumer")
+                .replace("      /evidence: {from: child_result, skill: default-producer, path: /data}",
+                        "      /evidence: {from: child_result, skill: default-producer, path: /data}\n"
+                                + "      /secondEvidence: {from: child_result, skill: default-secondProducer, path: /data}");
         Files.writeString(skills.resolve("root.yaml"), root);
         Files.writeString(skills.resolve("producer.yaml"), leaf("producer"));
         Files.writeString(skills.resolve("secondProducer.yaml"), leaf("secondProducer"));
@@ -65,13 +65,13 @@ class BindingIsolationIntegrationTest {
                         if (system.contains("Create an ordered flight plan")) {
                             var first = task("producer", List.of()); first.put("parallelGroup", "sources");
                             var second = task("secondProducer", List.of()); second.put("parallelGroup", "sources");
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", "root", "createdAt", "2026-10-04T00:00:00Z",
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-04T00:00:00Z",
                                     "status", "VALID", "tasks", List.of(first, second, task("consumer", List.of("producer", "secondProducer"))))));
                         }
-                        var matcher = Pattern.compile("Exact capability/tool: (\\w+)").matcher(system);
+                        var matcher = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
                         assertThat(matcher.find()).isTrue();
                         String skill = matcher.group(1);
-                        return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", skill,
+                        return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", skill.substring("default-".length()),
                                 "toolName", skill, "toolArguments", Map.of())));
                     } catch (Throwable ex) { failure.set(ex); return new MockResponse().setResponseCode(500); }
                 }
@@ -79,12 +79,12 @@ class BindingIsolationIntegrationTest {
             new ApplicationContextRunner().withUserConfiguration(App.class)
                     .withBean(RestSkillHandler.class, () -> invocation -> {
                         assertThat(invocation.input()).containsEntry("marker", "original");
-                        if (invocation.skillName().equals("producer")) {
+                        if (invocation.skillName().equals("default-producer")) {
                             firstEntered.countDown(); await(releaseFirst);
                             firstFinished.countDown();
                             return "{\"data\":{\"amount\":9007199254740993,\"source\":\"first\"}}";
                         }
-                        if (invocation.skillName().equals("secondProducer")) {
+                        if (invocation.skillName().equals("default-secondProducer")) {
                             if (!concurrent) assertThat(firstFinished.getCount()).isZero();
                             secondEntered.countDown(); await(releaseSecond);
                             return "{\"data\":{\"rows\":[\"original\"],\"source\":\"second\"}}";
@@ -102,7 +102,7 @@ class BindingIsolationIntegrationTest {
                             "loomspan.session.mission-timeout=30s").run(context -> {
                         assertThat(context).hasNotFailed();
                         try (var worker = Executors.newSingleThreadExecutor()) {
-                            var result = worker.submit(() -> context.getBean(SkillTemplate.class).invoke("root", Map.of("marker", "original")));
+                            var result = worker.submit(() -> context.getBean(SkillTemplate.class).invoke("default-root", Map.of("marker", "original")));
                             try {
                                 await(firstEntered);
                                 if (concurrent) await(secondEntered); // Both handlers are active before either may return.
@@ -135,19 +135,19 @@ class BindingIsolationIntegrationTest {
                         JsonNode wire = JSON.readTree(request.getBody().readUtf8());
                         String system = wire.path("messages").get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan"))
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", "root", "createdAt", "2026-10-04T00:00:00Z",
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-04T00:00:00Z",
                                     "status", "VALID", "tasks", List.of(task("producer", List.of()), task("consumer", List.of("producer"))))));
-                        var matcher = Pattern.compile("Exact capability/tool: (\\w+)").matcher(system);
+                        var matcher = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
                         assertThat(matcher.find()).isTrue();
                         String skill = matcher.group(1);
-                        return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", skill,
+                        return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", skill.substring("default-".length()),
                                 "toolName", skill, "toolArguments", Map.of())));
                     } catch (Throwable ex) { failure.set(ex); return new MockResponse().setResponseCode(500); }
                 }
             }); server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class)
                     .withBean(RestSkillHandler.class, () -> invocation -> {
-                        if (invocation.skillName().equals("producer")) {
+                        if (invocation.skillName().equals("default-producer")) {
                             producerCalls.incrementAndGet();
                             return JSON.writeValueAsString(Map.of("data", Map.of("marker", invocation.input().get("marker"))));
                         }
@@ -159,7 +159,7 @@ class BindingIsolationIntegrationTest {
                             "loomspan.session.quotas.max-tool-invocations=" + (quota ? 1 : 100), "loomspan.session.mission-timeout=30s")
                     .run(context -> {
                         assertThat(context).hasNotFailed();
-                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("root", Map.of("marker", "123")))
+                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default-root", Map.of("marker", "123")))
                                 .hasStackTraceContaining(quota ? "MAX_TOOL_INVOCATIONS" : "binding_assembled_input_invalid");
                     });
         }
@@ -189,14 +189,14 @@ class BindingIsolationIntegrationTest {
                             String owner = isOuter || !nested ? "root" : "middle";
                             List<Object> tasks = isOuter ? List.of(task("middle", List.of()))
                                     : List.of(task("producer", List.of()), task("consumer", List.of("producer")));
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", owner,
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-" + owner,
                                     "createdAt", "2026-10-04T00:00:00Z", "status", "VALID", "tasks", tasks)));
                         }
                         assertThat(system).contains("coordinator-assigned task", "Supply only unbound arguments");
-                        var matcher = Pattern.compile("Exact capability/tool: (\\w+)").matcher(system);
+                        var matcher = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
                         assertThat(matcher.find()).isTrue();
                         String skill = matcher.group(1);
-                        return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", skill,
+                        return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", skill.substring("default-".length()),
                                 "toolName", skill, "toolArguments", Map.of())));
                     } catch (Throwable ex) {
                         failure.compareAndSet(null, ex);
@@ -208,7 +208,7 @@ class BindingIsolationIntegrationTest {
             new ApplicationContextRunner().withUserConfiguration(App.class)
                     .withBean(RestSkillHandler.class, () -> invocation -> {
                         String marker = (String) invocation.input().get("marker");
-                        if (invocation.skillName().equals("producer")) {
+                        if (invocation.skillName().equals("default-producer")) {
                             if (!reload || marker.equals("held")) {
                                 entered.countDown();
                                 await(entered);
@@ -216,7 +216,7 @@ class BindingIsolationIntegrationTest {
                             }
                             return JSON.writeValueAsString(Map.of("data", Map.of("marker", marker)));
                         }
-                        assertThat(invocation.skillName()).isEqualTo("consumer");
+                        assertThat(invocation.skillName()).isEqualTo("default-consumer");
                         delivered.add(invocation.input());
                         assertThat(invocation.input().get("evidence")).isEqualTo(Map.of("marker", marker));
                         return JSON.writeValueAsString(Map.of("marker", marker));
@@ -233,7 +233,7 @@ class BindingIsolationIntegrationTest {
                             if (reload) {
                                 var reloader = context.getBean(SkillReloader.class);
                                 var captured = reloader.snapshot("default");
-                                var held = workers.submit(() -> template.invoke("root", Map.of("marker", "held", "freshMarker", "incorrect")));
+                                var held = workers.submit(() -> template.invoke("default-root", Map.of("marker", "held", "freshMarker", "incorrect")));
                                 try {
                                     await(entered);
                                     try (var update = reloader.prepare("default", List.of(new SkillDocument("new-root", parent("root", true)),
@@ -241,15 +241,15 @@ class BindingIsolationIntegrationTest {
                                         reloader.publish(update);
                                     }
                                     assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(captured.generationId());
-                                    assertThat(JSON.readTree(template.invoke("root", Map.of("marker", "incorrect", "freshMarker", "fresh")))
+                                    assertThat(JSON.readTree(template.invoke("default-root", Map.of("marker", "incorrect", "freshMarker", "fresh")))
                                             .path("marker").asText()).isEqualTo("fresh");
                                 } finally { release.countDown(); }
                                 assertThat(JSON.readTree(held.get(10, TimeUnit.SECONDS)).path("marker").asText()).isEqualTo("held");
                             } else {
                                 Map<String,Object> first = nested ? Map.of("outerMarker", "one", "marker", "foreign-root") : Map.of("marker", "one");
                                 Map<String,Object> second = nested ? Map.of("outerMarker", "two", "marker", "foreign-root") : Map.of("marker", "two");
-                                var one = workers.submit(() -> template.invoke("root", first));
-                                var two = workers.submit(() -> template.invoke("root", second));
+                                var one = workers.submit(() -> template.invoke("default-root", first));
+                                var two = workers.submit(() -> template.invoke("default-root", second));
                                 assertThat(JSON.readTree(one.get(10, TimeUnit.SECONDS)).path("marker").asText()).isEqualTo("one");
                                 assertThat(JSON.readTree(two.get(10, TimeUnit.SECONDS)).path("marker").asText()).isEqualTo("two");
                             }
@@ -278,18 +278,18 @@ class BindingIsolationIntegrationTest {
                   required: [marker]
                   additionalProperties: false
                 allowed_skills:
-                  - name: producer
+                  - name: default-producer
                     required: true
                     max_tasks: 1
                     input_bindings:
                       /marker: {from: input, path: %s}
-                  - name: consumer
+                  - name: default-consumer
                     required: true
                     max_tasks: 1
                     input_bindings:
                       /marker: {from: input, path: %s}
-                      /evidence: {from: child_result, skill: producer, path: /data}
-                output_from: {skill: consumer}
+                      /evidence: {from: child_result, skill: default-producer, path: /data}
+                output_from: {skill: default-consumer}
                 """.formatted(name, source, source);
     }
 
@@ -308,12 +308,12 @@ class BindingIsolationIntegrationTest {
               required: [outerMarker, marker]
               additionalProperties: false
             allowed_skills:
-              - name: middle
+              - name: default-middle
                 required: true
                 max_tasks: 1
                 input_bindings:
                   /marker: {from: input, path: /outerMarker}
-            output_from: {skill: middle}
+            output_from: {skill: default-middle}
             """; }
 
     private static String leaf(String name) { return """
@@ -329,7 +329,7 @@ class BindingIsolationIntegrationTest {
 
     private static Map<String,Object> task(String child, List<String> dependencies) {
         Map<String,Object> task = new LinkedHashMap<>();
-        task.put("taskId", child); task.put("title", child); task.put("status", "PENDING"); task.put("capabilityName", child);
+        task.put("taskId", child); task.put("title", child); task.put("status", "PENDING"); task.put("capabilityName", "default-" + child);
         task.put("intent", "Fulfill responsibility"); task.put("dependsOn", dependencies); task.put("expectedOutputs", List.of("complete result"));
         task.put("parallelGroup", null); task.put("note", ""); return task;
     }

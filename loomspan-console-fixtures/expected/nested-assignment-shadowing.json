@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-nested-assignment-shadowing",
   "sessionId" : "session-nested-assignment-shadowing",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-nested-assignment-shadowing",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-nested-assignment-shadowing"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {
@@ -45,7 +51,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "outer.skill"
+    "route" : "default-outer_skill"
   }, {
     "frameId" : "outer-planning",
     "parentFrameId" : "shadow-root",
@@ -67,7 +73,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "outer.skill#planning"
+    "route" : "default-outer_skill#planning"
   }, {
     "frameId" : "outer-step",
     "parentFrameId" : "shadow-root",
@@ -89,7 +95,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "outer.worker"
+    "route" : "default-outer_worker"
   }, {
     "frameId" : "inner-planning",
     "parentFrameId" : "outer-step",
@@ -111,7 +117,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "inner.skill#planning"
+    "route" : "default-inner_skill#planning"
   }, {
     "frameId" : "inner-step",
     "parentFrameId" : "outer-step",
@@ -133,7 +139,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "inner.worker"
+    "route" : "default-inner_worker"
   }, {
     "frameId" : "inner-model",
     "parentFrameId" : "inner-step",
@@ -155,7 +161,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "inner.worker#model"
+    "route" : "default-inner_worker#model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

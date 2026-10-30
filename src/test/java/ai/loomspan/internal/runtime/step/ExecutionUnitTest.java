@@ -52,7 +52,7 @@ class ExecutionUnitTest
 
         AssignedTaskExecution assignment = new AssignedTaskExecution(task, 1, true);
         var session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "assignment-handle", "test.entry", 3);
+                "assignment-handle", "default-test_entry", 3);
         var binding = ai.loomspan.internal.core.TestExecutionBindings.missionBinding(session).forkBranch();
         var future = CompletableFuture.<AssignedTaskOutcome>completedFuture(
                 new AssignedTaskOutcome.Success("done", null, null));

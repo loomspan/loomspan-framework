@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-assembled-input-result",
   "sessionId" : "session-assembled-input-result",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-assembled-input-result",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-assembled-input-result"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {
@@ -22,7 +28,7 @@
   },
   "usageComplete" : true,
   "resultAssemblies" : [ {
-    "skillName" : "test.entry",
+    "skillName" : "default-test_entry",
     "owningMissionFrameId" : "assembly-root",
     "modelContributionRequired" : false,
     "outputBindings" : [ {
@@ -56,7 +62,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "test.entry"
+    "route" : "default-test_entry"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

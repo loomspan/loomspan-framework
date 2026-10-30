@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-incomplete-frame-duration",
   "sessionId" : "session-incomplete-frame-duration",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-incomplete-frame-duration",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-incomplete-frame-duration"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {
@@ -45,7 +51,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "root.skill"
+    "route" : "default-root_skill"
   }, {
     "frameId" : "incomplete",
     "parentFrameId" : "root",
@@ -67,7 +73,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "root.tool"
+    "route" : "default-root_tool"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

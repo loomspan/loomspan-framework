@@ -198,9 +198,10 @@ func Run(parent context.Context, options Options, dependencies Dependencies) (re
 				return artifact.TraceMetadata{}, domain
 			}
 			return artifact.TraceMetadata{
-				TraceID:                   trace.TraceID,
-				SessionID:                 trace.SessionID,
-				EntrySkill:                trace.EntrySkill,
+				TraceID:      trace.TraceID,
+				SessionID:    trace.SessionID,
+				EntrySkill:   trace.EntrySkill,
+				GenerationID: trace.GenerationID, EntryNamespace: trace.EntryNamespace, NamespaceGenerationIDs: trace.NamespaceGenerationIDs,
 				Outcome:                   trace.Outcome,
 				FinalizedAt:               trace.FinalizedAt,
 				SizeBytes:                 trace.SizeBytes,

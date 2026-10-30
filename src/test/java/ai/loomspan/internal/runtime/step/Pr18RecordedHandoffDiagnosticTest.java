@@ -31,7 +31,7 @@ class Pr18RecordedHandoffDiagnosticTest {
     void evaluatesRetainedLiveActionsWithUnchangedFrameworkContract() throws Exception {
         Path output = Path.of("ai/thoughts/evidence/2026-10-03-PR-18-generated-input-guidance");
         var codecs = LoomspanJacksonCodecs.defaults();
-        var child = loadRecordedSkills().getSkill("compareOptions");
+        var child = loadRecordedSkills().getSkill("default-compareOptions");
         var contract = new SkillInputContractResolver().resolveYamlCapability(child);
         assertRecordedBoundaries(contract);
         var validator = new ai.loomspan.internal.runtime.input.SkillInputValidator();
@@ -77,26 +77,26 @@ class Pr18RecordedHandoffDiagnosticTest {
         var json = codecs.planningJson();
         Map<String,Object> data = json.readValue(Files.readString(output.resolve("diagnostic-input.json")), Map.class);
         var catalog = loadRecordedSkills();
-        var parent = catalog.getSkill("planResolution");
-        var child = catalog.getSkill("compareOptions");
+        var parent = catalog.getSkill("default-planResolution");
+        var child = catalog.getSkill("default-compareOptions");
         var config = child.executionConfiguration();
         var childManifest = child.manifest();
         var contract = new SkillInputContractResolver().resolveYamlCapability(child);
         assertRecordedBoundaries(contract);
         Files.writeString(output.resolve("resolved-input-contract.json"), json.writeValueAsString(contract));
-        var metadata = new CapabilityMetadata("yaml:compareOptions", "compareOptions", childManifest.getDescription(),
+        var metadata = new CapabilityMetadata("yaml:compareOptions", "default-compareOptions", childManifest.getDescription(),
                 SkillExecutionDescriptor.from(config), null, args -> null, CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("compareOptions", childManifest.getDescription()), contract, null);
+                CapabilityToolDescriptor.generic("default-compareOptions", childManifest.getDescription()), contract, null);
         BoundCapability tool = new BoundCapability(metadata, java.util.List.of(), (args,taskId, sourceResults) -> { throw new AssertionError("capture must not execute tool"); });
         Map<String,String> assignment = (Map<String,String>)data.get("task");
         List<PlanTask> tasks = new ArrayList<>();
         for (Map<String,String> row : (List<Map<String,String>>)data.get("tasks")) {
             boolean assigned = row.get("id").equals(assignment.get("ID"));
             tasks.add(new PlanTask(row.get("id"), row.get("title"), assigned ? PlanTaskStatus.PENDING : PlanTaskStatus.COMPLETED,
-                    assigned ? "compareOptions" : row.get("id").substring(5), assigned ? assignment.get("Intent") : null,
+                    assigned ? "default-compareOptions" : row.get("id").substring(5), assigned ? assignment.get("Intent") : null,
                     List.of(), assigned ? List.of(assignment.get("Expected outputs")) : List.of(), null, null));
         }
-        var plan = new ExecutionPlan((String)data.get("planId"), "planResolution", Instant.parse("2026-10-04T01:16:40Z"), tasks);
+        var plan = new ExecutionPlan((String)data.get("planId"), "default-planResolution", Instant.parse("2026-10-04T01:16:40Z"), tasks);
         var state = new DefaultExecutionStateService(Clock.systemUTC());
         PlanningService planning = mock(PlanningService.class);
         when(planning.initializePlan(any(),any(),any(),any(),any(),any())).thenAnswer(invocation -> {
@@ -106,7 +106,7 @@ class Pr18RecordedHandoffDiagnosticTest {
                 mission.recordCompletedTaskResult(prior.get("taskId"), prior.get("skillName"), prior.get("result"));
             return Optional.of(plan);
         });
-        var session = TestLoomspanSessions.withId("pr18-recorded-handoff", "test.entry", 3);
+        var session = TestLoomspanSessions.withId("pr18-recorded-handoff", "default-test_entry", 3);
         var binding = TestExecutionBindings.missionBinding(session);
         ModelInteraction model = request -> {
             try {

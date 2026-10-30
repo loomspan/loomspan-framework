@@ -24,7 +24,7 @@ vi.mock("react-router", () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => (
     <a href={to}>{children}</a>
   ),
-  useParams: () => ({ registeredName: "CheckDns" }),
+  useParams: () => ({ registeredName: "default-CheckDns" }),
   useNavigate: () => route.navigate,
   useSearchParams: () => [new URLSearchParams({ targetScopeId: route.scope })],
 }));
@@ -49,7 +49,7 @@ beforeEach(() => {
 test("TypeSafe detail retains source label, original declaration and descriptive schema", async () => {
   const yaml = "name: CheckDns\ntypesafe:\n  state: ${/input}\n  questions:\n    ready: {type: noul, instructions: Ready?}\n";
   const schema = '{"type":"object","properties":{"ready":{"type":"object"}}}';
-  vi.mocked(getSkillDetail).mockResolvedValue({ targetScopeId: "scope-1", registeredName: "CheckDns", source: "TYPESAFE", sourcePath: "opaque <label>", yaml, outputSchema: schema });
+  vi.mocked(getSkillDetail).mockResolvedValue({ targetScopeId: "scope-1", registeredName: "default-CheckDns", source: "TYPESAFE", sourcePath: "opaque <label>", yaml, outputSchema: schema });
   render(<SkillDetailView />);
   expect(await screen.findByText("TYPESAFE")).toBeInTheDocument();
   expect(screen.getByText("opaque <label>")).toBeInTheDocument();
@@ -76,13 +76,13 @@ test("skill detail renders sourcePath as plain text and yaml inside pre element"
   vi.mocked(getSkillDetail).mockResolvedValue({
     outputSchema: null,
     targetScopeId: "scope-1",
-    registeredName: "CheckDns",
+    registeredName: "default-CheckDns",
     source: "YAML", sourcePath: "/skills/check_dns.yaml",
     yaml: yamlWithHtml,
   });
   render(<SkillDetailView />);
   await vi.waitFor(() => {
-    expect(screen.getByText("CheckDns")).toBeInTheDocument();
+    expect(screen.getByText("default-CheckDns")).toBeInTheDocument();
   });
   expect(screen.getByText("/skills/check_dns.yaml")).toBeInTheDocument();
   const pre = document.querySelector("pre.yaml-block");
@@ -112,7 +112,7 @@ test("skill detail sourcePath is not a clickable link", async () => {
   vi.mocked(getSkillDetail).mockResolvedValue({
     outputSchema: null,
     targetScopeId: "scope-1",
-    registeredName: "CheckDns",
+    registeredName: "default-CheckDns",
     source: "YAML", sourcePath: "opaque <label>",
     yaml: "name: CheckDns",
   });
@@ -130,7 +130,7 @@ test("REST skill detail shows distinct label, path, and unchanged manifest", asy
   const yaml = "name: CheckDns\nrest: true\n# https://handler.example is inert text";
   vi.mocked(getSkillDetail).mockResolvedValue({
     outputSchema: null,
-    targetScopeId: "scope-1", registeredName: "CheckDns", source: "REST",
+    targetScopeId: "scope-1", registeredName: "default-CheckDns", source: "REST",
     sourcePath: "/skills/check_dns.yaml", yaml,
   });
   render(<SkillDetailView />);
@@ -144,7 +144,7 @@ test("REST skill detail shows distinct label, path, and unchanged manifest", asy
 test("Java skill details show bean and declared method without YAML content", async () => {
   vi.mocked(getSkillDetail).mockResolvedValue({
     outputSchema: null,
-    targetScopeId: "scope-1", registeredName: "CheckDns", source: "JAVA",
+    targetScopeId: "scope-1", registeredName: "default-CheckDns", source: "JAVA",
     beanName: "dnsSkills", method: "public java.lang.String example.Dns.lookup(java.lang.String)",
   });
   render(<SkillDetailView />);
@@ -160,7 +160,7 @@ test("Java skill details show bean and declared method without YAML content", as
 test("shows effective schema as inert metadata without modifying original YAML", async () => {
   const outputSchema = JSON.stringify({ type: "object", description: "<script>schema</script>", properties: { answer: { type: "string" } } });
   vi.mocked(getSkillDetail).mockResolvedValue({
-    targetScopeId: "scope-1", registeredName: "CheckDns", source: "YAML", sourcePath: "parent.yaml",
+    targetScopeId: "scope-1", registeredName: "default-CheckDns", source: "YAML", sourcePath: "parent.yaml",
     yaml: "name: parent\\noutput_from: {skill: child}", outputSchema,
   });
   render(<SkillDetailView />);

@@ -39,7 +39,7 @@ class LoomspanSessionTest {
 
     @Test
     void rejectsNullTraceMetadataValues() {
-        LoomspanSession session = TestLoomspanSessions.withId("null-trace-metadata", "test.entry", 3);
+        LoomspanSession session = TestLoomspanSessions.withId("null-trace-metadata", "default-test_entry", 3);
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("capabilityName", "lookupCustomer");
         metadata.put("linkedTaskId", null);
@@ -58,7 +58,7 @@ class LoomspanSessionTest {
             return Optional.empty();
         }).when(handle).finalizeTrace(any());
         LoomspanSession session = TestLoomspanSessions.withTraceHandle(
-                "projection-session", "test.entry", Clock.systemUTC(), handle, () -> "projection-failure");
+                "projection-session", "default-test_entry", Clock.systemUTC(), handle, () -> "projection-failure");
 
         assertThatThrownBy(() -> session.finalizeTrace(new TraceCompletion(
                 TraceOutcome.SUCCEEDED,
@@ -86,7 +86,7 @@ class LoomspanSessionTest {
             return Optional.empty();
         }).when(handle).finalizeTrace(any());
         LoomspanSession session = TestLoomspanSessions.withTraceHandle(
-                "projection-existing-session", "test.entry", Clock.systemUTC(), handle, () -> "original-failure");
+                "projection-existing-session", "default-test_entry", Clock.systemUTC(), handle, () -> "original-failure");
         String failureId = recordFailure(session, new IllegalStateException("original"), Map.of("message", "failed"));
 
         assertThatThrownBy(() -> session.finalizeTrace(new TraceCompletion(
@@ -111,7 +111,7 @@ class LoomspanSessionTest {
 
     @Test
     void recordsThrowableOnceAndReusesRecordedCause() {
-        LoomspanSession session = new LoomspanSession(8, "test.skill");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_skill");
         IllegalStateException cause = new IllegalStateException("same");
         String first = recordFailure(session, cause, Map.of("message", "failed"));
         String repeated = recordFailure(session, cause, Map.of("message", "failed"));
@@ -124,7 +124,7 @@ class LoomspanSessionTest {
 
     @Test
     void linksTheCanonicalTerminalErrorToTheRegisteredFinalProviderAttempt() {
-        LoomspanSession session = new LoomspanSession(8, "test.skill");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_skill");
         IllegalStateException cause = new IllegalStateException("provider failed");
         RuntimeException wrapper = new RuntimeException("call failed", cause);
         session.registerProviderFailure(cause, Map.of(
@@ -142,7 +142,7 @@ class LoomspanSessionTest {
 
     @Test
     void boundsCyclicAndDeepCauseTraversal() {
-        LoomspanSession session = new LoomspanSession(8, "test.skill");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_skill");
         RuntimeException first = new RuntimeException("first");
         RuntimeException second = new RuntimeException("second");
         first.initCause(second);
@@ -162,7 +162,7 @@ class LoomspanSessionTest {
 
     @Test
     void concurrentObservationsAppendOnceAndSessionsRemainIsolated() throws Exception {
-        LoomspanSession session = new LoomspanSession(8, "test.skill");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_skill");
         IllegalStateException failure = new IllegalStateException("shared");
         CountDownLatch start = new CountDownLatch(1);
         Set<String> ids = ConcurrentHashMap.newKeySet();
@@ -188,7 +188,7 @@ class LoomspanSessionTest {
         assertThat(ids).hasSize(1);
         assertThat(errorRecords).hasValue(1);
 
-        LoomspanSession other = new LoomspanSession(8, "test.skill");
+        LoomspanSession other = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_skill");
         assertThat(recordFailure(other, failure, Map.of("message", "failed"))).isNotIn(ids);
     }
 
@@ -199,7 +199,7 @@ class LoomspanSessionTest {
         AtomicReference<String> traceEntry = new AtomicReference<>();
         ExecutionObservationHandle observation = mock(ExecutionObservationHandle.class);
 
-        LoomspanSession session = new LoomspanSession(
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(
                 "session-normalized", overBound, 3, null, TracePersistencePolicy.ALWAYS, Clock.systemUTC(),
                 (sessionId, entrySkill) -> {
                     observationEntry.set(entrySkill);
@@ -220,7 +220,7 @@ class LoomspanSessionTest {
     void rejectsBlankEntrySkillBeforeInvokingEitherFactory() {
         AtomicInteger factoryCalls = new AtomicInteger();
 
-        assertThatThrownBy(() -> new LoomspanSession(
+        assertThatThrownBy(() -> ai.loomspan.internal.core.TestLoomspanSessions.create(
                 "session-invalid", " \t", 3, null, TracePersistencePolicy.ALWAYS, Clock.systemUTC(),
                 (sessionId, entrySkill) -> {
                     factoryCalls.incrementAndGet();
@@ -237,7 +237,7 @@ class LoomspanSessionTest {
 
     @Test
     void createsSessionWithGeneratedIdAndConfiguredMaxDepth() {
-        LoomspanSession session = new LoomspanSession(3, "test.entry");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(3, "default-test_entry");
 
         assertThat(session.getSessionId()).isNotBlank();
         assertThat(session.getMaxDepth()).isEqualTo(3);
@@ -246,7 +246,7 @@ class LoomspanSessionTest {
 
     @Test
     void pushAndPopFrameUsesLifoOrder() {
-        LoomspanSession session = new LoomspanSession(3, "test.entry");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(3, "default-test_entry");
         ExecutionFrame first = frame("frame-1", "route.one");
         ExecutionFrame second = frame("frame-2", "route.two");
 
@@ -263,7 +263,7 @@ class LoomspanSessionTest {
 
     @Test
     void throwsWhenPushingBeyondMaxDepthWithoutMutatingStack() {
-        LoomspanSession session = new LoomspanSession("session-1", "test.entry", 1);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-test_entry", 1);
         ExecutionFrame first = frame("frame-1", "route.one");
         ExecutionFrame second = frame("frame-2", "route.two");
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
@@ -281,7 +281,7 @@ class LoomspanSessionTest {
 
     @Test
     void throwsWhenRequiringLeafFromEmptyBranch() {
-        LoomspanSession session = new LoomspanSession(2, "test.entry");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(2, "default-test_entry");
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
 
         assertThatThrownBy(branch::requireLeaf)
@@ -291,7 +291,7 @@ class LoomspanSessionTest {
 
     @Test
     void exposesImmutableFrameSnapshots() {
-        LoomspanSession session = new LoomspanSession(2, "test.entry");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(2, "default-test_entry");
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         branch.push(frame("frame-1", "route.one"));
 
@@ -303,7 +303,7 @@ class LoomspanSessionTest {
 
     @Test
     void appendsJournalEntriesInSequentialOrder() {
-        LoomspanSession session = new LoomspanSession("session-1", "test.entry", 4);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-test_entry", 4);
 
         ExecutionPlan plan = plan("plan-1");
         appendRecord(session, TraceRecordType.PLAN_CREATED, Instant.parse("2026-03-15T12:00:00Z"), Map.of("planId", plan.planId()), plan);
@@ -329,7 +329,7 @@ class LoomspanSessionTest {
 
     @Test
     void sessionBindsFramesToJournalEntries() {
-        LoomspanSession session = new LoomspanSession("session-1", "test.entry", 4);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-test_entry", 4);
         ExecutionFrame frame = frame("frame-1", "route.one");
 
         ExecutionPlan plan = plan("plan-1");
@@ -348,7 +348,7 @@ class LoomspanSessionTest {
 
     @Test
     void exposesImmutableJournalSnapshots() {
-        LoomspanSession session = new LoomspanSession(2, "test.entry");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(2, "default-test_entry");
         ExecutionPlan plan = plan("plan-1");
         appendRecord(session, TraceRecordType.PLAN_CREATED, Instant.parse("2026-03-15T12:00:00Z"), Map.of("planId", plan.planId()), plan);
 
@@ -366,10 +366,10 @@ class LoomspanSessionTest {
 
     @Test
     void journalsPlanCreationAndUpdateSeparatelyFromActivePlanState() {
-        LoomspanSession session = new LoomspanSession("session-1", "test.entry", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-test_entry", 2);
         ExecutionPlan created = new ExecutionPlan(
                 "plan-1",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(new PlanTask("task-1", "Plan", PlanTaskStatus.PENDING, null)));
         ExecutionPlan updated = created.updateTask("task-1",
@@ -390,13 +390,13 @@ class LoomspanSessionTest {
     @Test
     void atomicallyReplacesAndClearsRetainedRootState()
     {
-        LoomspanSession session = new LoomspanSession("retained", "test.entry", 2);
-        ExecutionPlan plan = new ExecutionPlan("plan", "test.entry", Instant.EPOCH, List.of());
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("retained", "default-test_entry", 2);
+        ExecutionPlan plan = new ExecutionPlan("plan", "default-test_entry", Instant.EPOCH, List.of());
         LinterOutcome linter = new LinterOutcome(
-                "test.entry", "regex", 1, 0, 1, LinterOutcomeStatus.PASSED, "retry");
+                "default-test_entry", "regex", 1, 0, 1, LinterOutcomeStatus.PASSED, "retry");
         ai.loomspan.internal.outputschema.OutputSchemaOutcome output =
                 new ai.loomspan.internal.outputschema.OutputSchemaOutcome(
-                        "test.entry", null, 1, 0, 1,
+                        "default-test_entry", null, 1, 0, 1,
                         ai.loomspan.internal.outputschema.OutputSchemaOutcomeStatus.PASSED,
                         List.of());
 
@@ -413,7 +413,7 @@ class LoomspanSessionTest {
 
     @Test
     void storesAuthenticationAsRuntimeOnlySessionState() {
-        LoomspanSession session = new LoomspanSession("session-1", "test.entry", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-test_entry", 2);
         var authentication = UsernamePasswordAuthenticationToken.authenticated(
                 "user",
                 "pw",
@@ -426,9 +426,9 @@ class LoomspanSessionTest {
 
     @Test
     void storesLastLinterOutcomeAndJournalsItSeparately() {
-        LoomspanSession session = new LoomspanSession("session-1", "test.entry", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-test_entry", 2);
         LinterOutcome outcome = new LinterOutcome(
-                "lintedSkill",
+                "default-lintedSkill",
                 "regex",
                 2,
                 1,
@@ -454,7 +454,7 @@ class LoomspanSessionTest {
     void preservesFinalizedJournalAcrossRepeatedFinalizationAfterTraceDeletion() {
         LoomspanSession session = TestLoomspanSessions.withId(
                 "session-repeat-finalize",
-                "test.entry",
+                "default-test_entry",
                 2,
                 null,
                 TracePersistencePolicy.ONERROR,
@@ -485,7 +485,7 @@ class LoomspanSessionTest {
                 TraceFrameType.ROOT_MISSION,
                 route,
                 Map.of("route", route),
-                Instant.parse("2026-03-15T12:00:00Z"));
+                Instant.parse("2026-03-15T12:00:00Z"), null, null);
     }
 
     private static void appendError(LoomspanSession session, Instant timestamp, Object payload) {
@@ -496,7 +496,7 @@ class LoomspanSessionTest {
     private static ExecutionPlan plan(String planId) {
         return new ExecutionPlan(
                 planId,
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(new PlanTask("task-1", "Plan", PlanTaskStatus.PENDING, null)));
     }

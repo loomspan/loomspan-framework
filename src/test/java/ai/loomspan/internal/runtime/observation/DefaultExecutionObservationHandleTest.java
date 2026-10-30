@@ -112,7 +112,7 @@ class DefaultExecutionObservationHandleTest
                     2,
                     Map.of("outcome", "SUCCEEDED", "sessionUsageSnapshot", SessionUsageSnapshot.empty())));
             FinalizedTraceArtifact artifact = new FinalizedTraceArtifact(
-                    "trace", "session", "test.entry", "generation-test", TraceOutcome.SUCCEEDED, now, artifactPath,
+                    "trace", "session", "test.entry", "generation-test", "default", java.util.Map.of("default", "generation-test"), TraceOutcome.SUCCEEDED, now, artifactPath,
                     Files.size(artifactPath), TracePersistencePolicy.ALWAYS, null);
 
             handle.close(new ObservationCompletionDisposition(
@@ -159,7 +159,7 @@ class DefaultExecutionObservationHandleTest
                     "trace",
                     "session",
                     "test.entry",
-                    "generation-test",
+                    "generation-test", "default", java.util.Map.of("default", "generation-test"),
                     TraceOutcome.SUCCEEDED,
                     now.minusSeconds(30),
                     artifactPath,
@@ -492,7 +492,12 @@ class DefaultExecutionObservationHandleTest
     private TraceRecord record(TraceRecordType type, long sequence, Map<String, Object> metadata)
     {
         Map<String, Object> details = new java.util.LinkedHashMap<>(metadata);
-        if (type == TraceRecordType.TRACE_STARTED) details.put("generationId", "generation-test");
+        if (type == TraceRecordType.TRACE_STARTED)
+        {
+            details.put("generationId", "generation-test");
+            details.put("entryNamespace", "default");
+            details.put("namespaceGenerationIds", Map.of("default", "generation-test"));
+        }
         return new TraceRecord(
                 "trace", "session", sequence, Instant.parse("2026-07-24T12:00:00Z"), type,
                 null, null, null, null, "thread",

@@ -58,13 +58,13 @@ class JavaSkillIntegrationTest
                 assertThat(context).hasNotFailed();
                 var observed = new AtomicReference<SkillExecutionView>();
                 var skills = context.getBean(SkillTemplate.class);
-                assertThat(skills.invoke("plainEcho", Map.of("message", "hello"), observed::set))
+                assertThat(skills.invoke("default-plainEcho", Map.of("message", "hello"), observed::set))
                         .isEqualTo("{\"message\":\"hello\"}");
                 assertThat(observed.get()).isNotNull();
                 assertThat(observed.get().sessionId()).isNotBlank();
                 assertThat(observed.get().events()).isNotEmpty();
                 assertThat(calls).hasValue(1);
-                assertThatThrownBy(() -> skills.invoke("plainEcho", Map.of()))
+                assertThatThrownBy(() -> skills.invoke("default-plainEcho", Map.of()))
                         .isInstanceOf(SkillInputValidationException.class);
                 assertThat(calls).hasValue(1);
             });
@@ -87,15 +87,15 @@ class JavaSkillIntegrationTest
                         SecurityContextHolder.setContext(caller);
                         try
                         {
-                            assertThat(skills.invoke("securedEcho", Map.of("message", "hello"))).isEqualTo("\"alice:hello\"");
+                            assertThat(skills.invoke("default-securedEcho", Map.of("message", "hello"))).isEqualTo("\"alice:hello\"");
                             assertThat(SecurityContextHolder.getContext()).isSameAs(caller);
-                            assertThatThrownBy(() -> skills.invoke("alwaysDenied", Map.of())).isInstanceOf(AccessDeniedException.class);
+                            assertThatThrownBy(() -> skills.invoke("default-alwaysDenied", Map.of())).isInstanceOf(AccessDeniedException.class);
                             assertThat(SecurityContextHolder.getContext()).isSameAs(caller);
                             SecurityContext empty = new SecurityContextImpl();
                             SecurityContextHolder.setContext(empty);
-                            assertThatThrownBy(() -> skills.invoke("securedEcho", Map.of("message", "hidden")))
+                            assertThatThrownBy(() -> skills.invoke("default-securedEcho", Map.of("message", "hidden")))
                                     .isInstanceOf(AccessDeniedException.class);
-                            assertThat(skills.invoke("outsidePermit", Map.of())).isEqualTo("\"public\"");
+                            assertThat(skills.invoke("default-outsidePermit", Map.of())).isEqualTo("\"public\"");
                             assertThat(SecurityContextHolder.getContext()).isSameAs(empty);
                             assertThat(calls).hasValue(1);
                         }
@@ -116,10 +116,10 @@ class JavaSkillIntegrationTest
                 try
                 {
                     SecurityContextHolder.setContext(new SecurityContextImpl(authentication("alice", "ROLE_READ")));
-                    assertThat(context.getBean(SkillTemplate.class).invoke("genericEcho", Map.of("message", "hello")))
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default-genericEcho", Map.of("message", "hello")))
                             .isEqualTo("\"hello\"");
                     SecurityContextHolder.setContext(new SecurityContextImpl());
-                    assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("genericEcho", Map.of("message", "denied")))
+                    assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default-genericEcho", Map.of("message", "denied")))
                             .isInstanceOf(AccessDeniedException.class);
                 }
                 finally { SecurityContextHolder.setContext(before); }
@@ -159,7 +159,7 @@ class JavaSkillIntegrationTest
         probe.callerThreads.add(Thread.currentThread().threadId());
         try
         {
-            return skills.invoke("parallelEcho", Map.of("message", "hello"));
+            return skills.invoke("default-parallelEcho", Map.of("message", "hello"));
         }
         finally
         {
@@ -209,7 +209,7 @@ class JavaSkillIntegrationTest
                 });
                 runner(server).withBean("plainState", Object.class, () -> target).run(context -> {
                     assertThat(context).hasNotFailed();
-                    assertThat(context.getBean(SkillTemplate.class).invoke("exposed", Map.of())).isEqualTo("\"initialized\"");
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default-exposed", Map.of())).isEqualTo("\"initialized\"");
                 });
             }
         }
@@ -224,9 +224,9 @@ class JavaSkillIntegrationTest
                 model: integration
                 planning_mode: false
                 allowed_skills:
-                  - name: securedEcho
-                  - name: alwaysDenied
-                  - name: yamlSibling
+                  - name: default-securedEcho
+                  - name: default-alwaysDenied
+                  - name: default-yamlSibling
                 """);
         Files.writeString(directory.resolve("sibling.yml"), """
                 name: yamlSibling
@@ -240,7 +240,7 @@ class JavaSkillIntegrationTest
             server.enqueue(jsonResponse("""
                     {"id":"child-call","object":"chat.completion","created":1,"model":"integration-model",
                      "choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[
-                       {"id":"call1","type":"function","function":{"name":"securedEcho","arguments":"{\\"message\\":\\"child hello\\"}"}}
+                       {"id":"call1","type":"function","function":{"name":"default-securedEcho","arguments":"{\\"message\\":\\"child hello\\"}"}}
                      ]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
                     """));
             server.enqueue(finalResponse());
@@ -253,11 +253,11 @@ class JavaSkillIntegrationTest
                         try
                         {
                             SecurityContextHolder.setContext(new SecurityContextImpl(authentication("alice", "ROLE_READ")));
-                            assertThat(context.getBean(SkillTemplate.class).invoke("securedParent", Map.of("objective", "run child")))
+                            assertThat(context.getBean(SkillTemplate.class).invoke("default-securedParent", Map.of("objective", "run child")))
                                     .isEqualTo("done");
                             assertThat(calls).hasValue(1);
                             SecurityContextHolder.setContext(new SecurityContextImpl());
-                            assertThat(context.getBean(SkillTemplate.class).invoke("securedParent", Map.of("objective", "no restricted children")))
+                            assertThat(context.getBean(SkillTemplate.class).invoke("default-securedParent", Map.of("objective", "no restricted children")))
                                     .isEqualTo("done");
                             assertThat(calls).hasValue(1);
                         }

@@ -19,12 +19,12 @@ class SessionQuotaTest {
     @Test
     void throwsWhenModelCallQuotaExceeded() {
         DefaultSessionUsageService service = new DefaultSessionUsageService(quotas(10, 10, 10, 1, 100), new NoOpUsageMetricsRecorder());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-test_entry", 3);
 
-        service.recordMissionStart(session, "root.skill");
-        service.recordModelResponse(session, "root.skill", IDENTITY, new ModelUsageRecord(1, 2, 3, UsagePrecision.EXACT, null));
+        service.recordMissionStart(session, "default-root_skill");
+        service.recordModelResponse(session, "default-root_skill", IDENTITY, new ModelUsageRecord(1, 2, 3, UsagePrecision.EXACT, null));
 
-        assertThatThrownBy(() -> service.recordModelResponse(session, "root.skill", IDENTITY, new ModelUsageRecord(1, 2, 3, UsagePrecision.EXACT, null)))
+        assertThatThrownBy(() -> service.recordModelResponse(session, "default-root_skill", IDENTITY, new ModelUsageRecord(1, 2, 3, UsagePrecision.EXACT, null)))
                 .isInstanceOf(LoomspanQuotaExceededException.class)
                 .extracting("guardrailType", "limit", "observed")
                 .containsExactly(GuardrailType.MAX_MODEL_CALLS, 1L, 2L);
@@ -33,14 +33,14 @@ class SessionQuotaTest {
     @Test
     void throwsWhenToolInvocationQuotaExceeded() {
         DefaultSessionUsageService service = new DefaultSessionUsageService(quotas(10, 1, 10, 10, 100), new NoOpUsageMetricsRecorder());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-2", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-2", "default-test_entry", 3);
 
         var binding = ai.loomspan.internal.core.TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(
-                binding, () -> service.recordToolCall(session, "root.skill", "tool.one"));
+                binding, () -> service.recordToolCall(session, "default-root_skill", "tool.one"));
 
         assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.runWith(
-                binding, () -> service.recordToolCall(session, "root.skill", "tool.one")))
+                binding, () -> service.recordToolCall(session, "default-root_skill", "tool.one")))
                 .isInstanceOf(LoomspanQuotaExceededException.class)
                 .extracting("guardrailType")
                 .isEqualTo(GuardrailType.MAX_TOOL_INVOCATIONS);
@@ -49,7 +49,7 @@ class SessionQuotaTest {
     @Test
     void throwsWhenLinterRetryQuotaExceeded() {
         DefaultSessionUsageService service = new DefaultSessionUsageService(quotas(10, 10, 1, 10, 100), new NoOpUsageMetricsRecorder());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-3", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-3", "default-test_entry", 3);
 
         service.recordLinterOutcome(session, outcome(LinterOutcomeStatus.RETRYING, 0, 1));
 
@@ -70,6 +70,6 @@ class SessionQuotaTest {
     }
 
     private static LinterOutcome outcome(LinterOutcomeStatus status, int retryCount, int attempt) {
-        return new LinterOutcome("lintedSkill", "regex", attempt, retryCount, 4, status, "Return YAML");
+        return new LinterOutcome("default-lintedSkill", "regex", attempt, retryCount, 4, status, "Return YAML");
     }
 }

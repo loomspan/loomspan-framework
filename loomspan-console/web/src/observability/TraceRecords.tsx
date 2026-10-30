@@ -1073,7 +1073,7 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
                 <Focusable><span className="trace-context-trigger" tabIndex={0}>{context.label}</span></Focusable>
                 <Tooltip className="trace-context-tooltip" placement="top" offset={6}>{context.fullPath}</Tooltip>
               </TooltipTrigger>
-            )}</td>
+            )}{record.executingNamespace && <small className="trace-record-owner">{record.executingNamespace}: {record.executingGenerationId}</small>}</td>
             <td className="trace-numeric">{frameDuration == null ? "—" : <span>{formatDuration(frameDuration)}</span>}</td>
             <td className="trace-record-actions-cell">
               <div className="trace-record-actions">

@@ -103,10 +103,10 @@ class ModelAttemptCallAdvisorIntegrationTest
                 if (scenario.equals("quota")) quotas.setMaxProviderAttempts(1);
                 var usage = new DefaultSessionUsageService(quotas, new NoOpUsageMetricsRecorder());
                 var state = new DefaultExecutionStateService(CLOCK, usage);
-                var session = TestLoomspanSessions.withId("real-timeout-" + scenario, "test.entry", 4);
+                var session = TestLoomspanSessions.withId("real-timeout-" + scenario, "default-test_entry", 4);
                 var binding = TestExecutionBindings.missionBinding(session);
                 ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding,
-                        () -> state.openMissionFrame(session, "test.skill", Map.of()));
+                        () -> state.openMissionFrame(session, "default-test_skill", Map.of()));
                 openFrame(binding, state, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
                 var client = ChatClient.builder(runtime.chatModel()).defaultAdvisors(
                         new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), usage)).build();
@@ -161,10 +161,10 @@ class ModelAttemptCallAdvisorIntegrationTest
             var runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("local", properties);
             var usage = usageService();
             var state = new DefaultExecutionStateService(CLOCK, usage);
-            var session = TestLoomspanSessions.withId("complete-correction-context-limit", "test.entry", 4);
+            var session = TestLoomspanSessions.withId("complete-correction-context-limit", "default-test_entry", 4);
             var binding = TestExecutionBindings.missionBinding(session);
             ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding,
-                    () -> state.openMissionFrame(session, "test.skill", Map.of()));
+                    () -> state.openMissionFrame(session, "default-test_skill", Map.of()));
             openFrame(binding, state, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
             var schema = new YamlSkillManifest.OutputSchemaManifest();
             schema.setType("object");
@@ -211,9 +211,9 @@ class ModelAttemptCallAdvisorIntegrationTest
                 new LoomspanProperties().getSession().getQuotas(),
                 new MicrometerUsageMetricsRecorder(meterRegistry));
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("attempt-retry", "test.entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("attempt-retry", "default-test_entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ExecutionFrame root = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ExecutionFrame root = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         ExecutionFrame modelFrame = openFrame(binding, stateService,
                 session,
                 TraceFrameType.MODEL_CALL,
@@ -225,7 +225,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                 response("OK: corrected", 8, 3)));
 
         LinterCallAdvisor linter = new LinterCallAdvisor(
-                "test.skill",
+                "default-test_skill",
                 "regex",
                 Pattern.compile("^OK:.*$"),
                 "Return an OK response.",
@@ -266,7 +266,7 @@ class ModelAttemptCallAdvisorIntegrationTest
         assertThat(session.getSessionUsage().orElseThrow().promptUnits()).isEqualTo(18);
         assertThat(session.getSessionUsage().orElseThrow().completionUnits()).isEqualTo(7);
         assertThat(meterRegistry.get("loomspan.model.calls")
-                .tag("skill", "test.skill")
+                .tag("skill", "default-test_skill")
                 .tag("connection", "test-connection")
                 .tag("driver", "openai")
                 .tag("precision", "EXACT")
@@ -302,9 +302,9 @@ class ModelAttemptCallAdvisorIntegrationTest
                     .create("openai", properties);
             DefaultSessionUsageService usageService = usageService();
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-            LoomspanSession session = TestLoomspanSessions.withId("advisor-recursion", "test.entry", 4);
+            LoomspanSession session = TestLoomspanSessions.withId("advisor-recursion", "default-test_entry", 4);
             ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
             openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
             AtomicInteger toolExecutions = new AtomicInteger();
             List<String> toolValues = new ArrayList<>();
@@ -321,7 +321,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                     .inputSchema("{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}},\"required\":[\"value\"]}")
                     .build();
             LinterCallAdvisor semanticPolicy = new LinterCallAdvisor(
-                    "test.skill", "regex", Pattern.compile("^OK:.*$"),
+                    "default-test_skill", "regex", Pattern.compile("^OK:.*$"),
                     "Return an OK response.", 1, ignored -> { });
             ChatClient client = ChatClient.builder(runtime.chatModel())
                     .defaultAdvisors(semanticPolicy,
@@ -374,9 +374,9 @@ class ModelAttemptCallAdvisorIntegrationTest
                     .create("openai", properties);
             DefaultSessionUsageService usageService = usageService();
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-            LoomspanSession session = TestLoomspanSessions.withId("output-schema-tool-reuse", "test.entry", 4);
+            LoomspanSession session = TestLoomspanSessions.withId("output-schema-tool-reuse", "default-test_entry", 4);
             ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
             openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
             AtomicInteger toolExecutions = new AtomicInteger();
             ToolCallback tool = FunctionToolCallback.<Map<String, Object>, String>builder(
@@ -398,7 +398,7 @@ class ModelAttemptCallAdvisorIntegrationTest
             outputSchema.setRequired(List.of("result"));
             outputSchema.setAdditionalProperties(false);
             OutputSchemaCallAdvisor semanticPolicy = new OutputSchemaCallAdvisor(
-                    "test.skill", outputSchema, new OutputSchemaValidator(), new OutputSchemaPromptAugmentor(),
+                    "default-test_skill", outputSchema, new OutputSchemaValidator(), new OutputSchemaPromptAugmentor(),
                     1, ignored -> { });
             ChatClient client = ChatClient.builder(runtime.chatModel())
                     .defaultAdvisors(semanticPolicy,
@@ -436,9 +436,9 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("attempt-throw", "test.entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("attempt-throw", "default-test_entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ExecutionFrame root = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ExecutionFrame root = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         ExecutionFrame modelFrame = openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
         ModelTraceContext traceContext = traceContext();
         ChatModel throwingModel = prompt ->
@@ -502,14 +502,14 @@ class ModelAttemptCallAdvisorIntegrationTest
                 translator);
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("openai-authentication", "test.entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("openai-authentication", "default-test_entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(
-                binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+                binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
         ModelTraceContext traceContext = new ModelTraceContext(
                 new ModelExecutionIdentity("support-model", "primary-openai", AiDriver.OPENAI, "gpt-example"),
-                "test.skill",
+                "default-test_skill",
                 "mission");
         ChatClient client = ChatClient.builder(model)
                 .defaultAdvisors(new ProviderAttemptCallAdvisor(runtime, stateService,
@@ -556,9 +556,9 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("provider-retry", "test.entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("provider-retry", "default-test_entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
         ModelTraceContext traceContext = traceContext();
         AtomicInteger calls = new AtomicInteger();
@@ -639,9 +639,9 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("openai-read-timeout", "test.entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("openai-read-timeout", "default-test_entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
         AtomicInteger calls = new AtomicInteger();
         ChatModel model = prompt ->
@@ -719,9 +719,9 @@ class ModelAttemptCallAdvisorIntegrationTest
                 new LoomspanProperties().getSession().getQuotas(),
                 new MicrometerUsageMetricsRecorder(meterRegistry));
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("provider-exhaustion", "test.entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("provider-exhaustion", "default-test_entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
         AtomicInteger calls = new AtomicInteger();
         IllegalStateException terminal = new IllegalStateException("provider remained unavailable");
@@ -789,7 +789,7 @@ class ModelAttemptCallAdvisorIntegrationTest
         });
         assertThat(occurrences(output.getOut(), "Loomspan provider failure for framework model")).isEqualTo(1);
         assertThat(meterRegistry.get("loomspan.provider.attempts")
-                .tag("skill", "test.skill")
+                .tag("skill", "default-test_skill")
                 .tag("connection", "test-connection")
                 .tag("driver", "openai")
                 .tag("outcome", "failed")
@@ -810,16 +810,16 @@ class ModelAttemptCallAdvisorIntegrationTest
                 properties.getSession().getQuotas(),
                 new NoOpUsageMetricsRecorder());
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("attempt-quota", "test.entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("attempt-quota", "default-test_entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
         ModelTraceContext traceContext = traceContext();
         QueueChatModel model = new QueueChatModel(List.of(
                 response("invalid", 10, 4),
                 response("OK: corrected", 8, 3)));
         LinterCallAdvisor linter = new LinterCallAdvisor(
-                "test.skill",
+                "default-test_skill",
                 "regex",
                 Pattern.compile("^OK:.*$"),
                 "Return an OK response.",
@@ -851,9 +851,9 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("retry-interrupted", "test.entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("retry-interrupted", "default-test_entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
         ModelTraceContext traceContext = traceContext();
         CountDownLatch firstCall = new CountDownLatch(1);
@@ -911,9 +911,9 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("retry-pre-interrupted", "test.entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("retry-pre-interrupted", "default-test_entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
         AtomicInteger calls = new AtomicInteger();
         ChatModel model = prompt ->
@@ -972,9 +972,9 @@ class ModelAttemptCallAdvisorIntegrationTest
                     .create("openrouter", properties);
             DefaultSessionUsageService usageService = usageService();
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-            LoomspanSession session = TestLoomspanSessions.withId("openrouter-recovery", "test.entry", 4);
+            LoomspanSession session = TestLoomspanSessions.withId("openrouter-recovery", "default-test_entry", 4);
             ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "test.skill", Map.of()));
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
             openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
             ModelTraceContext traceContext = traceContext();
             ChatClient client = ChatClient.builder(runtime.chatModel())
@@ -1043,7 +1043,7 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         return new ModelTraceContext(
                 new ModelExecutionIdentity("test-model", "test-connection", AiDriver.OPENAI, "provider/model"),
-                "test.skill",
+                "default-test_skill",
                 "mission");
     }
 

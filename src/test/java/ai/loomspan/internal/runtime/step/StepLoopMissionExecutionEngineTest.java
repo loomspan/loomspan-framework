@@ -104,7 +104,7 @@ class StepLoopMissionExecutionEngineTest {
         var binding = new ChildInputBinding(ObjectFieldPath.parse("/value", false),
                 ChildInputBinding.SourceKind.INPUT, ObjectFieldPath.parse("/source", true), null);
         var calls = new AtomicInteger();
-        var tool = new BoundCapability(toolWithSchema("invoiceParser",
+        var tool = new BoundCapability(toolWithSchema("default-invoiceParser",
                 "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}},\"required\":[\"value\"],\"additionalProperties\":false}", "unused").metadata(),
                 List.of(binding), (arguments, taskId, sources) -> {
                     assertThat(arguments).isEmpty();
@@ -112,15 +112,15 @@ class StepLoopMissionExecutionEngineTest {
                     calls.incrementAndGet();
                     return "exact child result";
                 });
-        var session = TestLoomspanSessions.withId("direct-dispatch", "entry", 3);
+        var session = TestLoomspanSessions.withId("direct-dispatch", "default-entry", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
                     session, definition(), "Review source", Map.of("source", "exact"), model, List.of(tool))).isEqualTo("Finished");
         }
         assertThat(calls).hasValue(1);
         assertThat(model.systemMessagesSeen()).hasSize(1).allSatisfy(prompt -> assertThat(prompt).doesNotContain("--- ASSIGNED TASK ---"));
-        assertThat(readRecords(session)).noneMatch(record -> "rootVisibleSkill#step-1-model".equals(record.route())
-                || "rootVisibleSkill#step-1".equals(record.route()) && record.recordType() == TraceRecordType.STEP_ACTION_PROPOSED);
+        assertThat(readRecords(session)).noneMatch(record -> "default-rootVisibleSkill#step-1-model".equals(record.route())
+                || "default-rootVisibleSkill#step-1".equals(record.route()) && record.recordType() == TraceRecordType.STEP_ACTION_PROPOSED);
         assertThat(readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.STEP_STARTED))
                 .anySatisfy(record -> assertThat(record.metadata()).containsEntry("dispatchOrigin", "framework")
                         .containsEntry("dispatchReason", "eligible").containsEntry("assignedTaskId", "t-1"));
@@ -148,9 +148,9 @@ class StepLoopMissionExecutionEngineTest {
                 }
             }
         };
-        var tool = new BoundCapability(directTool("invoiceParser", "unused").metadata(), List.of(),
+        var tool = new BoundCapability(directTool("default-invoiceParser", "unused").metadata(), List.of(),
                 (arguments, taskId, sources) -> { sideEffects.incrementAndGet(); return "unexpected"; });
-        var session = TestLoomspanSessions.withId("direct-boundary-" + cancel, "entry", 3);
+        var session = TestLoomspanSessions.withId("direct-boundary-" + cancel, "default-entry", 3);
         var model = new SequenceChatClient();
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
@@ -175,12 +175,12 @@ class StepLoopMissionExecutionEngineTest {
                 ChildInputBinding.SourceKind.INPUT, ObjectFieldPath.parse("/source", true), null);
         for (String override : List.of("{\"context\":{\"evidence\":\"equal\"}}", "{\"context\":{\"evidence\":null}}",
                 "{\"context\":\"scalar\"}", "{\"context\":null}")) {
-            String rejected = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":" + override + "}";
+            String rejected = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":" + override + "}";
             var client = new SequenceChatClient(rejected,
-                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{\"context\":{\"reasoning\":\"new\"}}}",
+                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{\"context\":{\"reasoning\":\"new\"}}}",
                     "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
             var calls = new AtomicInteger();
-            var tool = new BoundCapability(toolWithSchema("invoiceParser", schema, "unused").metadata(), List.of(binding),
+            var tool = new BoundCapability(toolWithSchema("default-invoiceParser", schema, "unused").metadata(), List.of(binding),
                     (arguments, taskId, sources) -> {
                         assertThat(client.systemMessagesSeen()).hasSize(2);
                         assertThat(arguments).isEqualTo(Map.of("context", Map.of("reasoning", "new")));
@@ -188,7 +188,7 @@ class StepLoopMissionExecutionEngineTest {
                         return "accepted";
                     });
             var state = new DefaultExecutionStateService(FIXED_CLOCK);
-            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("binding-correction-" + override.hashCode(), "entry", 3);
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("binding-correction-" + override.hashCode(), "default-entry", 3);
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
                         session, definition(), "Review source", Map.of("source", "equal"), client, List.of(tool))).isEqualTo("Finished");
@@ -209,16 +209,16 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planning = new InitializingPlanningService(state, singleTaskPlan());
         YamlSkillManifest manifest = definitionWithMaxSteps(1).manifest();
         YamlSkillManifest.OutputFromManifest selector = new YamlSkillManifest.OutputFromManifest();
-        selector.setSkill("invoiceParser");
+        selector.setSkill("default-invoiceParser");
         manifest.setOutputFrom(selector);
         YamlSkillDefinition forwarding = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
         SequenceChatClient model = new SequenceChatClient(
-                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("forward-one", "rootVisibleSkill", 3);
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("forward-one", "default-rootVisibleSkill", 3);
         String exact = "  [\"quoted\", {\"secret\":\"preserved\"}]\n";
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThat(executeMission(engine(state, planning, executor, forwarding), session, forwarding, model,
-                    List.of(tool("invoiceParser", exact)))).isEqualTo(exact);
+                    List.of(tool("default-invoiceParser", exact)))).isEqualTo(exact);
         }
         assertThat(readRecords(session).stream().filter(record -> record.recordType().name().equals("RESULT_FORWARDED")))
                 .hasSize(1);
@@ -229,11 +229,11 @@ class StepLoopMissionExecutionEngineTest {
     void forwardingPreservesEveryDirectResultString(String exact) {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var definition = forwardingDefinition(1, false);
-        var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser"), new AtomicReference<>());
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("exact-forward", "rootVisibleSkill", 3);
+        var model = new TaskAddressedModel(Map.of("t-1", "default-invoiceParser"), new AtomicReference<>());
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("exact-forward", "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition),
-                    session, definition, model, List.of(tool("invoiceParser", exact)))).isEqualTo(exact);
+                    session, definition, model, List.of(tool("default-invoiceParser", exact)))).isEqualTo(exact);
         }
         assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.STRUCTURED_OUTPUT_RECORDED
                 || record.recordType() == TraceRecordType.LINTER_RECORDED || record.recordType() == TraceRecordType.EVIDENCE_VALIDATION_PASSED);
@@ -244,25 +244,25 @@ class StepLoopMissionExecutionEngineTest {
     void forwardingWaitsForWholeSelectedUnitAndLaterWork(boolean concurrent) throws Exception {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var tasks = List.of(
-                new PlanTask("t-1", "Answer", PlanTaskStatus.PENDING, "invoiceParser", "answer", List.of(), List.of(), "batch", null),
-                new PlanTask("t-2", "Required sibling", PlanTaskStatus.PENDING, "expenseLookup", "finish", List.of(), List.of(), "batch", null),
-                new PlanTask("t-3", "Accepted optional work", PlanTaskStatus.PENDING, "optional", "finish", List.of(), List.of(), null, null));
-        var plan = new ExecutionPlan("forward-complete", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
+                new PlanTask("t-1", "Answer", PlanTaskStatus.PENDING, "default-invoiceParser", "answer", List.of(), List.of(), "batch", null),
+                new PlanTask("t-2", "Required sibling", PlanTaskStatus.PENDING, "default-expenseLookup", "finish", List.of(), List.of(), "batch", null),
+                new PlanTask("t-3", "Accepted optional work", PlanTaskStatus.PENDING, "default-optional", "finish", List.of(), List.of(), null, null));
+        var plan = new ExecutionPlan("forward-complete", "default-rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
         var definition = forwardingDefinition(3, concurrent);
         CountDownLatch siblingStarted = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         AtomicInteger later = new AtomicInteger();
         AtomicReference<String> unexpectedFinal = new AtomicReference<>();
-        var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser", "t-2", "expenseLookup", "t-3", "optional"), unexpectedFinal);
-        var selected = directTool("invoiceParser", "x".repeat(8000) + " selected");
-        var sibling = new BoundCapability(tool("expenseLookup", "unused").metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> {
+        var model = new TaskAddressedModel(Map.of("t-1", "default-invoiceParser", "t-2", "default-expenseLookup", "t-3", "default-optional"), unexpectedFinal);
+        var selected = directTool("default-invoiceParser", "x".repeat(8000) + " selected");
+        var sibling = new BoundCapability(tool("default-expenseLookup", "unused").metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> {
             siblingStarted.countDown();
             try { assertThat(release.await(3, TimeUnit.SECONDS)).isTrue(); }
             catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
             return "sibling";
         });
-        var optional = new BoundCapability(directTool("optional", "unused").metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> { later.incrementAndGet(); return "optional"; });
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("join-forward", "rootVisibleSkill", 3);
+        var optional = new BoundCapability(directTool("default-optional", "unused").metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> { later.incrementAndGet(); return "optional"; });
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("join-forward", "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor(); ExecutorService caller = Executors.newSingleThreadExecutor()) {
             Future<String> result = caller.submit(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
                     session, definition, model, List.of(selected, sibling, optional)));
@@ -281,8 +281,8 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.RESULT_FORWARDED)).singleElement()
                 .satisfies(record -> {
                     assertThat(record.frameType()).isEqualTo(TraceFrameType.ROOT_MISSION);
-                    assertThat(record.metadata()).containsEntry("skillName", "rootVisibleSkill").containsEntry("planId", "forward-complete")
-                            .containsEntry("linkedTaskId", "t-1").containsEntry("capabilityName", "invoiceParser");
+                    assertThat(record.metadata()).containsEntry("skillName", "default-rootVisibleSkill").containsEntry("planId", "forward-complete")
+                            .containsEntry("linkedTaskId", "t-1").containsEntry("capabilityName", "default-invoiceParser");
                 });
         assertThat(session.getExecutionJournal().getEntriesSnapshot()).anyMatch(entry -> entry.type() == ai.loomspan.internal.core.JournalEntryType.RESULT_FORWARDED);
     }
@@ -291,20 +291,20 @@ class StepLoopMissionExecutionEngineTest {
     void forwardingRunsPrerequisiteBeforeSelectedTask() {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var tasks = List.of(
-                new PlanTask("prep", "Prepare", PlanTaskStatus.PENDING, "prepare", "prepare input", List.of(), List.of(), null, null),
-                new PlanTask("t-1", "Answer", PlanTaskStatus.PENDING, "invoiceParser", "answer", List.of("prep"), List.of(), null, null));
-        var plan = new ExecutionPlan("forward-prerequisite", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
+                new PlanTask("prep", "Prepare", PlanTaskStatus.PENDING, "default-prepare", "prepare input", List.of(), List.of(), null, null),
+                new PlanTask("t-1", "Answer", PlanTaskStatus.PENDING, "default-invoiceParser", "answer", List.of("prep"), List.of(), null, null));
+        var plan = new ExecutionPlan("forward-prerequisite", "default-rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
         var definition = forwardingDefinition(2, false);
-        var delegate = new TaskAddressedModel(Map.of("prep", "prepare", "t-1", "invoiceParser"), new AtomicReference<>());
+        var delegate = new TaskAddressedModel(Map.of("prep", "default-prepare", "t-1", "default-invoiceParser"), new AtomicReference<>());
         ai.loomspan.internal.model.ModelInteraction model = request -> {
             if (request.systemPrompt().contains("--- ASSIGNED TASK ---\nID: t-1"))
                 assertThat(request.systemPrompt()).contains("EXACT_PREREQUISITE_RESULT");
             return delegate.call(request);
         };
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("prerequisite-forward", "rootVisibleSkill", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("prerequisite-forward", "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThat(executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
-                    session, definition, model, List.of(tool("prepare", "EXACT_PREREQUISITE_RESULT"), tool("invoiceParser", "selected-answer"))))
+                    session, definition, model, List.of(tool("default-prepare", "EXACT_PREREQUISITE_RESULT"), tool("default-invoiceParser", "selected-answer"))))
                     .isEqualTo("selected-answer");
         }
     }
@@ -313,14 +313,14 @@ class StepLoopMissionExecutionEngineTest {
     void rejectsWholeForwardingUnitWhenAssignmentsDoNotFit() {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var tasks = List.of(
-                new PlanTask("t-1", "Answer", PlanTaskStatus.PENDING, "invoiceParser", "answer", List.of(), List.of(), "batch", null),
-                new PlanTask("t-2", "Sibling", PlanTaskStatus.PENDING, "expenseLookup", "finish", List.of(), List.of(), "batch", null));
-        var plan = new ExecutionPlan("forward-budget", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
+                new PlanTask("t-1", "Answer", PlanTaskStatus.PENDING, "default-invoiceParser", "answer", List.of(), List.of(), "batch", null),
+                new PlanTask("t-2", "Sibling", PlanTaskStatus.PENDING, "default-expenseLookup", "finish", List.of(), List.of(), "batch", null));
+        var plan = new ExecutionPlan("forward-budget", "default-rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
         var definition = forwardingDefinition(1, true);
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("budget-forward", "rootVisibleSkill", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("budget-forward", "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
-                    session, definition, new SequenceChatClient(), List.of(tool("invoiceParser", "answer"), tool("expenseLookup", "sibling"))))
+                    session, definition, new SequenceChatClient(), List.of(tool("default-invoiceParser", "answer"), tool("default-expenseLookup", "sibling"))))
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("exhausted");
         }
         assertThat(session.getExecutionPlanSnapshot().tasks()).allMatch(task -> task.status() == PlanTaskStatus.PENDING);
@@ -332,10 +332,10 @@ class StepLoopMissionExecutionEngineTest {
     void forwardingFailureNeverProducesParentSuccess(boolean selectedFails) {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var definition = forwardingDefinition(2, false);
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("failure-forward", "rootVisibleSkill", 3);
-        var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser", "t-2", "expenseLookup"), new AtomicReference<>());
-        var selected = selectedFails ? failingTool("invoiceParser") : tool("invoiceParser", "retained-selected");
-        var later = selectedFails ? tool("expenseLookup", "later") : failingTool("expenseLookup");
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("failure-forward", "default-rootVisibleSkill", 3);
+        var model = new TaskAddressedModel(Map.of("t-1", "default-invoiceParser", "t-2", "default-expenseLookup"), new AtomicReference<>());
+        var selected = selectedFails ? failingTool("default-invoiceParser") : tool("default-invoiceParser", "retained-selected");
+        var later = selectedFails ? tool("default-expenseLookup", "later") : failingTool("default-expenseLookup");
         var binding = TestExecutionBindings.missionBinding(session);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding, () -> executeMission(
@@ -350,13 +350,13 @@ class StepLoopMissionExecutionEngineTest {
     @Test
     void forwardingRejectsAmbiguousOrMissingAcceptedTask() {
         for (var plan : List.of(groupedPlan("ambiguous", false),
-                new ExecutionPlan("missing", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, List.of()))) {
+                new ExecutionPlan("missing", "default-rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, List.of()))) {
             var state = new DefaultExecutionStateService(FIXED_CLOCK);
             var definition = forwardingDefinition(3, true);
-            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("invalid-forward", "rootVisibleSkill", 3);
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("invalid-forward", "default-rootVisibleSkill", 3);
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
-                        session, definition, new SequenceChatClient(), List.of(tool("invoiceParser", "unused"))))
+                        session, definition, new SequenceChatClient(), List.of(tool("default-invoiceParser", "unused"))))
                         .isInstanceOf(IllegalStateException.class).hasMessageContaining("exactly one");
             }
             assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_FORWARDED);
@@ -372,13 +372,13 @@ class StepLoopMissionExecutionEngineTest {
         if (corruption.equals("stale")) completed = new ExecutionPlan(completed.planId(), completed.capabilityName(), completed.createdAt(), PlanStatus.STALE, completed.tasks());
         var planning = new InitializingPlanningService(state, completed);
         var definition = forwardingDefinition(1, false);
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("retained-forward", "rootVisibleSkill", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("retained-forward", "default-rootVisibleSkill", 3);
         var binding = TestExecutionBindings.missionBinding(session);
         if (!corruption.equals("missing")) binding.requireMission().recordCompletedTaskResult("t-1",
-                corruption.equals("wrong-skill") ? "other" : "invoiceParser", "result");
+                corruption.equals("wrong-skill") ? "other" : "default-invoiceParser", "result");
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding, () -> executeMission(engine(state, planning, executor, definition),
-                    session, definition, new SequenceChatClient(), List.of(tool("invoiceParser", "unused")))))
+                    session, definition, new SequenceChatClient(), List.of(tool("default-invoiceParser", "unused")))))
                     .isInstanceOf(IllegalStateException.class);
         }
         assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_FORWARDED);
@@ -393,13 +393,13 @@ class StepLoopMissionExecutionEngineTest {
         if (corruption.equals("stale")) completed = new ExecutionPlan(completed.planId(), completed.capabilityName(), completed.createdAt(), PlanStatus.STALE, completed.tasks());
         var planning = new InitializingPlanningService(state, completed);
         var definition = outputBindingDefinition(1, false);
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("retained-assembly", "rootVisibleSkill", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("retained-assembly", "default-rootVisibleSkill", 3);
         var binding = TestExecutionBindings.missionBinding(session);
         if (!corruption.equals("missing")) binding.requireMission().recordCompletedTaskResult("t-1",
-                corruption.equals("wrong-skill") ? "other" : "invoiceParser", "result");
+                corruption.equals("wrong-skill") ? "other" : "default-invoiceParser", "result");
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding, () -> executeMission(engine(state, planning, executor, definition),
-                    session, definition, new SequenceChatClient(), List.of(tool("invoiceParser", "unused")))))
+                    session, definition, new SequenceChatClient(), List.of(tool("default-invoiceParser", "unused")))))
                     .isInstanceOf(IllegalStateException.class);
         }
         assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_ASSEMBLED);
@@ -410,26 +410,26 @@ class StepLoopMissionExecutionEngineTest {
     void outputAssemblyJoinsWholeProducerUnitAndUnrelatedWork(boolean concurrent) throws Exception {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var tasks = List.of(
-                new PlanTask("t-1", "Bound answer", PlanTaskStatus.PENDING, "invoiceParser", "answer", List.of(), List.of(), "batch", null),
-                new PlanTask("t-2", "Sibling", PlanTaskStatus.PENDING, "expenseLookup", "finish", List.of(), List.of(), "batch", null),
-                new PlanTask("t-3", "Later", PlanTaskStatus.PENDING, "optional", "finish", List.of(), List.of(), null, null));
-        var plan = new ExecutionPlan("assembled-complete", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
+                new PlanTask("t-1", "Bound answer", PlanTaskStatus.PENDING, "default-invoiceParser", "answer", List.of(), List.of(), "batch", null),
+                new PlanTask("t-2", "Sibling", PlanTaskStatus.PENDING, "default-expenseLookup", "finish", List.of(), List.of(), "batch", null),
+                new PlanTask("t-3", "Later", PlanTaskStatus.PENDING, "default-optional", "finish", List.of(), List.of(), null, null));
+        var plan = new ExecutionPlan("assembled-complete", "default-rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
         var definition = twoProducerOutputBindingDefinition(3, concurrent);
         CountDownLatch held = new CountDownLatch(1), release = new CountDownLatch(1);
         AtomicInteger later = new AtomicInteger();
         AtomicReference<String> unexpectedFinal = new AtomicReference<>();
-        var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser", "t-2", "expenseLookup", "t-3", "optional"), unexpectedFinal);
-        var sibling = new BoundCapability(tool("expenseLookup", "unused").metadata(), List.of(), (arguments, taskId, sources) -> {
+        var model = new TaskAddressedModel(Map.of("t-1", "default-invoiceParser", "t-2", "default-expenseLookup", "t-3", "default-optional"), unexpectedFinal);
+        var sibling = new BoundCapability(tool("default-expenseLookup", "unused").metadata(), List.of(), (arguments, taskId, sources) -> {
             held.countDown();
             try { assertThat(release.await(5, TimeUnit.SECONDS)).isTrue(); }
             catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
             return "sibling";
         });
-        var optional = new BoundCapability(directTool("optional", "unused").metadata(), List.of(), (arguments, taskId, sources) -> { later.incrementAndGet(); return "later"; });
-        var session = TestLoomspanSessions.withId("join-assembly", "rootVisibleSkill", 3);
+        var optional = new BoundCapability(directTool("default-optional", "unused").metadata(), List.of(), (arguments, taskId, sources) -> { later.incrementAndGet(); return "later"; });
+        var session = TestLoomspanSessions.withId("join-assembly", "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor(); ExecutorService caller = Executors.newSingleThreadExecutor()) {
             Future<String> result = caller.submit(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
-                    session, definition, model, List.of(directTool("invoiceParser", "exact answer"), sibling, optional)));
+                    session, definition, model, List.of(directTool("default-invoiceParser", "exact answer"), sibling, optional)));
             try {
                 assertThat(held.await(5, TimeUnit.SECONDS)).isTrue();
                 assertThat(result.isDone()).isFalse(); assertThat(later).hasValue(0);
@@ -447,12 +447,12 @@ class StepLoopMissionExecutionEngineTest {
     void failedProducerOrUnrelatedWorkCannotPublishOutputAssembly(boolean producerFails) {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var definition = outputBindingDefinition(2, false);
-        var session = TestLoomspanSessions.withId("failed-assembly", "rootVisibleSkill", 3);
-        var model = new TaskAddressedModel(Map.of("t-1", "invoiceParser", "t-2", "expenseLookup"), new AtomicReference<>());
+        var session = TestLoomspanSessions.withId("failed-assembly", "default-rootVisibleSkill", 3);
+        var model = new TaskAddressedModel(Map.of("t-1", "default-invoiceParser", "t-2", "default-expenseLookup"), new AtomicReference<>());
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, twoTaskPlan()), executor, definition), session,
-                    definition, model, List.of(producerFails ? failingTool("invoiceParser") : tool("invoiceParser", "retained"),
-                            producerFails ? tool("expenseLookup", "later") : failingTool("expenseLookup"))))
+                    definition, model, List.of(producerFails ? failingTool("default-invoiceParser") : tool("default-invoiceParser", "retained"),
+                            producerFails ? tool("default-expenseLookup", "later") : failingTool("default-expenseLookup"))))
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("parser exploded");
         }
         assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.RESULT_ASSEMBLED);
@@ -462,7 +462,7 @@ class StepLoopMissionExecutionEngineTest {
     void outputBindingDoesNotGrantAccessToAnInvisibleProducer() {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var definition = outputBindingDefinition(1, false);
-        var session = TestLoomspanSessions.withId("invisible-output-producer", "rootVisibleSkill", 3);
+        var session = TestLoomspanSessions.withId("invisible-output-producer", "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition),
                     session, definition, new SequenceChatClient(), List.of())).isInstanceOf(IllegalStateException.class).hasMessageContaining("not eligible");
@@ -492,13 +492,13 @@ class StepLoopMissionExecutionEngineTest {
         linter.setRegex(regex); manifest.setLinter(linter);
         var definition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
         var model = new SequenceChatClient(mixed ? new String[] {
-                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}",
                 "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":{\"summary\":\"reasoned\"}}"} : new String[] {
-                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}"});
-        var session = TestLoomspanSessions.withId("decimal-assembly", "rootVisibleSkill", 3);
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}"});
+        var session = TestLoomspanSessions.withId("decimal-assembly", "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition),
-                    session, definition, model, List.of(tool("invoiceParser", decimal))))
+                    session, definition, model, List.of(tool("default-invoiceParser", decimal))))
                     .contains("\"report\":" + decimal);
         }
         assertThat(session.getLastLinterOutcome().orElseThrow().status()).isEqualTo(ai.loomspan.internal.linter.LinterOutcomeStatus.PASSED);
@@ -513,13 +513,13 @@ class StepLoopMissionExecutionEngineTest {
         var manifest = base.manifest(); manifest.setLinter(linter);
         var definition = new YamlSkillDefinition("default", base.resource(), manifest, EXECUTION_CONFIGURATION, base.evidenceContract());
         var client = new SequenceChatClient(
-                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}",
                 finalObjectEnvelope("{\"result\":3}"), finalObjectEnvelope("{\"result\":\"BAD\",\"reasoning\":\"unsupported\"}"),
                 finalObjectEnvelope("{\"result\":\"BAD\"}"), finalObjectEnvelope("{\"result\":\"GOOD\"}"));
         var calls = new AtomicInteger();
-        var producer = new BoundCapability(tool("invoiceParser", "unused").metadata(), List.of(),
+        var producer = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
                 (arguments, taskId, sourceResults) -> { calls.incrementAndGet(); return "AUTHORITATIVE_RESULT"; });
-        var session = TestLoomspanSessions.withId("combined-validation", "rootVisibleSkill", 3);
+        var session = TestLoomspanSessions.withId("combined-validation", "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition),
                     session, definition, client, List.of(producer))).isEqualTo("{\"result\":\"GOOD\"}");
@@ -545,11 +545,11 @@ class StepLoopMissionExecutionEngineTest {
         var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern("^NEVER$");
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(budget); linter.setRegex(regex); manifest.setLinter(linter);
         var definition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
-        var model = new SequenceChatClient("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
-        var session = TestLoomspanSessions.withId("bound-lint-terminal", "rootVisibleSkill", 3);
+        var model = new SequenceChatClient("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}");
+        var session = TestLoomspanSessions.withId("bound-lint-terminal", "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition),
-                    session, definition, model, List.of(tool("invoiceParser", "\"exact\""))))
+                    session, definition, model, List.of(tool("default-invoiceParser", "\"exact\""))))
                     .hasMessageContaining("binding_output_contract");
         }
         var outcome = session.getLastLinterOutcome().orElseThrow();
@@ -576,15 +576,15 @@ class StepLoopMissionExecutionEngineTest {
             default -> "{\"result\":\"BAD\"}";
         };
         var responses = new ArrayList<String>();
-        responses.add("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
+        responses.add("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}");
         for (int attempt = 0; attempt <= budget; attempt++) responses.add(finalObjectEnvelope(terminalPass && attempt == budget ? "{\"result\":\"GOOD\"}" : invalid));
         var model = new SequenceChatClient(responses.toArray(String[]::new));
-        var session = TestLoomspanSessions.withId("terminal-" + validator, "rootVisibleSkill", 3);
+        var session = TestLoomspanSessions.withId("terminal-" + validator, "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var engine = engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition);
-            if (terminalPass) assertThat(executeMission(engine, session, definition, model, List.of(tool("invoiceParser", "accepted"))))
+            if (terminalPass) assertThat(executeMission(engine, session, definition, model, List.of(tool("default-invoiceParser", "accepted"))))
                     .isEqualTo("{\"result\":\"GOOD\"}");
-            else assertThatThrownBy(() -> executeMission(engine, session, definition, model, List.of(tool("invoiceParser", "accepted"))))
+            else assertThatThrownBy(() -> executeMission(engine, session, definition, model, List.of(tool("default-invoiceParser", "accepted"))))
                     .hasMessageContaining("Final response validation exhausted at step 2");
         }
         assertThat(model.userMessagesSeen()).hasSize(budget + 2);
@@ -613,9 +613,9 @@ class StepLoopMissionExecutionEngineTest {
         var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern("(?s)(?=.*AUTHORITATIVE)(?=.*GOOD).*"); regex.setMessage("Use GOOD");
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(1); linter.setRegex(regex); manifest.setLinter(linter);
         var definition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION,
-                ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(Map.of("report", "invoiceParser", "reasoning", "expenseLookup")));
+                ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(Map.of("report", "default-invoiceParser", "reasoning", "default-expenseLookup")));
         var responses = new ArrayList<String>();
-        responses.add("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
+        responses.add("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}");
         responses.add(finalObjectEnvelope("{\"report\":null,\"summary\":\"BAD\"}"));
         if (corrected) {
             responses.add(finalObjectEnvelope("{\"summary\":\"BAD\",\"reasoning\":\"unsupported\"}"));
@@ -624,9 +624,9 @@ class StepLoopMissionExecutionEngineTest {
         } else responses.add(finalObjectEnvelope("{\"report\":\"AUTHORITATIVE\",\"summary\":\"BAD\"}"));
         var model = new SequenceChatClient(responses.toArray(String[]::new));
         var calls = new AtomicInteger();
-        var producer = new BoundCapability(tool("invoiceParser", "unused").metadata(), List.of(),
+        var producer = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
                 (arguments, taskId, sources) -> { calls.incrementAndGet(); return "\"AUTHORITATIVE\""; });
-        var session = TestLoomspanSessions.withId("mixed-policy", "rootVisibleSkill", 3);
+        var session = TestLoomspanSessions.withId("mixed-policy", "default-rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var engine = engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition);
             if (corrected) assertThat(executeMission(engine, session, definition, model, List.of(producer))).contains("AUTHORITATIVE", "GOOD").doesNotContain("unsupported");
@@ -648,7 +648,7 @@ class StepLoopMissionExecutionEngineTest {
         var manifest = definitionWithMaxSteps(maxSteps).manifest();
         manifest.setConcurrency(concurrent);
         var descriptor = new YamlSkillManifest.InputBindingManifest();
-        descriptor.setFrom("child_result"); descriptor.setSkill("invoiceParser"); descriptor.setPath("");
+        descriptor.setFrom("child_result"); descriptor.setSkill("default-invoiceParser"); descriptor.setPath("");
         manifest.setOutputBindings(Map.of("/report", descriptor));
         var schema = new YamlSkillManifest.OutputSchemaManifest(); schema.setType("object"); schema.setAdditionalProperties(false);
         var report = new YamlSkillManifest.OutputSchemaManifest(); report.setType("string");
@@ -659,7 +659,7 @@ class StepLoopMissionExecutionEngineTest {
     private static YamlSkillDefinition twoProducerOutputBindingDefinition(int maxSteps, boolean concurrent) {
         var manifest = outputBindingDefinition(maxSteps, concurrent).manifest();
         var descriptor = new YamlSkillManifest.InputBindingManifest();
-        descriptor.setFrom("child_result"); descriptor.setSkill("expenseLookup"); descriptor.setPath("");
+        descriptor.setFrom("child_result"); descriptor.setSkill("default-expenseLookup"); descriptor.setPath("");
         var bindings = new LinkedHashMap<>(manifest.getOutputBindings()); bindings.put("/other",descriptor); manifest.setOutputBindings(bindings);
         var fields = new LinkedHashMap<>(manifest.getOutputSchema().getProperties());
         var other = new YamlSkillManifest.OutputSchemaManifest(); other.setType("string"); fields.put("other",other);
@@ -671,7 +671,7 @@ class StepLoopMissionExecutionEngineTest {
         var manifest = definitionWithMaxSteps(maxSteps).manifest();
         manifest.setConcurrency(concurrent);
         var selector = new YamlSkillManifest.OutputFromManifest();
-        selector.setSkill("invoiceParser");
+        selector.setSkill("default-invoiceParser");
         manifest.setOutputFrom(selector);
         return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
@@ -680,10 +680,10 @@ class StepLoopMissionExecutionEngineTest {
     void capturesExactBindingAndRestoresReusedWorkerAfterSuccess() throws Exception {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan completedPlan = new ExecutionPlan(
-                "completed", "rootVisibleSkill", Instant.parse("2026-03-15T12:00:00Z"), List.of());
+                "completed", "default-rootVisibleSkill", Instant.parse("2026-03-15T12:00:00Z"), List.of());
         PlanningService planningService = new InitializingPlanningService(stateService, completedPlan);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-binding-success", "test.entry", 3);
+                "step-binding-success", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.model.ModelInteraction model = request -> {
             assertThat(ExecutionBindingScope.requireCurrent()).isSameAs(binding);
@@ -708,7 +708,7 @@ class StepLoopMissionExecutionEngineTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-binding-failure", "test.entry", 3);
+                "step-binding-failure", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.model.ModelInteraction model = request -> {
             ExecutionBinding workerBinding = ExecutionBindingScope.requireCurrent();
@@ -723,7 +723,7 @@ class StepLoopMissionExecutionEngineTest {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
             assertThatThrownBy(() -> ExecutionBindingScope.runWith(binding, () -> engine.executeMission(
                     session, definition(), "objective", null, model,
-                    List.of(tool("invoiceParser", "{}")), true, null)))
+                    List.of(tool("default-invoiceParser", "{}")), true, null)))
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("step boom");
             assertThat(missionExecutor.submit(ExecutionBindingScope::current).get(2, TimeUnit.SECONDS)).isEmpty();
         }
@@ -738,7 +738,7 @@ class StepLoopMissionExecutionEngineTest {
         when(missionExecutor.submit(any(Callable.class))).thenThrow(rejection);
         StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-binding-rejected", "test.entry", 3);
+                "step-binding-rejected", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
 
         ExecutionBindingScope.runWith(binding, () -> {
@@ -763,7 +763,7 @@ class StepLoopMissionExecutionEngineTest {
         AtomicReference<Optional<ExecutionBinding>> callerBindingAfter = new AtomicReference<>();
         java.util.concurrent.atomic.AtomicBoolean callerInterruptedAfter = new java.util.concurrent.atomic.AtomicBoolean();
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-binding-caller-interrupt", "test.entry", 3);
+                "step-binding-caller-interrupt", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.model.ModelInteraction model = request -> {
             ExecutionBinding workerBinding = ExecutionBindingScope.requireCurrent();
@@ -791,7 +791,7 @@ class StepLoopMissionExecutionEngineTest {
                 try {
                     ExecutionBindingScope.runWith(binding, () -> engine.executeMission(
                             session, definition(), "objective", null, model,
-                            List.of(tool("invoiceParser", "{}")), true, null));
+                            List.of(tool("default-invoiceParser", "{}")), true, null));
                 }
                 catch (Throwable failure) {
                     callerFailure.set(failure);
@@ -820,12 +820,12 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
         SequenceChatClient chatClient = new SequenceChatClient();
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-model-failure", "test.entry", 3);
+                "step-model-failure", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
             assertThatThrownBy(() -> executeMission(engine, session, definition(), chatClient,
-                    List.of(tool("invoiceParser", "unused"))))
+                    List.of(tool("default-invoiceParser", "unused"))))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("No more queued chat responses");
         }
@@ -853,16 +853,16 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-1"}}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"expenseLookup","toolArguments":{"invoiceId":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"default-expenseLookup","toolArguments":{"invoiceId":"INV-1"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Mission complete"}
                 """);
 
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-1", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-1", "default-test_entry", 3);
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
 
@@ -871,7 +871,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definition(),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}"), tool("expenseLookup", "{\"matches\":[]}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}"), tool("default-expenseLookup", "{\"matches\":[]}")));
 
             assertThat(response).isEqualTo("Mission complete");
         }
@@ -898,12 +898,12 @@ class StepLoopMissionExecutionEngineTest {
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Too early"}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-1"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-retry", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-retry", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             YamlSkillDefinition definition = definitionWithPrompt();
@@ -914,7 +914,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definition,
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}")));
 
             assertThat(response).isEqualTo("Finished");
         }
@@ -939,7 +939,7 @@ class StepLoopMissionExecutionEngineTest {
             String payload = payloadSize > 8192 ? CorrectionEvidenceFixtures.equipmentComparison("TAIL_SENTINEL")
                     : "short \ud83d\ude80TAIL_SENTINEL";
             String valid = LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(Map.of(
-                    "stepAction", "CALL_TOOL", "taskId", "t-1", "toolName", "invoiceParser",
+                    "stepAction", "CALL_TOOL", "taskId", "t-1", "toolName", "default-invoiceParser",
                     "toolArguments", Map.of("rawText", payload)));
             String rejected = valid + "}";
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
@@ -947,7 +947,7 @@ class StepLoopMissionExecutionEngineTest {
             SequenceChatClient chatClient = new SequenceChatClient(rejected, valid,
                     "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
             AtomicInteger calls = new AtomicInteger();
-            BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+            BoundCapability countedTool = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                     (arguments, taskId, sourceResults) -> {
                         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
                         calls.incrementAndGet();
@@ -955,7 +955,7 @@ class StepLoopMissionExecutionEngineTest {
                         return "parsed";
                     });
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "synthetic-brace-" + payloadSize, "test.entry", 3);
+                    "synthetic-brace-" + payloadSize, "default-test_entry", 3);
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor())
             {
                 StepLoopMissionExecutionEngine engine = engine(stateService, planningService, executor, definitionWithPrompt());
@@ -982,9 +982,9 @@ class StepLoopMissionExecutionEngineTest {
         String malformed = CorrectionEvidenceFixtures.equipmentComparison("MALFORMED") + "}";
         SequenceChatClient chatClient = new SequenceChatClient(malformed, malformed);
         AtomicInteger calls = new AtomicInteger();
-        BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability countedTool = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> { calls.incrementAndGet(); return "unexpected"; });
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("brace-exhaustion", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("brace-exhaustion", "default-test_entry", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor())
         {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, executor, definition());
@@ -1004,14 +1004,14 @@ class StepLoopMissionExecutionEngineTest {
             PlanningService planning = new InitializingPlanningService(state, singleTaskPlan());
             String rejected = CorrectionEvidenceFixtures.equipmentComparison("IDENTITY_REJECTED") + "}";
             Map<String, Object> action = new java.util.LinkedHashMap<>(Map.of("stepAction", "CALL_TOOL",
-                    "taskId", "t-1", "toolName", "invoiceParser", "toolArguments", Map.of("rawText", "INV-1")));
-            action.put(invalidField, "unassigned");
+                    "taskId", "t-1", "toolName", "default-invoiceParser", "toolArguments", Map.of("rawText", "INV-1")));
+            action.put(invalidField, invalidField.equals("toolName") ? "default-unassigned" : "unassigned");
             SequenceChatClient client = new SequenceChatClient(rejected,
                     LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(action));
             AtomicInteger toolCalls = new AtomicInteger();
-            BoundCapability countedTool = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+            BoundCapability countedTool = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                     (arguments, taskId, sourceResults) -> { toolCalls.incrementAndGet(); return "unexpected"; });
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("invalid-corrected-" + invalidField, "test.entry", 3);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("invalid-corrected-" + invalidField, "default-test_entry", 3);
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 StepLoopMissionExecutionEngine engine = engine(state, planning, executor, definition());
                 assertThatThrownBy(() -> executeMission(engine, session, definition(), client, List.of(countedTool)))
@@ -1031,12 +1031,12 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-1"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-prompt", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-prompt", "default-test_entry", 3);
         YamlSkillDefinition definition = definitionWithPrompt();
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -1047,7 +1047,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definition,
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}")));
 
             assertThat(response).isEqualTo("Finished");
         }
@@ -1069,15 +1069,15 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-1"}}
+                {"taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-1"}}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-1"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-missing-action", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-missing-action", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
@@ -1087,7 +1087,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definition(),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}")));
 
             assertThat(response).isEqualTo("Finished");
         }
@@ -1103,22 +1103,22 @@ class StepLoopMissionExecutionEngineTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan plan = new ExecutionPlan(
                 "plan-failure",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID,
                 List.of(
                         new PlanTask("t-1", "Parse invoice", PlanTaskStatus.PENDING,
-                                "invoiceParser", "Parse invoice", List.of(), List.of("parsed"), "batch", null),
+                                "default-invoiceParser", "Parse invoice", List.of(), List.of("parsed"), "batch", null),
                         new PlanTask("t-2", "Parse another invoice", PlanTaskStatus.PENDING,
-                                "invoiceParser", "Parse another invoice", List.of(), List.of("parsed"), "batch", null)));
+                                "default-invoiceParser", "Parse another invoice", List.of(), List.of("parsed"), "batch", null)));
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-1"}}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-failure", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-failure", "default-test_entry", 3);
         IllegalStateException expectedFailure = new IllegalStateException("parser exploded");
-        BoundCapability failingCapability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability failingCapability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     throw expectedFailure;
                 });
@@ -1153,12 +1153,12 @@ class StepLoopMissionExecutionEngineTest {
     void surfacesModelFailureAsExplicitTerminalFailure() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-model-failure", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-model-failure", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
             assertThatThrownBy(() -> executeMission(engine, session, definition(), new SequenceChatClient(),
-                    List.of(tool("invoiceParser", "unused"))))
+                    List.of(tool("default-invoiceParser", "unused"))))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("No more queued chat responses");
         }
@@ -1183,7 +1183,7 @@ class StepLoopMissionExecutionEngineTest {
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"{\\\"result\\\":\\\"Finished\\\"}"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-schema", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-schema", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(
@@ -1197,7 +1197,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definitionWithOutputSchema(),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}")));
 
             assertThat(response).isEqualTo("{\"result\":\"Finished\"}");
         }
@@ -1223,12 +1223,12 @@ class StepLoopMissionExecutionEngineTest {
             String terminal = finalEnvelope(pass ? "{\"result\":\"Finished\"}"
                     : CorrectionEvidenceFixtures.equipmentComparison("FINAL_TERMINAL"));
             SequenceChatClient client = new SequenceChatClient(
-                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{\"rawText\":\"INV-1\"}}",
+                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{\"rawText\":\"INV-1\"}}",
                     first, second, terminal);
             AtomicInteger toolCalls = new AtomicInteger();
-            BoundCapability tool = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+            BoundCapability tool = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                     (arguments, taskId, sourceResults) -> { toolCalls.incrementAndGet(); return "AUTHORITATIVE_RESULT"; });
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("large-final-" + pass, "test.entry", 3);
+            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("large-final-" + pass, "default-test_entry", 3);
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 StepLoopMissionExecutionEngine engine = engine(state, planning, executor, definition);
                 if (pass) assertThat(executeMission(engine, session, definition, client, List.of(tool))).isEqualTo("{\"result\":\"Finished\"}");
@@ -1258,9 +1258,9 @@ class StepLoopMissionExecutionEngineTest {
         SequenceChatClient client = new SequenceChatClient(rejected);
         client.failureAfterResponses = contextFailure;
         AtomicInteger toolCalls = new AtomicInteger();
-        BoundCapability tool = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability tool = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> { toolCalls.incrementAndGet(); return "unexpected"; });
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-context-limit", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-context-limit", "default-test_entry", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(state, planning, executor, definitionWithPrompt());
             assertThatThrownBy(() -> executeMission(engine, session, definitionWithPrompt(), client, List.of(tool)))
@@ -1294,9 +1294,9 @@ class StepLoopMissionExecutionEngineTest {
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":{"result":"Finished"}}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-evidence", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-evidence", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
-        binding.requireMission().recordSuccessfulDirectSkill("invoiceParser");
+        binding.requireMission().recordSuccessfulDirectSkill("default-invoiceParser");
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(
@@ -1307,7 +1307,7 @@ class StepLoopMissionExecutionEngineTest {
 
             String response = ExecutionBindingScope.supplyWith(binding, () -> executeMission(
                     engine, session, definitionWithOutputSchemaAndEvidenceContract(), chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}"))));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}"))));
 
             assertThat(response).isEqualTo("{\"result\":\"Finished\"}");
         }
@@ -1318,15 +1318,15 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
         assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
                 .contains("unsupported by gathered evidence")
-                .contains("requires successful completion of 'expenseLookup'")
-                .contains("successfully completed direct skills: [invoiceParser]");
+                .contains("requires successful completion of 'default-expenseLookup'")
+                .contains("successfully completed direct skills: [default-invoiceParser]");
         List<TraceRecord> evidenceRecords = new ArrayList<>();
         session.readTraceRecords(evidenceRecords::add);
         assertThat(evidenceRecords).filteredOn(record -> record.recordType() == TraceRecordType.EVIDENCE_VALIDATION_FAILED)
                 .singleElement()
                 .satisfies(record ->
                 {
-                    assertThat(record.data().path("requiredExpressions").path("reasoning").asText()).isEqualTo("expenseLookup");
+                    assertThat(record.data().path("requiredExpressions").path("reasoning").asText()).isEqualTo("default-expenseLookup");
                     assertThat(record.data().path("satisfiedSkills")).hasSize(1);
                     assertThat(record.data().path("issues").get(0).path("unsatisfiedRequirements")).hasSize(1);
                     assertThat(record.data().has("missingEvidence")).isFalse();
@@ -1344,7 +1344,7 @@ class StepLoopMissionExecutionEngineTest {
                   "result": "Finished"
                 }
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-bare-final-payload", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-bare-final-payload", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(
@@ -1358,7 +1358,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definitionWithOutputSchema(),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}")));
 
             assertThat(response).isEqualTo("{\"result\":\"Finished\"}");
         }
@@ -1374,12 +1374,12 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-1"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-complete-plan-repair", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-complete-plan-repair", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
@@ -1389,7 +1389,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definition(),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}")));
 
             assertThat(response).isEqualTo("Finished");
         }
@@ -1410,15 +1410,15 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{}}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-1"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-schema-aware-tool-args", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-schema-aware-tool-args", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
@@ -1428,7 +1428,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definition(),
                     chatClient,
-                    List.of(toolWithSchema("invoiceParser", """
+                    List.of(toolWithSchema("default-invoiceParser", """
                             {
                               "type": "object",
                               "properties": {
@@ -1456,15 +1456,15 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"payload":"<canonical mission input>"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"payload":"<canonical mission input>"}}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"payload":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"payload":"INV-1"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-placeholder-tool-args", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-placeholder-tool-args", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
@@ -1474,7 +1474,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definition(),
                     chatClient,
-                    List.of(toolWithSchema("invoiceParser", """
+                    List.of(toolWithSchema("default-invoiceParser", """
                             {
                               "type": "object",
                               "properties": {
@@ -1502,15 +1502,15 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{}}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-1"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-verbose-retry", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-verbose-retry", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
@@ -1520,7 +1520,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definition(),
                     chatClient,
-                    List.of(toolWithContract("invoiceParser", """
+                    List.of(toolWithContract("default-invoiceParser", """
                             {
                               "type": "object",
                               "properties": {},
@@ -1548,7 +1548,7 @@ class StepLoopMissionExecutionEngineTest {
                 .contains("`$.rawText` must be a string");
         for (String assigned : chatClient.systemMessagesSeen().subList(0, 2)) {
             assertThat(assigned).contains("required unbound arguments at the top level: [\"rawText\"]",
-                    "empty argument object is incomplete", "\"taskId\": \"t-1\"", "\"toolName\": \"invoiceParser\"")
+                    "empty argument object is incomplete", "\"taskId\": \"t-1\"", "\"toolName\": \"default-invoiceParser\"")
                     .doesNotContain("The empty toolArguments object is illustrative only", "toolArguments: {} is valid");
         }
     }
@@ -1572,11 +1572,11 @@ class StepLoopMissionExecutionEngineTest {
                     """;
             var validArguments = Map.<String, Object>of("count", 2);
             SequenceChatClient client = new SequenceChatClient(
-                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
-                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{\"count\":2}}",
+                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}",
+                    "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{\"count\":2}}",
                     "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
             AtomicInteger calls = new AtomicInteger();
-            BoundCapability tool = new BoundCapability(toolWithSchema("invoiceParser", schema, "unused").metadata(), java.util.List.of(),
+            BoundCapability tool = new BoundCapability(toolWithSchema("default-invoiceParser", schema, "unused").metadata(), java.util.List.of(),
                     (arguments, taskId, sourceResults) -> {
                         assertThat(client.systemMessagesSeen()).hasSize(2);
                         assertThat(arguments).isEqualTo(validArguments);
@@ -1585,7 +1585,7 @@ class StepLoopMissionExecutionEngineTest {
                     });
             var state = new DefaultExecutionStateService(FIXED_CLOCK);
             var planning = new InitializingPlanningService(state, singleTaskPlan());
-            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("description-correction-" + complex, "test.entry", 3);
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("description-correction-" + complex, "default-test_entry", 3);
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 assertThat(executeMission(engine(state, planning, executor), session, definition(), "Supply records", null, client, List.of(tool)))
                         .isEqualTo("Finished");
@@ -1630,13 +1630,13 @@ class StepLoopMissionExecutionEngineTest {
             if (invalidLocation.equals("root")) invalidArguments.put("forbidden", evidence);
             else invalidArguments.put("closed", Map.of("forbidden", evidence));
             String rejected = LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(Map.of(
-                    "stepAction", "CALL_TOOL", "taskId", "t-1", "toolName", "invoiceParser", "toolArguments", invalidArguments));
+                    "stepAction", "CALL_TOOL", "taskId", "t-1", "toolName", "default-invoiceParser", "toolArguments", invalidArguments));
             String valid = LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(Map.of(
-                    "stepAction", "CALL_TOOL", "taskId", "t-1", "toolName", "invoiceParser", "toolArguments", validArguments));
+                    "stepAction", "CALL_TOOL", "taskId", "t-1", "toolName", "default-invoiceParser", "toolArguments", validArguments));
             SequenceChatClient client = new SequenceChatClient(rejected, valid,
                     "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
             AtomicInteger calls = new AtomicInteger();
-            BoundCapability tool = new BoundCapability(toolWithSchema("invoiceParser", schema, "unused").metadata(), java.util.List.of(),
+            BoundCapability tool = new BoundCapability(toolWithSchema("default-invoiceParser", schema, "unused").metadata(), java.util.List.of(),
                     (arguments, taskId, sourceResults) -> {
                         assertThat(client.systemMessagesSeen()).hasSize(2);
                         assertThat(arguments).isEqualTo(validArguments);
@@ -1645,7 +1645,7 @@ class StepLoopMissionExecutionEngineTest {
                     });
             var state = new DefaultExecutionStateService(FIXED_CLOCK);
             var planning = new InitializingPlanningService(state, singleTaskPlan());
-            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("scope-correction-" + invalidLocation, "test.entry", 3);
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("scope-correction-" + invalidLocation, "default-test_entry", 3);
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 assertThat(executeMission(engine(state, planning, executor), session, definition(), "Route shipment", Map.of("evidence", evidence), client, List.of(tool)))
                         .isEqualTo("Finished");
@@ -1663,19 +1663,19 @@ class StepLoopMissionExecutionEngineTest {
 
     @Test
     void usesCanonicalMissionInputForPlanningAndStepUserMessages() {
-        String objective = "Execute YAML skill 'rootVisibleSkill' using the provided mission input object."
+        String objective = "Execute YAML skill 'default-rootVisibleSkill' using the provided mission input object."
                 + " Compare rootVisibleSkillArchive and retain the audit explanation.";
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan plan = singleTaskPlan();
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-7"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-7"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-mission-input", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-mission-input", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
@@ -1687,7 +1687,7 @@ class StepLoopMissionExecutionEngineTest {
                     objective,
                     Map.of("invoiceId", "INV-7"),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}")));
 
             assertThat(response).isEqualTo("Finished");
         }
@@ -1713,12 +1713,12 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-7"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-7"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-attachment", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-attachment", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor, attachmentDefinition());
@@ -1730,7 +1730,7 @@ class StepLoopMissionExecutionEngineTest {
                     "Extract ticket",
                     Map.of("image", imageResource("ticket.jpg", "SECRET_IMAGE_BYTES")),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}")));
 
             assertThat(response).isEqualTo("Finished");
         }
@@ -1752,15 +1752,15 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"duplicateInvoiceChecker","toolArguments":{"payload":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"default-duplicateInvoiceChecker","toolArguments":{"payload":"INV-1"}}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"expenseLookup","toolArguments":{"invoiceId":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"default-expenseLookup","toolArguments":{"invoiceId":"INV-1"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-parent-skill-tool-confusion", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-parent-skill-tool-confusion", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
@@ -1768,9 +1768,9 @@ class StepLoopMissionExecutionEngineTest {
             String response = executeMission(
                     engine,
                     session,
-                    definition("duplicateInvoiceChecker"),
+                    definition("default-duplicateInvoiceChecker"),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}"), tool("expenseLookup", "{\"matches\":[]}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}"), tool("default-expenseLookup", "{\"matches\":[]}")));
 
             assertThat(response).isEqualTo("Finished");
         }
@@ -1778,17 +1778,17 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(chatClient.systemMessagesSeen()).hasSize(3);
         assertThat(chatClient.systemMessagesSeen().get(0) + chatClient.userMessagesSeen().get(0))
                 .contains("ASSIGNED TASK")
-                .contains("Exact capability/tool: expenseLookup")
-                .doesNotContain("Skill: duplicateInvoiceChecker");
+                .contains("Exact capability/tool: default-expenseLookup")
+                .doesNotContain("Skill: default-duplicateInvoiceChecker");
         assertThat(chatClient.userMessagesSeen()).isNotEmpty();
-        assertThat(chatClient.userMessagesSeen().get(0)).doesNotContain("duplicateInvoiceChecker");
+        assertThat(chatClient.userMessagesSeen().get(0)).doesNotContain("default-duplicateInvoiceChecker");
         assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
-                .contains("Tool 'duplicateInvoiceChecker' is not in the available tools")
-                .contains("Exact capability/tool: expenseLookup")
+                .contains("Tool 'default-duplicateInvoiceChecker' is not in the available tools")
+                .contains("Exact capability/tool: default-expenseLookup")
                 .contains("Do not call the parent mission skill");
         assertThat(readRecords(session)).anyMatch(record -> record.recordType() == TraceRecordType.STEP_ACTION_REJECTED
                 && String.valueOf(record.metadata().get("reason"))
-                .contains("Tool 'duplicateInvoiceChecker' is not in the available tools"));
+                .contains("Tool 'default-duplicateInvoiceChecker' is not in the available tools"));
     }
 
     @Test
@@ -1803,7 +1803,7 @@ class StepLoopMissionExecutionEngineTest {
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"APPROVED: Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-linter", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-linter", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(
@@ -1817,7 +1817,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definitionWithRegexLinter(),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}")));
 
             assertThat(response).isEqualTo("APPROVED: Finished");
         }
@@ -1843,7 +1843,7 @@ class StepLoopMissionExecutionEngineTest {
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"APPROVED: Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-linter-retries", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-linter-retries", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(
@@ -1857,7 +1857,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definitionWithRegexLinter(2),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}")));
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}")));
 
             assertThat(response).isEqualTo("APPROVED: Finished");
         }
@@ -1880,7 +1880,7 @@ class StepLoopMissionExecutionEngineTest {
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Still too early"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-invalid-exhausted", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-invalid-exhausted", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
@@ -1890,7 +1890,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     definition(),
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}"))))
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}"))))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Step action validation exhausted");
         }
@@ -1908,14 +1908,14 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
         SequenceChatClient chatClient = new SequenceChatClient(BLOCK_UNTIL_INTERRUPTED);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-timeout", "test.entry", 3);
+                "step-loop-timeout", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newSingleThreadExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(
                     stateService, planningService, missionExecutor, definition(), Duration.ofMillis(100));
 
             assertThatThrownBy(() -> executeMission(engine, session, definition(), chatClient,
-                    List.of(tool("invoiceParser", "unused"))))
+                    List.of(tool("default-invoiceParser", "unused"))))
                     .isInstanceOf(LoomspanMissionTimeoutException.class)
                     .hasMessageContaining("step-loop-timeout");
             assertThat(missionExecutor.submit(ExecutionBindingScope::current).get(2, TimeUnit.SECONDS)).isEmpty();
@@ -1952,7 +1952,7 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
         SequenceChatClient chatClient = new SequenceChatClient(BLOCK_UNTIL_INTERRUPTED);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-cleanup-failure", "test.entry", 3);
+                "step-loop-cleanup-failure", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newSingleThreadExecutor())
         {
@@ -1960,7 +1960,7 @@ class StepLoopMissionExecutionEngineTest {
                     stateService, planningService, missionExecutor, definition(), Duration.ofMillis(100));
 
             assertThatThrownBy(() -> executeMission(engine, session, definition(), chatClient,
-                    List.of(tool("invoiceParser", "unused"))))
+                    List.of(tool("default-invoiceParser", "unused"))))
                     .isInstanceOf(LoomspanMissionTimeoutException.class)
                     .satisfies(failure -> assertThat(failure.getSuppressed()).contains(cleanupFailure));
         }
@@ -1989,7 +1989,7 @@ class StepLoopMissionExecutionEngineTest {
         };
         PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-admission-trace-failure", "test.entry", 3);
+                "step-loop-admission-trace-failure", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
 
         try (ExecutorService missionExecutor = Executors.newSingleThreadExecutor())
@@ -1997,8 +1997,8 @@ class StepLoopMissionExecutionEngineTest {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
             assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding,
                     () -> executeMission(engine, session, definition(), new SequenceChatClient(
-                            "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}"),
-                            List.of(tool("invoiceParser", "unused")))))
+                            "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}"),
+                            List.of(tool("default-invoiceParser", "unused")))))
                     .isSameAs(traceFailure);
         }
 
@@ -2015,7 +2015,7 @@ class StepLoopMissionExecutionEngineTest {
         ExecutionPlan original = groupedPlan("plan-timeout-cutoff", true);
         ExecutionPlan plan = forwarding ? new ExecutionPlan(original.planId(), original.capabilityName(), original.createdAt(), original.status(),
                 original.tasks().stream().map(task -> new PlanTask(task.taskId(), task.title(), task.status(),
-                        task.taskId().equals("t-1") ? "invoiceParser" : "expenseLookup", task.intent(), task.dependsOn(), task.expectedOutputs(),
+                        task.taskId().equals("t-1") ? "default-invoiceParser" : "default-expenseLookup", task.intent(), task.dependsOn(), task.expectedOutputs(),
                         task.parallelGroup(), task.note())).toList()) : original;
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         CountDownLatch lateWorkerStarted = new CountDownLatch(1);
@@ -2024,9 +2024,9 @@ class StepLoopMissionExecutionEngineTest {
         AtomicReference<MissionContext> retainedMission = new AtomicReference<>();
         AtomicInteger externalSideEffects = new AtomicInteger();
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", forwarding ? "expenseLookup" : "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                "t-1", "default-invoiceParser",
+                "t-2", forwarding ? "default-expenseLookup" : "default-invoiceParser"), new AtomicReference<>());
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     retainedMission.set(ExecutionBindingScope.requireCurrent().requireMission());
                     if (!"t-2".equals(taskId)) return "early-" + taskId;
@@ -2050,19 +2050,19 @@ class StepLoopMissionExecutionEngineTest {
                 });
         YamlSkillDefinition definition = forwarding ? forwardingDefinition(3, true) : definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-timeout-cutoff", forwarding ? "rootVisibleSkill" : "test.entry", 3);
+                "step-loop-timeout-cutoff", forwarding ? "default-rootVisibleSkill" : "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor())
         {
             StepLoopMissionExecutionEngine engine = engine(
                     stateService, planningService, missionExecutor, definition, Duration.ofMillis(100));
 
-            assertThatThrownBy(() -> executeMission(engine, session, definition, model, forwarding ? List.of(capability, new BoundCapability(tool("expenseLookup", "unused").metadata(), java.util.List.of(),
+            assertThatThrownBy(() -> executeMission(engine, session, definition, model, forwarding ? List.of(capability, new BoundCapability(tool("default-expenseLookup", "unused").metadata(), java.util.List.of(),
                             (arguments, taskId, sourceResults) -> capability.invoke(arguments, taskId))) : List.of(capability)))
                     .isInstanceOf(LoomspanMissionTimeoutException.class);
             assertThat(lateWorkerStarted.await(2, TimeUnit.SECONDS)).isTrue();
             assertThat(retainedMission.get().completedTaskResults()).containsExactly(
-                    new MissionContext.CompletedTaskResult("t-1", "invoiceParser", "early-t-1"));
+                    new MissionContext.CompletedTaskResult("t-1", "default-invoiceParser", "early-t-1"));
             List<TraceRecord> afterCutoff = readRecords(session);
             assertThat(session.getExecutionPlanSnapshot().status()).isEqualTo(PlanStatus.STALE);
             assertThat(session.getExecutionPlanSnapshot().tasks()).extracting(PlanTask::status)
@@ -2087,7 +2087,7 @@ class StepLoopMissionExecutionEngineTest {
         }
         // Executor close waits for physical branch return, beyond the capability's release signal.
         assertThat(retainedMission.get().completedTaskResults()).containsExactly(
-                new MissionContext.CompletedTaskResult("t-1", "invoiceParser", "early-t-1"));
+                new MissionContext.CompletedTaskResult("t-1", "default-invoiceParser", "early-t-1"));
     }
 
     @Test
@@ -2099,9 +2099,9 @@ class StepLoopMissionExecutionEngineTest {
         CountDownLatch lateMemberStarted = new CountDownLatch(1);
         CountDownLatch releaseLateMember = new CountDownLatch(1);
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser"), new AtomicReference<>());
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId)) return "first-complete";
                     lateMemberStarted.countDown();
@@ -2114,7 +2114,7 @@ class StepLoopMissionExecutionEngineTest {
                 });
         YamlSkillDefinition definition = definitionWithConcurrency(false);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-serialized-timeout", "test.entry", 3);
+                "step-loop-serialized-timeout", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = new SerializedMemberTimeoutExecutor(lateMemberStarted))
         {
@@ -2144,17 +2144,17 @@ class StepLoopMissionExecutionEngineTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
         SequenceChatClient model = new SequenceChatClient(
-                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}",
                 BLOCK_UNTIL_INTERRUPTED);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-final-synthesis-timeout", "test.entry", 3);
+                "step-loop-final-synthesis-timeout", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newSingleThreadExecutor())
         {
             StepLoopMissionExecutionEngine engine = engine(
                     stateService, planningService, missionExecutor, definition(), Duration.ofMillis(100));
             assertThatThrownBy(() -> executeMission(engine, session, definition(), model,
-                    List.of(tool("invoiceParser", "complete-before-final"))))
+                    List.of(tool("default-invoiceParser", "complete-before-final"))))
                     .isInstanceOf(LoomspanMissionTimeoutException.class);
         }
 
@@ -2169,10 +2169,10 @@ class StepLoopMissionExecutionEngineTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         PlanningService planningService = new InitializingPlanningService(stateService, singleTaskPlan());
         SequenceChatClient model = new SequenceChatClient(
-                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}");
         CountDownLatch capabilityStarted = new CountDownLatch(1);
         AtomicBoolean interrupted = new AtomicBoolean();
-        BoundCapability capability = new BoundCapability(directTool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability capability = new BoundCapability(directTool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     capabilityStarted.countDown();
                     try
@@ -2187,7 +2187,7 @@ class StepLoopMissionExecutionEngineTest {
                     }
                 });
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-final-gate", "test.entry", 3);
+                "step-loop-final-gate", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newSingleThreadExecutor())
         {
@@ -2208,9 +2208,9 @@ class StepLoopMissionExecutionEngineTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         PlanningService planningService = new InitializingPlanningService(stateService, twoTaskPlan());
         SequenceChatClient model = new SequenceChatClient(
-                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}");
         AtomicBoolean interrupted = new AtomicBoolean();
-        BoundCapability capability = new BoundCapability(directTool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability capability = new BoundCapability(directTool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     try
                     {
@@ -2225,7 +2225,7 @@ class StepLoopMissionExecutionEngineTest {
                 });
         YamlSkillDefinition definition = definitionWithMaxSteps(2);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-next-unit-gate", "test.entry", 3);
+                "step-loop-next-unit-gate", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newSingleThreadExecutor())
         {
@@ -2250,18 +2250,18 @@ class StepLoopMissionExecutionEngineTest {
         PlanningService planningService = new InitializingPlanningService(
                 stateService, groupedPlan("plan-stop-submission", false));
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", "invoiceParser"), new AtomicReference<>());
+                "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser"), new AtomicReference<>());
         YamlSkillDefinition definition = definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-stop-submission", "test.entry", 3);
+                "step-loop-stop-submission", "default-test_entry", 3);
 
         try (PauseAfterFirstGroupSubmissionExecutor missionExecutor = new PauseAfterFirstGroupSubmissionExecutor())
         {
             StepLoopMissionExecutionEngine engine = engine(
                     stateService, planningService, missionExecutor, definition, Duration.ofMillis(250));
             assertThatThrownBy(() -> executeMission(engine, session, definition, model,
-                    List.of(directTool("invoiceParser", "unused"))))
+                    List.of(directTool("default-invoiceParser", "unused"))))
                     .isInstanceOf(LoomspanMissionTimeoutException.class);
             assertThat(missionExecutor.firstGroupMemberSubmitted()).isTrue();
             assertThat(missionExecutor.submissions()).isEqualTo(2);
@@ -2277,12 +2277,12 @@ class StepLoopMissionExecutionEngineTest {
         RejectedExecutionException rejection = new RejectedExecutionException("reject second group member");
         YamlSkillDefinition definition = definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-partial-rejection", "test.entry", 3);
+                "step-loop-partial-rejection", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", "invoiceParser",
-                "t-3", "invoiceParser"), new AtomicReference<>());
+                "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser",
+                "t-3", "default-invoiceParser"), new AtomicReference<>());
 
         try (RejectThirdSubmissionExecutor missionExecutor = new RejectThirdSubmissionExecutor(rejection))
         {
@@ -2291,7 +2291,7 @@ class StepLoopMissionExecutionEngineTest {
 
             assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding,
                     () -> executeMission(engine, session, definition, model,
-                            List.of(directTool("invoiceParser", "completed-before-rejection")))))
+                            List.of(directTool("default-invoiceParser", "completed-before-rejection")))))
                     .isSameAs(rejection);
             assertThat(missionExecutor.submissions()).isEqualTo(3);
         }
@@ -2326,19 +2326,19 @@ class StepLoopMissionExecutionEngineTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan plan = new ExecutionPlan(
                 "plan-concurrent-admission",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID,
                 List.of(
                         new PlanTask("t-1", "First", PlanTaskStatus.PENDING,
-                                "invoiceParser", "first", List.of(), List.of(), "batch", null),
+                                "default-invoiceParser", "first", List.of(), List.of(), "batch", null),
                         new PlanTask("t-2", "Second", PlanTaskStatus.PENDING,
-                                "invoiceParser", "second", List.of(), List.of(), "batch", null)));
+                                "default-invoiceParser", "second", List.of(), List.of(), "batch", null)));
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         CountDownLatch bothStarted = new CountDownLatch(2);
         AtomicInteger invocations = new AtomicInteger();
         Set<Object> workerBranches = ConcurrentHashMap.newKeySet();
-        BoundCapability capability = new BoundCapability(directTool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability capability = new BoundCapability(directTool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     invocations.incrementAndGet();
                     workerBranches.add(ExecutionBindingScope.requireCurrent().branch());
@@ -2364,11 +2364,11 @@ class StepLoopMissionExecutionEngineTest {
             String response;
             if (prompt.contains("--- ASSIGNED TASK ---\nID: t-1"))
             {
-                response = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}";
+                response = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}";
             }
             else if (prompt.contains("--- ASSIGNED TASK ---\nID: t-2"))
             {
-                response = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-2\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}";
+                response = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-2\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}";
             }
             else
             {
@@ -2382,7 +2382,7 @@ class StepLoopMissionExecutionEngineTest {
                 ? definition()
                 : definitionWithConcurrency(configuredConcurrency);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-concurrent-admission", "test.entry", 3);
+                "step-loop-concurrent-admission", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newFixedThreadPool(3))
         {
@@ -2407,21 +2407,21 @@ class StepLoopMissionExecutionEngineTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan plan = new ExecutionPlan(
                 "plan-ungrouped-sequential",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID,
                 List.of(
                         new PlanTask("t-1", "First", PlanTaskStatus.PENDING,
-                                "invoiceParser", "first", List.of(), List.of(), null, null),
+                                "default-invoiceParser", "first", List.of(), List.of(), null, null),
                         new PlanTask("t-2", "Second", PlanTaskStatus.PENDING,
-                                "invoiceParser", "second", List.of(), List.of(), null, null)));
+                                "default-invoiceParser", "second", List.of(), List.of(), null, null)));
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         Set<Thread> callbackThreads = ConcurrentHashMap.newKeySet();
         List<String> taskOrder = java.util.Collections.synchronizedList(new ArrayList<>());
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser"), new AtomicReference<>());
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     callbackThreads.add(Thread.currentThread());
                     taskOrder.add(taskId);
@@ -2429,7 +2429,7 @@ class StepLoopMissionExecutionEngineTest {
                 });
         YamlSkillDefinition definition = definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-ungrouped-sequential", "test.entry", 3);
+                "step-loop-ungrouped-sequential", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor())
         {
@@ -2465,13 +2465,13 @@ class StepLoopMissionExecutionEngineTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan grouped = groupedPlan("snapshot-plan", true);
         List<PlanTask> tasks = new ArrayList<>();
-        tasks.add(new PlanTask("prep", "Prepare", PlanTaskStatus.PENDING, "invoiceParser", "prepare",
+        tasks.add(new PlanTask("prep", "Prepare", PlanTaskStatus.PENDING, "default-invoiceParser", "default-prepare",
                 List.of(), List.of(), null, null));
         tasks.addAll(grouped.tasks());
-        ExecutionPlan plan = new ExecutionPlan("snapshot-plan", "rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
+        ExecutionPlan plan = new ExecutionPlan("snapshot-plan", "default-rootVisibleSkill", Instant.EPOCH, PlanStatus.VALID, tasks);
         var finalPrompt = new AtomicReference<String>();
-        var delegate = new TaskAddressedModel(Map.of("prep", "invoiceParser", "t-1", "invoiceParser",
-                "t-2", "invoiceParser", "t-3", "invoiceParser"), finalPrompt);
+        var delegate = new TaskAddressedModel(Map.of("prep", "default-invoiceParser", "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser", "t-3", "default-invoiceParser"), finalPrompt);
         Map<String, List<String>> prompts = new java.util.concurrent.ConcurrentHashMap<>();
         AtomicInteger secondAttempts = new AtomicInteger();
         ai.loomspan.internal.model.ModelInteraction model = request -> {
@@ -2481,17 +2481,17 @@ class StepLoopMissionExecutionEngineTest {
                     prompts.computeIfAbsent(id, ignored -> java.util.Collections.synchronizedList(new ArrayList<>())).add(prompt);
                     if (id.equals("t-2") && secondAttempts.getAndIncrement() == 0)
                         return new ai.loomspan.internal.model.ModelInteractionResult(
-                                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"wrong\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
+                                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"wrong\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}",
                                 Map.of(ModelTraceContext.RESPONSE_ATTEMPT_CONTEXT_KEY, request.traceContext().nextAttempt()));
                 }
             }
             return delegate.call(request);
         };
         String padding = "x".repeat(1800);
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> padding + "COMPLETE_" + taskId);
         var definition = definitionWithConcurrency(concurrent);
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("snapshot-" + concurrent, "test.entry", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("snapshot-" + concurrent, "default-test_entry", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             assertThat(executeMission(engine(stateService, new InitializingPlanningService(stateService, plan), executor, definition),
                     session, definition, model, List.of(capability))).isEqualTo("done");
@@ -2513,9 +2513,9 @@ class StepLoopMissionExecutionEngineTest {
         CountDownLatch laterFinished = new CountDownLatch(1);
         AtomicReference<String> finalPrompt = new AtomicReference<>();
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", "invoiceParser"), finalPrompt);
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser"), finalPrompt);
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId))
                     {
@@ -2542,7 +2542,7 @@ class StepLoopMissionExecutionEngineTest {
                 });
         YamlSkillDefinition definition = definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-reverse-fold", "test.entry", 3);
+                "step-loop-reverse-fold", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor())
         {
@@ -2551,8 +2551,8 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(finalPrompt.get())
-                .contains("Step 1: Called invoiceParser for task t-1 -> result-t-1")
-                .contains("Step 2: Called invoiceParser for task t-2 -> result-t-2")
+                .contains("Step 1: Called default-invoiceParser for task t-1 -> result-t-1")
+                .contains("Step 2: Called default-invoiceParser for task t-2 -> result-t-2")
                 .contains("COMPLETED TASK EVIDENCE", "\"taskId\":\"t-1\"", "\"taskId\":\"t-2\"");
         List<TraceRecord> records = readRecords(session);
         assertThat(records.stream().filter(record -> record.recordType() == TraceRecordType.PLAN_UPDATED)).hasSize(2);
@@ -2587,10 +2587,10 @@ class StepLoopMissionExecutionEngineTest {
         CountDownLatch siblingFinished = new CountDownLatch(1);
         AtomicInteger laterUnitCalls = new AtomicInteger();
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", "invoiceParser",
-                "t-3", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser",
+                "t-3", "default-invoiceParser"), new AtomicReference<>());
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId))
                     {
@@ -2616,7 +2616,7 @@ class StepLoopMissionExecutionEngineTest {
                 });
         YamlSkillDefinition definition = definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-ordinary-failure", "test.entry", 3);
+                "step-loop-ordinary-failure", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
 
         try (ExecutorService missionExecutor = Executors.newFixedThreadPool(3))
@@ -2650,9 +2650,9 @@ class StepLoopMissionExecutionEngineTest {
                 "child-session", "nestedPlanner", Duration.ofSeconds(1), new IllegalStateException("child timed out"));
         CountDownLatch siblingFinished = new CountDownLatch(1);
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser"), new AtomicReference<>());
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId))
                     {
@@ -2672,7 +2672,7 @@ class StepLoopMissionExecutionEngineTest {
                 });
         YamlSkillDefinition definition = definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-nested-timeout", "test.entry", 3);
+                "step-loop-nested-timeout", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor())
@@ -2699,9 +2699,9 @@ class StepLoopMissionExecutionEngineTest {
                 "step-loop-nested-depth", 3, "nestedPlanner");
         CountDownLatch siblingFinished = new CountDownLatch(1);
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser"), new AtomicReference<>());
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId))
                     {
@@ -2721,7 +2721,7 @@ class StepLoopMissionExecutionEngineTest {
                 });
         YamlSkillDefinition definition = definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-nested-depth", "test.entry", 3);
+                "step-loop-nested-depth", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor())
@@ -2751,10 +2751,10 @@ class StepLoopMissionExecutionEngineTest {
         CountDownLatch releaseLaterMember = new CountDownLatch(1);
         CountDownLatch followingUnitStarted = new CountDownLatch(1);
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", "invoiceParser",
-                "t-3", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser",
+                "t-3", "default-invoiceParser"), new AtomicReference<>());
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     if ("t-1".equals(taskId))
                     {
@@ -2789,7 +2789,7 @@ class StepLoopMissionExecutionEngineTest {
                 });
         YamlSkillDefinition definition = definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-following-unit", "test.entry", 3);
+                "step-loop-following-unit", "default-test_entry", 3);
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor();
@@ -2825,9 +2825,9 @@ class StepLoopMissionExecutionEngineTest {
         IllegalArgumentException secondFailure = new IllegalArgumentException("second failure");
         CountDownLatch secondFailed = new CountDownLatch(1);
         TaskAddressedModel model = new TaskAddressedModel(Map.of(
-                "t-1", "invoiceParser",
-                "t-2", "invoiceParser"), new AtomicReference<>());
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+                "t-1", "default-invoiceParser",
+                "t-2", "default-invoiceParser"), new AtomicReference<>());
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     if ("t-2".equals(taskId))
                     {
@@ -2847,7 +2847,7 @@ class StepLoopMissionExecutionEngineTest {
                 });
         YamlSkillDefinition definition = definitionWithConcurrency(true);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-multiple-failures", "test.entry", 3);
+                "step-loop-multiple-failures", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor())
         {
@@ -2870,30 +2870,30 @@ class StepLoopMissionExecutionEngineTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan plan = new ExecutionPlan(
                 "plan-1",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID,
                 List.of(
                         new PlanTask("t-1", "Parse first invoice", PlanTaskStatus.PENDING,
-                                "invoiceParser", "Parse invoice A", List.of(), List.of("parsedA"), "invoice-batch", null),
+                                "default-invoiceParser", "Parse invoice A", List.of(), List.of("parsedA"), "invoice-batch", null),
                         new PlanTask("t-2", "Parse second invoice", PlanTaskStatus.PENDING,
-                                "invoiceParser", "Parse invoice B", List.of(), List.of("parsedB"), "invoice-batch", null)));
+                                "default-invoiceParser", "Parse invoice B", List.of(), List.of("parsedB"), "invoice-batch", null)));
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"invoiceParser","toolArguments":{"rawText":"INV-2"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-2"}}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":"INV-1"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-1"}}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"invoiceParser","toolArguments":{"rawText":"INV-2"}}
+                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"default-invoiceParser","toolArguments":{"rawText":"INV-2"}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Mission complete"}
                 """);
         AtomicInteger routerCalls = new AtomicInteger();
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-real-tool", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-real-tool", "default-test_entry", 3);
         BoundCapability realWrappedTool = realToolCallback(stateService, planningService, routerCalls, session);
         YamlSkillDefinition definition = definitionWithConcurrency(false);
 
@@ -2937,41 +2937,41 @@ class StepLoopMissionExecutionEngineTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan plan = new ExecutionPlan(
                 "plan-ordered",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID,
                 List.of(
                         new PlanTask("t-1", "Parse invoice", PlanTaskStatus.PENDING,
-                                "invoiceParser", "Parse the invoice", List.of(), List.of("parsed"), null, null),
+                                "default-invoiceParser", "Parse the invoice", List.of(), List.of("parsed"), null, null),
                         new PlanTask("t-2", "Look up expenses", PlanTaskStatus.PENDING,
-                                "expenseLookup", "Find expenses", List.of(), List.of("matches"), null, null)));
+                                "default-expenseLookup", "Find expenses", List.of(), List.of("matches"), null, null)));
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"expenseLookup","toolArguments":{}}
+                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"default-expenseLookup","toolArguments":{}}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{}}
                 """,
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"expenseLookup","toolArguments":{}}
+                {"stepAction":"CALL_TOOL","taskId":"t-2","toolName":"default-expenseLookup","toolArguments":{}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Mission complete"}
                 """);
         List<String> invocationOrder = new ArrayList<>();
-        BoundCapability invoiceParser = new BoundCapability(tool("invoiceParser", "parsed").metadata(), java.util.List.of(),
+        BoundCapability invoiceParser = new BoundCapability(tool("default-invoiceParser", "parsed").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     invocationOrder.add(taskId);
                     return "parsed";
                 });
-        BoundCapability expenseLookup = new BoundCapability(tool("expenseLookup", "matches").metadata(), java.util.List.of(),
+        BoundCapability expenseLookup = new BoundCapability(tool("default-expenseLookup", "matches").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     invocationOrder.add(taskId);
                     return "matches";
                 });
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-ordered-assignment", "test.entry", 3);
+                "step-loop-ordered-assignment", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor);
@@ -3005,25 +3005,25 @@ class StepLoopMissionExecutionEngineTest {
     void preservesExplicitNullArgumentsInTheStepLoopToolPath()
     {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
-        ExecutionPlan plan = new ExecutionPlan("plan-null", "rootVisibleSkill",
+        ExecutionPlan plan = new ExecutionPlan("plan-null", "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"), PlanStatus.VALID, List.of(new PlanTask("t-1", "Parse invoice", PlanTaskStatus.PENDING,
-                        "invoiceParser", "Parse invoice", List.of(), List.of("parsed"), null, null)));
+                        "default-invoiceParser", "Parse invoice", List.of(), List.of("parsed"), null, null)));
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
                 """
-                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"invoiceParser","toolArguments":{"rawText":null}}
+                {"stepAction":"CALL_TOOL","taskId":"t-1","toolName":"default-invoiceParser","toolArguments":{"rawText":null}}
                 """,
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Mission complete"}
                 """);
         AtomicReference<Map<String, Object>> observedArguments = new AtomicReference<>();
-        BoundCapability template = tool("invoiceParser", "unused");
+        BoundCapability template = tool("default-invoiceParser", "unused");
         BoundCapability capability = new BoundCapability(template.metadata(), java.util.List.of(), (arguments, taskId, sourceResults) -> {
             observedArguments.set(arguments);
             return "parsed";
         });
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-null", "test.entry", 3);
+                "step-loop-null", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor())
         {
@@ -3039,23 +3039,23 @@ class StepLoopMissionExecutionEngineTest {
     void rejectsWholeGroupedUnitBeforeAdmissionWhenFinalSynthesisWouldNotFit()
     {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
-        ExecutionPlan plan = new ExecutionPlan("plan-budget", "rootVisibleSkill",
+        ExecutionPlan plan = new ExecutionPlan("plan-budget", "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"), PlanStatus.VALID,
                 List.of(
-                        new PlanTask("t-1", "First", PlanTaskStatus.PENDING, "invoiceParser", "first",
+                        new PlanTask("t-1", "First", PlanTaskStatus.PENDING, "default-invoiceParser", "first",
                                 List.of(), List.of(), "batch", null),
-                        new PlanTask("t-2", "Second", PlanTaskStatus.PENDING, "invoiceParser", "second",
+                        new PlanTask("t-2", "Second", PlanTaskStatus.PENDING, "default-invoiceParser", "second",
                                 List.of(), List.of(), "batch", null)));
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         AtomicInteger invocations = new AtomicInteger();
-        BoundCapability capability = new BoundCapability(tool("invoiceParser", "unused").metadata(), java.util.List.of(),
+        BoundCapability capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), java.util.List.of(),
                 (arguments, taskId, sourceResults) -> {
                     invocations.incrementAndGet();
                     return "done";
                 });
         YamlSkillDefinition definition = definitionWithMaxSteps(2);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-group-budget", "test.entry", 3);
+                "step-loop-group-budget", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor())
         {
@@ -3075,27 +3075,27 @@ class StepLoopMissionExecutionEngineTest {
     void admitsExactlyNAssignmentsPlusFinalAtMaxStepsNPlusOne()
     {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
-        ExecutionPlan plan = new ExecutionPlan("plan-exact-budget", "rootVisibleSkill",
+        ExecutionPlan plan = new ExecutionPlan("plan-exact-budget", "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"), PlanStatus.VALID,
                 List.of(
-                        new PlanTask("t-1", "First", PlanTaskStatus.PENDING, "invoiceParser", "first",
+                        new PlanTask("t-1", "First", PlanTaskStatus.PENDING, "default-invoiceParser", "first",
                                 List.of(), List.of(), null, null),
-                        new PlanTask("t-2", "Second", PlanTaskStatus.PENDING, "expenseLookup", "second",
+                        new PlanTask("t-2", "Second", PlanTaskStatus.PENDING, "default-expenseLookup", "second",
                                 List.of(), List.of(), null, null)));
         PlanningService planningService = new InitializingPlanningService(stateService, plan);
         SequenceChatClient chatClient = new SequenceChatClient(
-                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
-                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-2\",\"toolName\":\"expenseLookup\",\"toolArguments\":{}}",
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}",
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-2\",\"toolName\":\"default-expenseLookup\",\"toolArguments\":{}}",
                 "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"done\"}");
         YamlSkillDefinition definition = definitionWithMaxSteps(3);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "step-loop-exact-budget", "test.entry", 3);
+                "step-loop-exact-budget", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor())
         {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor, definition);
             assertThat(executeMission(engine, session, definition, chatClient,
-                    List.of(tool("invoiceParser", "first"), tool("expenseLookup", "second"))))
+                    List.of(tool("default-invoiceParser", "first"), tool("default-expenseLookup", "second"))))
                     .isEqualTo("done");
         }
 
@@ -3119,13 +3119,13 @@ class StepLoopMissionExecutionEngineTest {
         SequenceChatClient chatClient = new SequenceChatClient();
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("rootVisibleSkill");
-        manifest.setDescription("rootVisibleSkill");
+        manifest.setDescription("default-rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setMaxSteps(0);
         YamlSkillDefinition invalidDefinition = new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-max-steps-zero", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-max-steps-zero", "default-test_entry", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(
@@ -3139,7 +3139,7 @@ class StepLoopMissionExecutionEngineTest {
                     session,
                     invalidDefinition,
                     chatClient,
-                    List.of(tool("invoiceParser", "{\"vendor\":\"Acme\"}"))))
+                    List.of(tool("default-invoiceParser", "{\"vendor\":\"Acme\"}"))))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("max_steps > 0")
                     .hasMessageContaining("was 0");
@@ -3225,12 +3225,12 @@ class StepLoopMissionExecutionEngineTest {
     }
 
     private static YamlSkillDefinition definition() {
-        return definition("rootVisibleSkill");
+        return definition("default-rootVisibleSkill");
     }
 
     private static YamlSkillDefinition definition(String name) {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName(name);
+        manifest.setName(ai.loomspan.internal.core.SkillIdentity.parse(name).localName());
         manifest.setDescription(name);
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
@@ -3241,7 +3241,7 @@ class StepLoopMissionExecutionEngineTest {
     {
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("rootVisibleSkill");
-        manifest.setDescription("rootVisibleSkill");
+        manifest.setDescription("default-rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setMaxSteps(maxSteps);
@@ -3252,7 +3252,7 @@ class StepLoopMissionExecutionEngineTest {
     {
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("rootVisibleSkill");
-        manifest.setDescription("rootVisibleSkill");
+        manifest.setDescription("default-rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setConcurrency(concurrency);
@@ -3262,7 +3262,7 @@ class StepLoopMissionExecutionEngineTest {
     private static YamlSkillDefinition definitionWithPrompt() {
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("rootVisibleSkill");
-        manifest.setDescription("rootVisibleSkill");
+        manifest.setDescription("default-rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setPrompt("STEP_PROMPT_SENTINEL");
@@ -3272,7 +3272,7 @@ class StepLoopMissionExecutionEngineTest {
     private static YamlSkillDefinition attachmentDefinition() {
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("rootVisibleSkill");
-        manifest.setDescription("rootVisibleSkill");
+        manifest.setDescription("default-rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setInputSchema(attachmentInputSchema());
@@ -3311,7 +3311,7 @@ class StepLoopMissionExecutionEngineTest {
     private static YamlSkillDefinition definitionWithOutputSchema() {
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("rootVisibleSkill");
-        manifest.setDescription("rootVisibleSkill");
+        manifest.setDescription("default-rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setOutputSchemaMaxRetries(1);
@@ -3329,7 +3329,7 @@ class StepLoopMissionExecutionEngineTest {
     private static YamlSkillDefinition definitionWithOutputSchemaAndEvidenceContract() {
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("rootVisibleSkill");
-        manifest.setDescription("rootVisibleSkill");
+        manifest.setDescription("default-rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setOutputSchemaMaxRetries(1);
@@ -3346,8 +3346,8 @@ class StepLoopMissionExecutionEngineTest {
         schema.setRequired(List.of("result"));
         manifest.setOutputSchema(schema);
         Map<String, String> contract = Map.of(
-                "result", "invoiceParser",
-                "reasoning", "expenseLookup");
+                "result", "default-invoiceParser",
+                "reasoning", "default-expenseLookup");
         return new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
@@ -3362,7 +3362,7 @@ class StepLoopMissionExecutionEngineTest {
     private static YamlSkillDefinition definitionWithRegexLinter(int maxRetries) {
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("rootVisibleSkill");
-        manifest.setDescription("rootVisibleSkill");
+        manifest.setDescription("default-rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         YamlSkillManifest.LinterManifest linter = new YamlSkillManifest.LinterManifest();
@@ -3379,39 +3379,39 @@ class StepLoopMissionExecutionEngineTest {
     private static ExecutionPlan singleTaskPlan() {
         return new ExecutionPlan(
                 "plan-1",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID,
                 List.of(new PlanTask("t-1", "Parse invoice", PlanTaskStatus.PENDING,
-                        "invoiceParser", "Extract invoice data", List.of(), List.of("parsedInvoice"), null, null)));
+                        "default-invoiceParser", "Extract invoice data", List.of(), List.of("parsedInvoice"), null, null)));
     }
 
     private static ExecutionPlan twoTaskPlan() {
         return new ExecutionPlan(
                 "plan-1",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID,
                 List.of(
                         new PlanTask("t-1", "Parse invoice", PlanTaskStatus.PENDING,
-                                "invoiceParser", "Extract invoice data", List.of(), List.of("parsedInvoice"), null, null),
+                                "default-invoiceParser", "Extract invoice data", List.of(), List.of("parsedInvoice"), null, null),
                         new PlanTask("t-2", "Look up expenses", PlanTaskStatus.PENDING,
-                                "expenseLookup", "Find matching expenses", List.of("t-1"), List.of("expenses"), null, null)));
+                                "default-expenseLookup", "Find matching expenses", List.of("t-1"), List.of("expenses"), null, null)));
     }
 
     private static ExecutionPlan groupedPlan(String planId, boolean includeLaterUnit)
     {
         List<PlanTask> tasks = new ArrayList<>(List.of(
                 new PlanTask("t-1", "First", PlanTaskStatus.PENDING,
-                        "invoiceParser", "first", List.of(), List.of(), "batch", null),
+                        "default-invoiceParser", "first", List.of(), List.of(), "batch", null),
                 new PlanTask("t-2", "Second", PlanTaskStatus.PENDING,
-                        "invoiceParser", "second", List.of(), List.of(), "batch", null)));
+                        "default-invoiceParser", "second", List.of(), List.of(), "batch", null)));
         if (includeLaterUnit)
         {
             tasks.add(new PlanTask("t-3", "Later", PlanTaskStatus.PENDING,
-                    "invoiceParser", "later", List.of("t-1"), List.of(), null, null));
+                    "default-invoiceParser", "later", List.of("t-1"), List.of(), null, null));
         }
-        return new ExecutionPlan(planId, "rootVisibleSkill", Instant.parse("2026-03-15T12:00:00Z"),
+        return new ExecutionPlan(planId, "default-rootVisibleSkill", Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID, tasks);
     }
 
@@ -3448,13 +3448,13 @@ class StepLoopMissionExecutionEngineTest {
                                                  AtomicInteger routerCalls,
                                                  LoomspanSession session) {
         CapabilityMetadata capability = new CapabilityMetadata(
-                "yaml:invoiceParser",
-                "invoiceParser",
-                "invoiceParser",
+                "yaml:default-invoiceParser",
+                "default-invoiceParser",
+                "default-invoiceParser",
                 SkillExecutionDescriptor.from(EXECUTION_CONFIGURATION), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
                 CapabilityKind.YAML_SKILL,
-                CapabilityToolDescriptor.generic("invoiceParser", "invoiceParser"),
+                CapabilityToolDescriptor.generic("default-invoiceParser", "default-invoiceParser"),
                 null);
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         when(router.execute(eq(capability), any(), eq(session), any())).thenAnswer(invocation -> {

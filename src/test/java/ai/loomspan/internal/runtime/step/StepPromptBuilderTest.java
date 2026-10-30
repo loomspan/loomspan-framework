@@ -47,7 +47,7 @@ class StepPromptBuilderTest {
                 """;
         var binding = new ChildInputBinding(ObjectFieldPath.parse("/context/evidence", false),
                 ChildInputBinding.SourceKind.INPUT, ObjectFieldPath.parse("/source", true), null);
-        var tool = new BoundCapability(mockTool("invoiceParser", schema).metadata(), List.of(binding),
+        var tool = new BoundCapability(mockTool("default-invoiceParser", schema).metadata(), List.of(binding),
                 (arguments, taskId, sources) -> "unused");
         assertThat(tool.metadata().inputContract().schema().required()).contains("context");
         assertThat(tool.argumentContract().schema().required()).isEmpty();
@@ -66,7 +66,7 @@ class StepPromptBuilderTest {
     void immediateActionExamplesAreParseableWithIllustrativeValuesExplainedOutsideJson()
     {
         ExecutionPlan plan = createTwoTaskPlan();
-        String assigned = buildPromptForCurrentMode(plan, "objective", 1, null, null, List.of(mockTool("invoiceParser")), false, null);
+        String assigned = buildPromptForCurrentMode(plan, "objective", 1, null, null, List.of(mockTool("default-invoiceParser")), false, null);
         String finalPrompt = StepPromptBuilder.buildFinalResponsePrompt(plan, "objective", null, 3, List.of(), null, null);
         for (String prompt : List.of(assigned, finalPrompt))
         {
@@ -88,9 +88,9 @@ class StepPromptBuilderTest {
         var partial = boundTool(full, "/caseId");
         var fullyBound = new BoundCapability(partial.metadata(), List.of(binding("/caseId"), binding("/payload")),
                 (arguments, taskId, sources) -> "unused");
-        var zero = mockTool("invoiceParser", "{\"type\":\"object\",\"additionalProperties\":false}");
-        var retainedZero = mockTool("invoiceParser", "{\"type\":\"object\",\"additionalProperties\":false,\"x-loomspan-runtime-ref-capable\":true}");
-        var optionalPlain = mockTool("invoiceParser", "{\"type\":\"object\",\"properties\":{\"note\":{\"type\":\"string\"}},\"additionalProperties\":false}");
+        var zero = mockTool("default-invoiceParser", "{\"type\":\"object\",\"additionalProperties\":false}");
+        var retainedZero = mockTool("default-invoiceParser", "{\"type\":\"object\",\"additionalProperties\":false,\"x-loomspan-runtime-ref-capable\":true}");
+        var optionalPlain = mockTool("default-invoiceParser", "{\"type\":\"object\",\"properties\":{\"note\":{\"type\":\"string\"}},\"additionalProperties\":false}");
         var optional = boundTool("""
                 {"type":"object","properties":{"caseId":{"type":"string"},"context":{"type":"object"}},
                  "required":["caseId"],"additionalProperties":false}
@@ -170,7 +170,7 @@ class StepPromptBuilderTest {
             "{\"type\":\"object\",\"additionalProperties\":false,\"minProperties\":1}",
             "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"anyOf\":[{\"required\":[\"x\"]}]}"})
     void unknownAndUnsupportedShapesGetNeutralGuidance(String schema) {
-        var tool = mockTool("invoiceParser", schema);
+        var tool = mockTool("default-invoiceParser", schema);
         for (boolean verbose : List.of(false, true)) {
             assertThat(assignedPrompt(tool, verbose)).contains("Follow the effective argument contract", "makes no claim that {} satisfies this contract",
                     "Effective model argument schema: " + schema)
@@ -184,14 +184,14 @@ class StepPromptBuilderTest {
     }
 
     private static BoundCapability boundTool(String schema, String destination) {
-        return new BoundCapability(mockTool("invoiceParser", schema).metadata(), List.of(binding(destination)),
+        return new BoundCapability(mockTool("default-invoiceParser", schema).metadata(), List.of(binding(destination)),
                 (arguments, taskId, sources) -> "unused");
     }
 
     private String assignedPrompt(BoundCapability tool, boolean verbose) {
         String prompt = buildPromptForCurrentMode(createTwoTaskPlan(), "Put useful new reasoning under context.candidateReasoning when requested.",
                 null, 1, List.of(), null, List.of(tool), false, verbose, null);
-        assertThat(prompt).contains("Exact capability/tool: invoiceParser", "\"taskId\": \"t-1\"", "\"stepAction\": \"CALL_TOOL\"", "Return raw JSON only");
+        assertThat(prompt).contains("Exact capability/tool: default-invoiceParser", "\"taskId\": \"t-1\"", "\"stepAction\": \"CALL_TOOL\"", "Return raw JSON only");
         assertThat(prompt).contains("Put useful new reasoning under context.candidateReasoning when requested.");
         assertThat(prompt).doesNotContain("The empty toolArguments object is illustrative only", "include every required argument");
         return prompt.replace("Put useful new reasoning under context.candidateReasoning when requested.", "objective");
@@ -202,24 +202,24 @@ class StepPromptBuilderTest {
         ExecutionPlan plan = createTwoTaskPlan();
         String prompt = buildPromptForCurrentMode(
                 plan, "Check for duplicate invoices", 1, null, null,
-                List.of(mockTool("invoiceParser")), false, null);
+                List.of(mockTool("default-invoiceParser")), false, null);
         assertThat(prompt).contains("Check for duplicate invoices");
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "Compare duplicateInvoiceChecker with 'duplicateInvoiceChecker' and YAML skill 'duplicateInvoiceChecker'.",
+            "Compare default-duplicateInvoiceChecker with 'default-duplicateInvoiceChecker' and YAML skill 'default-duplicateInvoiceChecker'.",
             "Preserve preduplicateInvoiceCheckerpost and duplicateInvoiceCheckerArchive references.",
-            "Execute YAML skill 'duplicateInvoiceChecker' using the provided mission input object. Then retain the audit explanation.",
-            "Execute skill 'duplicateInvoiceChecker' using the provided mission input object. Then compare α and β.\n Keep this suffix.",
-            "Fulfill the mission for skill 'duplicateInvoiceChecker' using the provided mission input object."
+            "Execute YAML skill 'default-duplicateInvoiceChecker' using the provided mission input object. Then retain the audit explanation.",
+            "Execute skill 'default-duplicateInvoiceChecker' using the provided mission input object. Then compare α and β.\n Keep this suffix.",
+            "Fulfill the mission for skill 'default-duplicateInvoiceChecker' using the provided mission input object."
     })
     void preservesCompleteObjectiveAcrossAssignedFinalAndUserPrompts(String objective) {
         ExecutionPlan plan = createTwoTaskPlan();
         for (Map<String, Object> input : List.<Map<String, Object>>of(Map.of(),
-                Map.of("payload", "duplicateInvoiceChecker", "nested", Map.of("value", "α\nβ")))) {
+                Map.of("payload", "default-duplicateInvoiceChecker", "nested", Map.of("value", "α\nβ")))) {
             String assigned = buildPromptForCurrentMode(plan, objective, input, 1, null, null,
-                    List.of(mockTool("invoiceParser", """
+                    List.of(mockTool("default-invoiceParser", """
                             {"type":"object","properties":{"payload":{"type":"string"}},
                              "required":["payload"],"additionalProperties":false}
                             """)), false, null);
@@ -229,8 +229,8 @@ class StepPromptBuilderTest {
             assertThat(assigned).contains(objective,
                     "Overall mission context (non-actionable; execute only the assigned task below)",
                     "ID: t-1", "Title: Parse invoice", "Intent: Extract vendor, amount, date",
-                    "Expected outputs: parsedInvoice", "Exact capability/tool: invoiceParser",
-                    "\"taskId\": \"t-1\"", "\"toolName\": \"invoiceParser\"",
+                    "Expected outputs: parsedInvoice", "Exact capability/tool: default-invoiceParser",
+                    "\"taskId\": \"t-1\"", "\"toolName\": \"default-invoiceParser\"",
                     "\"payload\": \"<string>\"", "Do not call the parent mission skill");
             assertThat(finalPrompt).contains(objective, "CALL_TOOL is not allowed anymore", "Do NOT call any tool");
             assertThat(userMessage).contains(objective);
@@ -254,11 +254,11 @@ class StepPromptBuilderTest {
 
         String userMessage = StepPromptBuilder.buildStepUserMessage(
                 plan,
-                "Execute YAML skill 'duplicateInvoiceChecker' using the provided mission input object.",
+                "Execute YAML skill 'default-duplicateInvoiceChecker' using the provided mission input object.",
                 Map.of("payload", "x"));
 
         assertThat(userMessage).contains("Mission objective:");
-        assertThat(userMessage).contains("Execute YAML skill 'duplicateInvoiceChecker' using the provided mission input object.");
+        assertThat(userMessage).contains("Execute YAML skill 'default-duplicateInvoiceChecker' using the provided mission input object.");
         assertThat(userMessage).contains("\"payload\" : \"x\"");
         assertThat(countOccurrences(userMessage, "Canonical mission input:")).isEqualTo(1);
     }
@@ -336,11 +336,11 @@ class StepPromptBuilderTest {
     @Test
     void buildStepPromptIncludesExecutionSummary() {
         ExecutionPlan plan = createTwoTaskPlan();
-        String summary = "Step 1: Called invoiceParser for t-1 -> parsed vendor=Acme";
+        String summary = "Step 1: Called default-invoiceParser for t-1 -> parsed vendor=Acme";
         String prompt = buildPromptForCurrentMode(
                 plan, "objective", 2, null, summary, List.of(), false, null);
         assertThat(prompt).contains("EXECUTION SUMMARY");
-        assertThat(prompt).contains("invoiceParser");
+        assertThat(prompt).contains("default-invoiceParser");
     }
 
     @Test
@@ -361,8 +361,8 @@ class StepPromptBuilderTest {
                 .updateTask("t-1", task -> task.complete("parsed"));
         String prompt = buildPromptForCurrentMode(
                 plan, "objective", 2, List.of(new CompletedTaskResult("prior", "skill", "{\"vendor\":\"Acme\"}")), null, List.of(), false, null);
-        assertThat(prompt).contains("ASSIGNED TASK", "ID: t-2", "Exact capability/tool: expenseLookup");
-        assertThat(prompt).contains("\"taskId\": \"t-2\"", "\"toolName\": \"expenseLookup\"");
+        assertThat(prompt).contains("ASSIGNED TASK", "ID: t-2", "Exact capability/tool: default-expenseLookup");
+        assertThat(prompt).contains("\"taskId\": \"t-2\"", "\"toolName\": \"default-expenseLookup\"");
         assertThat(prompt).contains("Do not call the parent mission skill");
     }
 
@@ -375,7 +375,7 @@ class StepPromptBuilderTest {
                 1,
                 null,
                 null,
-                List.of(mockTool("invoiceParser", """
+                List.of(mockTool("default-invoiceParser", """
                         {
                           "type": "object",
                           "properties": {
@@ -389,7 +389,7 @@ class StepPromptBuilderTest {
                 null);
 
         assertThat(prompt).contains("TOOL ARGUMENT SHAPE");
-        assertThat(prompt).contains("Task t-1 / tool invoiceParser");
+        assertThat(prompt).contains("Task t-1 / tool default-invoiceParser");
         assertThat(prompt).contains("\"payload\": \"<string>\"");
     }
 
@@ -403,7 +403,7 @@ class StepPromptBuilderTest {
                 1,
                 null,
                 null,
-                List.of(contractAwareTool("invoiceParser", """
+                List.of(contractAwareTool("default-invoiceParser", """
                         {
                           "type": "object",
                           "properties": {},
@@ -437,7 +437,7 @@ class StepPromptBuilderTest {
                 1,
                 null,
                 null,
-                List.of(mockTool("invoiceParser", """
+                List.of(mockTool("default-invoiceParser", """
                         {
                           "type": "object",
                           "properties": {
@@ -476,7 +476,7 @@ class StepPromptBuilderTest {
                 1,
                 null,
                 null,
-                List.of(mockTool("invoiceParser", """
+                List.of(mockTool("default-invoiceParser", """
                         {
                           "type": "object",
                           "properties": {
@@ -509,7 +509,7 @@ class StepPromptBuilderTest {
                 1,
                 null,
                 null,
-                List.of(mockTool("invoiceParser", """
+                List.of(mockTool("default-invoiceParser", """
                         {
                           "type": "object",
                           "additionalProperties": {
@@ -534,7 +534,7 @@ class StepPromptBuilderTest {
                 1,
                 null,
                 null,
-                List.of(mockTool("invoiceParser", """
+                List.of(mockTool("default-invoiceParser", """
                         {
                           "type": "object",
                           "additionalProperties": {
@@ -573,7 +573,7 @@ class StepPromptBuilderTest {
                 1,
                 null,
                 null,
-                List.of(mockTool("invoiceParser", """
+                List.of(mockTool("default-invoiceParser", """
                         {
                           "type": "object",
                           "properties": {
@@ -615,10 +615,10 @@ class StepPromptBuilderTest {
                 """;
 
         String compact = buildPromptForCurrentMode(
-                plan, "objective", 1, null, null, List.of(mockTool("invoiceParser", schema)), false, null);
+                plan, "objective", 1, null, null, List.of(mockTool("default-invoiceParser", schema)), false, null);
         String verbose = buildPromptForCurrentMode(
                 plan, "objective", null, 1, null, null,
-                List.of(mockTool("invoiceParser", schema)), false, true, null);
+                List.of(mockTool("default-invoiceParser", schema)), false, true, null);
 
         assertThat(compact).contains("\"value\": <any JSON value>");
         assertThat(compact).contains("\"<key>\": <any JSON value>");
@@ -634,30 +634,30 @@ class StepPromptBuilderTest {
         ExecutionPlan plan = createTwoTaskPlan();
         String prompt = buildPromptForCurrentMode(
                 plan, "objective", 1, null, null,
-                List.of(mockTool("invoiceParser"), mockTool("expenseLookup")), false, null);
-        assertThat(prompt).contains("AVAILABLE TOOL FOR THIS ASSIGNMENT", "invoiceParser");
-        assertThat(prompt).doesNotContain("- expenseLookup");
+                List.of(mockTool("default-invoiceParser"), mockTool("default-expenseLookup")), false, null);
+        assertThat(prompt).contains("AVAILABLE TOOL FOR THIS ASSIGNMENT", "default-invoiceParser");
+        assertThat(prompt).doesNotContain("- default-expenseLookup");
     }
 
     @Test
     void assignedPromptShowsOnlyExactTaskAndToolAndOmitsFinalChoice()
     {
         ExecutionPlan plan = createTwoTaskPlan()
-                .updateTask("t-1", task -> task.bindInProgress("Starting tool invoiceParser"));
+                .updateTask("t-1", task -> task.bindInProgress("Starting tool default-invoiceParser"));
         PlanTask assigned = plan.findTask("t-1").orElseThrow();
 
         String prompt = StepPromptBuilder.buildAssignedStepPrompt(
                 plan, assigned, "objective", Map.of("invoiceId", "INV-1"), 1,
                 List.of(new CompletedTaskResult("prior", "skill", "prior-result")), "prior-summary",
-                List.of(mockTool("invoiceParser"), mockTool("expenseLookup")), false);
+                List.of(mockTool("default-invoiceParser"), mockTool("default-expenseLookup")), false);
 
         assertThat(prompt)
-                .contains("ASSIGNED TASK", "ID: t-1", "Exact capability/tool: invoiceParser")
+                .contains("ASSIGNED TASK", "ID: t-1", "Exact capability/tool: default-invoiceParser")
                 .contains("prior-result", "prior-summary")
-                .contains("\"taskId\": \"t-1\"", "\"toolName\": \"invoiceParser\"")
-                .doesNotContain("Exact capability/tool: expenseLookup")
+                .contains("\"taskId\": \"t-1\"", "\"toolName\": \"default-invoiceParser\"")
+                .doesNotContain("Exact capability/tool: default-expenseLookup")
                 .doesNotContain("FINAL_RESPONSE")
-                .doesNotContain("parallelGroup", "dependsOn", "Starting tool invoiceParser");
+                .doesNotContain("parallelGroup", "dependsOn", "Starting tool default-invoiceParser");
         assertThat(countOccurrences(prompt, "--- ASSIGNED TASK ---")).isEqualTo(1);
     }
 
@@ -666,7 +666,7 @@ class StepPromptBuilderTest {
         ExecutionPlan plan = createTwoTaskPlan();
         String prompt = buildPromptForCurrentMode(
                 plan, "objective", 1, null, null, List.of(), false, null);
-        assertThat(prompt).contains("AVAILABLE TOOL FOR THIS ASSIGNMENT", "- invoiceParser");
+        assertThat(prompt).contains("AVAILABLE TOOL FOR THIS ASSIGNMENT", "- default-invoiceParser");
     }
 
     @Test
@@ -675,7 +675,7 @@ class StepPromptBuilderTest {
                 .updateTask("t-1", task -> task.complete("parsed"))
                 .updateTask("t-2", task -> task.complete("matched"));
         String prompt = buildPromptForCurrentMode(
-                plan, "objective", 3, null, "Step 2 complete", List.of(mockTool("invoiceParser")), true, null);
+                plan, "objective", 3, null, "Step 2 complete", List.of(mockTool("default-invoiceParser")), true, null);
         assertThat(prompt).contains("All required plan tasks are already COMPLETE");
         assertThat(prompt).contains("You must return a FINAL_RESPONSE action");
         assertThat(prompt).doesNotContain("Option 1 - Call a tool for a ready task");
@@ -688,13 +688,13 @@ class StepPromptBuilderTest {
                 .updateTask("t-1", task -> task.complete("parsed"))
                 .updateTask("t-2", task -> task.complete("matched"));
         String prompt = buildPromptForCurrentMode(
-                plan, "objective", 3, null, "Step 2 complete", List.of(mockTool("invoiceParser")), true, duplicateInvoiceOutputSchema());
+                plan, "objective", 3, null, "Step 2 complete", List.of(mockTool("default-invoiceParser")), true, duplicateInvoiceOutputSchema());
         assertThat(prompt).contains("REQUIRED FINAL RESPONSE SHAPE");
         assertThat(prompt).contains("Property semantics:");
         assertThat(prompt).contains("$ — object, non-null, additionalProperties=false");
         assertThat(prompt).contains("$.isDuplicate — boolean, required, non-null");
         assertThat(prompt).contains("$.reasoning — string, required, non-null");
-        assertThat(prompt).doesNotContain("invoiceParser and expenseLookup");
+        assertThat(prompt).doesNotContain("default-invoiceParser and default-expenseLookup");
         assertThat(prompt).doesNotContain("\"evidence\"");
         assertThat(prompt).doesNotContain("Required top-level fields:");
     }
@@ -709,7 +709,7 @@ class StepPromptBuilderTest {
         schema.getProperties().get("reasoning").setNullable(true);
 
         String prompt = buildPromptForCurrentMode(
-                plan, "objective", 3, null, "Step 2 complete", List.of(mockTool("invoiceParser")), true, schema);
+                plan, "objective", 3, null, "Step 2 complete", List.of(mockTool("default-invoiceParser")), true, schema);
 
         assertThat(prompt).contains("$.invoiceDate — string, required, nullable");
         assertThat(prompt).contains("$.reasoning — string, required, nullable");
@@ -722,7 +722,7 @@ class StepPromptBuilderTest {
     {
         String prompt = buildPromptForCurrentMode(
                 createTwoTaskPlan(), "objective", 1, null, null,
-                List.of(mockTool("invoiceParser"), mockTool("expenseLookup")), false, duplicateInvoiceOutputSchema());
+                List.of(mockTool("default-invoiceParser"), mockTool("default-expenseLookup")), false, duplicateInvoiceOutputSchema());
 
         assertThat(prompt).doesNotContain("REQUIRED FINAL RESPONSE SHAPE");
         assertThat(prompt).doesNotContain("Property semantics:");
@@ -739,7 +739,7 @@ class StepPromptBuilderTest {
                     "type", "object", "properties", properties, "required", List.of("details"), "additionalProperties", false));
             for (boolean forced : List.of(false, true)) {
                 String prompt = buildPromptForCurrentMode(createTwoTaskPlan(), "objective", null, 1, List.of(), null,
-                        List.of(mockTool("invoiceParser", schema)), false, forced, null);
+                        List.of(mockTool("default-invoiceParser", schema)), false, forced, null);
                 assertThat(prompt).contains("At `$` (top level): Required fields: [details]", "Only these fields are allowed:",
                         "At `$.details`: Required fields: []", "Additional fields are allowed with any JSON value");
                 if (forced || count > 6) assertThat(prompt).contains("`$.p1` must be a string");
@@ -806,7 +806,7 @@ class StepPromptBuilderTest {
 
         YamlSkillManifest.OutputSchemaManifest isDuplicate = new YamlSkillManifest.OutputSchemaManifest();
         isDuplicate.setType("boolean");
-        isDuplicate.setEvidence("invoiceParser and expenseLookup");
+        isDuplicate.setEvidence("default-invoiceParser and default-expenseLookup");
         YamlSkillManifest.OutputSchemaManifest vendorName = new YamlSkillManifest.OutputSchemaManifest();
         vendorName.setType("string");
         YamlSkillManifest.OutputSchemaManifest totalAmount = new YamlSkillManifest.OutputSchemaManifest();
@@ -829,12 +829,12 @@ class StepPromptBuilderTest {
 
     private ExecutionPlan createTwoTaskPlan() {
         PlanTask task1 = new PlanTask("t-1", "Parse invoice", PlanTaskStatus.PENDING,
-                "invoiceParser", "Extract vendor, amount, date",
+                "default-invoiceParser", "Extract vendor, amount, date",
                 List.of(), List.of("parsedInvoice"), null, null);
         PlanTask task2 = new PlanTask("t-2", "Look up expenses", PlanTaskStatus.PENDING,
-                "expenseLookup", "Find matching expenses",
+                "default-expenseLookup", "Find matching expenses",
                 List.of("t-1"), List.of("expenses"), null, null);
-        return new ExecutionPlan("plan-1", "duplicateInvoiceChecker", Instant.now(),
+        return new ExecutionPlan("plan-1", "default-duplicateInvoiceChecker", Instant.now(),
                 PlanStatus.VALID, List.of(task1, task2));
     }
 

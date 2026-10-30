@@ -51,7 +51,7 @@ class EvidenceExpressionParserTest
             "'default-a)',10",
             "'default-a && default-b',11",
             "'default-a || default-b',11",
-            "'\"default-a\"',1"
+            "'\"a\"',1"
     })
     void rejectsMalformedExpressionsWithPreciseColumns(String raw, int column)
     {

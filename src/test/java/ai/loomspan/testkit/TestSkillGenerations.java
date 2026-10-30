@@ -39,7 +39,9 @@ public final class TestSkillGenerations
     public static ai.loomspan.internal.core.ExecutionBinding binding(ai.loomspan.internal.core.LoomspanSession session,
             ai.loomspan.internal.core.MissionContext mission, ai.loomspan.internal.core.PhysicalBranchContext branch,
             SkillGeneration generation) {
-        return new ai.loomspan.internal.core.ExecutionBinding(session, mission, branch, generation, snapshot(generation));
+        return new ai.loomspan.internal.core.ExecutionBinding(session, mission, branch, generation,
+                new ai.loomspan.internal.skill.SkillAdmissionSnapshot(
+                        ai.loomspan.internal.core.SkillIdentity.parse(ai.loomspan.internal.core.TestLoomspanSessions.entrySkill(session)), Map.of(generation.namespace(), generation)));
     }
 
     public static SkillGeneration of(CapabilityMetadata... capabilities)

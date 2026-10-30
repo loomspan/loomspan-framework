@@ -45,7 +45,7 @@ class SuccessfulSkillCompletionBoundaryTest
         PlanningService planning = mock(PlanningService.class);
         ExecutionStateService state = mock(ExecutionStateService.class);
         CapabilityMetadata capability = capability();
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("linked", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("linked", "default-test_entry", 3);
         when(planning.markToolStarted(eq(session), eq(capability))).thenReturn(Optional.of("task-1"));
         when(state.openFrame(eq(session), eq(TraceFrameType.TOOL_INVOCATION), eq(capability.name()), any()))
                 .thenReturn(frame(capability.name()));
@@ -71,7 +71,7 @@ class SuccessfulSkillCompletionBoundaryTest
         PlanningService planning = mock(PlanningService.class);
         ExecutionStateService state = mock(ExecutionStateService.class);
         CapabilityMetadata capability = capability();
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("unplanned", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("unplanned", "default-test_entry", 3);
         when(planning.markToolStarted(eq(session), eq(capability))).thenReturn(Optional.empty());
         when(state.openFrame(eq(session), eq(TraceFrameType.TOOL_INVOCATION), eq(capability.name()), any()))
                 .thenReturn(frame(capability.name()));
@@ -94,14 +94,14 @@ class SuccessfulSkillCompletionBoundaryTest
         for (RuntimeException failure : List.of(
                 new IllegalStateException("failed"),
                 new CancellationException("cancelled"),
-                new AccessDeniedException("denied")))
+                new AccessDeniedException("default-denied")))
         {
             CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
             PlanningService planning = mock(PlanningService.class);
             ExecutionStateService state = mock(ExecutionStateService.class);
             CapabilityMetadata capability = capability();
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "failure-" + failure.getClass().getSimpleName(), "test.entry", 3);
+                    "failure-" + failure.getClass().getSimpleName(), "default-test_entry", 3);
             when(planning.markToolStarted(eq(session), eq(capability))).thenReturn(Optional.empty());
             when(state.openFrame(eq(session), eq(TraceFrameType.TOOL_INVOCATION), eq(capability.name()), any()))
                     .thenReturn(frame(capability.name()));
@@ -122,12 +122,12 @@ class SuccessfulSkillCompletionBoundaryTest
     {
         return new CapabilityMetadata(
                 "rest:child",
-                "investigateNetwork",
+                "default-investigateNetwork",
                 "Investigate the network",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
                 CapabilityKind.REST_SKILL,
-                CapabilityToolDescriptor.generic("investigateNetwork", "Investigate the network"),
+                CapabilityToolDescriptor.generic("default-investigateNetwork", "Investigate the network"),
                 null);
     }
 
@@ -152,7 +152,7 @@ class SuccessfulSkillCompletionBoundaryTest
                 Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID,
                 List.of(new PlanTask(
-                        "task-1", "Investigate", PlanTaskStatus.IN_PROGRESS, "investigateNetwork",
+                        "task-1", "Investigate", PlanTaskStatus.IN_PROGRESS, "default-investigateNetwork",
                         "Investigate", List.of(), List.of(), null, null)));
     }
 
@@ -160,6 +160,6 @@ class SuccessfulSkillCompletionBoundaryTest
     {
         return new ExecutionFrame(
                 "frame-1", null, ai.loomspan.internal.core.OperationType.SKILL,
-                TraceFrameType.TOOL_INVOCATION, route, Map.of(), Instant.parse("2026-03-15T12:00:00Z"));
+                TraceFrameType.TOOL_INVOCATION, route, Map.of(), Instant.parse("2026-03-15T12:00:00Z"), null, null);
     }
 }

@@ -7,8 +7,8 @@ import {
 } from "./scope";
 
 test("scopeBoundPath carries the producing target scope", () => {
-  expect(scopeBoundPath("/skills/CheckDns", "scope/a")).toBe(
-    "/skills/CheckDns?targetScopeId=scope%2Fa",
+  expect(scopeBoundPath("/skills/default-CheckDns", "scope/a")).toBe(
+    "/skills/default-CheckDns?targetScopeId=scope%2Fa",
   );
 });
 

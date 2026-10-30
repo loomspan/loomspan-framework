@@ -75,7 +75,7 @@ class LoomspanSessionPropertiesTest {
                     assertThat(properties.getQuotas().getMaxModelCalls()).isEqualTo(5);
                     assertThat(properties.getQuotas().getMaxUsageUnits()).isEqualTo(1234);
                     assertThat(executionTraceProperties.getPersistence()).isEqualTo(TracePersistencePolicy.ALWAYS);
-                    assertThat(runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), LoomspanSession::getMaxDepth)).isEqualTo(3);
+                    assertThat(runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), LoomspanSession::getMaxDepth)).isEqualTo(3);
                 });
     }
 
@@ -166,26 +166,26 @@ class LoomspanSessionPropertiesTest {
                             persistence: always
                         """));
                 reloader.publish(b);
-                TracePersistencePolicy oldPolicy = runner.callWithNewSession("test.entry", captured.snapshot(),
+                TracePersistencePolicy oldPolicy = runner.callWithNewSession("default-test_entry", captured.snapshot(),
                         session -> session.getExecutionTrace().persistencePolicy());
                 assertThat(oldPolicy).isEqualTo(TracePersistencePolicy.NEVER);
-                assertThat(runner.callWithNewSession("test.entry", captured.snapshot(), LoomspanSession::getMaxDepth))
+                assertThat(runner.callWithNewSession("default-test_entry", captured.snapshot(), LoomspanSession::getMaxDepth))
                         .isEqualTo(2);
-                TracePersistencePolicy newPolicy = runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(manager.active("default")),
+                TracePersistencePolicy newPolicy = runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(manager.active("default")),
                         session -> session.getExecutionTrace().persistencePolicy());
                 assertThat(newPolicy).isEqualTo(TracePersistencePolicy.ALWAYS);
-                assertThat(runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(manager.active("default")), LoomspanSession::getMaxDepth))
+                assertThat(runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(manager.active("default")), LoomspanSession::getMaxDepth))
                         .isEqualTo(5);
                 var usage = context.getBean(ai.loomspan.internal.runtime.usage.SessionUsageService.class);
-                runner.callWithNewSession("test.entry", captured.snapshot(), session -> {
-                    usage.recordMissionStart(session, "test.entry");
-                    assertThatThrownBy(() -> usage.recordMissionStart(session, "test.entry"))
+                runner.callWithNewSession("default-test_entry", captured.snapshot(), session -> {
+                    usage.recordMissionStart(session, "default-test_entry");
+                    assertThatThrownBy(() -> usage.recordMissionStart(session, "default-test_entry"))
                             .isInstanceOf(ai.loomspan.internal.runtime.LoomspanQuotaExceededException.class);
                     return null;
                 });
-                runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(manager.active("default")), session -> {
-                    usage.recordMissionStart(session, "test.entry");
-                    usage.recordMissionStart(session, "test.entry");
+                runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(manager.active("default")), session -> {
+                    usage.recordMissionStart(session, "default-test_entry");
+                    usage.recordMissionStart(session, "default-test_entry");
                     return null;
                 });
             }

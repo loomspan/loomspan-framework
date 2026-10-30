@@ -22,6 +22,8 @@ public record ActiveExecutionSnapshot(
         Instant updatedAt,
         String entrySkill,
         String generationId,
+        String entryNamespace,
+        java.util.Map<String, String> namespaceGenerationIds,
         String phase,
         String summary,
         List<ActiveBranch> activeBranches,
@@ -44,6 +46,8 @@ public record ActiveExecutionSnapshot(
         Objects.requireNonNull(updatedAt, "updatedAt must not be null");
         entrySkill = requireNonBlank(entrySkill, "entrySkill");
         generationId = requireNonBlank(generationId, "generationId");
+        namespaceGenerationIds = new ai.loomspan.internal.core.CapturedNamespaceMetadata(
+                entryNamespace, generationId, namespaceGenerationIds).namespaceGenerationIds();
         phase = ExecutionObservationLimits.truncate(requireNonBlank(phase, "phase"),
                 ExecutionObservationLimits.TEXT_CODE_POINTS);
         summary = ExecutionObservationLimits.truncate(summary, ExecutionObservationLimits.SUMMARY_CODE_POINTS);
@@ -55,7 +59,7 @@ public record ActiveExecutionSnapshot(
     ActiveExecutionSnapshot withRegistryOrdinal(long ordinal)
     {
         return new ActiveExecutionSnapshot(
-                sessionId, traceId, ordinal, lastCanonicalSequence, startedAt, updatedAt, entrySkill, generationId,
+                sessionId, traceId, ordinal, lastCanonicalSequence, startedAt, updatedAt, entrySkill, generationId, entryNamespace, namespaceGenerationIds,
                 phase, summary, activeBranches, usage, outcome);
     }
 

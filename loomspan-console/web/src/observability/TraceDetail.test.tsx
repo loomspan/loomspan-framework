@@ -60,8 +60,8 @@ const trace: Trace = {
   targetScopeId: "scope-1",
   traceId: "trace-1",
   sessionId: "session-1",
-  entrySkill: "CheckDns",
-  generationId: "generation-fixture",
+  entrySkill: "default-CheckDns",
+  generationId: "generation-fixture", entryNamespace: "default", namespaceGenerationIds: { default: "generation-fixture" },
   outcome: "SUCCEEDED",
   finalizedAt: "2026-07-27T10:10:00Z",
   sizeBytes: 4096,
@@ -91,7 +91,7 @@ test("trace detail renders facts when loaded", async () => {
     expect(screen.getByText("trace-1")).toBeInTheDocument();
   });
   expect(screen.getByText("session-1")).toBeInTheDocument();
-  expect(screen.getByText("CheckDns")).toBeInTheDocument();
+  expect(screen.getByText("default-CheckDns")).toBeInTheDocument();
   expect(screen.getByText("SUCCEEDED")).toBeInTheDocument();
   expect(screen.getByText("PERSISTENT")).toBeInTheDocument();
 });

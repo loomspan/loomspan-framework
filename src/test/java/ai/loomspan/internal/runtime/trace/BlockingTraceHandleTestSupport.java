@@ -20,7 +20,7 @@ public final class BlockingTraceHandleTestSupport
     private final CountDownLatch releaseCompletionAppend = new CountDownLatch(1);
     private final AtomicInteger ids = new AtomicInteger();
 
-    public ExecutionTraceHandle create(String sessionId, String entrySkill, String generationId,
+    public ExecutionTraceHandle create(String sessionId, String entrySkill, ai.loomspan.internal.core.CapturedNamespaceMetadata namespaceMetadata,
             TracePersistencePolicy persistencePolicy, Clock clock,
             ExecutionObservationHandle observationHandle)
     {
@@ -42,7 +42,7 @@ public final class BlockingTraceHandleTestSupport
                 }
                 delegate.append(record);
             };
-            return new DefaultExecutionTraceHandle(
+            return ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                     "blocking-trace-" + ids.incrementAndGet(), sessionId, entrySkill, path,
                     persistencePolicy, clock, () -> "record-" + ids.incrementAndGet(),
                     Thread.currentThread().getName(), path.toString(), observationHandle, blocking);

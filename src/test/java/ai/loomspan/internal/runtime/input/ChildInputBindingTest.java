@@ -14,14 +14,14 @@ class ChildInputBindingTest {
     }
     @Test void rejectsProducerCyclesImpossibleCountsAndKnownInvalidPaths() {
         var parent = new SkillInputContractResolver().resolveFromToolSchema("{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"additionalProperties\":false}");
-        var consumer = new Allowed("consumer", result("/data", "producer"));
-        var constraints = List.of(consumer.constraint(), new ai.loomspan.internal.skill.AllowedSkillConstraint("producer", 2, null, false, List.of(result("/x", "consumer"))));
-        var issues = ChildInputBindingDeclarations.validate(parent, constraints, Map.of("consumer", parent));
+        var consumer = new Allowed("default-consumer", result("/data", "default-producer"));
+        var constraints = List.of(consumer.constraint(), new ai.loomspan.internal.skill.AllowedSkillConstraint("default-producer", 2, null, false, List.of(result("/x", "default-consumer"))));
+        var issues = ChildInputBindingDeclarations.validate(parent, constraints, Map.of("default-consumer", parent));
         assertThat(issues).anyMatch(issue -> issue.contains("closed object")).anyMatch(issue -> issue.contains("exactly one")).anyMatch(issue -> issue.contains("cyclic"));
     }
     @Test void skipsConditionalProducerCardinalityWhenConsumerCannotBePlanned() {
-        var consumer = new ai.loomspan.internal.skill.AllowedSkillConstraint("consumer", null, 0, false, List.of(result("/data", "producer")));
-        var producer = new ai.loomspan.internal.skill.AllowedSkillConstraint("producer", 2, null, false, List.of());
+        var consumer = new ai.loomspan.internal.skill.AllowedSkillConstraint("default-consumer", null, 0, false, List.of(result("/data", "default-producer")));
+        var producer = new ai.loomspan.internal.skill.AllowedSkillConstraint("default-producer", 2, null, false, List.of());
         assertThat(ChildInputBindingDeclarations.validate(SkillInputContract.genericObject(), List.of(consumer, producer), Map.of())).isEmpty();
     }
     private record Allowed(String name, ChildInputBinding binding) {

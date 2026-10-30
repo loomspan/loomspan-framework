@@ -267,7 +267,7 @@ class MissionLifecycleTest
     @Test
     void closedAncestorRevokesDescendantWhileClosedChildLeavesParentWritable()
     {
-        ExecutionBinding parent = binding("parent", null);
+        ExecutionBinding parent = binding("default-parent", null);
         ExecutionBinding child = binding("child", parent.requireMission());
 
         child.requireMission().lifecycle().closeNow();
@@ -346,15 +346,15 @@ class MissionLifecycleTest
 
     private static ExecutionBinding binding(String id, MissionContext parent, java.util.function.LongSupplier nanoTime)
     {
-        LoomspanSession session = parent == null ? new LoomspanSession("session-" + id, id, 8) : parent.session();
-        MissionContext mission = new MissionContext(session, id, "mission-" + id, parent, nanoTime);
+        LoomspanSession session = parent == null ? ai.loomspan.internal.core.TestLoomspanSessions.create("session-" + id, "default-testMission", 8) : parent.session();
+        MissionContext mission = new MissionContext(session, "default-testMission", "mission-" + id, parent, nanoTime);
         return ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
     }
 
     private static AssignedTaskExecution assignment(String id, int step)
     {
         return new AssignedTaskExecution(new PlanTask(id, id, PlanTaskStatus.PENDING,
-                "tool", id, List.of(), List.of(), null, null), step, true);
+                "default-tool", id, List.of(), List.of(), null, null), step, true);
     }
 
     private static void await(CountDownLatch latch)

@@ -187,6 +187,8 @@ export type ActiveExecution = {
   elapsedMillis: number;
   entrySkill: string;
   generationId: string;
+  entryNamespace: string;
+  namespaceGenerationIds: Record<string, string>;
   status: string;
   phase: string;
   summary: string;
@@ -201,6 +203,8 @@ export type Trace = {
   sessionId: string;
   entrySkill: string;
   generationId: string;
+  entryNamespace: string;
+  namespaceGenerationIds: Record<string, string>;
   outcome: string;
   finalizedAt: string;
   sizeBytes: number;
@@ -268,6 +272,7 @@ export type Page<T> = {
 };
 
 export type TraceAnalysisSummary = EvidenceEnvelope & {
+ entrySkill: string; generationId: string; entryNamespace: string; namespaceGenerationIds: Record<string,string>;
   traceId: string; sessionId: string; outcome: string;
   terminalFailureId: string | null; recordCount: number; frameCount: number;
   attemptCount: number; retryCount: number; validationCount: number;
@@ -292,6 +297,7 @@ export type TraceFrame = {
   parallelGroup?: string | null; effectiveConcurrency?: boolean | null;
 };
 export type TraceRecord = {
+ executingNamespace?: string; executingGenerationId?: string;
   sequence: number; type: string; failureId?: string; validationStatus?: string; frameId: string; parentFrameId: string;
   frameType: string; route: string; threadName: string; timestampMillis: number;
   representation: string; isChunk: boolean; isEnvelope: boolean;

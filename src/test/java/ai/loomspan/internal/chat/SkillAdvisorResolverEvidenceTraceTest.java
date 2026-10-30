@@ -50,7 +50,7 @@ class SkillAdvisorResolverEvidenceTraceTest
                 "{\"vendorName\":\"Acme\"}",
                 "{\"vendorName\":\"Acme\"}"));
 
-        assertThatThrownBy(() -> new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        assertThatThrownBy(() -> new LoomspanSessionRunner(3).callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
         {
             return TestExecutionBindings.callWithCurrentSessionMission(() -> {
                 try
@@ -74,12 +74,12 @@ class SkillAdvisorResolverEvidenceTraceTest
                 {
                     assertThat(record.metadata())
                             .containsEntry("unsatisfiedClaims", List.of("vendorName"))
-                            .containsEntry("requiredExpressions", Map.of("vendorName", "invoiceParser"));
+                            .containsEntry("requiredExpressions", Map.of("vendorName", "default-invoiceParser"));
                     assertThat(record.metadata().get("satisfiedSkills")).isEqualTo(List.of());
                     assertThat(record.data().path("requiredExpressions").path("vendorName").asText())
-                            .isEqualTo("invoiceParser");
+                            .isEqualTo("default-invoiceParser");
                     assertThat(record.data().path("issues").get(0).path("requiredExpression").asText())
-                            .isEqualTo("invoiceParser");
+                            .isEqualTo("default-invoiceParser");
                     assertThat(record.data().path("issues").get(0).path("unsatisfiedRequirements"))
                             .hasSize(1);
                     assertThat(record.metadata()).doesNotContainKey("missingEvidence");
@@ -94,10 +94,10 @@ class SkillAdvisorResolverEvidenceTraceTest
         CallAdvisor advisor = evidenceAdvisor(new DefaultSkillAdvisorResolver(stateService));
         List<TraceRecord> records = new ArrayList<>();
 
-        new LoomspanSessionRunner(3).callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        new LoomspanSessionRunner(3).callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
         {
             return TestExecutionBindings.callWithCurrentSessionMission(() -> {
-                ExecutionBindingScope.requireCurrent().requireMission().recordSuccessfulDirectSkill("invoiceParser");
+                ExecutionBindingScope.requireCurrent().requireMission().recordSuccessfulDirectSkill("default-invoiceParser");
                 ChatClientResponse response = advisor.adviseCall(
                         request(),
                         new RecordingChain(List.of("{\"vendorName\":\"Acme\"}")));
@@ -114,9 +114,9 @@ class SkillAdvisorResolverEvidenceTraceTest
                     assertThat(record.metadata().get("claims"))
                             .isEqualTo(List.of("vendorName"));
                     assertThat(record.metadata().get("satisfiedSkills"))
-                            .isEqualTo(List.of("invoiceParser"));
+                            .isEqualTo(List.of("default-invoiceParser"));
                     assertThat(record.data().path("requiredExpressions").path("vendorName").asText())
-                            .isEqualTo("invoiceParser");
+                            .isEqualTo("default-invoiceParser");
                     assertThat(record.data().path("issues").isEmpty()).isTrue();
                     assertThat(record.data().has("missingEvidence")).isFalse();
                 });
@@ -140,7 +140,7 @@ class SkillAdvisorResolverEvidenceTraceTest
 
         YamlSkillManifest.OutputSchemaManifest vendorName = new YamlSkillManifest.OutputSchemaManifest();
         vendorName.setType("string");
-        vendorName.setEvidence("invoiceParser");
+        vendorName.setEvidence("default-invoiceParser");
         YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
         schema.setType("object");
         schema.setProperties(Map.of("vendorName", vendorName));
@@ -154,7 +154,7 @@ class SkillAdvisorResolverEvidenceTraceTest
                 new EffectiveSkillExecutionConfiguration(
                         "gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium"),
                 ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(
-                        Map.of("vendorName", "invoiceParser")));
+                        Map.of("vendorName", "default-invoiceParser")));
     }
 
     private static ChatClientRequest request()

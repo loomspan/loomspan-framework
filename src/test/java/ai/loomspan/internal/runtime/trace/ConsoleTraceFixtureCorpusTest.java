@@ -79,6 +79,7 @@ class ConsoleTraceFixtureCorpusTest
             "native-evaluation-provider-failure",
             "single-attempt-success",
             "java-root-success",
+            "namespace-captured-context",
             "assembled-input-result",
             "assembled-child-result",
             "runtime-terminal-failure",
@@ -233,7 +234,7 @@ class ConsoleTraceFixtureCorpusTest
     void javaRootCorpusUsesExactNameClosedMissionAndNoModelOrPlanRecords() throws Exception
     {
         List<JsonNode> records = parseLines(fixtureRoot().resolve("traces/java-root-success.ndjson"));
-        assertThat(records.getFirst().at("/metadata/entrySkill").asText()).isEqualTo("javaLookup");
+        assertThat(records.getFirst().at("/metadata/entrySkill").asText()).isEqualTo("default-javaLookup");
         assertThat(records.stream().map(record -> record.path("recordType").asText()).toList())
                 .contains("FRAME_OPENED", "FRAME_CLOSED", "TRACE_COMPLETED")
                 .noneMatch(type -> type.startsWith("MODEL_") || type.startsWith("PLAN_"));
@@ -332,7 +333,7 @@ class ConsoleTraceFixtureCorpusTest
     void currentPlanSemanticEvidenceFixtureContainsDistinctJoinableChains() throws Exception
     {
         List<JsonNode> records = parseLines(fixtureRoot().resolve("traces/current-plan-semantic-evidence.ndjson"));
-        assertThat(records.getFirst().at("/metadata/entrySkill").asText()).isEqualTo("test.entry");
+        assertThat(records.getFirst().at("/metadata/entrySkill").asText()).isEqualTo("default-test_entry");
 
         List<JsonNode> creations = records.stream()
                 .filter(node -> "PLAN_CREATED".equals(node.path("recordType").asText()))
@@ -886,13 +887,21 @@ class ConsoleTraceFixtureCorpusTest
     {
         Path trace = root.resolve("traces").resolve(name + ".ndjson");
         AtomicInteger ids = new AtomicInteger();
-        String entrySkill = name.equals("java-root-success") ? "javaLookup" : "test.entry";
-        DefaultExecutionTraceHandle handle = name.equals("single-attempt-success")
-                ? new DefaultExecutionTraceHandle(
+        String entrySkill = name.equals("namespace-captured-context") ? "orders-search" : name.equals("java-root-success") ? "default-javaLookup" : "default-test_entry";
+        DefaultExecutionTraceHandle handle = name.equals("namespace-captured-context")
+                ? new DefaultExecutionTraceHandle("trace-" + name, "session-" + name, entrySkill,
+                        new ai.loomspan.internal.core.CapturedNamespaceMetadata("orders", "orders-old",
+                                Map.of("orders", "orders-old", "tax", "tax-retired", "audit", "audit-unexecuted")),
+                        trace, TracePersistencePolicy.ALWAYS, false, false, CLOCK, 0L, false,
+                        () -> "namespace-id", "fixture-thread", "traces/" + name + ".ndjson",
+                        ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandle.INSTANCE,
+                        null, null, ImmediateCompletionRetention.INSTANCE, null)
+                : name.equals("single-attempt-success")
+                ? ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                         "trace-" + name, "session-" + name, entrySkill, trace, TracePersistencePolicy.ALWAYS,
                         CLOCK, () -> "payload-" + ids.incrementAndGet(), "fixture-thread",
                         "traces/" + name + ".ndjson", new ConfiguredLimitsSnapshot(7, 11, 3, 5, 15, 1234))
-                : new DefaultExecutionTraceHandle(
+                : ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                         "trace-" + name, "session-" + name, entrySkill, trace, TracePersistencePolicy.ALWAYS,
                         CLOCK, () -> "payload-" + ids.incrementAndGet(), "fixture-thread",
                         "traces/" + name + ".ndjson");
@@ -913,15 +922,26 @@ class ConsoleTraceFixtureCorpusTest
             }
             case "assembled-input-result" -> {
                 PhysicalBranchContext branch = new PhysicalBranchContext(session);
-                ExecutionFrame owner = frame("assembly-root", null, TraceFrameType.ROOT_MISSION, "test.entry");
+                ExecutionFrame owner = frame("assembly-root", null, TraceFrameType.ROOT_MISSION, "default-test_entry");
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, owner, CLOCK.instant()); branch.push(owner);
-                ExecutionBindingScope.callWith(fixtureBinding(session, branch, "test.entry", owner.frameId()), () -> {
-                    new DefaultExecutionTraceRecorder(CLOCK).recordResultAssembled(session, "test.entry", null, false,
+                ExecutionBindingScope.callWith(fixtureBinding(session, branch, "default-test_entry", owner.frameId()), () -> {
+                    new DefaultExecutionTraceRecorder(CLOCK).recordResultAssembled(session, "default-test_entry", null, false,
                             List.of(ordered("destination", "/assessment", "sourceKind", "input", "sourcePath", "/assessment", "parentMissionFrameId", owner.frameId())),
                             "{\"assessment\":{\"amount\":9007199254740993,\"lines\":[\"second\",\"first\"],\"text\":\"{\\\"nested\\\":true}\"}}");
                     return null;
                 });
                 appendFrame(handle, TraceRecordType.FRAME_CLOSED, owner, CLOCK.instant()); branch.close(owner);
+            }
+            case "namespace-captured-context" ->
+            {
+                var rootFrame = new ExecutionFrame("namespace-root", null, OperationType.CAPABILITY,
+                        TraceFrameType.ROOT_MISSION, "orders-search", Map.of(), CLOCK.instant(), "orders", "orders-old");
+                var targetFrame = new ExecutionFrame("namespace-target", "namespace-root", OperationType.CAPABILITY,
+                        TraceFrameType.TOOL_INVOCATION, "tax-search", Map.of(), CLOCK.instant(), "tax", "tax-retired");
+                appendFrame(handle, TraceRecordType.FRAME_OPENED, rootFrame, CLOCK.instant());
+                appendFrame(handle, TraceRecordType.FRAME_OPENED, targetFrame, CLOCK.instant());
+                appendFrame(handle, TraceRecordType.FRAME_CLOSED, targetFrame, CLOCK.instant());
+                appendFrame(handle, TraceRecordType.FRAME_CLOSED, rootFrame, CLOCK.instant());
             }
             case "java-root-success" ->
             {
@@ -955,10 +975,10 @@ class ConsoleTraceFixtureCorpusTest
             {
                 DefaultExecutionTraceRecorder recorder = new DefaultExecutionTraceRecorder(CLOCK);
                 ExecutionBinding binding = fixtureBinding(
-                        session, new PhysicalBranchContext(session), "test.entry", "advisor-retry");
+                        session, new PhysicalBranchContext(session), "default-test_entry", "advisor-retry");
                 appendAttempt(handle, "retry-1", "attempt-1", 1, 10, 4, "EXACT");
                 ExecutionBindingScope.runWith(binding, () -> recorder.recordOutputSchemaOutcome(session, new OutputSchemaOutcome(
-                        "test.entry", OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED,
+                        "default-test_entry", OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED,
                         1, 0, 1, OutputSchemaOutcomeStatus.RETRYING, List.of())));
                 handle.append(TraceRecordType.ADVISOR_REQUEST_MUTATION_RECORDED,
                         attempt("retry-1", "attempt-1", 1, Map.of("status", "retrying")),
@@ -968,7 +988,7 @@ class ConsoleTraceFixtureCorpusTest
                         attempt("retry-1", "attempt-2", 2, Map.of("status", "passed")),
                         Map.of("validator", "linter"));
                 ExecutionBindingScope.runWith(binding, () -> recorder.recordOutputSchemaOutcome(session, new OutputSchemaOutcome(
-                        "test.entry", null, 2, 1, 1, OutputSchemaOutcomeStatus.PASSED, List.of())));
+                        "default-test_entry", null, 2, 1, 1, OutputSchemaOutcomeStatus.PASSED, List.of())));
                 attributed = terminal = new Usage(18, 7);
             }
             case "recovered-provider-attempt-diagnostic" ->
@@ -1098,8 +1118,8 @@ class ConsoleTraceFixtureCorpusTest
             }
             case "nested-frame-usage" ->
             {
-                ExecutionFrame rootFrame = frame("root", null, TraceFrameType.ROOT_MISSION, "root.skill");
-                ExecutionFrame skill = frame("skill", "root", TraceFrameType.SKILL_EXECUTION, "root.skill");
+                ExecutionFrame rootFrame = frame("root", null, TraceFrameType.ROOT_MISSION, "default-root_skill");
+                ExecutionFrame skill = frame("skill", "root", TraceFrameType.SKILL_EXECUTION, "default-root_skill");
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, rootFrame, CLOCK.instant());
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, skill, CLOCK.instant().plusSeconds(1));
                 appendAttempt(handle, skill, "retry-framed", "attempt-framed", 1, 4, 2, "EXACT");
@@ -1110,9 +1130,9 @@ class ConsoleTraceFixtureCorpusTest
             }
             case "repeated-skill-invocations" ->
             {
-                ExecutionFrame rootFrame = frame("root", null, TraceFrameType.ROOT_MISSION, "root.skill");
-                ExecutionFrame first = frame("skill-1", "root", TraceFrameType.SKILL_EXECUTION, "root.skill");
-                ExecutionFrame second = frame("skill-2", "root", TraceFrameType.SKILL_EXECUTION, "root.skill");
+                ExecutionFrame rootFrame = frame("root", null, TraceFrameType.ROOT_MISSION, "default-root_skill");
+                ExecutionFrame first = frame("skill-1", "root", TraceFrameType.SKILL_EXECUTION, "default-root_skill");
+                ExecutionFrame second = frame("skill-2", "root", TraceFrameType.SKILL_EXECUTION, "default-root_skill");
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, rootFrame, CLOCK.instant());
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, first, CLOCK.instant().plusSeconds(1));
                 appendAttempt(handle, first, "retry-1", "attempt-1", 1, 2, 1, "EXACT");
@@ -1150,17 +1170,17 @@ class ConsoleTraceFixtureCorpusTest
                     ordered("value", "needle before needle middle needle after"));
             case "incomplete-frame-duration" ->
             {
-                ExecutionFrame rootFrame = frame("root", null, TraceFrameType.ROOT_MISSION, "root.skill");
-                ExecutionFrame incomplete = frame("incomplete", "root", TraceFrameType.TOOL_INVOCATION, "root.tool");
+                ExecutionFrame rootFrame = frame("root", null, TraceFrameType.ROOT_MISSION, "default-root_skill");
+                ExecutionFrame incomplete = frame("incomplete", "root", TraceFrameType.TOOL_INVOCATION, "default-root_tool");
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, rootFrame, CLOCK.instant());
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, incomplete, CLOCK.instant().plusSeconds(1));
                 appendFrame(handle, TraceRecordType.FRAME_CLOSED, rootFrame, CLOCK.instant().plusSeconds(4));
             }
             case "overlapping-frame-duration" ->
             {
-                ExecutionFrame rootFrame = frame("root", null, TraceFrameType.ROOT_MISSION, "root.skill");
-                ExecutionFrame first = frame("child-1", "root", TraceFrameType.SKILL_EXECUTION, "root.first");
-                ExecutionFrame second = frame("child-2", "root", TraceFrameType.SKILL_EXECUTION, "root.second");
+                ExecutionFrame rootFrame = frame("root", null, TraceFrameType.ROOT_MISSION, "default-root_skill");
+                ExecutionFrame first = frame("child-1", "root", TraceFrameType.SKILL_EXECUTION, "default-root_first");
+                ExecutionFrame second = frame("child-2", "root", TraceFrameType.SKILL_EXECUTION, "default-root_second");
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, rootFrame, CLOCK.instant());
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, first, CLOCK.instant().plusSeconds(1));
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, second, CLOCK.instant().plusSeconds(3));
@@ -1247,19 +1267,19 @@ class ConsoleTraceFixtureCorpusTest
 
     private static void executeCurrentPlanSemanticFixture(DefaultExecutionTraceHandle handle) throws IOException
     {
-        ExecutionFrame root = frame("mission-root", null, TraceFrameType.ROOT_MISSION, "shared.skill");
-        ExecutionFrame primary = frame("planning-primary", "mission-root", TraceFrameType.PLANNING, "shared.skill");
-        ExecutionFrame nestedSkill = frame("nested-skill", "mission-root", TraceFrameType.SKILL_EXECUTION, "shared.skill");
-        ExecutionFrame nestedMission = frame("nested-mission", "nested-skill", TraceFrameType.ROOT_MISSION, "shared.skill");
-        ExecutionFrame nested = frame("planning-nested", "nested-mission", TraceFrameType.PLANNING, "shared.skill");
-        ExecutionFrame tool = frame("tool-current", "mission-root", TraceFrameType.TOOL_INVOCATION, "lookupIncident");
+        ExecutionFrame root = frame("mission-root", null, TraceFrameType.ROOT_MISSION, "default-shared_skill");
+        ExecutionFrame primary = frame("planning-primary", "mission-root", TraceFrameType.PLANNING, "default-shared_skill");
+        ExecutionFrame nestedSkill = frame("nested-skill", "mission-root", TraceFrameType.SKILL_EXECUTION, "default-shared_skill");
+        ExecutionFrame nestedMission = frame("nested-mission", "nested-skill", TraceFrameType.ROOT_MISSION, "default-shared_skill");
+        ExecutionFrame nested = frame("planning-nested", "nested-mission", TraceFrameType.PLANNING, "default-shared_skill");
+        ExecutionFrame tool = frame("tool-current", "mission-root", TraceFrameType.TOOL_INVOCATION, "default-lookupIncident");
         appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant());
         appendFrame(handle, TraceRecordType.FRAME_OPENED, primary, CLOCK.instant().plusSeconds(1));
         appendAttempt(handle, primary, "retry-primary", "attempt-rejected", 1, 2, 1, "EXACT");
         appendAttempt(handle, primary, "retry-primary", "attempt-accepted", 2, 2, 1, "EXACT");
         Map<String, Object> accepted = attempt("retry-primary", "attempt-accepted", 2, Map.of("planId", "framework-primary-plan"));
         handle.append(TraceRecordType.PLAN_CREATED, primary, TraceFrameType.PLANNING, accepted,
-                fixturePlan("framework-primary-plan", "shared.skill", 0, "p".repeat(3000)));
+                fixturePlan("framework-primary-plan", "default-shared_skill", 0, "p".repeat(3000)));
         handle.append(TraceRecordType.ADVISOR_RESPONSE_MUTATION_RECORDED, primary, TraceFrameType.PLANNING,
                 attempt("retry-primary", "attempt-accepted", 2, Map.of("status", "passed")), Map.of("review", "accepted"));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, primary, CLOCK.instant().plusSeconds(3));
@@ -1267,7 +1287,7 @@ class ConsoleTraceFixtureCorpusTest
         {
             handle.append(TraceRecordType.PLAN_UPDATED, root, TraceFrameType.ROOT_MISSION,
                     Map.of("planId", "framework-primary-plan"),
-                    fixturePlan("framework-primary-plan", "shared.skill", version, "p".repeat(3000)));
+                    fixturePlan("framework-primary-plan", "default-shared_skill", version, "p".repeat(3000)));
         }
         appendFrame(handle, TraceRecordType.FRAME_OPENED, nestedSkill, CLOCK.instant().plusSeconds(4));
         appendFrame(handle, TraceRecordType.FRAME_OPENED, nestedMission, CLOCK.instant().plusSeconds(4));
@@ -1275,29 +1295,29 @@ class ConsoleTraceFixtureCorpusTest
         appendAttempt(handle, nested, "retry-nested", "attempt-nested", 1, 2, 1, "EXACT");
         handle.append(TraceRecordType.PLAN_CREATED, nested, TraceFrameType.PLANNING,
                 attempt("retry-nested", "attempt-nested", 1, Map.of("planId", "framework-nested-plan")),
-                fixturePlan("framework-nested-plan", "shared.skill", 0, "nested"));
+                fixturePlan("framework-nested-plan", "default-shared_skill", 0, "nested"));
         handle.append(TraceRecordType.STRUCTURED_OUTPUT_RECORDED, nested, TraceFrameType.PLANNING,
                 Map.of(), ordered("incident", "INC-2401", "accepted", true));
         handle.append(TraceRecordType.EVIDENCE_RECORDED, nested, TraceFrameType.PLANNING, Map.of(), JSON.nullNode());
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, nested, CLOCK.instant().plusSeconds(7));
         handle.append(TraceRecordType.PLAN_UPDATED, nestedMission, TraceFrameType.ROOT_MISSION,
                 Map.of("planId", "framework-nested-plan"),
-                fixturePlan("framework-nested-plan", "shared.skill", 1, "nested-updated"));
+                fixturePlan("framework-nested-plan", "default-shared_skill", 1, "nested-updated"));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, nestedMission, CLOCK.instant().plusSeconds(8));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, nestedSkill, CLOCK.instant().plusSeconds(8));
         appendFrame(handle, TraceRecordType.FRAME_OPENED, tool, CLOCK.instant().plusSeconds(8));
         handle.append(TraceRecordType.TOOL_CALL_STARTED, tool, TraceFrameType.TOOL_INVOCATION,
-                Map.of("capabilityName", "lookupIncident"), Map.of("incidentId", "INC-2401"));
+                Map.of("capabilityName", "default-lookupIncident"), Map.of("incidentId", "INC-2401"));
         handle.append(TraceRecordType.TOOL_CALL_COMPLETED, tool, TraceFrameType.TOOL_INVOCATION,
-                Map.of("capabilityName", "lookupIncident"), Map.of("status", "resolved"));
+                Map.of("capabilityName", "default-lookupIncident"), Map.of("status", "resolved"));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, tool, CLOCK.instant().plusSeconds(9));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, root, CLOCK.instant().plusSeconds(10));
     }
 
     private static void executeCanonicalConcurrentFixture(DefaultExecutionTraceHandle handle) throws IOException
     {
-        ExecutionFrame root = frame("concurrent-root", null, TraceFrameType.ROOT_MISSION, "test.entry");
-        ExecutionFrame planning = frame("concurrent-planning", "concurrent-root", TraceFrameType.PLANNING, "test.entry#planning");
+        ExecutionFrame root = frame("concurrent-root", null, TraceFrameType.ROOT_MISSION, "default-test_entry");
+        ExecutionFrame planning = frame("concurrent-planning", "concurrent-root", TraceFrameType.PLANNING, "default-test_entry#planning");
         appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant());
         appendFrame(handle, TraceRecordType.FRAME_OPENED, planning, CLOCK.instant());
         handle.append(TraceRecordType.PLAN_CREATED, planning, TraceFrameType.PLANNING,
@@ -1317,10 +1337,10 @@ class ConsoleTraceFixtureCorpusTest
                 planUpdateMetadata("ADMISSION", List.of("task-a", "task-b", "task-c"), "enabled", true, null),
                 concurrentPlan("VALID", "COMPLETED", "COMPLETED", "COMPLETED", "IN_PROGRESS", "IN_PROGRESS", "IN_PROGRESS"));
 
-        ExecutionFrame stepB = frame("step-b", "concurrent-root", TraceFrameType.STEP_EXECUTION, "worker.b");
-        ExecutionFrame nestedB = frame("nested-planning-b", "step-b", TraceFrameType.PLANNING, "worker.b#planning");
-        ExecutionFrame stepA = frame("step-a", "concurrent-root", TraceFrameType.STEP_EXECUTION, "worker.a");
-        ExecutionFrame modelA = frame("model-a", "step-a", TraceFrameType.MODEL_CALL, "worker.a#model");
+        ExecutionFrame stepB = frame("step-b", "concurrent-root", TraceFrameType.STEP_EXECUTION, "default-worker_b");
+        ExecutionFrame nestedB = frame("nested-planning-b", "step-b", TraceFrameType.PLANNING, "default-worker_b#planning");
+        ExecutionFrame stepA = frame("step-a", "concurrent-root", TraceFrameType.STEP_EXECUTION, "default-worker_a");
+        ExecutionFrame modelA = frame("model-a", "step-a", TraceFrameType.MODEL_CALL, "default-worker_a#model");
         appendAssignedFrame(handle, TraceRecordType.FRAME_OPENED, stepB, CLOCK.instant().plusSeconds(10), "task-b", 5, "enabled", true, null);
         appendFrame(handle, TraceRecordType.FRAME_OPENED, nestedB, CLOCK.instant().plusSeconds(10));
         appendAssignedFrame(handle, TraceRecordType.FRAME_OPENED, stepA, CLOCK.instant().plusSeconds(12), "task-a", 4, "enabled", true, null);
@@ -1347,31 +1367,31 @@ class ConsoleTraceFixtureCorpusTest
 
     private static void executeNestedAssignmentShadowingFixture(DefaultExecutionTraceHandle handle) throws IOException
     {
-        ExecutionFrame root = frame("shadow-root", null, TraceFrameType.ROOT_MISSION, "outer.skill");
-        ExecutionFrame outerPlanning = frame("outer-planning", "shadow-root", TraceFrameType.PLANNING, "outer.skill#planning");
-        ExecutionFrame outerStep = frame("outer-step", "shadow-root", TraceFrameType.STEP_EXECUTION, "outer.worker");
-        ExecutionFrame innerPlanning = frame("inner-planning", "outer-step", TraceFrameType.PLANNING, "inner.skill#planning");
-        ExecutionFrame innerStep = frame("inner-step", "outer-step", TraceFrameType.STEP_EXECUTION, "inner.worker");
-        ExecutionFrame innerModel = frame("inner-model", "inner-step", TraceFrameType.MODEL_CALL, "inner.worker#model");
+        ExecutionFrame root = frame("shadow-root", null, TraceFrameType.ROOT_MISSION, "default-outer_skill");
+        ExecutionFrame outerPlanning = frame("outer-planning", "shadow-root", TraceFrameType.PLANNING, "default-outer_skill#planning");
+        ExecutionFrame outerStep = frame("outer-step", "shadow-root", TraceFrameType.STEP_EXECUTION, "default-outer_worker");
+        ExecutionFrame innerPlanning = frame("inner-planning", "outer-step", TraceFrameType.PLANNING, "default-inner_skill#planning");
+        ExecutionFrame innerStep = frame("inner-step", "outer-step", TraceFrameType.STEP_EXECUTION, "default-inner_worker");
+        ExecutionFrame innerModel = frame("inner-model", "inner-step", TraceFrameType.MODEL_CALL, "default-inner_worker#model");
 
         appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant());
         appendFrame(handle, TraceRecordType.FRAME_OPENED, outerPlanning, CLOCK.instant().plusSeconds(1));
         handle.append(TraceRecordType.PLAN_CREATED, outerPlanning, TraceFrameType.PLANNING,
-                Map.of("planId", "outer-plan"), shadowPlan("outer-plan", "outer.skill", "outer-task", "PENDING", "VALID"));
+                Map.of("planId", "outer-plan"), shadowPlan("outer-plan", "default-outer_skill", "outer-task", "PENDING", "VALID"));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, outerPlanning, CLOCK.instant().plusSeconds(2));
         handle.append(TraceRecordType.PLAN_UPDATED, root, TraceFrameType.ROOT_MISSION,
                 transitionMetadata("outer-plan", "ADMISSION", List.of("outer-task"), null, false, null),
-                shadowPlan("outer-plan", "outer.skill", "outer-task", "IN_PROGRESS", "VALID"));
+                shadowPlan("outer-plan", "default-outer_skill", "outer-task", "IN_PROGRESS", "VALID"));
         appendAssignedFrame(handle, TraceRecordType.FRAME_OPENED, outerStep, CLOCK.instant().plusSeconds(3),
                 "outer-plan", "outer-task", 1, null, false, null);
 
         appendFrame(handle, TraceRecordType.FRAME_OPENED, innerPlanning, CLOCK.instant().plusSeconds(4));
         handle.append(TraceRecordType.PLAN_CREATED, innerPlanning, TraceFrameType.PLANNING,
-                Map.of("planId", "inner-plan"), shadowPlan("inner-plan", "inner.skill", "inner-task", "PENDING", "VALID"));
+                Map.of("planId", "inner-plan"), shadowPlan("inner-plan", "default-inner_skill", "inner-task", "PENDING", "VALID"));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, innerPlanning, CLOCK.instant().plusSeconds(5));
         handle.append(TraceRecordType.PLAN_UPDATED, outerStep, TraceFrameType.STEP_EXECUTION,
                 transitionMetadata("inner-plan", "ADMISSION", List.of("inner-task"), null, false, null),
-                shadowPlan("inner-plan", "inner.skill", "inner-task", "IN_PROGRESS", "VALID"));
+                shadowPlan("inner-plan", "default-inner_skill", "inner-task", "IN_PROGRESS", "VALID"));
         appendAssignedFrame(handle, TraceRecordType.FRAME_OPENED, innerStep, CLOCK.instant().plusSeconds(6),
                 "inner-plan", "inner-task", 1, null, false, null);
         appendFrame(handle, TraceRecordType.FRAME_OPENED, innerModel, CLOCK.instant().plusSeconds(7));
@@ -1380,13 +1400,13 @@ class ConsoleTraceFixtureCorpusTest
                 "inner-plan", null, 0, null, false, "COMPLETED");
         handle.append(TraceRecordType.PLAN_UPDATED, outerStep, TraceFrameType.STEP_EXECUTION,
                 transitionMetadata("inner-plan", "JOIN", List.of("inner-task"), null, null, "COMPLETED"),
-                shadowPlan("inner-plan", "inner.skill", "inner-task", "COMPLETED", "VALID"));
+                shadowPlan("inner-plan", "default-inner_skill", "inner-task", "COMPLETED", "VALID"));
 
         appendAssignedFrame(handle, TraceRecordType.FRAME_CLOSED, outerStep, CLOCK.instant().plusSeconds(15),
                 "outer-plan", null, 0, null, false, "COMPLETED");
         handle.append(TraceRecordType.PLAN_UPDATED, root, TraceFrameType.ROOT_MISSION,
                 transitionMetadata("outer-plan", "JOIN", List.of("outer-task"), null, null, "COMPLETED"),
-                shadowPlan("outer-plan", "outer.skill", "outer-task", "COMPLETED", "VALID"));
+                shadowPlan("outer-plan", "default-outer_skill", "outer-task", "COMPLETED", "VALID"));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, root, CLOCK.instant().plusSeconds(18));
     }
 
@@ -1397,11 +1417,11 @@ class ConsoleTraceFixtureCorpusTest
         handle.append(TraceRecordType.PLAN_UPDATED, root, TraceFrameType.ROOT_MISSION,
                 planUpdateMetadata("ADMISSION", List.of(taskId), group, false, null), admitted);
         ExecutionFrame step = frame("step-" + taskId.substring(taskId.length() - 1), "concurrent-root",
-                TraceFrameType.STEP_EXECUTION, "worker." + taskId.substring(taskId.length() - 1));
+                TraceFrameType.STEP_EXECUTION, "default-worker_" + taskId.substring(taskId.length() - 1));
         appendAssignedFrame(handle, TraceRecordType.FRAME_OPENED, step, openedAt, taskId, stepNumber, group, false, null);
         if (taskId.equals("task-f"))
         {
-            ExecutionFrame nested = frame("nested-planning-f", step.frameId(), TraceFrameType.PLANNING, "worker.f#planning");
+            ExecutionFrame nested = frame("nested-planning-f", step.frameId(), TraceFrameType.PLANNING, "default-worker_f#planning");
             appendFrame(handle, TraceRecordType.FRAME_OPENED, nested, openedAt.plusSeconds(1));
             appendFrame(handle, TraceRecordType.FRAME_CLOSED, nested, openedAt.plusSeconds(2));
             appendAssignedFrame(handle, TraceRecordType.FRAME_CLOSED, step, openedAt.plusSeconds(3), null, 0, null, false, "COMPLETED");
@@ -1463,19 +1483,19 @@ class ConsoleTraceFixtureCorpusTest
             String group = index < 2 ? "disabled" : index == 2 ? null : "enabled";
             tasks.add(ordered(
                     "taskId", "task-" + ids[index], "title", "Task " + ids[index].toUpperCase(),
-                    "status", taskStatuses[index], "capabilityName", "worker." + ids[index],
+                    "status", taskStatuses[index], "capabilityName", "default-worker_" + ids[index],
                     "intent", "Run " + ids[index], "dependsOn", List.of(), "expectedOutputs", List.of(),
                     "parallelGroup", group, "note", null));
         }
-        return ordered("planId", "concurrent-plan", "capabilityName", "test.entry",
+        return ordered("planId", "concurrent-plan", "capabilityName", "default-test_entry",
                 "createdAt", CLOCK.instant().toString(), "status", planStatus, "tasks", tasks);
     }
 
     private static void executeRecoveredProviderAttemptDiagnosticFixture(DefaultExecutionTraceHandle handle)
             throws IOException
     {
-        ExecutionFrame root = frame("root", null, TraceFrameType.ROOT_MISSION, "recoverProviderCall");
-        ExecutionFrame model = frame("model", "root", TraceFrameType.MODEL_CALL, "recoverProviderCall#model");
+        ExecutionFrame root = frame("root", null, TraceFrameType.ROOT_MISSION, "default-recoverProviderCall");
+        ExecutionFrame model = frame("model", "root", TraceFrameType.MODEL_CALL, "default-recoverProviderCall#model");
         appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant());
         appendFrame(handle, TraceRecordType.FRAME_OPENED, model, CLOCK.instant().plusSeconds(1));
 
@@ -1541,11 +1561,11 @@ class ConsoleTraceFixtureCorpusTest
             LoomspanSession session, DefaultExecutionTraceHandle handle) throws Exception
     {
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
-        ExecutionBinding binding = fixtureBinding(session, branch, "diagnoseProvider", "root");
+        ExecutionBinding binding = fixtureBinding(session, branch, "default-diagnoseProvider", "root");
         return ExecutionBindingScope.callWith(binding, () ->
         {
-            ExecutionFrame root = frame("root", null, TraceFrameType.ROOT_MISSION, "diagnoseProvider");
-            ExecutionFrame model = frame("model", "root", TraceFrameType.MODEL_CALL, "diagnoseProvider#model");
+            ExecutionFrame root = frame("root", null, TraceFrameType.ROOT_MISSION, "default-diagnoseProvider");
+            ExecutionFrame model = frame("model", "root", TraceFrameType.MODEL_CALL, "default-diagnoseProvider#model");
             appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant());
             branch.push(root);
             appendFrame(handle, TraceRecordType.FRAME_OPENED, model, CLOCK.instant().plusSeconds(1));
@@ -1590,14 +1610,14 @@ class ConsoleTraceFixtureCorpusTest
             DefaultExecutionTraceHandle handle) throws IOException
     {
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
-        ExecutionBinding binding = fixtureBinding(session, branch, "handleIncident", "root");
+        ExecutionBinding binding = fixtureBinding(session, branch, "default-handleIncident", "root");
         try
         {
             return ExecutionBindingScope.callWith(binding, () ->
             {
-        ExecutionFrame root = frame("root", null, TraceFrameType.ROOT_MISSION, "handleIncident");
-        ExecutionFrame step = frame("step", "root", TraceFrameType.STEP_EXECUTION, "handleIncident#step-1");
-        ExecutionFrame model = frame("model", "step", TraceFrameType.MODEL_CALL, "handleIncident#step-model");
+        ExecutionFrame root = frame("root", null, TraceFrameType.ROOT_MISSION, "default-handleIncident");
+        ExecutionFrame step = frame("step", "root", TraceFrameType.STEP_EXECUTION, "default-handleIncident#step-1");
+        ExecutionFrame model = frame("model", "step", TraceFrameType.MODEL_CALL, "default-handleIncident#step-model");
         appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant());
         branch.push(root);
         appendFrame(handle, TraceRecordType.FRAME_OPENED, step, CLOCK.instant().plusSeconds(1));
@@ -1640,41 +1660,41 @@ class ConsoleTraceFixtureCorpusTest
     private static void executeForwardingFixture(LoomspanSession session, DefaultExecutionTraceHandle handle, boolean nested, boolean assembly) throws Exception
     {
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
-        ExecutionFrame root = frame("forward-root", null, TraceFrameType.ROOT_MISSION, "prepareReport");
+        ExecutionFrame root = frame("forward-root", null, TraceFrameType.ROOT_MISSION, "default-prepareReport");
         appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant()); branch.push(root);
-        ExecutionBindingScope.callWith(fixtureBinding(session, branch, "prepareReport", root.frameId()), () -> {
-            forwardingPlan(handle, root, "report-plan", "prepareReport", nested ? "coordinateReport" : "finishReport", "PENDING", "PENDING");
-            forwardingPlan(handle, root, "report-plan", "prepareReport", nested ? "coordinateReport" : "finishReport", "IN_PROGRESS", "PENDING");
-            ExecutionFrame selected = frame("selected-tool", root.frameId(), TraceFrameType.TOOL_INVOCATION, nested ? "coordinateReport" : "finishReport");
+        ExecutionBindingScope.callWith(fixtureBinding(session, branch, "default-prepareReport", root.frameId()), () -> {
+            forwardingPlan(handle, root, "report-plan", "default-prepareReport", nested ? "default-coordinateReport" : "default-finishReport", "PENDING", "PENDING");
+            forwardingPlan(handle, root, "report-plan", "default-prepareReport", nested ? "default-coordinateReport" : "default-finishReport", "IN_PROGRESS", "PENDING");
+            ExecutionFrame selected = frame("selected-tool", root.frameId(), TraceFrameType.TOOL_INVOCATION, nested ? "default-coordinateReport" : "default-finishReport");
             appendFrame(handle, TraceRecordType.FRAME_OPENED, selected, CLOCK.instant()); branch.push(selected);
             DefaultExecutionTraceRecorder recorder = new DefaultExecutionTraceRecorder(CLOCK);
             ToolTraceContext selectedContext = new ToolTraceContext(selected.route(), "finish-task", false);
             recorder.recordToolStarted(session, selected, selectedContext, ordered("arguments", ordered()));
             if (nested) {
-                ExecutionFrame child = frame("forward-child", selected.frameId(), TraceFrameType.SKILL_EXECUTION, "coordinateReport");
+                ExecutionFrame child = frame("forward-child", selected.frameId(), TraceFrameType.SKILL_EXECUTION, "default-coordinateReport");
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, child, CLOCK.instant()); branch.push(child);
-                ExecutionBindingScope.callWith(fixtureBinding(session, branch, "coordinateReport", child.frameId()), () -> {
-                    forwardingPlan(handle, child, "child-plan", "coordinateReport", "finishReport", "PENDING", "PENDING");
-                    forwardingPlan(handle, child, "child-plan", "coordinateReport", "finishReport", "IN_PROGRESS", "PENDING");
-                    ExecutionFrame producer = frame("producer-tool", child.frameId(), TraceFrameType.TOOL_INVOCATION, "finishReport");
+                ExecutionBindingScope.callWith(fixtureBinding(session, branch, "default-coordinateReport", child.frameId()), () -> {
+                    forwardingPlan(handle, child, "child-plan", "default-coordinateReport", "default-finishReport", "PENDING", "PENDING");
+                    forwardingPlan(handle, child, "child-plan", "default-coordinateReport", "default-finishReport", "IN_PROGRESS", "PENDING");
+                    ExecutionFrame producer = frame("producer-tool", child.frameId(), TraceFrameType.TOOL_INVOCATION, "default-finishReport");
                     appendFrame(handle, TraceRecordType.FRAME_OPENED, producer, CLOCK.instant()); branch.push(producer);
-                    ToolTraceContext producerContext = new ToolTraceContext("finishReport", "finish-task", false);
+                    ToolTraceContext producerContext = new ToolTraceContext("default-finishReport", "finish-task", false);
                     recorder.recordToolStarted(session, producer, producerContext, ordered("arguments", ordered()));
                     recorder.recordToolCompleted(session, producer, producerContext, ordered("result", "  \u5b8c\u6574 report\n"));
                     appendFrame(handle, TraceRecordType.FRAME_CLOSED, producer, CLOCK.instant()); branch.close(producer);
-                    forwardingPlan(handle, child, "child-plan", "coordinateReport", "finishReport", "COMPLETED", "PENDING");
-                    executeLaterForwardingWork(session, handle, branch, recorder, child, "child-plan", "coordinateReport", "finishReport", "child-later");
-                    recorder.recordResultForwarded(session, "coordinateReport", "child-plan", "finish-task", "finishReport");
+                    forwardingPlan(handle, child, "child-plan", "default-coordinateReport", "default-finishReport", "COMPLETED", "PENDING");
+                    executeLaterForwardingWork(session, handle, branch, recorder, child, "child-plan", "default-coordinateReport", "default-finishReport", "child-later");
+                    recorder.recordResultForwarded(session, "default-coordinateReport", "child-plan", "finish-task", "default-finishReport");
                     return null;
                 });
                 appendFrame(handle, TraceRecordType.FRAME_CLOSED, child, CLOCK.instant()); branch.close(child);
             }
             recorder.recordToolCompleted(session, selected, selectedContext, ordered("result", "  \u5b8c\u6574 report\n"));
             appendFrame(handle, TraceRecordType.FRAME_CLOSED, selected, CLOCK.instant()); branch.close(selected);
-            forwardingPlan(handle, root, "report-plan", "prepareReport", selected.route(), "COMPLETED", "PENDING");
-            executeLaterForwardingWork(session, handle, branch, recorder, root, "report-plan", "prepareReport", selected.route(), "root-later");
+            forwardingPlan(handle, root, "report-plan", "default-prepareReport", selected.route(), "COMPLETED", "PENDING");
+            executeLaterForwardingWork(session, handle, branch, recorder, root, "report-plan", "default-prepareReport", selected.route(), "root-later");
             if (assembly) {
-                ExecutionFrame contribution = frame("assembly-model", root.frameId(), TraceFrameType.MODEL_CALL, "prepareReport#model");
+                ExecutionFrame contribution = frame("assembly-model", root.frameId(), TraceFrameType.MODEL_CALL, "default-prepareReport#model");
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, contribution, CLOCK.instant());
                 handle.append(TraceRecordType.MODEL_REQUEST_SENT, contribution, TraceFrameType.MODEL_CALL,
                         attempt("retry-assembly", "attempt-assembly", 1, Map.of()), Map.of("messages", List.of("Generate summary only; report is framework-owned")));
@@ -1682,10 +1702,10 @@ class ConsoleTraceFixtureCorpusTest
                         attempt("retry-assembly", "attempt-assembly", 1, Map.of("usage", usage(Usage.ZERO, "EXACT"))), Map.of("content", "{\"summary\":\"Original model wording\"}"));
                 appendFrame(handle, TraceRecordType.FRAME_CLOSED, contribution, CLOCK.instant());
             }
-            if (assembly) recorder.recordResultAssembled(session, "prepareReport", "report-plan", true,
+            if (assembly) recorder.recordResultAssembled(session, "default-prepareReport", "report-plan", true,
                     List.of(ordered("destination", "/report", "sourceKind", "child_result", "sourcePath", "", "parentMissionFrameId", root.frameId(), "sourceTaskId", "finish-task", "sourceSkill", selected.route())),
                     "{\"report\":\"  \u5b8c\u6574 report\\n\",\"summary\":\"Original model wording\"}");
-            else recorder.recordResultForwarded(session, "prepareReport", "report-plan", "finish-task", selected.route());
+            else recorder.recordResultForwarded(session, "default-prepareReport", "report-plan", "finish-task", selected.route());
             return null;
         });
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, root, CLOCK.instant()); branch.close(root);
@@ -1696,9 +1716,9 @@ class ConsoleTraceFixtureCorpusTest
             String plan, String parent, String selected, String frameId) throws IOException
     {
         forwardingPlan(handle, owner, plan, parent, selected, "COMPLETED", "IN_PROGRESS");
-        ExecutionFrame later = frame(frameId, owner.frameId(), TraceFrameType.TOOL_INVOCATION, "laterWork");
+        ExecutionFrame later = frame(frameId, owner.frameId(), TraceFrameType.TOOL_INVOCATION, "default-laterWork");
         appendFrame(handle, TraceRecordType.FRAME_OPENED, later, CLOCK.instant()); branch.push(later);
-        ToolTraceContext context = new ToolTraceContext("laterWork", "later-task", false);
+        ToolTraceContext context = new ToolTraceContext("default-laterWork", "later-task", false);
         recorder.recordToolStarted(session, later, context, ordered("arguments", ordered()));
         recorder.recordToolCompleted(session, later, context, ordered("result", "later complete"));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, later, CLOCK.instant()); branch.close(later);
@@ -1711,7 +1731,7 @@ class ConsoleTraceFixtureCorpusTest
         List<Map<String, Object>> tasks = new ArrayList<>();
         for (int index = 0; index < 2; index++) tasks.add(ordered("taskId", index == 0 ? "finish-task" : "later-task",
                 "title", index == 0 ? "Produce complete report" : "Finish later work", "status", index == 0 ? selectedStatus : laterStatus,
-                "capabilityName", index == 0 ? selected : "laterWork", "intent", "Complete accepted work", "dependsOn", List.of(),
+                "capabilityName", index == 0 ? selected : "default-laterWork", "intent", "Complete accepted work", "dependsOn", List.of(),
                 "expectedOutputs", List.of(), "parallelGroup", null, "note", null));
         Map<String, Object> snapshot = ordered("planId", plan, "capabilityName", parent, "createdAt", CLOCK.instant().toString(),
                 "status", "VALID", "tasks", tasks);
@@ -1737,15 +1757,15 @@ class ConsoleTraceFixtureCorpusTest
             boolean fail) throws IOException
     {
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
-        ExecutionBinding binding = fixtureBinding(session, branch, "handleBilling", "root");
+        ExecutionBinding binding = fixtureBinding(session, branch, "default-handleBilling", "root");
         try
         {
             return ExecutionBindingScope.callWith(binding, () ->
             {
         String name = fail ? "unplanned-tool-failure" : "planned-tool-success";
-        ExecutionFrame root = frame("root", null, TraceFrameType.ROOT_MISSION, "handleBilling");
-        ExecutionFrame step = frame("step", "root", TraceFrameType.STEP_EXECUTION, "handleBilling#step-1");
-        ExecutionFrame tool = frame("tool", "step", TraceFrameType.TOOL_INVOCATION, "lookupCustomer");
+        ExecutionFrame root = frame("root", null, TraceFrameType.ROOT_MISSION, "default-handleBilling");
+        ExecutionFrame step = frame("step", "root", TraceFrameType.STEP_EXECUTION, "default-handleBilling#step-1");
+        ExecutionFrame tool = frame("tool", "step", TraceFrameType.TOOL_INVOCATION, "default-lookupCustomer");
         appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant());
         branch.push(root);
         appendFrame(handle, TraceRecordType.FRAME_OPENED, step, CLOCK.instant().plusSeconds(1));
@@ -1753,7 +1773,7 @@ class ConsoleTraceFixtureCorpusTest
         if (!fail)
         {
             Map<String, Object> dispatch = ordered("stepNumber", 1, "readyTasks", 1,
-                    "assignedTaskId", "task-lookup", "capabilityName", "lookupCustomer",
+                    "assignedTaskId", "task-lookup", "capabilityName", "default-lookupCustomer",
                     "dispatchOrigin", "framework", "dispatchReason", "eligible");
             handle.append(TraceRecordType.STEP_STARTED, step, TraceFrameType.STEP_EXECUTION, dispatch, ordered("planStatus", "VALID"));
             Map<String, Object> validated = new LinkedHashMap<>(dispatch);
@@ -1766,7 +1786,7 @@ class ConsoleTraceFixtureCorpusTest
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK);
         TaskExecutionEvent event = new TaskExecutionEvent(
                 "event-" + name,
-                "lookupCustomer",
+                "default-lookupCustomer",
                 fail ? null : "task-lookup",
                 ordered("arguments", ordered("customerId", "CUST-1001")),
                 fail ? "No unique ready task matched this tool call" : null);
@@ -1774,11 +1794,11 @@ class ConsoleTraceFixtureCorpusTest
         {
             stateService.logUnplannedToolCall(session, event);
             IllegalStateException failure = fixtureFailure("customer lookup failed");
-            stateService.logToolFailure(session, new ToolTraceContext("lookupCustomer", null, true), ordered(
+            stateService.logToolFailure(session, new ToolTraceContext("default-lookupCustomer", null, true), ordered(
                     "arguments", ordered("customerId", "CUST-1001"),
                     "failure", ordered("message", failure.getMessage())));
             String failureId = stateService.recordFailure(session, failure, ordered(
-                    "tool", "lookupCustomer",
+                    "tool", "default-lookupCustomer",
                     "message", failure.getMessage()));
             closeFixtureToolFrames(branch, handle, root, step, tool);
             return failureId;
@@ -1787,7 +1807,7 @@ class ConsoleTraceFixtureCorpusTest
         stateService.logToolCall(session, event);
         stateService.logToolResult(session, new TaskExecutionEvent(
                 "event-" + name,
-                "lookupCustomer",
+                "default-lookupCustomer",
                 "task-lookup",
                 ordered("result", "customer-active"),
                 null));
@@ -1845,8 +1865,8 @@ class ConsoleTraceFixtureCorpusTest
             boolean aborted) throws IOException
     {
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
-        ExecutionBinding binding = fixtureBinding(session, branch, "root.skill", "root");
-        ExecutionFrame rootFrame = frame("root", null, TraceFrameType.ROOT_MISSION, "root.skill");
+        ExecutionBinding binding = fixtureBinding(session, branch, "default-root_skill", "root");
+        ExecutionFrame rootFrame = frame("root", null, TraceFrameType.ROOT_MISSION, "default-root_skill");
         appendFrame(handle, TraceRecordType.FRAME_OPENED, rootFrame, CLOCK.instant());
         branch.push(rootFrame);
 
@@ -1922,7 +1942,7 @@ class ConsoleTraceFixtureCorpusTest
     private static YamlSkillDefinition runtimeFixtureDefinition()
     {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("root.skill");
+        manifest.setName("root_skill");
         manifest.setDescription("Runtime terminal fixture");
         manifest.setModel("gpt-5");
         EffectiveSkillExecutionConfiguration configuration = new EffectiveSkillExecutionConfiguration(
@@ -2003,7 +2023,7 @@ class ConsoleTraceFixtureCorpusTest
             TraceFrameType frameType,
             String route)
     {
-        return new ExecutionFrame(frameId, parentFrameId, OperationType.SKILL, frameType, route, Map.of(), CLOCK.instant());
+        return new ExecutionFrame(frameId, parentFrameId, OperationType.SKILL, frameType, route, Map.of(), CLOCK.instant(), null, null);
     }
 
     private static void appendFrame(
@@ -2124,6 +2144,15 @@ class ConsoleTraceFixtureCorpusTest
         result.put("valid", true);
         result.put("traceId", "trace-" + name);
         result.put("sessionId", "session-" + name);
+        result.put("entrySkill", name.equals("namespace-captured-context") ? "orders-search" : name.equals("java-root-success") ? "default-javaLookup" : "default-test_entry");
+        result.put("generationId", "trace-" + name);
+        result.put("entryNamespace", "default");
+        result.put("namespaceGenerationIds", Map.of("default", "trace-" + name));
+        if (name.equals("namespace-captured-context")) {
+            result.put("generationId", "orders-old");
+            result.put("entryNamespace", "orders");
+            result.put("namespaceGenerationIds", ordered("audit", "audit-unexecuted", "orders", "orders-old", "tax", "tax-retired"));
+        }
         result.put("outcome", outcome);
         result.put("terminalFailureId", terminalFailureId);
         if (name.equals("single-attempt-success"))
@@ -2142,16 +2171,16 @@ class ConsoleTraceFixtureCorpusTest
         result.put("usageComplete", usageComplete(name));
         if (name.endsWith("forwarded-child-result")) {
             List<Map<String, Object>> forwarding = new ArrayList<>();
-            if (name.startsWith("nested-")) forwarding.add(ordered("skillName", "coordinateReport", "planId", "child-plan", "linkedTaskId", "finish-task", "capabilityName", "finishReport"));
-            forwarding.add(ordered("skillName", "prepareReport", "planId", "report-plan", "linkedTaskId", "finish-task", "capabilityName", name.startsWith("nested-") ? "coordinateReport" : "finishReport"));
+            if (name.startsWith("nested-")) forwarding.add(ordered("skillName", "default-coordinateReport", "planId", "child-plan", "linkedTaskId", "finish-task", "capabilityName", "default-finishReport"));
+            forwarding.add(ordered("skillName", "default-prepareReport", "planId", "report-plan", "linkedTaskId", "finish-task", "capabilityName", name.startsWith("nested-") ? "default-coordinateReport" : "default-finishReport"));
             result.put("resultForwardings", forwarding);
         }
         if (name.equals("assembled-input-result")) result.put("resultAssemblies", List.of(ordered(
-                "skillName", "test.entry", "owningMissionFrameId", "assembly-root", "modelContributionRequired", false,
+                "skillName", "default-test_entry", "owningMissionFrameId", "assembly-root", "modelContributionRequired", false,
                 "outputBindings", List.of(ordered("destination", "/assessment", "sourceKind", "input", "sourcePath", "/assessment", "parentMissionFrameId", "assembly-root")))));
         if (name.equals("assembled-child-result")) result.put("resultAssemblies", List.of(ordered(
-                "skillName", "prepareReport", "owningMissionFrameId", "forward-root", "planId", "report-plan", "modelContributionRequired", true,
-                "outputBindings", List.of(ordered("destination", "/report", "sourceKind", "child_result", "sourcePath", "", "parentMissionFrameId", "forward-root", "sourceTaskId", "finish-task", "sourceSkill", "finishReport")))));
+                "skillName", "default-prepareReport", "owningMissionFrameId", "forward-root", "planId", "report-plan", "modelContributionRequired", true,
+                "outputBindings", List.of(ordered("destination", "/report", "sourceKind", "child_result", "sourcePath", "", "parentMissionFrameId", "forward-root", "sourceTaskId", "finish-task", "sourceSkill", "default-finishReport")))));
         result.put("attempts", expectedAttempts(name));
         result.put("retries", expectedRetries(name));
         result.put("validationLinks", expectedValidationLinks(name));
@@ -2424,19 +2453,19 @@ class ConsoleTraceFixtureCorpusTest
     private static List<Map<String, Object>> concurrentPrefixes()
     {
         Map<String, Object> root = branch(null, null, null, null, null,
-                path("concurrent-root", "ROOT_MISSION", "test.entry"));
+                path("concurrent-root", "ROOT_MISSION", "default-test_entry"));
         Map<String, Object> branchB = branch("concurrent-plan", "task-b", 5, "enabled", true,
-                path("concurrent-root", "ROOT_MISSION", "test.entry",
-                        "step-b", "STEP_EXECUTION", "worker.b",
-                        "nested-planning-b", "PLANNING", "worker.b#planning"));
+                path("concurrent-root", "ROOT_MISSION", "default-test_entry",
+                        "step-b", "STEP_EXECUTION", "default-worker_b",
+                        "nested-planning-b", "PLANNING", "default-worker_b#planning"));
         Map<String, Object> branchA = branch("concurrent-plan", "task-a", 4, "enabled", true,
-                path("concurrent-root", "ROOT_MISSION", "test.entry",
-                        "step-a", "STEP_EXECUTION", "worker.a",
-                        "model-a", "MODEL_CALL", "worker.a#model"));
+                path("concurrent-root", "ROOT_MISSION", "default-test_entry",
+                        "step-a", "STEP_EXECUTION", "default-worker_a",
+                        "model-a", "MODEL_CALL", "default-worker_a#model"));
         Map<String, Object> branchF = branch("concurrent-plan", "task-f", 3, null, false,
-                path("concurrent-root", "ROOT_MISSION", "test.entry",
-                        "step-f", "STEP_EXECUTION", "worker.f",
-                        "nested-planning-f", "PLANNING", "worker.f#planning"));
+                path("concurrent-root", "ROOT_MISSION", "default-test_entry",
+                        "step-f", "STEP_EXECUTION", "default-worker_f",
+                        "nested-planning-f", "PLANNING", "default-worker_f#planning"));
         return List.of(
                 ordered("sequence", 3, "branches", List.of(root)),
                 ordered("sequence", 7, "branches", List.of(root)),
@@ -2547,7 +2576,7 @@ class ConsoleTraceFixtureCorpusTest
                     "usage", Usage.ZERO.asMap(),
                     "usageComplete", false));
             case "missing-response-usage" -> List.of(expectedAttempt(name, "retry-1", "attempt-1", 1));
-            case "java-root-success", "assembled-input-result" -> List.of();
+            case "java-root-success", "namespace-captured-context", "assembled-input-result" -> List.of();
             case "nested-frame-usage" -> List.of(
                     expectedAttempt(name, "retry-framed", "attempt-framed", 1),
                     expectedAttempt(name, "retry-unframed", "attempt-unframed", 1));
@@ -2645,89 +2674,92 @@ class ConsoleTraceFixtureCorpusTest
         return switch (name)
         {
             case "assembled-child-result" -> List.of(
-                    expectedFrame("forward-root", null, "ROOT_MISSION", "prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("planning-report-plan", "forward-root", "PLANNING", "prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("selected-tool", "forward-root", "TOOL_INVOCATION", "finishReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("root-later", "forward-root", "TOOL_INVOCATION", "laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("assembly-model", "forward-root", "MODEL_CALL", "prepareReport#model", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("forward-root", null, "ROOT_MISSION", "default-prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("planning-report-plan", "forward-root", "PLANNING", "default-prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("selected-tool", "forward-root", "TOOL_INVOCATION", "default-finishReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("root-later", "forward-root", "TOOL_INVOCATION", "default-laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("assembly-model", "forward-root", "MODEL_CALL", "default-prepareReport#model", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "forwarded-child-result" -> List.of(
-                    expectedFrame("forward-root", null, "ROOT_MISSION", "prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("planning-report-plan", "forward-root", "PLANNING", "prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("selected-tool", "forward-root", "TOOL_INVOCATION", "finishReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("root-later", "forward-root", "TOOL_INVOCATION", "laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("forward-root", null, "ROOT_MISSION", "default-prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("planning-report-plan", "forward-root", "PLANNING", "default-prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("selected-tool", "forward-root", "TOOL_INVOCATION", "default-finishReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("root-later", "forward-root", "TOOL_INVOCATION", "default-laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "nested-forwarded-child-result" -> List.of(
-                    expectedFrame("forward-root", null, "ROOT_MISSION", "prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("planning-report-plan", "forward-root", "PLANNING", "prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("selected-tool", "forward-root", "TOOL_INVOCATION", "coordinateReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("forward-child", "selected-tool", "SKILL_EXECUTION", "coordinateReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("planning-child-plan", "forward-child", "PLANNING", "coordinateReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("producer-tool", "forward-child", "TOOL_INVOCATION", "finishReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("child-later", "forward-child", "TOOL_INVOCATION", "laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("root-later", "forward-root", "TOOL_INVOCATION", "laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
-            case "assembled-input-result" -> List.of(expectedFrame("assembly-root", null, "ROOT_MISSION", "test.entry", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("forward-root", null, "ROOT_MISSION", "default-prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("planning-report-plan", "forward-root", "PLANNING", "default-prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("selected-tool", "forward-root", "TOOL_INVOCATION", "default-coordinateReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("forward-child", "selected-tool", "SKILL_EXECUTION", "default-coordinateReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("planning-child-plan", "forward-child", "PLANNING", "default-coordinateReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("producer-tool", "forward-child", "TOOL_INVOCATION", "default-finishReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("child-later", "forward-child", "TOOL_INVOCATION", "default-laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("root-later", "forward-root", "TOOL_INVOCATION", "default-laterWork", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+            case "assembled-input-result" -> List.of(expectedFrame("assembly-root", null, "ROOT_MISSION", "default-test_entry", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+            case "namespace-captured-context" -> List.of(
+                    expectedFrame("namespace-root", null, "ROOT_MISSION", "orders-search", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("namespace-target", "namespace-root", "TOOL_INVOCATION", "tax-search", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "java-root-success" -> List.of(
-                    expectedFrame("java-root", null, "ROOT_MISSION", "javaLookup", 0, 0,
+                    expectedFrame("java-root", null, "ROOT_MISSION", "default-javaLookup", 0, 0,
                             Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "nested-frame-usage" -> List.of(
-                    expectedFrame("root", null, "ROOT_MISSION", "root.skill", 8000, 4000, Usage.ZERO, new Usage(4, 2), new Usage(4, 2)),
-                    expectedFrame("skill", "root", "SKILL_EXECUTION", "root.skill", 4000, 4000, new Usage(4, 2), Usage.ZERO, new Usage(4, 2)));
+                    expectedFrame("root", null, "ROOT_MISSION", "default-root_skill", 8000, 4000, Usage.ZERO, new Usage(4, 2), new Usage(4, 2)),
+                    expectedFrame("skill", "root", "SKILL_EXECUTION", "default-root_skill", 4000, 4000, new Usage(4, 2), Usage.ZERO, new Usage(4, 2)));
             case "runtime-terminal-failure", "runtime-terminal-abort" -> List.of(
-                    expectedFrame("root", null, "ROOT_MISSION", "root.skill", 3000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("model", "root", "MODEL_CALL", "root.skill#mission-model", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("root", null, "ROOT_MISSION", "default-root_skill", 3000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("model", "root", "MODEL_CALL", "default-root_skill#mission-model", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "recovered-provider-attempt-diagnostic" -> List.of(
-                    expectedFrame("root", null, "ROOT_MISSION", "recoverProviderCall", 5000, 2000,
+                    expectedFrame("root", null, "ROOT_MISSION", "default-recoverProviderCall", 5000, 2000,
                             Usage.ZERO, new Usage(4, 2), new Usage(4, 2)),
-                    expectedFrame("model", "root", "MODEL_CALL", "recoverProviderCall#model", 3000, 3000,
+                    expectedFrame("model", "root", "MODEL_CALL", "default-recoverProviderCall#model", 3000, 3000,
                             new Usage(4, 2), Usage.ZERO, new Usage(4, 2)));
             case "terminal-provider-failure-actionable" -> List.of(
-                    expectedFrame("root", null, "ROOT_MISSION", "diagnoseProvider", 3000, 2000,
+                    expectedFrame("root", null, "ROOT_MISSION", "default-diagnoseProvider", 3000, 2000,
                             Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("model", "root", "MODEL_CALL", "diagnoseProvider#model", 1000, 1000,
+                    expectedFrame("model", "root", "MODEL_CALL", "default-diagnoseProvider#model", 1000, 1000,
                             Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "timeout-step-failure" -> List.of(
-                    expectedFrame("root", null, "ROOT_MISSION", "handleIncident", 5000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("step", "root", "STEP_EXECUTION", "handleIncident#step-1", 3000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("model", "step", "MODEL_CALL", "handleIncident#step-model", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("root", null, "ROOT_MISSION", "default-handleIncident", 5000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("step", "root", "STEP_EXECUTION", "default-handleIncident#step-1", 3000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("model", "step", "MODEL_CALL", "default-handleIncident#step-model", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "repeated-skill-invocations" -> List.of(
-                    expectedFrame("root", null, "ROOT_MISSION", "root.skill", 7000, 3000, Usage.ZERO, new Usage(5, 3), new Usage(5, 3)),
-                    expectedFrame("skill-1", "root", "SKILL_EXECUTION", "root.skill", 2000, 2000, new Usage(2, 1), Usage.ZERO, new Usage(2, 1)),
-                    expectedFrame("skill-2", "root", "SKILL_EXECUTION", "root.skill", 2000, 2000, new Usage(3, 2), Usage.ZERO, new Usage(3, 2)));
+                    expectedFrame("root", null, "ROOT_MISSION", "default-root_skill", 7000, 3000, Usage.ZERO, new Usage(5, 3), new Usage(5, 3)),
+                    expectedFrame("skill-1", "root", "SKILL_EXECUTION", "default-root_skill", 2000, 2000, new Usage(2, 1), Usage.ZERO, new Usage(2, 1)),
+                    expectedFrame("skill-2", "root", "SKILL_EXECUTION", "default-root_skill", 2000, 2000, new Usage(3, 2), Usage.ZERO, new Usage(3, 2)));
             case "incomplete-frame-duration" -> List.of(
-                    expectedFrame("root", null, "ROOT_MISSION", "root.skill", 4000, null, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("incomplete", "root", "TOOL_INVOCATION", "root.tool", null, null, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("root", null, "ROOT_MISSION", "default-root_skill", 4000, null, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("incomplete", "root", "TOOL_INVOCATION", "default-root_tool", null, null, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "overlapping-frame-duration" -> List.of(
-                    expectedFrame("root", null, "ROOT_MISSION", "root.skill", 8000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("child-1", "root", "SKILL_EXECUTION", "root.first", 4000, 4000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("child-2", "root", "SKILL_EXECUTION", "root.second", 4000, 4000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("root", null, "ROOT_MISSION", "default-root_skill", 8000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("child-1", "root", "SKILL_EXECUTION", "default-root_first", 4000, 4000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("child-2", "root", "SKILL_EXECUTION", "default-root_second", 4000, 4000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "planned-tool-success", "unplanned-tool-failure" -> List.of(
-                    expectedFrame("root", null, "ROOT_MISSION", "handleBilling", 4000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("step", "root", "STEP_EXECUTION", "handleBilling#step-1", 2000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("tool", "step", "TOOL_INVOCATION", "lookupCustomer", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("root", null, "ROOT_MISSION", "default-handleBilling", 4000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("step", "root", "STEP_EXECUTION", "default-handleBilling#step-1", 2000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("tool", "step", "TOOL_INVOCATION", "default-lookupCustomer", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "current-plan-semantic-evidence" -> List.of(
-                    expectedFrame("mission-root", null, "ROOT_MISSION", "shared.skill", 10000, 3000, Usage.ZERO, new Usage(6, 3), new Usage(6, 3)),
-                    expectedFrame("planning-primary", "mission-root", "PLANNING", "shared.skill", 2000, 2000, new Usage(4, 2), Usage.ZERO, new Usage(4, 2)),
-                    expectedFrame("nested-skill", "mission-root", "SKILL_EXECUTION", "shared.skill", 4000, 0, Usage.ZERO, new Usage(2, 1), new Usage(2, 1)),
-                    expectedFrame("nested-mission", "nested-skill", "ROOT_MISSION", "shared.skill", 4000, 2000, Usage.ZERO, new Usage(2, 1), new Usage(2, 1)),
-                    expectedFrame("planning-nested", "nested-mission", "PLANNING", "shared.skill", 2000, 2000, new Usage(2, 1), Usage.ZERO, new Usage(2, 1)),
-                    expectedFrame("tool-current", "mission-root", "TOOL_INVOCATION", "lookupIncident", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("mission-root", null, "ROOT_MISSION", "default-shared_skill", 10000, 3000, Usage.ZERO, new Usage(6, 3), new Usage(6, 3)),
+                    expectedFrame("planning-primary", "mission-root", "PLANNING", "default-shared_skill", 2000, 2000, new Usage(4, 2), Usage.ZERO, new Usage(4, 2)),
+                    expectedFrame("nested-skill", "mission-root", "SKILL_EXECUTION", "default-shared_skill", 4000, 0, Usage.ZERO, new Usage(2, 1), new Usage(2, 1)),
+                    expectedFrame("nested-mission", "nested-skill", "ROOT_MISSION", "default-shared_skill", 4000, 2000, Usage.ZERO, new Usage(2, 1), new Usage(2, 1)),
+                    expectedFrame("planning-nested", "nested-mission", "PLANNING", "default-shared_skill", 2000, 2000, new Usage(2, 1), Usage.ZERO, new Usage(2, 1)),
+                    expectedFrame("tool-current", "mission-root", "TOOL_INVOCATION", "default-lookupIncident", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "canonical-concurrent-contract" -> List.of(
-                    expectedFrame("concurrent-root", null, "ROOT_MISSION", "test.entry", 18000, 5000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("concurrent-planning", "concurrent-root", "PLANNING", "test.entry#planning", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("step-d", "concurrent-root", "STEP_EXECUTION", "worker.d", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("step-e", "concurrent-root", "STEP_EXECUTION", "worker.e", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("step-f", "concurrent-root", "STEP_EXECUTION", "worker.f", 3000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("nested-planning-f", "step-f", "PLANNING", "worker.f#planning", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("step-b", "concurrent-root", "STEP_EXECUTION", "worker.b", 5000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("nested-planning-b", "step-b", "PLANNING", "worker.b#planning", 4000, 4000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("step-a", "concurrent-root", "STEP_EXECUTION", "worker.a", 5000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("model-a", "step-a", "MODEL_CALL", "worker.a#model", 4000, 4000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("concurrent-root", null, "ROOT_MISSION", "default-test_entry", 18000, 5000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("concurrent-planning", "concurrent-root", "PLANNING", "default-test_entry#planning", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("step-d", "concurrent-root", "STEP_EXECUTION", "default-worker_d", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("step-e", "concurrent-root", "STEP_EXECUTION", "default-worker_e", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("step-f", "concurrent-root", "STEP_EXECUTION", "default-worker_f", 3000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("nested-planning-f", "step-f", "PLANNING", "default-worker_f#planning", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("step-b", "concurrent-root", "STEP_EXECUTION", "default-worker_b", 5000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("nested-planning-b", "step-b", "PLANNING", "default-worker_b#planning", 4000, 4000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("step-a", "concurrent-root", "STEP_EXECUTION", "default-worker_a", 5000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("model-a", "step-a", "MODEL_CALL", "default-worker_a#model", 4000, 4000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "nested-assignment-shadowing" -> List.of(
-                    expectedFrame("shadow-root", null, "ROOT_MISSION", "outer.skill", 18000, 5000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("outer-planning", "shadow-root", "PLANNING", "outer.skill#planning", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("outer-step", "shadow-root", "STEP_EXECUTION", "outer.worker", 12000, 3000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("inner-planning", "outer-step", "PLANNING", "inner.skill#planning", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("inner-step", "outer-step", "STEP_EXECUTION", "inner.worker", 8000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
-                    expectedFrame("inner-model", "inner-step", "MODEL_CALL", "inner.worker#model", 6000, 6000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+                    expectedFrame("shadow-root", null, "ROOT_MISSION", "default-outer_skill", 18000, 5000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("outer-planning", "shadow-root", "PLANNING", "default-outer_skill#planning", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("outer-step", "shadow-root", "STEP_EXECUTION", "default-outer_worker", 12000, 3000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("inner-planning", "outer-step", "PLANNING", "default-inner_skill#planning", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("inner-step", "outer-step", "STEP_EXECUTION", "default-inner_worker", 8000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
+                    expectedFrame("inner-model", "inner-step", "MODEL_CALL", "default-inner_worker#model", 6000, 6000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             default -> List.of();
         };
     }
@@ -3301,7 +3333,7 @@ class ConsoleTraceFixtureCorpusTest
                     traceFrameType,
                     route,
                     parameters == null ? Map.of() : Map.copyOf(parameters),
-                    CLOCK.instant().plusSeconds(1));
+                    CLOCK.instant().plusSeconds(1), null, null);
             branch.push(frame);
             try
             {

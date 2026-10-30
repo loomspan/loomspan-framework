@@ -39,7 +39,7 @@ public class LiveActivityProjector
             TraceRecordType.TRACE_COMPLETED);
 
     private static final List<String> DETAIL_KEYS = List.of(
-            "skillName", "owningMissionFrameId", "modelContributionRequired", "segment", "retrySequenceId", "attemptId", "attemptNumber",
+            "skillName", "executingNamespace", "executingGenerationId", "owningMissionFrameId", "modelContributionRequired", "segment", "retrySequenceId", "attemptId", "attemptNumber",
             "capabilityName", "linkedTaskId", "unplanned", "planId", "stepNumber",
             "stepAction", "retry", "reason", "exhausted", "failureId", "classification",
             "exceptionType", "message", "outcome", "terminalFailureId", "providerAttemptNumber",
@@ -83,6 +83,19 @@ public class LiveActivityProjector
             if (!(generationId instanceof String id) || id.isBlank())
                 throw new IllegalArgumentException("TRACE_STARTED requires generationId");
             state.generationId = id;
+            Object namespace = record.metadata().get("entryNamespace");
+            Object mapping = record.metadata().get("namespaceGenerationIds");
+            if (!(namespace instanceof String owner) || !(mapping instanceof Map<?, ?> raw))
+                throw new IllegalArgumentException("TRACE_STARTED requires captured namespace metadata");
+            Map<String, String> ids = new java.util.TreeMap<>();
+            raw.forEach((key, value) -> {
+                if (!(key instanceof String name) || !(value instanceof String generation))
+                    throw new IllegalArgumentException("namespaceGenerationIds must contain strings");
+                ids.put(name, generation);
+            });
+            var captured = new ai.loomspan.internal.core.CapturedNamespaceMetadata(owner, id, ids);
+            state.entryNamespace = captured.entryNamespace();
+            state.namespaceGenerationIds = captured.namespaceGenerationIds();
         }
         if (type == TraceRecordType.FRAME_OPENED)
         {
@@ -204,6 +217,8 @@ public class LiveActivityProjector
                 record.timestamp(),
                 state.entrySkill,
                 state.generationId,
+                state.entryNamespace,
+                state.namespaceGenerationIds,
                 state.phase,
                 state.summary,
                 state.activeBranches(),

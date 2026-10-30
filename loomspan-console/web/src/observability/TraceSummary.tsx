@@ -20,8 +20,12 @@ export function TraceSummary({ trace, action }: { trace: Trace; action?: ReactNo
           <dd>{trace.entrySkill}</dd>
         </div>
         <div className="summary-fact identifier">
-          <dt>Generation</dt>
+          <dt>Entry generation</dt>
           <dd>{trace.generationId}</dd>
+        </div>
+        <div className="summary-fact identifier">
+          <dt>Captured generations</dt>
+          <dd>{Object.entries(trace.namespaceGenerationIds).map(([namespace, generation]) => `${namespace}: ${generation}`).join(", ")}</dd>
         </div>
         <div className="summary-fact identifier">
           <dt>Session</dt>

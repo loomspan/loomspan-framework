@@ -10,7 +10,7 @@ interface InternalExecutionTraceHandleFactory
     ExecutionTraceHandle create(
             String sessionId,
             String entrySkill,
-            String generationId,
+            CapturedNamespaceMetadata namespaceMetadata,
             TracePersistencePolicy persistencePolicy,
             Clock clock,
             ExecutionObservationHandle observationHandle);

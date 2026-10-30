@@ -3,7 +3,6 @@ package ai.loomspan.internal.observability.web;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.autoconfigure.ExecutionTraceProperties;
 import ai.loomspan.internal.observability.ObservabilityActivationCoordinator;
-import ai.loomspan.internal.skill.SkillGeneration;
 import ai.loomspan.internal.skill.SkillGenerationManager;
 import ai.loomspan.internal.runtime.observation.catalog.RegisteredSkillCatalog;
 import org.junit.jupiter.api.Test;
@@ -57,7 +56,7 @@ class ObservabilityRouteRegistrarTest
         configuration.setEnabled(true);
         configuration.getAuth().setApiKey("0123456789abcdef0123456789abcdef");
         SkillGenerationManager generations = mock(SkillGenerationManager.class);
-        when(generations.active("default")).thenThrow(new IllegalStateException("inspection projection failed"));
+        when(generations.registeredSkillCatalog()).thenThrow(new IllegalStateException("inspection projection failed"));
         var registrar = new ObservabilityRouteRegistrar(
                 null, null, null, new ObservabilityActivationCoordinator(),
                 properties, new ExecutionTraceProperties(), generations,
@@ -85,9 +84,7 @@ class ObservabilityRouteRegistrarTest
         properties.getObservability().getAuth()
                 .setApiKey("0123456789abcdef0123456789abcdef");
         SkillGenerationManager generations = mock(SkillGenerationManager.class);
-        SkillGeneration generation = mock(SkillGeneration.class);
-        when(generation.registeredSkillCatalog()).thenReturn(mock(RegisteredSkillCatalog.class));
-        when(generations.active("default")).thenReturn(generation);
+        when(generations.registeredSkillCatalog()).thenReturn(mock(RegisteredSkillCatalog.class));
         ObservabilityActivationCoordinator activation = new ObservabilityActivationCoordinator();
         ObservabilityRouteRegistrar registrar = new ObservabilityRouteRegistrar(
                 mappings,

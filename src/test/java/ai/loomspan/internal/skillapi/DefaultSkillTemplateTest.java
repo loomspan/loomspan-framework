@@ -237,7 +237,7 @@ class DefaultSkillTemplateTest {
     void preservesAccessDeniedExceptionInstance() {
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         DefaultSkillTemplate template = templateWithRegisteredSkill(router);
-        AccessDeniedException failure = new AccessDeniedException("denied");
+        AccessDeniedException failure = new AccessDeniedException("default-denied");
         when(router.execute(any(), any(), any(), eq(null))).thenThrow(failure);
 
         assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of("payload", "hello")))
@@ -310,7 +310,7 @@ class DefaultSkillTemplateTest {
                 "alice", "n/a", List.of(new SimpleGrantedAuthority("ROLE_ALLOWED"))));
 
         ai.loomspan.internal.core.LoomspanSession existingSession =
-                new ai.loomspan.internal.core.LoomspanSession(4, "existing");
+                ai.loomspan.internal.core.TestLoomspanSessions.create(4, "existing");
         ai.loomspan.internal.core.ExecutionBinding existingBinding =
                 ai.loomspan.internal.core.ExecutionBinding.sessionOnly(existingSession, ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()));
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(existingBinding, () -> {

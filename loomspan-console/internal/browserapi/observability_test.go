@@ -59,9 +59,9 @@ func (client *fixtureObservabilityClient) Get(_ context.Context, endpoint string
 	case strings.HasSuffix(endpoint, "/instance"):
 		body = `{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.9-SNAPSHOT","observedAt":"2026-07-27T00:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":1,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`
 	case strings.Contains(endpoint, "/skills/"):
-		body = `{"registeredName":"CheckDns","source": "YAML", "sourcePath":"classpath:/skills/check-dns.yaml","yaml":"name: CheckDns"}`
+		body = `{"registeredName":"default-CheckDns","source": "YAML", "sourcePath":"classpath:/skills/check-dns.yaml","yaml":"name: CheckDns"}`
 	case strings.Contains(endpoint, "/skills"):
-		body = `{"items":[{"registeredName":"CheckDns","source": "YAML", "sourcePath":"classpath:/skills/check-dns.yaml"}],"hasMore":false,"nextCursor":null,"observedAt":"2026-07-27T00:00:00Z"}`
+		body = `{"items":[{"registeredName":"default-CheckDns","source": "YAML", "sourcePath":"classpath:/skills/check-dns.yaml"}],"hasMore":false,"nextCursor":null,"observedAt":"2026-07-27T00:00:00Z"}`
 	case strings.Contains(endpoint, "/active-executions/"):
 		body = client.activeExecutionBody()
 	case strings.Contains(endpoint, "/active-executions"):
@@ -90,11 +90,11 @@ func (*fixtureObservabilityClient) OpenArtifact(context.Context, string, string,
 func (*fixtureObservabilityClient) Close() {}
 
 func activeExecutionFixture() string {
-	return `{"sessionId":"session-1","traceId":"trace-1","lastCanonicalSequence":7,"startedAt":"2026-07-27T00:00:00Z","updatedAt":"2026-07-27T00:00:01Z","elapsedMillis":1000,"entrySkill":"CheckDns","generationId":"generation-fixture","status":"ACTIVE","phase":"RUNNING","summary":"Checking DNS","activeBranches":[{"planId":"plan-1","taskId":"task-1","stepNumber":1,"parallelGroup":null,"effectiveConcurrency":false,"path":[{"frameId":"root","frameType":"ROOT_MISSION","route":"CheckDns"},{"frameId":"frame-1","frameType":"STEP_EXECUTION","route":"CheckDns#step-1"}]}],"usage":{"skillInvocations":1,"toolInvocations":0,"linterRetries":0,"modelCalls":1,"providerAttempts":1,"promptUnits":10,"completionUnits":5,"usageUnits":15,"exactModelResponses":1,"heuristicModelResponses":0,"unavailableModelResponses":0},"configuredLimits":{"maxSkillInvocations":64,"maxToolInvocations":128,"maxLinterRetries":32,"maxModelCalls":64,"maxProviderAttempts":192,"maxUsageUnits":200000}}`
+	return `{"sessionId":"session-1","traceId":"trace-1","lastCanonicalSequence":7,"startedAt":"2026-07-27T00:00:00Z","updatedAt":"2026-07-27T00:00:01Z","elapsedMillis":1000,"entrySkill":"default-CheckDns","generationId":"generation-fixture","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-fixture"},"status":"ACTIVE","phase":"RUNNING","summary":"Checking DNS","activeBranches":[{"planId":"plan-1","taskId":"task-1","stepNumber":1,"parallelGroup":null,"effectiveConcurrency":false,"path":[{"frameId":"root","frameType":"ROOT_MISSION","route":"default-CheckDns"},{"frameId":"frame-1","frameType":"STEP_EXECUTION","route":"CheckDns#step-1"}]}],"usage":{"skillInvocations":1,"toolInvocations":0,"linterRetries":0,"modelCalls":1,"providerAttempts":1,"promptUnits":10,"completionUnits":5,"usageUnits":15,"exactModelResponses":1,"heuristicModelResponses":0,"unavailableModelResponses":0},"configuredLimits":{"maxSkillInvocations":64,"maxToolInvocations":128,"maxLinterRetries":32,"maxModelCalls":64,"maxProviderAttempts":192,"maxUsageUnits":200000}}`
 }
 
 func traceFixture() string {
-	return `{"traceId":"trace-1","sessionId":"session-1","entrySkill":"CheckDns","generationId":"generation-fixture","outcome":"SUCCEEDED","finalizedAt":"2026-07-27T00:00:02Z","sizeBytes":100,"persistencePolicy":"PERSISTENT","applicationTraceExpiresAt":"2026-07-28T00:00:02Z"}`
+	return `{"traceId":"trace-1","sessionId":"session-1","entrySkill":"default-CheckDns","generationId":"generation-fixture","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-fixture"},"outcome":"SUCCEEDED","finalizedAt":"2026-07-27T00:00:02Z","sizeBytes":100,"persistencePolicy":"PERSISTENT","applicationTraceExpiresAt":"2026-07-28T00:00:02Z"}`
 }
 
 func TestObservabilityRoutesRequireSession(t *testing.T) {
@@ -302,8 +302,8 @@ func TestObservabilityRoutesReturnCanonicalDTOs(t *testing.T) {
 		want string
 	}{
 		{"/api/console/v1/observability/instance", `{}`, `"registeredSkillCount":1`},
-		{"/api/console/v1/skills/list", `{"cursor":"","pageSize":10}`, `"registeredName":"CheckDns"`},
-		{"/api/console/v1/skills/detail", `{"registeredName":"CheckDns"}`, `"yaml":"name: CheckDns"`},
+		{"/api/console/v1/skills/list", `{"cursor":"","pageSize":10}`, `"registeredName":"default-CheckDns"`},
+		{"/api/console/v1/skills/detail", `{"registeredName":"default-CheckDns"}`, `"yaml":"name: CheckDns"`},
 		{"/api/console/v1/active-executions/list", `{"cursor":"","pageSize":10}`, `"resumeCursor":"9"`},
 		{"/api/console/v1/active-executions/detail", `{"sessionId":"session-1"}`, `"frameId":"frame-1"`},
 		{"/api/console/v1/traces/list", `{"cursor":"","pageSize":10}`, `"traceId":"trace-1"`},
@@ -392,7 +392,7 @@ func TestTraceRoutesFallBackToInstalledAcquisitionFacts(t *testing.T) {
 	}
 	acquiredAt := time.Date(2026, 7, 27, 0, 0, 3, 0, time.UTC)
 	metadata := artifact.TraceMetadata{
-		TraceID: "trace-1", SessionID: "session-1", EntrySkill: "CheckDns", GenerationID: "generation-1", Outcome: "SUCCEEDED",
+		TraceID: "trace-1", SessionID: "session-1", EntrySkill: "default-CheckDns", GenerationID: "generation-1", EntryNamespace: "default", NamespaceGenerationIDs: map[string]string{"default": "generation-1"}, Outcome: "SUCCEEDED",
 		FinalizedAt: acquiredAt.Add(-time.Minute), SizeBytes: 100,
 		PersistencePolicy: "RETAINED", ApplicationTraceExpiresAt: acquiredAt.Add(time.Hour),
 	}
@@ -426,7 +426,7 @@ func TestTraceRoutesFallBackToInstalledAcquisitionFacts(t *testing.T) {
 		}
 		body := response.Body.String()
 		for _, want := range []string{
-			`"traceId":"trace-1"`, `"entrySkill":"CheckDns"`, `"generationId":"generation-1"`, `"localAvailable":true`,
+			`"traceId":"trace-1"`, `"entrySkill":"default-CheckDns"`, `"generationId":"generation-1","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-1"}`, `"localAvailable":true`,
 			`"applicationAvailability":"AVAILABLE"`, `"persistencePolicy":"RETAINED"`,
 		} {
 			if !strings.Contains(body, want) {

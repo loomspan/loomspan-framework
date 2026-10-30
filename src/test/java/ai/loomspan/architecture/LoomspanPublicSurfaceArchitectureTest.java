@@ -136,6 +136,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.core.ExecutionCoordinator", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.ExecutionBinding", "Public only for immutable execution identity collaboration between internal runtime packages."),
             Map.entry("ai.loomspan.internal.core.ExecutionBindingScope", "Public only for explicit scoped binding at internal runtime boundaries."),
+            Map.entry("ai.loomspan.internal.core.CapturedNamespaceMetadata", "Public only for primitive captured metadata collaboration between internal execution and trace packages."),
             Map.entry("ai.loomspan.internal.core.ExecutionFrame", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.ExecutionJournal", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.ExecutionPlan", "Public only for Java collaboration between distinct internal subsystem packages."),

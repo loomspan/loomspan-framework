@@ -39,7 +39,10 @@ Use execution traces to explain what Loomspan and the model provider did during 
 
 A complete raw trace may be saved and opened by Console when its framework-owned
 `TRACE_STARTED.metadata.consoleCompatibilityVersion` exactly matches Console.
-Matching `development` values are best-effort for the same checkout; they do not
+The marker is the exact release string from Maven `${project.version}` through
+filtered `META-INF/loomspan-release.properties`, without an independent protocol
+counter. A different resolved release is rejected without fallback or migration.
+Matching `development` values permit normal complete validation; they do not
 promise compatibility after canonical trace changes. Imported evidence is a
 transient process-local copy and is not adopted after restart. The marker is a
 reader-compatibility fact only: it does not authenticate the producer, verify
@@ -96,6 +99,26 @@ journal's established field-name redaction retain their usual policies.
 
 ## Trace identity
 
+Skill identities are full canonical `namespace-localName` strings, including
+`default-search`. Local-name case is preserved. Existing Console lookups,
+correlations and displays keep the whole identity; `a-search` and `b-search` name
+different skills. A model/planning operation route is still an operation, not a
+skill identity. Unknown-skill diagnostics retain null/unavailable context.
+
+`TRACE_STARTED.metadata` records `entryNamespace`, entry-scoped `generationId`
+and `namespaceGenerationIds`, the admission snapshot's complete reachable namespace
+to generation-ID association. Existing active/finalized/acquired/imported trace
+metadata carries the same captured facts. Console acquisition/import obtains them
+from validated canonical bytes. They remain accurate after replacement, removal
+or recreation; the current registry is not evidence for an old execution. Known
+record owner facts use `executingNamespace`/`executingGenerationId` where applicable.
+The entry ID can differ from a captured REST target's ID.
+
+Cross-namespace execution keeps one session/trace/sequence and observer flow.
+Public skill-call visibility grants no observation/configuration access; existing
+observation authorization and retention still apply. Host inspection metadata is
+unfiltered, while runtime discovery remains execution-permission filtered.
+
 ### Assigned dispatch observations
 
 STEP_STARTED records the accepted `assignedTaskId`, `capabilityName`,
@@ -121,7 +144,7 @@ and Console `TraceRecords.step.test.tsx` / `TraceRecords.stepAction.test.tsx`.
 
 `entrySkill` is the exact registered name of the top-level Java, REST, TypeSafe, or model-backed YAML skill whose invocation owns the session. Loomspan records it before execution begins, keeps it unchanged across nested skill invocations, and exposes it in Trace Catalog and Trace Detail without requiring artifact acquisition. It is a recorded fact: it does not prove that the skill is still registered or that it is more important than nested work.
 
-`TRACE_STARTED.metadata.generationId` records the complete skill and execution-configuration generation captured by the root. Live execution and finalized trace diagnostics carry the same process-local ID, including when old work finishes after a newer publication. Its trace persistence and run-start limit snapshot come from that captured generation. Use the ID to distinguish which complete version a current execution used, not as a durable content hash, chronological ordering, or historical catalog key. See [the application reload contract](../java-api/skill-reload.md).
+`TRACE_STARTED.metadata.generationId` records the entry namespace's skill and execution-configuration generation captured by the root, not a target namespace generation. Live execution and finalized trace diagnostics carry the same process-local ID, including when old work finishes after a newer publication. Its trace persistence and run-start limit snapshot come from that captured generation. Use the ID to distinguish which complete version a current execution used, not as a durable content hash, chronological ordering, or historical catalog key. See [the application reload contract](../java-api/skill-reload.md).
 
 ## Live review and purpose
 

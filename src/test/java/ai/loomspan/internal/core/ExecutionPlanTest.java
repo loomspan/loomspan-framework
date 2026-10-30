@@ -16,7 +16,7 @@ class ExecutionPlanTest {
     void storesImmutableOrderedTasks() {
         ExecutionPlan plan = new ExecutionPlan(
                 "plan-1",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(
                         new PlanTask("task-1", "Plan", PlanTaskStatus.PENDING, null),
@@ -31,7 +31,7 @@ class ExecutionPlanTest {
     void updatesOnlyMatchingTask() {
         ExecutionPlan plan = new ExecutionPlan(
                 "plan-1",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(
                         new PlanTask("task-1", "Plan", PlanTaskStatus.PENDING, null),
@@ -49,7 +49,7 @@ class ExecutionPlanTest {
     void allImmutablePlanCopiesPreservePlanId() {
         ExecutionPlan plan = new ExecutionPlan(
                 "framework-plan-id",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(
                         new PlanTask("task-1", "Plan", PlanTaskStatus.PENDING, null),

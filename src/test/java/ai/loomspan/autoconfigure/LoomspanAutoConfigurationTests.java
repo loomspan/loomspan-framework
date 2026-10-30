@@ -159,7 +159,7 @@ class LoomspanAutoConfigurationTests {
                     assertThat(context).hasSingleBean(SkillInputContractResolver.class);
                     assertThat(context).hasSingleBean(SkillInputValidator.class);
                     assertThat(context).hasSingleBean(SkillTemplate.class);
-                    assertThat(context).hasSingleBean(SkillCatalog.class);
+                    assertThat(context).hasSingleBean(ai.loomspan.api.SkillReloader.class);
                     assertThat(context).hasSingleBean(SkillRoleEvaluator.class);
                     assertThat(context.getBean(LoomspanProperties.class).getSession().getMaxDepth()).isEqualTo(5);
                 });
@@ -267,10 +267,10 @@ class LoomspanAutoConfigurationTests {
                     assertThat(context.getBeansOfType(ChatModel.class)).isEmpty();
 
                     CapabilityMetadata metadata = context.getBean(SkillGenerationManager.class)
-                            .active("default").capability("deterministicTarget");
+                            .active("default").capability("default-deterministicTarget");
                     assertThat(metadata.skillExecution().configured()).isFalse();
                     assertThat(context.getBean(SkillTemplate.class)
-                            .invoke("deterministicTarget", Map.of("input", "alpha")))
+                            .invoke("default-deterministicTarget", Map.of("input", "alpha")))
                             .isEqualTo("\"mapped:alpha\"");
                 });
     }
@@ -371,7 +371,7 @@ class LoomspanAutoConfigurationTests {
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/default-thinking-skill.yaml")
                 .run(context -> {
                     SkillGenerationManager generations = context.getBean(SkillGenerationManager.class);
-                    CapabilityMetadata metadata = generations.active("default").capability("thinkingDefaultSkill");
+                    CapabilityMetadata metadata = generations.active("default").capability("default-thinkingDefaultSkill");
 
                     assertThat(metadata).isNotNull();
                     assertThat(metadata.skillExecution().configured()).isTrue();
@@ -389,7 +389,7 @@ class LoomspanAutoConfigurationTests {
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/none/*.yaml")
                 .run(context -> {
                     SkillGenerationManager generations = context.getBean(SkillGenerationManager.class);
-                    assertThat(generations.active("default").capability("deterministicTarget")).isNotNull();
+                    assertThat(generations.active("default").capability("default-deterministicTarget")).isNotNull();
                     assertThat(generations.active("default").capability("targetBean#deterministicTarget")).isNull();
                 });
     }

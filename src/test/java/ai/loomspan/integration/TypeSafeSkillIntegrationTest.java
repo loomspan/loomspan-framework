@@ -87,7 +87,7 @@ class TypeSafeSkillIntegrationTest {
     }
 
     private String invoke(SkillTemplate template, Map<String, Object> input) {
-        return template.invoke("judgment", input, view -> sessionIds.add(view.sessionId()));
+        return template.invoke("default-judgment", input, view -> sessionIds.add(view.sessionId()));
     }
 
     private List<JsonNode> traces(org.springframework.context.ApplicationContext context)
@@ -325,7 +325,7 @@ class TypeSafeSkillIntegrationTest {
                                 assertThat(context).hasNotFailed();
                                 assertThat(
                                                 context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default")
-                                                        .skill("judgment")
+                                                        .skill("default-judgment")
                                                         .orElseThrow()
                                                         .kind())
                                         .isEqualTo(SkillKind.TYPESAFE);
@@ -333,7 +333,7 @@ class TypeSafeSkillIntegrationTest {
                                         context.getBean(SkillGenerationManager.class)
                                                 .active("default")
                                                 .registeredSkillCatalog()
-                                                .find("judgment")
+                                                .find("default-judgment")
                                                 .orElseThrow();
                                 assertThat(entry.source()).isEqualTo("TYPESAFE");
                                 assertThat(entry.yaml()).isEqualTo(leaf());
@@ -343,7 +343,7 @@ class TypeSafeSkillIntegrationTest {
                                 assertThat(entry.outputSchema())
                                         .isEqualTo(
                                                 context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default")
-                                                        .skill("judgment")
+                                                        .skill("default-judgment")
                                                         .orElseThrow()
                                                         .outputSchema());
                                 String result =
@@ -618,7 +618,7 @@ class TypeSafeSkillIntegrationTest {
                                 var template = context.getBean(SkillTemplate.class);
                                 var oldSchema =
                                         context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default")
-                                                .skill("judgment")
+                                                .skill("default-judgment")
                                                 .orElseThrow()
                                                 .outputSchema();
                                 var oldGeneration = context.getBean(SkillGenerationManager.class).active("default");
@@ -647,7 +647,7 @@ class TypeSafeSkillIntegrationTest {
                                                 context.getBean(SkillGenerationManager.class)
                                                         .active("default")
                                                         .registeredSkillCatalog()
-                                                        .find("judgment")
+                                                        .find("default-judgment")
                                                         .orElseThrow();
                                         assertThat(supplied.source()).isEqualTo("TYPESAFE");
                                         assertThat(supplied.sourcePath())
@@ -691,7 +691,7 @@ class TypeSafeSkillIntegrationTest {
                                             .isEqualTo("B");
                                     assertThat(
                                                     context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default")
-                                                            .skill("judgment")
+                                                            .skill("default-judgment")
                                                             .orElseThrow()
                                                             .outputSchema())
                                             .isEqualTo(oldSchema);
@@ -775,7 +775,7 @@ class TypeSafeSkillIntegrationTest {
                                 Map<String, Object> task = new LinkedHashMap<>();
                                 task.put("taskId", child);
                                 task.put("title", "Assess contact");
-                                task.put("capabilityName", child);
+                                task.put("capabilityName", "default-" + child);
                                 task.put("intent", "Assess contact");
                                 task.put("status", "PENDING");
                                 task.put("dependsOn", List.of());
@@ -786,7 +786,7 @@ class TypeSafeSkillIntegrationTest {
                                         JSON.writeValueAsString(
                                                 Map.of(
                                                         "capabilityName",
-                                                        assembly ? "summarizeContact" : "assessReportedContact",
+                                                        assembly ? "default-summarizeContact" : "default-assessReportedContact",
                                                         "createdAt",
                                                         "2026-10-10T00:00:00Z",
                                                         "status",
@@ -869,12 +869,12 @@ class TypeSafeSkillIntegrationTest {
                                                         new SkillDocument("published binding parent", blocks.get(5))), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class))));
                                 var template = context.getBean(SkillTemplate.class);
                                 String generation = reloader.snapshot("default").generationId();
-                                assertThat(template.invoke("assessContact", documentedInput, v -> sessionIds.add(v.sessionId())))
+                                assertThat(template.invoke("default-assessContact", documentedInput, v -> sessionIds.add(v.sessionId())))
                                         .isEqualTo(retained);
                                 AtomicReference<SkillExecutionView> view = new AtomicReference<>();
                                 assertThat(
                                                 template.invoke(
-                                                        "assessReportedContact",
+                                                        "default-assessReportedContact",
                                                         documentedInput,
                                                         v -> { view.set(v); sessionIds.add(v.sessionId()); }))
                                         .isEqualTo(retained);
@@ -895,7 +895,7 @@ class TypeSafeSkillIntegrationTest {
                                     assertThat(request.at("/data/request/state")).isEqualTo(JSON.valueToTree(documentedInput.get("context")));
                                     assertThat(records(trace, "FRAME_OPENED")).anySatisfy(frame -> {
                                         assertThat(frame.path("frameId")).isEqualTo(request.path("frameId"));
-                                        assertThat(frame.path("route").asText()).isEqualTo("assessContact");
+                                        assertThat(frame.path("route").asText()).isEqualTo("default-assessContact");
                                     });
                                     var response = records(trace, "MODEL_RESPONSE_RECEIVED").stream().filter(record -> record.path("frameId").equals(request.path("frameId"))).toList();
                                     assertThat(response).hasSize(1);
@@ -906,17 +906,17 @@ class TypeSafeSkillIntegrationTest {
                                 }
                                 assertThat(
                                                 reloader.snapshot("default")
-                                                        .skill("assessReportedContact")
+                                                        .skill("default-assessReportedContact")
                                                         .orElseThrow()
                                                         .outputSchema())
                                         .isEqualTo(
                                                 reloader.snapshot("default")
-                                                        .skill("assessContact")
+                                                        .skill("default-assessContact")
                                                         .orElseThrow()
                                                         .outputSchema());
                                 Map<String, Object> fixedInput = Map.of("context", documentedInput.get("context"));
-                                assertThat(template.invoke("assessFixedContact", fixedInput)).isEqualTo(retained);
-                                assertThat(JSON.readTree(template.invoke("summarizeContact", fixedInput)))
+                                assertThat(template.invoke("default-assessFixedContact", fixedInput)).isEqualTo(retained);
+                                assertThat(JSON.readTree(template.invoke("default-summarizeContact", fixedInput)))
                                         .isEqualTo(JSON.valueToTree(Map.of(
                                                 "department", "technical",
                                                 "repeatProbability", 0.9,
@@ -1009,7 +1009,7 @@ typesafe:
                             context -> {
                                 assertThat(context).hasNotFailed();
                                 var catalog = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
-                                var schema = catalog.skill("judgment").orElseThrow().outputSchema();
+                                var schema = catalog.skill("default-judgment").orElseThrow().outputSchema();
                                 var template = context.getBean(SkillTemplate.class);
                                 try (var threads = Executors.newFixedThreadPool(2)) {
                                     var first = threads.submit(() -> invoke(template, firstInput));
@@ -1018,7 +1018,7 @@ typesafe:
                                     try {
                                         assertThat(arrived.await(5, TimeUnit.SECONDS)).isTrue();
                                         assertThat(
-                                                        catalog.skill("judgment")
+                                                        catalog.skill("default-judgment")
                                                                 .orElseThrow()
                                                                 .outputSchema())
                                                 .isEqualTo(schema);
@@ -1052,7 +1052,7 @@ typesafe:
                                 } finally {
                                     release.countDown();
                                 }
-                                assertThat(catalog.skill("judgment").orElseThrow().outputSchema())
+                                assertThat(catalog.skill("default-judgment").orElseThrow().outputSchema())
                                         .isEqualTo(schema);
                             });
             assertThat(failure.get()).isNull();
@@ -1090,12 +1090,12 @@ input_schema:
   required: [payload]
   additionalProperties: false
 allowed_skills:
-  - name: judgment
+  - name: default-judgment
     required: true
     max_tasks: 1
     input_bindings:
       /count: {from: input, path: /payload/count}
-output_from: {skill: judgment}
+output_from: {skill: default-judgment}
 """;
         List<JsonNode> nativeRequests = new CopyOnWriteArrayList<>();
         AtomicReference<Throwable> failure = new AtomicReference<>();
@@ -1113,7 +1113,7 @@ output_from: {skill: judgment}
                                 Map<String, Object> task = new LinkedHashMap<>();
                                 task.put("taskId", "judge");
                                 task.put("title", "Judge value");
-                                task.put("capabilityName", "judgment");
+                                task.put("capabilityName", "default-judgment");
                                 task.put("intent", "Judge value");
                                 task.put("status", "PENDING");
                                 task.put("dependsOn", List.of());
@@ -1124,7 +1124,7 @@ output_from: {skill: judgment}
                                         JSON.writeValueAsString(
                                                 Map.of(
                                                         "capabilityName",
-                                                        "boundJudgment",
+                                                        "default-boundJudgment",
                                                         "createdAt",
                                                         "2026-10-10T00:00:00Z",
                                                         "status",
@@ -1188,7 +1188,7 @@ output_from: {skill: judgment}
                                 assertThat(invoke(template, Map.of("count", "3"))).isEqualTo("{}");
                                 assertThat(
                                                 template.invoke(
-                                                        "boundJudgment",
+                                                        "default-boundJudgment",
                                                         Map.of("payload", Map.of("count", 3)),
                                                         view -> sessionIds.add(view.sessionId())))
                                         .isEqualTo("{}");
@@ -1204,7 +1204,7 @@ output_from: {skill: judgment}
                                 assertThatThrownBy(
                                                 () ->
                                                         template.invoke(
-                                                                "boundJudgment",
+                                                                "default-boundJudgment",
                                                                 Map.of(
                                                                         "payload",
                                                                         Map.of("count", "3")),
@@ -1252,16 +1252,16 @@ output_from: {skill: judgment}
                 max_steps: 1
                 input_schema: {type: object, additionalProperties: true}
                 allowed_skills:
-                  - name: judgment
+                  - name: default-judgment
                     required: true
                     max_tasks: 1
                     input_bindings:
                       /candidates: {from: input, path: /candidates}
-                output_from: {skill: judgment}
+                output_from: {skill: default-judgment}
                 """;
         try (var server = new MockWebServer()) {
-            var task = Map.of("taskId", "judge", "title", "Judge", "capabilityName", "judgment", "intent", "Judge", "status", "PENDING", "dependsOn", List.of(), "expectedOutputs", List.of("result"));
-            String plan = JSON.writeValueAsString(Map.of("capabilityName", "parent", "createdAt", "2026-10-11T00:00:00Z", "status", "VALID", "tasks", List.of(task)));
+            var task = Map.of("taskId", "judge", "title", "Judge", "capabilityName", "default-judgment", "intent", "Judge", "status", "PENDING", "dependsOn", List.of(), "expectedOutputs", List.of("result"));
+            String plan = JSON.writeValueAsString(Map.of("capabilityName", "default-parent", "createdAt", "2026-10-11T00:00:00Z", "status", "VALID", "tasks", List.of(task)));
             server.enqueue(success(JSON.writeValueAsString(Map.of("id", "fixture", "object", "chat.completion", "created", 1, "model", "planner", "choices", List.of(
                     Map.of("index", 0, "message", Map.of("role", "assistant", "content", plan), "finish_reason", "stop")), "usage", Map.of("prompt_tokens", 1, "completion_tokens", 1, "total_tokens", 2)))));
             runner(server, "/", document).withPropertyValues(
@@ -1273,7 +1273,7 @@ output_from: {skill: judgment}
                         assertThat(context).hasNotFailed();
                         var reloader = context.getBean(SkillReloader.class);
                         reloader.publish(reloader.prepare("default", List.of(new SkillDocument("leaf", document), new SkillDocument("parent", parent)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class))));
-                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("parent", Map.of("candidates", Map.of("A", "first")), v -> sessionIds.add(v.sessionId())))
+                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default-parent", Map.of("candidates", Map.of("A", "first")), v -> sessionIds.add(v.sessionId())))
                                 .isInstanceOf(SkillException.class)
                                 .hasStackTraceContaining(scenario.equals("budget") ? "MAX_PROVIDER_ATTEMPTS" : "judgment");
                         var trace = traces(context);

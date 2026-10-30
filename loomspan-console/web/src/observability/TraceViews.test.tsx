@@ -430,6 +430,7 @@ test("evidence detail labels base64 without interpreting content", () => {
 
 test("usage compares only supported arithmetic facts and preserves zero and absent limit semantics", () => {
   const summary = {
+ entrySkill: "orders-search", generationId: "entry-generation", entryNamespace:"orders", namespaceGenerationIds:{orders:"entry-generation",tax:"old-target"},
     source: "TARGET" as const,
     targetScopeId: "scope-1",
     traceId: "trace-1",

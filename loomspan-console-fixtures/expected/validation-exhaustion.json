@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-validation-exhaustion",
   "sessionId" : "session-validation-exhaustion",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-validation-exhaustion",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-validation-exhaustion"
+  },
   "outcome" : "FAILED",
   "terminalFailureId" : "failure-validation",
   "attributedUsage" : {

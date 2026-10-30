@@ -157,7 +157,7 @@ Admission leases already constructed runtimes. It is not a transaction over exte
 systems. Each dispatch independently enforces the executing source's declared children,
 same-namespace or captured Public visibility, and target RBAC. Retaining a generation
 does not authorize its other skills. A Public child cannot call back into a Private
-entry namespace. Observation wire integration remains PR 27.5.
+entry namespace. Public skill-call visibility grants no configuration or observation access.
 
 Children execute with their captured target definitions, model/connection credentials,
 mission timeout and attachment limits. One session keeps the entry's quotas, depth and
@@ -207,10 +207,104 @@ Startup creates Private default and assigned Java namespaces with separate runti
 Fixed Java methods remain in every generation of their namespace and are immediately
 available for direct entry; removal preserves beans and retained work. Restart rebuilds
 Private startup state. Hosts authorize management/routing and own readiness/sequencing.
-These boundaries do not provide complete tenant isolation. See the
-[publication guide](agent-skills/loomspan-docs/references/java-api/skill-reload.md).
-Reachable admission and captured cross-namespace execution are implemented;
-serialized observation and Console integration continue in PR 27.5.
+Credentials, database permissions, mutable Java state and resource consumption
+still need host/application controls; namespaces do not establish complete tenant
+isolation. See the [publication guide](agent-skills/loomspan-docs/references/java-api/skill-reload.md).
+
+### Deployment patterns
+
+An embedded application can load `default-parent` at startup with an
+`allowed_skills` reference to its fixed `default-local` Java method. Both belong
+to the same Private namespace and can execute immediately, without publication.
+Foreign startup references cannot bypass Private visibility. For managed sharing,
+start without local skill or execution-configuration files, publish the fixed
+Java namespace as Public, then supply the caller's documents and configuration
+through `SkillReloader`. For example, given this method on an application bean:
+
+```java
+@SkillMethod(namespace = "utility", name = "echo", description = "Echo a value")
+public String echo(@SkillParam(description = "Value") String value) {
+    return value;
+}
+```
+
+The host can publish these complete managed generations with an injected
+`SkillReloader`; `providerKey` comes from its own credential source:
+
+```java
+try (PreparedSkillUpdate utility = reloader.prepare("utility", List.of(),
+        new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PUBLIC)) {
+    reloader.publish(utility); // Retains utility-echo from the application bean.
+}
+SkillDocument caller = new SkillDocument("assistant", """
+        name: assistant
+        description: Echo using the shared Java capability
+        model: assistant
+        allowed_skills: [{name: utility-echo}]
+        """);
+ExecutionConfiguration execution = new ExecutionConfiguration("""
+        loomspan:
+          connections:
+            chat:
+              driver: openai
+              base-url: https://api.openai.com
+              api-key-ref: provider-key
+          models:
+            assistant: {connection: chat, provider-model: gpt-4.1-mini}
+        """);
+try (PreparedSkillUpdate department = reloader.prepare("department", List.of(caller),
+        execution, Map.of("provider-key", providerKey))) {
+    reloader.publish(department);
+}
+// An injected SkillTemplate now admits department-assistant freshly on each call.
+```
+
+The model alias and provider model are illustrative host choices. A department's
+later complete publication automatically retains its own fixed Java methods;
+omitted supplied declarations disappear. Sharing requires explicit `PUBLIC` on
+every replacement. Restart returns to Private startup generations, without restored
+runtime publications, so the host repeats the managed sequence before accepting
+requests. `NamespaceStartupIntegrationTest` executes both embedded and file-free
+managed callers using a deterministic provider fixture and verifies restart,
+complete replacement, fixed methods, and removal/recreation.
+
+For a cyclic dependency, first publish a real valid Public `a` without its foreign
+edge, then valid Public `b -> a`, then replace Public `a` with `a -> b`. Every
+intermediate publication must be valid and callable; existing forwarding/schema
+cycle validation and recursion limits still apply. There is no atomic multi-namespace
+bootstrap. Removal or Public-to-Private replacement affects fresh admission while
+already admitted work retains its captured view. Dependent publications are not
+removed automatically, and withdrawal does not drain work. Hosts own management
+authorization, entry routing, readiness, external migration gates, drainage,
+version admission and repository integration. Loomspan prescribes no publisher
+role, namespace membership, reserved shared name, or app/environment mapping.
+
+### Captured execution diagnostics
+
+One invocation has one session, trace, canonical event sequence and completed
+observer flow across all namespaces. Existing Console skill displays, lookups,
+correlations and trace readers use complete qualified names, so `a-search` and
+`b-search` remain distinct. Host inspection includes Private and restricted skill
+metadata under existing observation authorization; runtime discovery remains
+execution-permission filtered.
+
+Trace start, live execution and finalized trace metadata retain `entryNamespace`
+and `namespaceGenerationIds`, the captured namespace-to-generation map. Session
+`generationId` always identifies the entry generation. A known record's
+`executingNamespace`/`executingGenerationId` describe its executing owner, separately
+from a REST invocation's captured target ID. These facts remain accurate after
+replacement, removal and recreation. Unknown-skill diagnostics retain unavailable
+values, and routes naming model/planning operations keep their operation meaning.
+Canonical prompts, inputs, outputs, tools, evidence and diagnostics are preserved;
+only the existing derived journal/observer projection has its established
+field-name redaction exception.
+
+Console live connections and saved trace imports require an exact release match
+for `consoleCompatibilityVersion`, derived from Maven `${project.version}` through
+filtered `META-INF/loomspan-release.properties`. A different release is rejected.
+Matching `development` markers permit normal validation but promise no compatibility
+between development builds. There are no legacy readers, alternate protocol counters,
+trace migrations or historical readability guarantee.
 
 ## Choose your integration
 
@@ -234,6 +328,8 @@ confidence do not establish judgment correctness or live parity between routes.
 - **[Sidecar](https://github.com/loomspan/loomspan-sidecar):** use the separate
   Loomspan HTTP service from applications in other languages or when you want a
   separate runtime. Its repository covers setup, versions, and integration guidance.
+  Cloud hosts Framework directly; sidecar examples do not make sidecar a runtime
+  dependency or select a Cloud authentication scheme.
 
 Model-backed skills need a named connection using the OpenAI, Anthropic, Gemini,
 or Ollama driver. Native TypeSafe leaves require the `typesafe` driver. Java and REST leaves can execute without a framework model call.

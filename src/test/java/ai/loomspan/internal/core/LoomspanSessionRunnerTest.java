@@ -47,7 +47,7 @@ class LoomspanSessionRunnerTest {
     void defaultsNewSessionsToRetainTraceOnError() {
         LoomspanSessionRunner sessionRunner = new LoomspanSessionRunner(4);
 
-        TracePersistencePolicy persistencePolicy = sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()),
+        TracePersistencePolicy persistencePolicy = sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()),
                 session -> session.getExecutionTrace().persistencePolicy());
 
         assertThat(persistencePolicy).isEqualTo(TracePersistencePolicy.ONERROR);
@@ -57,7 +57,7 @@ class LoomspanSessionRunnerTest {
     void finalizesStandaloneRunnerSessionsAndWritesTerminalTraceRecord() throws Exception {
         LoomspanSessionRunner sessionRunner = new LoomspanSessionRunner(4, TracePersistencePolicy.ALWAYS);
 
-        String tracePathText = sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+        String tracePathText = sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
             appendRecord(session, TraceRecordType.MODEL_REQUEST_SENT, Instant.parse("2026-03-15T12:00:00Z"), Map.of("segment", "test"), Map.of("objective", "runner"));
             return session.getExecutionTrace().filePath();
         });
@@ -82,7 +82,7 @@ class LoomspanSessionRunnerTest {
         java.util.concurrent.atomic.AtomicReference<String> tracePathText = new java.util.concurrent.atomic.AtomicReference<>();
         String sessionId = null;
         try {
-            sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+            sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
                 appendRecord(session, TraceRecordType.MODEL_REQUEST_SENT, Instant.parse("2026-03-15T12:00:00Z"), Map.of("segment", "test"), Map.of("objective", "runner"));
                 tracePathText.set(session.getExecutionTrace().filePath());
                 throw new IllegalStateException(session.getSessionId());
@@ -112,7 +112,7 @@ class LoomspanSessionRunnerTest {
         LoomspanSessionRunner sessionRunner = new LoomspanSessionRunner(4, TracePersistencePolicy.ONERROR);
 
         java.util.concurrent.atomic.AtomicReference<String> tracePathText = new java.util.concurrent.atomic.AtomicReference<>();
-        assertThatThrownBy(() -> sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+        assertThatThrownBy(() -> sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
             tracePathText.set(session.getExecutionTrace().filePath());
             throw new IllegalArgumentException("boom");
         }))
@@ -150,9 +150,9 @@ class LoomspanSessionRunnerTest {
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Future<String> first = executor.submit(() ->
-                    sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> LoomspanSession.getCurrentSession().getSessionId()));
+                    sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> LoomspanSession.getCurrentSession().getSessionId()));
             Future<String> second = executor.submit(() ->
-                    sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> LoomspanSession.getCurrentSession().getSessionId()));
+                    sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> LoomspanSession.getCurrentSession().getSessionId()));
 
             assertThat(Set.of(first.get(), second.get())).hasSize(2);
         }
@@ -163,14 +163,14 @@ class LoomspanSessionRunnerTest {
         LoomspanSessionRunner sessionRunner = new LoomspanSessionRunner(4);
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            Future<String> first = executor.submit(() -> sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+            Future<String> first = executor.submit(() -> sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
                 PhysicalBranchContext branch = ExecutionBindingScope.requireCurrent().branch();
                 branch.push(frame("frame-1", "route.one"));
                 String result = session.getSessionId() + ":" + branch.depth() + ":" + branch.requireLeaf().route();
                 branch.close(branch.requireLeaf());
                 return result;
             }));
-            Future<String> second = executor.submit(() -> sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+            Future<String> second = executor.submit(() -> sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
                 PhysicalBranchContext branch = ExecutionBindingScope.requireCurrent().branch();
                 branch.push(frame("frame-2", "route.two"));
                 String result = session.getSessionId() + ":" + branch.depth() + ":" + branch.requireLeaf().route();
@@ -190,7 +190,7 @@ class LoomspanSessionRunnerTest {
         java.util.concurrent.atomic.AtomicReference<LoomspanSession> sessionRef = new java.util.concurrent.atomic.AtomicReference<>();
         java.util.concurrent.atomic.AtomicReference<String> tracePathText = new java.util.concurrent.atomic.AtomicReference<>();
 
-        assertThatThrownBy(() -> sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+        assertThatThrownBy(() -> sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
             sessionRef.set(session);
             tracePathText.set(session.getExecutionTrace().filePath());
             ExecutionBindingScope.requireCurrent().branch().push(frame("frame-1", "route.one"));
@@ -225,7 +225,7 @@ class LoomspanSessionRunnerTest {
         LoomspanSessionRunner sessionRunner = new LoomspanSessionRunner(4);
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            Future<String> first = executor.submit(() -> sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+            Future<String> first = executor.submit(() -> sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
                 ExecutionPlan plan = plan("plan-first");
                 appendRecord(session, TraceRecordType.PLAN_CREATED, Instant.parse("2026-03-15T12:00:00Z"), Map.of("planId", plan.planId()), plan);
                 appendRecord(session, TraceRecordType.TOOL_CALL_STARTED, Instant.parse("2026-03-15T12:00:01Z"), Map.of(), Map.of("route", "tool.one"));
@@ -235,7 +235,7 @@ class LoomspanSessionRunnerTest {
                         + ":"
                         + session.getJournalSnapshot().get(0).type().name();
             }));
-            Future<String> second = executor.submit(() -> sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+            Future<String> second = executor.submit(() -> sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
                 ExecutionPlan plan = plan("plan-second");
                 appendRecord(session, TraceRecordType.PLAN_CREATED, Instant.parse("2026-03-15T12:00:02Z"), Map.of("planId", plan.planId()), plan);
                 session.markTraceErrored();
@@ -261,7 +261,7 @@ class LoomspanSessionRunnerTest {
                 "pw",
                 AuthorityUtils.createAuthorityList("ROLE_ALLOWED"));
 
-        String authority = sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), authentication, session ->
+        String authority = sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), authentication, session ->
                 session.getAuthentication()
                         .orElseThrow()
                         .getAuthorities()
@@ -277,7 +277,7 @@ class LoomspanSessionRunnerTest {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-03-15T12:34:56Z"), ZoneOffset.UTC);
         LoomspanSessionRunner sessionRunner = new LoomspanSessionRunner(4, TracePersistencePolicy.ALWAYS, fixedClock);
 
-        Instant timestamp = sessionRunner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+        Instant timestamp = sessionRunner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
             session.appendTraceRecord(TraceRecordType.MODEL_REQUEST_SENT, null, Map.of("segment", "test"), Map.of("objective", "runner"));
             List<TraceRecord> records = new ArrayList<>();
             session.readTraceRecords(records::add);
@@ -301,7 +301,7 @@ class LoomspanSessionRunnerTest {
                 ImmediateCompletionRetention.INSTANCE, quotas);
 
         @SuppressWarnings("unchecked")
-        Map<String, Integer> snapshot = runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+        Map<String, Integer> snapshot = runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
             quotas.setMaxModelCalls(99);
             List<TraceRecord> records = new ArrayList<>();
             session.readTraceRecords(records::add);
@@ -324,7 +324,7 @@ class LoomspanSessionRunnerTest {
         LoomspanSessionRunner runner = new LoomspanSessionRunner(
                 4, TracePersistencePolicy.NEVER, clock, observation);
 
-        runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+        runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
             assertThat(observation.handles).hasSize(1);
             assertThat(observation.handles.getFirst().records)
                     .extracting(TraceRecord::recordType)
@@ -357,7 +357,7 @@ class LoomspanSessionRunnerTest {
         LoomspanSessionRunner runner = new LoomspanSessionRunner(
                 4, TracePersistencePolicy.NEVER, Clock.systemUTC(), throwingFactory);
 
-        String result = runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> "unchanged");
+        String result = runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> "unchanged");
         assertThat(result).isEqualTo("unchanged");
     }
 
@@ -378,7 +378,7 @@ class LoomspanSessionRunnerTest {
         IllegalStateException applicationFailure = new IllegalStateException("application failed");
 
         IllegalStateException delivered = assertThrows(IllegalStateException.class,
-                () -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+                () -> runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
                     throw applicationFailure;
                 }));
 
@@ -394,7 +394,7 @@ class LoomspanSessionRunnerTest {
                 4, TracePersistencePolicy.ALWAYS, Clock.systemUTC(), observation);
         AtomicReference<java.nio.file.Path> tracePath = new AtomicReference<>();
 
-        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
+        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> {
             java.nio.file.Path path = java.nio.file.Path.of(session.getExecutionTrace().filePath());
             tracePath.set(path);
             try {
@@ -429,13 +429,15 @@ class LoomspanSessionRunnerTest {
             handle.recordAppended(new TraceRecord(
                     "trace-construction", sessionId, 1L, clock.instant(),
                     TraceRecordType.TRACE_STARTED, null, null, null, null,
-                    "thread", Map.of("generationId", generationId), null));
+                    "thread", Map.of("generationId", generationId.generationId(),
+                            "entryNamespace", generationId.entryNamespace(),
+                            "namespaceGenerationIds", generationId.namespaceGenerationIds()), null));
             throw new IllegalStateException("trace construction failed");
         };
         LoomspanSessionRunner runner = new LoomspanSessionRunner(
                 4, TracePersistencePolicy.ALWAYS, clock, observation, failingFactory);
 
-        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> "unreachable"))
+        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> "unreachable"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("trace construction failed");
 
@@ -465,7 +467,7 @@ class LoomspanSessionRunnerTest {
         AtomicReference<Path> tracePath = new AtomicReference<>();
         InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, generationId, policy, clock, handle) -> {
             ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle delegate =
-                    new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                    ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                             sessionId, entrySkill, TracePersistencePolicy.ALWAYS, clock, handle);
             tracePath.set(delegate.tracePath());
             return new FailingFinalizationTraceHandle(delegate, true);
@@ -476,7 +478,7 @@ class LoomspanSessionRunnerTest {
         AtomicInteger completionCalls = new AtomicInteger();
         AtomicReference<java.util.Optional<ExecutionJournal>> finalizedJournal = new AtomicReference<>();
 
-        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), null, session -> {
+        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), null, session -> {
             throw actionFailure;
         }, (result, session, failure) -> {
             completionCalls.incrementAndGet();
@@ -507,7 +509,7 @@ class LoomspanSessionRunnerTest {
         SecurityException failure = new SecurityException("retention access denied");
         InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, generationId, policy, clock, handle) -> {
             ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle delegate =
-                    new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                    ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                             sessionId, entrySkill, TracePersistencePolicy.ALWAYS, clock, handle);
             tracePath.set(delegate.tracePath());
             return new FailingFinalizationTraceHandle(delegate, failure);
@@ -515,7 +517,7 @@ class LoomspanSessionRunnerTest {
         LoomspanSessionRunner runner = new LoomspanSessionRunner(
                 4, TracePersistencePolicy.ALWAYS, Clock.systemUTC(), observation, traceFactory);
 
-        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> "result"))
+        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> "result"))
                 .isSameAs(failure);
 
         try {
@@ -536,7 +538,7 @@ class LoomspanSessionRunnerTest {
         AtomicReference<Path> tracePath = new AtomicReference<>();
         InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, generationId, policy, clock, handle) -> {
             ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle delegate =
-                    new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                    ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                             sessionId, entrySkill, TracePersistencePolicy.ALWAYS, clock, handle);
             tracePath.set(delegate.tracePath());
             return new FailingFinalizationTraceHandle(delegate, failAfterCompletion);
@@ -544,7 +546,7 @@ class LoomspanSessionRunnerTest {
         LoomspanSessionRunner runner = new LoomspanSessionRunner(
                 4, TracePersistencePolicy.ALWAYS, Clock.systemUTC(), observation, traceFactory);
 
-        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> "result"))
+        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> "result"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Failed to finalize execution trace");
 
@@ -667,7 +669,7 @@ class LoomspanSessionRunnerTest {
                 TraceFrameType.ROOT_MISSION,
                 route,
                 Map.of("route", route),
-                Instant.parse("2026-03-15T12:00:00Z"));
+                Instant.parse("2026-03-15T12:00:00Z"), null, null);
     }
 
     private static void appendRecord(LoomspanSession session,
@@ -686,7 +688,7 @@ class LoomspanSessionRunnerTest {
     private static ExecutionPlan plan(String planId) {
         return new ExecutionPlan(
                 planId,
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of());
     }

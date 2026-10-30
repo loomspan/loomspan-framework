@@ -74,11 +74,11 @@ class TraceCompletionMetadataTest {
                 TraceOutcome.SUCCEEDED,
                 snapshot,
                 null,
-                Map.of("skillName", "expenseLookup", "remainingFrames", 0));
+                Map.of("skillName", "default-expenseLookup", "remainingFrames", 0));
 
         Map<String, Object> metadata = completion.metadata();
 
-        assertThat(metadata.get("skillName")).isEqualTo("expenseLookup");
+        assertThat(metadata.get("skillName")).isEqualTo("default-expenseLookup");
         assertThat(metadata.get("remainingFrames")).isEqualTo(0);
         assertThat(metadata.get("outcome")).isEqualTo("SUCCEEDED");
         assertThat(metadata).containsKey("sessionUsageSnapshot");

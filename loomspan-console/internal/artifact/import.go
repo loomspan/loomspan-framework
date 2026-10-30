@@ -96,6 +96,7 @@ func (service *Service) Import(ctx context.Context, reader io.Reader, declaredLe
 	service.mu.Lock()
 	result := entry.acquireResult
 	service.mu.Unlock()
+	result.artifact.Metadata = result.artifact.Metadata.Clone()
 	return result.artifact, result.err
 }
 

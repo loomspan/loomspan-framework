@@ -121,7 +121,7 @@ class LinterCallAdvisorTest {
         RecordingChain chain = new RecordingChain(List.of("bad", "OK: corrected"));
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() -> {
             ChatClientResponse response = advisor.adviseCall(request("Write YAML"), chain);
 
@@ -147,7 +147,7 @@ class LinterCallAdvisorTest {
         RecordingChain chain = new RecordingChain(List.of("bad", "OK: corrected"));
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() -> {
             var frame = stateService.openFrame(session, TraceFrameType.MODEL_CALL, "lintedSkill#model", Map.of());
 
@@ -176,7 +176,7 @@ class LinterCallAdvisorTest {
         RecordingChain chain = new RecordingChain(List.of("bad-1"));
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        assertThatThrownBy(() -> runner.callWithNewSession("test.entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> advisor.adviseCall(request("Write YAML"), chain)))
+        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> advisor.adviseCall(request("Write YAML"), chain)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("boom");
     }
@@ -194,7 +194,7 @@ class LinterCallAdvisorTest {
 
     private static LinterCallAdvisor advisor(int maxRetries, LinterOutcomeRecorder outcomeRecorder) {
         return new LinterCallAdvisor(
-                "lintedSkill",
+                "default-lintedSkill",
                 "regex",
                 Pattern.compile("^OK:.*$"),
                 "Return fenced YAML only.",

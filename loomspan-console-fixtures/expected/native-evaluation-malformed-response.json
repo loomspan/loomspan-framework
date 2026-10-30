@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-native-evaluation-malformed-response",
   "sessionId" : "session-native-evaluation-malformed-response",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-native-evaluation-malformed-response",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-native-evaluation-malformed-response"
+  },
   "outcome" : "FAILED",
   "terminalFailureId" : "failure-native",
   "attributedUsage" : {

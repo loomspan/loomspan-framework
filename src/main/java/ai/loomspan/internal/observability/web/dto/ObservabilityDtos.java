@@ -111,6 +111,8 @@ public final class ObservabilityDtos
             long elapsedMillis,
             String entrySkill,
             String generationId,
+            String entryNamespace,
+            java.util.Map<String, String> namespaceGenerationIds,
             String status,
             String phase,
             String summary,
@@ -120,6 +122,8 @@ public final class ObservabilityDtos
     {
         public ActiveExecution
         {
+            namespaceGenerationIds = new ai.loomspan.internal.core.CapturedNamespaceMetadata(
+                    entryNamespace, generationId, namespaceGenerationIds).namespaceGenerationIds();
             activeBranches = List.copyOf(Objects.requireNonNull(activeBranches, "activeBranches must not be null"));
         }
     }
@@ -128,11 +132,20 @@ public final class ObservabilityDtos
             String sessionId,
             String entrySkill,
             String generationId,
+            String entryNamespace,
+            java.util.Map<String, String> namespaceGenerationIds,
             TraceOutcome outcome,
             Instant finalizedAt,
             long sizeBytes,
             TracePersistencePolicy persistencePolicy,
-            Instant applicationTraceExpiresAt) {}
+            Instant applicationTraceExpiresAt)
+    {
+        public Trace
+        {
+            namespaceGenerationIds = new ai.loomspan.internal.core.CapturedNamespaceMetadata(
+                    entryNamespace, generationId, namespaceGenerationIds).namespaceGenerationIds();
+        }
+    }
     public record Page<T>(
             List<T> items,
             boolean hasMore,

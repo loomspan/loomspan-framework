@@ -97,7 +97,7 @@ class LiveActivityProjectorTest
                 prefixes.put(prefix.path("sequence").longValue(), prefix.path("branches")));
 
         ExecutionProjectionState state = state(
-                "session-canonical-concurrent-contract", "test.entry");
+                "session-canonical-concurrent-contract", "default-test_entry");
         LiveActivityProjector projector = new LiveActivityProjector();
         for (String line : Files.readAllLines(root.resolve("traces/canonical-concurrent-contract.ndjson")))
         {
@@ -615,10 +615,34 @@ class LiveActivityProjectorTest
                 .hasMessageContaining("byte limit");
     }
 
+    @Test
+    void retainsCapturedNamespaceGenerationsFromTraceStart()
+    {
+        Map<String, String> generations = new LinkedHashMap<>();
+        generations.put("orders", "generation-entry");
+        generations.put("tax", "generation-retired");
+        var start = new TraceRecord("trace", "session", 1,
+                Instant.parse("2026-07-24T12:00:00Z"), TraceRecordType.TRACE_STARTED,
+                null, null, null, null, "thread",
+                Map.of("entryNamespace", "orders", "generationId", "generation-entry",
+                        "namespaceGenerationIds", generations), null);
+        var projection = new LiveActivityProjector().project(state("session", "orders-search"), start);
+        generations.put("tax", "generation-recreated");
+        assertThat(projection.snapshot().entryNamespace()).isEqualTo("orders");
+        assertThat(projection.snapshot().generationId()).isEqualTo("generation-entry");
+        assertThat(projection.snapshot().namespaceGenerationIds())
+                .containsEntry("orders", "generation-entry")
+                .containsEntry("tax", "generation-retired");
+        assertThatThrownBy(() -> projection.snapshot().namespaceGenerationIds().put("tax", "mutation"))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
     private static ExecutionProjectionState state(String sessionId, String entrySkill)
     {
         ExecutionProjectionState state = new ExecutionProjectionState(sessionId, entrySkill);
         state.generationId = "generation-test";
+        state.entryNamespace = "default";
+        state.namespaceGenerationIds = Map.of("default", "generation-test");
         return state;
     }
 
@@ -630,7 +654,12 @@ class LiveActivityProjectorTest
             StringNode data)
     {
         Map<String, Object> details = new LinkedHashMap<>(metadata);
-        if (type == TraceRecordType.TRACE_STARTED) details.put("generationId", "generation-test");
+        if (type == TraceRecordType.TRACE_STARTED)
+        {
+            details.put("generationId", "generation-test");
+            details.put("entryNamespace", "default");
+            details.put("namespaceGenerationIds", Map.of("default", "generation-test"));
+        }
         return new TraceRecord(
                 "trace", "session", sequence, Instant.parse("2026-07-24T12:00:00Z"), type,
                 frameType == null ? null : "frame-" + sequence, null, frameType,

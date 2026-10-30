@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-timeout-step-failure",
   "sessionId" : "session-timeout-step-failure",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-timeout-step-failure",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-timeout-step-failure"
+  },
   "outcome" : "FAILED",
   "terminalFailureId" : "failure-timeout-step",
   "attributedUsage" : {
@@ -71,7 +77,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "handleIncident"
+    "route" : "default-handleIncident"
   }, {
     "frameId" : "step",
     "parentFrameId" : "root",
@@ -93,7 +99,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "handleIncident#step-1"
+    "route" : "default-handleIncident#step-1"
   }, {
     "frameId" : "model",
     "parentFrameId" : "step",
@@ -115,7 +121,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "handleIncident#step-model"
+    "route" : "default-handleIncident#step-model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

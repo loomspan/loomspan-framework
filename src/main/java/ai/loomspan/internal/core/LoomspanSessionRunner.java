@@ -299,16 +299,16 @@ public class LoomspanSessionRunner
             var captured = generation.runtime();
             InternalExecutionTraceHandleFactory selectedTraceFactory = captured == null || generationTraceRetention == null
                     ? traceHandleFactory
-                    : (sessionId, selectedEntrySkill, generationId, policy, handleClock, observationHandle) ->
+                    : (sessionId, selectedEntrySkill, namespaceMetadata, policy, handleClock, observationHandle) ->
                             new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
-                                    sessionId, selectedEntrySkill, generationId, policy, handleClock, observationHandle,
+                                    sessionId, selectedEntrySkill, namespaceMetadata, policy, handleClock, observationHandle,
                                     generationTraceRetention,
                                     ConfiguredLimitsSnapshot.from(captured.properties().getSession().getQuotas()),
                                     canonicalTraceMapper);
             LoomspanSession session = new LoomspanSession(
                 UUID.randomUUID().toString(),
                 entrySkill,
-                generation.id(),
+                CapturedNamespaceMetadata.from(snapshot),
                 captured == null ? maxDepth : captured.properties().getSession().getMaxDepth(),
                 null,
                 null,

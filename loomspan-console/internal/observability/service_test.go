@@ -76,7 +76,7 @@ func TestObservabilityServiceReturnsSkillPageFromFixture(t *testing.T) {
 	if domain != nil {
 		t.Fatal(domain)
 	}
-	if len(page.Items) != 4 || page.Items[0].RegisteredName != "CheckDns" || page.Items[1].Source != "REST" || page.Items[3].Source != "TYPESAFE" {
+	if len(page.Items) != 4 || page.Items[0].RegisteredName != "default-CheckDns" || page.Items[1].Source != "REST" || page.Items[3].Source != "TYPESAFE" {
 		t.Fatalf("unexpected page: %#v", page)
 	}
 	if page.HasMore {
@@ -199,7 +199,7 @@ func TestObservabilityServiceRejectsSemanticallyInvalidSuccessResponses(t *testi
 			name: "detail identifier mismatch",
 			body: `{"registeredName":"OtherSkill","source": "YAML", "sourcePath":"classpath:/other.yaml","yaml":"name: OtherSkill"}`,
 			call: func(service *Service, scope target.Scope) *consolecore.Error {
-				_, domain := service.GetSkill(context.Background(), scope, "CheckDns")
+				_, domain := service.GetSkill(context.Background(), scope, "default-CheckDns")
 				return domain
 			},
 		},
@@ -285,11 +285,11 @@ func TestObservabilityServiceReturnsSkillDetailFromFixture(t *testing.T) {
 	if domain != nil {
 		t.Fatal(domain)
 	}
-	detail, domain := service.GetSkill(context.Background(), scope, "CheckDns")
+	detail, domain := service.GetSkill(context.Background(), scope, "default-CheckDns")
 	if domain != nil {
 		t.Fatal(domain)
 	}
-	if detail.RegisteredName != "CheckDns" || detail.Yaml == "" {
+	if detail.RegisteredName != "default-CheckDns" || detail.Yaml == "" {
 		t.Fatalf("unexpected detail: %#v", detail)
 	}
 }
@@ -334,7 +334,7 @@ func TestObservabilityServiceReturnsActiveExecutionDetailFromFixture(t *testing.
 	if domain != nil {
 		t.Fatal(domain)
 	}
-	if execution.SessionID != "session-1" || execution.EntrySkill != "CheckDns" {
+	if execution.SessionID != "session-1" || execution.EntrySkill != "default-CheckDns" {
 		t.Fatalf("unexpected execution: %#v", execution)
 	}
 }

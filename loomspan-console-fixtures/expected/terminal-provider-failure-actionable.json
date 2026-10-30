@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-terminal-provider-failure-actionable",
   "sessionId" : "session-terminal-provider-failure-actionable",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-terminal-provider-failure-actionable",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-terminal-provider-failure-actionable"
+  },
   "outcome" : "FAILED",
   "terminalFailureId" : "failure-terminal-provider",
   "attributedUsage" : {
@@ -72,7 +78,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "diagnoseProvider"
+    "route" : "default-diagnoseProvider"
   }, {
     "frameId" : "model",
     "parentFrameId" : "root",
@@ -94,7 +100,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "diagnoseProvider#model"
+    "route" : "default-diagnoseProvider#model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

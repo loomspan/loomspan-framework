@@ -57,13 +57,13 @@ class DeclaredChildInputBindingsIntegrationTest {
                 max_steps: 1
                 input_schema: {type: object, additionalProperties: true}
                 allowed_skills:
-                  - name: evaluation
+                  - name: default-evaluation
                     required: true
                     max_tasks: 1
                     input_bindings:
                       /amount: {from: input, path: /amount}
                       /candidates: {from: input, path: /candidates}
-                output_from: {skill: evaluation}
+                output_from: {skill: default-evaluation}
                 """);
         var nativeBodies = new ArrayList<String>();
         try (var server = new MockWebServer()) {
@@ -73,7 +73,7 @@ class DeclaredChildInputBindingsIntegrationTest {
                         nativeBodies.add(request.getBody().readUtf8());
                         return new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"answers\":{}}");
                     }
-                    return response(JSON.writeValueAsString(Map.of("capabilityName", "root", "createdAt", "2026-10-10T00:00:00Z",
+                    return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-10T00:00:00Z",
                             "status", "VALID", "tasks", List.of(task("evaluation", List.of())))));
                 }
             });
@@ -88,9 +88,9 @@ class DeclaredChildInputBindingsIntegrationTest {
                 assertThat(context).hasNotFailed();
                 var template = context.getBean(SkillTemplate.class);
                 var candidates = Map.of("KeepCase", Map.of("description", "original"));
-                assertThat(template.invoke("evaluation", Map.of("amount", "4", "candidates", candidates))).isEqualTo("{}");
-                assertThat(template.invoke("root", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{}");
-                org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("root", Map.of("amount", "4", "candidates", candidates)))
+                assertThat(template.invoke("default-evaluation", Map.of("amount", "4", "candidates", candidates))).isEqualTo("{}");
+                assertThat(template.invoke("default-root", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{}");
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", Map.of("amount", "4", "candidates", candidates)))
                         .hasStackTraceContaining("binding_assembled_input_invalid");
                 assertThat(nativeBodies).hasSize(2);
                 assertThat(JSON.readTree(nativeBodies.getFirst())).isEqualTo(JSON.readTree(nativeBodies.getLast()));
@@ -117,16 +117,16 @@ class DeclaredChildInputBindingsIntegrationTest {
                     requestId: {type: string}
                   additionalProperties: false
                 allowed_skills:
-                  - name: producer
+                  - name: default-producer
                     required: true
                     max_tasks: 1
                     input_bindings:
                       /caseId: {from: input, path: /requestId}
-                output_from: {skill: producer}
+                output_from: {skill: default-producer}
                 """;
         if (scenario.equals("tool-quota")) {
-            root = root.replace("max_steps: 1", "max_steps: 2").replace("output_from: {skill: producer}", "output_from: {skill: consumer}")
-                    .replace("output_from:", "  - {name: consumer, required: true, max_tasks: 1}\noutput_from:");
+            root = root.replace("max_steps: 1", "max_steps: 2").replace("output_from: {skill: default-producer}", "output_from: {skill: default-consumer}")
+                    .replace("output_from:", "  - {name: default-consumer, required: true, max_tasks: 1}\noutput_from:");
             Files.writeString(skills.resolve("consumer.yaml"), """
                     name: consumer
                     description: Second explicit task
@@ -153,7 +153,7 @@ class DeclaredChildInputBindingsIntegrationTest {
                     String system = JSON.readTree(request.getBody().readUtf8()).path("messages").get(0).path("content").asText();
                     assertThat(system).contains("Create an ordered flight plan");
                     if (scenario.equals("revoked")) revoked.set(true);
-                    return response(JSON.writeValueAsString(Map.of("capabilityName", "root", "createdAt", "2026-10-04T00:00:00Z",
+                    return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-04T00:00:00Z",
                             "status", "VALID", "tasks", scenario.equals("tool-quota")
                                     ? List.of(task("producer", List.of()), task("consumer", List.of("producer")))
                                     : List.of(task("producer", List.of())))));
@@ -161,7 +161,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             });
             server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class).withBean(RestSkillHandler.class, () -> invocation -> {
-                if (invocation.skillName().equals("producer")) assertThat(invocation.input()).containsEntry("caseId", "case-one");
+                if (invocation.skillName().equals("default-producer")) assertThat(invocation.input()).containsEntry("caseId", "case-one");
                 if (scenario.equals("approval")) throw new org.springframework.security.access.AccessDeniedException("Explicit application approval absent");
                 sideEffects.incrementAndGet();
                 return "COMPLETE";
@@ -179,8 +179,8 @@ class DeclaredChildInputBindingsIntegrationTest {
                         try {
                             var template = context.getBean(SkillTemplate.class);
                             Map<String, Object> input = scenario.equals("missing") ? Map.of() : Map.of("requestId", "case-one");
-                            if (scenario.equals("success")) assertThat(template.invoke("root", input, view -> observerCalls.incrementAndGet())).isEqualTo("COMPLETE");
-                            else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("root", input, view -> observerCalls.incrementAndGet()))
+                            if (scenario.equals("success")) assertThat(template.invoke("default-root", input, view -> observerCalls.incrementAndGet())).isEqualTo("COMPLETE");
+                            else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", input, view -> observerCalls.incrementAndGet()))
                                     .hasStackTraceContaining(switch (scenario) {
                                         case "missing" -> "binding_source_unavailable";
                                         case "approval" -> "Explicit application approval absent";
@@ -228,11 +228,11 @@ class DeclaredChildInputBindingsIntegrationTest {
                 "loomspan.connections.local.api-key=local-test", "loomspan.models.local.connection=local",
                 "loomspan.models.local.provider-model=deterministic").run(context -> {
             assertThat(context).hasNotFailed();
-            var catalog=context.getBean(ai.loomspan.api.SkillCatalog.class);
-            assertThat(catalog.skill("root")).isPresent();
-            assertThat(catalog.skill("producer")).isPresent();
-            assertThat(catalog.skill("consumer")).isPresent();
-            assertThat(catalog.skill("consumer").orElseThrow().inputSchema()).contains("caseId", "records", "assessment");
+            var catalog=context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
+            assertThat(catalog.skill("default-root")).isPresent();
+            assertThat(catalog.skill("default-producer")).isPresent();
+            assertThat(catalog.skill("default-consumer")).isPresent();
+            assertThat(catalog.skill("default-consumer").orElseThrow().inputSchema()).contains("caseId", "records", "assessment");
         });
     }
 
@@ -266,18 +266,18 @@ class DeclaredChildInputBindingsIntegrationTest {
                         if (system.contains("Create an ordered flight plan")) {
                             plannerCalls.incrementAndGet();
                             assertThat(system).contains("Declared child input dependencies", "exactly one", "Generate only inputs");
-                            return response(JSON.writeValueAsString(Map.of("capabilityName","root","createdAt","2026-10-04T00:00:00Z",
+                            return response(JSON.writeValueAsString(Map.of("capabilityName","default-root","createdAt","2026-10-04T00:00:00Z",
                                     "status","VALID","tasks",List.of(task("producer",List.of()),task("consumer",List.of("producer"))))));
                         }
                         if (system.contains("coordinator-assigned task")) {
-                            String child=system.contains("Exact capability/tool: producer") ? "producer" : "consumer";
+                            String child=system.contains("Exact capability/tool: default-producer") ? "producer" : "consumer";
                             assertThat(child).isEqualTo("consumer");
                             consumerDispatchCalls.incrementAndGet();
                             Map<String,Object> args=child.equals("consumer") && reasoning
                                     ? Map.of("context",Map.of("candidateReasoning","new reasoning")) : Map.of();
                             actions.add(args);
                             assertThat(system).contains("Framework supplies declared bound fields");
-                            return response(JSON.writeValueAsString(Map.of("stepAction","CALL_TOOL","taskId",child,"toolName",child,"toolArguments",args)));
+                            return response(JSON.writeValueAsString(Map.of("stepAction","CALL_TOOL","taskId",child,"toolName","default-" + child,"toolArguments",args)));
                         }
                         if (system.contains("PRODUCER")) {
                             if (modelProducerCalls.incrementAndGet() == 1) return response("{\"data\":9}");
@@ -294,7 +294,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             }); server.start();
             ApplicationContextRunner runner=new ApplicationContextRunner().withUserConfiguration(App.class)
                     .withBean(RestSkillHandler.class,()-> invocation -> {
-                        if (invocation.skillName().equals("producer")) {
+                        if (invocation.skillName().equals("default-producer")) {
                             assertThat(invocation.input()).containsEntry("caseId","case-one");
                             return JSON.writeValueAsString(Map.of("data",assessment("case-one")));
                         }
@@ -308,7 +308,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             if (consumerKind.equals("java")) runner=runner.withBean(JavaConsumer.class,()->new JavaConsumer(received));
             runner.run(context -> {
                 assertThat(context).hasNotFailed();
-                String result=context.getBean(SkillTemplate.class).invoke("root", input);
+                String result=context.getBean(SkillTemplate.class).invoke("default-root", input);
                 assertThat(result).isEqualTo(consumerKind.equals("java") ? JSON.writeValueAsString("COMPLETE") : "COMPLETE");
             });
         }
@@ -345,19 +345,19 @@ class DeclaredChildInputBindingsIntegrationTest {
               required: [requestId, records]
               additionalProperties: false
             allowed_skills:
-              - name: producer
+              - name: default-producer
                 required: true
                 max_tasks: 1
                 input_bindings:
                   /caseId: {from: input, path: /requestId}
-              - name: consumer
+              - name: default-consumer
                 required: true
                 max_tasks: 1
                 input_bindings:
                   /caseId: {from: input, path: /requestId}
                   /context/records: {from: input, path: /records}
-                  /context/assessment: {from: child_result, skill: producer, path: /data}
-            output_from: {skill: consumer}
+                  /context/assessment: {from: child_result, skill: default-producer, path: /data}
+            output_from: {skill: default-consumer}
             """; }
     private static String producer(String kind) { return """
             name: producer
@@ -392,7 +392,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             """; }
     private static Map<String,Object> task(String child,List<String> dependencies) {
         Map<String,Object> task=new LinkedHashMap<>(); task.put("taskId",child);task.put("title",child);task.put("status","PENDING");
-        task.put("capabilityName",child);task.put("intent","Fulfill responsibility");task.put("dependsOn",dependencies);
+        task.put("capabilityName","default-" + child);task.put("intent","Fulfill responsibility");task.put("dependsOn",dependencies);
         task.put("expectedOutputs",List.of("complete result"));task.put("parallelGroup",null);task.put("note","");return task;
     }
     private static MockResponse response(String content) {

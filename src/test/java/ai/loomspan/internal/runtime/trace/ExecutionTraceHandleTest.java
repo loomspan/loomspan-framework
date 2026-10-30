@@ -32,8 +32,8 @@ class ExecutionTraceHandleTest {
     @Test
     void writesAuthoritativeConsoleCompatibilityVersionOnTraceStarted() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC);
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle(
-                "marked-trace", "test.entry", TracePersistencePolicy.ALWAYS, clock);
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
+                "marked-trace", "default-test_entry", TracePersistencePolicy.ALWAYS, clock);
 
         TraceRecord started = readRecords(handle).getFirst();
 
@@ -47,7 +47,7 @@ class ExecutionTraceHandleTest {
     @Test
     void writesEntrySkillOnTraceStarted() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC);
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle(
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                 "entry-skill-trace", "incident.primary", TracePersistencePolicy.ALWAYS, clock);
 
         TraceRecord started = readRecords(handle).getFirst();
@@ -61,17 +61,17 @@ class ExecutionTraceHandleTest {
     void appliesNeverOnErrorAndAlwaysPersistencePolicies() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC);
 
-        DefaultExecutionTraceHandle never = new DefaultExecutionTraceHandle("never-trace", "test.entry", TracePersistencePolicy.NEVER, clock);
+        DefaultExecutionTraceHandle never = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create("never-trace", "default-test_entry", TracePersistencePolicy.NEVER, clock);
         never.finalizeTrace(completion(TraceOutcome.SUCCEEDED));
         assertThat(Files.exists(never.tracePath())).isFalse();
 
-        DefaultExecutionTraceHandle onError = new DefaultExecutionTraceHandle("onerror-trace", "test.entry", TracePersistencePolicy.ONERROR, clock);
+        DefaultExecutionTraceHandle onError = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create("onerror-trace", "default-test_entry", TracePersistencePolicy.ONERROR, clock);
         onError.markErrored();
         onError.append(TraceRecordType.ERROR_RECORDED, java.util.Map.of("kind", "runtime"), java.util.Map.of("message", "boom"));
         onError.finalizeTrace(completion(TraceOutcome.FAILED));
         assertThat(Files.exists(onError.tracePath())).isTrue();
 
-        DefaultExecutionTraceHandle always = new DefaultExecutionTraceHandle("always-trace", "test.entry", TracePersistencePolicy.ALWAYS, clock);
+        DefaultExecutionTraceHandle always = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create("always-trace", "default-test_entry", TracePersistencePolicy.ALWAYS, clock);
         always.finalizeTrace(completion(TraceOutcome.SUCCEEDED));
         assertThat(Files.exists(always.tracePath())).isTrue();
     }
@@ -79,7 +79,7 @@ class ExecutionTraceHandleTest {
     @Test
     void honorsExplicitTimestampOverridesInTraceEnvelope() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC);
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle("override-trace", "test.entry", TracePersistencePolicy.ALWAYS, clock);
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create("override-trace", "default-test_entry", TracePersistencePolicy.ALWAYS, clock);
 
         handle.append(
                 TraceRecordType.MODEL_REQUEST_SENT,
@@ -96,7 +96,7 @@ class ExecutionTraceHandleTest {
     @Test
     void usesSessionNamedTempFiles() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC);
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle("shared-session", "test.entry", TracePersistencePolicy.ALWAYS, clock);
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create("shared-session", "default-test_entry", TracePersistencePolicy.ALWAYS, clock);
 
         assertThat(handle.tracePath().getFileName().toString())
                 .startsWith("shared-session.")
@@ -108,8 +108,8 @@ class ExecutionTraceHandleTest {
     @Test
     void usesDistinctTraceFilesForRepeatedRunsOfTheSameSessionId() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC);
-        DefaultExecutionTraceHandle first = new DefaultExecutionTraceHandle("shared-session", "test.entry", TracePersistencePolicy.ALWAYS, clock);
-        DefaultExecutionTraceHandle second = new DefaultExecutionTraceHandle("shared-session", "test.entry", TracePersistencePolicy.ALWAYS, clock);
+        DefaultExecutionTraceHandle first = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create("shared-session", "default-test_entry", TracePersistencePolicy.ALWAYS, clock);
+        DefaultExecutionTraceHandle second = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create("shared-session", "default-test_entry", TracePersistencePolicy.ALWAYS, clock);
 
         assertThat(first.tracePath()).isNotEqualTo(second.tracePath());
         assertThat(first.tracePath().getFileName().toString()).startsWith("shared-session.");
@@ -122,7 +122,7 @@ class ExecutionTraceHandleTest {
     @Test
     void rejectsAppendsAfterTraceFinalization() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC);
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle("completed-trace", "test.entry", TracePersistencePolicy.ALWAYS, clock);
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create("completed-trace", "default-test_entry", TracePersistencePolicy.ALWAYS, clock);
 
         handle.finalizeTrace(completion(TraceOutcome.SUCCEEDED));
 
@@ -161,9 +161,9 @@ class ExecutionTraceHandleTest {
             public void close() {
             }
         };
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle(
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                 "short-grace-trace",
-                "test.entry",
+                "default-test_entry",
                 TracePersistencePolicy.NEVER,
                 clock,
                 ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandle.INSTANCE,
@@ -179,8 +179,8 @@ class ExecutionTraceHandleTest {
     void publishesTraceStartedAndCapturePolicyExactlyOnce() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC);
         RecordingObservationHandle observation = new RecordingObservationHandle();
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle(
-                "observed-trace", "test.entry", TracePersistencePolicy.ALWAYS, clock, observation);
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
+                "observed-trace", "default-test_entry", TracePersistencePolicy.ALWAYS, clock, observation);
 
         assertThat(observation.records)
                 .extracting(TraceRecord::recordType)
@@ -196,8 +196,8 @@ class ExecutionTraceHandleTest {
     void publishesCompleteLogicalChunkedRecordOnlyAfterAllChunksSucceed() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC);
         RecordingObservationHandle observation = new RecordingObservationHandle();
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle(
-                "chunked-trace", "test.entry", TracePersistencePolicy.ALWAYS, clock, observation);
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
+                "chunked-trace", "default-test_entry", TracePersistencePolicy.ALWAYS, clock, observation);
         String payload = "x".repeat(4_097);
 
         TraceRecord persistedEnvelope = handle.append(
@@ -239,10 +239,10 @@ class ExecutionTraceHandleTest {
         RecordingObservationHandle observation = new RecordingObservationHandle();
         Path tracePath = tempDir.resolve("failed-" + failingWrite + ".ndjson");
         ControllableWriter writer = new ControllableWriter(tracePath, failingWrite);
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle(
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                 "trace-" + failingWrite,
                 "session-" + failingWrite,
-                "test.entry",
+                "default-test_entry",
                 tracePath,
                 TracePersistencePolicy.ALWAYS,
                 clock,

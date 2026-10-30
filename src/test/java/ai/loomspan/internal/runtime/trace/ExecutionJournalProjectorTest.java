@@ -24,18 +24,18 @@ class ExecutionJournalProjectorTest {
     void projectsMissionLifecycleWithoutExposingInputOrAuthentication() {
         var started = new TraceRecord("trace", "session", 1, Instant.parse("2026-03-24T12:00:00Z"),
                 TraceRecordType.FRAME_OPENED, "root", null,
-                ai.loomspan.internal.core.TraceFrameType.ROOT_MISSION, "javaRoot", "worker",
+                ai.loomspan.internal.core.TraceFrameType.ROOT_MISSION, "default-javaRoot", "worker",
                 Map.of(), OBJECT_MAPPER.valueToTree(Map.of("password", "secret", "authentication", "credentials")));
         var finished = new TraceRecord("trace", "session", 2, Instant.parse("2026-03-24T12:00:01Z"),
                 TraceRecordType.FRAME_CLOSED, "root", null,
-                ai.loomspan.internal.core.TraceFrameType.ROOT_MISSION, "javaRoot", "worker",
+                ai.loomspan.internal.core.TraceFrameType.ROOT_MISSION, "default-javaRoot", "worker",
                 Map.of("status", "completed"), null);
         var entries = new ExecutionJournalProjector().project(List.of(started, finished)).getEntriesSnapshot();
         assertThat(entries).extracting(JournalEntry::type)
                 .containsExactly(JournalEntryType.SKILL_STARTED, JournalEntryType.SKILL_FINISHED);
         assertThat(entries).allSatisfy(entry -> {
             assertThat(entry.frameId()).isEqualTo("root");
-            assertThat(entry.route()).isEqualTo("javaRoot");
+            assertThat(entry.route()).isEqualTo("default-javaRoot");
             assertThat(entry.payload().toString()).doesNotContain("secret", "credentials", "authentication");
         });
         assertThat(entries.getLast().payload().path("status").asText()).isEqualTo("completed");
@@ -53,7 +53,7 @@ class ExecutionJournalProjectorTest {
                 "frame-1",
                 null,
                 null,
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "main",
                 Map.of(
                         "attemptId", "attempt-1",
@@ -100,7 +100,7 @@ class ExecutionJournalProjectorTest {
                 "frame-1",
                 null,
                 null,
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "main",
                 Map.of("capabilityName", "deploy.service", "linkedTaskId", "task-1"),
                 OBJECT_MAPPER.valueToTree(Map.of(
@@ -118,7 +118,7 @@ class ExecutionJournalProjectorTest {
                 "frame-1",
                 null,
                 null,
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 "main",
                 Map.of("exceptionType", "java.lang.IllegalStateException"),
                 OBJECT_MAPPER.valueToTree(Map.of("message", "boom", "apiKey", "top-secret")));

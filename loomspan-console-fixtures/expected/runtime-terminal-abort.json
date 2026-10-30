@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-runtime-terminal-abort",
   "sessionId" : "session-runtime-terminal-abort",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-runtime-terminal-abort",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-runtime-terminal-abort"
+  },
   "outcome" : "ABORTED",
   "terminalFailureId" : "failure-abort",
   "attributedUsage" : {
@@ -67,7 +73,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "root.skill"
+    "route" : "default-root_skill"
   }, {
     "frameId" : "model",
     "parentFrameId" : "root",
@@ -89,7 +95,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "root.skill#mission-model"
+    "route" : "default-root_skill#mission-model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

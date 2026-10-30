@@ -81,7 +81,10 @@ state, lifecycle and **only the target's captured base/absence**, then atomicall
 installs it. Dependency revision, deletion, visibility or recreation changes alone
 never make publication stale. There is no dependency revalidation or automatic
 retry at publication. Installation does not prove current dependency executability;
-reachable admission and cross-namespace dispatch integration follow in PRs 27.3–27.4.
+every fresh root admission captures and validates its declared reachable graph.
+Temporary `SkillTemplate.validate` checks release their ownership immediately and
+reserve no execution; `SkillInvocationHandoff` retains an admitted snapshot until
+its single execution or explicit release.
 
 A target change after capture rejects the candidate as stale. A change before
 capture becomes its base, regardless of a prior catalog read. Competing candidates
@@ -126,6 +129,33 @@ the contract called by `b`, then Public `b -> a`, then replacement Public `a -> 
 All intermediate versions must be callable and valid; unresolved stubs and invalid
 schema/forwarding cycles are unsupported.
 
+## Managed hosting boundaries
+
+An embedded startup caller and its fixed Java children in `default` can execute
+without a publication. For file-free managed hosting, publish the Java target's
+namespace with empty supplied documents, complete configuration and explicit
+`PUBLIC`, then publish the caller's complete documents/configuration through the
+same API. Namespace names are host choices. A Java-only target can use
+`new ExecutionConfiguration("loomspan: {}")`; the model-backed caller supplies its
+own complete connections/models, including explicit credential references. Pass
+in-memory `SkillDocument` values to `prepare` rather than configuring startup files.
+See [Java declarations](java-skills.md) and [model configuration](../skill-authoring/model-selection-and-connections.md)
+for the corresponding authored contracts.
+A department can publish supplied declarations into its assigned Java namespace;
+fixed methods remain and omitted supplied declarations disappear. On restart,
+repeat the managed sequence from Private startup before advertising readiness.
+
+The host authorizes management and routes external entry requests. Namespaces do
+not establish complete tenant isolation: credentials, database permissions,
+mutable Java state and resource consumption need host/application controls.
+There is no prescribed publisher role, namespace membership, reserved shared
+namespace or app/environment mapping. Cloud hosts Framework directly; sidecar
+hosting examples are optional and select neither a dependency nor Cloud auth.
+External migration gates, drainage, version admission and repository integration
+remain host work. Public call visibility grants neither configuration nor
+observation access. See [observation](observation-and-errors.md#captured-namespace-identity)
+for entry-versus-target generation facts.
+
 ## Retirement notifications
 
 Register framework-wide `onGenerationRetired(listener)` before staging resources.
@@ -143,6 +173,7 @@ retirement callback. There is no historical invocation API.
 
 - `SkillReloaderTest`: complete replacement, base/absence, state/lifecycle, deterministic concurrent preparation/publication, disposal and retirement.
 - `SkillDependencyValidatorTest`: candidate overlay, transitive contracts/visibility, captured metadata retirement and coherent capture races.
-- `NamespaceStartupIntegrationTest`: Private startup, direct Java, managed no-file publication, removal/recreation and restart.
+- `NamespaceStartupIntegrationTest`: actual embedded and file-free managed caller execution, explicit Public sharing, prospective visibility changes, departmental complete replacement retaining fixed Java, removal/recreation and Private restart.
+- `SkillDependencyValidatorTest#transitiveReturnUsesCandidateDeclarationsContractsAndVisibility`: staged ordinary cycles with candidate return paths and unchanged forwarding-cycle rejection.
 - `ExecutionConfigurationParserTest`: exact configuration/credential boundary and nested validation.
 - `LoomspanPublicSurfaceArchitectureTest`: closed supported API and sole RestSkillHandler SPI.

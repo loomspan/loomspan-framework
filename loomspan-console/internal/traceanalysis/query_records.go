@@ -375,6 +375,7 @@ func recordToSummary(rec *Record, row recordIndexRow, ctx TraceContext, rep Reco
 	}
 	validationStatus, _ := normalizeValidationStatus(rec.metadataStringOrEmpty("status"))
 	return RecordSummary{
+		ExecutingNamespace: rec.metadataStringOrEmpty("executingNamespace"), ExecutingGenerationID: rec.metadataStringOrEmpty("executingGenerationId"),
 		Context:          ctx,
 		Sequence:         rec.Sequence,
 		Type:             string(rec.Type),

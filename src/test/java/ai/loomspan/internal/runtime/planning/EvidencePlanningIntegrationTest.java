@@ -34,12 +34,12 @@ class EvidencePlanningIntegrationTest
     @Test
     void acceptsEitherInvestigatorWithoutRequiringBothAndRendersTheCanonicalExpression()
     {
-        for (String investigator : List.of("investigateNetwork", "investigateApp"))
+        for (String investigator : List.of("default-investigateNetwork", "default-investigateApp"))
         {
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
             DefaultPlanningService planningService = new DefaultPlanningService(stateService);
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "session-" + investigator, "test.entry", 3);
+                    "session-" + investigator, "default-test_entry", 3);
             SimpleChatClient client = new SimpleChatClient(incidentPlan(investigator), "unused");
 
             ExecutionPlan result = ai.loomspan.internal.core.TestExecutionBindings.callWithSession(
@@ -52,12 +52,12 @@ class EvidencePlanningIntegrationTest
                     incidentTools()).orElseThrow());
 
             assertThat(result.tasks()).extracting(PlanTask::capabilityName)
-                    .contains("classifyIncident", investigator, "draftIncidentResponse")
-                    .doesNotContain(investigator.equals("investigateNetwork") ? "investigateApp" : "investigateNetwork");
+                    .contains("default-classifyIncident", investigator, "default-draftIncidentResponse")
+                    .doesNotContain(investigator.equals("default-investigateNetwork") ? "default-investigateApp" : "default-investigateNetwork");
             assertThat(client.getSystemMessagesSeen().getFirst())
-                    .contains("classifyIncident and (investigateNetwork or investigateApp)")
+                    .contains("default-classifyIncident and (default-investigateNetwork or default-investigateApp)")
                     .contains("For an 'or' group, include any one alternative")
-                    .doesNotContain("[investigateNetwork, investigateApp] tool(s)");
+                    .doesNotContain("[default-investigateNetwork, default-investigateApp] tool(s)");
         }
     }
 
@@ -66,7 +66,7 @@ class EvidencePlanningIntegrationTest
     {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-gap", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-gap", "default-test_entry", 3);
         SimpleChatClient client = new SimpleChatClient(classificationOnlyPlan(), "unused");
 
         assertThatThrownBy(() -> ai.loomspan.internal.core.TestExecutionBindings.callWithSession(
@@ -91,12 +91,12 @@ class EvidencePlanningIntegrationTest
                             "unsatisfiedClaims", "requiredExpressions", "satisfiedSkills", "unsatisfiedRequirements");
                     assertThat(record.metadata()).doesNotContainKey("missingEvidence");
                     assertThat(record.data().toString())
-                            .contains("classifyIncident and (investigateNetwork or investigateApp)")
+                            .contains("default-classifyIncident and (default-investigateNetwork or default-investigateApp)")
                             .contains("\"mode\":\"any\"");
                 });
         assertThat(client.getSystemMessagesSeen()).anySatisfy(message -> assertThat(message)
-                .contains("classifyIncident and (investigateNetwork or investigateApp)")
-                .contains("already planned: [classifyIncident, draftIncidentResponse]"));
+                .contains("default-classifyIncident and (default-investigateNetwork or default-investigateApp)")
+                .contains("already planned: [default-classifyIncident, default-draftIncidentResponse]"));
     }
 
     private static YamlSkillDefinition incidentDefinition()
@@ -115,9 +115,9 @@ class EvidencePlanningIntegrationTest
         schema.setRequired(List.of("severity", "userMessage"));
         manifest.setOutputSchema(schema);
         Map<String, String> evidence = Map.of(
-                "severity", "classifyIncident",
-                "likelyCause", "classifyIncident and (investigateNetwork or investigateApp)",
-                "userMessage", "draftIncidentResponse");
+                "severity", "default-classifyIncident",
+                "likelyCause", "default-classifyIncident and (default-investigateNetwork or default-investigateApp)",
+                "userMessage", "default-draftIncidentResponse");
         EffectiveSkillExecutionConfiguration configuration = new EffectiveSkillExecutionConfiguration(
                 "gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
         return new YamlSkillDefinition("default",
@@ -137,10 +137,10 @@ class EvidencePlanningIntegrationTest
     private static List<BoundCapability> incidentTools()
     {
         return List.of(
-                tool("classifyIncident"),
-                tool("investigateNetwork"),
-                tool("investigateApp"),
-                tool("draftIncidentResponse"));
+                tool("default-classifyIncident"),
+                tool("default-investigateNetwork"),
+                tool("default-investigateApp"),
+                tool("default-draftIncidentResponse"));
     }
 
     private static BoundCapability tool(String name)
@@ -150,12 +150,12 @@ class EvidencePlanningIntegrationTest
 
     private static ExecutionPlan incidentPlan(String investigator)
     {
-        return plan(List.of("classifyIncident", investigator, "draftIncidentResponse"));
+        return plan(List.of("default-classifyIncident", investigator, "default-draftIncidentResponse"));
     }
 
     private static ExecutionPlan classificationOnlyPlan()
     {
-        return plan(List.of("classifyIncident", "draftIncidentResponse", "draftIncidentResponse"));
+        return plan(List.of("default-classifyIncident", "default-draftIncidentResponse", "default-draftIncidentResponse"));
     }
 
     private static ExecutionPlan plan(List<String> capabilities)
@@ -174,7 +174,7 @@ class EvidencePlanningIntegrationTest
                 .toList();
         return new ExecutionPlan(
                 "plan-incident",
-                "handleIncident",
+                "default-handleIncident",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID,
                 tasks);

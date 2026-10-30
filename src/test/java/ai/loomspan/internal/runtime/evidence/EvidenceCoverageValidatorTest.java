@@ -24,94 +24,94 @@ class EvidenceCoverageValidatorTest
     void evaluatesNestedBooleanRequirementsAndExplainsUnsatisfiedClauses()
     {
         EvidenceContract contract = contract(Map.of(
-                "likelyCause", "classifyIncident and (investigateNetwork or investigateApp)"));
+                "likelyCause", "default-classifyIncident and (default-investigateNetwork or default-investigateApp)"));
 
-        assertThat(finalCoverage(contract, Set.of("classifyIncident", "investigateNetwork")).complete()).isTrue();
-        assertThat(finalCoverage(contract, Set.of("classifyIncident", "investigateApp")).complete()).isTrue();
-        assertThat(finalCoverage(contract, Set.of("classifyIncident", "investigateNetwork", "investigateApp")).complete()).isTrue();
-        assertThat(finalCoverage(contract, Set.of("classifyincident", "investigateNetwork")).complete()).isFalse();
+        assertThat(finalCoverage(contract, Set.of("default-classifyIncident", "default-investigateNetwork")).complete()).isTrue();
+        assertThat(finalCoverage(contract, Set.of("default-classifyIncident", "default-investigateApp")).complete()).isTrue();
+        assertThat(finalCoverage(contract, Set.of("default-classifyIncident", "default-investigateNetwork", "default-investigateApp")).complete()).isTrue();
+        assertThat(finalCoverage(contract, Set.of("default-classifyincident", "default-investigateNetwork")).complete()).isFalse();
 
-        EvidenceCoverageIssue classificationOnly = finalCoverage(contract, Set.of("classifyIncident")).issues().getFirst();
+        EvidenceCoverageIssue classificationOnly = finalCoverage(contract, Set.of("default-classifyIncident")).issues().getFirst();
         assertThat(classificationOnly.requiredExpression())
-                .isEqualTo("classifyIncident and (investigateNetwork or investigateApp)");
+                .isEqualTo("default-classifyIncident and (default-investigateNetwork or default-investigateApp)");
         assertThat(classificationOnly.unsatisfiedRequirements()).singleElement().satisfies(all ->
         {
             assertThat(all.mode()).isEqualTo("all");
             assertThat(all.children()).singleElement().satisfies(any ->
             {
                 assertThat(any.mode()).isEqualTo("any");
-                assertThat(any.skills()).containsExactly("investigateNetwork", "investigateApp");
+                assertThat(any.skills()).containsExactly("default-investigateNetwork", "default-investigateApp");
             });
         });
 
-        EvidenceCoverageIssue investigatorOnly = finalCoverage(contract, Set.of("investigateNetwork")).issues().getFirst();
+        EvidenceCoverageIssue investigatorOnly = finalCoverage(contract, Set.of("default-investigateNetwork")).issues().getFirst();
         assertThat(investigatorOnly.unsatisfiedRequirements()).singleElement().satisfies(all ->
                 assertThat(all.children()).singleElement().satisfies(missing ->
                 {
                     assertThat(missing.mode()).isEqualTo("skill");
-                    assertThat(missing.skills()).containsExactly("classifyIncident");
+                    assertThat(missing.skills()).containsExactly("default-classifyIncident");
                 }));
     }
 
     @Test
     void preservesConjunctiveAlternativesWithoutFlatteningAndRemainsMonotonic()
     {
-        EvidenceContract contract = contract(Map.of("result", "(a and b) or (c and d)"));
+        EvidenceContract contract = contract(Map.of("result", "(default-a and default-b) or (default-c and default-d)"));
 
         EvidenceCoverageIssue issue = validator.validateEvidenceForClaims(
-                Set.of("result"), Set.of("a"), contract).issues().getFirst();
+                Set.of("result"), Set.of("default-a"), contract).issues().getFirst();
         EvidenceRequirement any = issue.unsatisfiedRequirements().getFirst();
         assertThat(any.mode()).isEqualTo("any");
         assertThat(any.children()).hasSize(2);
         assertThat(any.children().getFirst().mode()).isEqualTo("all");
-        assertThat(any.children().getFirst().skills()).containsExactly("b");
-        assertThat(any.children().get(1).skills()).containsExactly("c", "d");
+        assertThat(any.children().getFirst().skills()).containsExactly("default-b");
+        assertThat(any.children().get(1).skills()).containsExactly("default-c", "default-d");
 
-        assertThat(validator.validateEvidenceForClaims(Set.of("result"), Set.of("a", "b"), contract).complete()).isTrue();
-        assertThat(validator.validateEvidenceForClaims(Set.of("result"), Set.of("a", "b", "c"), contract).complete()).isTrue();
+        assertThat(validator.validateEvidenceForClaims(Set.of("result"), Set.of("default-a", "default-b"), contract).complete()).isTrue();
+        assertThat(validator.validateEvidenceForClaims(Set.of("result"), Set.of("default-a", "default-b", "default-c"), contract).complete()).isTrue();
     }
 
     @Test
     void planningEvaluatesEveryClaimAgainstExactNonblankCapabilityNames()
     {
         EvidenceContract contract = contract(Map.of(
-                "severity", "classifyIncident",
-                "likelyCause", "classifyIncident and (investigateNetwork or investigateApp)",
-                "optionalSummary", "draftIncidentResponse"));
+                "severity", "default-classifyIncident",
+                "likelyCause", "default-classifyIncident and (default-investigateNetwork or default-investigateApp)",
+                "optionalSummary", "default-draftIncidentResponse"));
 
         EvidenceCoverageResult missingOptional = validator.validatePlanCoverage(plan(
-                "classifyIncident", "investigateNetwork", " ", null), contract);
+                "default-classifyIncident", "default-investigateNetwork", " ", null), contract);
         assertThat(missingOptional.evaluatedClaims()).containsExactlyInAnyOrder("severity", "likelyCause", "optionalSummary");
         assertThat(missingOptional.issues()).extracting(EvidenceCoverageIssue::claimName)
                 .containsExactly("optionalSummary");
 
         assertThat(validator.validatePlanCoverage(plan(
-                "classifyIncident", "investigateNetwork", "draftIncidentResponse"), contract).complete()).isTrue();
+                "default-classifyIncident", "default-investigateNetwork", "default-draftIncidentResponse"), contract).complete()).isTrue();
         assertThat(validator.validatePlanCoverage(plan(
-                "classifyIncident", "investigateApp", "draftIncidentResponse"), contract).complete()).isTrue();
+                "default-classifyIncident", "default-investigateApp", "default-draftIncidentResponse"), contract).complete()).isTrue();
         assertThat(validator.validatePlanCoverage(plan(
-                "classifyincident", "investigateApp", "draftIncidentResponse"), contract).complete()).isFalse();
+                "default-classifyincident", "default-investigateApp", "default-draftIncidentResponse"), contract).complete()).isFalse();
     }
 
     @Test
     void finalValidationEvaluatesOnlyPresentContractBackedClaims() throws Exception
     {
         EvidenceContract contract = contract(Map.of(
-                "requiredResult", "classifyIncident",
-                "optionalDetail", "investigateNetwork or investigateApp"));
+                "requiredResult", "default-classifyIncident",
+                "optionalDetail", "default-investigateNetwork or default-investigateApp"));
         EvidenceBackedOutputValidator outputValidator = new EvidenceBackedOutputValidator();
 
         EvidenceCoverageResult requiredOnly = outputValidator.validate(
                 JsonMapper.builder().build().readTree("{\"requiredResult\":\"high\"}"),
                 contract,
-                Set.of("classifyIncident"));
+                Set.of("default-classifyIncident"));
         assertThat(requiredOnly.complete()).isTrue();
         assertThat(requiredOnly.evaluatedClaims()).containsExactly("requiredResult");
 
         EvidenceCoverageResult unsupportedOptional = outputValidator.validate(
                 JsonMapper.builder().build().readTree("{\"requiredResult\":\"high\",\"optionalDetail\":\"network\"}"),
                 contract,
-                Set.of("classifyIncident"));
+                Set.of("default-classifyIncident"));
         assertThat(unsupportedOptional.issues()).extracting(EvidenceCoverageIssue::claimName)
                 .containsExactly("optionalDetail");
     }
@@ -149,7 +149,7 @@ class EvidenceCoverageValidatorTest
                 .toList();
         return new ExecutionPlan(
                 "plan-1",
-                "handleIncident",
+                "default-handleIncident",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 PlanStatus.VALID,
                 tasks);

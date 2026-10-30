@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/skillidentity"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/target"
 )
 
@@ -321,7 +322,7 @@ func validateSkillDetail(skill SkillDetail, requestedName string) error {
 }
 
 func validateActiveExecution(execution ActiveExecution) error {
-	if execution.SessionID == "" || execution.TraceID == "" || execution.EntrySkill == "" || execution.GenerationID == "" {
+	if execution.SessionID == "" || execution.TraceID == "" || execution.EntrySkill == "" || execution.GenerationID == "" || !skillidentity.ValidCapture(execution.EntrySkill, execution.EntryNamespace, execution.GenerationID, execution.NamespaceGenerationIDs) {
 		return errors.New("execution identity is missing")
 	}
 	if execution.StartedAt.IsZero() || execution.UpdatedAt.IsZero() ||
@@ -542,7 +543,7 @@ func requireNonnegativeIntegerMembers(raw json.RawMessage, objectName string, na
 }
 
 func validateTrace(trace Trace) error {
-	if trace.TraceID == "" || trace.SessionID == "" || trace.EntrySkill == "" || trace.GenerationID == "" || trace.Outcome == "" ||
+	if trace.TraceID == "" || trace.SessionID == "" || trace.EntrySkill == "" || trace.GenerationID == "" || trace.Outcome == "" || !skillidentity.ValidCapture(trace.EntrySkill, trace.EntryNamespace, trace.GenerationID, trace.NamespaceGenerationIDs) ||
 		trace.PersistencePolicy == "" {
 		return errors.New("trace identity or state is missing")
 	}

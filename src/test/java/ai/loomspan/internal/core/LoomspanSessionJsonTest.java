@@ -23,14 +23,14 @@ class LoomspanSessionJsonTest {
     void serializesExecutionTraceAndDerivedJournalForLiveSession() throws Exception {
         LoomspanSession session = TestLoomspanSessions.withId(
                 "session-json-live",
-                "test.entry",
+                "default-test_entry",
                 4,
                 null,
                 TracePersistencePolicy.ALWAYS,
                 FIXED_CLOCK);
         ExecutionPlan plan = new ExecutionPlan(
                 "plan-1",
-                "rootVisibleSkill",
+                "default-rootVisibleSkill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 java.util.List.of());
 
@@ -55,7 +55,7 @@ class LoomspanSessionJsonTest {
     void preservesDerivedJournalAfterFinalizationDeletesNeverRetainedTraceFile() throws Exception {
         LoomspanSession session = TestLoomspanSessions.withId(
                 "session-json-finalized",
-                "test.entry",
+                "default-test_entry",
                 4,
                 null,
                 TracePersistencePolicy.NEVER,

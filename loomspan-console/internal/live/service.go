@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"math/rand/v2"
 	"strconv"
 	"sync"
@@ -480,6 +481,10 @@ func (service *Service) refreshBaseline(ctx context.Context, scope target.Scope)
 			service.mu.Unlock()
 			return "", consolecore.NewError(consolecore.CodeTargetChanged, "The selected target changed. Start this operation again.", string(scope.ID), consolecore.Details{}, ctx.Err())
 		}
+		baseline.Executions = append([]observability.ActiveExecution(nil), baseline.Executions...)
+		for i := range baseline.Executions {
+			baseline.Executions[i].NamespaceGenerationIDs = maps.Clone(baseline.Executions[i].NamespaceGenerationIDs)
+		}
 		service.baseline = baseline
 		service.notifyBaselineLocked(baseline.ObservedAt)
 		service.mu.Unlock()
@@ -506,6 +511,9 @@ func (service *Service) Baseline() Baseline {
 	defer service.mu.Unlock()
 	result := service.baseline
 	result.Executions = append([]observability.ActiveExecution(nil), service.baseline.Executions...)
+	for i := range result.Executions {
+		result.Executions[i].NamespaceGenerationIDs = maps.Clone(result.Executions[i].NamespaceGenerationIDs)
+	}
 	return result
 }
 

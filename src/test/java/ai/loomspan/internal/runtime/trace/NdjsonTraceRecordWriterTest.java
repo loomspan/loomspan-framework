@@ -19,9 +19,9 @@ class NdjsonTraceRecordWriterTest {
     @Test
     void writesMonotonicSequenceAndSessionNamedTempFile() throws Exception {
         String sessionId = "trace-writer-session";
-        DefaultExecutionTraceHandle handle = new DefaultExecutionTraceHandle(
+        DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                 sessionId,
-                "test.entry",
+                "default-test_entry",
                 TracePersistencePolicy.ALWAYS,
                 Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC));
 

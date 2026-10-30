@@ -447,7 +447,7 @@ class SkillMethodBeanPostProcessorTest {
 
     static class MultipleMethodsBean {
         @SkillMethod(description = "First")
-        String first() { return "first"; }
+        String first() { return "default-first"; }
 
         @SkillMethod(description = "Second")
         String second() { return "second"; }

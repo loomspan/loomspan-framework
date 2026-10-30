@@ -21,7 +21,7 @@ class ChildInputBindingAssemblerTest
     private ChildInputBinding result(String destination, String source)
     {
         return new ChildInputBinding(ObjectFieldPath.parse(destination, false), ChildInputBinding.SourceKind.CHILD_RESULT,
-                ObjectFieldPath.parse(source, true), "producer");
+                ObjectFieldPath.parse(source, true), "default-producer");
     }
 
     @Test
@@ -54,7 +54,7 @@ class ChildInputBindingAssemblerTest
         source.put("nil", null);
         var bindings = List.of(input("/context/evidence", "/literal.dot"), input("/context/nil", "/nil"),
                 result("/context/accepted", "/data"));
-        var accepted = new MissionContext.CompletedTaskResult("task-1", "producer", "{\"data\":{\"text\":\"{not parsed}\"}}");
+        var accepted = new MissionContext.CompletedTaskResult("task-1", "default-producer", "{\"data\":{\"text\":\"{not parsed}\"}}");
         var assembly = assembler.assemble(Map.of("context", Map.of("reasoning", "new")), bindings, source,
                 List.of(accepted), "parent-1");
         var context = (Map<?,?>) assembly.arguments().get("context");
@@ -81,7 +81,7 @@ class ChildInputBindingAssemblerTest
         for (Object context : List.of(Map.of("evidence", "same"), Map.of("evidence", Map.of("nested", 1)),
                 "scalar", List.of(1)))
             assertThatThrownBy(() -> assembler.assemble(Map.of("context", context), List.of(binding),
-                    Map.of("source", "same"), List.of(), "parent"))
+                    Map.of("source", "same"), List.of(), "default-parent"))
                     .hasMessageContaining("binding_model_override");
         var nullAncestor = new LinkedHashMap<String,Object>();
         nullAncestor.put("context", null);
@@ -99,11 +99,11 @@ class ChildInputBindingAssemblerTest
         var binding = result("/value", "/data");
         assertThatThrownBy(() -> assembler.assemble(Map.of(), List.of(binding), Map.of(), List.of(), "p"))
                 .hasMessageContaining("found 0");
-        var first = new MissionContext.CompletedTaskResult("one", "producer", "{}");
-        var second = new MissionContext.CompletedTaskResult("two", "producer", "{}");
+        var first = new MissionContext.CompletedTaskResult("one", "default-producer", "{}");
+        var second = new MissionContext.CompletedTaskResult("two", "default-producer", "{}");
         assertThatThrownBy(() -> assembler.assemble(Map.of(), List.of(binding), Map.of(), List.of(first, second), "p"))
                 .hasMessageContaining("found 2");
-        var malformed = new MissionContext.CompletedTaskResult("one", "producer", "{unfinished");
+        var malformed = new MissionContext.CompletedTaskResult("one", "default-producer", "{unfinished");
         assertThatThrownBy(() -> assembler.assemble(Map.of(), List.of(binding), Map.of(), List.of(malformed), "p"))
                 .hasMessageContaining("Missing object source path");
         assertThat(assembler.assemble(Map.of(), List.of(result("/value", "")), Map.of(), List.of(malformed), "p").arguments())

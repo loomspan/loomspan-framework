@@ -89,11 +89,11 @@ class ConcurrentGroupedExecutionIntegrationTest
     @Test
     void concurrentNestedDirectAndPlanningMissionsKeepStateAndDiagnosticsIsolated() throws Exception
     {
-        String root = "rootPlanner";
-        String directChild = "directChild";
-        String planningChild = "planningChild";
-        String leafA = "leafA";
-        String leafB = "leafB";
+        String root = "default-rootPlanner";
+        String directChild = "default-directChild";
+        String planningChild = "default-planningChild";
+        String leafA = "default-leafA";
+        String leafB = "default-leafB";
         Authentication authentication = allowedAuthentication();
         LoomspanSession session = session("concurrent-nested", root, 6, authentication);
         DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
@@ -137,7 +137,7 @@ class ConcurrentGroupedExecutionIntegrationTest
         AtomicReference<ExecutionCoordinator> coordinator = new AtomicReference<>();
         MissionExecutionEngine directEngine = (currentSession, definition, objective, missionInput, model,
                 visibleTools, planningEnabled, currentAuthentication) -> {
-            assertThat(definition.manifest().getName()).isEqualTo(directChild);
+            assertThat(definition.identity().toString()).isEqualTo(directChild);
             assertThat(currentAuthentication).isSameAs(authentication);
             assertAuthorized(currentSession);
             MissionContext current = ExecutionBindingScope.requireCurrent().requireMission();
@@ -209,10 +209,10 @@ class ConcurrentGroupedExecutionIntegrationTest
     @Test
     void actualNestedDepthFailureIsAnOrdinaryMemberOutcomeAndDoesNotCancelSibling()
     {
-        String root = "depthRoot";
-        String deepChild = "deepChild";
-        String grandchild = "grandchild";
-        String successfulChild = "successfulChild";
+        String root = "default-depthRoot";
+        String deepChild = "default-deepChild";
+        String grandchild = "default-grandchild";
+        String successfulChild = "default-successfulChild";
         Authentication authentication = allowedAuthentication();
         LoomspanSession session = session("concurrent-depth", root, 2, authentication);
         DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
@@ -227,9 +227,9 @@ class ConcurrentGroupedExecutionIntegrationTest
                 Map.of("depth-task", deepChild, "success-task", successfulChild));
         AtomicReference<ExecutionCoordinator> coordinator = new AtomicReference<>();
         MissionExecutionEngine directEngine = (currentSession, definition, objective, missionInput, model,
-                visibleTools, planningEnabled, currentAuthentication) -> switch (definition.manifest().getName())
+                visibleTools, planningEnabled, currentAuthentication) -> switch (definition.identity().toString())
         {
-            case "deepChild" -> {
+            case "default-deepChild" -> {
                 deepStarted.countDown();
                 await(siblingStarted, "sibling must start before the nested depth failure");
                 try
@@ -241,13 +241,13 @@ class ConcurrentGroupedExecutionIntegrationTest
                     depthAttempted.countDown();
                 }
             }
-            case "successfulChild" -> {
+            case "default-successfulChild" -> {
                 siblingStarted.countDown();
                 await(deepStarted, "deep child must start concurrently");
                 await(depthAttempted, "sibling must remain alive through the nested depth failure");
                 yield "sibling complete";
             }
-            case "grandchild" -> {
+            case "default-grandchild" -> {
                 grandchildEngineCalls.incrementAndGet();
                 yield "unreachable";
             }
@@ -285,9 +285,9 @@ class ConcurrentGroupedExecutionIntegrationTest
     @Test
     void nestedChildTimeoutIsMemberFailureAndDoesNotCancelSibling()
     {
-        String root = "timeoutRoot";
-        String timeoutChild = "timeoutChild";
-        String successfulChild = "timeoutSibling";
+        String root = "default-timeoutRoot";
+        String timeoutChild = "default-timeoutChild";
+        String successfulChild = "default-timeoutSibling";
         Authentication authentication = allowedAuthentication();
         LoomspanSession session = session("concurrent-child-timeout", root, 4, authentication);
         DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
@@ -302,14 +302,14 @@ class ConcurrentGroupedExecutionIntegrationTest
                 Map.of("timeout-task", timeoutChild, "sibling-task", successfulChild));
         AtomicReference<ExecutionCoordinator> coordinator = new AtomicReference<>();
         MissionExecutionEngine directEngine = (currentSession, definition, objective, missionInput, model,
-                visibleTools, planningEnabled, currentAuthentication) -> switch (definition.manifest().getName())
+                visibleTools, planningEnabled, currentAuthentication) -> switch (definition.identity().toString())
         {
-            case "timeoutChild" -> {
+            case "default-timeoutChild" -> {
                 await(siblingStarted, "sibling must start before the nested timeout");
                 timeoutThrown.countDown();
                 throw expected;
             }
-            case "timeoutSibling" -> {
+            case "default-timeoutSibling" -> {
                 siblingStarted.countDown();
                 await(timeoutThrown, "sibling must remain alive through the nested timeout");
                 yield "sibling complete";
@@ -345,8 +345,8 @@ class ConcurrentGroupedExecutionIntegrationTest
     @Test
     void parentTimeoutRevokesLateWritesFromAnActualNestedDirectMission() throws Exception
     {
-        String root = "parentTimeoutRoot";
-        String child = "lateNestedChild";
+        String root = "default-parentTimeoutRoot";
+        String child = "default-lateNestedChild";
         Authentication authentication = allowedAuthentication();
         LoomspanSession session = session("concurrent-parent-timeout", root, 4, authentication);
         DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
@@ -422,9 +422,9 @@ class ConcurrentGroupedExecutionIntegrationTest
     @Test
     void quotaFailureBecomesMemberOutcomeWithoutRefundingSiblingWork()
     {
-        String root = "quotaRoot";
-        String quotaChild = "quotaChild";
-        String successfulChild = "quotaSibling";
+        String root = "default-quotaRoot";
+        String quotaChild = "default-quotaChild";
+        String successfulChild = "default-quotaSibling";
         Authentication authentication = allowedAuthentication();
         LoomspanSession session = session("concurrent-quota", root, 4, authentication);
         LoomspanProperties.Session.Quotas quotas = new LoomspanProperties.Session.Quotas();
@@ -440,15 +440,15 @@ class ConcurrentGroupedExecutionIntegrationTest
                 Map.of("quota-task", quotaChild, "sibling-task", successfulChild));
         AtomicReference<ExecutionCoordinator> coordinator = new AtomicReference<>();
         MissionExecutionEngine directEngine = (currentSession, definition, objective, missionInput, model,
-                visibleTools, planningEnabled, currentAuthentication) -> switch (definition.manifest().getName())
+                visibleTools, planningEnabled, currentAuthentication) -> switch (definition.identity().toString())
         {
-            case "quotaSibling" -> {
+            case "default-quotaSibling" -> {
                 usage.reserveProviderAttempt(currentSession, successfulChild);
                 siblingReserved.countDown();
                 await(quotaAttempted, "successful sibling must finish after the rejected reservation");
                 yield "paid work retained";
             }
-            case "quotaChild" -> {
+            case "default-quotaChild" -> {
                 await(siblingReserved, "successful sibling must reserve the only provider attempt first");
                 try
                 {
@@ -591,7 +591,7 @@ class ConcurrentGroupedExecutionIntegrationTest
     private static YamlSkillManifest manifest(String name, List<String> allowedSkills)
     {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName(name);
+        manifest.setName(ai.loomspan.internal.core.SkillIdentity.parse(name).localName());
         manifest.setDescription(name);
         manifest.setModel("gpt-5");
         manifest.setAllowedSkills(allowedSkills.stream()
@@ -692,7 +692,7 @@ class ConcurrentGroupedExecutionIntegrationTest
         public ModelInteraction create(YamlSkillDefinition definition,
                 ai.loomspan.internal.model.ModelInteractionMode mode)
         {
-            String skillName = definition.manifest().getName();
+            String skillName = definition.identity().toString();
             return request -> respond(skillName, request);
         }
 
@@ -744,7 +744,7 @@ class ConcurrentGroupedExecutionIntegrationTest
         {
             super(new LoomspanProperties(), new LoomspanProperties.Skills());
             this.definitions = definitions.stream().collect(java.util.stream.Collectors.toMap(
-                    definition -> definition.manifest().getName(), Function.identity()));
+                    definition -> definition.identity().toString(), Function.identity()));
         }
 
         @Override

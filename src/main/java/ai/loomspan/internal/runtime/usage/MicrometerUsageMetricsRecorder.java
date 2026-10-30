@@ -21,7 +21,7 @@ public class MicrometerUsageMetricsRecorder implements UsageMetricsRecorder
     @Override
     public void recordSkillInvocation(String skillName)
     {
-        meterRegistry.counter("loomspan.skill.calls", "skill", normalize(skillName)).increment();
+        meterRegistry.counter("loomspan.skill.calls", "skill", skillTag(skillName)).increment();
     }
 
     @Override
@@ -30,7 +30,7 @@ public class MicrometerUsageMetricsRecorder implements UsageMetricsRecorder
         Objects.requireNonNull(usageRecord, "usageRecord must not be null");
         Objects.requireNonNull(identity, "identity must not be null");
         String[] identityTags = {
-                "skill", normalize(skillName),
+                "skill", skillTag(skillName),
                 "connection", normalize(identity.connection()),
                 "driver", normalize(identity.driver().name())
         };
@@ -47,7 +47,7 @@ public class MicrometerUsageMetricsRecorder implements UsageMetricsRecorder
     {
         Objects.requireNonNull(identity, "identity must not be null");
         meterRegistry.counter("loomspan.provider.attempts",
-                "skill", normalize(skillName),
+                "skill", skillTag(skillName),
                 "model", normalize(identity.frameworkModel()),
                 "connection", normalize(identity.connection()),
                 "driver", normalize(identity.driver().name()),
@@ -61,8 +61,8 @@ public class MicrometerUsageMetricsRecorder implements UsageMetricsRecorder
     {
         meterRegistry.counter(
                 "loomspan.tool.calls",
-                "skill", normalize(skillName),
-                "tool", normalize(toolName),
+                "skill", skillTag(skillName),
+                "tool", skillTag(toolName),
                 "outcome", normalize(outcome)).increment();
     }
 
@@ -71,7 +71,7 @@ public class MicrometerUsageMetricsRecorder implements UsageMetricsRecorder
     {
         meterRegistry.counter(
                 "loomspan.tool.accuracy.samples",
-                "skill", normalize(skillName),
+                "skill", skillTag(skillName),
                 "linter", normalize(linterType),
                 "outcome", normalize(outcome)).increment();
     }
@@ -82,7 +82,7 @@ public class MicrometerUsageMetricsRecorder implements UsageMetricsRecorder
         Objects.requireNonNull(outcome, "outcome must not be null");
         meterRegistry.counter(
                 "loomspan.linter.outcomes",
-                "skill", normalize(outcome.skillName()),
+                "skill", skillTag(outcome.skillName()),
                 "status", outcome.status().name(),
                 "linter", normalize(outcome.linterType())).increment();
     }
@@ -92,9 +92,14 @@ public class MicrometerUsageMetricsRecorder implements UsageMetricsRecorder
     {
         meterRegistry.counter(
                 "loomspan.guardrail.trips",
-                "skill", normalize(skillName),
+                "skill", skillTag(skillName),
                 "guardrail", guardrailType.name(),
                 "outcome", "quota_exceeded").increment();
+    }
+
+    private String skillTag(String value)
+    {
+        return value == null || value.isBlank() ? "unknown" : value;
     }
 
     private String normalize(String value)

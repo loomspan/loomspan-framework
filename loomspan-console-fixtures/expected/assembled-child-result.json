@@ -3,6 +3,12 @@
   "valid" : true,
   "traceId" : "trace-assembled-child-result",
   "sessionId" : "session-assembled-child-result",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-assembled-child-result",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-assembled-child-result"
+  },
   "outcome" : "SUCCEEDED",
   "terminalFailureId" : null,
   "attributedUsage" : {
@@ -22,7 +28,7 @@
   },
   "usageComplete" : true,
   "resultAssemblies" : [ {
-    "skillName" : "prepareReport",
+    "skillName" : "default-prepareReport",
     "owningMissionFrameId" : "forward-root",
     "planId" : "report-plan",
     "modelContributionRequired" : true,
@@ -32,7 +38,7 @@
       "sourcePath" : "",
       "parentMissionFrameId" : "forward-root",
       "sourceTaskId" : "finish-task",
-      "sourceSkill" : "finishReport"
+      "sourceSkill" : "default-finishReport"
     } ]
   } ],
   "attempts" : [ {
@@ -103,7 +109,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "prepareReport"
+    "route" : "default-prepareReport"
   }, {
     "frameId" : "planning-report-plan",
     "parentFrameId" : "forward-root",
@@ -125,7 +131,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "prepareReport#planning"
+    "route" : "default-prepareReport#planning"
   }, {
     "frameId" : "selected-tool",
     "parentFrameId" : "forward-root",
@@ -147,7 +153,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "finishReport"
+    "route" : "default-finishReport"
   }, {
     "frameId" : "root-later",
     "parentFrameId" : "forward-root",
@@ -169,7 +175,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "laterWork"
+    "route" : "default-laterWork"
   }, {
     "frameId" : "assembly-model",
     "parentFrameId" : "forward-root",
@@ -191,7 +197,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "prepareReport#model"
+    "route" : "default-prepareReport#model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

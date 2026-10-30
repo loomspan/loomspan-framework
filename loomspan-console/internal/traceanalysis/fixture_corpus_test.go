@@ -38,6 +38,11 @@ func fixtureRoot(t *testing.T) string {
 
 // expectedFile is the JSON shape of one committed expected result.
 type expectedFile struct {
+	EntrySkill             string            `json:"entrySkill,omitempty"`
+	GenerationID           string            `json:"generationId,omitempty"`
+	EntryNamespace         string            `json:"entryNamespace,omitempty"`
+	NamespaceGenerationIDs map[string]string `json:"namespaceGenerationIds,omitempty"`
+
 	Case                    string                  `json:"case"`
 	Valid                   bool                    `json:"valid"`
 	TraceID                 string                  `json:"traceId,omitempty"`
@@ -439,7 +444,7 @@ func TestFixtureCorpusExposesCurrentEntrySkillPlanIdentityAndAcceptedAttempt(t *
 	if domain != nil {
 		t.Fatalf("process fixture: %v", domain)
 	}
-	if processed.Metadata.EntrySkill != "test.entry" {
+	if processed.Metadata.EntrySkill != "default-test_entry" {
 		t.Fatalf("entrySkill=%q", processed.Metadata.EntrySkill)
 	}
 	h := newServiceTestHarnessForVersion(t, "trace-current-plan-semantic-evidence", string(traceBytes), fixtureCompatibilityVersion)
@@ -718,7 +723,7 @@ func TestProcessorPublishesOnlyValidatedTraceStartedEntrySkill(t *testing.T) {
 		raw  string
 		want string
 	}{
-		{name: "valid", raw: `{"entrySkill":"actual.skill"}`, want: "actual.skill"},
+		{name: "valid", raw: `{"entrySkill":"default-actual_skill"}`, want: "default-actual_skill"},
 		{name: "missing", raw: `{"misleading":"filename.skill"}`},
 		{name: "blank", raw: `{"entrySkill":"  "}`},
 		{name: "non-string", raw: `{"entrySkill":{"name":"model.skill"}}`},
@@ -751,7 +756,7 @@ func TestFrameworkDispatchFixtureKeepsAuthoritativeRawEvidenceWithoutModelCall(t
 		}
 		if kind == "STEP_STARTED" {
 			metadata := record["metadata"].(map[string]any)
-			if metadata["dispatchOrigin"] != "framework" || metadata["dispatchReason"] != "eligible" || metadata["assignedTaskId"] != "task-lookup" || metadata["capabilityName"] != "lookupCustomer" {
+			if metadata["dispatchOrigin"] != "framework" || metadata["dispatchReason"] != "eligible" || metadata["assignedTaskId"] != "task-lookup" || metadata["capabilityName"] != "default-lookupCustomer" {
 				t.Fatalf("dispatch identity: %#v", metadata)
 			}
 			found = true
@@ -841,6 +846,7 @@ func buildAnalysisResultFromSink(t *testing.T, sink *fakeSink) analysisResult {
 		t.Fatalf("parse manifest: %v", err)
 	}
 	result := analysisResult{
+		EntrySkill: m.EntrySkill, GenerationID: m.GenerationID, EntryNamespace: m.EntryNamespace, NamespaceGenerationIDs: m.NamespaceGenerationIDs,
 		Valid:     true,
 		TraceID:   m.TraceID,
 		SessionID: m.SessionID,
@@ -988,6 +994,10 @@ func buildRetryResultsFromAttempts(attempts []attemptResult) []retryResult {
 // committed expected file field by field.
 func compareAnalysisResult(t *testing.T, name string, result analysisResult, expected expectedFile) {
 	t.Helper()
+	if result.EntrySkill != expected.EntrySkill || result.GenerationID != expected.GenerationID || result.EntryNamespace != expected.EntryNamespace || !reflect.DeepEqual(result.NamespaceGenerationIDs, expected.NamespaceGenerationIDs) {
+		t.Errorf("captured metadata mismatch for %s: got %s %s %s %v want %s %s %s %v", name, result.EntrySkill, result.GenerationID, result.EntryNamespace, result.NamespaceGenerationIDs, expected.EntrySkill, expected.GenerationID, expected.EntryNamespace, expected.NamespaceGenerationIDs)
+	}
+
 	if result.TraceID != expected.TraceID {
 		t.Errorf("traceId mismatch for %s: got %s want %s", name, result.TraceID, expected.TraceID)
 	}

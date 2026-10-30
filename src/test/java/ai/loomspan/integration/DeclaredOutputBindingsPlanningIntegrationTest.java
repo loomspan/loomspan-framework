@@ -37,7 +37,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                   required: [options]
                   additionalProperties: false
                 allowed_skills:
-                  - name: evaluation
+                  - name: default-evaluation
                     required: true
                     max_tasks: 1
                     input_bindings:
@@ -49,7 +49,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                   required: [selected]
                   additionalProperties: false
                 output_bindings:
-                  /selected: {from: child_result, skill: evaluation, path: %s}
+                  /selected: {from: child_result, skill: default-evaluation, path: %s}
                 """.formatted(output, pointer));
         Files.writeString(directory.resolve("evaluation.yaml"), """
                 name: evaluation
@@ -71,7 +71,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                                 : scenario.equals("singleton") ? "{\"type\":\"choice\"}" : scenario.equals("case-source") ? "{\"probabilities\":{\"keepcase\":0.8}}" : "{\"probabilities\":{}}";
                         return new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"answers\":{\"category\":"+answer+"}}");
                     }
-                    return response(JSON.writeValueAsString(Map.of("capabilityName", "root", "createdAt", "2026-10-10T00:00:00Z", "status", "VALID", "tasks", List.of(task("evaluation")))));
+                    return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-10T00:00:00Z", "status", "VALID", "tasks", List.of(task("evaluation")))));
                 }
             }); server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class).withPropertyValues(
@@ -83,13 +83,13 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
             ).run(context -> {
                 assertThat(context).hasNotFailed(); var template = context.getBean(SkillTemplate.class);
                 var input = Map.<String,Object>of("options", scenario.equals("dynamic-missing-probability") ? Map.of("RuntimeKey", "first") : Map.of("A", "first", "B", "second"));
-                String registeredSchema = context.getBean(ai.loomspan.api.SkillCatalog.class).skill("evaluation").orElseThrow().outputSchema();
+                String registeredSchema = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skill("default-evaluation").orElseThrow().outputSchema();
                 if (dynamic) assertThat(JSON.readTree(registeredSchema).at("/properties/category/properties/choice").has("enum")).isFalse();
                 if (scenario.endsWith("allowed") && !scenario.endsWith("disallowed") || scenario.equals("singleton"))
-                    assertThat(JSON.readTree(template.invoke("root", input)).path("selected").asText()).isEqualTo(scenario.equals("singleton") ? "choice" : "A");
-                else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("root", input))
+                    assertThat(JSON.readTree(template.invoke("default-root", input)).path("selected").asText()).isEqualTo(scenario.equals("singleton") ? "choice" : "A");
+                else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", input))
                         .hasStackTraceContaining(probability ? "binding_source_unavailable" : "binding_output_validation");
-                assertThat(context.getBean(ai.loomspan.api.SkillCatalog.class).skill("evaluation").orElseThrow().outputSchema()).isEqualTo(registeredSchema);
+                assertThat(context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skill("default-evaluation").orElseThrow().outputSchema()).isEqualTo(registeredSchema);
             });
             assertThat(calls).hasValue(2);
         }
@@ -122,13 +122,13 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                   required: [caseId]
                   additionalProperties: false
                 allowed_skills:
-                  - {name: first, max_tasks: 2}
-                  - {name: second, max_tasks: 2}
-                  - {name: later, required: true, max_tasks: 1}
+                  - {name: default-first, max_tasks: 2}
+                  - {name: default-second, max_tasks: 2}
+                  - {name: default-later, required: true, max_tasks: 1}
                 output_bindings:
                   /caseId: {from: input, path: /caseId}
-                  /assessment: {from: child_result, skill: first, path: /assessment}
-                  /rows: {from: child_result, skill: second, path: ''}
+                  /assessment: {from: child_result, skill: default-first, path: /assessment}
+                  /rows: {from: child_result, skill: default-second, path: ''}
                 output_schema_max_retries: 1
                 output_schema:
                   type: object
@@ -158,12 +158,12 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                         int attempt = plans.incrementAndGet();
                         assertThat(system).contains("exactly one direct task", "first", "second");
                         var tasks = attempt == 1 ? List.of(task("later")) : List.of(task("first"),task("second"),task("later"));
-                        return response(JSON.writeValueAsString(Map.of("capabilityName","root","createdAt","2026-10-05T00:00:00Z","status","VALID","tasks",tasks)));
+                        return response(JSON.writeValueAsString(Map.of("capabilityName","default-root","createdAt","2026-10-05T00:00:00Z","status","VALID","tasks",tasks)));
                     }
                     if (system.contains("coordinator-assigned task")) {
-                        var match = Pattern.compile("Exact capability/tool: (\\w+)").matcher(system);
+                        var match = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
                         assertThat(match.find()).isTrue(); String child=match.group(1);
-                        return response(JSON.writeValueAsString(Map.of("stepAction","CALL_TOOL","taskId",child,"toolName",child,"toolArguments",Map.of())));
+                        return response(JSON.writeValueAsString(Map.of("stepAction","CALL_TOOL","taskId",child.substring("default-".length()),"toolName",child,"toolArguments",Map.of())));
                     }
                     assertThat(mixed).isTrue(); assertThat(later.get()).isEqualTo(1);
                     assertThat(system).contains("summary");
@@ -176,8 +176,8 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
             ApplicationContextRunner runner = new ApplicationContextRunner().withUserConfiguration(App.class).withBean(RestSkillHandler.class, () -> invocation -> {
                 children.incrementAndGet();
                 return switch(invocation.skillName()) {
-                    case "first" -> EXACT;
-                    case "second" -> "[3,1,2]";
+                    case "default-first" -> EXACT;
+                    case "default-second" -> "[3,1,2]";
                     default -> { later.incrementAndGet(); yield "unrelated completed"; }
                 };
             }).withPropertyValues("spring.main.web-application-type=none","loomspan.skills.locations="+directory.toUri()+"*.yaml",
@@ -187,7 +187,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
             if(kind.equals("java")) runner = runner.withBean(JavaProducer.class,JavaProducer::new);
             runner.run(context -> {
                         assertThat(context).hasNotFailed();
-                        var result=JSON.readTree(context.getBean(SkillTemplate.class).invoke("root",Map.of("caseId","C-1")));
+                        var result=JSON.readTree(context.getBean(SkillTemplate.class).invoke("default-root",Map.of("caseId","C-1")));
                         assertThat(result.path("caseId").asText()).isEqualTo("C-1");
                         assertThat(result.path("assessment").path("number").asText()).isEqualTo("123456789012345678901234567890");
                         assertThat(result.path("assessment").path("text").asText()).isEqualTo("{looks:json}");
@@ -199,7 +199,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
         assertThat(finals.get()).isEqualTo(mixed ? 2 : 0); assertThat(children.get()).isEqualTo(kind.equals("rest") ? 3 : 2);
     }
     private static Map<String,Object> task(String name) {
-        return Map.of("taskId",name,"title",name,"status","PENDING","capabilityName",name,"intent","work","dependsOn",List.of(),"expectedOutputs",List.of("result"));
+        return Map.of("taskId",name,"title",name,"status","PENDING","capabilityName","default-" + name,"intent","work","dependsOn",List.of(),"expectedOutputs",List.of("result"));
     }
     private static MockResponse response(String content) {
         return new MockResponse().setHeader("Content-Type","application/json").setBody(JSON.writeValueAsString(Map.of(

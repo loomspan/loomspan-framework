@@ -87,7 +87,7 @@ func newServiceTestHarnessForOutcomeAndVersion(t *testing.T, traceID, ndjson, ou
 			// The session ID must match the NDJSON content's sessionId.
 			// All test traces use "session-" + (traceID without "trace-" prefix).
 			sessionID := deriveSessionID(traceID)
-			_, _ = fmt.Fprintf(w, `{"targetScopeId":"scope-test","traceId":"%s","sessionId":"%s","entrySkill":"CheckDns","outcome":"%s","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":%d,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-08-01T12:00:00Z"}`,
+			_, _ = fmt.Fprintf(w, `{"targetScopeId":"scope-test","traceId":"%s","sessionId":"%s","entrySkill":"default-CheckDns","outcome":"%s","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":%d,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-08-01T12:00:00Z"}`,
 				traceID, sessionID, outcome, len(body))
 		case strings.HasSuffix(r.URL.Path, "/traces/"+traceID+"/artifact"):
 			w.Header().Set("Content-Type", applicationclient.ArtifactMediaType)
@@ -1382,7 +1382,7 @@ func TestFramesAttachDirectGapKindsWithoutPropagation(t *testing.T) {
 
 // nestedFrameUsageTrace is a trace with two frames (root + skill) matching the
 // Java fixture corpus nested-frame-usage case.
-const nestedFrameUsageTrace = `{"traceId":"trace-nested-frame-usage","sessionId":"session-nested-frame-usage","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/nested-frame-usage.ndjson","consoleCompatibilityVersion":"development","generationId":"generation-test"},"data":{"sessionId":"session-nested-frame-usage"}}
+const nestedFrameUsageTrace = `{"traceId":"trace-nested-frame-usage","sessionId":"session-nested-frame-usage","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/nested-frame-usage.ndjson","consoleCompatibilityVersion":"development","generationId":"generation-test","entrySkill":"default-test","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-test"}},"data":{"sessionId":"session-nested-frame-usage"}}
 {"traceId":"trace-nested-frame-usage","sessionId":"session-nested-frame-usage","sequence":2,"timestamp":1784894400.000000000,"recordType":"TRACE_CAPTURE_POLICY_RECORDED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"persistencePolicy":"ALWAYS"},"data":null}
 {"traceId":"trace-nested-frame-usage","sessionId":"session-nested-frame-usage","sequence":3,"timestamp":1784894400.000000000,"recordType":"FRAME_OPENED","frameId":"root","parentFrameId":null,"frameType":"ROOT_MISSION","route":"root.skill","threadName":"fixture-thread","metadata":{"timestampOverride":"2026-07-24T12:00:00Z"},"data":null}
 {"traceId":"trace-nested-frame-usage","sessionId":"session-nested-frame-usage","sequence":4,"timestamp":1784894401.000000000,"recordType":"FRAME_OPENED","frameId":"skill","parentFrameId":"root","frameType":"SKILL_EXECUTION","route":"root.skill","threadName":"fixture-thread","metadata":{"timestampOverride":"2026-07-24T12:00:01Z"},"data":null}
@@ -1399,3 +1399,67 @@ const nestedFrameUsageTrace = `{"traceId":"trace-nested-frame-usage","sessionId"
 
 // chunkedPayloadTraceForService is reserved for future use; the existing
 // chunkedPayloadTrace test helper is used instead.
+
+func TestCapturedNamespaceQueriesKeepEqualLocalNamesAndRetainedGenerations(t *testing.T) {
+	var raw strings.Builder
+	for _, line := range strings.Split(strings.TrimSpace(nestedFrameUsageTrace), "\n") {
+		var record map[string]any
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Fatal(err)
+		}
+		metadata := record["metadata"].(map[string]any)
+		if record["recordType"] == "TRACE_STARTED" {
+			metadata["entrySkill"] = "orders-search"
+			metadata["entryNamespace"] = "orders"
+			metadata["namespaceGenerationIds"] = map[string]string{"orders": "generation-test", "tax": "retired-target"}
+		}
+		if frameID, ok := record["frameId"].(string); ok {
+			namespace, identity, generation := "orders", "orders-search", "generation-test"
+			if frameID == "skill" {
+				namespace, identity, generation = "tax", "tax-search", "retired-target"
+			}
+			record["route"] = identity
+			metadata["skillName"] = identity
+			metadata["executingNamespace"] = namespace
+			metadata["executingGenerationId"] = generation
+		}
+		encoded, err := json.Marshal(record)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw.Write(encoded)
+		raw.WriteByte('\n')
+	}
+	h := newServiceTestHarness(t, "trace-nested-frame-usage", raw.String())
+	summary, domain := h.service.GetSummary(context.Background(), targetEvidence(h.scopeID), SummaryRequest{Handle: h.handle})
+	if domain != nil || summary.EntrySkill != "orders-search" || summary.GenerationID != "generation-test" || summary.NamespaceGenerationIDs["tax"] != "retired-target" {
+		t.Fatalf("captured summary=%+v error=%v", summary, domain)
+	}
+	summary.NamespaceGenerationIDs["tax"] = "caller mutation"
+	again, domain := h.service.GetSummary(context.Background(), targetEvidence(h.scopeID), SummaryRequest{Handle: h.handle})
+	if domain != nil || again.NamespaceGenerationIDs["tax"] != "retired-target" {
+		t.Fatalf("mutable summary leaked: %+v %v", again, domain)
+	}
+	for skill, frameID := range map[string]string{"orders-search": "root", "tax-search": "skill"} {
+		page, domain := h.service.QueryFrames(context.Background(), targetEvidence(h.scopeID), FrameQuery{Handle: h.handle, PageSize: 10, Filter: FrameFilter{SkillName: skill}})
+		if domain != nil || len(page.Items) != 1 || page.Items[0].FrameID != frameID || page.Items[0].Route != skill {
+			t.Fatalf("lookup %s: %+v %v", skill, page, domain)
+		}
+	}
+	page, domain := h.service.QueryRecords(context.Background(), targetEvidence(h.scopeID), RecordQuery{Handle: h.handle, PageSize: 100, Representation: RecordRepresentationLogical})
+	if domain != nil {
+		t.Fatal(domain)
+	}
+	sawChild := false
+	for _, record := range page.Items {
+		if record.FrameID == "skill" {
+			sawChild = true
+			if record.ExecutingNamespace != "tax" || record.ExecutingGenerationID != "retired-target" {
+				t.Fatalf("lost executing owner: %+v", record)
+			}
+		}
+	}
+	if !sawChild {
+		t.Fatal("missing captured target records")
+	}
+}

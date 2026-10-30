@@ -21,24 +21,24 @@ class ExecutionStateServiceTest
     @Test
     void routesPlanAndEvidenceToTheCurrentMission()
     {
-        LoomspanSession session = new LoomspanSession(4, "entry");
-        MissionContext parent = new MissionContext(session, "entry", "parent", null);
-        MissionContext child = new MissionContext(session, "child", "child", parent);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(4, "default-entry");
+        MissionContext parent = new MissionContext(session, "default-entry", "default-parent", null);
+        MissionContext child = new MissionContext(session, "default-child", "child", parent);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
-        ExecutionPlan plan = new ExecutionPlan("plan", "entry", CLOCK.instant(), List.of());
+        ExecutionPlan plan = new ExecutionPlan("plan", "default-entry", CLOCK.instant(), List.of());
 
         ExecutionBindingScope.runWith(ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, branch, ai.loomspan.testkit.TestSkillGenerations.empty()), () -> {
-            ExecutionFrame root = state.openMissionFrame(session, "entry", Map.of());
+            ExecutionFrame root = state.openMissionFrame(session, "default-entry", Map.of());
             try {
                 state.storePlan(plan);
-                state.recordSuccessfulSkill("direct", null, true);
+                state.recordSuccessfulSkill("default-direct", null, true);
                 ExecutionBindingScope.runWith(ai.loomspan.testkit.TestSkillGenerations.binding(session, child, branch, ai.loomspan.testkit.TestSkillGenerations.empty()), () -> {
                     assertThat(state.currentPlan()).isEmpty();
                     assertThat(state.currentSuccessfulSkills()).isEmpty();
                 });
                 assertThat(state.currentPlan()).contains(plan);
-                assertThat(state.currentSuccessfulSkills()).containsExactly("direct");
+                assertThat(state.currentSuccessfulSkills()).containsExactly("default-direct");
             }
             finally { state.closeMissionFrame(session, root); }
         });
@@ -47,12 +47,12 @@ class ExecutionStateServiceTest
     @Test
     void opensAndClosesFramesAgainstTheBoundBranchInStrictOrder()
     {
-        LoomspanSession session = new LoomspanSession(4, "entry");
-        MissionContext mission = new MissionContext(session, "entry", "mission", null);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(4, "default-entry");
+        MissionContext mission = new MissionContext(session, "default-entry", "mission", null);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
         ExecutionBindingScope.runWith(ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, branch, ai.loomspan.testkit.TestSkillGenerations.empty()), () -> {
-            ExecutionFrame root = state.openMissionFrame(session, "entry", Map.of());
+            ExecutionFrame root = state.openMissionFrame(session, "default-entry", Map.of());
             ExecutionFrame child = state.openFrame(session, TraceFrameType.MODEL_CALL, "model", Map.of());
             assertThat(child.parentFrameId()).isEqualTo(root.frameId());
             assertThatThrownBy(() -> state.closeFrame(session, root, Map.of())).isInstanceOf(IllegalStateException.class);
@@ -66,14 +66,14 @@ class ExecutionStateServiceTest
     @Test
     void recordsDiagnosticsOnMissionImmediately()
     {
-        LoomspanSession session = new LoomspanSession(4, "entry");
-        MissionContext mission = new MissionContext(session, "entry", "mission", null);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(4, "default-entry");
+        MissionContext mission = new MissionContext(session, "default-entry", "mission", null);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
-        LinterOutcome outcome = new LinterOutcome("entry", "regex", 1, 0, 1,
+        LinterOutcome outcome = new LinterOutcome("default-entry", "regex", 1, 0, 1,
                 LinterOutcomeStatus.PASSED, "ok");
         ExecutionBindingScope.runWith(ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, branch, ai.loomspan.testkit.TestSkillGenerations.empty()), () -> {
-            ExecutionFrame root = state.openMissionFrame(session, "entry", Map.of());
+            ExecutionFrame root = state.openMissionFrame(session, "default-entry", Map.of());
             state.recordLinterOutcome(session, outcome);
             assertThat(mission.lastLinterOutcome()).contains(outcome);
             state.closeMissionFrame(session, root);
@@ -83,15 +83,15 @@ class ExecutionStateServiceTest
     @Test
     void forkedBranchRecordsDiagnosticDeltaWithoutMutatingMission()
     {
-        LoomspanSession session = new LoomspanSession(4, "entry");
-        MissionContext mission = new MissionContext(session, "entry", "mission", null);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(4, "default-entry");
+        MissionContext mission = new MissionContext(session, "default-entry", "mission", null);
         ExecutionBinding parent = ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
-        LinterOutcome outcome = new LinterOutcome("entry", "regex", 1, 0, 1,
+        LinterOutcome outcome = new LinterOutcome("default-entry", "regex", 1, 0, 1,
                 LinterOutcomeStatus.PASSED, "worker-only");
 
         ExecutionBindingScope.runWith(parent, () -> {
-            ExecutionFrame root = state.openMissionFrame(session, "entry", Map.of());
+            ExecutionFrame root = state.openMissionFrame(session, "default-entry", Map.of());
             ExecutionBinding fork = ExecutionBindingScope.requireCurrent().forkBranch();
             ExecutionBindingScope.runWith(fork, () -> {
                 ExecutionFrame worker = state.openFrame(session, TraceFrameType.STEP_EXECUTION, "worker", Map.of());
@@ -109,8 +109,8 @@ class ExecutionStateServiceTest
     @Test
     void rejectsAnExplicitSessionFromAnotherBinding()
     {
-        LoomspanSession first = new LoomspanSession(4, "entry");
-        LoomspanSession second = new LoomspanSession(4, "entry");
+        LoomspanSession first = ai.loomspan.internal.core.TestLoomspanSessions.create(4, "default-entry");
+        LoomspanSession second = ai.loomspan.internal.core.TestLoomspanSessions.create(4, "default-entry");
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
         ExecutionBindingScope.runWith(TestExecutionBindings.missionBinding(first), () ->
                 assertThatThrownBy(() -> state.openFrame(second, TraceFrameType.MODEL_CALL, "model", Map.of()))
@@ -120,17 +120,17 @@ class ExecutionStateServiceTest
     @Test
     void closedBindingSuppressesStateTraceFailureAndFrameMutations()
     {
-        LoomspanSession session = new LoomspanSession(8, "entry");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-entry");
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
-        ExecutionPlan original = new ExecutionPlan("original", "entry", CLOCK.instant(), List.of());
+        ExecutionPlan original = new ExecutionPlan("original", "default-entry", CLOCK.instant(), List.of());
         binding.requireMission().storePlan(original);
 
         ExecutionBindingScope.runWith(binding, () -> {
             int recordsBefore = records(session).size();
             binding.requireMission().lifecycle().closeNow();
-            state.storePlan(new ExecutionPlan("late", "entry", CLOCK.instant(), List.of()));
-            state.recordSuccessfulSkill("late-skill", null, true);
+            state.storePlan(new ExecutionPlan("late", "default-entry", CLOCK.instant(), List.of()));
+            state.recordSuccessfulSkill("default-late_skill", null, true);
             state.recordStepEvent(session, binding.branch().requireLeaf(), TraceRecordType.STEP_COMPLETED,
                     Map.of(), Map.of());
 
@@ -147,27 +147,27 @@ class ExecutionStateServiceTest
     @Test
     void parentCutoffSuppressesEveryLaterChildCleanupMutation()
     {
-        LoomspanSession session = new LoomspanSession(8, "entry");
-        MissionContext parent = new MissionContext(session, "entry", "parent-frame", null);
-        MissionContext child = new MissionContext(session, "child", "child-frame", parent);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-entry");
+        MissionContext parent = new MissionContext(session, "default-entry", "parent-frame", null);
+        MissionContext child = new MissionContext(session, "default-child", "child-frame", parent);
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         DefaultExecutionStateService state = new DefaultExecutionStateService(CLOCK);
         ExecutionBinding parentBinding = ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, branch, ai.loomspan.testkit.TestSkillGenerations.empty());
 
         ExecutionBindingScope.runWith(parentBinding, () -> {
-            state.openMissionFrame(session, "entry", Map.of());
+            state.openMissionFrame(session, "default-entry", Map.of());
             ExecutionBinding childBinding = ai.loomspan.testkit.TestSkillGenerations.binding(session, child, branch, ai.loomspan.testkit.TestSkillGenerations.empty());
             ExecutionBindingScope.runWith(childBinding, () -> {
-                ExecutionFrame childFrame = state.openMissionFrame(session, "child", Map.of());
-                ExecutionPlan original = new ExecutionPlan("child-original", "child", CLOCK.instant(), List.of());
+                ExecutionFrame childFrame = state.openMissionFrame(session, "default-child", Map.of());
+                ExecutionPlan original = new ExecutionPlan("child-original", "default-child", CLOCK.instant(), List.of());
                 child.storePlan(original);
                 MissionLifecycle.Cutoff childCutoff = child.lifecycle().closeNow();
                 int recordsBefore = records(session).size();
 
                 parent.lifecycle().closeNow();
                 state.storeAndLogPlanForCleanup(session,
-                        new ExecutionPlan("child-late", "child", CLOCK.instant(), List.of()), null, childCutoff);
-                state.recordSuccessfulSkillForCleanup(session, "late-skill", "late-task", childCutoff);
+                        new ExecutionPlan("child-late", "default-child", CLOCK.instant(), List.of()), null, childCutoff);
+                state.recordSuccessfulSkillForCleanup(session, "default-late_skill", "late-task", childCutoff);
                 state.closeFrameForCleanup(session, childFrame, Map.of("status", "aborted"), childCutoff, false);
 
                 assertThat(child.currentPlan()).containsSame(original);

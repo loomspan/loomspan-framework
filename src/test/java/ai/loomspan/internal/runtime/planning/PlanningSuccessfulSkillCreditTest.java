@@ -24,18 +24,18 @@ class PlanningSuccessfulSkillCreditTest
         DefaultExecutionStateService state = new DefaultExecutionStateService(Clock.fixed(
                 Instant.parse("2026-03-15T12:00:00Z"), ZoneOffset.UTC));
         DefaultPlanningService planning = new DefaultPlanningService(state);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("planning-credit", "test.entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("planning-credit", "default-test_entry", 3);
         TestExecutionBindings.callWithSession(session, () -> {
-        state.storePlan(plan("task-success", "investigateNetwork"));
+        state.storePlan(plan("task-success", "default-investigateNetwork"));
 
         assertThat(successfulSkills()).isEmpty();
-        planning.markToolCompleted(session, "task-success", "investigateNetwork").orElseThrow();
-        assertThat(successfulSkills()).containsExactly("investigateNetwork");
+        planning.markToolCompleted(session, "task-success", "default-investigateNetwork").orElseThrow();
+        assertThat(successfulSkills()).containsExactly("default-investigateNetwork");
 
         state.storePlan(plan("task-failure", "investigateApp"));
         planning.markToolFailed(session, "task-failure", "investigateApp", new IllegalStateException("failed"));
         assertThat(successfulSkills())
-                .containsExactly("investigateNetwork")
+                .containsExactly("default-investigateNetwork")
                 .doesNotContain("investigateApp");
         return null;
         });

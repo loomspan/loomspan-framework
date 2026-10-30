@@ -1,0 +1,88 @@
+{
+  "case" : "namespace-captured-context",
+  "valid" : true,
+  "traceId" : "trace-namespace-captured-context",
+  "sessionId" : "session-namespace-captured-context",
+  "entrySkill" : "orders-search",
+  "generationId" : "orders-old",
+  "entryNamespace" : "orders",
+  "namespaceGenerationIds" : {
+    "audit" : "audit-unexecuted",
+    "orders" : "orders-old",
+    "tax" : "tax-retired"
+  },
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "terminalUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ ],
+  "retries" : [ ],
+  "validationLinks" : [ ],
+  "frames" : [ {
+    "frameId" : "namespace-root",
+    "parentFrameId" : null,
+    "frameType" : "ROOT_MISSION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "orders-search"
+  }, {
+    "frameId" : "namespace-target",
+    "parentFrameId" : "namespace-root",
+    "frameType" : "TOOL_INVOCATION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "tax-search"
+  } ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

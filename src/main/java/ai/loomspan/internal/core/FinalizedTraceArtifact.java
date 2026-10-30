@@ -11,6 +11,8 @@ public record FinalizedTraceArtifact(
         String sessionId,
         String entrySkill,
         String generationId,
+        String entryNamespace,
+        java.util.Map<String, String> namespaceGenerationIds,
         TraceOutcome outcome,
         Instant finalizedAt,
         Path artifactPath,
@@ -24,6 +26,8 @@ public record FinalizedTraceArtifact(
         sessionId = requireNonBlank(sessionId, "sessionId");
         entrySkill = requireNonBlank(entrySkill, "entrySkill");
         generationId = requireNonBlank(generationId, "generationId");
+        namespaceGenerationIds = new ai.loomspan.internal.core.CapturedNamespaceMetadata(
+                entryNamespace, generationId, namespaceGenerationIds).namespaceGenerationIds();
         Objects.requireNonNull(outcome, "outcome must not be null");
         Objects.requireNonNull(finalizedAt, "finalizedAt must not be null");
         artifactPath = Objects.requireNonNull(artifactPath, "artifactPath must not be null").toAbsolutePath().normalize();

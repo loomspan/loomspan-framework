@@ -538,10 +538,10 @@ func TestTraceAnalysisRecordsExposeFailureIdentityAndRecordLocalValidationStatus
 func TestTraceAnalysisRecordsExposePlanIdentityAndCapability(t *testing.T) {
 	router, _, cookie, fake := traceAnalysisRouter(t)
 	fake.recordPage = traceanalysis.Page[traceanalysis.RecordSummary]{Items: []traceanalysis.RecordSummary{{
-		Sequence: 12, Type: "PLAN_UPDATED", Facts: traceanalysis.RecordFacts{Plan: &traceanalysis.PlanReference{PlanID: "plan-1", CapabilityName: "investigateNetwork"}},
+		Sequence: 12, Type: "PLAN_UPDATED", Facts: traceanalysis.RecordFacts{Plan: &traceanalysis.PlanReference{PlanID: "plan-1", CapabilityName: "default-investigateNetwork"}},
 	}}}
 	response := traceAnalysisRequest(router, "/api/console/v1/traces/analysis/records", `{"source":"TARGET","traceId":"trace-1","pageSize":1,"representation":"LOGICAL"}`, cookie)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"plan":{"planId":"plan-1","capabilityName":"investigateNetwork"}`) {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"plan":{"planId":"plan-1","capabilityName":"default-investigateNetwork"}`) {
 		t.Fatalf("response=%d %s", response.Code, response.Body.String())
 	}
 	for _, forbidden := range []string{`"traceRootFrameId"`, `"missionFrameId"`, `"planningFrameId"`, `"attemptId"`, `"retrySequenceId"`} {

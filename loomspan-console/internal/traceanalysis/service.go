@@ -11,6 +11,7 @@ import (
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/skillidentity"
 )
 
 // Service is the transport-neutral trace-analysis query service. It is both
@@ -137,7 +138,7 @@ func readManifest(lease *artifact.Lease) (result manifest, resultErr error) {
 }
 
 func validateManifest(m manifest) error {
-	if m.Schema != manifestSchemaV1 || m.TraceID == "" || m.SessionID == "" ||
+	if m.Schema != manifestSchemaV1 || m.TraceID == "" || m.SessionID == "" || !skillidentity.ValidCapture(m.EntrySkill, m.EntryNamespace, m.GenerationID, m.NamespaceGenerationIDs) ||
 		m.RecordCount < 0 || m.FrameCount < 0 || m.PlanCount < 0 || m.AttemptCount < 0 || m.RetryCount < 0 ||
 		m.ValidationCount < 0 || m.FailureCount < 0 || m.PayloadCount < 0 ||
 		m.GapCount < 0 || m.UncertaintyCount < 0 {

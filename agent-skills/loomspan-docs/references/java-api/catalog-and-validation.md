@@ -70,8 +70,9 @@ Startup namespaces are Private; foreign outgoing references require a Public tar
 Fixed Java methods remain assigned to their original namespace across replacement
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
-for complete signatures, sequencing and retirement. This slice implements preparation
-and installation plus retained reachable admission; cross-namespace child dispatch follows in PR 27.4.
+for complete signatures, sequencing and retirement. Captured cross-namespace child
+dispatch independently enforces source authority, Public target visibility and target RBAC;
+unfiltered host metadata does not grant execution or observation access.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.
 

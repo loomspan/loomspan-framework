@@ -20,7 +20,7 @@ class YamlSkillDefinitionTest
     @Test
     void preservesDeclaredFieldsAcrossDefinitionDefensiveCopies()
     {
-        YamlSkillManifest manifest = manifest("llm.copy.skill");
+        YamlSkillManifest manifest = manifest("llm_copy_skill");
         manifest.setModel(null);
         manifest.setThinkingLevel(" ");
         manifest.setPrompt(null);
@@ -44,7 +44,7 @@ class YamlSkillDefinitionTest
         assertThat(secondCopy.getRbacRoles()).isEmpty();
         assertThat(new ObjectMapper().valueToTree(firstCopy).has("declaredFields")).isFalse();
 
-        YamlSkillManifest omitted = manifest("llm.omitted.copy.skill");
+        YamlSkillManifest omitted = manifest("llm_omitted_copy_skill");
         YamlSkillDefinition llm = new YamlSkillDefinition("default", resource(), omitted, CONFIGURATION);
         assertThat(llm.manifest().declaredFields()).isEmpty();
 
@@ -54,31 +54,31 @@ class YamlSkillDefinitionTest
     void preservesEvidenceAndAbsenceAcrossDefinitionDefensiveCopies()
     {
         YamlSkillManifest.OutputSchemaManifest annotated = outputSchema("string");
-        annotated.setEvidence("reviewSkill");
+        annotated.setEvidence("default-reviewSkill");
         YamlSkillManifest.OutputSchemaManifest unannotated = outputSchema("array");
         unannotated.setItems(outputSchema("string"));
         YamlSkillManifest.OutputSchemaManifest root = outputSchema("object");
         root.setProperties(Map.of("ResultValue", annotated, "notes", unannotated));
 
-        YamlSkillManifest manifest = manifest("llm.evidence.copy.skill");
+        YamlSkillManifest manifest = manifest("llm_evidence_copy_skill");
         manifest.setOutputSchema(root);
         EvidenceContract contract = ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(
-                Map.of("ResultValue", "reviewSkill"));
+                Map.of("ResultValue", "default-reviewSkill"));
         YamlSkillDefinition definition = new YamlSkillDefinition("default", resource(), manifest, CONFIGURATION, contract);
 
         YamlSkillManifest.OutputSchemaManifest first = definition.outputSchema();
-        assertThat(first.getProperties().get("ResultValue").getEvidence()).isEqualTo("reviewSkill");
+        assertThat(first.getProperties().get("ResultValue").getEvidence()).isEqualTo("default-reviewSkill");
         assertThat(first.getProperties().get("notes").getEvidence()).isNull();
         assertThat(first.getProperties().get("notes").getItems().getEvidence()).isNull();
         first.getProperties().get("ResultValue").setEvidence("mutated");
         assertThat(definition.outputSchema().getProperties().get("ResultValue").getEvidence())
-                .isEqualTo("reviewSkill");
+                .isEqualTo("default-reviewSkill");
     }
 
     @Test
     void enforcesExecutionConfigurationInvariantByImplementationType()
     {
-        YamlSkillManifest llm = manifest("llm.skill");
+        YamlSkillManifest llm = manifest("llm_skill");
         YamlSkillDefinition llmDefinition = new YamlSkillDefinition("default", resource(), llm, CONFIGURATION);
         assertThat(llmDefinition.requireExecutionConfiguration()).isSameAs(CONFIGURATION);
 
@@ -92,20 +92,20 @@ class YamlSkillDefinitionTest
     @Test
     void resolvesPlanningConcurrencyAndPreservesItsDeclaration()
     {
-        YamlSkillManifest omitted = manifest("planner.omitted");
+        YamlSkillManifest omitted = manifest("planner_omitted");
         omitted.setPlanningMode(true);
         YamlSkillDefinition omittedDefinition = new YamlSkillDefinition("default", resource(), omitted, CONFIGURATION);
         assertThat(omittedDefinition.concurrencyEnabled()).isTrue();
         assertThat(omittedDefinition.manifest().isDeclared(YamlSkillManifest.Field.CONCURRENCY)).isFalse();
 
-        YamlSkillManifest enabled = manifest("planner.enabled");
+        YamlSkillManifest enabled = manifest("planner_enabled");
         enabled.setPlanningMode(true);
         enabled.setConcurrency(true);
         YamlSkillDefinition enabledDefinition = new YamlSkillDefinition("default", resource(), enabled, CONFIGURATION);
         assertThat(enabledDefinition.concurrencyEnabled()).isTrue();
         assertThat(enabledDefinition.manifest().isDeclared(YamlSkillManifest.Field.CONCURRENCY)).isTrue();
 
-        YamlSkillManifest disabled = manifest("planner.disabled");
+        YamlSkillManifest disabled = manifest("planner_disabled");
         disabled.setPlanningMode(true);
         disabled.setConcurrency(false);
         assertThat(new YamlSkillDefinition("default", resource(), disabled, CONFIGURATION).concurrencyEnabled()).isFalse();
@@ -117,13 +117,13 @@ class YamlSkillDefinitionTest
     @Test
     void rejectsProgrammaticInapplicableOrNullConcurrencyDeclarations()
     {
-        YamlSkillManifest direct = manifest("direct.invalid");
+        YamlSkillManifest direct = manifest("direct_invalid");
         direct.setConcurrency(false);
         assertThatThrownBy(() -> new YamlSkillDefinition("default", resource(), direct, CONFIGURATION))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("planning_mode is explicitly true");
 
-        YamlSkillManifest nullPlanner = manifest("planner.null");
+        YamlSkillManifest nullPlanner = manifest("planner_null");
         nullPlanner.setPlanningMode(true);
         nullPlanner.setConcurrency(null);
         assertThatThrownBy(() -> new YamlSkillDefinition("default", resource(), nullPlanner, CONFIGURATION))

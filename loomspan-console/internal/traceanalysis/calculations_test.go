@@ -116,7 +116,7 @@ func boolStr(b bool) string {
 func startedRecord(seq int) string {
 	return `{"traceId":"t","sessionId":"s","sequence":` + itoa(seq) +
 		`,"timestamp":` + timestampForSeq(seq) +
-		`,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"consoleCompatibilityVersion":"development","generationId":"generation-test"},"data":null}`
+		`,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th","metadata":{"consoleCompatibilityVersion":"development","generationId":"generation-test","entrySkill":"default-test","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-test"}},"data":null}`
 }
 
 // processTrace runs the full processor over raw and returns the manifest or the

@@ -43,14 +43,14 @@ class StepActionValidatorTest {
     @BeforeEach
     void setUp() {
         PlanTask task1 = new PlanTask("t-1", "Parse invoice", PlanTaskStatus.PENDING,
-                "invoiceParser", "Extract vendor, amount, date",
+                "default-invoiceParser", "Extract vendor, amount, date",
                 List.of(), List.of("parsedInvoice"), null, null);
         PlanTask task2 = new PlanTask("t-2", "Look up expenses", PlanTaskStatus.PENDING,
-                "expenseLookup", "Find matching expenses",
+                "default-expenseLookup", "Find matching expenses",
                 List.of("t-1"), List.of("expenses"), null, null);
-        plan = new ExecutionPlan("plan-1", "duplicateInvoiceChecker", Instant.now(),
+        plan = new ExecutionPlan("plan-1", "default-duplicateInvoiceChecker", Instant.now(),
                 PlanStatus.VALID, List.of(task1, task2));
-        visibleTools = List.of(mockTool("invoiceParser"), mockTool("expenseLookup"));
+        visibleTools = List.of(mockTool("default-invoiceParser"), mockTool("default-expenseLookup"));
     }
 
     @Test
@@ -62,10 +62,10 @@ class StepActionValidatorTest {
                  "properties":{"evidence":{},"reasoning":{"type":"string"}},"required":["evidence"],"additionalProperties":true}},
                  "required":["context"],"additionalProperties":false}
                 """)) {
-            var tool = new BoundCapability(mockTool("invoiceParser", schema).metadata(), List.of(binding),
+            var tool = new BoundCapability(mockTool("default-invoiceParser", schema).metadata(), List.of(binding),
                     (arguments, taskId, sources) -> "unused");
             for (Map<String,Object> accepted : List.<Map<String,Object>>of(Map.of(), Map.of("context", Map.of("reasoning", "new"))))
-                assertThat(validateCurrentMode(StepAction.callTool("t-1", "invoiceParser", accepted),
+                assertThat(validateCurrentMode(StepAction.callTool("t-1", "default-invoiceParser", accepted),
                         plan, List.of(tool), true).valid()).isTrue();
             var nullBound = new java.util.LinkedHashMap<String,Object>();
             nullBound.put("evidence", null);
@@ -74,7 +74,7 @@ class StepActionValidatorTest {
             for (Map<String,Object> rejected : List.<Map<String,Object>>of(Map.of("context", Map.of("evidence", "equal")),
                     Map.of("context", nullBound), Map.of("context", "scalar"), Map.of("context", List.of(1)),
                     Map.of("context", Map.of("evidence", Map.of("nested", "override"))), nullAncestor)) {
-                var result = validateCurrentMode(StepAction.callTool("t-1", "invoiceParser", rejected), plan, List.of(tool), true);
+                var result = validateCurrentMode(StepAction.callTool("t-1", "default-invoiceParser", rejected), plan, List.of(tool), true);
                 assertThat(result.valid()).isFalse();
                 assertThat(result.rejectionReason()).contains("Binding override", "/context/evidence");
             }
@@ -92,7 +92,7 @@ class StepActionValidatorTest {
 
         @Test
         void nullActionTypeRejected() {
-            StepAction action = new StepAction(null, "t-1", "invoiceParser", Map.of(), null);
+            StepAction action = new StepAction(null, "t-1", "default-invoiceParser", Map.of(), null);
             StepValidationResult result = validateCurrentMode(action, plan, visibleTools, true);
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason()).contains("Step action type is null");
@@ -103,16 +103,16 @@ class StepActionValidatorTest {
     class CallToolValidation {
         @Test
         void validCallToolReadyTaskPasses() {
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of("input", "text"));
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of("input", "text"));
             StepValidationResult result = validateCurrentMode(action, plan, visibleTools, true);
             assertThat(result.valid()).isTrue();
         }
 
         @Test
         void bareObjectToolSchemaRemainsPermissive() {
-            List<BoundCapability> genericObjectTools = List.of(mockTool("invoiceParser", "{}"));
+            List<BoundCapability> genericObjectTools = List.of(mockTool("default-invoiceParser", "{}"));
 
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of("input", "text"));
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of("input", "text"));
             StepValidationResult result = validateCurrentMode(action, plan, genericObjectTools, true);
 
             assertThat(result.valid()).isTrue();
@@ -120,7 +120,7 @@ class StepActionValidatorTest {
 
         @Test
         void missingTaskIdRejected() {
-            StepAction action = new StepAction(StepActionType.CALL_TOOL, null, "invoiceParser", Map.of(), null);
+            StepAction action = new StepAction(StepActionType.CALL_TOOL, null, "default-invoiceParser", Map.of(), null);
             StepValidationResult result = validateCurrentMode(action, plan, visibleTools, true);
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason()).contains("taskId");
@@ -136,7 +136,7 @@ class StepActionValidatorTest {
 
         @Test
         void unknownTaskIdRejected() {
-            StepAction action = StepAction.callTool("t-99", "invoiceParser", Map.of());
+            StepAction action = StepAction.callTool("t-99", "default-invoiceParser", Map.of());
             StepValidationResult result = validateCurrentMode(action, plan, visibleTools, true);
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason())
@@ -146,7 +146,7 @@ class StepActionValidatorTest {
         @Test
         void completedTaskRejected() {
             ExecutionPlan updated = plan.updateTask("t-1", task -> task.complete("done"));
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of());
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of());
             StepValidationResult result = validateCurrentMode(action, updated, visibleTools, true);
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason()).contains("not IN_PROGRESS", "COMPLETED");
@@ -162,20 +162,20 @@ class StepActionValidatorTest {
 
         @Test
         void wrongToolForTaskRejected() {
-            StepAction action = StepAction.callTool("t-1", "expenseLookup", Map.of());
+            StepAction action = StepAction.callTool("t-1", "default-expenseLookup", Map.of());
             StepValidationResult result = validateCurrentMode(action, plan, visibleTools, true);
             assertThat(result.valid()).isFalse();
-            assertThat(result.rejectionReason()).contains("expects tool 'invoiceParser'");
+            assertThat(result.rejectionReason()).contains("expects tool 'default-invoiceParser'");
         }
 
         @Test
         void taskWithoutCapabilityBindingRejected() {
-            ExecutionPlan invalidPlan = new ExecutionPlan("plan-1", "duplicateInvoiceChecker", Instant.now(),
+            ExecutionPlan invalidPlan = new ExecutionPlan("plan-1", "default-duplicateInvoiceChecker", Instant.now(),
                     PlanStatus.VALID, List.of(
                     new PlanTask("t-1", "Parse invoice", PlanTaskStatus.PENDING,
                             null, "Extract vendor, amount, date",
                             List.of(), List.of("parsedInvoice"), null, null)));
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of());
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of());
             StepValidationResult result = validateCurrentMode(action, invalidPlan, visibleTools, true);
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason()).contains("does not declare an allowed tool capability");
@@ -184,14 +184,14 @@ class StepActionValidatorTest {
         @Test
         void dependencySatisfiedTaskPasses() {
             ExecutionPlan updated = plan.updateTask("t-1", task -> task.complete("done"));
-            StepAction action = StepAction.callTool("t-2", "expenseLookup", Map.of());
+            StepAction action = StepAction.callTool("t-2", "default-expenseLookup", Map.of());
             StepValidationResult result = validateCurrentMode(action, updated, visibleTools, true);
             assertThat(result.valid()).isTrue();
         }
 
         @Test
         void missingRequiredArgumentsFromConcreteToolSchemaRejected() {
-            List<BoundCapability> schemaAwareTools = List.of(mockTool("invoiceParser", """
+            List<BoundCapability> schemaAwareTools = List.of(mockTool("default-invoiceParser", """
                     {
                       "type": "object",
                       "properties": {
@@ -201,7 +201,7 @@ class StepActionValidatorTest {
                       "additionalProperties": false
                     }
                     """));
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of());
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of());
             StepValidationResult result = validateCurrentMode(action, plan, schemaAwareTools, true);
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason()).contains("missing_required");
@@ -210,7 +210,7 @@ class StepActionValidatorTest {
 
         @Test
         void requiredArgumentsFromConcreteToolSchemaPassWhenPresent() {
-            List<BoundCapability> schemaAwareTools = List.of(mockTool("invoiceParser", """
+            List<BoundCapability> schemaAwareTools = List.of(mockTool("default-invoiceParser", """
                     {
                       "type": "object",
                       "properties": {
@@ -220,28 +220,28 @@ class StepActionValidatorTest {
                       "additionalProperties": false
                     }
                     """));
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of("rawText", "INV-1"));
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of("rawText", "INV-1"));
             StepValidationResult result = validateCurrentMode(action, plan, schemaAwareTools, true);
             assertThat(result.valid()).isTrue();
         }
 
         @Test
         void genericObjectSchemaDoesNotTriggerRequiredArgumentRejection() {
-            List<BoundCapability> genericTools = List.of(mockTool("invoiceParser", """
+            List<BoundCapability> genericTools = List.of(mockTool("default-invoiceParser", """
                     {
                       "type": "object",
                       "properties": {},
                       "additionalProperties": true
                     }
                     """));
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of());
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of());
             StepValidationResult result = validateCurrentMode(action, plan, genericTools, true);
             assertThat(result.valid()).isTrue();
         }
 
         @Test
         void nestedAndTypedToolArgumentsUseSharedValidator() {
-            List<BoundCapability> schemaAwareTools = List.of(mockTool("invoiceParser", """
+            List<BoundCapability> schemaAwareTools = List.of(mockTool("default-invoiceParser", """
                     {
                       "type": "object",
                       "properties": {
@@ -258,7 +258,7 @@ class StepActionValidatorTest {
                       "additionalProperties": false
                     }
                     """));
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of("options", Map.of("enabled", "nope", "extra", true)));
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of("options", Map.of("enabled", "nope", "extra", true)));
 
             StepValidationResult result = validateCurrentMode(action, plan, schemaAwareTools, true);
 
@@ -269,7 +269,7 @@ class StepActionValidatorTest {
 
         @Test
         void nestedObjectWithoutAdditionalPropertiesKeywordRemainsOpen() {
-            List<BoundCapability> schemaAwareTools = List.of(mockTool("invoiceParser", """
+            List<BoundCapability> schemaAwareTools = List.of(mockTool("default-invoiceParser", """
                     {
                       "type": "object",
                       "properties": {
@@ -285,7 +285,7 @@ class StepActionValidatorTest {
                     }
                     """));
 
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of(
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of(
                     "options", Map.of("enabled", true, "extra", "allowed")));
 
             StepValidationResult result = validateCurrentMode(action, plan, schemaAwareTools, true);
@@ -295,7 +295,7 @@ class StepActionValidatorTest {
 
         @Test
         void contractAwareToolRejectsMissingArgumentsEvenWhenPublishedSchemaIsGeneric() {
-            List<BoundCapability> tools = List.of(contractAwareTool("invoiceParser", """
+            List<BoundCapability> tools = List.of(contractAwareTool("default-invoiceParser", """
                     {
                       "type": "object",
                       "properties": {},
@@ -312,7 +312,7 @@ class StepActionValidatorTest {
                     }
                     """));
 
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of());
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of());
             StepValidationResult result = validateCurrentMode(action, plan, tools, true);
 
             assertThat(result.valid()).isFalse();
@@ -322,7 +322,7 @@ class StepActionValidatorTest {
 
         @Test
         void placeholderToolArgumentsAreRejectedEvenWhenTypeValid() {
-            List<BoundCapability> schemaAwareTools = List.of(mockTool("invoiceParser", """
+            List<BoundCapability> schemaAwareTools = List.of(mockTool("default-invoiceParser", """
                     {
                       "type": "object",
                       "properties": {
@@ -333,7 +333,7 @@ class StepActionValidatorTest {
                     }
                     """));
 
-            StepAction action = StepAction.callTool("t-1", "invoiceParser",
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser",
                     Map.of("payload", "<canonical mission input>"));
 
             StepValidationResult result = validateCurrentMode(action, plan, schemaAwareTools, true);
@@ -346,7 +346,7 @@ class StepActionValidatorTest {
         @Test
         void stepValidationAcceptsGenericMapValuesAndStillRejectsNestedPlaceholders()
         {
-            List<BoundCapability> tools = List.of(mockTool("invoiceParser", """
+            List<BoundCapability> tools = List.of(mockTool("default-invoiceParser", """
                     {
                       "type": "object",
                       "properties": {
@@ -368,10 +368,10 @@ class StepActionValidatorTest {
                     "durationMinutes", 210);
 
             StepValidationResult accepted = validateCurrentMode(
-                    StepAction.callTool("t-1", "invoiceParser", Map.of("options", List.of(validOption))),
+                    StepAction.callTool("t-1", "default-invoiceParser", Map.of("options", List.of(validOption))),
                     plan, tools, true);
             StepValidationResult placeholder = validateCurrentMode(
-                    StepAction.callTool("t-1", "invoiceParser", Map.of(
+                    StepAction.callTool("t-1", "default-invoiceParser", Map.of(
                             "options", List.of(Map.of("operator", "<value>", "price", 69.0)))),
                     plan, tools, true);
 
@@ -383,7 +383,7 @@ class StepActionValidatorTest {
 
         @Test
         void typedMapToolSchemaIsNotTreatedAsGeneric() {
-            List<BoundCapability> typedMapTools = List.of(mockTool("invoiceParser", """
+            List<BoundCapability> typedMapTools = List.of(mockTool("default-invoiceParser", """
                     {
                       "type": "object",
                       "additionalProperties": {
@@ -392,7 +392,7 @@ class StepActionValidatorTest {
                     }
                     """));
 
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of("count", 3));
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of("count", 3));
             StepValidationResult result = validateCurrentMode(action, plan, typedMapTools, true);
 
             assertThat(result.valid()).isFalse();
@@ -401,14 +401,14 @@ class StepActionValidatorTest {
 
         @Test
         void strictEmptyObjectToolSchemaRejectsInventedArguments() {
-            List<BoundCapability> strictEmptyTools = List.of(mockTool("invoiceParser", """
+            List<BoundCapability> strictEmptyTools = List.of(mockTool("default-invoiceParser", """
                     {
                       "type": "object",
                       "additionalProperties": false
                     }
                     """));
 
-            StepAction action = StepAction.callTool("t-1", "invoiceParser", Map.of("extra", "nope"));
+            StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of("extra", "nope"));
             StepValidationResult result = validateCurrentMode(action, plan, strictEmptyTools, true);
 
             assertThat(result.valid()).isFalse();
@@ -489,13 +489,13 @@ class StepActionValidatorTest {
             PlanTask assignment = admitted.findTask("t-1").orElseThrow();
 
             assertThat(StepActionValidator.validateAssigned(
-                    StepAction.callTool("t-1", "invoiceParser", Map.of()), admitted, assignment, visibleTools).valid())
+                    StepAction.callTool("t-1", "default-invoiceParser", Map.of()), admitted, assignment, visibleTools).valid())
                     .isTrue();
             assertThat(StepActionValidator.validateAssigned(
-                    StepAction.callTool("t-2", "expenseLookup", Map.of()), admitted, assignment, visibleTools).rejectionReason())
+                    StepAction.callTool("t-2", "default-expenseLookup", Map.of()), admitted, assignment, visibleTools).rejectionReason())
                     .isEqualTo("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId.");
             assertThat(StepActionValidator.validateAssigned(
-                    new StepAction(StepActionType.CALL_TOOL, null, "invoiceParser", Map.of(), null),
+                    new StepAction(StepActionType.CALL_TOOL, null, "default-invoiceParser", Map.of(), null),
                     admitted, assignment, visibleTools).rejectionReason())
                     .isEqualTo("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId.");
             assertThat(StepActionValidator.validateAssigned(
@@ -509,17 +509,17 @@ class StepActionValidatorTest {
         {
             PlanTask assignment = plan.findTask("t-1").orElseThrow();
             assertThat(StepActionValidator.validateAssigned(
-                    StepAction.callTool("t-1", "invoiceParser", Map.of()), plan, assignment, visibleTools).rejectionReason())
+                    StepAction.callTool("t-1", "default-invoiceParser", Map.of()), plan, assignment, visibleTools).rejectionReason())
                     .contains("not IN_PROGRESS", "PENDING");
 
             ExecutionPlan admitted = plan.updateTask("t-1", task -> task.bindInProgress("starting"));
             PlanTask admittedAssignment = admitted.findTask("t-1").orElseThrow();
-            List<BoundCapability> typedTools = List.of(mockTool("invoiceParser", """
+            List<BoundCapability> typedTools = List.of(mockTool("default-invoiceParser", """
                     {"type":"object","properties":{"invoiceId":{"type":"string"}},
                      "required":["invoiceId"],"additionalProperties":false}
                     """));
             StepValidationResult invalid = StepActionValidator.validateAssigned(
-                    StepAction.callTool("t-1", "invoiceParser", Map.of("invoiceId", "<value>")),
+                    StepAction.callTool("t-1", "default-invoiceParser", Map.of("invoiceId", "<value>")),
                     admitted, admittedAssignment, typedTools);
             assertThat(invalid.valid()).isFalse();
             assertThat(invalid.rejectionReason()).contains("unresolved placeholder values", "invoiceId");

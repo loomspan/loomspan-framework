@@ -57,7 +57,7 @@ func (service *Service) runAcquisition(entry *entry, scope target.Scope, traceID
 		return
 	}
 	service.mu.Lock()
-	entry.metadata = metadata
+	entry.metadata = metadata.Clone()
 	entry.applicationAvailability = ApplicationAvailable
 	service.mu.Unlock()
 
@@ -211,12 +211,9 @@ func (service *Service) installStream(entry *entry, stream inputStream, metadata
 	validatedMetadata.TraceID = processResult.Metadata.TraceID
 	validatedMetadata.SessionID = processResult.Metadata.SessionID
 	validatedMetadata.GenerationID = processResult.Metadata.GenerationID
-	// Target acquisition retains the catalog's source fact. A target-free
-	// import has no catalog metadata, so its entry skill comes only from the
-	// validated TRACE_STARTED record published by the processor.
-	if entry.key.owner.Source() == evidence.SourceImported {
-		validatedMetadata.EntrySkill = processResult.Metadata.EntrySkill
-	}
+	validatedMetadata.EntryNamespace = processResult.Metadata.EntryNamespace
+	validatedMetadata.NamespaceGenerationIDs = processResult.Metadata.Clone().NamespaceGenerationIDs
+	validatedMetadata.EntrySkill = processResult.Metadata.EntrySkill
 	validatedMetadata.Outcome = processResult.Metadata.Outcome
 	validatedMetadata.FinalizedAt = processResult.Metadata.FinalizedAt
 	validatedMetadata.PersistencePolicy = processResult.Metadata.PersistencePolicy
@@ -239,7 +236,7 @@ func (service *Service) installStream(entry *entry, stream inputStream, metadata
 	return AcquiredArtifact{
 		Owner:         entry.key.owner,
 		Handle:        entry.handle,
-		Metadata:      validatedMetadata,
+		Metadata:      validatedMetadata.Clone(),
 		LocalBytes:    aggregate,
 		AcquiredAt:    time.Time{},
 		LastUsedAt:    now,
@@ -268,7 +265,7 @@ func (service *Service) runProcessor(entry *entry, stagingDir string, metadata T
 
 	req := ProcessRequest{
 		Context:  entry.acquireCtx,
-		Metadata: metadata,
+		Metadata: metadata.Clone(),
 		Raw:      &cancelableReader{ctx: entry.acquireCtx, r: rawReader},
 		Sink:     sink,
 	}

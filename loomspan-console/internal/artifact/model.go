@@ -2,6 +2,7 @@ package artifact
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
@@ -23,8 +24,8 @@ const (
 	ApplicationUnavailable ApplicationAvailability = "UNAVAILABLE"
 )
 
-// TraceMetadata is the immutable acquisition-time trace metadata copied from the
-// authoritative observability response. It is retained by the entry for the
+// TraceMetadata retains canonical facts validated from trace bytes and upstream
+// availability facts observed at acquisition. It is retained by the entry for the
 // entry's entire lifetime so installed evidence remains usable after upstream
 // authentication failure or application expiry.
 type TraceMetadata struct {
@@ -32,6 +33,8 @@ type TraceMetadata struct {
 	SessionID                 string
 	EntrySkill                string
 	GenerationID              string
+	EntryNamespace            string
+	NamespaceGenerationIDs    map[string]string
 	Outcome                   string
 	FinalizedAt               time.Time
 	SizeBytes                 int64
@@ -177,4 +180,10 @@ type StoredEntry struct {
 	ApplicationAvailability   string          `json:"applicationAvailability,omitempty"`
 	LocalAvailable            bool            `json:"localAvailable"`
 	ActivePin                 bool            `json:"activePin"`
+}
+
+// Clone detaches mutable metadata at service boundaries.
+func (m TraceMetadata) Clone() TraceMetadata {
+	m.NamespaceGenerationIDs = maps.Clone(m.NamespaceGenerationIDs)
+	return m
 }

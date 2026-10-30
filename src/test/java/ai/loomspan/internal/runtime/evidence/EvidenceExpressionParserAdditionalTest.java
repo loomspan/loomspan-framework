@@ -33,7 +33,7 @@ class EvidenceExpressionParserAdditionalTest
             "'default-a && default-b',11,expected 'and'",
             "'default-a || default-b',11,expected 'and'",
             "'default-a, default-b',1,invalid local name",
-            "'\"default-a\"',1,expected a skill name",
+            "'\"a\"',1,expected a skill name",
             "'not default-a',1,invalid qualified skill reference"
     })
     void reportsMalformedCategoryAndPreciseColumn(String raw, int column, String detail)
