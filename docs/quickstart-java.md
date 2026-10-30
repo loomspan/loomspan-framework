@@ -121,7 +121,7 @@ public class DemoApplication {
 
     @Bean
     ApplicationRunner triage(SkillTemplate skills) {
-        return args -> System.out.println(skills.invoke("triageSupportRequest",
+        return args -> System.out.println(skills.invoke("default-triageSupportRequest",
             Map.of("customerMessage", """
                 Since this morning's deployment, checkout times out after payment.
                 Three customers say they were charged but received no order confirmation.

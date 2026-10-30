@@ -204,7 +204,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         Objects.requireNonNull(objective, "objective must not be null");
         Objects.requireNonNull(modelInteraction, "modelInteraction must not be null");
         Objects.requireNonNull(visibleTools, "visibleTools must not be null");
-        String skillName = definition.manifest().getName();
+        String skillName = definition.identity().toString();
         EffectiveSkillExecutionConfiguration executionConfiguration = definition.requireExecutionConfiguration();
 
         ExecutionBinding capturedBinding = ExecutionBindingScope.requireCurrent();
@@ -336,7 +336,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             List<BoundCapability> visibleTools,
             MissionLifecycle lifecycle)
     {
-        String skillName = definition.manifest().getName();
+        String skillName = definition.identity().toString();
         int maxSteps = definition.maxSteps(defaultMaxSteps);
         if (maxSteps <= 0)
         {
@@ -563,7 +563,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             OutputSchemaValidationResult result, int linterAttempt, int schemaAttempt, int evidenceAttempt) {
         int maxRetries = definition.outputSchemaMaxRetries();
         boolean exhausted = OutputValidationPolicy.exhausted(schemaAttempt, maxRetries);
-        executionStateService.recordOutputSchemaOutcome(session, OutputValidationPolicy.schemaOutcome(definition.manifest().getName(), schemaAttempt, maxRetries, false, result.failureMode(), result.issues(), Integer.MAX_VALUE));
+        executionStateService.recordOutputSchemaOutcome(session, OutputValidationPolicy.schemaOutcome(definition.identity().toString(), schemaAttempt, maxRetries, false, result.failureMode(), result.issues(), Integer.MAX_VALUE));
         return new FinalResponseValidationOutcome(StepValidationResult.rejected("Final model contribution violates output bindings: "
                 + OutputValidationFeedback.planningSchemaSummary(result.issues())), linterAttempt, schemaAttempt + 1, evidenceAttempt, exhausted);
     }
@@ -1304,7 +1304,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         ? "Final response did not match the configured regex linter."
                         : linter.getRegex().getMessage());
 
-        LinterOutcome outcome = OutputValidationPolicy.linterOutcome(skillDefinition.manifest().getName(),
+        LinterOutcome outcome = OutputValidationPolicy.linterOutcome(skillDefinition.identity().toString(),
                 linter.getType(), attempt, maxRetries, matches, detail);
         executionStateService.recordLinterOutcome(LoomspanSession.getCurrentSession(), outcome);
 
@@ -1325,7 +1325,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
 
         int maxRetries = skillDefinition.outputSchemaMaxRetries();
         OutputSchemaValidationResult result = outputSchemaValidator.validate(finalResponse, skillDefinition.outputSchema());
-        OutputSchemaOutcome outcome = OutputValidationPolicy.schemaOutcome(skillDefinition.manifest().getName(),
+        OutputSchemaOutcome outcome = OutputValidationPolicy.schemaOutcome(skillDefinition.identity().toString(),
                 attempt, maxRetries, result.valid(), result.failureMode(), result.issues(), Integer.MAX_VALUE);
         executionStateService.recordOutputSchemaOutcome(session, outcome);
 
@@ -1360,7 +1360,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                 session,
                 result.complete(),
                 Map.of(
-                        "skillName", skillDefinition.manifest().getName(),
+                        "skillName", skillDefinition.identity().toString(),
                         "claims", result.evaluatedClaims(),
                         "attempt", attempt,
                         "maxRetries", maxRetries),

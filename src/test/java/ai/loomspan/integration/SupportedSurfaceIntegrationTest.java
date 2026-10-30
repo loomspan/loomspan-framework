@@ -52,7 +52,7 @@ class SupportedSurfaceIntegrationTest
                     .setBody("""
                             {"id":"chatcmpl-supported-surface","object":"chat.completion","created":1,
                              "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"capabilityName\\\":\\\"supportedSurfaceSkill\\\",\\\"createdAt\\\":\\\"2026-09-12T12:00:00Z\\\",\\\"status\\\":\\\"VALID\\\",\\\"tasks\\\":[{\\\"taskId\\\":\\\"java-task\\\",\\\"title\\\":\\\"Call Java leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"supportedJavaLeaf\\\",\\\"intent\\\":\\\"Echo through Java\\\",\\\"dependsOn\\\":[],\\\"expectedOutputs\\\":[\\\"Java echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"},{\\\"taskId\\\":\\\"rest-task\\\",\\\"title\\\":\\\"Call REST leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"supportedRestLeaf\\\",\\\"intent\\\":\\\"Echo through REST\\\",\\\"dependsOn\\\":[\\\"java-task\\\"],\\\"expectedOutputs\\\":[\\\"REST echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"}]}"},
+                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"capabilityName\\\":\\\"default-supportedSurfaceSkill\\\",\\\"createdAt\\\":\\\"2026-09-12T12:00:00Z\\\",\\\"status\\\":\\\"VALID\\\",\\\"tasks\\\":[{\\\"taskId\\\":\\\"java-task\\\",\\\"title\\\":\\\"Call Java leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"default-supportedJavaLeaf\\\",\\\"intent\\\":\\\"Echo through Java\\\",\\\"dependsOn\\\":[],\\\"expectedOutputs\\\":[\\\"Java echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"},{\\\"taskId\\\":\\\"rest-task\\\",\\\"title\\\":\\\"Call REST leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"default-supportedRestLeaf\\\",\\\"intent\\\":\\\"Echo through REST\\\",\\\"dependsOn\\\":[\\\"java-task\\\"],\\\"expectedOutputs\\\":[\\\"REST echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"}]}"},
                                          "finish_reason":"stop"}],
                              "usage":{"prompt_tokens":3,"completion_tokens":3,"total_tokens":6}}
                             """));
@@ -61,7 +61,7 @@ class SupportedSurfaceIntegrationTest
                     .setBody("""
                             {"id":"chatcmpl-supported-surface-java","object":"chat.completion","created":1,
                              "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"CALL_TOOL\\\",\\\"taskId\\\":\\\"java-task\\\",\\\"toolName\\\":\\\"supportedJavaLeaf\\\",\\\"toolArguments\\\":{\\\"message\\\":\\\"hello through the public API\\\"}}"},
+                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"CALL_TOOL\\\",\\\"taskId\\\":\\\"java-task\\\",\\\"toolName\\\":\\\"default-supportedJavaLeaf\\\",\\\"toolArguments\\\":{\\\"message\\\":\\\"hello through the public API\\\"}}"},
                                          "finish_reason":"stop"}],
                              "usage":{"prompt_tokens":4,"completion_tokens":3,"total_tokens":7}}
                             """));
@@ -70,7 +70,7 @@ class SupportedSurfaceIntegrationTest
                     .setBody("""
                             {"id":"chatcmpl-supported-surface-rest","object":"chat.completion","created":1,
                              "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"CALL_TOOL\\\",\\\"taskId\\\":\\\"rest-task\\\",\\\"toolName\\\":\\\"supportedRestLeaf\\\",\\\"toolArguments\\\":{\\\"message\\\":\\\"hello through the public API\\\"}}"},
+                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"CALL_TOOL\\\",\\\"taskId\\\":\\\"rest-task\\\",\\\"toolName\\\":\\\"default-supportedRestLeaf\\\",\\\"toolArguments\\\":{\\\"message\\\":\\\"hello through the public API\\\"}}"},
                                          "finish_reason":"stop"}],
                              "usage":{"prompt_tokens":4,"completion_tokens":3,"total_tokens":7}}
                             """));
@@ -103,31 +103,32 @@ class SupportedSurfaceIntegrationTest
                         assertThat(context).hasNotFailed();
                         assertThat(context).hasSingleBean(SkillTemplate.class);
                         assertThat(context).hasSingleBean(SkillInvocationHandoff.class);
-                        assertThat(context).hasSingleBean(SkillCatalog.class);
+                        assertThat(context).doesNotHaveBean(SkillCatalog.class);
 
                         SkillTemplate skills = context.getBean(SkillTemplate.class);
                         SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
-                        SkillCatalog catalog = context.getBean(SkillCatalog.class);
+                        SkillCatalog catalog = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("DEFAULT");
+                        assertThat(catalog.namespace()).isEqualTo("default");
                         assertThat(catalog.skills()).extracting(descriptor -> descriptor.name())
                                 .isSorted()
-                                .contains("supportedSurfaceSkill", "supportedJavaLeaf", "supportedRestLeaf");
-                        assertThat(catalog.skill("supportedJavaLeaf")).get()
+                                .contains("default-supportedSurfaceSkill", "default-supportedJavaLeaf", "default-supportedRestLeaf");
+                        assertThat(catalog.skill("default-supportedJavaLeaf")).get()
                                 .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.JAVA);
-                        assertThat(catalog.skill("supportedRestLeaf")).get()
+                        assertThat(catalog.skill("default-supportedRestLeaf")).get()
                                 .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.REST);
-                        assertThat(catalog.skill("supportedSurfaceSkill")).get()
+                        assertThat(catalog.skill("default-supportedSurfaceSkill")).get()
                                 .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.YAML);
-                        assertThat(catalog.skill("missing")).isEmpty();
+                        assertThat(catalog.skill("default-missing")).isEmpty();
                         AtomicReference<SkillExecutionView> observed = new AtomicReference<>();
                         var authorized = UsernamePasswordAuthenticationToken.authenticated(
                                 "supported-caller", "unused", AuthorityUtils.createAuthorityList("ROLE_REST_USER"));
                         try {
                             SecurityContextHolder.getContext().setAuthentication(authorized);
-                            skills.validate("supportedSurfaceSkill",
+                            skills.validate("default-supportedSurfaceSkill",
                                     Map.of("message", "hello through the public API"));
-                            skills.validate("supportedJavaLeaf", new DirectRequest("precheck"));
-                            skills.validate("supportedRestLeaf", new DirectRequest("precheck"));
-                            var admitted = handoff.handoff("supportedRestLeaf", new DirectRequest("handed-off"));
+                            skills.validate("default-supportedJavaLeaf", new DirectRequest("precheck"));
+                            skills.validate("default-supportedRestLeaf", new DirectRequest("precheck"));
+                            var admitted = handoff.handoff("default-supportedRestLeaf", new DirectRequest("handed-off"));
                             assertThat(admitted.generationId()).isEqualTo(catalog.generationId());
                             SecurityContextHolder.clearContext();
                             assertThat(admitted.invoke()).isEqualTo("REST: handed-off");
@@ -138,7 +139,7 @@ class SupportedSurfaceIntegrationTest
                                     .hasValue("supported-caller");
                             SecurityContextHolder.getContext().setAuthentication(authorized);
                             var admittedRoot = handoff.handoff(
-                                    "supportedSurfaceSkill",
+                                    "default-supportedSurfaceSkill",
                                     Map.of("message", "hello through the public API"));
                             assertThat(admittedRoot.generationId()).isEqualTo(catalog.generationId());
                             assertThat(admittedRoot.invoke(observed::set))
@@ -156,7 +157,7 @@ class SupportedSurfaceIntegrationTest
                             Map<String, Object> mutableInput = new LinkedHashMap<>();
                             mutableInput.put("message", "direct");
                             mutableInput.put("values", mutableValues);
-                            assertThat(skills.invoke("supportedRestLeaf", mutableInput))
+                            assertThat(skills.invoke("default-supportedRestLeaf", mutableInput))
                                     .isEqualTo("REST: direct");
                             mutableValues.add("late");
                             assertThat((List<Object>) SupportedSkillConfiguration.lastInvocation.get().input().get("values"))
@@ -170,15 +171,15 @@ class SupportedSurfaceIntegrationTest
 
                             AtomicInteger preSessionObserverCalls = new AtomicInteger();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
-                                    "supportedRestLeaf", Map.of(), ignored -> preSessionObserverCalls.incrementAndGet())))
+                                    "default-supportedRestLeaf", Map.of(), ignored -> preSessionObserverCalls.incrementAndGet())))
                                     .isInstanceOf(SkillInputValidationException.class);
                             assertThat(preSessionObserverCalls).hasValue(0);
 
                             AtomicReference<SkillExecutionView> failedView = new AtomicReference<>();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
-                                    "supportedRestLeaf", Map.of("message", "fail"), failedView::set)))
+                                    "default-supportedRestLeaf", Map.of("message", "fail"), failedView::set)))
                                     .isInstanceOf(SkillException.class)
-                                    .hasMessage("Skill 'supportedRestLeaf' execution failed.");
+                                    .hasMessage("Skill 'default-supportedRestLeaf' execution failed.");
                             assertThat(failedView.get()).isNotNull();
                             assertThat(failedView.get().events()).isNotEmpty();
 
@@ -186,16 +187,16 @@ class SupportedSurfaceIntegrationTest
                                     UsernamePasswordAuthenticationToken.authenticated(
                                             "denied-caller", "unused", AuthorityUtils.NO_AUTHORITIES));
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(
-                                    () -> skills.validate("supportedRestLeaf", Map.of("message", "denied"))))
+                                    () -> skills.validate("default-supportedRestLeaf", Map.of("message", "denied"))))
                                     .isInstanceOf(AccessDeniedException.class);
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(
-                                    () -> skills.validate("supportedJavaLeaf", Map.of("message", "denied"))))
+                                    () -> skills.validate("default-supportedJavaLeaf", Map.of("message", "denied"))))
                                     .isInstanceOf(AccessDeniedException.class);
                             AtomicReference<SkillExecutionView> rejectedView = new AtomicReference<>();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
-                                    "supportedRestLeaf", Map.of("message", "denied"), rejectedView::set)))
+                                    "default-supportedRestLeaf", Map.of("message", "denied"), rejectedView::set)))
                                     .isInstanceOf(AccessDeniedException.class)
-                                    .hasMessage("Access denied for capability 'supportedRestLeaf'");
+                                    .hasMessage("Access denied for capability 'default-supportedRestLeaf'");
                             assertThat(rejectedView.get()).isNotNull();
                             assertThat(rejectedView.get().events()).extracting(event -> event.type())
                                     .contains("ERROR");
@@ -214,13 +215,13 @@ class SupportedSurfaceIntegrationTest
                     .contains("\"model\":\"integration-model\"")
                     .contains("hello through the public API")
                     .contains("Create an ordered flight plan")
-                    .contains("supportedJavaLeaf", "supportedRestLeaf");
+                    .contains("default-supportedJavaLeaf", "default-supportedRestLeaf");
 
             RecordedRequest javaRequest = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(javaRequest).isNotNull();
             String javaBody = javaRequest.getBody().readUtf8();
             assertThat(javaBody)
-                    .contains("java-task", "supportedJavaLeaf")
+                    .contains("java-task", "default-supportedJavaLeaf")
                     .doesNotContain("REST: hello through the public API");
             JsonNode javaPayload = new ObjectMapper().readTree(javaBody);
             assertThat(requestMessages(javaPayload))
@@ -232,7 +233,7 @@ class SupportedSurfaceIntegrationTest
             assertThat(restRequest).isNotNull();
             String restBody = restRequest.getBody().readUtf8();
             assertThat(restBody)
-                    .contains("rest-task", "supportedRestLeaf", "Java: hello through the public API");
+                    .contains("rest-task", "default-supportedRestLeaf", "Java: hello through the public API");
             JsonNode restPayload = new ObjectMapper().readTree(restBody);
             assertThat(requestMessages(restPayload))
                     .containsOnlyOnce("--- TOOL ARGUMENT SHAPE ---")

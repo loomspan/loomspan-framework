@@ -31,7 +31,7 @@ rbac_roles: [ACCOUNT_READER]
 
 No input schema uses the existing generic object contract. Explicit schemas use the same validation and `ref://` resolution path as other skills. Business input is never inherited from a parent.
 
-REST skills share the exact case-sensitive namespace with model YAML and Java skills and may be roots or direct children of model-backed YAML skills. A successful child earns the existing task, required-child, and evidence credit; denial, cancellation, null return, or failure does not. They execute through the direct mission lifecycle without a model request.
+REST declarations use the same canonical namespace identity rules as model YAML and Java skills and may be roots or direct children of model-backed YAML skills. A successful child earns the existing task, required-child, and evidence credit; denial, cancellation, null return, or failure does not. They execute through the direct mission lifecycle without a model request.
 
 REST definitions and their resolved handler capability are part of the root's captured immutable generation. A running or admitted tree keeps that definition and policy consistently across nested execution, including after a newer generation is published. The fixed handler receives the tree's trusted `generationId()` to select application-owned configuration; the application stages that configuration before publication and retains older configuration until `SkillReloader.onGenerationRetired` reports safe retirement during normal operation. See [two-stage application updates](../java-api/skill-reload.md) for the registration sequence and shutdown limits. No historical-invocation API is provided.
 
@@ -41,7 +41,7 @@ YAML `rbac_roles` applies normally. The captured caller authentication is instal
 
 When REST manifests exist, the application MUST provide exactly one `RestSkillHandler` bean. See [REST handler SPI](../java-api/rest-skills.md). With no REST manifests, handler beans are unused and do not trigger cardinality validation.
 
-Console lists the kind as `REST` and shows the source label and unchanged manifest text. For configured YAML, the label is derived from the resource path; for application-supplied YAML, it is the exact `SkillDocument.sourceName` and may be arbitrary nonblank text. The label is diagnostic only; manifest `name` remains the callable identity. The inspection wire field remains `sourcePath`. Console does not reveal handler internals or infer an endpoint. Framework and Console diagnostics require the exact coordinated project version; dual `development` versions only attempt ordinary complete validation.
+Console lists the kind as `REST` and shows the source label and unchanged manifest text. For configured YAML, the label is derived from the resource path; for application-supplied YAML, it is the exact `SkillDocument.sourceName` and may be arbitrary nonblank text. The label is diagnostic only; manifest `name` remains the local declaration component; namespace ownership constructs the qualified callable identity. The inspection wire field remains `sourcePath`. Console does not reveal handler internals or infer an endpoint. Framework and Console diagnostics require the exact coordinated project version; dual `development` versions only attempt ordinary complete validation.
 
 ## Forwarded REST results
 

@@ -35,8 +35,8 @@ public interface SkillReloader
     /** Publishes a candidate prepared by this framework instance exactly once. */
     void publish(PreparedSkillUpdate update);
 
-    /** Returns the current immutable catalog without reading skill resources. */
-    SkillCatalog snapshot();
+    /** Selects the normalized namespace once; missing namespaces fail. Returned metadata remains immutable. */
+    SkillCatalog snapshot(String namespace);
 
     /**
      * Registers a listener for a published generation after it is superseded and all captured

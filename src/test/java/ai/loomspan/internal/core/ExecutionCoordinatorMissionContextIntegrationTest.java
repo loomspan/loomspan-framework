@@ -168,7 +168,7 @@ class ExecutionCoordinatorMissionContextIntegrationTest
         manifest.setName(name);
         manifest.setDescription(name);
         manifest.setModel("gpt-5");
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, CONFIG);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, CONFIG);
     }
 
     private static CapabilityMetadata capability(String name)

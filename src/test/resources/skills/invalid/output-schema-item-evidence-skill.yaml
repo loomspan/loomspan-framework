@@ -2,10 +2,10 @@ name: outputSchemaItemEvidenceSkill
 description: Invalid evidence on an array item schema
 model: gpt-5
 allowed_skills:
-  - name: reviewSkill
+  - name: default-reviewSkill
 output_schema:
   type: object
   properties:
     results:
       type: array
-      items: { type: string, evidence: reviewSkill }
+      items: { type: string, evidence: default-reviewSkill }

@@ -12,8 +12,8 @@ class EvidenceExpressionParserAdditionalTest
 
     @ParameterizedTest
     @CsvSource({
-            "'a AnD(b oR c)','a and (b or c)'",
-            "'androidCheck OR orderLookup AND candyParser','androidCheck or orderLookup and candyParser'"
+            "'default-a AnD(default-b oR default-c)','default-a and (default-b or default-c)'",
+            "'default-androidCheck OR default-orderLookup AND default-candyParser','default-androidCheck or default-orderLookup and default-candyParser'"
     })
     void supportsOperatorAdjacencyCasingAndWholeTokenNames(String raw, String canonical)
     {
@@ -23,18 +23,18 @@ class EvidenceExpressionParserAdditionalTest
     @ParameterizedTest
     @CsvSource({
             "' ',2,expression must not be blank",
-            "'and a',1,reserved operator 'and'",
+            "'and default-a',1,reserved operator 'and'",
             "'OR',1,reserved operator 'OR'",
-            "'a or',5,expected a skill name",
-            "'a b',3,expected 'and'",
+            "'default-a or',13,expected a skill name",
+            "'default-a default-b',11,expected 'and'",
             "'()',2,empty parentheses",
-            "'(a',3,expected ')'",
-            "'a)',2,unmatched closing",
-            "'a && b',3,expected 'and'",
-            "'a || b',3,expected 'and'",
-            "'a, b',2,expected 'and'",
-            "'\"a\"',1,expected a skill name",
-            "'not a',5,expected 'and'"
+            "'(default-a',11,expected ')'",
+            "'default-a)',10,unmatched closing",
+            "'default-a && default-b',11,expected 'and'",
+            "'default-a || default-b',11,expected 'and'",
+            "'default-a, default-b',1,invalid local name",
+            "'\"default-a\"',1,expected a skill name",
+            "'not default-a',1,invalid qualified skill reference"
     })
     void reportsMalformedCategoryAndPreciseColumn(String raw, int column, String detail)
     {

@@ -1,5 +1,7 @@
 package ai.loomspan.internal.skill;
 
+import ai.loomspan.internal.core.SkillIdentity;
+
 import ai.loomspan.api.PreparedSkillUpdate;
 import ai.loomspan.api.ExecutionConfiguration;
 import ai.loomspan.api.SkillCatalog;
@@ -162,7 +164,12 @@ public final class DefaultSkillReloader implements SkillReloader
     }
 
     @Override
-    public SkillCatalog snapshot() { return generations.active().skillCatalog(); }
+    public SkillCatalog snapshot(String namespace) {
+        String owner = SkillIdentity.normalizeNamespace(namespace);
+        SkillGeneration generation = generations.active();
+        if (!owner.equals(generation.namespace())) throw new SkillReloadException("No active namespace '" + owner + "'");
+        return generation.skillCatalog();
+    }
 
     private String readWhileOpen()
     {

@@ -38,9 +38,9 @@ class TypeSafeRegisteredInspectionIntegrationTest {
         inspect("judgment.yaml", discovered);
         String supplied = "# Original supplied document\n" + discovered.replace("{A: null}", "{B: null, C: null}") + "\n";
         String label = " opaque ../ Native: <label> ";
-        String previous = reloader.snapshot().generationId();
+        String previous = reloader.snapshot("default").generationId();
         reloader.publish(reloader.prepare(List.of(new SkillDocument(label, supplied))));
-        assertThat(reloader.snapshot().generationId()).isNotEqualTo(previous);
+        assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(previous);
         inspect(label, supplied);
     }
 
@@ -60,7 +60,7 @@ class TypeSafeRegisteredInspectionIntegrationTest {
         assertThat(detail.path("source").asText()).isEqualTo("TYPESAFE");
         assertThat(detail.path("sourcePath").asText()).isEqualTo(location);
         assertThat(detail.path("yaml").asText()).isEqualTo(yaml);
-        assertThat(detail.path("outputSchema").asText()).isEqualTo(reloader.snapshot().skill("judgment").orElseThrow().outputSchema());
+        assertThat(detail.path("outputSchema").asText()).isEqualTo(reloader.snapshot("default").skill("judgment").orElseThrow().outputSchema());
         assertThat(detail.has("beanName")).isFalse();
         assertThat(detail.has("method")).isFalse();
     }

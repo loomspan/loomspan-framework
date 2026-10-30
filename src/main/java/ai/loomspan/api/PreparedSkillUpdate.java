@@ -1,6 +1,9 @@
 package ai.loomspan.api;
 
-/** Opaque caller-held candidate; only a framework-created instance can be published. */
+/**
+ * generationId() and snapshot() identify this candidate namespace generation, not its captured base.
+ * Catalog metadata retains no executable resource lease.
+ * Opaque caller-held candidate; only a framework-created instance can be published. */
 public interface PreparedSkillUpdate extends AutoCloseable
 {
     String generationId();

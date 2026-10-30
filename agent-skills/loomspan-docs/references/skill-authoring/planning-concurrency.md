@@ -7,6 +7,8 @@ coverage: source-verified
 
 # Planning Concurrency
 
+All skill references use [canonical qualified identities](mental-model.md#canonical-namespace-identity), including same-namespace children and binding producers. Declarations keep local `name` components.
+
 ## Applicability and defaults
 
 `concurrency` is an execution setting for an LLM-backed skill that explicitly declares `planning_mode: true`.
@@ -43,9 +45,9 @@ Minimal valid generated-task fragment:
 
 ```json
 [
-  {"taskId":"fetch-a","capabilityName":"lookupA","dependsOn":[],"parallelGroup":"fetch"},
-  {"taskId":"fetch-b","capabilityName":"lookupB","dependsOn":[],"parallelGroup":"fetch"},
-  {"taskId":"combine","capabilityName":"combine","dependsOn":["fetch-a","fetch-b"],"parallelGroup":null}
+  {"taskId":"fetch-a","capabilityName":"default-lookupA","dependsOn":[],"parallelGroup":"fetch"},
+  {"taskId":"fetch-b","capabilityName":"default-lookupB","dependsOn":[],"parallelGroup":"fetch"},
+  {"taskId":"combine","capabilityName":"default-combine","dependsOn":["fetch-a","fetch-b"],"parallelGroup":null}
 ]
 ```
 

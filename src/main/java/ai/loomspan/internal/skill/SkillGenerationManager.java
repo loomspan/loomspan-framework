@@ -1,5 +1,7 @@
 package ai.loomspan.internal.skill;
 
+import ai.loomspan.internal.core.SkillIdentity;
+
 import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.RestSkillInvocation;
 import ai.loomspan.api.SkillDocument;
@@ -124,6 +126,22 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         return prepareCatalog(check(catalog.checkedSupplied(documents, true)), currentProperties(), currentPolicy());
     }
 
+    public SkillGeneration prepare(String namespace, List<SkillDocument> documents)
+    {
+        String owner = SkillIdentity.normalizeNamespace(namespace);
+        initializeFixedDependencies();
+        YamlSkillCatalog catalog = currentCatalog();
+        return prepareCatalog(check(owner, catalog.checkedSupplied(owner, documents, true)), currentProperties(), currentPolicy());
+    }
+
+    public SkillValidationResult validate(String namespace, List<SkillDocument> documents)
+    {
+        String owner = SkillIdentity.normalizeNamespace(namespace);
+        requireInitialized();
+        YamlSkillCatalog catalog = currentCatalog();
+        return validationResult(check(owner, catalog.checkedSupplied(owner, documents, false)));
+    }
+
     public SkillGeneration prepare(List<SkillDocument> documents, ExecutionConfiguration configuration)
     {
         return prepare(documents, configuration, null);
@@ -218,7 +236,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             throw new IllegalStateException("Skill validation requires completed framework startup");
     }
 
-    private record CheckedSet(List<YamlSkillDefinition> definitions,
+    private record CheckedSet(String namespace, List<YamlSkillDefinition> definitions,
             Map<YamlSkillDefinition, SkillInputContract> contracts, Map<String, String> outputSchemas, List<SkillValidationIssue> issues)
     {
         void requireValid()
@@ -234,25 +252,27 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         if (issues.stream().anyMatch(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR))
             return new SkillValidationResult(issues, List.of());
         List<ValidatedSkill> skills = new ArrayList<>();
-        for (CapabilityMetadata javaCapability : fixedJavaCapabilities)
+        for (CapabilityMetadata javaCapability : fixedJavaCapabilities.stream().filter(cap -> cap.identity().namespace().equals(checked.namespace())).toList())
             skills.add(new ValidatedSkill(javaCapability.name(), javaCapability.kind().publicKind()));
         for (YamlSkillDefinition definition : checked.definitions())
-            skills.add(new ValidatedSkill(definition.manifest().getName(),
+            skills.add(new ValidatedSkill(definition.identity().toString(),
                     definition.rest() ? SkillKind.REST : definition.typesafe() ? SkillKind.TYPESAFE : SkillKind.YAML));
         skills.sort(Comparator.comparing(ValidatedSkill::name));
         return new SkillValidationResult(issues, skills);
     }
 
-    private CheckedSet check(YamlSkillCatalog.CheckedDocuments documents)
+    private CheckedSet check(YamlSkillCatalog.CheckedDocuments documents) { return check("default", documents); }
+
+    private CheckedSet check(String namespace, YamlSkillCatalog.CheckedDocuments documents)
     {
         List<SkillValidationIssue> issues = new ArrayList<>(documents.issues());
         Map<YamlSkillDefinition, SkillInputContract> contracts = new LinkedHashMap<>();
         LinkedHashMap<String, CapabilityMetadata> names = new LinkedHashMap<>();
-        for (CapabilityMetadata javaCapability : fixedJavaCapabilities)
+        for (CapabilityMetadata javaCapability : fixedJavaCapabilities.stream().filter(cap -> cap.identity().namespace().equals(namespace)).toList())
             names.put(javaCapability.name(), javaCapability);
         for (YamlSkillDefinition definition : documents.definitions())
         {
-            String name = definition.manifest().getName();
+            String name = definition.identity().toString();
             CapabilityMetadata existing = names.get(name);
             if (existing != null)
                 issues.add(error(definition, "name", "Capability with name '" + name
@@ -283,13 +303,13 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             for (String child : definition.allowedSkills())
                 if (!names.containsKey(child) && !unknownFailedName && !failedNames.contains(child))
                     issues.add(error(definition, "allowed_skills", "Unknown child skill '" + child
-                            + "' in allowed_skills of '" + definition.manifest().getName() + "' at "
+                            + "' in allowed_skills of '" + definition.identity().toString() + "' at "
                             + definition.source().diagnosticName()));
         Map<String, YamlSkillDefinition> definitions = new LinkedHashMap<>();
-        documents.definitions().forEach(definition -> definitions.put(definition.manifest().getName(), definition));
+        documents.definitions().forEach(definition -> definitions.put(definition.identity().toString(), definition));
         Map<String, SkillInputContract> receiverContracts = new LinkedHashMap<>();
-        fixedJavaCapabilities.forEach(capability -> receiverContracts.put(capability.name(), capability.inputContract()));
-        contracts.forEach((definition, contract) -> receiverContracts.put(definition.manifest().getName(), contract));
+        fixedJavaCapabilities.stream().filter(cap -> cap.identity().namespace().equals(namespace)).forEach(capability -> receiverContracts.put(capability.name(), capability.inputContract()));
+        contracts.forEach((definition, contract) -> receiverContracts.put(definition.identity().toString(), contract));
         for (var definition : documents.definitions()) {
             var bindingIssues = ai.loomspan.internal.runtime.input.ChildInputBindingDeclarations.validate(
                     contracts.get(definition), definition.allowedSkillConstraints(), receiverContracts);
@@ -302,7 +322,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
                     new LinkedHashSet<>(), issues, unknownFailedName, failedNames);
         for (YamlSkillDefinition definition : documents.definitions())
             validateOutputBindings(definition, contracts.get(definition), schemas, issues);
-        return new CheckedSet(documents.definitions(), Map.copyOf(contracts), Map.copyOf(schemas), List.copyOf(issues));
+        return new CheckedSet(namespace, documents.definitions(), Map.copyOf(contracts), Map.copyOf(schemas), List.copyOf(issues));
     }
 
     private static void validateOutputBindings(YamlSkillDefinition definition, SkillInputContract input,
@@ -320,7 +340,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
                     source = selectBindingSchema(inputSchema, binding.sourcePath(), false);
                 else {
                     var producer = definition.allowedSkillConstraints().stream()
-                            .filter(child -> child.name().equals(binding.skill())).findFirst().orElseThrow(
+                            .filter(child -> child.identity().equals(binding.skillIdentity())).findFirst().orElseThrow(
                                     () -> new IllegalArgumentException("unknown direct producer '" + binding.skill() + "'"));
                     if (Integer.valueOf(0).equals(producer.maxTasks()) || producer.effectiveMinTasks() > 1)
                         throw new IllegalArgumentException("producer cannot have exactly one task '" + binding.skill() + "'");
@@ -444,7 +464,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             Set<String> resolved, LinkedHashSet<String> visiting, List<SkillValidationIssue> issues,
             boolean unknownFailedName, List<String> failedNames)
     {
-        String name = definition.manifest().getName();
+        String name = definition.identity().toString();
         if (resolved.contains(name)) return schemas.get(name);
         if (!visiting.add(name)) {
             issues.add(error(definition, "output_from.skill", "Forwarding cycle: " + String.join(" -> ", visiting) + " -> " + name));
@@ -492,7 +512,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     private static SkillValidationIssue error(YamlSkillDefinition definition, String path, String message)
     {
         return new SkillValidationIssue(SkillValidationIssue.Severity.ERROR,
-                definition.source().diagnosticName(), definition.manifest().getName(), path, message);
+                definition.source().diagnosticName(), definition.identity().toString(), path, message);
     }
 
     private SkillGeneration prepareCatalog(CheckedSet checked, LoomspanProperties properties, TracePersistencePolicy policy)
@@ -503,14 +523,14 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         String generationId = generationNamespace + "-" + ordinal;
         List<YamlSkillDefinition> definitions = checked.definitions();
         LinkedHashMap<String, CapabilityMetadata> capabilities = new LinkedHashMap<>();
-        for (CapabilityMetadata metadata : fixedJavaCapabilities) putCapability(capabilities, metadata);
+        for (CapabilityMetadata metadata : fixedJavaCapabilities.stream().filter(cap -> cap.identity().namespace().equals(checked.namespace())).toList()) putCapability(capabilities, metadata);
 
         List<YamlSkillDefinition> restDefinitions = definitions.stream().filter(YamlSkillDefinition::rest).toList();
         RestSkillHandler restHandler = restDefinitions.isEmpty() ? null : requireRestHandler();
         LinkedHashMap<String, YamlSkillDefinition> definitionsByName = new LinkedHashMap<>();
         for (YamlSkillDefinition definition : definitions)
         {
-            String name = definition.manifest().getName();
+            String name = definition.identity().toString();
             definitionsByName.put(name, definition);
             String description = definition.manifest().getDescription();
             var contract = checked.contracts().get(definition);
@@ -518,7 +538,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             RestSkillHandler handler = restHandler;
             CapabilityMetadata metadata = new CapabilityMetadata(
                     (rest ? "rest:" : "yaml:") + definition.source().diagnosticName(),
-                    name, description,
+                    definition.identity(), description,
                     rest ? SkillExecutionDescriptor.none()
                             : SkillExecutionDescriptor.from(definition.requireExecutionConfiguration()),
                     SkillAccessPolicy.yamlRoles(definition.rbacRoles()),
@@ -530,7 +550,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             putCapability(capabilities, metadata);
         }
         ExecutionRuntime runtime = runtimeFactory == null ? null : runtimeFactory.apply(properties, policy);
-        try { return new SkillGeneration(generationId, capabilities, definitionsByName, null, null, runtime); }
+        try { return new SkillGeneration(checked.namespace(), generationId, capabilities, definitionsByName, null, null, runtime); }
         catch (RuntimeException | Error ex) { if (runtime != null) runtime.close(); throw ex; }
     }
 

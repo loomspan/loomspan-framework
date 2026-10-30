@@ -2,7 +2,10 @@ package ai.loomspan.api;
 
 import java.util.Objects;
 
-/** Read-only public metadata for a registered skill. */
+/**
+ * Names are canonical qualified namespace-localName identities.
+ * This immutable metadata grants no authorization or execution reservation.
+ * Read-only public metadata for a registered skill. */
 public record SkillDescriptor(String name, String description, SkillKind kind, String inputSchema, String outputSchema)
 {
     public SkillDescriptor

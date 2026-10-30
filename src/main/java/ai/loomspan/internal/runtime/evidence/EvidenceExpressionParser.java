@@ -58,7 +58,8 @@ public final class EvidenceExpressionParser
         if (token.type == TokenType.IDENTIFIER)
         {
             consume();
-            return new EvidenceExpression.Skill(token.text, token.start + 1);
+            try { return new EvidenceExpression.Skill(token.text, token.start + 1); }
+            catch (IllegalArgumentException ex) { throw error(token, ex.getMessage()); }
         }
         if (token.type == TokenType.LPAREN)
         {
@@ -119,7 +120,7 @@ public final class EvidenceExpressionParser
             while (offset < source.length())
             {
                 char character = source.charAt(offset);
-                if (!Character.isLetterOrDigit(character) && character != '_')
+                if (Character.isWhitespace(character) || character == '(' || character == ')')
                 {
                     break;
                 }

@@ -7,6 +7,8 @@ coverage: source-verified
 
 # Skill Authorization
 
+All skill references use [canonical qualified identities](mental-model.md#canonical-namespace-identity), including same-namespace children and binding producers. Declarations keep local `name` components.
+
 ## Applicability
 
 Use this topic for Java JSR-250 policies, YAML `rbac_roles`, and local child visibility. Authorization is enforced before execution and filters a YAML parent's locally allowed tools. Prompts and model-supplied arguments MUST NOT choose caller authentication.

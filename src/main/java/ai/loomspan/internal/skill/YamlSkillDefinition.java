@@ -1,5 +1,7 @@
 package ai.loomspan.internal.skill;
 
+import ai.loomspan.internal.core.SkillIdentity;
+
 import tools.jackson.databind.ObjectMapper;
 import ai.loomspan.internal.runtime.evidence.EvidenceContract;
 import org.springframework.core.io.Resource;
@@ -11,18 +13,30 @@ import java.util.List;
 /**
  * Stable typed catalog entry for a YAML skill manifest and its resolved execution configuration.
  */
-public record YamlSkillDefinition(
-        Resource resource,
-        YamlSkillManifest manifest,
-        @Nullable EffectiveSkillExecutionConfiguration executionConfiguration,
-        EvidenceContract evidenceContract,
-        YamlSkillSource source,
-        List<AllowedSkillConstraint> allowedSkillConstraints)
+public final class YamlSkillDefinition
 {
+    private final Resource resource;
+    private final YamlSkillManifest manifest;
+    private final EffectiveSkillExecutionConfiguration executionConfiguration;
+    private final EvidenceContract evidenceContract;
+    private final YamlSkillSource source;
+    private final List<AllowedSkillConstraint> allowedSkillConstraints;
+    private final SkillIdentity identity;
+    private final SkillIdentity outputFromIdentity;
+    private final List<ai.loomspan.internal.runtime.input.ChildInputBinding> preparedOutputBindings;
+    public Resource resource() { return resource; }
+    public EffectiveSkillExecutionConfiguration executionConfiguration() { return executionConfiguration; }
+    public EvidenceContract evidenceContract() { return evidenceContract; }
+    public YamlSkillSource source() { return source; }
+    public List<AllowedSkillConstraint> allowedSkillConstraints() { return allowedSkillConstraints; }
+    public SkillIdentity identity() { return identity; }
+    public SkillIdentity outputFromIdentity() { return outputFromIdentity; }
     private static final ObjectMapper COPY_MAPPER =
             ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion();
 
-    public YamlSkillDefinition
+    public YamlSkillDefinition(String namespace, Resource resource, YamlSkillManifest manifest,
+            EffectiveSkillExecutionConfiguration executionConfiguration, EvidenceContract evidenceContract,
+            YamlSkillSource source, List<AllowedSkillConstraint> allowedSkillConstraints)
     {
         manifest = copyManifest(manifest);
         allowedSkillConstraints = allowedSkillConstraints == null
@@ -49,30 +63,40 @@ public record YamlSkillDefinition(
         {
             throw new IllegalArgumentException("LLM-backed YAML skill definitions require a non-null 'concurrency' value");
         }
+        this.resource = java.util.Objects.requireNonNull(resource);
+        this.manifest = manifest;
+        this.executionConfiguration = executionConfiguration;
+        this.evidenceContract = evidenceContract;
+        this.source = source;
+        this.allowedSkillConstraints = allowedSkillConstraints;
+        this.identity = new SkillIdentity(namespace, manifest.getName());
+        this.outputFromIdentity = manifest.getOutputFrom() == null ? null
+                : SkillIdentity.parse(manifest.getOutputFrom().getSkill());
+        this.preparedOutputBindings = compileOutputBindings();
     }
 
-    public YamlSkillDefinition(Resource resource,
+    public YamlSkillDefinition(String namespace, Resource resource,
             YamlSkillManifest manifest,
             EffectiveSkillExecutionConfiguration executionConfiguration)
     {
-        this(resource, manifest, executionConfiguration, EvidenceContract.empty(), null, null);
+        this(namespace, resource, manifest, executionConfiguration, EvidenceContract.empty(), null, null);
     }
 
-    public YamlSkillDefinition(Resource resource,
+    public YamlSkillDefinition(String namespace, Resource resource,
             YamlSkillManifest manifest,
             EffectiveSkillExecutionConfiguration executionConfiguration,
             EvidenceContract evidenceContract)
     {
-        this(resource, manifest, executionConfiguration, evidenceContract, null, null);
+        this(namespace, resource, manifest, executionConfiguration, evidenceContract, null, null);
     }
 
-    public YamlSkillDefinition(Resource resource,
+    public YamlSkillDefinition(String namespace, Resource resource,
             YamlSkillManifest manifest,
             EffectiveSkillExecutionConfiguration executionConfiguration,
             EvidenceContract evidenceContract,
             YamlSkillSource source)
     {
-        this(resource, manifest, executionConfiguration, evidenceContract, source, null);
+        this(namespace, resource, manifest, executionConfiguration, evidenceContract, source, null);
     }
 
     public List<String> allowedSkills()
@@ -97,10 +121,12 @@ public record YamlSkillDefinition(
 
     /** Exact direct child selected for runtime result forwarding, or null for synthesis. */
     public String outputFromSkill() {
-        return manifest.getOutputFrom() == null ? null : manifest.getOutputFrom().getSkill();
+        return outputFromIdentity == null ? null : outputFromIdentity.toString();
     }
 
-    public List<ai.loomspan.internal.runtime.input.ChildInputBinding> outputBindings() {
+    public List<ai.loomspan.internal.runtime.input.ChildInputBinding> outputBindings() { return preparedOutputBindings; }
+
+    private List<ai.loomspan.internal.runtime.input.ChildInputBinding> compileOutputBindings() {
         return manifest.getOutputBindings().entrySet().stream().map(entry -> {
             var descriptor = entry.getValue();
             return new ai.loomspan.internal.runtime.input.ChildInputBinding(

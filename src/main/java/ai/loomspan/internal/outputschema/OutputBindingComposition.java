@@ -19,7 +19,7 @@ public final class OutputBindingComposition {
     private ai.loomspan.internal.core.ExecutionPlan capturedPlan;
     public OutputBindingComposition(YamlSkillDefinition definition, MissionContext mission, ObjectMapper mapper) {
         this(definition.outputSchema(), definition.outputBindings(), mission.input(), mission.completedTaskResults(), mission.missionFrameId(), mapper);
-        if (!definition.manifest().getName().equals(mission.skillName())) throw new IllegalArgumentException("binding_source_unavailable: Output owner differs from invocation.");
+        if (!definition.identity().toString().equals(mission.skillName())) throw new IllegalArgumentException("binding_source_unavailable: Output owner differs from invocation.");
         this.mission = mission;
         capturedPlan = mission.currentPlan().orElse(null);
         var evidence = new ai.loomspan.internal.runtime.evidence.EvidenceBackedOutputValidator().validate(

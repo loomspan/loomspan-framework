@@ -12,7 +12,7 @@ import java.util.UUID;
 
 public final class TestSkillGenerations
 {
-    private static final SkillGeneration EMPTY = new SkillGeneration("test-empty", Map.of(), Map.of());
+    private static final SkillGeneration EMPTY = new SkillGeneration("default", "test-empty", Map.of(), Map.of());
 
     private TestSkillGenerations() {}
 
@@ -35,8 +35,8 @@ public final class TestSkillGenerations
             Map<String, YamlSkillDefinition> definitions)
     {
         String id = UUID.randomUUID().toString();
-        return new SkillGeneration(id, capabilities, definitions,
-                new DefaultSkillCatalog(id, capabilities.values().stream().toList()),
+        return new SkillGeneration("default", id, capabilities, definitions,
+                new DefaultSkillCatalog("default", id, capabilities.values().stream().toList()),
                 new DefaultRegisteredSkillCatalog(java.util.List.of(), Map.of()));
     }
 }

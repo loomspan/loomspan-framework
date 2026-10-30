@@ -3,4 +3,4 @@ description: Root YAML skill for binary ref integration testing.
 model: gpt-5
 planning_mode: true
 allowed_skills:
-  - name: binaryVisibleSkill
+  - name: default-binaryVisibleSkill

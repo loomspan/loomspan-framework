@@ -2,11 +2,11 @@ name: outputSchemaNestedPropertyEvidenceSkill
 description: Invalid evidence on a nested property
 model: gpt-5
 allowed_skills:
-  - name: reviewSkill
+  - name: default-reviewSkill
 output_schema:
   type: object
   properties:
     result:
       type: object
       properties:
-        detail: { type: string, evidence: reviewSkill }
+        detail: { type: string, evidence: default-reviewSkill }

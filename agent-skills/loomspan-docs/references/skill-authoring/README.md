@@ -61,7 +61,7 @@ Do not load every document by default. Start with the routing entry most relevan
 | Topic | Coverage | Notes |
 | --- | --- | --- |
 | Skill-tree mental model | Initial, source-verified | Shared Java/YAML identity, immutable complete generations, public activation, root capture, local visibility, lifecycle, and nesting |
-| Shared skill identity | Source-verified | Exact `name` format, case sensitivity, no-rewrite policy, propagation, duplicates across sources, supplied diagnostic labels, and no diagnostic-location aliases |
+| Shared skill identity | Foundation source-verified | Local declarations, canonical qualified references, namespace/combined limits, parsed bindings, duplicates, target feedback and content fidelity; active registry/root/model/observation integration follows in PRs 27.2-27.5 |
 | Evidence contracts | Source-verified | Immediate-root property annotations, strict scalar/placement rules, Boolean direct-child expressions, planning/final truth sets, metadata isolation, enforcement, nested mission isolation, and separation from complete result delivery and factual correctness |
 | Source verification | Initial | How an LLM should use guide, tests, fixtures, samples, and production code together |
 | Skill-design review | Initial | Cross-cutting questions; not a manifest validator |

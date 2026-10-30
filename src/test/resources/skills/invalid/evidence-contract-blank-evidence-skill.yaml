@@ -2,7 +2,7 @@ name: evidenceContractBlankEvidenceSkill
 description: Invalid evidence contract blank evidence id
 model: gpt-5
 allowed_skills:
-  - name: invoiceParser
+  - name: default-invoiceParser
 output_schema:
   type: object
   additionalProperties: false

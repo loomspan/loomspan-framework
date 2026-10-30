@@ -38,9 +38,9 @@ class SkillMethodBeanPostProcessorTest {
 
         process(processor, new RegistrationBean(), "registrationBean");
 
-        CapabilityMetadata metadata = registry.getCapability("declaredOperation");
+        CapabilityMetadata metadata = registry.getCapability("default-declaredOperation");
         assertThat(metadata).isNotNull();
-        assertThat(metadata.name()).isEqualTo("declaredOperation");
+        assertThat(metadata.name()).isEqualTo("default-declaredOperation");
         assertThat(metadata.description()).isEqualTo("Test desc");
         assertThat(registry.getCapability("nonSkillOperation")).isNull();
         assertThat(registry.getAllCapabilities()).hasSize(1);
@@ -55,7 +55,7 @@ class SkillMethodBeanPostProcessorTest {
 
         assertThat(registry.getAllCapabilities())
                 .extracting(CapabilityMetadata::name)
-                .containsExactlyInAnyOrder("first", "second");
+                .containsExactlyInAnyOrder("default-first", "default-second");
     }
 
     @Test
@@ -69,7 +69,7 @@ class SkillMethodBeanPostProcessorTest {
             var registry = new TestCapabilityRegistry();
             process(processor(registry), context.getBean(SecuredSubclass.class), "securedSubclass");
             // Spring searches the inherited method's declaring class, not a subclass that does not override it.
-            assertThat(registry.getCapability("inherited").accessPolicy())
+            assertThat(registry.getCapability("default-inherited").accessPolicy())
                     .isEqualTo(ai.loomspan.internal.security.SkillAccessPolicy.unrestricted());
             try (var ignored = new ai.loomspan.internal.security.ScopedAuthentication(null).open(null))
             {
@@ -111,7 +111,7 @@ class SkillMethodBeanPostProcessorTest {
 
         process(processor, new InvocationBean(), "invocationBean");
 
-        CapabilityMetadata metadata = registry.getCapability("combineValues");
+        CapabilityMetadata metadata = registry.getCapability("default-combineValues");
         Method method = getDeclaredMethod(InvocationBean.class, "combineValues", String.class, Boolean.class);
         Map<String, Object> arguments = Map.of(
                 method.getParameters()[0].getName(), "alpha",
@@ -130,7 +130,7 @@ class SkillMethodBeanPostProcessorTest {
 
         process(processor, new OptionalInvocationBean(), "optionalInvocationBean");
 
-        CapabilityMetadata metadata = registry.getCapability("optionalValues");
+        CapabilityMetadata metadata = registry.getCapability("default-optionalValues");
         Method method = getDeclaredMethod(OptionalInvocationBean.class, "optionalValues", String.class, String.class);
         Map<String, Object> arguments = Map.of(method.getParameters()[0].getName(), "base");
 
@@ -147,7 +147,7 @@ class SkillMethodBeanPostProcessorTest {
         SkillMethodBeanPostProcessor processor = processor(registry);
         process(processor, new UnconstrainedInvocationBean(), "unconstrainedInvocationBean");
 
-        CapabilityMetadata target = registry.getCapability("acceptValues");
+        CapabilityMetadata target = registry.getCapability("default-acceptValues");
         Method method = getDeclaredMethod(UnconstrainedInvocationBean.class, "acceptValues", Object.class, List.class);
         String valueName = method.getParameters()[0].getName();
         String optionsName = method.getParameters()[1].getName();
@@ -196,7 +196,7 @@ class SkillMethodBeanPostProcessorTest {
 
         process(processor, new ThrowingInvocationBean(), "throwingInvocationBean");
 
-        CapabilityMetadata metadata = registry.getCapability("throwingOperation");
+        CapabilityMetadata metadata = registry.getCapability("default-throwingOperation");
 
         assertThat(metadata.invoker().invoke(Map.of())).isEqualTo("ERROR: IllegalArgumentException. HINT: boom");
     }
@@ -208,11 +208,11 @@ class SkillMethodBeanPostProcessorTest {
 
         process(processor, new ThrowingInvocationBean(), "throwingInvocationBean");
 
-        CapabilityMetadata metadata = registry.getCapability("throwingOperation");
+        CapabilityMetadata metadata = registry.getCapability("default-throwingOperation");
         Object rawResult = metadata.invoker().invoke(Map.of());
 
         assertThat(rawResult).isEqualTo("ERROR: IllegalArgumentException. HINT: boom");
-        assertThat(output.getAll()).contains("Java skill 'throwingOperation' failed during deterministic execution");
+        assertThat(output.getAll()).contains("Java skill 'default-throwingOperation' failed during deterministic execution");
         assertThat(output.getAll()).contains("java.lang.IllegalStateException: wrapper");
         assertThat(output.getAll()).contains("Caused by: java.lang.IllegalArgumentException: boom");
         assertThat(rawResult.toString()).doesNotContain("at ai.loomspan");
@@ -226,7 +226,7 @@ class SkillMethodBeanPostProcessorTest {
 
         process(processor, new RefStringInvocationBean(), "refStringInvocationBean");
 
-        CapabilityMetadata metadata = registry.getCapability("readRefAsString");
+        CapabilityMetadata metadata = registry.getCapability("default-readRefAsString");
         Method method = getDeclaredMethod(RefStringInvocationBean.class, "readRefAsString", String.class);
         Object rawResult = metadata.invoker().invoke(Map.of(
                 method.getParameters()[0].getName(),
@@ -242,7 +242,7 @@ class SkillMethodBeanPostProcessorTest {
 
         process(processor, new RefBytesInvocationBean(), "refBytesInvocationBean");
 
-        CapabilityMetadata metadata = registry.getCapability("readRefAsBytes");
+        CapabilityMetadata metadata = registry.getCapability("default-readRefAsBytes");
         Method method = getDeclaredMethod(RefBytesInvocationBean.class, "readRefAsBytes", byte[].class);
         Object rawResult = metadata.invoker().invoke(Map.of(
                 method.getParameters()[0].getName(),
@@ -259,8 +259,8 @@ class SkillMethodBeanPostProcessorTest {
         process(processor, new RefResourceInvocationBean(), "refResourceInvocationBean");
         process(processor, new RefStreamInvocationBean(), "refStreamInvocationBean");
 
-        CapabilityMetadata resourceMetadata = registry.getCapability("readRefAsResource");
-        CapabilityMetadata streamMetadata = registry.getCapability("readRefAsStream");
+        CapabilityMetadata resourceMetadata = registry.getCapability("default-readRefAsResource");
+        CapabilityMetadata streamMetadata = registry.getCapability("default-readRefAsStream");
         Method resourceMethod = getDeclaredMethod(RefResourceInvocationBean.class, "readRefAsResource", Resource.class);
         Method streamMethod = getDeclaredMethod(RefStreamInvocationBean.class, "readRefAsStream", InputStream.class);
 
@@ -285,14 +285,14 @@ class SkillMethodBeanPostProcessorTest {
         process(processor, new RefStreamInvocationBean(), "refStreamInvocationBean");
         process(processor, new NestedRecordInvocationBean(), "nestedRecordInvocationBean");
 
-        assertThat(readPayloadPropertyType(registry.getCapability("readRefAsBytes"))).isEqualTo("string");
-        assertThat(readPayloadPropertyType(registry.getCapability("readRefAsResource"))).isEqualTo("string");
-        assertThat(readPayloadPropertyType(registry.getCapability("readRefAsStream"))).isEqualTo("string");
-        assertThat(readNestedAttachmentItemType(registry.getCapability("readNestedRecord"))).isEqualTo("string");
-        assertThat(readPayloadPropertyRefMarker(registry.getCapability("readRefAsBytes"))).isTrue();
-        assertThat(readPayloadPropertyRefMarker(registry.getCapability("readRefAsResource"))).isTrue();
-        assertThat(readPayloadPropertyRefMarker(registry.getCapability("readRefAsStream"))).isTrue();
-        assertThat(readNestedAttachmentItemRefMarker(registry.getCapability("readNestedRecord"))).isTrue();
+        assertThat(readPayloadPropertyType(registry.getCapability("default-readRefAsBytes"))).isEqualTo("string");
+        assertThat(readPayloadPropertyType(registry.getCapability("default-readRefAsResource"))).isEqualTo("string");
+        assertThat(readPayloadPropertyType(registry.getCapability("default-readRefAsStream"))).isEqualTo("string");
+        assertThat(readNestedAttachmentItemType(registry.getCapability("default-readNestedRecord"))).isEqualTo("string");
+        assertThat(readPayloadPropertyRefMarker(registry.getCapability("default-readRefAsBytes"))).isTrue();
+        assertThat(readPayloadPropertyRefMarker(registry.getCapability("default-readRefAsResource"))).isTrue();
+        assertThat(readPayloadPropertyRefMarker(registry.getCapability("default-readRefAsStream"))).isTrue();
+        assertThat(readNestedAttachmentItemRefMarker(registry.getCapability("default-readNestedRecord"))).isTrue();
     }
 
     @Test
@@ -302,7 +302,7 @@ class SkillMethodBeanPostProcessorTest {
 
         process(processor, new NestedRecordInvocationBean(), "nestedRecordInvocationBean");
 
-        CapabilityMetadata metadata = registry.getCapability("readNestedRecord");
+        CapabilityMetadata metadata = registry.getCapability("default-readNestedRecord");
         Method method = getDeclaredMethod(NestedRecordInvocationBean.class, "readNestedRecord", NestedPayload.class);
         Object rawResult = metadata.invoker().invoke(Map.of(
                 method.getParameters()[0].getName(),
@@ -323,7 +323,7 @@ class SkillMethodBeanPostProcessorTest {
 
         process(processor, new TypedCollectionInvocationBean(), "typedCollectionInvocationBean");
 
-        CapabilityMetadata metadata = registry.getCapability("readTypedCollection");
+        CapabilityMetadata metadata = registry.getCapability("default-readTypedCollection");
         Method method = getDeclaredMethod(TypedCollectionInvocationBean.class, "readTypedCollection", List.class);
         Object rawResult = metadata.invoker().invoke(Map.of(
                 method.getParameters()[0].getName(),
@@ -369,6 +369,40 @@ class SkillMethodBeanPostProcessorTest {
 
         assertThat(contract.isGeneric()).isFalse();
         assertThat(contract.schema().allowsAdditionalProperties()).isFalse();
+    }
+
+    @Test void registersDistinctNamespacesAndCanonicalDuplicates() {
+        var registry = new TestCapabilityRegistry(); var processor=processor(registry);
+        process(processor,new NamespacedBean(),"namespaced");
+        assertThat(registry.getAllCapabilities()).extracting(CapabilityMetadata::name).containsExactlyInAnyOrder("tax-search","orders-search","tax-Search");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> process(processor,new DuplicateNamespaceBean(),"duplicate"))
+                .isInstanceOf(CapabilityCollisionException.class).hasMessageContaining("tax-search").hasMessageContaining("namespaced").hasMessageContaining("duplicate");
+    }
+    static class NamespacedBean {
+        @SkillMethod(namespace="Tax", name="search", description="tax") String tax() { throw new AssertionError(); }
+        @SkillMethod(namespace="orders", name="search", description="orders") String orders() { throw new AssertionError(); }
+        @SkillMethod(namespace="tax", name="Search", description="case") String upper() { throw new AssertionError(); }
+    }
+    static class DuplicateNamespaceBean {
+        @SkillMethod(namespace="TAX", name="search", description="duplicate") String search() { throw new AssertionError(); }
+    }
+    @Test void enforcesIndependentJavaNamespaceAndCombinedLimits() {
+        var registry=new TestCapabilityRegistry(); var processor=processor(registry);
+        process(processor,new JavaLimitAccepted(),"accepted");
+        assertThat(registry.getAllCapabilities().getFirst().name()).hasSize(64);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> process(processor,new JavaNamespaceOversized(),"badNamespace"))
+                .hasMessageContaining("badNamespace").hasMessageContaining("length 33").hasMessageContaining("limit 32");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> process(processor,new JavaIdentityOversized(),"badIdentity"))
+                .hasMessageContaining("badIdentity").hasMessageContaining("length 65").hasMessageContaining("limit 64");
+    }
+    static class JavaLimitAccepted {
+        @SkillMethod(namespace="nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn", name="sssssssssssssssssssssssssssssss", description="accepted") String accepted() { throw new AssertionError(); }
+    }
+    static class JavaNamespaceOversized {
+        @SkillMethod(namespace="nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn", name="x", description="rejected") String bad() { throw new AssertionError(); }
+    }
+    static class JavaIdentityOversized {
+        @SkillMethod(namespace="nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn", name="ssssssssssssssssssssssssssssssss", description="rejected") String bad() { throw new AssertionError(); }
     }
 
     private SkillMethodBeanPostProcessor processor(TestCapabilityRegistry registry) {

@@ -68,10 +68,10 @@ class PublicSkillReloadIntegrationTest
                                 planning_mode: false
                                 """))));
                         var template = context.getBean(SkillTemplate.class);
-                        if (expires) assertThatThrownBy(() -> template.invoke("candidateSkill", Map.of()))
+                        if (expires) assertThatThrownBy(() -> template.invoke("default-candidateSkill", Map.of()))
                                 .isInstanceOf(ai.loomspan.api.SkillException.class)
                                 .satisfies(PublicSkillReloadIntegrationTest::assertProviderTimeout);
-                        else assertThat(template.invoke("candidateSkill", Map.of())).isEqualTo("embedded-success");
+                        else assertThat(template.invoke("default-candidateSkill", Map.of())).isEqualTo("embedded-success");
                         assertThat(server.getRequestCount()).isEqualTo(1);
                     });
                 }
@@ -84,7 +84,7 @@ class PublicSkillReloadIntegrationTest
             first.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
                     {"id":"tool","object":"chat.completion","created":1,"model":"compact",
                      "choices":[{"index":0,"message":{"role":"assistant","content":null,
-                       "tool_calls":[{"id":"child-call","type":"function","function":{"name":"child","arguments":"{}"}}]},
+                       "tool_calls":[{"id":"child-call","type":"function","function":{"name":"default-child","arguments":"{}"}}]},
                        "finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
                     """));
             first.enqueue(modelResponse("too-late").setHeadersDelay(3000, java.util.concurrent.TimeUnit.MILLISECONDS));
@@ -97,7 +97,7 @@ class PublicSkillReloadIntegrationTest
                     model: selected
                     planning_mode: false
                     allowed_skills:
-                      - name: child
+                      - name: default-child
                     """), new SkillDocument("child", """
                     name: child
                     description: child model
@@ -109,7 +109,7 @@ class PublicSkillReloadIntegrationTest
                 var a = reloader.prepare(documents, timeoutConfiguration(first, "2s", 2),
                         Map.of("candidate.key", "local-A"));
                 reloader.publish(a);
-                var pending = context.getBean(SkillInvocationHandoff.class).handoff("parent", Map.of());
+                var pending = context.getBean(SkillInvocationHandoff.class).handoff("default-parent", Map.of());
                 var b = reloader.prepare(documents, timeoutConfiguration(second, "1s", 1),
                         Map.of("candidate.key", "local-B"));
                 reloader.publish(b);
@@ -117,7 +117,7 @@ class PublicSkillReloadIntegrationTest
                 assertThat(pending.invoke()).isEqualTo("old-tree-finished");
                 assertThat(first.getRequestCount()).isEqualTo(4);
                 assertThat(second.getRequestCount()).isZero();
-                assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("child", Map.of()))
+                assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default-child", Map.of()))
                         .isInstanceOf(ai.loomspan.api.SkillException.class)
                         .satisfies(PublicSkillReloadIntegrationTest::assertProviderTimeout);
                 assertThat(second.getRequestCount()).isEqualTo(1);
@@ -172,7 +172,7 @@ class PublicSkillReloadIntegrationTest
                             var view = new AtomicReference<ai.loomspan.api.SkillExecutionView>();
                             var callerInterrupted = new java.util.concurrent.atomic.AtomicBoolean();
                             Thread caller = Thread.ofPlatform().unstarted(() -> {
-                                try { context.getBean(SkillTemplate.class).invoke("candidateSkill", Map.of(), view::set); }
+                                try { context.getBean(SkillTemplate.class).invoke("default-candidateSkill", Map.of(), view::set); }
                                 catch (Throwable ex) { failure.set(ex); callerInterrupted.set(Thread.currentThread().isInterrupted()); }
                             });
                             try
@@ -220,7 +220,7 @@ class PublicSkillReloadIntegrationTest
                 var a = reloader.prepare(documents, oldConfig); // Environment path
                 assertThat(server.getRequestCount()).isZero();
                 reloader.publish(a);
-                var pending = context.getBean(SkillInvocationHandoff.class).handoff("candidateSkill", Map.of());
+                var pending = context.getBean(SkillInvocationHandoff.class).handoff("default-candidateSkill", Map.of());
                 var b = reloader.prepare(documents, timeoutConfiguration(server, "1s", 1),
                         Map.of("candidate.key", "host-local-key")); // Host-map path
                 assertThat(server.getRequestCount()).isZero();
@@ -232,7 +232,7 @@ class PublicSkillReloadIntegrationTest
                 for (int i = 0; i < 3; i++)
                 {
                     if (i > 0) reloader.publish(reloader.prepare(documents));
-                    assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("candidateSkill", Map.of()))
+                    assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default-candidateSkill", Map.of()))
                             .isInstanceOf(ai.loomspan.api.SkillException.class)
                             .satisfies(PublicSkillReloadIntegrationTest::assertProviderTimeout);
                 }
@@ -251,7 +251,7 @@ class PublicSkillReloadIntegrationTest
                     "name: candidateSkill\ndescription: model\nmodel: selected\nplanning_mode: false\n"));
             timeoutContext(directory).withPropertyValues("candidate.key=environment-local-key").run(context -> {
                 var reloader = context.getBean(SkillReloader.class);
-                String active = reloader.snapshot().generationId();
+                String active = reloader.snapshot("default").generationId();
                 for (String invalid : List.of("0ms", "-1ms", "PT0.0015S", "2147483648ms", "malformed-secret-sentinel"))
                 {
                     var candidate = timeoutConfiguration(server, invalid, 1);
@@ -266,7 +266,7 @@ class PublicSkillReloadIntegrationTest
                             .isInstanceOf(SkillReloadException.class)
                             .hasNoCause().hasMessageNotContaining("host-secret-sentinel")
                             .hasMessageNotContaining("malformed-secret-sentinel");
-                    assertThat(reloader.snapshot().generationId()).isEqualTo(active);
+                    assertThat(reloader.snapshot("default").generationId()).isEqualTo(active);
                 }
                 assertThat(server.getRequestCount()).isZero();
             });
@@ -324,14 +324,14 @@ class PublicSkillReloadIntegrationTest
                                 Map.of("host.key", "host-A"));
                         assertThat(first.getRequestCount()).isZero();
                         reloader.publish(a);
-                        var pending = handoff.handoff("candidateSkill", Map.of());
+                        var pending = handoff.handoff("default-candidateSkill", Map.of());
                         assertThat(pending.generationId()).isEqualTo(a.generationId());
                         PreparedSkillUpdate b = reloader.prepare(documents,
                                 candidateConfiguration(second, "host.key"), Map.of("host.key", "host-B"));
                         assertThat(second.getRequestCount()).isZero();
                         reloader.publish(b);
                         assertThat(pending.invoke()).isEqualTo("first");
-                        assertThat(context.getBean(SkillTemplate.class).invoke("candidateSkill", Map.of()))
+                        assertThat(context.getBean(SkillTemplate.class).invoke("default-candidateSkill", Map.of()))
                                 .isEqualTo("second");
                     });
             assertThat(first.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS).getHeader("Authorization"))
@@ -363,10 +363,10 @@ class PublicSkillReloadIntegrationTest
                         SkillReloader reloader = context.getBean(SkillReloader.class);
                         SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
                         reloader.publish(reloader.prepare(documents, candidateConfiguration(first, "candidate.a", 2)));
-                        var pending = handoff.handoff("retrySkill", Map.of());
+                        var pending = handoff.handoff("default-retrySkill", Map.of());
                         reloader.publish(reloader.prepare(documents, candidateConfiguration(second, "candidate.b", 1)));
                         assertThat(pending.invoke()).isEqualTo("retried");
-                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("retrySkill", Map.of()))
+                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default-retrySkill", Map.of()))
                                 .isInstanceOf(ai.loomspan.api.SkillException.class);
                     });
             assertThat(first.getRequestCount()).isEqualTo(2);
@@ -394,23 +394,23 @@ class PublicSkillReloadIntegrationTest
                         assertThat(context).hasNotFailed();
                         SkillReloader reloader = context.getBean(SkillReloader.class);
                         SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
-                        String initial = reloader.snapshot().generationId();
+                        String initial = reloader.snapshot("default").generationId();
                         assertThat(reloader.validate(documents, candidateConfiguration(first, "missing.key")).valid()).isTrue();
                         assertThatThrownBy(() -> reloader.prepare(documents, candidateConfiguration(first, "missing.key")))
                                 .isInstanceOf(SkillReloadException.class).hasMessageNotContaining("external-a");
-                        assertThat(reloader.snapshot().generationId()).isEqualTo(initial);
+                        assertThat(reloader.snapshot("default").generationId()).isEqualTo(initial);
                         PreparedSkillUpdate a = reloader.prepare(documents, candidateConfiguration(first, "candidate.a"));
                         assertThat(first.getRequestCount()).isZero();
                         reloader.publish(a);
-                        var pending = handoff.handoff("candidateSkill", Map.of());
+                        var pending = handoff.handoff("default-candidateSkill", Map.of());
                         assertThat(pending.generationId()).isEqualTo(a.generationId());
                         PreparedSkillUpdate b = reloader.prepare(documents, candidateConfiguration(second, "candidate.b"));
                         assertThat(second.getRequestCount()).isZero();
                         reloader.publish(b);
                         assertThat(pending.invoke()).isEqualTo("first");
-                        assertThat(context.getBean(SkillTemplate.class).invoke("candidateSkill", Map.of())).isEqualTo("second");
+                        assertThat(context.getBean(SkillTemplate.class).invoke("default-candidateSkill", Map.of())).isEqualTo("second");
                         PreparedSkillUpdate skillOnly = reloader.prepare(documents);
-                        assertThat(skillOnly.snapshot().skill("candidateSkill")).isPresent();
+                        assertThat(skillOnly.snapshot().skill("default-candidateSkill")).isPresent();
                         reloader.publish(skillOnly);
                         assertThat(skillOnly.generationId()).isNotEqualTo(b.generationId());
                     });
@@ -499,11 +499,11 @@ class PublicSkillReloadIntegrationTest
                         assertThat(server.getRequestCount()).isZero();
                         try (PreparedSkillUpdate prepared = reloader.prepare(documents, configuration))
                         {
-                            assertThat(prepared.snapshot().skill("candidateSkill")).isPresent();
+                            assertThat(prepared.snapshot().skill("default-candidateSkill")).isPresent();
                             assertThat(server.getRequestCount()).isZero();
                             reloader.publish(prepared);
                         }
-                        assertThat(context.getBean(SkillTemplate.class).invoke("candidateSkill", Map.of()))
+                        assertThat(context.getBean(SkillTemplate.class).invoke("default-candidateSkill", Map.of()))
                                 .isEqualTo("candidate");
                     });
             assertThat(server.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS)).isNotNull();
@@ -526,12 +526,12 @@ class PublicSkillReloadIntegrationTest
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     SkillReloader reloader = context.getBean(SkillReloader.class);
-                    String initial = reloader.snapshot().generationId();
+                    String initial = reloader.snapshot("default").generationId();
                     SkillValidationResult configuredFeedback = reloader.validate();
                     assertThat(configuredFeedback.valid()).isTrue();
                     assertThat(configuredFeedback.skills().stream()
                             .filter(skill -> skill.kind() == SkillKind.REST)
-                            .map(ValidatedSkill::name).toList()).containsExactly("configured");
+                            .map(ValidatedSkill::name).toList()).containsExactly("default-configured");
                     String supplied = "name: supplied\ndescription: supplied\nrest: true\n";
                     var documents = List.of(new SkillDocument(directory.resolve("absent.yaml").toString(), supplied));
                     SkillValidationResult proposed = reloader.validate(documents);
@@ -539,21 +539,21 @@ class PublicSkillReloadIntegrationTest
                     List<String> proposedRestNames = proposed.skills().stream()
                             .filter(skill -> skill.kind() == SkillKind.REST)
                             .map(ValidatedSkill::name).toList();
-                    assertThat(proposedRestNames).containsExactly("supplied");
+                    assertThat(proposedRestNames).containsExactly("default-supplied");
                     assertThat(Files.exists(directory.resolve("absent.yaml"))).isFalse();
-                    assertThat(reloader.snapshot().generationId()).isEqualTo(initial);
-                    assertThat(reloader.snapshot().skill("configured")).isPresent();
-                    assertThat(reloader.snapshot().skill("supplied")).isEmpty();
+                    assertThat(reloader.snapshot("default").generationId()).isEqualTo(initial);
+                    assertThat(reloader.snapshot("default").skill("default-configured")).isPresent();
+                    assertThat(reloader.snapshot("default").skill("default-supplied")).isEmpty();
                     PreparedSkillUpdate candidate = reloader.prepare(documents);
-                    assertThat(candidate.snapshot().skill("supplied")).isPresent();
+                    assertThat(candidate.snapshot().skill("default-supplied")).isPresent();
                     try { Files.writeString(configured, "name: broken\ndescription: broken\nrest: true\nmodel: forbidden\n"); }
                     catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
                     assertThat(reloader.validate().valid()).isFalse();
                     assertThat(reloader.validate(documents).valid()).isTrue();
                     assertThatThrownBy(reloader::prepare).isInstanceOf(SkillReloadException.class);
                     reloader.publish(candidate);
-                    assertThat(reloader.snapshot().skill("supplied")).isPresent();
-                    assertThat(reloader.snapshot().skill("broken")).isEmpty();
+                    assertThat(reloader.snapshot("default").skill("default-supplied")).isPresent();
+                    assertThat(reloader.snapshot("default").skill("default-broken")).isEmpty();
                 });
         assertThat(Files.readString(configured)).contains("model: forbidden");
     }
@@ -579,13 +579,13 @@ class PublicSkillReloadIntegrationTest
                         RestConfiguration.config.remove(id);
                     }))
                     {
-                        String initial = reloader.snapshot().generationId();
+                        String initial = reloader.snapshot("default").generationId();
                         RestConfiguration.config.put(initial, "initial");
                         PreparedSkillUpdate first = reloader.prepare(List.of(new SkillDocument("A", yaml)));
                         RestConfiguration.config.put(first.generationId(), "A");
                         reloader.publish(first);
                         assertThat(retired).containsExactly(initial);
-                        var pending = handoff.handoff("leaf", Map.of("message", "old"));
+                        var pending = handoff.handoff("default-leaf", Map.of("message", "old"));
                         assertThat(pending.generationId()).isEqualTo(first.generationId()).isNotBlank();
                         PreparedSkillUpdate second = reloader.prepare(List.of(new SkillDocument("B", yaml)));
                         RestConfiguration.config.put(second.generationId(), "B");
@@ -598,7 +598,7 @@ class PublicSkillReloadIntegrationTest
                         assertThat(pending.generationId()).isEqualTo(first.generationId());
                         assertThat(RestConfiguration.config).doesNotContainKey(first.generationId());
                         assertThat(RestConfiguration.config).containsKey(second.generationId());
-                        var invokedPending = handoff.handoff("leaf", Map.of("message", "older"));
+                        var invokedPending = handoff.handoff("default-leaf", Map.of("message", "older"));
                         assertThat(invokedPending.generationId()).isEqualTo(second.generationId());
                         PreparedSkillUpdate third = reloader.prepare(List.of(new SkillDocument("C", yaml)));
                         RestConfiguration.config.put(third.generationId(), "C");
@@ -610,7 +610,7 @@ class PublicSkillReloadIntegrationTest
                         assertThat(retired).containsExactly(initial, first.generationId(), second.generationId());
                         assertThat(invokedPending.generationId()).isEqualTo(second.generationId());
                         assertThat(RestConfiguration.config).containsKey(third.generationId());
-                        var failingPending = handoff.handoff("leaf", Map.of("message", "fail"));
+                        var failingPending = handoff.handoff("default-leaf", Map.of("message", "fail"));
                         assertThat(failingPending.generationId()).isEqualTo(third.generationId());
                         PreparedSkillUpdate fourth = reloader.prepare(List.of(new SkillDocument("D", yaml)));
                         RestConfiguration.config.put(fourth.generationId(), "D");
@@ -660,7 +660,7 @@ class PublicSkillReloadIntegrationTest
                                 planning_mode: false
                                 """)));
                         reloader.publish(candidate);
-                        assertThat(context.getBean(SkillTemplate.class).invoke("modelFromMemory", Map.of()))
+                        assertThat(context.getBean(SkillTemplate.class).invoke("default-modelFromMemory", Map.of()))
                                 .isEqualTo("done");
                     });
             assertThat(server.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS)).isNotNull();
@@ -682,33 +682,33 @@ class PublicSkillReloadIntegrationTest
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     SkillReloader reloader = context.getBean(SkillReloader.class);
-                    SkillCatalog startup = context.getBean(SkillCatalog.class);
+                    SkillCatalog startup = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
                     assertThat(startup.skills()).isEmpty();
                     PreparedSkillUpdate candidate = reloader.prepare(List.of(new SkillDocument("opaque label", yaml)));
-                    assertThat(candidate.snapshot().skill("suppliedLeaf")).isPresent();
-                    assertThat(reloader.snapshot().skills()).isEmpty();
+                    assertThat(candidate.snapshot().skill("default-suppliedLeaf")).isPresent();
+                    assertThat(reloader.snapshot("default").skills()).isEmpty();
                     RestConfiguration.config.put(candidate.generationId(), "S");
                     reloader.publish(candidate);
-                    assertThat(context.getBean(SkillTemplate.class).invoke("suppliedLeaf", Map.of("message", "hi")))
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default-suppliedLeaf", Map.of("message", "hi")))
                             .isEqualTo("S:hi");
-                    String activeId = reloader.snapshot().generationId();
+                    String activeId = reloader.snapshot("default").generationId();
                     assertThatThrownBy(() -> reloader.prepare(List.of(new SkillDocument("bad source", "invalid: ["))))
                             .isInstanceOf(SkillReloadException.class).hasStackTraceContaining("bad source");
-                    assertThat(reloader.snapshot().generationId()).isEqualTo(activeId);
+                    assertThat(reloader.snapshot("default").generationId()).isEqualTo(activeId);
                     assertThat(startup.skills()).isEmpty();
                     var admitted = context.getBean(SkillInvocationHandoff.class)
-                            .handoff("suppliedLeaf", Map.of("message", "old"));
+                            .handoff("default-suppliedLeaf", Map.of("message", "old"));
                     PreparedSkillUpdate replacement = reloader.prepare(List.of(new SkillDocument("other label", yaml)));
                     RestConfiguration.config.put(replacement.generationId(), "T");
                     reloader.publish(replacement);
                     assertThat(admitted.invoke()).isEqualTo("S:old");
-                    assertThat(context.getBean(SkillTemplate.class).invoke("suppliedLeaf", Map.of("message", "new")))
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default-suppliedLeaf", Map.of("message", "new")))
                             .isEqualTo("T:new");
                     PreparedSkillUpdate configured = reloader.prepare();
                     assertThat(configured.snapshot().skills()).isEmpty();
                     PreparedSkillUpdate competingSupplied = reloader.prepare(List.of(new SkillDocument("again", yaml)));
                     reloader.publish(configured);
-                    assertThat(reloader.snapshot().skills()).isEmpty();
+                    assertThat(reloader.snapshot("default").skills()).isEmpty();
                     assertThatThrownBy(() -> reloader.publish(competingSupplied))
                             .isInstanceOf(SkillReloadException.class).hasMessageContaining("stale");
                 });
@@ -742,12 +742,12 @@ class PublicSkillReloadIntegrationTest
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     SkillReloader reloader = context.getBean(SkillReloader.class);
-                    assertThat(reloader.snapshot().skills()).isEmpty();
+                    assertThat(reloader.snapshot("default").skills()).isEmpty();
                     PreparedSkillUpdate candidate = reloader.prepare(saved);
                     generation[0] = candidate.generationId();
                     RestConfiguration.config.put(generation[0], "R");
                     reloader.publish(candidate);
-                    assertThat(context.getBean(SkillTemplate.class).invoke("restored", Map.of()))
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default-restored", Map.of()))
                             .isEqualTo("R:null");
                 });
         RestConfiguration.config.clear();
@@ -786,13 +786,13 @@ class PublicSkillReloadIntegrationTest
                     SkillReloader reloader = context.getBean(SkillReloader.class);
                     SkillTemplate template = context.getBean(SkillTemplate.class);
                     SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
-                    SkillCatalog startup = context.getBean(SkillCatalog.class);
+                    SkillCatalog startup = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
                     String initial = startup.generationId();
                     RestConfiguration.config.put(initial, "A");
-                    assertThat(template.invoke("reloadLeaf", Map.of("message", "hello"))).isEqualTo("A:hello");
-                    assertThat(template.invoke("reloadLeaf", Map.of("message", "trusted", "generationId", "spoofed")))
+                    assertThat(template.invoke("default-reloadLeaf", Map.of("message", "hello"))).isEqualTo("A:hello");
+                    assertThat(template.invoke("default-reloadLeaf", Map.of("message", "trusted", "generationId", "spoofed")))
                             .isEqualTo("A:trusted");
-                    var admittedOld = handoff.handoff("reloadLeaf", Map.of("message", "delayed", "generationId", "spoofed"));
+                    var admittedOld = handoff.handoff("default-reloadLeaf", Map.of("message", "delayed", "generationId", "spoofed"));
                     assertThat(admittedOld.generationId()).isEqualTo(initial).isNotBlank();
 
                     PreparedSkillUpdate candidate = reloader.prepare();
@@ -804,17 +804,17 @@ class PublicSkillReloadIntegrationTest
                     reloader.publish(candidate);
 
                     assertThat(startup.generationId()).isEqualTo(initial);
-                    assertThat(startup.skill("reloadLeaf")).isPresent();
-                    assertThat(reloader.snapshot().generationId()).isEqualTo(candidate.generationId());
+                    assertThat(startup.skill("default-reloadLeaf")).isPresent();
+                    assertThat(reloader.snapshot("default").generationId()).isEqualTo(candidate.generationId());
                     assertThat(admittedOld.generationId()).isEqualTo(initial);
                     assertThat(admittedOld.invoke()).isEqualTo("A:delayed");
                     assertThat(RestConfiguration.lastInvocation.get().generationId()).isEqualTo(initial);
-                    var admittedNew = handoff.handoff("reloadLeaf", new ReloadRequest("new"));
+                    var admittedNew = handoff.handoff("default-reloadLeaf", new ReloadRequest("new"));
                     assertThat(admittedNew.generationId()).isEqualTo(candidate.generationId());
                     assertThat(admittedNew.invoke()).isEqualTo("B:new");
                     assertThat(RestConfiguration.lastInvocation.get().generationId())
                             .isEqualTo(admittedNew.generationId());
-                    assertThat(template.invoke("reloadLeaf", Map.of("message", "world"))).isEqualTo("B:world");
+                    assertThat(template.invoke("default-reloadLeaf", Map.of("message", "world"))).isEqualTo("B:world");
                     assertThatThrownBy(() -> reloader.publish(candidate)).isInstanceOf(SkillReloadException.class);
                     assertThatThrownBy(reloader::prepare).isInstanceOf(SkillReloadException.class);
 
@@ -826,7 +826,7 @@ class PublicSkillReloadIntegrationTest
                             .isNotEqualTo(competing.generationId());
                     RestConfiguration.config.put(sameYaml.generationId(), "C");
                     reloader.publish(sameYaml);
-                    assertThat(template.invoke("reloadLeaf", Map.of("message", "again"))).isEqualTo("C:again");
+                    assertThat(template.invoke("default-reloadLeaf", Map.of("message", "again"))).isEqualTo("C:again");
                     assertThatThrownBy(() -> reloader.publish(competing)).isInstanceOf(SkillReloadException.class)
                             .hasMessageContaining("stale");
 
@@ -835,8 +835,8 @@ class PublicSkillReloadIntegrationTest
                     PreparedSkillUpdate empty = reloader.prepare();
                     assertThat(empty.snapshot().skills()).isEmpty();
                     reloader.publish(empty);
-                    assertThat(reloader.snapshot().skills()).isEmpty();
-                    assertThat(startup.skill("reloadLeaf")).isPresent();
+                    assertThat(reloader.snapshot("default").skills()).isEmpty();
+                    assertThat(startup.skill("default-reloadLeaf")).isPresent();
                 });
         RestConfiguration.config.clear();
     }

@@ -14,8 +14,11 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SkillMethod
 {
-    /** Exact skill name; empty uses the canonical Java method name. */
+    /** Local declaration name; empty uses the canonical Java method name. */
     String name() default "";
+
+    /** Owning namespace; normalized to lowercase, 1–32 ASCII letters, digits or underscores. */
+    String namespace() default "default";
 
     /** Description presented to callers and parent models. */
     String description();

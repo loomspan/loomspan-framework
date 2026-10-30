@@ -7,9 +7,19 @@ coverage: source-verified
 
 # Catalog Discovery and Root Pre-Checks
 
-Inject `SkillCatalog` to read one eager startup snapshot. Its `generationId()` is the opaque process-local identity of that generation. `skills()` is immutable and
-sorted by exact registered name; `skill(name)` performs exact lookup and returns empty
-when absent. Every registered YAML, Java, REST, and TypeSafe skill is included even when restricted.
+Acquire a catalog with `SkillCatalog catalog = reloader.snapshot("default")` from
+an injected `SkillReloader`. There is no injected startup `SkillCatalog` bean and
+no no-argument snapshot alias. `namespace()` is the canonical lowercase owner,
+including for an empty catalog; `generationId()` is its opaque generation ID.
+Acquisition selects the current namespace generation once; a missing namespace fails.
+
+`skills()` is immutable, unfiltered and deterministically sorted by qualified name.
+`skill("Tax-search")` normalizes namespace case and preserves local-name case.
+Malformed/unqualified arguments fail; valid unknown or foreign-namespace identities
+return empty without consulting another catalog. Every registered kind is included
+even when authorization denies execution. Catalogs remain unchanged after replacement
+or removal and hold no executable resource lease, authorization or execution reservation.
+
 Each `SkillDescriptor` has five components: `name`, `description`, `kind`,
 `inputSchema`, and nullable `outputSchema`. `inputSchema` is the exact registered
 JSON input-schema string shown to models. `outputSchema` is normalized effective
@@ -18,8 +28,7 @@ descriptive schema, inherited through a
 forwarding chain, or null for Java, REST and model producers without a schema.
 Native descriptive metadata does not validate or repair TypeSafe answers.
 Child-local evidence annotations are omitted from metadata; it does not install
-a parent validator or guarantee factual correctness. See [output contracts](../skill-authoring/output-contracts.md). The catalog has no refresh or
-replacement contract and discovery is not authorization. For current discovery after publication, call `SkillReloader.snapshot()`; the injected catalog never changes. See [skill-reload.md](skill-reload.md).
+a parent validator or guarantee factual correctness. See [output contracts](../skill-authoring/output-contracts.md). Retain a catalog as metadata or acquire another through `SkillReloader.snapshot(namespace)` for current discovery. Discovery is not authorization. See [skill-reload.md](skill-reload.md).
 
 Use `SkillTemplate.validate(name, map)` or `validate(name, object)` before asynchronous
 dispatch. Both perform the same exact lookup, conversion, contract validation, safe error
@@ -38,6 +47,10 @@ When atomic ownership transfer is required, use `SkillInvocationHandoff` rather
 than `validate`: handoff prepares the input and reserves one lifecycle admission,
 while execution still enforces authorization with the authentication captured at
 handoff. See [invocation.md](invocation.md).
+
+Pass `descriptor.name()` directly to invocation, validation or handoff; do not split
+it or reconstruct a local alias. PR 27.2 supplies active-registry/removal integration;
+PR 27.3 verifies descriptor-driven root admission.
 
 ## Source Anchors
 

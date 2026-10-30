@@ -24,7 +24,7 @@ Application code MAY depend on the twenty-three types in the closed
 | `SkillValidationIssue` | Inspect structured draft diagnostics |
 | `ValidatedSkill` | Read an exact proposed callable name and public kind |
 | `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog and close it if unused |
-| `SkillCatalog` | Discover an immutable startup, prepared-candidate, or current snapshot of registered skills |
+| `SkillCatalog` | Discover an immutable immutable namespace generation catalog, acquired explicitly or from a prepared candidate |
 | `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
 | `SkillKind` | Distinguish YAML, Java, REST, and TYPESAFE registrations |
 | `SkillExecutionView` | Observe the completed invocation session |

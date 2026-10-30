@@ -77,7 +77,7 @@ class DefaultRegisteredSkillCatalogTest
                 definition.resource(),
                 definition.source().locationPattern(),
                 new byte[] {(byte) 0xC3, (byte) 0x28});
-        YamlSkillDefinition withInvalidSource = new YamlSkillDefinition(
+        YamlSkillDefinition withInvalidSource = new YamlSkillDefinition("default",
                 definition.resource(),
                 definition.manifest(),
                 definition.executionConfiguration(),
@@ -123,7 +123,7 @@ class DefaultRegisteredSkillCatalogTest
         manifest.setName(name);
         manifest.setDescription("description");
         manifest.setModel("model");
-        return new YamlSkillDefinition(
+        return new YamlSkillDefinition("default",
                 new FileSystemResource(file),
                 manifest,
                 new EffectiveSkillExecutionConfiguration(
@@ -142,7 +142,7 @@ class DefaultRegisteredSkillCatalogTest
         manifest.setName(name);
         manifest.setDescription("description");
         manifest.setRest(true);
-        return new YamlSkillDefinition(
+        return new YamlSkillDefinition("default",
                 new FileSystemResource(file),
                 manifest,
                 null,

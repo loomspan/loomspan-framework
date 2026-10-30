@@ -32,6 +32,22 @@ import static org.mockito.Mockito.when;
 
 class SkillReloaderTest
 {
+    @Test void snapshotValidatesNamespaceAtEntryAndRetainsMetadataAfterPublication() {
+        var manager = mock(SkillGenerationManager.class);
+        var lifecycle = lifecycle();
+        var before = new SkillGeneration("Tax", "before", java.util.Map.of(), java.util.Map.of());
+        when(manager.active()).thenReturn(before);
+        var reloader = new DefaultSkillReloader(manager, lifecycle);
+        var retained = reloader.snapshot("TAX");
+        assertThat(retained.namespace()).isEqualTo("tax");
+        assertThatThrownBy(() -> reloader.snapshot("absent")).isInstanceOf(SkillReloadException.class);
+        assertThatThrownBy(() -> reloader.snapshot(" tax")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reloader.snapshot("n".repeat(33))).hasMessageContaining("length 33").hasMessageContaining("limit 32");
+        when(manager.active()).thenReturn(new SkillGeneration("tax", "after", java.util.Map.of(), java.util.Map.of()));
+        assertThat(reloader.snapshot("tax").generationId()).isEqualTo("after");
+        assertThat(retained.generationId()).isEqualTo("before");
+    }
+
     @Test
     void validationValuesAreImmutableAndPreparedCandidateRetainsItsBase()
     {
@@ -65,9 +81,9 @@ class SkillReloaderTest
         PreparedSkillUpdate candidate = reloader.prepare();
         assertThat(reloader.validate().valid()).isTrue();
         assertThat(reloader.validate().valid()).isTrue();
-        assertThat(reloader.snapshot().generationId()).isNotEqualTo(candidate.generationId());
+        assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(candidate.generationId());
         reloader.publish(candidate);
-        assertThat(reloader.snapshot().generationId()).isEqualTo(candidate.generationId());
+        assertThat(reloader.snapshot("default").generationId()).isEqualTo(candidate.generationId());
     }
     @Test
     void unusedPublishedGenerationsRetireOnceAndRejectedCandidatesDoNot()
@@ -77,7 +93,7 @@ class SkillReloaderTest
         DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle());
         List<String> retired = new CopyOnWriteArrayList<>();
         reloader.onGenerationRetired(retired::add);
-        String initial = reloader.snapshot().generationId();
+        String initial = reloader.snapshot("default").generationId();
         PreparedSkillUpdate first = reloader.prepare();
         PreparedSkillUpdate stale = reloader.prepare();
         assertThat(retired).isEmpty();
@@ -104,17 +120,17 @@ class SkillReloaderTest
         SkillGenerationManager manager = manager(SkillReloaderTest::emptyCatalog);
         manager.afterSingletonsInstantiated();
         DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle());
-        String active = reloader.snapshot().generationId();
+        String active = reloader.snapshot("default").generationId();
         PreparedSkillUpdate abandoned = reloader.prepare();
         abandoned.close();
         abandoned.close();
         assertThatThrownBy(() -> reloader.publish(abandoned)).isInstanceOf(SkillReloadException.class)
                 .hasMessageContaining("closed");
-        assertThat(reloader.snapshot().generationId()).isEqualTo(active);
+        assertThat(reloader.snapshot("default").generationId()).isEqualTo(active);
         PreparedSkillUpdate published = reloader.prepare();
         reloader.publish(published);
         published.close();
-        assertThat(reloader.snapshot().generationId()).isEqualTo(published.generationId());
+        assertThat(reloader.snapshot("default").generationId()).isEqualTo(published.generationId());
     }
 
     @Test
@@ -125,13 +141,13 @@ class SkillReloaderTest
         DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle());
         List<String> delivered = new CopyOnWriteArrayList<>();
         reloader.onGenerationRetired(id -> {
-            assertThat(reloader.snapshot().generationId()).isNotEqualTo(id);
+            assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(id);
             try { reloader.onGenerationRetired(ignored -> { }).close(); }
             catch (Exception ex) { throw new AssertionError(ex); }
             throw new IllegalStateException("listener failed");
         });
         AutoCloseable removable = reloader.onGenerationRetired(delivered::add);
-        String initial = reloader.snapshot().generationId();
+        String initial = reloader.snapshot("default").generationId();
         PreparedSkillUpdate first = reloader.prepare();
         reloader.publish(first);
         assertThat(delivered).containsExactly(initial);
@@ -139,7 +155,7 @@ class SkillReloaderTest
         PreparedSkillUpdate second = reloader.prepare();
         reloader.publish(second);
         assertThat(delivered).containsExactly(initial);
-        assertThat(reloader.snapshot().generationId()).isEqualTo(second.generationId());
+        assertThat(reloader.snapshot("default").generationId()).isEqualTo(second.generationId());
     }
 
     @Test
@@ -156,7 +172,7 @@ class SkillReloaderTest
             await(release);
             delivered.add(id);
         });
-        String initial = reloader.snapshot().generationId();
+        String initial = reloader.snapshot("default").generationId();
         PreparedSkillUpdate first = reloader.prepare();
         Thread publisher = Thread.ofVirtual().start(() -> reloader.publish(first));
         try
@@ -257,13 +273,13 @@ class SkillReloaderTest
         FrameworkExecutionLifecycle lifecycle = lifecycle();
         DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle);
         DefaultSkillReloader foreign = new DefaultSkillReloader(manager, lifecycle);
-        String initial = reloader.snapshot().generationId();
+        String initial = reloader.snapshot("default").generationId();
 
         PreparedSkillUpdate first = reloader.prepare();
         PreparedSkillUpdate second = reloader.prepare();
         assertThat(first.generationId()).isNotEqualTo(initial).isNotEqualTo(second.generationId());
         assertThat(first.snapshot().generationId()).isEqualTo(first.generationId());
-        assertThat(reloader.snapshot().generationId()).isEqualTo(initial);
+        assertThat(reloader.snapshot("default").generationId()).isEqualTo(initial);
         assertThatThrownBy(() -> foreign.publish(first)).isInstanceOf(SkillReloadException.class);
         PreparedSkillUpdate fabricated = new PreparedSkillUpdate()
         {
@@ -273,7 +289,7 @@ class SkillReloaderTest
         assertThatThrownBy(() -> reloader.publish(fabricated)).isInstanceOf(SkillReloadException.class);
 
         reloader.publish(first);
-        assertThat(reloader.snapshot().generationId()).isEqualTo(first.generationId());
+        assertThat(reloader.snapshot("default").generationId()).isEqualTo(first.generationId());
         assertThatThrownBy(() -> reloader.publish(first)).isInstanceOf(SkillReloadException.class);
         assertThatThrownBy(() -> reloader.publish(second)).isInstanceOf(SkillReloadException.class)
                 .hasMessageContaining("stale");
@@ -305,7 +321,7 @@ class SkillReloaderTest
         {
             var pending = workers.submit(() -> reloader.prepare(List.of(new SkillDocument("slow supplied", "name: skill\n"))));
             assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
-            assertThat(reloader.snapshot().generationId()).isNotEqualTo(ready.generationId());
+            assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(ready.generationId());
             reloader.publish(ready);
             proceed.countDown();
             PreparedSkillUpdate stale = pending.get(5, TimeUnit.SECONDS);
@@ -338,7 +354,7 @@ class SkillReloaderTest
         });
         manager.afterSingletonsInstantiated();
         DefaultSkillReloader reloader = new DefaultSkillReloader(manager, lifecycle());
-        String activeId = reloader.snapshot().generationId();
+        String activeId = reloader.snapshot("default").generationId();
         ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
         try
         {
@@ -358,7 +374,7 @@ class SkillReloaderTest
                 Thread.onSpinWait();
             assertThat(secondWorker.get().getState()).isEqualTo(Thread.State.BLOCKED);
             assertThat(secondReadEntered.getCount()).isOne();
-            assertThat(reloader.snapshot().generationId()).isEqualTo(activeId);
+            assertThat(reloader.snapshot("default").generationId()).isEqualTo(activeId);
             releaseFirstRead.countDown();
             assertThat(first.get(5, TimeUnit.SECONDS).generationId())
                     .isNotEqualTo(second.get(5, TimeUnit.SECONDS).generationId());
@@ -388,7 +404,7 @@ class SkillReloaderTest
             start.countDown();
             assertThat(List.of(firstPublished.get(5, TimeUnit.SECONDS), secondPublished.get(5, TimeUnit.SECONDS)))
                     .containsExactlyInAnyOrder(true, false);
-            assertThat(reloader.snapshot().generationId()).isIn(first.generationId(), second.generationId());
+            assertThat(reloader.snapshot("default").generationId()).isIn(first.generationId(), second.generationId());
         }
         finally
         {

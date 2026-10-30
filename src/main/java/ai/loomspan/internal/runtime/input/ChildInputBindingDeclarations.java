@@ -38,7 +38,7 @@ public final class ChildInputBindingDeclarations {
                     else if (!Integer.valueOf(0).equals(child.maxTasks())
                             && (Integer.valueOf(0).equals(producer.maxTasks()) || producer.effectiveMinTasks() > 1))
                         issues.add(label + "producer cannot have exactly one task '" + binding.skill() + "'");
-                    if (child.name().equals(binding.skill())) issues.add(label + "self dependency");
+                    if (child.identity().equals(binding.skillIdentity())) issues.add(label + "self dependency");
                 }
             }
         }

@@ -37,11 +37,9 @@ import ai.loomspan.internal.skill.SkillGenerationManager;
 import ai.loomspan.internal.skill.DefaultSkillReloader;
 import ai.loomspan.internal.skillapi.DefaultSkillTemplate;
 import ai.loomspan.internal.skillapi.DefaultSkillInvocationHandoff;
-import ai.loomspan.internal.skillapi.DefaultSkillCatalog;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import ai.loomspan.api.SkillTemplate;
 import ai.loomspan.api.SkillInvocationHandoff;
-import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillReloader;
 import ai.loomspan.internal.vfs.DefaultRefResolver;
 import ai.loomspan.internal.vfs.RefResolver;
@@ -232,12 +230,7 @@ public class LoomspanAutoConfiguration
         return new SkillInputValidator();
     }
 
-    @Bean
-    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    SkillCatalog skillCatalog(SkillGenerationManager generationManager)
-    {
-        return generationManager.active().skillCatalog();
-    }
+
 
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)

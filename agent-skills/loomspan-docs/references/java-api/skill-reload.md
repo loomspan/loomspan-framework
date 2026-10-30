@@ -7,6 +7,21 @@ coverage: source-verified
 
 # Two-stage skill updates
 
+## Namespace metadata foundation
+
+A prepared update's `generationId()` and `snapshot().generationId()` identify the
+candidate, independently of its captured base. Its catalog identifies only the
+candidate namespace and supplied declarations plus that namespace's fixed Java
+registrations. Validation feedback uses qualified names, reserves no generation
+and retains empty metadata on errors. Catalog metadata is not authorization or
+an execution reservation. Namespace replacement under another name requires
+creation, explicit reference updates, then removal; there is no rename/inheritance.
+
+PR 27.2 replaces the existing default-only publication overloads below with complete
+namespace-targeted management and active-registry acquisition. PR 27.1 verifies
+identity/catalog foundations; later root/model/observation integration is not
+claimed by this document's earlier execution examples.
+
 ## Complete execution publication
 
 Connection `request-timeout` is publishable through the existing `ExecutionConfiguration` and both credential preparation paths. Validation checks its supported drivers, exact whole-millisecond precision and `1..2147483647ms` range without resolving credentials or calling providers. Invalid candidates leave the active generation unchanged. Host-map preparation intentionally wraps non-credential errors generically with no original cause to protect supplied secrets; use `validate` for the actionable safe property path. See [provider call budgets](../skill-authoring/model-selection-and-connections.md#provider-call-budgets) for defaults, Ollama rejection and the mission/retry distinction.
@@ -28,7 +43,7 @@ if (feedback.valid()) {
 
 Close any candidate that will not be published. A stale or shutdown-rejected candidate is closed by the framework; a repeated publish rejection does not close its already active generation. Existing skill-only overloads use a copy of the execution settings active at preparation, including after an explicit publication. Root handoff captures the entire version, so its delayed work, descendants, provider retries, limits, and tracing retain that version. Superseded provider clients close after captured physical work finishes. Republishing earlier authored content yields another process-local ID. Process settings (shutdown, observability API/auth/retention, skill locations, Spring/server infrastructure) cannot be published. Ordinary `application.yml` remains the startup path; trace persistence now binds only at `loomspan.execution-trace.persistence` with default `ONERROR`. Applications using the former top-level key must move it under `loomspan`. External credential revocation may still fail a provider request.
 
-For editor feedback, call `reloader.validate()` to reread configured resources or `reloader.validate(completeDocuments)` to check an in-memory complete replacement set. Check the result's `valid()` before treating `skills()` as a complete candidate: any `ERROR` makes it false and leaves metadata empty, while warnings retain complete metadata. Empty metadata can also mean a valid empty candidate. `issues()` provides severity, source name, optional skill name and field path, and message. Each immutable `ValidatedSkill` has an exact callable `name()` and `SkillKind` of `JAVA`, `YAML`, `REST`, or `TYPESAFE`. Successful results include fixed Java and the entire proposed YAML/REST/TypeSafe set, sorted by exact case-sensitive name; both result lists are immutable and detached from later operations. Supplied source labels are diagnostics, never paths. An empty collection proposes removal of YAML, REST, and TypeSafe skills while fixed Java skills remain.
+For editor feedback, call `reloader.validate()` to reread configured resources or `reloader.validate(completeDocuments)` to check an in-memory complete replacement set. Check the result's `valid()` before treating `skills()` as a complete candidate: any `ERROR` makes it false and leaves metadata empty, while warnings retain complete metadata. Empty metadata can also mean a valid empty candidate. `issues()` provides severity, source name, optional skill name and field path, and message. Each immutable `ValidatedSkill` has a canonical qualified callable `name()` and `SkillKind` of `JAVA`, `YAML`, `REST`, or `TYPESAFE`. Successful results include fixed Java and the entire proposed YAML/REST/TypeSafe set, sorted by exact case-sensitive name; both result lists are immutable and detached from later operations. Supplied source labels are diagnostics, never paths. An empty collection proposes removal of YAML, REST, and TypeSafe skills while fixed Java skills remain.
 
 ```java
 SkillValidationResult feedback = reloader.validate(completeDocuments);
@@ -43,12 +58,12 @@ if (feedback.valid()) {
 
 Repeated validation does not allocate an ID, create a candidate, activate a generation, instantiate a REST handler, change fixed caches, or notify retirement listeners. Validation does not invoke skills or models or test external connectivity. Correct the draft, then `prepare` current input, stage resources using `update.snapshot()` as the authoritative description of the frozen candidate, and `publish`; validation does not guarantee or authorize these later lifecycle steps. See [draft validation workflow](../skill-authoring/validation-workflow.md).
 
-Inject the framework-provided `SkillReloader`. Register retirement notification, read `snapshot().generationId()`, and stage matching application-owned REST configuration before opening your traffic gate. The initially injected `SkillCatalog` is a permanent startup snapshot; call `reloader.snapshot()` for current discovery. Catalog lookup is unfiltered and does not authorize an invocation.
+Inject the framework-provided `SkillReloader`. Register retirement notification, read `snapshot("default").generationId()`, and stage matching application-owned REST configuration before opening your traffic gate. Acquire current immutable metadata through `reloader.snapshot("default")`; no startup catalog bean is injected. Catalog lookup is unfiltered and does not authorize an invocation.
 
 ```java
 AutoCloseable retirement = reloader.onGenerationRetired(id ->
         cleanupExecutor.execute(() -> configurationStore.remove(id)));
-configurationStore.stage(reloader.snapshot().generationId(), initialConfiguration);
+configurationStore.stage(reloader.snapshot("default").generationId(), initialConfiguration);
 trafficGate.open();
 
 PreparedSkillUpdate update = reloader.prepare(); // or prepare(completeDocuments)
@@ -76,15 +91,15 @@ trafficGate.open(); // application-owned readiness gate
 
 The ordinary configured generation starts first. On every process start, REST configuration must be staged for whichever generation the application will serve; old process IDs cannot be reused. Loomspan intentionally has no startup switch, deferred activation mode, persistence store, or framework traffic gate. The application owns its durable snapshot, staging, and traffic readiness.
 
-`publish` succeeds once only for an update from the same framework instance whose preparation base is still active. Foreign, fabricated, stale, repeated, and shutdown-time updates fail with unchecked `SkillReloadException`; preparation with host-supplied values uses a generic failure wrapper so the original exception cannot disclose those values. A later update requires another `prepare`. `snapshot()` never reads resources. Shutdown begun during preparation prevents a successful return. Old admitted and running trees keep their captured definitions and ID; new roots capture the new active generation.
+`publish` succeeds once only for an update from the same framework instance whose preparation base is still active. Foreign, fabricated, stale, repeated, and shutdown-time updates fail with unchecked `SkillReloadException`; preparation with host-supplied values uses a generic failure wrapper so the original exception cannot disclose those values. A later update requires another `prepare`. `snapshot(namespace)` never reads resources. Shutdown begun during preparation prevents a successful return. Old admitted and running trees keep their captured definitions and ID; new roots capture the new active generation.
 
-Use `AdmittedSkillInvocation.generationId()` to correlate a pending root with the application-owned durable snapshot staged for that generation before invocation. Do not use `reloader.snapshot().generationId()` for an already admitted handle: publication can change the current catalog before handoff returns. The handle's ID remains readable after release, retirement, or cutoff, but reading it does not retain the generation or guarantee that the application's mapping still exists. Handle a missing mapping and release an admission abandoned during lookup or recording; the application owns mapping retention and durable correlation.
+Use `AdmittedSkillInvocation.generationId()` to correlate a pending root with the application-owned durable snapshot staged for that generation before invocation. Do not use `reloader.snapshot("default").generationId()` for an already admitted handle: publication can change the current catalog before handoff returns. The handle's ID remains readable after release, retirement, or cutoff, but reading it does not retain the generation or guarantee that the application's mapping still exists. Handle a missing mapping and release an admission abandoned during lookup or recording; the application owns mapping retention and durable correlation.
 
 The application owns readiness, staging, cleanup, and retries. Publishing B does not show that all work using A has finished. During normal operation, a registered listener is selected once when a superseded published generation has no captured preparation, pending admission, running root, or physically running descendant. This includes unused generations replaced immediately; a notification can occur before `publish` returns, so stage resources first. Listeners run outside framework locks on publication, invocation, admission-release, or physical-return threads and may run concurrently. They must be thread-safe and return promptly; schedule slow cleanup on an application-owned executor. A throwing listener is logged and isolated from publication, invocation, other listeners, and later retirements. Closing the returned handle prevents future selection without waiting for already selected callbacks. There is no replay, durable delivery, ordering across generation IDs, or retry. Delivery may be omitted after shutdown begins, including for the active generation, and shutdown does not wait for cleanup. Never-published rejected or discarded candidates get no callback and require application cleanup; a rejected repeated publish does not make its previously published generation safe to remove. See [REST handler SPI](rest-skills.md) for generation-keyed handler selection. There is no historical invocation API.
 
 ## Evidence
 
-- `PublicSkillReloadIntegrationTest` exercises startup ID staging, frozen publication, new REST routing, pending-admission retirement, and unchanged startup catalog.
+- `PublicSkillReloadIntegrationTest` exercises startup ID staging, frozen publication, new REST routing, pending-admission retirement, and retained immutable catalog.
 - `PublicSkillReloadIntegrationTest` also exercises supplied REST YAML without files, old admitted work, configured alternation, and restart resubmission.
 - `PublicSkillReloadIntegrationTest` exercises both timeout credential paths, safe atomic rejection, old/new budgets,
   repeated skill-only retention, captured child/retry calls and longer-provider-budget mission/caller cutoff.

@@ -64,7 +64,7 @@ class SkillGenerationManagerTest
                 description: Bind named answers
                 model: model
                 planning_mode: true
-                allowed_skills: [{name: producer, max_tasks: 1}]
+                allowed_skills: [{name: default-producer, max_tasks: 1}]
                 output_schema:
                   type: object
                   properties:
@@ -72,16 +72,16 @@ class SkillGenerationManagerTest
                   required: [result]
                   additionalProperties: false
                 output_bindings:
-                  /result: {from: child_result, skill: producer, path: /category/choice}
+                  /result: {from: child_result, skill: default-producer, path: /category/choice}
                 """;
         var producer = new SkillDocument("opaque native label", leaf);
         assertThat(manager.validate(List.of(new SkillDocument("parent", parent), producer)).valid()).isTrue();
         var generation = manager.prepare(List.of(new SkillDocument("parent", parent), producer));
-        var schema = generation.capability("producer").tool().outputSchema();
-        assertThat(generation.skillCatalog().skill("producer").orElseThrow().outputSchema()).isEqualTo(schema);
-        assertThat(generation.registeredSkillCatalog().find("producer").orElseThrow().outputSchema()).isEqualTo(schema);
-        assertThat(generation.registeredSkillCatalog().find("producer").orElseThrow().sourcePath()).isEqualTo("opaque native label");
-        assertThat(generation.registeredSkillCatalog().find("producer").orElseThrow().yaml()).isEqualTo(leaf);
+        var schema = generation.capability("default-producer").tool().outputSchema();
+        assertThat(generation.skillCatalog().skill("default-producer").orElseThrow().outputSchema()).isEqualTo(schema);
+        assertThat(generation.registeredSkillCatalog().find("default-producer").orElseThrow().outputSchema()).isEqualTo(schema);
+        assertThat(generation.registeredSkillCatalog().find("default-producer").orElseThrow().sourcePath()).isEqualTo("opaque native label");
+        assertThat(generation.registeredSkillCatalog().find("default-producer").orElseThrow().yaml()).isEqualTo(leaf);
         for (String invalid : List.of(parent.replace("enum: [A, Z]", "enum: [Z]"),
                 parent.replace("enum: [A, Z]", "enum: [score]").replace("path: /category/choice", "path: /category/type"),
                 parent.replace("type: string, enum: [A, Z]", "type: integer").replace("path: /category/choice", "path: /severity/score"))) {
@@ -104,7 +104,7 @@ class SkillGenerationManagerTest
                 description: parent
                 model: model
                 planning_mode: true
-                allowed_skills: [{name: producer, max_tasks: 2}]
+                allowed_skills: [{name: default-producer, max_tasks: 2}]
                 input_schema:
                   type: object
                   properties:
@@ -119,12 +119,12 @@ class SkillGenerationManagerTest
                   additionalProperties: false
                 output_bindings:
                   /caseid: {from: input, path: /id}
-                  /answer: {from: child_result, skill: producer, path: /value}
+                  /answer: {from: child_result, skill: default-producer, path: /value}
                 """;
         var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\noutput_schema: {type: object, properties: {value: {type: string}}, additionalProperties: false}\n");
         assertThat(manager.validate(List.of(new SkillDocument("parent", parent), producer)).valid()).isTrue();
         var generation = manager.prepare(List.of(new SkillDocument("parent", parent), producer));
-        assertThat(generation.definition("parent").outputBindings().getFirst().destination().pointer()).isEqualTo("/CaseId");
+        assertThat(generation.definition("default-parent").outputBindings().getFirst().destination().pointer()).isEqualTo("/CaseId");
         Map<String, String> invalid = Map.ofEntries(
                 Map.entry("count zero", parent.replace("max_tasks: 2", "max_tasks: 0")),
                 Map.entry("count minimum", parent.replace("max_tasks: 2", "min_tasks: 2")),
@@ -167,12 +167,12 @@ class SkillGenerationManagerTest
                   required: [requestId]
                   additionalProperties: false
                 allowed_skills:
-                  - name: producer
+                  - name: default-producer
                     max_tasks: 1
-                  - name: consumer
+                  - name: default-consumer
                     input_bindings:
                       /caseId: {from: input, path: /requestId}
-                      /data: {from: child_result, skill: producer, path: /undeclaredOutput}
+                      /data: {from: child_result, skill: default-producer, path: /undeclaredOutput}
                 """;
         var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\n");
         var consumer = new SkillDocument("consumer", """
@@ -189,8 +189,8 @@ class SkillGenerationManagerTest
                 """);
         assertThat(manager.validate(List.of(new SkillDocument("parent", parent), producer, consumer)).valid()).isTrue();
         Map<String, String> bad = Map.of(
-                "unknown producer", parent.replace("skill: producer", "skill: other"),
-                "self", parent.replace("skill: producer", "skill: consumer"),
+                "unknown producer", parent.replace("skill: default-producer", "skill: default-other"),
+                "self", parent.replace("skill: default-producer", "skill: default-consumer"),
                 "impossible count", parent.replace("max_tasks: 1", "max_tasks: 0"),
                 "missing input field", parent.replace("path: /requestId", "path: /absent"),
                 "closed target", parent.replace("/caseId:", "/absent:"),
@@ -200,7 +200,7 @@ class SkillGenerationManagerTest
             assertThat(validation.valid()).as(entry.getKey()).isFalse();
             assertThat(validation.issues()).anyMatch(issue -> issue.fieldPath().equals("allowed_skills.input_bindings"));
         }
-        String cycle = parent.replace("    max_tasks: 1", "    max_tasks: 1\n    input_bindings:\n      /data: {from: child_result, skill: consumer, path: ''}");
+        String cycle = parent.replace("    max_tasks: 1", "    max_tasks: 1\n    input_bindings:\n      /data: {from: child_result, skill: default-consumer, path: ''}");
         assertThat(manager.validate(List.of(new SkillDocument("parent", cycle), producer, consumer)).issues())
                 .anyMatch(issue -> issue.message().contains("cyclic"));
     }
@@ -219,11 +219,11 @@ class SkillGenerationManagerTest
                         name: producer
                         description: Produce an answer
                         model: model
-                        allowed_skills: [{name: fixedJava}]
+                        allowed_skills: [{name: default-fixedJava}]
                         output_schema:
                           type: object
                           properties:
-                            answer: {type: string, evidence: fixedJava, nullable: true}
+                            answer: {type: string, evidence: default-fixedJava, nullable: true}
                           required: [answer]
                           additionalProperties: false
                         """),
@@ -233,23 +233,23 @@ class SkillGenerationManagerTest
                 new SkillDocument("plain", "name: plain\ndescription: plain\nmodel: model\n"));
         assertThat(manager.validate(documents).valid()).isTrue();
         SkillGeneration generation = manager.prepare(documents);
-        String schema = generation.skillCatalog().skill("producer").orElseThrow().outputSchema();
+        String schema = generation.skillCatalog().skill("default-producer").orElseThrow().outputSchema();
         assertThat(schema).contains("answer", "nullable", "additionalProperties").doesNotContain("evidence");
-        assertThat(generation.definition("producer").evidenceContract().isEmpty()).isFalse();
-        assertThat(generation.definition("inner").outputSchema()).isNull();
-        assertThat(generation.definition("inner").evidenceContract().isEmpty()).isTrue();
+        assertThat(generation.definition("default-producer").evidenceContract().isEmpty()).isFalse();
+        assertThat(generation.definition("default-inner").outputSchema()).isNull();
+        assertThat(generation.definition("default-inner").evidenceContract().isEmpty()).isTrue();
         for (String name : List.of("outer", "inner", "producer")) {
-            assertThat(generation.skillCatalog().skill(name).orElseThrow().outputSchema()).isEqualTo(schema);
-            assertThat(generation.registeredSkillCatalog().find(name).orElseThrow().outputSchema()).isEqualTo(schema);
+            assertThat(generation.skillCatalog().skill("default-" + name).orElseThrow().outputSchema()).isEqualTo(schema);
+            assertThat(generation.registeredSkillCatalog().find("default-" + name).orElseThrow().outputSchema()).isEqualTo(schema);
         }
         for (String name : List.of("javaParent", "fixedJava", "restParent", "restLeaf", "plainParent", "plain"))
-            assertThat(generation.skillCatalog().skill(name).orElseThrow().outputSchema()).isNull();
+            assertThat(generation.skillCatalog().skill("default-" + name).orElseThrow().outputSchema()).isNull();
         manager.activate(generation);
         var captured = manager.capture();
         var replacement = manager.prepare(List.of(forwardingDocument("outer", "fixedJava")));
         manager.activate(replacement);
-        assertThat(captured.generation().skillCatalog().skill("outer").orElseThrow().outputSchema()).isEqualTo(schema);
-        assertThat(manager.active().skillCatalog().skill("outer").orElseThrow().outputSchema()).isNull();
+        assertThat(captured.generation().skillCatalog().skill("default-outer").orElseThrow().outputSchema()).isEqualTo(schema);
+        assertThat(manager.active().skillCatalog().skill("default-outer").orElseThrow().outputSchema()).isNull();
         captured.lease().close();
     }
 
@@ -271,8 +271,8 @@ class SkillGenerationManagerTest
             assertThat(manager.active().id()).isEqualTo(original);
         }
         assertThat(manager.validate(List.of(
-                new SkillDocument("a", "name: a\ndescription: a\nmodel: model\nallowed_skills: [{name: b}]\n"),
-                new SkillDocument("b", "name: b\ndescription: b\nmodel: model\nallowed_skills: [{name: a}]\n"))).valid()).isTrue();
+                new SkillDocument("a", "name: a\ndescription: a\nmodel: model\nallowed_skills: [{name: default-b}]\n"),
+                new SkillDocument("b", "name: b\ndescription: b\nmodel: model\nallowed_skills: [{name: default-a}]\n"))).valid()).isTrue();
     }
 
     private static SkillDocument forwardingDocument(String name, String child) {
@@ -281,8 +281,8 @@ class SkillGenerationManagerTest
                 description: Prepare and delegate
                 model: model
                 planning_mode: true
-                allowed_skills: [{name: %s, required: true, max_tasks: 1}]
-                output_from: {skill: %s}
+                allowed_skills: [{name: default-%s, required: true, max_tasks: 1}]
+                output_from: {skill: default-%s}
                 """.formatted(name, child, child));
     }
 
@@ -364,10 +364,10 @@ class SkillGenerationManagerTest
         manager.afterSingletonsInstantiated();
         var firstRegistry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
         var secondRegistry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
-        SkillGeneration first = new SkillGeneration("first", Map.of(), Map.of(), null, null,
+        SkillGeneration first = new SkillGeneration("default", "first", Map.of(), Map.of(), null, null,
                 new ExecutionRuntime(new LoomspanProperties(), ai.loomspan.internal.core.TracePersistencePolicy.ONERROR,
                         firstRegistry));
-        SkillGeneration second = new SkillGeneration("second", Map.of(), Map.of(), null, null,
+        SkillGeneration second = new SkillGeneration("default", "second", Map.of(), Map.of(), null, null,
                 new ExecutionRuntime(new LoomspanProperties(), ai.loomspan.internal.core.TracePersistencePolicy.ONERROR,
                         secondRegistry));
         manager.activate(first);
@@ -407,25 +407,25 @@ class SkillGenerationManagerTest
                 new SkillDocument("opaque REST source", "name: Brest\ndescription: route\nrest: true\n")));
         assertThat(first.valid()).isTrue();
         assertThat(first.skills()).containsExactly(
-                new ValidatedSkill("Brest", SkillKind.REST),
-                new ValidatedSkill("Zjava", SkillKind.JAVA),
-                new ValidatedSkill("ayaml", SkillKind.YAML));
+                new ValidatedSkill("default-Brest", SkillKind.REST),
+                new ValidatedSkill("default-Zjava", SkillKind.JAVA),
+                new ValidatedSkill("default-ayaml", SkillKind.YAML));
         assertThat(first.skills()).extracting(ValidatedSkill::name).doesNotHaveDuplicates();
         assertThat(manager.active().id()).isEqualTo(activeId);
-        assertThat(manager.active().skillCatalog().skill("Brest")).isEmpty();
+        assertThat(manager.active().skillCatalog().skill("default-Brest")).isEmpty();
         assertThat(constructions).hasValue(0);
         assertThat(retirements).hasValue(0);
 
         var replacement = manager.validate(List.of(
                 new SkillDocument("kind changed", "name: ayaml\ndescription: route\nrest: true\n")));
         assertThat(replacement.skills()).containsExactly(
-                new ValidatedSkill("Zjava", SkillKind.JAVA),
-                new ValidatedSkill("ayaml", SkillKind.REST));
+                new ValidatedSkill("default-Zjava", SkillKind.JAVA),
+                new ValidatedSkill("default-ayaml", SkillKind.REST));
         assertThat(first.skills()).containsExactly(
-                new ValidatedSkill("Brest", SkillKind.REST),
-                new ValidatedSkill("Zjava", SkillKind.JAVA),
-                new ValidatedSkill("ayaml", SkillKind.YAML));
-        assertThat(manager.validate(List.of()).skills()).containsExactly(new ValidatedSkill("Zjava", SkillKind.JAVA));
+                new ValidatedSkill("default-Brest", SkillKind.REST),
+                new ValidatedSkill("default-Zjava", SkillKind.JAVA),
+                new ValidatedSkill("default-ayaml", SkillKind.YAML));
+        assertThat(manager.validate(List.of()).skills()).containsExactly(new ValidatedSkill("default-Zjava", SkillKind.JAVA));
         assertThat(retirements).hasValue(0);
         assertThat(manager.prepare(List.of()).id()).endsWith("-2");
         assertThat(constructions).hasValue(0);
@@ -446,7 +446,7 @@ class SkillGenerationManagerTest
         Files.writeString(directory.resolve("configured.yaml"), yaml);
         var configured = manager.validate();
         var supplied = manager.validate(List.of(new SkillDocument("diagnostic label", yaml)));
-        assertThat(configured.skills()).containsExactly(new ValidatedSkill("only", SkillKind.YAML));
+        assertThat(configured.skills()).containsExactly(new ValidatedSkill("default-only", SkillKind.YAML));
         assertThat(supplied.skills()).isEqualTo(configured.skills());
 
         var malformed = manager.validate(List.of(new SkillDocument("good", yaml),
@@ -460,8 +460,8 @@ class SkillGenerationManagerTest
         assertThat(duplicate.skills()).isEmpty();
         assertThat(duplicate.issues()).anySatisfy(issue -> assertThat(issue.message()).contains("only"));
         Files.writeString(directory.resolve("configured.yaml"), yaml.replace("only", "later"));
-        assertThat(manager.validate().skills()).containsExactly(new ValidatedSkill("later", SkillKind.YAML));
-        assertThat(configured.skills()).containsExactly(new ValidatedSkill("only", SkillKind.YAML));
+        assertThat(manager.validate().skills()).containsExactly(new ValidatedSkill("default-later", SkillKind.YAML));
+        assertThat(configured.skills()).containsExactly(new ValidatedSkill("default-only", SkillKind.YAML));
     }
 
     @Test
@@ -479,8 +479,8 @@ class SkillGenerationManagerTest
         assertThat(feedback.issues()).isNotEmpty().allSatisfy(issue ->
                 assertThat(issue.severity()).isEqualTo(SkillValidationIssue.Severity.WARNING));
         assertThat(feedback.skills()).containsExactly(
-                new ValidatedSkill("fixedJava", SkillKind.JAVA),
-                new ValidatedSkill("outputSchemaComplexSkill", SkillKind.YAML));
+                new ValidatedSkill("default-fixedJava", SkillKind.JAVA),
+                new ValidatedSkill("default-outputSchemaComplexSkill", SkillKind.YAML));
     }
 
     @Test
@@ -531,7 +531,7 @@ class SkillGenerationManagerTest
             assertThat(issue.fieldPath()).isEqualTo("name");
         });
         assertThatThrownBy(() -> manager.prepare(conflict)).hasMessageContaining("already registered");
-        List<SkillDocument> missing = List.of(new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: missing\n"));
+        List<SkillDocument> missing = List.of(new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: default-missing\n"));
         var missingFeedback = manager.validate(missing);
         assertThat(missingFeedback.skills()).isEmpty();
         assertThat(missingFeedback.issues()).extracting(issue -> issue.fieldPath())
@@ -539,7 +539,7 @@ class SkillGenerationManagerTest
         assertThatThrownBy(() -> manager.prepare(missing)).hasMessageContaining("Unknown child skill");
         assertThat(manager.validate(List.of()).valid()).isTrue();
         assertThat(manager.prepare(List.of()).capabilities()).extracting(CapabilityMetadata::name)
-                .containsExactly("fixedJava");
+                .containsExactly("default-fixedJava");
     }
 
     @Test
@@ -591,7 +591,7 @@ class SkillGenerationManagerTest
         manager.afterSingletonsInstantiated();
         var result = manager.validate(List.of(
                 new SkillDocument("bad", "name: couldExist\ndescription: bad\nrest: true\nmodel: forbidden\n"),
-                new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: couldExist\n  - name: certainlyMissing\n")));
+                new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: default-couldExist\n  - name: default-certainlyMissing\n")));
         assertThat(result.issues()).extracting(issue -> issue.message())
                 .anySatisfy(message -> assertThat(message).contains("certainlyMissing"))
                 .noneSatisfy(message -> assertThat(message).contains("Unknown child skill 'couldExist'"));
@@ -612,15 +612,15 @@ class SkillGenerationManagerTest
         caller.clear();
         Files.delete(file);
         manager.activate(supplied);
-        assertThat(supplied.skillCatalog().skill("supplied")).isPresent();
-        assertThat(supplied.skillCatalog().skill("configured")).isEmpty();
-        assertThat(supplied.registeredSkillCatalog().find("supplied")).get()
+        assertThat(supplied.skillCatalog().skill("default-supplied")).isPresent();
+        assertThat(supplied.skillCatalog().skill("default-configured")).isEmpty();
+        assertThat(supplied.registeredSkillCatalog().find("default-supplied")).get()
                 .satisfies(entry -> {
                     assertThat(entry.sourcePath()).isEqualTo("opaque label");
                     assertThat(entry.yaml()).isEqualTo(suppliedYaml);
                 });
         SkillGeneration empty = manager.prepare(List.of());
-        assertThat(empty.capabilities()).extracting(CapabilityMetadata::name).containsExactly("fixedJava");
+        assertThat(empty.capabilities()).extracting(CapabilityMetadata::name).containsExactly("default-fixedJava");
         assertThat(manager.prepare(List.of(new SkillDocument("opaque label", suppliedYaml))).id())
                 .isNotEqualTo(supplied.id());
         assertThatThrownBy(() -> manager.prepare(List.of(new SkillDocument("orphan label", """
@@ -628,7 +628,7 @@ class SkillGenerationManagerTest
                 description: orphan
                 model: model
                 allowed_skills:
-                  - name: missingChild
+                  - name: default-missingChild
                 """))))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("missingChild")
                 .hasMessageContaining("orphan label");
@@ -649,11 +649,11 @@ class SkillGenerationManagerTest
 
         assertThat(first.id()).isNotBlank().isNotEqualTo(second.id());
         assertThat(first.capabilities()).extracting(CapabilityMetadata::name)
-                .containsExactly("fixedJava", "yamlSkill");
-        assertThat(first.capability("fixedJava")).isSameAs(javaSkill);
-        assertThat(first.definition("yamlSkill")).isSameAs(yaml);
+                .containsExactly("default-fixedJava", "default-yamlSkill");
+        assertThat(first.capability("default-fixedJava")).isSameAs(javaSkill);
+        assertThat(first.definition("default-yamlSkill")).isSameAs(yaml);
         assertThat(first.skillCatalog().skills()).extracting(skill -> skill.name())
-                .containsExactly("fixedJava", "yamlSkill");
+                .containsExactly("default-fixedJava", "default-yamlSkill");
         assertThat(first.registeredSkillCatalog().registeredSkillCount()).isEqualTo(2);
         manager.activate(first);
         assertThat(manager.active()).isSameAs(first);
@@ -677,8 +677,8 @@ class SkillGenerationManagerTest
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("already registered");
         assertThat(manager.active()).isSameAs(active);
-        assertThat(manager.active().capability("validYaml")).isNotNull();
-        assertThat(manager.active().skillCatalog().skill("validYaml")).isPresent();
+        assertThat(manager.active().capability("default-validYaml")).isNotNull();
+        assertThat(manager.active().skillCatalog().skill("default-validYaml")).isPresent();
     }
 
     @Test
@@ -696,14 +696,14 @@ class SkillGenerationManagerTest
             default -> catalog(yamlSkill("parent", List.of("removedChild")));
         });
 
-        assertThat(manager.prepare().capability("first")).isNotNull();
-        assertThat(manager.prepare().capability("second")).isNotNull();
+        assertThat(manager.prepare().capability("default-first")).isNotNull();
+        assertThat(manager.prepare().capability("default-second")).isNotNull();
         SkillGeneration emptyYaml = manager.prepare();
         assertThat(emptyYaml.capabilities()).containsExactly(javaSkill);
         assertThat(emptyYaml.definitions()).isEmpty();
         assertThatThrownBy(manager::prepare)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Unknown child skill 'removedChild'");
+                .hasMessageContaining("Unknown child skill 'default-removedChild'");
     }
 
     @Test
@@ -728,10 +728,10 @@ class SkillGenerationManagerTest
         manager.activate(candidate);
 
         assertThat(manager.active()).isSameAs(candidate);
-        assertThat(candidate.definition("captured").prompt()).isEqualTo("Original prompt");
-        assertThat(candidate.skillCatalog().skill("captured")).get()
+        assertThat(candidate.definition("default-captured").prompt()).isEqualTo("Original prompt");
+        assertThat(candidate.skillCatalog().skill("default-captured")).get()
                 .extracting(skill -> skill.description()).isEqualTo("Original description");
-        assertThat(candidate.registeredSkillCatalog().find("captured")).get()
+        assertThat(candidate.registeredSkillCatalog().find("default-captured")).get()
                 .extracting(entry -> entry.yaml()).isEqualTo(original);
         assertThat(manager.prepare().definitions()).isEmpty();
     }
@@ -752,11 +752,11 @@ class SkillGenerationManagerTest
         manager.activate(active);
 
         assertThat(List.of(first.id(), second.id(), prepared.id(), active.id())).doesNotHaveDuplicates();
-        assertThat(first.capability("generation1")).isNotNull();
-        assertThat(second.capability("generation2")).isNotNull();
-        assertThat(prepared.capability("generation3")).isNotNull();
+        assertThat(first.capability("default-generation1")).isNotNull();
+        assertThat(second.capability("default-generation2")).isNotNull();
+        assertThat(prepared.capability("default-generation3")).isNotNull();
         assertThat(manager.active()).isSameAs(active);
-        assertThat(active.capability("generation4")).isNotNull();
+        assertThat(active.capability("default-generation4")).isNotNull();
     }
 
     @Test
@@ -779,9 +779,9 @@ class SkillGenerationManagerTest
         SkillGeneration first = manager.prepare();
         SkillGeneration second = manager.prepare();
 
-        assertThat(first.capability("restSkill").invoker().invoke(java.util.Map.of()))
+        assertThat(first.capability("default-restSkill").invoker().invoke(java.util.Map.of()))
                 .isEqualTo("handler-1");
-        assertThat(second.capability("restSkill").invoker().invoke(java.util.Map.of()))
+        assertThat(second.capability("default-restSkill").invoker().invoke(java.util.Map.of()))
                 .isEqualTo("handler-1");
         assertThat(instances).hasValue(1);
     }
@@ -820,9 +820,10 @@ class SkillGenerationManagerTest
 
     private static CapabilityMetadata javaSkill(String name)
     {
-        return new CapabilityMetadata("java:" + name, name, name, SkillExecutionDescriptor.none(),
+        String canonical = "default-" + name;
+        return new CapabilityMetadata("java:" + name, canonical, name, SkillExecutionDescriptor.none(),
                 SkillAccessPolicy.unrestricted(), arguments -> name, CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic(name, name),
+                CapabilityToolDescriptor.generic(canonical, name),
                 new SkillSource(null, "testBean", name + "()"));
     }
 
@@ -833,14 +834,14 @@ class SkillGenerationManagerTest
         manifest.setDescription(name);
         manifest.setModel("model");
         manifest.setAllowedSkills(allowed.stream()
-                .map(child -> new YamlSkillManifest.AllowedSkillManifest(child, null, null, null)).toList());
+                .map(child -> new YamlSkillManifest.AllowedSkillManifest("default-" + child, null, null, null)).toList());
         byte[] yaml = ("name: " + name + "\ndescription: " + name + "\nmodel: model\n")
                 .getBytes(StandardCharsets.UTF_8);
         ByteArrayResource resource = new ByteArrayResource(yaml, name + ".yaml")
         {
             @Override public String getFilename() { return name + ".yaml"; }
         };
-        return new YamlSkillDefinition(resource, manifest,
+        return new YamlSkillDefinition("default", resource, manifest,
                 new EffectiveSkillExecutionConfiguration("model", "connection", AiDriver.OPENAI,
                         "provider-model", "medium"));
     }
@@ -857,6 +858,6 @@ class SkillGenerationManagerTest
         {
             @Override public String getFilename() { return name + ".yaml"; }
         };
-        return new YamlSkillDefinition(resource, manifest, null);
+        return new YamlSkillDefinition("default", resource, manifest, null);
     }
 }

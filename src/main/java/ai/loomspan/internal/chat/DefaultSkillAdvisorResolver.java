@@ -100,7 +100,7 @@ public final class DefaultSkillAdvisorResolver implements SkillAdvisorResolver
         if (definition.outputSchema() != null)
         {
             OutputSchemaCallAdvisor schemaAdvisor = new OutputSchemaCallAdvisor(
-                    definition.manifest().getName(),
+                    definition.identity().toString(),
                     definition.outputSchema(),
                     outputSchemaValidator,
                     outputSchemaPromptAugmentor,
@@ -114,7 +114,7 @@ public final class DefaultSkillAdvisorResolver implements SkillAdvisorResolver
         if (!definition.evidenceContract().isEmpty())
         {
             advisors.add(new EvidenceContractCallAdvisor(
-                    definition.manifest().getName(),
+                    definition.identity().toString(),
                     definition.evidenceContract(),
                     evidenceBackedOutputValidator,
                     definition.outputSchemaMaxRetries(),
@@ -122,7 +122,7 @@ public final class DefaultSkillAdvisorResolver implements SkillAdvisorResolver
                             LoomspanSession.getCurrentSession(),
                             true,
                             Map.of(
-                                    "skillName", definition.manifest().getName(),
+                                    "skillName", definition.identity().toString(),
                                     "claims", result.evaluatedClaims(),
                                     "satisfiedSkills", result.satisfiedSkills()),
                             result),
@@ -130,7 +130,7 @@ public final class DefaultSkillAdvisorResolver implements SkillAdvisorResolver
                             LoomspanSession.getCurrentSession(),
                             false,
                             Map.of(
-                                    "skillName", definition.manifest().getName(),
+                                    "skillName", definition.identity().toString(),
                                     "claims", result.evaluatedClaims(),
                                     "unsatisfiedClaims", result.issues().stream().map(ai.loomspan.internal.runtime.evidence.EvidenceCoverageIssue::claimName).toList(),
                                     "requiredExpressions", result.requiredExpressions(),
@@ -149,7 +149,7 @@ public final class DefaultSkillAdvisorResolver implements SkillAdvisorResolver
             }
 
             advisors.add(new LinterCallAdvisor(
-                    definition.manifest().getName(),
+                    definition.identity().toString(),
                     linter.getType(),
                     Pattern.compile(linter.getRegex().getPattern()),
                     detail,

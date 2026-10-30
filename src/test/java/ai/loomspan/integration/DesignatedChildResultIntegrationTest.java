@@ -199,7 +199,7 @@ class DesignatedChildResultIntegrationTest {
             if (kind.equals("java")) runner = runner.withBean(JavaReport.class, JavaReport::new);
             runner.run(context -> {
                 assertThat(context).hasNotFailed();
-                var catalog = context.getBean(SkillCatalog.class);
+                var catalog = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
                 String schema = catalog.skill("root").orElseThrow().outputSchema();
                 if (kind.equals("model")) {
                     assertThat(JSON.readTree(schema).path("properties").path("report").path("type").asText()).isEqualTo("string");
@@ -278,7 +278,7 @@ class DesignatedChildResultIntegrationTest {
                         assertThat(context).hasNotFailed();
                         SkillTemplate facade = context.getBean(SkillTemplate.class);
                         SkillReloader reloader = context.getBean(SkillReloader.class);
-                        SkillCatalog capturedCatalog = reloader.snapshot();
+                        SkillCatalog capturedCatalog = reloader.snapshot("default");
                         String oldSchema = capturedCatalog.skill("root").orElseThrow().outputSchema();
                         assertThat(oldSchema).contains("oldReport");
                         try (var executor = Executors.newFixedThreadPool(2)) {
@@ -291,8 +291,8 @@ class DesignatedChildResultIntegrationTest {
                                             new SkillDocument("new-leaf", isolatedProducer("new"))))) {
                                         reloader.publish(update);
                                     }
-                                    assertThat(reloader.snapshot().generationId()).isNotEqualTo(capturedCatalog.generationId());
-                                    assertThat(reloader.snapshot().skill("root").orElseThrow().outputSchema()).contains("newReport");
+                                    assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(capturedCatalog.generationId());
+                                    assertThat(reloader.snapshot("default").skill("root").orElseThrow().outputSchema()).contains("newReport");
                                     assertThat(capturedCatalog.skill("root").orElseThrow().outputSchema()).isEqualTo(oldSchema);
                                     assertThat(JSON.readTree(facade.invoke("root", Map.of("marker", "fresh"))).path("newReport").asText()).isEqualTo("fresh");
                                 } finally { releaseProducer.countDown(); }

@@ -2,8 +2,8 @@ name: evidenceContractListExpressionSkill
 description: Invalid list-valued expression
 model: gpt-5
 allowed_skills:
-  - name: invoiceParser
+  - name: default-invoiceParser
 output_schema:
   type: object
   properties:
-    vendorName: { type: string, evidence: [invoiceParser] }
+    vendorName: { type: string, evidence: [default-invoiceParser] }

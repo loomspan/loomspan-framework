@@ -2,4 +2,4 @@ name: invalidChildNameParent
 description: Invalid child name.
 model: gpt-5
 allowed_skills:
-  - name: child-name
+  - name: default-child-name

@@ -13,18 +13,18 @@ Use an `evidence` annotation on an immediate root `output_schema` property when 
 
 ```yaml
 allowed_skills:
-  - name: classifyIncident
-  - name: investigateNetwork
-  - name: investigateApp
+  - name: default-classifyIncident
+  - name: default-investigateNetwork
+  - name: default-investigateApp
 output_schema:
   type: object
   properties:
     severity:
       type: string
-      evidence: classifyIncident
+      evidence: default-classifyIncident
     likelyCause:
       type: string
-      evidence: classifyIncident and (investigateNetwork or investigateApp)
+      evidence: default-classifyIncident and (default-investigateNetwork or default-investigateApp)
   required: [severity, likelyCause]
   additionalProperties: false
 ```
@@ -57,9 +57,9 @@ primary        := SKILL_NAME | "(" expression ")"
 
 - `and` binds more tightly than `or`; parentheses override precedence.
 - Operators are case-insensitive whole tokens and render canonically in lowercase.
-- Skill names are case-sensitive and MUST exactly match a direct `allowed_skills` entry.
+- Leaves MUST be qualified identities and match a direct `allowed_skills` entry after namespace normalization; local-name case remains exact.
 - Whitespace around and between tokens is insignificant.
-- `and` and `or` are reserved in every casing. Operator substrings in names such as `androidCheck` and `orderLookup` remain identifiers.
+- `and` and `or` are reserved in every casing. Qualified identities such as `and-search`, `default-androidCheck` and `default-orderLookup` remain identifiers.
 - `not`, `&&`, `||`, quoted names, implicit operators, predicates, and output-value conditions are unsupported.
 
 ## Truth sets

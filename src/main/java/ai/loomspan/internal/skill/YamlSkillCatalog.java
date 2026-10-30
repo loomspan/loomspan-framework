@@ -1,5 +1,7 @@
 package ai.loomspan.internal.skill;
 
+import ai.loomspan.internal.core.SkillIdentity;
+
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.DatabindException;
@@ -52,8 +54,7 @@ public class YamlSkillCatalog implements InitializingBean
     private static final int OUTPUT_SCHEMA_WARNING_DEPTH = 4;
     private static final int OUTPUT_SCHEMA_WARNING_PROPERTIES = 12;
     private static final int OUTPUT_SCHEMA_WARNING_REQUIRED = 8;
-    private static final String PUBLIC_SKILL_NAME_REGEX = "^[A-Za-z_][A-Za-z0-9_]{0,63}$";
-    private static final Pattern PUBLIC_SKILL_NAME_PATTERN = Pattern.compile(PUBLIC_SKILL_NAME_REGEX);
+    private String namespace = "default";
     private static final Set<String> ALLOWED_SKILL_ENTRY_FIELDS = Set.of("name", "min_tasks", "max_tasks", "required", "input_bindings");
     private static final Set<YamlSkillManifest.Field> REST_FORBIDDEN_FIELDS = Set.of(
             YamlSkillManifest.Field.MODEL, YamlSkillManifest.Field.PROMPT,
@@ -142,6 +143,7 @@ public class YamlSkillCatalog implements InitializingBean
 
     CheckedDocuments checkedConfigured(boolean logWarnings)
     {
+        namespace = "default";
         reset(logWarnings);
         List<SkillValidationIssue> issues = new ArrayList<>();
         List<DiscoveredYamlSkillResource> resources;
@@ -160,7 +162,18 @@ public class YamlSkillCatalog implements InitializingBean
         return checked(issues);
     }
 
+    CheckedDocuments checkedSupplied(String namespace, List<SkillDocument> documents, boolean logWarnings)
+    {
+        this.namespace = SkillIdentity.normalizeNamespace(namespace);
+        return checkSuppliedDocuments(documents, logWarnings);
+    }
+
     CheckedDocuments checkedSupplied(List<SkillDocument> documents, boolean logWarnings)
+    {
+        return checkedSupplied("default", documents, logWarnings);
+    }
+
+    private CheckedDocuments checkSuppliedDocuments(List<SkillDocument> documents, boolean logWarnings)
     {
         Objects.requireNonNull(documents, "documents must not be null");
         reset(logWarnings);
@@ -243,9 +256,9 @@ public class YamlSkillCatalog implements InitializingBean
 
     private void addDefinition(Resource resource, YamlSkillDefinition definition)
     {
-        YamlSkillDefinition previous = skillsByName.putIfAbsent(definition.manifest().getName(), definition);
+        YamlSkillDefinition previous = skillsByName.putIfAbsent(definition.identity().toString(), definition);
         if (previous != null)
-            throw invalidSkill(resource, "name", "duplicate skill name '" + definition.manifest().getName()
+            throw invalidSkill(resource, "name", "duplicate skill name '" + definition.identity()
                     + "'; first declared in " + describe(previous.resource()));
     }
 
@@ -262,7 +275,7 @@ public class YamlSkillCatalog implements InitializingBean
      */
     public YamlSkillDefinition getSkill(String name)
     {
-        return skillsByName.get(name);
+        return skillsByName.get(SkillIdentity.parse(name).toString());
     }
 
     private List<DiscoveredYamlSkillResource> discoverResources()
@@ -330,7 +343,7 @@ public class YamlSkillCatalog implements InitializingBean
                             "field is not allowed for REST skills; remove it");
                 }
             }
-            return new YamlSkillDefinition(resource, manifest, null, EvidenceContract.empty(), source, List.of());
+            return new YamlSkillDefinition(namespace, resource, manifest, null, EvidenceContract.empty(), source, List.of());
         }
 
         if (manifest.isTypesafeDeclared()) {
@@ -340,7 +353,7 @@ public class YamlSkillCatalog implements InitializingBean
             var model = resolveModelCatalogEntry(resource, manifest);
             var connection = modelsProperties.getConnections().get(model.getConnection());
             if (connection == null || !"TYPESAFE".equals(connection.getDriver().name())) throw invalidNamedSkill(resource, manifest, "model", "TypeSafe skill requires a typesafe driver connection");
-            return new YamlSkillDefinition(resource, manifest, new EffectiveSkillExecutionConfiguration(manifest.getModel(), model.getConnection(), connection.getDriver(), model.getProviderModel(), null), EvidenceContract.empty(), source, List.of());
+            return new YamlSkillDefinition(namespace, resource, manifest, new EffectiveSkillExecutionConfiguration(manifest.getModel(), model.getConnection(), connection.getDriver(), model.getProviderModel(), null), EvidenceContract.empty(), source, List.of());
         }
         validateConcurrency(resource, manifest);
         if (!StringUtils.hasText(manifest.getModel()))
@@ -369,7 +382,7 @@ public class YamlSkillCatalog implements InitializingBean
                 effectiveThinkingLevel);
 
         return new YamlSkillDefinition(
-                resource,
+                namespace, resource,
                 manifest,
                 effectiveConfiguration,
                 evidenceContract,
@@ -483,8 +496,7 @@ public class YamlSkillCatalog implements InitializingBean
             if (!field.equals("skill"))
                 throw invalidNamedSkill(resource, skillName, "output_from." + field, "unknown field");
         JsonNode target = selector.get("skill");
-        if (target == null || !target.isTextual() || !PUBLIC_SKILL_NAME_PATTERN.matcher(target.textValue()).matches())
-            throw invalidNamedSkill(resource, skillName, "output_from.skill", "must be an exact valid public skill name");
+        var targetIdentity = reference(resource, skillName, "output_from.skill", target == null ? null : target.textValue());
         if (!root.path("planning_mode").isBoolean() || !root.path("planning_mode").booleanValue())
             throw invalidNamedSkill(resource, skillName, "output_from", "requires explicit planning_mode: true");
         for (String conflict : List.of("output_schema", "output_schema_max_retries", "linter"))
@@ -493,7 +505,7 @@ public class YamlSkillCatalog implements InitializingBean
         JsonNode children = root.path("allowed_skills");
         boolean selected = false;
         if (children.isArray()) for (JsonNode child : children) {
-            if (target.textValue().equals(child.path("name").asText())
+            if (targetIdentity.equals(reference(resource, skillName, "allowed_skills.name", child.path("name").textValue()))
                     && child.path("required").isBoolean() && child.path("required").booleanValue()
                     && child.path("max_tasks").isIntegralNumber() && child.path("max_tasks").intValue() == 1)
                 selected = true;
@@ -534,7 +546,7 @@ public class YamlSkillCatalog implements InitializingBean
             throw invalidNamedSkill(resource, skillName, "allowed_skills", "must be a YAML sequence of objects");
         }
 
-        Set<String> names = new LinkedHashSet<>();
+        Set<SkillIdentity> names = new LinkedHashSet<>();
         for (int index = 0; index < entries.size(); index++)
         {
             JsonNode entry = entries.get(index);
@@ -558,12 +570,8 @@ public class YamlSkillCatalog implements InitializingBean
                 throw invalidNamedSkill(resource, skillName, entryPath + ".name", "required field must be a nonblank string");
             }
             String name = nameNode.textValue();
-            if (!PUBLIC_SKILL_NAME_PATTERN.matcher(name).matches())
-            {
-                throw invalidNamedSkill(resource, skillName, entryPath + ".name",
-                        "invalid public skill name '" + name + "'; names must match " + PUBLIC_SKILL_NAME_REGEX);
-            }
-            if (!names.add(name))
+            var canonicalName = reference(resource, skillName, entryPath + ".name", name);
+            if (!names.add(canonicalName))
             {
                 throw invalidNamedSkill(resource, skillName, entryPath + ".name", "duplicate allowed skill name '" + name + "'");
             }
@@ -619,11 +627,11 @@ public class YamlSkillCatalog implements InitializingBean
             if (!"child_result".equals(field.getValue().path("from").asText())) continue;
             if (!root.path("planning_mode").isBoolean() || !root.path("planning_mode").booleanValue())
                 throw invalidNamedSkill(resource, skillName, "output_bindings", "child_result requires explicit planning_mode: true");
-            String producer = field.getValue().path("skill").asText();
+            var producer = reference(resource, skillName, "output_bindings.skill", field.getValue().path("skill").textValue());
             boolean allowed = false;
             for (JsonNode child : root.path("allowed_skills"))
-                if (producer.equals(child.path("name").asText())) allowed = true;
-            if (!allowed || producer.equals(skillName))
+                if (producer.equals(reference(resource, skillName, "allowed_skills.name", child.path("name").textValue()))) allowed = true;
+            if (!allowed || producer.equals(new SkillIdentity(namespace, skillName)))
                 throw invalidNamedSkill(resource, skillName, "output_bindings", "requires a distinct allowed direct producer '" + producer + "'");
         }
     }
@@ -657,9 +665,7 @@ public class YamlSkillCatalog implements InitializingBean
                 var source = ai.loomspan.internal.runtime.input.ObjectFieldPath.parse(value.get("path").textValue(), true);
                 String producer = null;
                 if (kind.equals("child_result")) {
-                    if (!value.path("skill").isTextual() || !PUBLIC_SKILL_NAME_PATTERN.matcher(value.get("skill").textValue()).matches())
-                        throw new IllegalArgumentException("child_result requires exact valid skill name");
-                    producer = value.get("skill").textValue();
+                    producer = SkillIdentity.parse(value.path("skill").textValue()).toString();
                 }
                 new ai.loomspan.internal.runtime.input.ChildInputBinding(destination,
                         kind.equals("input") ? ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT
@@ -744,13 +750,14 @@ public class YamlSkillCatalog implements InitializingBean
 
     private void validatePublicSkillName(Resource resource, String skillName)
     {
-        if (!PUBLIC_SKILL_NAME_PATTERN.matcher(skillName).matches())
-        {
-            throw invalidNamedSkill(resource, skillName, "name",
-                    "invalid public skill name '" + skillName + "'. Names must match " + PUBLIC_SKILL_NAME_REGEX
-                            + " (1-64 characters; start with a letter or underscore; then use only letters, digits, or underscores). "
-                            + "Example: searchFlights.");
-        }
+        try { diagnosticSkillNames.put(resource, new SkillIdentity(namespace, skillName).toString()); }
+        catch (IllegalArgumentException ex) { throw invalidNamedSkill(resource, skillName, "name", ex.getMessage()); }
+    }
+
+    private SkillIdentity reference(Resource resource, String skill, String field, String value)
+    {
+        try { return SkillIdentity.parse(value); }
+        catch (IllegalArgumentException ex) { throw invalidNamedSkill(resource, skill, field, ex.getMessage()); }
     }
 
     private void validateLinter(Resource resource, YamlSkillManifest manifest)
@@ -831,7 +838,7 @@ public class YamlSkillCatalog implements InitializingBean
         ai.loomspan.internal.runtime.evidence.EvidenceExpressionParser parser =
                 new ai.loomspan.internal.runtime.evidence.EvidenceExpressionParser();
         Set<String> directChildren = manifest.getAllowedSkills().stream()
-                .map(YamlSkillManifest.AllowedSkillManifest::getName)
+                .map(child -> SkillIdentity.parse(child.getName()).toString())
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
         for (Map.Entry<String, YamlSkillManifest.OutputSchemaManifest> entry
@@ -1317,7 +1324,7 @@ public class YamlSkillCatalog implements InitializingBean
             String fieldName,
             String detail)
     {
-        return invalidNamedSkill(resource, manifest.getName(), fieldName, detail);
+        return invalidNamedSkill(resource, diagnosticSkillNames.get(resource), fieldName, detail);
     }
 
     private AuthoringException invalidNamedSkill(Resource resource,
@@ -1325,7 +1332,7 @@ public class YamlSkillCatalog implements InitializingBean
             String fieldName,
             String detail)
     {
-        return new AuthoringException(diagnosticSource(resource), skillName, fieldName,
+        return new AuthoringException(diagnosticSource(resource), diagnosticSkillNames.getOrDefault(resource, skillName), fieldName,
                 "Invalid YAML skill '" + skillName + "' in '" + describe(resource)
                         + "' for field '" + fieldName + "': " + detail);
     }

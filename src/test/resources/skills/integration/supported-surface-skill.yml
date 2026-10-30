@@ -5,5 +5,5 @@ planning_mode: true
 concurrency: false
 max_steps: 3
 allowed_skills:
-  - name: supportedJavaLeaf
-  - name: supportedRestLeaf
+  - name: default-supportedJavaLeaf
+  - name: default-supportedRestLeaf

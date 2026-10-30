@@ -79,7 +79,7 @@ input_schema:
 In an embedded Java application, invoke it through an injected `SkillTemplate`:
 
 ```java
-String triage = skills.invoke("triageSupportRequest", Map.of("customerMessage", """
+String triage = skills.invoke("default-triageSupportRequest", Map.of("customerMessage", """
         Since this morning's deployment, checkout times out after payment.
         Three customers say they were charged but received no order confirmation.
         Retrying sometimes creates two orders. Browsing and cart updates still work.
@@ -96,7 +96,7 @@ history as Java or REST skills and let a planning parent call those allowed
 capabilities. See the [skill-tree guide](agent-skills/loomspan-docs/references/skill-authoring/mental-model.md).
 
 When one direct child supplies the complete answer, an explicit model planner
-can use `output_from: {skill: finish}` with a required, unique `finish` task. It
+can use `output_from: {skill: default-finish}` with a required, unique `finish` task. It
 still completes all accepted work, then returns that child's existing text
 unchanged without a parent synthesis request. See [output contracts](agent-skills/loomspan-docs/references/skill-authoring/output-contracts.md)
 for syntax, schema ownership, and model/Java/REST examples.
@@ -120,6 +120,35 @@ and nested binding destinations retain model dispatch. Planning and a model-back
 child's own reasoning still run; authorization and task/tool limits still apply.
 See [declared child input bindings](agent-skills/loomspan-docs/references/skill-authoring/input-bindings.md)
 for complete schemas, object pointers, dependencies and diagnostics.
+
+## Skill identities and catalogs
+
+Declarations keep local names such as `search`; every reference is qualified,
+including `default-search`. Java `@SkillMethod(namespace = "Tax", name = "search", description = "Search")`
+registers `tax-search`; the namespace defaults to `default`. Only namespace case
+normalizes; local-name case remains exact. Components start with an ASCII letter
+or underscore and contain ASCII letters, digits or underscores. Namespace length
+is at most 32 and total identity length at most 64 including its single hyphen.
+No shorthand, aliases, fallback search, trimming or character replacement is supported.
+
+Inject `SkillReloader` and acquire `SkillCatalog catalog = reloader.snapshot("default")`.
+There is no injected startup catalog or no-argument acquisition. `namespace()` and
+`generationId()` identify the catalog's owner and opaque generation, even when empty.
+Descriptors and validation feedback carry qualified names. Lookup rejects malformed
+references and returns empty for valid unknown or foreign identities. Retained
+catalogs are immutable, sorted, unfiltered metadata with no resource lease or
+execution reservation. Pass `descriptor.name()` directly to invocation/validation
+or handoff; the catalog does not authorize or pin that later admission.
+
+A prepared update's ID and snapshot identify its candidate, not its base.
+Validation allocates no generation and errors leave candidate metadata incomplete.
+Changing a namespace name means creating another namespace, updating references
+explicitly, then removing the old namespace; no rename or inheritance is provided.
+
+This sequential implementation establishes identity/catalog foundations in PR 27.1.
+Active registry/startup/management integration follows in PR 27.2; root admission,
+model dispatch and observation consumers follow in PRs 27.3-27.5. Their integration
+checks remain outstanding in this slice.
 
 ## Choose your integration
 

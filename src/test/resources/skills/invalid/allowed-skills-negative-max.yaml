@@ -3,5 +3,5 @@ description: Negative maximum.
 model: gpt-5
 planning_mode: true
 allowed_skills:
-  - name: childOne
+  - name: default-childOne
     max_tasks: -1

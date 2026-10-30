@@ -26,20 +26,23 @@ public class InvoiceLookup {
 }
 ```
 
-Call this skill with `skills.invoke("invoiceExists", Map.of("reference", "INV-42"))`, where `skills` is the injected `SkillTemplate`.
+Call this skill with `skills.invoke("default-invoiceExists", Map.of("reference", "INV-42"))`, where `skills` is the injected `SkillTemplate`.
 
-The runtime method annotation has two elements:
+The runtime method annotation has three elements:
 
 ```java
 String name() default "";
+String namespace() default "default";
 String description();
 ```
 
-An omitted or empty `name` uses the canonical Java method name. A nonempty name MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` exactly. Padded, whitespace-only, non-ASCII, hyphenated, and overlength names fail startup; Loomspan does not rewrite them. The annotation owns the description. A blank description retains the method-name fallback.
+An omitted or empty `name` uses the canonical Java method name. The declaration name remains local. A nonempty name MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` exactly. Padded, whitespace-only, non-ASCII, hyphenated, and overlength names fail startup; Loomspan does not rewrite them. The annotation owns the description. A blank description retains the method-name fallback.
 
-Java, REST, and model-backed YAML skills share one namespace. Duplicate names fail startup with both declaration locations. Distinct overloaded methods MAY declare distinct explicit names; overloads that retain the same name collide. Bean aliases and compiler bridge methods do not create additional registrations. Bean and method locations shown in Console are diagnostics, never alternative invocation names.
+Java, REST, TypeSafe and model-backed YAML skills use canonical qualified identities. Namespace ownership comes from `namespace`, normalized to lowercase with an independent 32-character limit; total identity length is at most 64. Duplicate canonical identities fail startup with both declaration locations; equal local names in different namespaces are distinct. Distinct overloaded methods MAY declare distinct explicit names; overloads that retain the same name collide. Bean aliases and compiler bridge methods do not create additional registrations. Bean and method locations shown in Console are diagnostics, never alternative invocation names.
 
 A YAML `mapping` key is rejected, including null, empty, and scalar forms. Remove the wrapper and put its chosen callable name and description on the annotation.
+
+The example registers `default-invoiceExists`. See the [identity rules](../skill-authoring/mental-model.md#canonical-namespace-identity) for exact grammar, limits and reference syntax.
 
 ## Inputs, results, and lifecycle
 

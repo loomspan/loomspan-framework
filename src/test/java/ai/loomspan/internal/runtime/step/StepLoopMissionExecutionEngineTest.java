@@ -211,7 +211,7 @@ class StepLoopMissionExecutionEngineTest {
         YamlSkillManifest.OutputFromManifest selector = new YamlSkillManifest.OutputFromManifest();
         selector.setSkill("invoiceParser");
         manifest.setOutputFrom(selector);
-        YamlSkillDefinition forwarding = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        YamlSkillDefinition forwarding = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
         SequenceChatClient model = new SequenceChatClient(
                 "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("forward-one", "rootVisibleSkill", 3);
@@ -490,7 +490,7 @@ class StepLoopMissionExecutionEngineTest {
         var regex = new YamlSkillManifest.RegexManifest();
         regex.setPattern(".*" + java.util.regex.Pattern.quote("\"report\":" + decimal) + ".*");
         linter.setRegex(regex); manifest.setLinter(linter);
-        var definition = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        var definition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
         var model = new SequenceChatClient(mixed ? new String[] {
                 "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
                 "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":{\"summary\":\"reasoned\"}}"} : new String[] {
@@ -511,7 +511,7 @@ class StepLoopMissionExecutionEngineTest {
         var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern(".*GOOD.*"); regex.setMessage("Use GOOD");
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(1); linter.setRegex(regex);
         var manifest = base.manifest(); manifest.setLinter(linter);
-        var definition = new YamlSkillDefinition(base.resource(), manifest, EXECUTION_CONFIGURATION, base.evidenceContract());
+        var definition = new YamlSkillDefinition("default", base.resource(), manifest, EXECUTION_CONFIGURATION, base.evidenceContract());
         var client = new SequenceChatClient(
                 "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}",
                 finalObjectEnvelope("{\"result\":3}"), finalObjectEnvelope("{\"result\":\"BAD\",\"reasoning\":\"unsupported\"}"),
@@ -544,7 +544,7 @@ class StepLoopMissionExecutionEngineTest {
         var manifest = outputBindingDefinition(1, false).manifest();
         var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern("^NEVER$");
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(budget); linter.setRegex(regex); manifest.setLinter(linter);
-        var definition = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        var definition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
         var model = new SequenceChatClient("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
         var session = TestLoomspanSessions.withId("bound-lint-terminal", "rootVisibleSkill", 3);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -569,7 +569,7 @@ class StepLoopMissionExecutionEngineTest {
         var manifest = base.manifest(); manifest.setOutputSchemaMaxRetries(budget);
         var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern(".*GOOD.*"); regex.setMessage(" ");
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(budget); linter.setRegex(regex); manifest.setLinter(linter);
-        var definition = new YamlSkillDefinition(base.resource(), manifest, EXECUTION_CONFIGURATION, base.evidenceContract());
+        var definition = new YamlSkillDefinition("default", base.resource(), manifest, EXECUTION_CONFIGURATION, base.evidenceContract());
         String invalid = switch (validator) {
             case "schema" -> "{\"result\":3}";
             case "evidence" -> "{\"result\":\"GOOD\",\"reasoning\":\"unsupported\"}";
@@ -612,7 +612,7 @@ class StepLoopMissionExecutionEngineTest {
         manifest.getOutputSchema().setRequired(List.of("report", "summary"));
         var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern("(?s)(?=.*AUTHORITATIVE)(?=.*GOOD).*"); regex.setMessage("Use GOOD");
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(1); linter.setRegex(regex); manifest.setLinter(linter);
-        var definition = new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION,
+        var definition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION,
                 ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(Map.of("report", "invoiceParser", "reasoning", "expenseLookup")));
         var responses = new ArrayList<String>();
         responses.add("{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"invoiceParser\",\"toolArguments\":{}}");
@@ -653,7 +653,7 @@ class StepLoopMissionExecutionEngineTest {
         var schema = new YamlSkillManifest.OutputSchemaManifest(); schema.setType("object"); schema.setAdditionalProperties(false);
         var report = new YamlSkillManifest.OutputSchemaManifest(); report.setType("string");
         schema.setProperties(Map.of("report", report)); schema.setRequired(List.of("report")); manifest.setOutputSchema(schema);
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillDefinition twoProducerOutputBindingDefinition(int maxSteps, boolean concurrent) {
@@ -664,7 +664,7 @@ class StepLoopMissionExecutionEngineTest {
         var fields = new LinkedHashMap<>(manifest.getOutputSchema().getProperties());
         var other = new YamlSkillManifest.OutputSchemaManifest(); other.setType("string"); fields.put("other",other);
         manifest.getOutputSchema().setProperties(fields); manifest.getOutputSchema().setRequired(List.of("report","other"));
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]),manifest,EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]),manifest,EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillDefinition forwardingDefinition(int maxSteps, boolean concurrent) {
@@ -673,7 +673,7 @@ class StepLoopMissionExecutionEngineTest {
         var selector = new YamlSkillManifest.OutputFromManifest();
         selector.setSkill("invoiceParser");
         manifest.setOutputFrom(selector);
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     @Test
@@ -1217,7 +1217,7 @@ class StepLoopMissionExecutionEngineTest {
             YamlSkillDefinition baseDefinition = definitionWithOutputSchema();
             YamlSkillManifest manifest = baseDefinition.manifest();
             manifest.setOutputSchemaMaxRetries(2);
-            YamlSkillDefinition definition = new YamlSkillDefinition(baseDefinition.resource(), manifest, baseDefinition.executionConfiguration());
+            YamlSkillDefinition definition = new YamlSkillDefinition("default", baseDefinition.resource(), manifest, baseDefinition.executionConfiguration());
             String first = finalEnvelope(CorrectionEvidenceFixtures.equipmentComparison("FINAL_ONE"));
             String second = finalEnvelope(CorrectionEvidenceFixtures.equipmentComparison("FINAL_TWO"));
             String terminal = finalEnvelope(pass ? "{\"result\":\"Finished\"}"
@@ -3123,7 +3123,7 @@ class StepLoopMissionExecutionEngineTest {
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setMaxSteps(0);
-        YamlSkillDefinition invalidDefinition = new YamlSkillDefinition(
+        YamlSkillDefinition invalidDefinition = new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-max-steps-zero", "test.entry", 3);
 
@@ -3234,7 +3234,7 @@ class StepLoopMissionExecutionEngineTest {
         manifest.setDescription(name);
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillDefinition definitionWithMaxSteps(int maxSteps)
@@ -3245,7 +3245,7 @@ class StepLoopMissionExecutionEngineTest {
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setMaxSteps(maxSteps);
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillDefinition definitionWithConcurrency(boolean concurrency)
@@ -3256,7 +3256,7 @@ class StepLoopMissionExecutionEngineTest {
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setConcurrency(concurrency);
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillDefinition definitionWithPrompt() {
@@ -3266,7 +3266,7 @@ class StepLoopMissionExecutionEngineTest {
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setPrompt("STEP_PROMPT_SENTINEL");
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillDefinition attachmentDefinition() {
@@ -3276,7 +3276,7 @@ class StepLoopMissionExecutionEngineTest {
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setInputSchema(attachmentInputSchema());
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillManifest.InputSchemaManifest attachmentInputSchema() {
@@ -3323,7 +3323,7 @@ class StepLoopMissionExecutionEngineTest {
         schema.setProperties(Map.of("result", resultField));
         schema.setRequired(List.of("result"));
         manifest.setOutputSchema(schema);
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillDefinition definitionWithOutputSchemaAndEvidenceContract() {
@@ -3348,7 +3348,7 @@ class StepLoopMissionExecutionEngineTest {
         Map<String, String> contract = Map.of(
                 "result", "invoiceParser",
                 "reasoning", "expenseLookup");
-        return new YamlSkillDefinition(
+        return new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 EXECUTION_CONFIGURATION,
@@ -3373,7 +3373,7 @@ class StepLoopMissionExecutionEngineTest {
         regex.setMessage("Must start with APPROVED:");
         linter.setRegex(regex);
         manifest.setLinter(linter);
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static ExecutionPlan singleTaskPlan() {

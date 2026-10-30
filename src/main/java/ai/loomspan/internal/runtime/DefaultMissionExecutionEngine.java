@@ -73,7 +73,7 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
         Objects.requireNonNull(objective, "objective must not be null");
         Objects.requireNonNull(modelInteraction, "modelInteraction must not be null");
         Objects.requireNonNull(visibleTools, "visibleTools must not be null");
-        String skillName = definition.manifest().getName();
+        String skillName = definition.identity().toString();
         EffectiveSkillExecutionConfiguration executionConfiguration = definition.requireExecutionConfiguration();
         return missionWorkExecutor.execute(session, skillName, () -> {
             ExecutionBinding capturedBinding = ExecutionBindingScope.requireCurrent();
@@ -165,12 +165,12 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
     private void validateBoundPolicies(LoomspanSession session, YamlSkillDefinition definition, String content) {
         var evidence = new ai.loomspan.internal.runtime.evidence.EvidenceBackedOutputValidator().validate(content,
                 definition.evidenceContract(), ExecutionBindingScope.requireCurrent().requireMission().successfulDirectSkills());
-        if (!definition.evidenceContract().isEmpty()) executionStateService.recordEvidenceValidation(session, evidence.complete(), Map.of("skillName",definition.manifest().getName()), evidence);
+        if (!definition.evidenceContract().isEmpty()) executionStateService.recordEvidenceValidation(session, evidence.complete(), Map.of("skillName",definition.identity().toString()), evidence);
         if (!evidence.complete()) throw new IllegalArgumentException("binding_evidence_validation: " + evidence.issues());
         var linter = definition.linter();
         if (linter != null && "regex".equals(linter.getType()) && linter.getRegex()!=null) {
             boolean matches = OutputValidationPolicy.matches(java.util.regex.Pattern.compile(linter.getRegex().getPattern()), content);
-            executionStateService.recordLinterOutcome(session,OutputValidationPolicy.immutableLinterOutcome(definition.manifest().getName(),
+            executionStateService.recordLinterOutcome(session,OutputValidationPolicy.immutableLinterOutcome(definition.identity().toString(),
                     linter.getType(), linter.getMaxRetries()==null ? 0 : linter.getMaxRetries(), matches,
                     matches ? "Assembled output matched configured regex linter." : "Assembled output did not match configured regex linter."));
             if (!matches) throw new IllegalArgumentException("binding_linter_validation: Immutable assembled output failed configured regex linter.");

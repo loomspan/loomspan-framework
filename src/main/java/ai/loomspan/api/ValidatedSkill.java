@@ -2,7 +2,9 @@ package ai.loomspan.api;
 
 import java.util.Objects;
 
-/** Immutable callable identity and kind in a successfully checked skill proposal. */
+/**
+ * The name is the canonical qualified identity in the checked namespace proposal.
+ * Immutable callable identity and kind in a successfully checked skill proposal. */
 public record ValidatedSkill(String name, SkillKind kind)
 {
     public ValidatedSkill

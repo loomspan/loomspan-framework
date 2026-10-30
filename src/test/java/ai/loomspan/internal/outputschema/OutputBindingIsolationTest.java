@@ -17,7 +17,7 @@ class OutputBindingIsolationTest {
         root.setProperties(Map.of("value", value)); root.setRequired(List.of("value")); manifest.setOutputSchema(root);
         var binding = new YamlSkillManifest.InputBindingManifest(); binding.setFrom("child_result"); binding.setSkill("producer"); binding.setPath("");
         manifest.setOutputBindings(Map.of("/value",binding));
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]),manifest,
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]),manifest,
                 new EffectiveSkillExecutionConfiguration("local","test",ai.loomspan.autoconfigure.AiDriver.OPENAI,"test","medium"));
     }
     private static MissionContext owner(LoomspanSession session, String skill, String frame, MissionContext parent, String text) {

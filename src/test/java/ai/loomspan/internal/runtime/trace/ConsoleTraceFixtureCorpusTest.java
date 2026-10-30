@@ -1927,7 +1927,7 @@ class ConsoleTraceFixtureCorpusTest
         manifest.setModel("gpt-5");
         EffectiveSkillExecutionConfiguration configuration = new EffectiveSkillExecutionConfiguration(
                 "gpt-5", "fixture", AiDriver.OPENAI, "openai/gpt-5", "medium");
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, configuration);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, configuration);
     }
 
     private static void appendAttemptWithoutUsage(

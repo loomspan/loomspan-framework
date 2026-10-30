@@ -79,9 +79,9 @@ class SkillGenerationExecutionIntegrationTest
                 mock(LoomspanSessionRunner.class), mapper, new SkillInputValidator(),
                 new SkillRoleEvaluator(null, null), null);
 
-        template.validate("invoiceParser", new Object());
+        template.validate("default-invoiceParser", new Object());
         assertThat(retired).containsExactly(oldId);
-        assertThatThrownBy(() -> template.validate("invoiceParser", Map.of("payload", "hello")))
+        assertThatThrownBy(() -> template.validate("default-invoiceParser", Map.of("payload", "hello")))
                 .isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
         generations.activate(TestSkillGenerations.empty());
         assertThat(retired).containsExactly(oldId, replacementGeneration.id());
@@ -116,7 +116,7 @@ class SkillGenerationExecutionIntegrationTest
         var template = new DefaultSkillTemplate(generations, router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         var admitted = new DefaultSkillInvocationHandoff(template, lifecycle)
-                .handoff("invoiceParser", Map.of("payload", "hello"));
+                .handoff("default-invoiceParser", Map.of("payload", "hello"));
         assertThat(admitted.generationId()).isEqualTo(oldGeneration.id()).isNotBlank();
 
         generations.activate(replacementGeneration);
@@ -126,7 +126,7 @@ class SkillGenerationExecutionIntegrationTest
         {
             assertThat(admitted.invoke()).isEqualTo("old-result");
             assertThat(admitted.generationId()).isEqualTo(oldGeneration.id());
-            assertThatThrownBy(() -> template.invoke("invoiceParser", Map.of("payload", "hello")))
+            assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of("payload", "hello")))
                     .isInstanceOf(AccessDeniedException.class);
             verify(coordinator).execute(eq(oldCapability), any(), any(), any(), eq(null));
             verify(coordinator, never()).execute(eq(replacementCapability), any(), any(), any(), eq(null));
@@ -178,10 +178,10 @@ class SkillGenerationExecutionIntegrationTest
         var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
         try
         {
-            var old = handoff.handoff("invoiceParser", new OldInput("hello"));
+            var old = handoff.handoff("default-invoiceParser", new OldInput("hello"));
             assertThat(generations.active().id()).isEqualTo(replacement.id());
             assertThat(old.generationId()).isEqualTo(oldId).isNotBlank();
-            var current = handoff.handoff("invoiceParser", Map.of("replacementPayload", "new"));
+            var current = handoff.handoff("default-invoiceParser", Map.of("replacementPayload", "new"));
             assertThat(current.generationId()).isEqualTo(replacement.id());
             assertThat(old.invoke()).isEqualTo("old-result");
             assertThat(current.invoke()).isEqualTo("replacement-result");
@@ -208,8 +208,8 @@ class SkillGenerationExecutionIntegrationTest
                         Map.of(requiredField, new SkillInputSchemaNode("string", Map.of(), List.of(), null,
                                 null, List.of(), null, null, false, true)),
                         List.of(requiredField), Boolean.FALSE, null, List.of(), null, null, false, true));
-        return new CapabilityMetadata(id, "invoiceParser", "Invoice parser",
+        return new CapabilityMetadata(id, "default-invoiceParser", "Invoice parser",
                 SkillExecutionDescriptor.none(), policy, arguments -> "unused", CapabilityKind.JAVA_SKILL,
-                CapabilityToolDescriptor.generic("invoiceParser", "Invoice parser"), input, null);
+                CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"), input, null);
     }
 }

@@ -7,6 +7,8 @@ coverage: source-verified
 
 # Output Contracts
 
+All skill references use [canonical qualified identities](mental-model.md#canonical-namespace-identity), including same-namespace children and binding producers. Declarations keep local `name` components.
+
 ## Applicability
 
 [TypeSafe leaves](typesafe-skills.md) have a generated descriptive output schema
@@ -25,7 +27,7 @@ The root schema MUST have `type: object`. Supported node types are `object`, `ar
 | Generate the whole output | Omit `output_from` and `output_bindings`; author a parent `output_schema` when structured output is required | The parent synthesizes and owns its final-output validation. |
 | Preserve selected input/child values in every output field | Declare `output_bindings` covering a closed output object | Framework assembles and validates it with no final model request. |
 | Preserve evidence while generating reasoning | Bind preserved fields and leave reasoning fields unbound | The model contributes only unbound fields; Framework validates the complete assembly. |
-| Orchestrate work while one direct child already supplies the complete intended answer | `output_from: {skill: finish}` | Runtime returns that accepted task's existing Framework String unchanged after all accepted work succeeds. |
+| Orchestrate work while one direct child already supplies the complete intended answer | `output_from: {skill: default-finish}` | Runtime returns that accepted task's existing Framework String unchanged after all accepted work succeeds. |
 
 Forwarding retains model planning, input preparation, explicit unbound child arguments, [author-declared input bindings](input-bindings.md), dependencies, and genuine orchestration duties. Authors SHOULD reconsider a wrapper with no additional responsibility. Do not instruct a forwarding parent to copy, quote, or reconstruct the child's answer.
 
@@ -55,8 +57,8 @@ planning_mode: true
 max_steps: 1
 prompt: Determine the report scope and supply explicit arguments to finishReport.
 allowed_skills:
-  - {name: finishReport, required: true, max_tasks: 1}
-output_from: {skill: finishReport}
+  - {name: default-finishReport, required: true, max_tasks: 1}
+output_from: {skill: default-finishReport}
 ```
 
 ```yaml
@@ -87,8 +89,8 @@ planning_mode: true
 max_steps: 1
 prompt: Determine the report request and invoke finishReport.
 allowed_skills:
-  - {name: finishReport, required: true, max_tasks: 1}
-output_from: {skill: finishReport}
+  - {name: default-finishReport, required: true, max_tasks: 1}
+output_from: {skill: default-finishReport}
 ```
 
 The returned Framework text is `"Report complete"`, including JSON quotes from the existing Jackson Java result boundary. No output schema is inferred from the Java return type.
@@ -126,8 +128,8 @@ input_schema:
   required: [caseId]
   additionalProperties: false
 allowed_skills:
-  - {name: assessEquipment, required: true, max_tasks: 1}
-  - {name: planResolution, required: true, max_tasks: 1}
+  - {name: default-assessEquipment, required: true, max_tasks: 1}
+  - {name: default-planResolution, required: true, max_tasks: 1}
 output_schema:
   type: object
   properties:
@@ -138,8 +140,8 @@ output_schema:
   additionalProperties: false
 output_bindings:
   /caseId: {from: input, path: /caseId}
-  /equipmentAssessment: {from: child_result, skill: assessEquipment, path: ""}
-  /recommendation: {from: child_result, skill: planResolution, path: ""}
+  /equipmentAssessment: {from: child_result, skill: default-assessEquipment, path: ""}
+  /recommendation: {from: child_result, skill: default-planResolution, path: ""}
 ```
 
 Every bound child producer must occur exactly once in the accepted plan, even when its allowed entry is optional. Impossible declared counts fail configuration validation. These output requirements add no dependency or false ordering; independent producers may run in parallel. All accepted work must succeed before assembly, including work unrelated to these bindings. Planning, access, invocation limits and cancellation still apply.

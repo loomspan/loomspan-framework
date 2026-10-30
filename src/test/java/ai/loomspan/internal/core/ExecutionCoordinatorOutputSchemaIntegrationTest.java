@@ -234,7 +234,7 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
             manifest.setLinter(linter);
         }
 
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, executionConfiguration);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, executionConfiguration);
     }
 
     private static final class StubYamlSkillCatalog extends ai.loomspan.internal.skill.YamlSkillCatalog {

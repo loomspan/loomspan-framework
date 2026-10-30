@@ -475,7 +475,7 @@ class DefaultSkillTemplateTest {
     @Test
     void rejectsCustomRegistryMetadataThatDoesNotMatchRequestedYamlName() {
         CapabilityMetadata otherSkill = yamlSkillMetadata();
-        assertThatThrownBy(() -> new ai.loomspan.internal.skill.SkillGeneration("candidate",
+        assertThatThrownBy(() -> new ai.loomspan.internal.skill.SkillGeneration("default", "candidate",
                 Map.of("requestedSkill", otherSkill), Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("capability key");

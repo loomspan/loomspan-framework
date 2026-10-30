@@ -324,7 +324,7 @@ class TypeSafeSkillIntegrationTest {
                             context -> {
                                 assertThat(context).hasNotFailed();
                                 assertThat(
-                                                context.getBean(SkillCatalog.class)
+                                                context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default")
                                                         .skill("judgment")
                                                         .orElseThrow()
                                                         .kind())
@@ -342,7 +342,7 @@ class TypeSafeSkillIntegrationTest {
                                 assertThat(entry.method()).isNull();
                                 assertThat(entry.outputSchema())
                                         .isEqualTo(
-                                                context.getBean(SkillCatalog.class)
+                                                context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default")
                                                         .skill("judgment")
                                                         .orElseThrow()
                                                         .outputSchema());
@@ -617,7 +617,7 @@ class TypeSafeSkillIntegrationTest {
                                 assertThat(context).hasNotFailed();
                                 var template = context.getBean(SkillTemplate.class);
                                 var oldSchema =
-                                        context.getBean(SkillCatalog.class)
+                                        context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default")
                                                 .skill("judgment")
                                                 .orElseThrow()
                                                 .outputSchema();
@@ -691,7 +691,7 @@ class TypeSafeSkillIntegrationTest {
                                                             .asText())
                                             .isEqualTo("B");
                                     assertThat(
-                                                    context.getBean(SkillCatalog.class)
+                                                    context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default")
                                                             .skill("judgment")
                                                             .orElseThrow()
                                                             .outputSchema())
@@ -870,7 +870,7 @@ class TypeSafeSkillIntegrationTest {
                                                         new SkillDocument("published fixed leaf", blocks.get(4)),
                                                         new SkillDocument("published binding parent", blocks.get(5)))));
                                 var template = context.getBean(SkillTemplate.class);
-                                String generation = reloader.snapshot().generationId();
+                                String generation = reloader.snapshot("default").generationId();
                                 assertThat(template.invoke("assessContact", documentedInput, v -> sessionIds.add(v.sessionId())))
                                         .isEqualTo(retained);
                                 AtomicReference<SkillExecutionView> view = new AtomicReference<>();
@@ -907,12 +907,12 @@ class TypeSafeSkillIntegrationTest {
                                     assertThat(records(trace, "RESULT_FORWARDED")).hasSize(nested ? 1 : 0);
                                 }
                                 assertThat(
-                                                reloader.snapshot()
+                                                reloader.snapshot("default")
                                                         .skill("assessReportedContact")
                                                         .orElseThrow()
                                                         .outputSchema())
                                         .isEqualTo(
-                                                reloader.snapshot()
+                                                reloader.snapshot("default")
                                                         .skill("assessContact")
                                                         .orElseThrow()
                                                         .outputSchema());
@@ -1010,7 +1010,7 @@ typesafe:
                     .run(
                             context -> {
                                 assertThat(context).hasNotFailed();
-                                var catalog = context.getBean(SkillCatalog.class);
+                                var catalog = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
                                 var schema = catalog.skill("judgment").orElseThrow().outputSchema();
                                 var template = context.getBean(SkillTemplate.class);
                                 try (var threads = Executors.newFixedThreadPool(2)) {

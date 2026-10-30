@@ -726,7 +726,7 @@ class MissionExecutionEngineTest {
         manifest.setName("rootVisibleSkill");
         manifest.setDescription("rootVisibleSkill");
         manifest.setModel("gpt-5");
-        return new YamlSkillDefinition(new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillDefinition definitionWithPrompt() {
@@ -735,7 +735,7 @@ class MissionExecutionEngineTest {
         manifest.setDescription("rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setPrompt("Act as a careful parser.");
-        return new YamlSkillDefinition(new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillDefinition attachmentDefinition() {
@@ -744,7 +744,7 @@ class MissionExecutionEngineTest {
         manifest.setDescription("rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setInputSchema(attachmentInputSchema());
-        return new YamlSkillDefinition(new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
     private static YamlSkillManifest.InputSchemaManifest attachmentInputSchema() {

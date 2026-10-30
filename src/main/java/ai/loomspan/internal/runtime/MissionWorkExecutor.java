@@ -126,7 +126,7 @@ public final class MissionWorkExecutor
     public String executeEvaluation(LoomspanSession session, ai.loomspan.internal.skill.YamlSkillDefinition definition,
             Map<String, Object> input)
     {
-        return execute(session, definition.manifest().getName(), () ->
+        return execute(session, definition.identity().toString(), () ->
                 new ai.loomspan.internal.typesafe.TypeSafeExecutor(executionStateService, sessionUsageService)
                         .execute(definition, input, session));
     }

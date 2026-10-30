@@ -182,7 +182,7 @@ class CapabilityExecutionRouterTest {
         manifest.setName("childLlmSkill");
         manifest.setDescription("childLlmSkill");
         manifest.setModel("gpt-5");
-        ai.loomspan.internal.skill.YamlSkillDefinition definition = new ai.loomspan.internal.skill.YamlSkillDefinition(
+        ai.loomspan.internal.skill.YamlSkillDefinition definition = new ai.loomspan.internal.skill.YamlSkillDefinition("default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 new ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration(
@@ -405,7 +405,7 @@ class CapabilityExecutionRouterTest {
         manifest.setName(capability.name());
         manifest.setDescription(capability.description());
         manifest.setModel("gpt-5");
-        var definition = new ai.loomspan.internal.skill.YamlSkillDefinition(
+        var definition = new ai.loomspan.internal.skill.YamlSkillDefinition("default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest,
                 new ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration(
                         "gpt-5", "test-connection", ai.loomspan.autoconfigure.AiDriver.OPENAI,

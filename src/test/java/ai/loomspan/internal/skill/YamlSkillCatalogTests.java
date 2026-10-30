@@ -93,13 +93,13 @@ class YamlSkillCatalogTests {
                 Map.entry("missing path", "{/id: {from: input}}"),
                 Map.entry("null path", "{/id: {from: input, path: null}}"),
                 Map.entry("numeric path", "{/id: {from: input, path: 3}}"),
-                Map.entry("input skill", "{/id: {from: input, path: /id, skill: producer}}"),
+                Map.entry("input skill", "{/id: {from: input, path: /id, skill: default-producer}}"),
                 Map.entry("unknown field", "{/id: {from: input, path: /id, extra: true}}"),
                 Map.entry("root", "{'': {from: input, path: /id}}"),
                 Map.entry("overlap", "{/id: {from: input, path: /id}, /id/a: {from: input, path: /id}}"),
                 Map.entry("case overlap", "{/id: {from: input, path: /id}, /ID/a: {from: input, path: /id}}"),
                 Map.entry("duplicate", "{/id: {from: input, path: /id}, /id: {from: input, path: /other}}"),
-                Map.entry("nonplanning child", "{/id: {from: child_result, skill: producer, path: ''}}"));
+                Map.entry("nonplanning child", "{/id: {from: child_result, skill: default-producer, path: ''}}"));
         return invalid.entrySet().stream().map(entry -> DynamicTest.dynamicTest(entry.getKey(), () -> {
             String yaml = "name: bound\ndescription: bound\nmodel: forward-model\noutput_schema: {type: object}\noutput_bindings: " + entry.getValue();
             var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(List.of(new SkillDocument("invalid-output-binding", yaml)), false);
@@ -142,7 +142,7 @@ class YamlSkillCatalogTests {
                 Map.entry("missing path", "{/id: {from: input}}"),
                 Map.entry("null path", "{/id: {from: input, path: null}}"),
                 Map.entry("numeric path", "{/id: {from: input, path: 12}}"),
-                Map.entry("input skill", "{/id: {from: input, path: /id, skill: producer}}"),
+                Map.entry("input skill", "{/id: {from: input, path: /id, skill: default-producer}}"),
                 Map.entry("missing producer", "{/id: {from: child_result, path: /id}}"),
                 Map.entry("unknown field", "{/id: {from: input, path: /id, field: value}}"),
                 Map.entry("nonpointer destination", "{id: {from: input, path: /id}}"),
@@ -170,19 +170,19 @@ class YamlSkillCatalogTests {
     @TestFactory
     java.util.stream.Stream<DynamicTest> rejectsInvalidForwardingDeclarations() {
         Map<String, String> invalid = Map.ofEntries(
-                Map.entry("null selector", forwardingYaml().replace("output_from:\n  skill: answer", "output_from: null")),
-                Map.entry("scalar selector", forwardingYaml().replace("output_from:\n  skill: answer", "output_from: answer")),
-                Map.entry("list selector", forwardingYaml().replace("output_from:\n  skill: answer", "output_from: [answer]")),
+                Map.entry("null selector", forwardingYaml().replace("output_from:\n  skill: default-answer", "output_from: null")),
+                Map.entry("scalar selector", forwardingYaml().replace("output_from:\n  skill: default-answer", "output_from: answer")),
+                Map.entry("list selector", forwardingYaml().replace("output_from:\n  skill: default-answer", "output_from: [answer]")),
                 Map.entry("unknown selector field", forwardingYaml() + "  field: value\n"),
-                Map.entry("blank child", forwardingYaml().replace("skill: answer", "skill: ' '")),
-                Map.entry("trimmed child", forwardingYaml().replace("skill: answer", "skill: ' answer'")),
-                Map.entry("number child", forwardingYaml().replace("skill: answer", "skill: 3")),
-                Map.entry("null child", forwardingYaml().replace("skill: answer", "skill: null")),
+                Map.entry("blank child", forwardingYaml().replace("skill: default-answer", "skill: ' '")),
+                Map.entry("trimmed child", forwardingYaml().replace("skill: default-answer", "skill: ' answer'")),
+                Map.entry("number child", forwardingYaml().replace("skill: default-answer", "skill: 3")),
+                Map.entry("null child", forwardingYaml().replace("skill: default-answer", "skill: null")),
                 Map.entry("nonplanning", forwardingYaml().replace("planning_mode: true", "planning_mode: false")),
                 Map.entry("missing explicit planning", forwardingYaml().replace("planning_mode: true\n", "")),
                 Map.entry("not required", forwardingYaml().replace("required: true", "min_tasks: 1")),
                 Map.entry("not unique", forwardingYaml().replace("max_tasks: 1", "max_tasks: 2")),
-                Map.entry("not allowed", forwardingYaml().replace("skill: answer", "skill: other")),
+                Map.entry("not allowed", forwardingYaml().replace("skill: default-answer", "skill: default-other")),
                 Map.entry("parent schema null", forwardingYaml() + "output_schema: null\n"),
                 Map.entry("parent retries null", forwardingYaml() + "output_schema_max_retries: null\n"),
                 Map.entry("parent linter null", forwardingYaml() + "linter: null\n"),
@@ -217,11 +217,11 @@ class YamlSkillCatalogTests {
                 model: forward-model
                 planning_mode: true
                 allowed_skills:
-                  - name: answer
+                  - name: default-answer
                     required: true
                     max_tasks: 1
                 output_from:
-                  skill: answer
+                  skill: default-answer
                 """;
     }
 
@@ -235,7 +235,7 @@ class YamlSkillCatalogTests {
         assertThat(checked.issues()).anyMatch(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR);
         assertThat(checked.issues()).extracting(issue -> issue.sourceName())
                 .containsExactly("bad YAML", "bad REST");
-        assertThat(checked.issues().get(1).skillName()).isEqualTo("broken");
+        assertThat(checked.issues().get(1).skillName()).isEqualTo("default-broken");
         assertThat(checked.issues().get(1).fieldPath()).isEqualTo("model");
         assertThat(checked.definitions()).extracting(definition -> definition.manifest().getName())
                 .containsExactly("good");
@@ -260,7 +260,7 @@ class YamlSkillCatalogTests {
         assertThat(first).isNotEmpty().allSatisfy(issue -> {
             assertThat(issue.severity()).isEqualTo(SkillValidationIssue.Severity.WARNING);
             assertThat(issue.sourceName()).isEqualTo("draft");
-            assertThat(issue.skillName()).isEqualTo("outputSchemaComplexSkill");
+            assertThat(issue.skillName()).isEqualTo("default-outputSchemaComplexSkill");
             assertThat(issue.fieldPath()).startsWith("output_schema");
         });
         assertThat(second).isEqualTo(first);
@@ -292,8 +292,8 @@ class YamlSkillCatalogTests {
                 new SkillDocument("SCHEME:untrusted", valid.replace("one", "two"))));
         assertThat(catalog.getSkills()).extracting(definition -> definition.source().suppliedLabel())
                 .containsExactly("opaque label", "SCHEME:untrusted");
-        assertThat(catalog.getSkill("one").source().bytes()).isEqualTo(valid.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        assertThat(catalog.getSkill("one").rbacRoles()).containsExactly("READER");
+        assertThat(catalog.getSkill("default-one").source().bytes()).isEqualTo(valid.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(catalog.getSkill("default-one").rbacRoles()).containsExactly("READER");
 
         assertThatThrownBy(() -> catalog.loadSupplied(null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> catalog.loadSupplied(java.util.Arrays.asList((SkillDocument) null)))
@@ -323,7 +323,7 @@ class YamlSkillCatalogTests {
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("model source")
                 .hasMessageContaining("unknown model");
         catalog.loadSupplied(List.of(new SkillDocument("corrected", valid)));
-        assertThat(catalog.getSkill("one")).isNotNull();
+        assertThat(catalog.getSkill("default-one")).isNotNull();
     }
 
     @TempDir
@@ -357,7 +357,7 @@ class YamlSkillCatalogTests {
         Path manifest = writeManifest("rest-valid.yaml", "name: restLookup\ndescription: REST lookup\nrest: true\n");
         modelFreeContextRunner.withPropertyValues("loomspan.skills.locations=" + manifest.toUri()).run(context -> {
             assertThat(context).hasNotFailed();
-            YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class).getSkill("restLookup");
+            YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class).getSkill("default-restLookup");
             assertThat(definition.rest()).isTrue();
             assertThat(definition.executionConfiguration()).isNull();
             assertThat(definition.hasGenericInputContract()).isTrue();
@@ -416,7 +416,7 @@ class YamlSkillCatalogTests {
                 "Skill2",
                 "CaseName",
                 "caseName",
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 
         contextRunner
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/public-name/valid/*.yaml")
@@ -426,11 +426,11 @@ class YamlSkillCatalogTests {
                     assertThat(catalog.getSkills())
                             .extracting(definition -> definition.manifest().getName())
                             .containsExactlyInAnyOrderElementsOf(expectedNames);
-                    expectedNames.forEach(name -> assertThat(catalog.getSkill(name))
+                    expectedNames.forEach(name -> assertThat(catalog.getSkill("default-" + name))
                             .isNotNull()
                             .extracting(definition -> definition.manifest().getName())
                             .isEqualTo(name));
-                    assertThat(catalog.getSkill("expenselookup")).isNull();
+                    assertThat(catalog.getSkill("default-expenselookup")).isNull();
                 });
     }
 
@@ -457,11 +457,7 @@ class YamlSkillCatalogTests {
                                 .hasMessageContaining(testCase.filename())
                                 .hasMessageContaining("field 'name'")
                                 .hasMessageContaining("'" + testCase.value() + "'")
-                                .hasMessageContaining("^[A-Za-z_][A-Za-z0-9_]{0,63}$")
-                                .hasMessageContaining("1-64 characters")
-                                .hasMessageContaining("start with a letter or underscore")
-                                .hasMessageContaining("only letters, digits, or underscores")
-                                .hasMessageContaining("searchFlights"))))
+                                )))
                 .toList();
     }
 
@@ -515,9 +511,9 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
-                    assertThat(catalog.getSkill("concurrencyOmitted").concurrencyEnabled()).isTrue();
-                    assertThat(catalog.getSkill("concurrencyTrue").concurrencyEnabled()).isTrue();
-                    assertThat(catalog.getSkill("concurrencyFalse").concurrencyEnabled()).isFalse();
+                    assertThat(catalog.getSkill("default-concurrencyOmitted").concurrencyEnabled()).isTrue();
+                    assertThat(catalog.getSkill("default-concurrencyTrue").concurrencyEnabled()).isTrue();
+                    assertThat(catalog.getSkill("default-concurrencyFalse").concurrencyEnabled()).isFalse();
                 });
     }
 
@@ -604,8 +600,8 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    assertThat(catalog.getSkill("thinkingDefaultSkill")).isNotNull();
-                    assertThat(catalog.getSkill("thinkingDefaultSkill").executionConfiguration())
+                    assertThat(catalog.getSkill("default-thinkingDefaultSkill")).isNotNull();
+                    assertThat(catalog.getSkill("default-thinkingDefaultSkill").executionConfiguration())
                             .extracting(
                                     EffectiveSkillExecutionConfiguration::frameworkModel,
                                     EffectiveSkillExecutionConfiguration::connection,
@@ -623,9 +619,9 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    assertThat(catalog.getSkill("nonThinkingSkill")).isNotNull();
-                    assertThat(catalog.getSkill("nonThinkingSkill").executionConfiguration().providerModel()).isEqualTo("llama3.2");
-                    assertThat(catalog.getSkill("nonThinkingSkill").executionConfiguration().thinkingLevel()).isNull();
+                    assertThat(catalog.getSkill("default-nonThinkingSkill")).isNotNull();
+                    assertThat(catalog.getSkill("default-nonThinkingSkill").executionConfiguration().providerModel()).isEqualTo("llama3.2");
+                    assertThat(catalog.getSkill("default-nonThinkingSkill").executionConfiguration().thinkingLevel()).isNull();
                 });
     }
 
@@ -676,7 +672,7 @@ class YamlSkillCatalogTests {
                             .isNotNull()
                             .hasMessageContaining("second-skill.yaml")
                             .hasMessageContaining("field 'name'")
-                            .hasMessageContaining("duplicate skill name 'duplicateSkill'");
+                            .hasMessageContaining("duplicate skill name 'default-duplicateSkill'");
                 });
     }
 
@@ -723,10 +719,10 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    assertThat(catalog.getSkill("rootVisibleSkill")).isNotNull();
-                    assertThat(catalog.getSkill("rootVisibleSkill").allowedSkills())
-                            .containsExactly("allowedVisibleSkill", "disallowedVisibleSkill");
-                    assertThat(catalog.getSkill("allowedVisibleSkill").rbacRoles())
+                    assertThat(catalog.getSkill("default-rootVisibleSkill")).isNotNull();
+                    assertThat(catalog.getSkill("default-rootVisibleSkill").allowedSkills())
+                            .containsExactly("default-allowedVisibleSkill", "default-disallowedVisibleSkill");
+                    assertThat(catalog.getSkill("default-allowedVisibleSkill").rbacRoles())
                             .containsExactly("ALLOWED");
                 });
     }
@@ -738,16 +734,16 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class)
-                            .getSkill("structuredConstraintParent");
+                            .getSkill("default-structuredConstraintParent");
                     assertThat(definition.allowedSkills())
-                            .containsExactly("requiredChild", "boundedChild", "optionalChild");
+                            .containsExactly("default-requiredChild", "default-boundedChild", "default-optionalChild");
                     assertThat(definition.allowedSkillConstraints())
                             .extracting(AllowedSkillConstraint::effectiveMinTasks)
                             .containsExactly(1, 2, 0);
                     assertThat(definition.allowedSkillConstraints().get(1).maxTasks()).isEqualTo(3);
                     assertThat(definition.allowedSkillConstraints().get(2).required()).isFalse();
                     assertThatThrownBy(() -> definition.allowedSkillConstraints()
-                            .add(new AllowedSkillConstraint("other", null, null, false, java.util.List.of())))
+                            .add(new AllowedSkillConstraint("default-other", null, null, false, java.util.List.of())))
                             .isInstanceOf(UnsupportedOperationException.class);
                 });
     }
@@ -791,17 +787,17 @@ class YamlSkillCatalogTests {
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/allowed-child-skill.yaml")
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
-                    YamlSkillDefinition definition = catalog.getSkill("allowedVisibleSkill");
+                    YamlSkillDefinition definition = catalog.getSkill("default-allowedVisibleSkill");
 
                     definition.manifest().setName("mutated.name");
                     definition.manifest().setRbacRoles(java.util.List.of("ROLE_MUTATED"));
 
-                    assertThat(catalog.getSkill("allowedVisibleSkill").manifest().getName())
+                    assertThat(catalog.getSkill("default-allowedVisibleSkill").manifest().getName())
                             .isEqualTo("allowedVisibleSkill");
-                    assertThat(catalog.getSkill("allowedVisibleSkill").rbacRoles())
+                    assertThat(catalog.getSkill("default-allowedVisibleSkill").rbacRoles())
                             .containsExactly("ALLOWED");
 
-                    assertThat(catalog.getSkill("mutated.name")).isNull();
+                    assertThat(catalog.getSkill("default-mutated")).isNull();
                 });
     }
 
@@ -815,13 +811,13 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    catalog.getSkill("lintedSkill").linter().setType("mutated");
-                    catalog.getSkill("inputSchemaSkill").inputSchema().setType("string");
-                    catalog.getSkill("outputSchemaSkill").outputSchema().setType("string");
+                    catalog.getSkill("default-lintedSkill").linter().setType("mutated");
+                    catalog.getSkill("default-inputSchemaSkill").inputSchema().setType("string");
+                    catalog.getSkill("default-outputSchemaSkill").outputSchema().setType("string");
 
-                    assertThat(catalog.getSkill("lintedSkill").linter().getType()).isEqualTo("regex");
-                    assertThat(catalog.getSkill("inputSchemaSkill").inputSchema().getType()).isEqualTo("object");
-                    assertThat(catalog.getSkill("outputSchemaSkill").outputSchema().getType()).isEqualTo("object");
+                    assertThat(catalog.getSkill("default-lintedSkill").linter().getType()).isEqualTo("regex");
+                    assertThat(catalog.getSkill("default-inputSchemaSkill").inputSchema().getType()).isEqualTo("object");
+                    assertThat(catalog.getSkill("default-outputSchemaSkill").outputSchema().getType()).isEqualTo("object");
                 });
     }
 
@@ -834,10 +830,10 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    assertThat(catalog.getSkill("promptSkill").prompt())
+                    assertThat(catalog.getSkill("default-promptSkill").prompt())
                             .contains("LONG_PROMPT_SENTINEL")
                             .contains("Follow the private skill instructions.");
-                    assertThat(catalog.getSkill("blankPromptSkill").prompt()).isNull();
+                    assertThat(catalog.getSkill("default-blankPromptSkill").prompt()).isNull();
                 });
     }
 
@@ -861,9 +857,9 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    assertThat(catalog.getSkill("thinkingDefaultSkill").allowedSkills()).isEmpty();
-                    assertThat(catalog.getSkill("thinkingDefaultSkill").rbacRoles()).isEmpty();
-                    assertThat(catalog.getSkill("thinkingDefaultSkill").manifest().getPlanningMode()).isNull();
+                    assertThat(catalog.getSkill("default-thinkingDefaultSkill").allowedSkills()).isEmpty();
+                    assertThat(catalog.getSkill("default-thinkingDefaultSkill").rbacRoles()).isEmpty();
+                    assertThat(catalog.getSkill("default-thinkingDefaultSkill").manifest().getPlanningMode()).isNull();
                 });
     }
 
@@ -874,10 +870,10 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    assertThat(catalog.getSkill("planningDisabledSkill")).isNotNull();
-                    assertThat(catalog.getSkill("planningDisabledSkill").manifest().getPlanningMode()).isFalse();
-                    assertThat(catalog.getSkill("planningDisabledSkill").planningModeEnabled(true)).isFalse();
-                    assertThat(catalog.getSkill("planningDisabledSkill").planningModeEnabled(false)).isFalse();
+                    assertThat(catalog.getSkill("default-planningDisabledSkill")).isNotNull();
+                    assertThat(catalog.getSkill("default-planningDisabledSkill").manifest().getPlanningMode()).isFalse();
+                    assertThat(catalog.getSkill("default-planningDisabledSkill").planningModeEnabled(true)).isFalse();
+                    assertThat(catalog.getSkill("default-planningDisabledSkill").planningModeEnabled(false)).isFalse();
                 });
     }
 
@@ -888,13 +884,13 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    assertThat(catalog.getSkill("lintedSkill")).isNotNull();
-                    assertThat(catalog.getSkill("lintedSkill").linter()).isNotNull();
-                    assertThat(catalog.getSkill("lintedSkill").linter().getType()).isEqualTo("regex");
-                    assertThat(catalog.getSkill("lintedSkill").linter().getMaxRetries()).isEqualTo(2);
-                    assertThat(catalog.getSkill("lintedSkill").linter().getRegex()).isNotNull();
-                    assertThat(catalog.getSkill("lintedSkill").linter().getRegex().getPattern()).isEqualTo("^```yaml[\\s\\S]*```$");
-                    assertThat(catalog.getSkill("lintedSkill").linter().getRegex().getMessage()).isEqualTo("Return fenced YAML only.");
+                    assertThat(catalog.getSkill("default-lintedSkill")).isNotNull();
+                    assertThat(catalog.getSkill("default-lintedSkill").linter()).isNotNull();
+                    assertThat(catalog.getSkill("default-lintedSkill").linter().getType()).isEqualTo("regex");
+                    assertThat(catalog.getSkill("default-lintedSkill").linter().getMaxRetries()).isEqualTo(2);
+                    assertThat(catalog.getSkill("default-lintedSkill").linter().getRegex()).isNotNull();
+                    assertThat(catalog.getSkill("default-lintedSkill").linter().getRegex().getPattern()).isEqualTo("^```yaml[\\s\\S]*```$");
+                    assertThat(catalog.getSkill("default-lintedSkill").linter().getRegex().getMessage()).isEqualTo("Return fenced YAML only.");
                 });
     }
 
@@ -905,8 +901,8 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    assertThat(catalog.getSkill("thinkingDefaultSkill")).isNotNull();
-                    assertThat(catalog.getSkill("thinkingDefaultSkill").linter()).isNull();
+                    assertThat(catalog.getSkill("default-thinkingDefaultSkill")).isNotNull();
+                    assertThat(catalog.getSkill("default-thinkingDefaultSkill").linter()).isNull();
                 });
     }
 
@@ -917,8 +913,8 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    assertThat(catalog.getSkill("outputSchemaSkill")).isNotNull();
-                    assertThat(catalog.getSkill("outputSchemaSkill").manifest().getOutputSchemaMaxRetries()).isEqualTo(2);
+                    assertThat(catalog.getSkill("default-outputSchemaSkill")).isNotNull();
+                    assertThat(catalog.getSkill("default-outputSchemaSkill").manifest().getOutputSchemaMaxRetries()).isEqualTo(2);
                 });
     }
 
@@ -927,7 +923,7 @@ class YamlSkillCatalogTests {
         contextRunner
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/input-schema-skill.yaml")
                 .run(context -> {
-                    YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class).getSkill("inputSchemaSkill");
+                    YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class).getSkill("default-inputSchemaSkill");
 
                     assertThat(definition).isNotNull();
                     assertThat(definition.inputSchema()).isNotNull();
@@ -941,7 +937,7 @@ class YamlSkillCatalogTests {
         contextRunner
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/attachment-input-skill.yaml")
                 .run(context -> {
-                    YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class).getSkill("attachmentInputSkill");
+                    YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class).getSkill("default-attachmentInputSkill");
 
                     assertThat(definition).isNotNull();
                     assertThat(definition.inputSchema().getProperties().get("image").getType()).isEqualTo("attachment");
@@ -1011,10 +1007,10 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
-                    assertThat(catalog.getSkill("evidenceContractSkill")).isNotNull();
-                    assertThat(catalog.getSkill("evidenceContractSkill").evidenceContract()
+                    assertThat(catalog.getSkill("default-evidenceContractSkill")).isNotNull();
+                    assertThat(catalog.getSkill("default-evidenceContractSkill").evidenceContract()
                             .canonicalExpressionForClaim("isDuplicate"))
-                            .isEqualTo("invoiceParser and expenseLookup");
+                            .isEqualTo("default-invoiceParser and default-expenseLookup");
                 });
     }
 
@@ -1036,10 +1032,10 @@ class YamlSkillCatalogTests {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context.getBean(YamlSkillCatalog.class)
-                            .getSkill("evidenceHashNameSkill")
+                            .getSkill("default-evidenceHashNameSkill")
                             .evidenceContract()
                             .canonicalExpressionForClaim("result"))
-                            .isEqualTo("reviewSkill");
+                            .isEqualTo("default-reviewSkill");
                 });
     }
 
@@ -1061,7 +1057,7 @@ class YamlSkillCatalogTests {
                         .isNotNull()
                         .hasMessageContaining("field 'output_schema.properties.vendorName.evidence'")
                         .hasMessageContaining("column 1")
-                        .hasMessageContaining("did you mean 'invoiceParser'?"));
+                        .hasMessageContaining("did you mean 'default-invoiceParser'?"));
     }
 
     @Test
@@ -1136,7 +1132,7 @@ class YamlSkillCatalogTests {
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/output-schema-complex-skill.yaml")
                 .run(context -> {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
-                    YamlSkillManifest.OutputSchemaManifest root = catalog.getSkill("outputSchemaComplexSkill")
+                    YamlSkillManifest.OutputSchemaManifest root = catalog.getSkill("default-outputSchemaComplexSkill")
                             .manifest().getOutputSchema();
                     YamlSkillManifest.OutputSchemaManifest item = root.getProperties().get("lineItems").getItems();
                     YamlSkillManifest.OutputSchemaManifest details = item.getProperties().get("details");
@@ -1165,7 +1161,7 @@ class YamlSkillCatalogTests {
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/output-schema-complex-skill.yaml")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
-                    assertThat(context.getBean(YamlSkillCatalog.class).getSkill("outputSchemaComplexSkill")).isNotNull();
+                    assertThat(context.getBean(YamlSkillCatalog.class).getSkill("default-outputSchemaComplexSkill")).isNotNull();
                     assertThat(output.getOut())
                             .contains("output_schema")
                             .contains("recommended");

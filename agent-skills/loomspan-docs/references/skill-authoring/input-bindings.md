@@ -14,6 +14,8 @@ receiving input contract remains authoritative; the calling model generates only
 unbound arguments under a separate projected contract. Binding grants no access
 and does not change invocation limits or the captured configuration generation.
 
+All skill references use [canonical qualified identities](mental-model.md#canonical-namespace-identity), including same-namespace children and binding producers. Declarations keep local `name` components.
+
 ## Automatic assigned dispatch
 
 After the model produces an accepted plan, Framework constructs CALL_TOOL with
@@ -93,19 +95,19 @@ input_schema:
   required: [requestId, records]
   additionalProperties: false
 allowed_skills:
-  - name: producer
+  - name: default-producer
     required: true
     max_tasks: 1
     input_bindings:
       /caseId: {from: input, path: /requestId}
-  - name: consumer
+  - name: default-consumer
     required: true
     max_tasks: 1
     input_bindings:
       /caseId: {from: input, path: /requestId}
       /context/records: {from: input, path: /records}
-      /context/assessment: {from: child_result, skill: producer, path: /data}
-output_from: {skill: consumer}
+      /context/assessment: {from: child_result, skill: default-producer, path: /data}
+output_from: {skill: default-consumer}
 ```
 
 ```yaml

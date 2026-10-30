@@ -232,7 +232,7 @@ class BindingIsolationIntegrationTest {
                         try (var workers = Executors.newFixedThreadPool(2)) {
                             if (reload) {
                                 var reloader = context.getBean(SkillReloader.class);
-                                var captured = reloader.snapshot();
+                                var captured = reloader.snapshot("default");
                                 var held = workers.submit(() -> template.invoke("root", Map.of("marker", "held", "freshMarker", "incorrect")));
                                 try {
                                     await(entered);
@@ -240,7 +240,7 @@ class BindingIsolationIntegrationTest {
                                             new SkillDocument("producer", leaf("producer")), new SkillDocument("consumer", leaf("consumer"))))) {
                                         reloader.publish(update);
                                     }
-                                    assertThat(reloader.snapshot().generationId()).isNotEqualTo(captured.generationId());
+                                    assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(captured.generationId());
                                     assertThat(JSON.readTree(template.invoke("root", Map.of("marker", "incorrect", "freshMarker", "fresh")))
                                             .path("marker").asText()).isEqualTo("fresh");
                                 } finally { release.countDown(); }

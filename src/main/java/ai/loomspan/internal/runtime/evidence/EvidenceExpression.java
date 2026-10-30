@@ -1,5 +1,7 @@
 package ai.loomspan.internal.runtime.evidence;
 
+import ai.loomspan.internal.core.SkillIdentity;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -16,30 +18,33 @@ public sealed interface EvidenceExpression permits EvidenceExpression.Skill, Evi
 
     EvidenceRequirement unsatisfiedRequirement(Set<String> successfulSkills);
 
-    record Skill(String name, int column) implements EvidenceExpression
+    record Skill(SkillIdentity identity, int column) implements EvidenceExpression
     {
+        public Skill(String name, int column) { this(SkillIdentity.parse(name), column); }
+        public String name() { return identity.toString(); }
+
         @Override
         public boolean evaluate(Set<String> successfulSkills)
         {
-            return successfulSkills != null && successfulSkills.contains(name);
+            return successfulSkills != null && successfulSkills.contains(name());
         }
 
         @Override
         public String canonical()
         {
-            return name;
+            return name();
         }
 
         @Override
         public Set<String> referencedSkills()
         {
-            return Set.of(name);
+            return Set.of(name());
         }
 
         @Override
         public EvidenceRequirement unsatisfiedRequirement(Set<String> successfulSkills)
         {
-            return evaluate(successfulSkills) ? null : new EvidenceRequirement("skill", name, List.of(name), List.of());
+            return evaluate(successfulSkills) ? null : new EvidenceRequirement("skill", name(), List.of(name()), List.of());
         }
     }
 

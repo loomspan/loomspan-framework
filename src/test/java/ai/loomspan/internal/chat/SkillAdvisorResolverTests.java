@@ -132,7 +132,7 @@ class SkillAdvisorResolverTests {
             linter.setRegex(regex);
             manifest.setLinter(linter);
         }
-        return new YamlSkillDefinition(
+        return new YamlSkillDefinition("default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium"),

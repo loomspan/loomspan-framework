@@ -1,5 +1,7 @@
 package ai.loomspan.internal.skill;
 
+import ai.loomspan.internal.core.SkillIdentity;
+
 import org.springframework.lang.Nullable;
 
 import java.util.Objects;
@@ -9,7 +11,7 @@ import ai.loomspan.internal.runtime.input.ObjectFieldPath;
 
 /** Immutable normalized task-count contract for one direct child skill. */
 public record AllowedSkillConstraint(
-        String name,
+        SkillIdentity identity,
         @Nullable Integer minTasks,
         @Nullable Integer maxTasks,
         boolean required,
@@ -17,7 +19,7 @@ public record AllowedSkillConstraint(
 {
     public AllowedSkillConstraint
     {
-        Objects.requireNonNull(name, "name must not be null");
+        Objects.requireNonNull(identity, "identity must not be null");
         inputBindings = inputBindings == null ? List.of() : List.copyOf(inputBindings);
         if (minTasks != null && minTasks < 0)
         {
@@ -32,6 +34,13 @@ public record AllowedSkillConstraint(
             throw new IllegalArgumentException("maxTasks must not be less than the effective minimum");
         }
     }
+
+    public AllowedSkillConstraint(String name, Integer minTasks, Integer maxTasks, boolean required, List<ChildInputBinding> inputBindings)
+    {
+        this(SkillIdentity.parse(name), minTasks, maxTasks, required, inputBindings);
+    }
+
+    public String name() { return identity.toString(); }
 
     public int effectiveMinTasks()
     {

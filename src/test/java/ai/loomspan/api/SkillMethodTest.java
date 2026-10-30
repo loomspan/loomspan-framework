@@ -30,10 +30,11 @@ class SkillMethodTest {
 
         assertThat(annotation).isNotNull();
         assertThat(annotation.name()).isEmpty();
+        assertThat(annotation.namespace()).isEqualTo("default");
         assertThat(annotation.description()).isEqualTo("Default route");
         assertThat(SkillMethod.class.getDeclaredMethods())
                 .extracting(java.lang.reflect.Method::getName)
-                .containsExactlyInAnyOrder("description", "name");
+                .containsExactlyInAnyOrder("description", "name", "namespace");
     }
 
     static class SampleSkills {

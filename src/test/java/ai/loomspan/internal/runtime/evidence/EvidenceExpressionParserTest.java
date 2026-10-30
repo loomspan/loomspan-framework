@@ -15,13 +15,13 @@ class EvidenceExpressionParserTest
 
     @ParameterizedTest
     @CsvSource({
-            "a,a",
-            "a AND b AND c,a and b and c",
-            "a Or b OR c,a or b or c",
-            "a or b and c,a or b and c",
-            "'(a or b) and c','(a or b) and c'",
-            "'a AND (b Or c)','a and (b or c)'",
-            "androidCheck or orderLookup and candyParser,androidCheck or orderLookup and candyParser"
+            "default-a,default-a",
+            "default-a AND default-b AND default-c,default-a and default-b and default-c",
+            "default-a Or default-b OR default-c,default-a or default-b or default-c",
+            "default-a or default-b and default-c,default-a or default-b and default-c",
+            "'(default-a or default-b) and default-c','(default-a or default-b) and default-c'",
+            "'default-a AND (default-b Or default-c)','default-a and (default-b or default-c)'",
+            "default-androidCheck or default-orderLookup and default-candyParser,default-androidCheck or default-orderLookup and default-candyParser"
     })
     void parsesAndCanonicallyRendersSupportedExpressions(String raw, String canonical)
     {
@@ -31,27 +31,27 @@ class EvidenceExpressionParserTest
     @Test
     void evaluatesPrecedenceAndAlternatives()
     {
-        EvidenceExpression expression = parser.parse("classifyIncident and (investigateNetwork or investigateApp)");
+        EvidenceExpression expression = parser.parse("default-classifyIncident and (default-investigateNetwork or default-investigateApp)");
         assertThat(expression.referencedSkills())
-                .containsExactly("classifyIncident", "investigateNetwork", "investigateApp");
-        assertThat(expression.evaluate(Set.of("classifyIncident", "investigateNetwork"))).isTrue();
-        assertThat(expression.evaluate(Set.of("classifyIncident", "investigateApp"))).isTrue();
-        assertThat(expression.evaluate(Set.of("classifyIncident"))).isFalse();
-        assertThat(expression.evaluate(Set.of("investigateNetwork"))).isFalse();
+                .containsExactly("default-classifyIncident", "default-investigateNetwork", "default-investigateApp");
+        assertThat(expression.evaluate(Set.of("default-classifyIncident", "default-investigateNetwork"))).isTrue();
+        assertThat(expression.evaluate(Set.of("default-classifyIncident", "default-investigateApp"))).isTrue();
+        assertThat(expression.evaluate(Set.of("default-classifyIncident"))).isFalse();
+        assertThat(expression.evaluate(Set.of("default-investigateNetwork"))).isFalse();
     }
 
     @ParameterizedTest
     @CsvSource({
             "' ',2",
-            "'and a',1",
-            "'a or',5",
-            "'a b',3",
+            "'and default-a',1",
+            "'default-a or',13",
+            "'default-a default-b',11",
             "'()',2",
-            "'(a',3",
-            "'a)',2",
-            "'a && b',3",
-            "'a || b',3",
-            "'\"a\"',1"
+            "'(default-a',11",
+            "'default-a)',10",
+            "'default-a && default-b',11",
+            "'default-a || default-b',11",
+            "'\"default-a\"',1"
     })
     void rejectsMalformedExpressionsWithPreciseColumns(String raw, int column)
     {

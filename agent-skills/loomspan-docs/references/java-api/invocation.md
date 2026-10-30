@@ -24,7 +24,7 @@ void validate(String skillName, Map<String, Object> input);
 ```
 
 `skillName` MUST identify a registered Java, REST, TypeSafe, or model-backed YAML skill by its exact name.
-For Java, this is the annotation name or the canonical method name when omitted.
+For Java, combine its owning annotation namespace with the local annotation name (or canonical method name when omitted). Pass a catalog descriptor name unchanged. Root boundary integration is completed in PR 27.3.
 Bean names and method signatures are diagnostics, never invocation aliases.
 
 ```java
@@ -40,7 +40,7 @@ public final class InvoiceWorkflow {
 
     public String check(String invoiceText) {
         return skills.invoke(
-                "duplicateInvoiceChecker",
+                "default-duplicateInvoiceChecker",
                 Map.of("payload", invoiceText));
     }
 }
@@ -131,7 +131,7 @@ AdmittedSkillInvocation admitted;
 synchronized (dispatchGate) {
     if (dispatchClosed) return;
     SecurityContextHolder.getContext().setAuthentication(authentication);
-    admitted = handoff.handoff("duplicateInvoiceChecker", input);
+    admitted = handoff.handoff("default-duplicateInvoiceChecker", input);
 }
 try {
     String snapshotId = snapshotByGeneration.get(admitted.generationId());

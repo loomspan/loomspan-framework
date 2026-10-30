@@ -237,7 +237,7 @@ class DefaultCapabilityInvokerTest {
         manifest.setName("rootVisibleSkill");
         manifest.setDescription("rootVisibleSkill");
         manifest.setModel("gpt-5");
-        return new ai.loomspan.internal.skill.YamlSkillDefinition(
+        return new ai.loomspan.internal.skill.YamlSkillDefinition("default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 new ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration(

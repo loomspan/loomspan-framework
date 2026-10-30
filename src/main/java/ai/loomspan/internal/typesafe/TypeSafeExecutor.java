@@ -40,7 +40,7 @@ public final class TypeSafeExecutor {
         var context =
                 new ModelTraceContext(
                         ModelExecutionIdentity.from(configuration),
-                        definition.manifest().getName(),
+                        definition.identity().toString(),
                         "evaluation");
         var frame = binding.branch().requireLeaf();
         var requestEvidence = evidence(client, configuration.providerModel());
@@ -48,7 +48,7 @@ public final class TypeSafeExecutor {
         for (int number = 1; number <= runtime.retryPolicy().maxAttempts(); number++) {
             requireNotInterrupted();
             lifecycle.requireOpenForNewWork(binding);
-            usage.reserveProviderAttempt(session, definition.manifest().getName());
+            usage.reserveProviderAttempt(session, definition.identity().toString());
             var attempt = context.nextAttempt(number);
             state.recordModelRequestSent(session, frame, context, attempt, requestEvidence);
             String raw;
@@ -62,7 +62,7 @@ public final class TypeSafeExecutor {
                 var metadata = failureMetadata(details, outcome);
                 usage.recordProviderAttemptOutcome(
                         session,
-                        definition.manifest().getName(),
+                        definition.identity().toString(),
                         context.identity(),
                         "failed",
                         details.category(),
@@ -101,7 +101,7 @@ public final class TypeSafeExecutor {
             }
             usage.recordProviderAttemptOutcome(
                     session,
-                    definition.manifest().getName(),
+                    definition.identity().toString(),
                     context.identity(),
                     "succeeded",
                     null,
@@ -111,7 +111,7 @@ public final class TypeSafeExecutor {
             state.recordModelResponseReceived(
                     session, frame, context, attempt, counts, responseEvidence);
             usage.recordModelResponse(
-                    session, definition.manifest().getName(), context.identity(), counts);
+                    session, definition.identity().toString(), context.identity(), counts);
             if (decoding != null)
                 throw new IllegalStateException("System One returned unreadable JSON", decoding);
             JsonNode answers = envelope == null ? null : envelope.get("answers");

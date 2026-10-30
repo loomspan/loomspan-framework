@@ -80,7 +80,7 @@ final class SpringAiChatClientAssembler
     {
         Objects.requireNonNull(definition, "definition must not be null");
         EffectiveSkillExecutionConfiguration executionConfiguration = definition.requireExecutionConfiguration();
-        String skillName = definition.manifest().getName();
+        String skillName = definition.identity().toString();
         var captured = ExecutionBindingScope.current().map(binding -> binding.generation().runtime()).orElse(null);
         ProviderConnectionRuntime runtime = captured == null
                 ? chatModelResolver.resolve(skillName, executionConfiguration)

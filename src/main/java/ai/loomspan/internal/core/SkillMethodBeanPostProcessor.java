@@ -204,17 +204,15 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
         validateSkillParameters(beanName, method, contractMethod);
         String capabilityDescription = annotation.description().isBlank() ? method.getName() : annotation.description();
         String inputSchema = buildInputSchema(method, contractMethod);
-        String name = annotation.name().isEmpty() ? method.getName() : annotation.name();
-        if (!name.matches("^[A-Za-z_][A-Za-z0-9_]{0,63}$"))
-        {
-            throw new IllegalArgumentException("Invalid skill name '" + name
-                    + "': use 1-64 ASCII letters, digits or underscores, starting with a letter or underscore");
-        }
         String location = beanName + "#" + method.toGenericString();
+        final SkillIdentity identity;
+        try { identity = new SkillIdentity(annotation.namespace(), annotation.name().isEmpty() ? method.getName() : annotation.name()); }
+        catch (IllegalArgumentException ex) { throw new IllegalArgumentException("Invalid @SkillMethod namespace/name at " + location + ": " + ex.getMessage(), ex); }
+        String name = identity.toString();
         CapabilityInvoker invoker = arguments -> invokeSkillMethod(beanName, method, contractMethod, name, arguments);
         var policy = new ai.loomspan.internal.security.SkillAccessPolicyResolver()
                 .resolve(method, targetClass);
-        CapabilityMetadata metadata = new CapabilityMetadata(location, name, capabilityDescription,
+        CapabilityMetadata metadata = new CapabilityMetadata(location, identity, capabilityDescription,
                 SkillExecutionDescriptor.none(), policy, invoker, CapabilityKind.JAVA_SKILL,
                 new CapabilityToolDescriptor(name, capabilityDescription, inputSchema, null),
                 inputContractResolver.resolveJavaCapability(inputSchema),

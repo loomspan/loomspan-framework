@@ -113,7 +113,7 @@ public class DefaultPlanningService implements PlanningService
         Objects.requireNonNull(objective, "objective must not be null");
         Objects.requireNonNull(definition, "definition must not be null");
         Objects.requireNonNull(modelInteraction, "modelInteraction must not be null");
-        String capabilityName = definition.manifest().getName();
+        String capabilityName = definition.identity().toString();
         var executionConfiguration = definition.requireExecutionConfiguration();
 
         log.debug(
@@ -276,7 +276,7 @@ public class DefaultPlanningService implements PlanningService
             List<BoundCapability> visibleTools,
             ExecutionFrame planningFrame)
     {
-        String capabilityName = definition.manifest().getName();
+        String capabilityName = definition.identity().toString();
         var executionConfiguration = definition.requireExecutionConfiguration();
         EvidenceContract evidenceContract = definition.evidenceContract();
         List<AllowedSkillConstraint> taskConstraints = definition.allowedSkillConstraints();
@@ -501,7 +501,7 @@ public class DefaultPlanningService implements PlanningService
             @Nullable EvidenceContract evidenceContract,
             ModelTraceContext modelTraceContext)
     {
-        String capabilityName = definition.manifest().getName();
+        String capabilityName = definition.identity().toString();
         ModelExecutionIdentity modelIdentity = ModelExecutionIdentity.from(executionConfiguration);
         ExecutionFrame modelFrame = executionStateService.openFrame(
                 session,

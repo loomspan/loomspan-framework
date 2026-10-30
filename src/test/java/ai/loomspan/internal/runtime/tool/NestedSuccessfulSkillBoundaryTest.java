@@ -128,7 +128,7 @@ class NestedSuccessfulSkillBoundaryTest
         manifest.setName("handleIncident");
         manifest.setDescription("Handle incident");
         manifest.setModel("gpt-5");
-        return new YamlSkillDefinition(
+        return new YamlSkillDefinition("default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 new EffectiveSkillExecutionConfiguration(

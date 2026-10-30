@@ -22,13 +22,39 @@ YAML planner -> YAML specialist -> Java @SkillMethod or REST leaf
 
 Not every tree needs every level. Java skills can be roots without a model; a simple reasoning skill can be one YAML declaration.
 
-## Exact shared identity
+## Canonical namespace identity
 
-A YAML manifest's `name` or a Java annotation's `name` is the single callable identity. An omitted or empty Java annotation name uses the canonical method name. Every name MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$`: 1–64 ASCII characters, beginning with a letter or underscore. Names are case-sensitive and are never trimmed, sanitized, normalized, truncated, or aliased. Descriptive lowerCamelCase is recommended, but underscores and uppercase starts are valid.
+A declaration's `name` is a local component matching `[A-Za-z_][A-Za-z0-9_]{0,63}`.
+Startup YAML belongs to `default`; Java `@SkillMethod.namespace` defaults to
+`default`. An empty Java annotation `name` uses the canonical method name.
+Authoritative ownership constructs one callable identity: `namespace-localName`.
 
-Use the exact name in `SkillTemplate`, `allowed_skills`, plan targets, evidence expressions, provider tool definitions, metrics, and traces. Duplicate names across Java, REST, TypeSafe, and model-backed YAML fail startup and identify both declarations. Relevant lazy Java beans are discovered before the initial complete skill generation is built. Every child reference must resolve within that complete generation; authorization filtering does not make missing names valid.
+Every reference MUST be qualified, including same-namespace and default references:
+`default-search`, `tax-calculateTax`. This includes `allowed_skills`, evidence,
+`output_from.skill`, and input/output binding producers. Namespace case normalizes
+to lowercase; local names remain case-sensitive. `Tax-search` equals `tax-search`,
+while `tax-Search` differs. `a_b-c` and `a-b_c` differ.
 
-Each root invocation captures one immutable, complete declaration and execution generation before input conversion or validation. Its input contracts, definitions, local child surface, models, connections, limits, and trace policy remain coherent for the full nested and parallel invocation tree. An application can prepare and publish a complete new generation through the public `SkillReloader`; publication affects only roots captured afterward, not running or admitted work. Skill YAML syntax does not change. Applications can register for safe retirement of superseded published generations to remove generation-keyed resources during normal operation; see [two-stage application updates](../java-api/skill-reload.md). There is no historical-invocation API.
+Each component starts with an ASCII letter or underscore and contains only ASCII
+letters, digits or underscores. Namespace length is at most 32; total identity
+length including its single hyphen is at most 64. Thus an N-character namespace
+leaves `63 - N` local characters (`default` leaves 56). Standalone declaration
+grammar does not waive this combined limit, including for unoffered/optional skills.
+Whitespace, slash/colon separators, extra hyphens, encoding, imports, shorthand,
+wildcards and fallback searches are invalid. Loomspan never trims or repairs input.
+
+Duplicate and binding comparisons use resolved canonical identities. Source labels,
+raw YAML, prompts and original evidence expression text remain unchanged. Renaming
+a namespace means creating another namespace, updating references explicitly, and
+removing the old namespace; there is no identity-preserving rename or inheritance.
+
+**Sequential implementation boundary:** PR 27.1 establishes parsing, immutable
+namespace generations/catalogs and Java ownership. Active multi-namespace startup
+and publication integration is PR 27.2; root admission, model/child dispatch and
+observation integration follow in PRs 27.3-27.5. Guidance for those later paths
+states the series contract, not completed integration coverage in this slice.
+
+Each root invocation captures one immutable, complete declaration and execution generation before input conversion or validation. Its input contracts, definitions, local child surface, models, connections, limits, and trace policy remain coherent for the full nested and parallel invocation tree. An application can prepare and publish a complete new generation through the public `SkillReloader`; publication affects only roots captured afterward, not running or admitted work. Authored references must use the qualified syntax above. Applications can register for safe retirement of superseded published generations to remove generation-keyed resources during normal operation; see [two-stage application updates](../java-api/skill-reload.md). There is no historical-invocation API.
 
 Bean names, YAML source labels, and declared method signatures are diagnostic locations, never a second callable identity. File-loaded YAML has a file-derived label; application-supplied `SkillDocument` YAML has its exact arbitrary `sourceName` label, which need not resemble a path or have an extension. Neither changes manifest `name` or `allowed_skills` resolution. The inspection wire field remains named `sourcePath`. Any YAML `mapping` key, including null, empty, or scalar forms, is rejected with annotation-only guidance.
 

@@ -7,6 +7,8 @@ coverage: source-verified
 
 # TypeSafe evaluation skills
 
+All skill references use [canonical qualified identities](mental-model.md#canonical-namespace-identity), including same-namespace children and binding producers. Declarations keep local `name` components.
+
 ## Applies when
 
 Use a TypeSafe leaf for independent Choice, Noul, or Score judgments over supplied
@@ -119,7 +121,7 @@ typesafe:
 An application service injects `ai.loomspan.api.SkillTemplate` and invokes:
 
 ```java
-String answers = skills.invoke("assessContact", Map.of(
+String answers = skills.invoke("default-assessContact", Map.of(
         "context", Map.of("message", "Again: checkout failed. Browsing works."),
         "candidates", Map.of("billing", "Charges", "technical", "Checkout failures"),
         "levels", List.of("All functions available", "A critical operation is blocked")));
@@ -251,14 +253,14 @@ input_schema:
   required: [context, candidates, levels]
   additionalProperties: false
 allowed_skills:
-  - name: assessContact
+  - name: default-assessContact
     required: true
     max_tasks: 1
     input_bindings:
       /context: {from: input, path: /context}
       /candidates: {from: input, path: /candidates}
       /levels: {from: input, path: /levels}
-output_from: {skill: assessContact}
+output_from: {skill: default-assessContact}
 ```
 
 Invoke `assessReportedContact` with the same input as the direct example. Planning
@@ -313,7 +315,7 @@ typesafe:
       criteria: [All functions available, A critical operation is blocked]
 ```
 
-Invoke directly with `skills.invoke("assessFixedContact", Map.of("context",
+Invoke directly with `skills.invoke("default-assessFixedContact", Map.of("context",
 Map.of("message", "Again: checkout failed. Browsing works.")))`. Each primitive
 is independently usable by retaining just its question in either complete leaf;
 single-question results still have that question's name at the root.
@@ -335,7 +337,7 @@ input_schema:
   required: [context]
   additionalProperties: false
 allowed_skills:
-  - name: assessFixedContact
+  - name: default-assessFixedContact
     required: true
     max_tasks: 1
     input_bindings:
@@ -350,10 +352,10 @@ output_schema:
   required: [department, repeatProbability, severity, technicalProbability]
   additionalProperties: false
 output_bindings:
-  /department: {from: child_result, skill: assessFixedContact, path: /department/choice}
-  /repeatProbability: {from: child_result, skill: assessFixedContact, path: /repeat/noul}
-  /severity: {from: child_result, skill: assessFixedContact, path: /severity/score}
-  /technicalProbability: {from: child_result, skill: assessFixedContact, path: /department/probabilities/technical}
+  /department: {from: child_result, skill: default-assessFixedContact, path: /department/choice}
+  /repeatProbability: {from: child_result, skill: default-assessFixedContact, path: /repeat/noul}
+  /severity: {from: child_result, skill: default-assessFixedContact, path: /severity/score}
+  /technicalProbability: {from: child_result, skill: default-assessFixedContact, path: /department/probabilities/technical}
 ```
 
 Invoke `summarizeContact` with the same `context` input as the fixed direct leaf.
