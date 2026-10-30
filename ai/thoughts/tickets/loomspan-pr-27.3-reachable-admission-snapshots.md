@@ -50,4 +50,4 @@ The accepted design and its acceptance coverage are normative, including distinc
 ## Pipeline notes
 
 - Destructive API changes are authorized without compatibility shims or alternate identity formats.
-- Each series ticket gets a local commit without sync. Intermediate downstream breakage is allowed; record exact verification blockers, do not conceal them with bridges or claim passing checks. PR 27.5 closes all remaining integration gaps.
+- The developer reviews and commits each ticket; leave changes uncommitted and do not sync. Intermediate downstream breakage is allowed; record exact verification blockers, do not conceal them with bridges or claim passing checks. PR 27.5 closes all remaining integration gaps.

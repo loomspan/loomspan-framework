@@ -52,4 +52,4 @@ Treat the linked design and acceptance coverage as normative, not suggestions to
 ## Pipeline notes
 
 - Destructive changes are intentional; update existing signatures/consumers directly without compatibility shims or dual identities.
-- A local commit follows each ticket, with no intermediate sync. Downstream integration may remain broken; record specific verification blockers and leave no temporary bridges. PR 27.5 must resolve all remaining gaps.
+- The developer reviews and commits each ticket; leave changes uncommitted and do not sync. Downstream integration may remain broken; record specific verification blockers and leave no temporary bridges. PR 27.5 must resolve all remaining gaps.

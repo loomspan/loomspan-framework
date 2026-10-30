@@ -31,7 +31,7 @@ Finish the PR 27 series with existing Framework and Console surfaces consistentl
 
 Final ticket, depending on PR 27.1–27.4. The accepted [namespace design](../phases/skill-namespaces.md), particularly Discovery/observation, Release compatibility, and Acceptance coverage, defines the final behavior. Follow `loomspan-console/AGENTS.md` when changing Console consumers and fixtures. Update wire producers and consumers in this same slice rather than spreading a contract transition across releases.
 
-These are five sequential local commits for one PR 27 implementation, sized for GPT 6.1 Sol with focused outcomes rather than independently deployable features. The full series must be coherent before sync. No Cloud implementation, new Console features, optional implementation-specific Java configuration, or follow-up resource measurement is included.
+These are five sequential implementation tickets for one PR 27 implementation, sized for GPT 6.1 Sol with focused outcomes rather than independently deployable features. The full series must be coherent before sync. No Cloud implementation, new Console features, optional implementation-specific Java configuration, or follow-up resource measurement is included.
 
 The accepted design and all implementation acceptance scenarios are normative. Source findings in that document are historical leads to verify, not executed proofs. Resolve concrete types/record fields/signatures within the accepted contracts; do not replace those contracts with a different feature design. Use this ownership map when closing the series, including explicit carry-forward verification blockers from earlier tickets:
 
@@ -56,5 +56,7 @@ This map allocates verification, not additional features or a new test subsystem
 
 ## Pipeline notes
 
+- The developer reviews and commits each ticket; leave changes uncommitted and do not sync.
+
 - Breaking supported/wire contracts is authorized for this development-stage release; no compatibility shims, migrations, or fallback readers.
-- Earlier ticket commits may intentionally be broken and are not synced individually. This final ticket must resolve all series integration gaps and complete verification; intermediate-breakage permission is not a final acceptance waiver. Do not sync or start implementation merely because these tickets exist.
+- Earlier ticket slices may intentionally be broken and are not synced individually. This final ticket must resolve all series integration gaps and complete verification; intermediate-breakage permission is not a final acceptance waiver. Do not sync or start implementation merely because these tickets exist.

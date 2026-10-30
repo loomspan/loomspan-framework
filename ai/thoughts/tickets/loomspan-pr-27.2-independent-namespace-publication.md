@@ -61,5 +61,7 @@ Treat the linked accepted design and its acceptance coverage as normative; repos
 
 ## Pipeline notes
 
+- The developer reviews and commits each ticket; leave changes uncommitted and do not sync.
+
 - Breaking API changes and removal of legacy inheritance/serialization paths are intentional; no compatibility shims.
-- This is a sequential local-commit slice of PR 27 with no intervening sync. Intermediate breakage from downstream slices is allowed. Record specific verification blockers and hand them forward; do not add temporary bridges. PR 27.5 must close all integration gaps.
+- This is a sequential implementation slice of PR 27. Intermediate breakage from downstream slices is allowed. Record specific verification blockers and hand them forward; do not add temporary bridges. PR 27.5 must close all integration gaps.
