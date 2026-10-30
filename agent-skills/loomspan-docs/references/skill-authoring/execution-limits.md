@@ -41,6 +41,35 @@ slot, tool invocation and applicable skill/depth budgets. Request-specific hooks
 run only for actual model requests; independent authorization, lifecycle and
 application approval checks still apply before side effects.
 
+## Captured entry and current settings
+
+One admitted root retains one session across namespace calls:
+
+| Settings | Captured owner |
+| --- | --- |
+| Skill/tool invocations, model calls, provider attempts, linter retries, usage units | Entry generation; shared accumulated counters |
+| Maximum depth, trace persistence and recorded configured quota limits | Entry generation |
+| Definition, model, connection/credentials, mission timeout | Current executing target generation |
+| Attachment maximum size | Current skill materializing that input |
+
+Six orders model calls plus three pricing calls consume nine of orders' limit of
+twenty. Pricing's session quota applies when pricing is the entry. A smaller child
+quota neither resets nor reduces the entry budget. The trace limit snapshot contains
+the six session quotas only. Publication after admission cannot change these settings.
+
+Each mission timeout starts under existing mission execution behavior; host queue time
+does not create a deadline. A parent timeout keeps running while a child starts its
+own timeout. A 60-second parent that calls a 30-second child after 50 seconds still
+expires on its original budget. Timeout return does not prove arbitrary external work
+stopped or permit early resource retirement. Provider request timeout/retries retain
+their connection behavior. Inputs accepted by a parent can fail child materialization
+under a smaller attachment limit; limits are not combined into a session attachment budget.
+
+Evidence: `DefaultSessionUsageService#quotas`, `LoomspanSessionRunner#executeAdmittedRoot`,
+`MissionWorkExecutor#timeout`, `DefaultMissionInputMaterializer#maxSizeBytes`,
+`SessionUsageServiceTest#namespaceChildrenShareEveryCounterAndUseOnlyCapturedEntryQuotas`,
+and `NamespaceExecutionAuthorityIntegrationTest`.
+
 ## Application shutdown
 
 `loomspan.shutdown.timeout` defaults to `30s` and must be positive. When the owning
@@ -75,6 +104,7 @@ Fixed Java methods remain assigned to their original namespace across replacemen
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
-and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+and installation, retained reachable admission and captured target dispatch.
+Serialized observation/Console integration remains PR 27.5.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

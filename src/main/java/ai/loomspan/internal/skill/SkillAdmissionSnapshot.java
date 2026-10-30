@@ -18,6 +18,11 @@ public record SkillAdmissionSnapshot(SkillIdentity entry, Map<String, SkillGener
     }
 
     public SkillGeneration entryGeneration() { return generations.get(entry.namespace()); }
+    public ai.loomspan.internal.core.CapabilityMetadata resolve(SkillIdentity identity) {
+        var capability = generation(identity.namespace()).capability(identity.toString());
+        if (capability == null) throw new IllegalArgumentException("Unknown captured capability '" + identity + "'");
+        return capability;
+    }
     public SkillGeneration generation(String namespace) {
         var generation = generations.get(namespace);
         if (generation == null) throw new IllegalArgumentException("Namespace '" + namespace + "' was not captured");

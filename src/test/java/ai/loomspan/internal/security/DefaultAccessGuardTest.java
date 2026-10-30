@@ -23,44 +23,60 @@ class DefaultAccessGuardTest {
 
     @Test
     void allowsUnprotectedCapabilityWithoutAuthentication() {
-        CapabilityMetadata capability = capability("public.skill", Set.of());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
+        CapabilityMetadata capability = capability("default-publicSkill", Set.of());
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", capability.name(), 2);
 
-        assertThat(accessGuard.canAccess(capability, session, null)).isTrue();
-        accessGuard.checkAccess(capability, session, null);
+        assertThat(canAccess(capability, session, null)).isTrue();
+        checkAccess(capability, session, null);
     }
 
     @Test
     void deniesProtectedCapabilityWithoutInvocationOrSessionAuthentication() {
-        CapabilityMetadata capability = capability("protected.skill", Set.of("ALLOWED"));
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
+        CapabilityMetadata capability = capability("default-protectedSkill", Set.of("ALLOWED"));
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", capability.name(), 2);
 
-        assertThat(accessGuard.canAccess(capability, session, null)).isFalse();
-        assertThatThrownBy(() -> accessGuard.checkAccess(capability, session, null))
+        assertThat(canAccess(capability, session, null)).isFalse();
+        assertThatThrownBy(() -> checkAccess(capability, session, null))
                 .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("protected.skill");
+                .hasMessageContaining("default-protectedSkill");
     }
 
     @Test
     void usesSessionAuthenticationWhenInvocationAuthenticationIsNull() {
-        CapabilityMetadata capability = capability("protected.skill", Set.of("ALLOWED"));
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
+        CapabilityMetadata capability = capability("default-protectedSkill", Set.of("ALLOWED"));
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", capability.name(), 2);
         session.setAuthentication(authentication("ROLE_ALLOWED"));
 
         assertThat(accessGuard.resolveAuthentication(null, session)).isEqualTo(session.getAuthentication().orElseThrow());
-        assertThat(accessGuard.canAccess(capability, session, null)).isTrue();
+        assertThat(canAccess(capability, session, null)).isTrue();
     }
 
     @Test
     void prefersInvocationAuthenticationOverSessionAuthentication() {
-        CapabilityMetadata capability = capability("protected.skill", Set.of("ALLOWED"));
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "test.entry", 2);
+        CapabilityMetadata capability = capability("default-protectedSkill", Set.of("ALLOWED"));
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", capability.name(), 2);
         session.setAuthentication(authentication("ROLE_ALLOWED"));
         Authentication invocationAuthentication = authentication("ROLE_OTHER");
 
         assertThat(accessGuard.resolveAuthentication(invocationAuthentication, session)).isEqualTo(invocationAuthentication);
-        assertThat(accessGuard.canAccess(capability, session, invocationAuthentication)).isFalse();
-        assertThat(accessGuard.canAccess(capability, session, authentication("ROLE_ALLOWED"))).isTrue();
+        assertThat(canAccess(capability, session, invocationAuthentication)).isFalse();
+        assertThat(canAccess(capability, session, authentication("ROLE_ALLOWED"))).isTrue();
+    }
+
+    private boolean canAccess(CapabilityMetadata capability, LoomspanSession session, Authentication authentication) {
+        return ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(rootBinding(capability, session),
+                () -> accessGuard.canAccess(capability, session, authentication));
+    }
+    private void checkAccess(CapabilityMetadata capability, LoomspanSession session, Authentication authentication) {
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(rootBinding(capability, session),
+                () -> accessGuard.checkAccess(capability, session, authentication));
+    }
+    private ai.loomspan.internal.core.ExecutionBinding rootBinding(CapabilityMetadata capability, LoomspanSession session) {
+        var generation = new ai.loomspan.internal.skill.SkillGeneration("default", "captured",
+                java.util.Map.of(capability.name(), capability), java.util.Map.of(), null,
+                new ai.loomspan.internal.runtime.observation.catalog.DefaultRegisteredSkillCatalog(java.util.List.of(), java.util.Map.of()));
+        return ai.loomspan.internal.core.ExecutionBinding.sessionOnly(session,
+                new ai.loomspan.internal.skill.SkillAdmissionSnapshot(capability.identity(), java.util.Map.of("default", generation)));
     }
 
     private static CapabilityMetadata capability(String name, Set<String> roles) {

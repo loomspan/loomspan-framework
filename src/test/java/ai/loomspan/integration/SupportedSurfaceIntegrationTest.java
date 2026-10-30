@@ -161,6 +161,8 @@ class SupportedSurfaceIntegrationTest
                             assertThat(admitted.invoke()).isEqualTo("REST: handed-off");
                             assertThat(SupportedSkillConfiguration.lastInvocation.get().generationId())
                                     .isEqualTo(admitted.generationId());
+                            assertThat(SupportedSkillConfiguration.lastInvocation.get().skillName())
+                                    .isEqualTo("default-supportedRestLeaf");
                             admitted.release();
                             assertThat(SupportedSkillConfiguration.handlerAuthentication)
                                     .hasValue("supported-caller");

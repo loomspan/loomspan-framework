@@ -95,11 +95,15 @@ public class ExecutionCoordinator
         {
             throw new IllegalArgumentException("Explicit session does not match the current execution binding.");
         }
-        if (!baseBinding.generation().owns(rootCapability))
+        var targetGeneration = baseBinding.snapshot().generation(rootCapability.identity().namespace());
+        if (!targetGeneration.owns(rootCapability))
             throw new IllegalArgumentException("Capability '" + rootCapability.name()
                     + "' does not belong to the current skill generation");
+        accessGuard.checkAccess(rootCapability, session, authentication);
         YamlSkillDefinition definition = rootCapability.kind() == CapabilityKind.YAML_SKILL || rootCapability.kind() == CapabilityKind.TYPESAFE_SKILL
-                ? requireYamlSkill(baseBinding, rootCapability.name()) : null;
+                ? targetGeneration.definition(rootCapability.name()) : null;
+        if ((rootCapability.kind() == CapabilityKind.YAML_SKILL || rootCapability.kind() == CapabilityKind.TYPESAFE_SKILL) && definition == null)
+            throw new IllegalArgumentException("Unknown captured YAML skill '" + rootCapability.name() + "'");
         MissionContext parentMission = baseBinding.mission();
         boolean topLevelInvocation = parentMission == null;
         if (topLevelInvocation && !rootCapability.name().equals(session.entrySkill()))
@@ -109,12 +113,12 @@ public class ExecutionCoordinator
 
         MissionContext mission = new MissionContext(session, rootCapability.name(), UUID.randomUUID().toString(), parentMission);
         mission.captureInput(missionInput == null ? Map.of() : missionInput);
-        ExecutionBinding missionBinding = baseBinding.withMission(mission);
+        ExecutionBinding missionBinding = baseBinding.withTarget(rootCapability, mission);
         try
         {
             return ExecutionBindingScope.supplyWith(missionBinding, () -> executeBound(
                     definition, rootCapability, objective, missionInput, session, authentication,
-                    mission, parentMission, topLevelInvocation));
+                    mission, baseBinding, topLevelInvocation));
         }
         finally
         {
@@ -129,10 +133,11 @@ public class ExecutionCoordinator
             LoomspanSession session,
             @Nullable Authentication authentication,
             MissionContext mission,
-            @Nullable MissionContext parentMission,
+            ExecutionBinding parentBinding,
             boolean topLevelInvocation)
     {
         String skillName = rootCapability.name();
+        MissionContext parentMission = parentBinding.mission();
 
         LinkedHashMap<String, Object> frameParameters = new LinkedHashMap<>();
         frameParameters.put("objective", objective);
@@ -150,7 +155,6 @@ public class ExecutionCoordinator
 
         try
         {
-            accessGuard.checkAccess(rootCapability, session, authentication);
             if (rootCapability.kind() == CapabilityKind.TYPESAFE_SKILL)
                 return missionWorkExecutor.executeEvaluation(session, definition, missionInput == null ? Map.of() : missionInput);
             if (rootCapability.kind() == CapabilityKind.JAVA_SKILL
@@ -283,8 +287,6 @@ public class ExecutionCoordinator
             }
             if (parentMission != null)
             {
-                ExecutionBinding childBinding = ExecutionBindingScope.requireCurrent();
-                ExecutionBinding parentBinding = childBinding.withMission(parentMission);
                 parentBinding.runIfWritable(() -> {
                     PhysicalBranchContext branch = parentBinding.branch();
                     BranchDiagnosticDelta diagnostics = mission.diagnosticDelta();
@@ -486,29 +488,9 @@ public class ExecutionCoordinator
         return parent == null || parent.isBlank() ? child : parent + "." + child;
     }
 
-    private YamlSkillDefinition requireYamlSkill(ExecutionBinding binding, String skillName)
-    {
-        YamlSkillDefinition definition = binding.generation().definition(skillName);
-        if (definition == null)
-        {
-            throw new IllegalArgumentException("Unknown YAML skill '" + skillName + "'");
-        }
-        return definition;
-    }
-
     private CapabilityMetadata requireCapability(ExecutionBinding binding, String skillName)
     {
-        CapabilityMetadata capability = binding.generation().capability(skillName);
-        if (capability == null)
-        {
-            throw new IllegalArgumentException("Unknown capability '" + skillName + "'");
-        }
-        if (!skillName.equals(capability.name()))
-        {
-            throw new IllegalStateException("Skill generation returned inconsistent registered skill metadata for '"
-                    + skillName + "'");
-        }
-        return capability;
+        return binding.snapshot().resolve(SkillIdentity.parse(skillName));
     }
 
     private static String requireNonBlank(String value, String fieldName)

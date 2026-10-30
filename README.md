@@ -154,7 +154,22 @@ RBAC with temporary leases, then releases them. It creates no session, invokes n
 skill/provider, and reserves no root. Later invocation can fail after dependency,
 authentication, or lifecycle changes; use handoff when reserved admission is needed.
 Admission leases already constructed runtimes. It is not a transaction over external
-systems. Cross-namespace child dispatch and observation integration remain PRs 27.4–27.5.
+systems. Each dispatch independently enforces the executing source's declared children,
+same-namespace or captured Public visibility, and target RBAC. Retaining a generation
+does not authorize its other skills. A Public child cannot call back into a Private
+entry namespace. Observation wire integration remains PR 27.5.
+
+Children execute with their captured target definitions, model/connection credentials,
+mission timeout and attachment limits. One session keeps the entry's quotas, depth and
+trace policy; child usage consumes that entry budget. Parent timeout remains active
+while a child uses its own timeout. Managed workers preserve caller identity through
+standard Spring Security and restore the parent context after success or failure.
+See [execution limits](agent-skills/loomspan-docs/references/skill-authoring/execution-limits.md).
+
+The sole `RestSkillHandler` receives `RestSkillInvocation` with the qualified target
+`skillName`, unchanged business `input`, and the captured target `generationId`.
+For `orders-root` calling `tax-lookup`, this ID belongs to tax; the admitted root's
+ID still belongs to orders. Replacement/removal does not reroute retained REST work.
 
 A prepared update's ID and snapshot identify its candidate, not its base.
 Validation allocates no generation and errors leave candidate metadata incomplete.
@@ -194,8 +209,8 @@ available for direct entry; removal preserves beans and retained work. Restart r
 Private startup state. Hosts authorize management/routing and own readiness/sequencing.
 These boundaries do not provide complete tenant isolation. See the
 [publication guide](agent-skills/loomspan-docs/references/java-api/skill-reload.md).
-Reachable execution admission, cross-namespace dispatch and observation integration
-continue in PRs 27.3–27.5; publication success establishes installation.
+Reachable admission and captured cross-namespace execution are implemented;
+serialized observation and Console integration continue in PR 27.5.
 
 ## Choose your integration
 

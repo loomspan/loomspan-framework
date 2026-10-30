@@ -83,7 +83,8 @@ class ApplicationApiValueTest
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("nested", nested);
 
-        RestSkillInvocation invocation = new RestSkillInvocation("lookup", input, "generation-a");
+        RestSkillInvocation invocation = new RestSkillInvocation("tax-lookup", input, "generation-a");
+        assertThat(invocation.skillName()).isEqualTo("tax-lookup");
         assertThat(invocation.generationId()).isEqualTo("generation-a");
         values.add("late");
         nonStringKeyedValues.add("late");
@@ -103,8 +104,8 @@ class ApplicationApiValueTest
         assertThatThrownBy(() -> ((Map<Object, Object>) copiedNested.get("nonStringKeyed")).put(8, "x"))
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> new RestSkillInvocation(null, Map.of(), "generation-a")).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new RestSkillInvocation("lookup", null, "generation-a")).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new RestSkillInvocation("lookup", Map.of(), null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new RestSkillInvocation("tax-lookup", null, "generation-a")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new RestSkillInvocation("tax-lookup", Map.of(), null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test

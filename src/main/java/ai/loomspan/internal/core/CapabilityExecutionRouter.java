@@ -77,7 +77,7 @@ public class CapabilityExecutionRouter
         {
             throw new IllegalArgumentException("Skill execution requires the current binding for the explicit session.");
         }
-        if (!binding.generation().owns(capability))
+        if (!binding.snapshot().generation(capability.identity().namespace()).owns(capability))
         {
             throw new IllegalArgumentException("Capability '" + capability.name()
                     + "' does not belong to the current skill generation");

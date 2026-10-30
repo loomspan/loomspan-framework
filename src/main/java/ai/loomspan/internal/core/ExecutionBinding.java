@@ -44,6 +44,22 @@ public record ExecutionBinding(
         return new ExecutionBinding(session, Objects.requireNonNull(nextMission, "mission must not be null"), branch, generation, snapshot);
     }
 
+    public SkillGeneration entryGeneration() { return snapshot.entryGeneration(); }
+    public String entryNamespace() { return snapshot.entry().namespace(); }
+    public String currentNamespace() { return generation.namespace(); }
+    public boolean isEntryTarget(CapabilityMetadata target) {
+        return target.identity().equals(snapshot.entry()) && target.name().equals(session.entrySkill());
+    }
+
+    public ExecutionBinding withTarget(CapabilityMetadata target, MissionContext nextMission)
+    {
+        SkillGeneration selected = snapshot.generation(target.identity().namespace());
+        if (!selected.owns(target)) throw new IllegalArgumentException("Target must belong to the captured generation");
+        if (!target.name().equals(nextMission.skillName()))
+            throw new IllegalArgumentException("Target must match the next mission");
+        return new ExecutionBinding(session, nextMission, branch, selected, snapshot);
+    }
+
     public ExecutionBinding forkBranch()
     {
         return new ExecutionBinding(session, mission, branch.fork(), generation, snapshot);

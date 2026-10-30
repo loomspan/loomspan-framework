@@ -308,7 +308,7 @@ public class DefaultPlanningService implements PlanningService
                     .filter(Objects::nonNull)
                     .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
             PlanStructureValidationResult structureValidation = planStructureValidator.validate(
-                    attemptResult.planTree(), visibleCapabilityNames);
+                    attemptResult.planTree(), visibleCapabilityNames, capabilityName);
             if (structureValidation.hasErrors())
             {
                 String combinedFeedback = structureValidation.retryFeedback();

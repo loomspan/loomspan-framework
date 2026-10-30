@@ -23,7 +23,11 @@ public class DefaultSkillVisibilityResolver implements SkillVisibilityResolver
     @Override
     public List<CapabilityMetadata> visibleSkillsFor(String currentSkillName, LoomspanSession session, @Nullable Authentication authentication)
     {
-        SkillGeneration generation = ExecutionBindingScope.requireCurrent().generation();
+        var binding = ExecutionBindingScope.requireCurrent();
+        if (binding.session() != session || binding.mission() == null
+                || !currentSkillName.equals(binding.mission().skillName()))
+            throw new IllegalArgumentException("Discovery requires the current source mission and session");
+        SkillGeneration generation = binding.generation();
         YamlSkillDefinition currentSkill = generation.definition(currentSkillName);
 
         if (currentSkill == null)
@@ -39,7 +43,7 @@ public class DefaultSkillVisibilityResolver implements SkillVisibilityResolver
             {
                 continue;
             }
-            CapabilityMetadata metadata = generation.capability(allowedSkillName);
+            CapabilityMetadata metadata = binding.snapshot().resolve(ai.loomspan.internal.core.SkillIdentity.parse(allowedSkillName));
             if (metadata == null || !accessGuard.canAccess(metadata, session, authentication))
             {
                 continue;

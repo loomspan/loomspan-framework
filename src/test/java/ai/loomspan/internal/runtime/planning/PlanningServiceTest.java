@@ -1212,7 +1212,7 @@ class PlanningServiceTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-no-tools", "test.entry", 3);
-        SimpleChatClient chatClient = new SimpleChatClient(emptyPlan("plan-no-tools"), "done");
+        SimpleChatClient chatClient = new SimpleChatClient(new ExecutionPlan("plan-no-tools", "default-duplicateInvoiceChecker", Instant.parse("2026-03-15T12:00:00Z"), List.of()), "done");
 
         initializePlan(planningService, session, "check invoice", null, rootDefinition("duplicateInvoiceChecker"), chatClient, List.of());
 

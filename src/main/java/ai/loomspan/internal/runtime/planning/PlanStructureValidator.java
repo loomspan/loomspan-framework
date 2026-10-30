@@ -27,7 +27,7 @@ final class PlanStructureValidator
     private static final String GROUP_GRAMMAR = "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$";
     private static final Pattern GROUP_PATTERN = Pattern.compile(GROUP_GRAMMAR);
 
-    PlanStructureValidationResult validate(JsonNode planTree, Set<String> visibleCapabilityNames)
+    PlanStructureValidationResult validate(JsonNode planTree, Set<String> visibleCapabilityNames, String executingName)
     {
         Set<String> visibleNames = visibleCapabilityNames == null ? Set.of() : Set.copyOf(visibleCapabilityNames);
         List<PlanStructureIssue> issues = new ArrayList<>();
@@ -35,6 +35,11 @@ final class PlanStructureValidator
         {
             issues.add(issue(PLAN_STRUCTURE, "Plan root must be an object with a tasks array."));
             return new PlanStructureValidationResult(issues);
+        }
+        if (executingName != null) {
+            String selected = canonicalSelection(planNode, issues, "Plan root");
+            if (selected != null && !executingName.equals(selected))
+                issues.add(issue(PLAN_STRUCTURE, "Plan root capabilityName must match executing skill '" + executingName + "'."));
         }
         JsonNode tasksNode = planNode.get("tasks");
         if (!(tasksNode instanceof ArrayNode tasks))
@@ -88,9 +93,10 @@ final class PlanStructureValidator
                         "%s field 'capabilityName' must be a nonblank string naming an exact visible capability."
                                 .formatted(label)));
             }
-            else if (!visibleNames.contains(capabilityNode.textValue()))
+            else
             {
-                issues.add(issue(PLAN_STRUCTURE,
+                String selected = canonicalSelection(task, issues, label);
+                if (selected != null && !visibleNames.contains(selected)) issues.add(issue(PLAN_STRUCTURE,
                         "%s field 'capabilityName' value '%s' is not an exact visible capability name."
                                 .formatted(label, capabilityNode.textValue())));
             }
@@ -254,5 +260,18 @@ final class PlanStructureValidator
     private static PlanStructureIssue issue(String code, String message)
     {
         return new PlanStructureIssue(code, message);
+    }
+
+    private static String canonicalSelection(ObjectNode node, List<PlanStructureIssue> issues, String label) {
+        var value = node.get("capabilityName");
+        try {
+            if (value == null || !value.isTextual()) throw new IllegalArgumentException("capabilityName must be a string");
+            String canonical = ai.loomspan.internal.core.SkillIdentity.parse(value.textValue()).toString();
+            node.put("capabilityName", canonical);
+            return canonical;
+        } catch (IllegalArgumentException ex) {
+            issues.add(issue(PLAN_STRUCTURE, label + " invalid capabilityName: " + ex.getMessage()));
+            return null;
+        }
     }
 }

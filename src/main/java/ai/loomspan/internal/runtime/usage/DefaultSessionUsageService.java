@@ -30,7 +30,7 @@ public class DefaultSessionUsageService implements SessionUsageService
     {
         return ExecutionBindingScope.current()
                 .filter(binding -> binding.session() == session)
-                .map(binding -> binding.generation().runtime())
+                .map(binding -> binding.entryGeneration().runtime())
                 .filter(Objects::nonNull)
                 .map(runtime -> runtime.properties().getSession().getQuotas())
                 .orElse(quotas);

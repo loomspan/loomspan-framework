@@ -30,13 +30,13 @@ class SpringAiToolCallbackAdapterTest
                   "additionalProperties": false
                 }
                 """;
-        BoundCapability capability = capability("rankTransportOptions", schema);
+        BoundCapability capability = capability("a_b-rankTransportOptions", schema);
 
         List<ToolCallback> callbacks = SpringAiToolCallbackAdapter.adapt(List.of(capability));
 
         assertThat(callbacks).hasSize(1);
-        assertThat(callbacks.getFirst().getToolDefinition().name()).isEqualTo("rankTransportOptions");
-        assertThat(callbacks.getFirst().getToolDefinition().description()).isEqualTo("rankTransportOptions");
+        assertThat(callbacks.getFirst().getToolDefinition().name()).isEqualTo("a_b-rankTransportOptions");
+        assertThat(callbacks.getFirst().getToolDefinition().description()).isEqualTo("a_b-rankTransportOptions");
         assertThat(objectMapper.readTree(callbacks.getFirst().getToolDefinition().inputSchema()))
                 .isEqualTo(objectMapper.readTree(schema));
         assertThat(objectMapper.readTree(callbacks.getFirst().getToolDefinition().inputSchema())

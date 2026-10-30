@@ -46,7 +46,11 @@ final class SpringAiChatClientAssembler
     {
         this(chatModelResolver, optionsContributor, skillAdvisorResolver, executionStateService,
                 modelUsageExtractor, sessionUsageService,
-                model -> ChatClient.builder(model, observationRegistry, null, null));
+                model -> ChatClient.builder(model, observationRegistry, null, null,
+                        org.springframework.ai.chat.client.advisor.ToolCallingAdvisor.builder()
+                                .toolCallingManager(new CanonicalToolCallingManager(
+                                        org.springframework.ai.model.tool.ToolCallingManager.builder()
+                                                .observationRegistry(observationRegistry).build()))));
     }
 
     SpringAiChatClientAssembler(SkillChatModelResolver chatModelResolver,

@@ -1194,7 +1194,12 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                     return new ParsedStepAction(StepAction.finalResponse(node), null);
                 }
             }
+            parsed = parsed.canonicalSelection();
             return new ParsedStepAction(parsed, null);
+        }
+        catch (IllegalArgumentException ex)
+        {
+            return new ParsedStepAction(null, new StepActionCorrection.Failure("Invalid tool identity: " + ex.getMessage()));
         }
         catch (JacksonException ex)
         {

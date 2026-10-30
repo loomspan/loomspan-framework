@@ -160,7 +160,9 @@ class JavaSkillMissionCutoffTest
             public String execute(String skillName, String objective, LoomspanSession session,
                     org.springframework.security.core.Authentication authentication)
             {
-                return TestExecutionBindings.callWithGeneration(session, generation,
+                return ExecutionBindingScope.supplyWith(ExecutionBinding.sessionOnly(session,
+                        new ai.loomspan.internal.skill.SkillAdmissionSnapshot(SkillIdentity.parse(skillName),
+                                Map.of(generation.namespace(), generation))),
                         () -> super.execute(skillName, objective, session, authentication));
             }
         };

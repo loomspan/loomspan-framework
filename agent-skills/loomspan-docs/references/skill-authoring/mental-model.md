@@ -48,9 +48,9 @@ raw YAML, prompts and original evidence expression text remain unchanged. Renami
 a namespace means creating another namespace, updating references explicitly, and
 removing the old namespace; there is no identity-preserving rename or inheritance.
 
-**Sequential implementation boundary:** Namespace parsing, startup, publication/removal,
-and retained reachable root admission are implemented through PR 27.3. Cross-namespace
-child dispatch and observation integration remain PRs 27.4–27.5.
+**Implementation boundary:** Namespace parsing, startup, publication/removal, retained
+reachable admission and captured cross-namespace execution are implemented.
+Serialized observation and Console integration remain PR 27.5.
 
 Each root captures an immutable association of exactly the namespace generations reached
 by its declared child graph, before input conversion or validation. Every declared branch
@@ -133,7 +133,7 @@ A YAML skill can be a root in one tree and a nested specialist in another if its
 
 `allowed_skills` defines the candidate child Java, REST, TypeSafe, or model-backed YAML skills for one LLM-backed skill. It is not transitive.
 
-If a root allows `investigateNetwork`, and `investigateNetwork` allows `checkDns`, the root sees `investigateNetwork`; it does not automatically see `checkDns`.
+If a root allows `network-investigate`, and that skill allows `network-checkDns`, the root sees `network-investigate`; it does not automatically see `network-checkDns`.
 
 Runtime authorization filters the declared tool surface again; see [authorization](authorization.md) for JSR-250, YAML roles, and trusted caller scope. Visibility is not authorization by itself, and authorization is enforced at execution as well as discovery.
 
@@ -150,7 +150,7 @@ When an LLM-backed YAML skill invokes another LLM-backed YAML skill:
 - the child uses its own model, prompt, allowed skills, plan, and property-level output evidence requirements;
 - the child owns an isolated plan and successful-direct-skill set, and the exact parent mission resumes after the child returns or fails;
 - the parent observes the child capability result, not the child's internal tool surface or evidence ledger.
-- every branch preserves the root's authoritative retained namespace association, even if a newer generation becomes active; cross-namespace dispatch integration follows in PR 27.4.
+- every branch preserves the root's authoritative retained namespace association, caller and session; current generation follows the executing target and the exact parent binding resumes after success or failure. See [execution limits](execution-limits.md) for the entry/current settings split.
 
 This isolation is intentional. A parent contract should describe the child capability it invokes rather than coupling itself to the child's internal leaves.
 
@@ -239,6 +239,7 @@ Fixed Java methods remain assigned to their original namespace across replacemen
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
-and installation plus retained reachable admission; cross-namespace child dispatch follows in PR 27.4.
+and installation, retained reachable admission and captured cross-namespace execution.
+Serialized observation/Console integration remains PR 27.5.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

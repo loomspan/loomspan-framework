@@ -7,7 +7,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Immutable application handoff for one REST skill invocation. */
+/**
+ * Immutable application handoff for one REST skill invocation.
+ * {@code skillName} is the canonical qualified target identity ({@code namespace-localName}).
+ * {@code input} preserves the validated, reference-resolved business values.
+ * {@code generationId} identifies the captured executing target generation, which may differ
+ * from the admitted root's entry generation. These identities are captured during preparation,
+ * independent of current publication and business input.
+ */
 public record RestSkillInvocation(String skillName, Map<String, Object> input, String generationId)
 {
     public RestSkillInvocation

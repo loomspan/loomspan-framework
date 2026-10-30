@@ -114,15 +114,15 @@ class SpringAiChatClientAssemblerIntegrationTest
                 new LoomspanProperties().getSession().getQuotas(), new NoOpUsageMetricsRecorder());
         DefaultExecutionStateService state = new DefaultExecutionStateService(Clock.systemUTC(), usage);
         var resolver = (ai.loomspan.internal.chat.SkillAdvisorResolver) ignored -> List.of(
-                new LinterCallAdvisor("test.skill", "regex", Pattern.compile("^OK:.*$"), "Return OK", 1, fact -> { }));
+                new LinterCallAdvisor("default-test", "regex", Pattern.compile("^OK:.*$"), "Return OK", 1, fact -> { }));
         SpringAiModelInteractionFactory factory = new SpringAiModelInteractionFactory(
                 (skill, configuration) -> runtime, resolver, state, new ModelUsageExtractor(), usage,
                 new SpringAiChatOptionsContributor(), ObservationRegistry.NOOP);
-        LoomspanSession session = TestLoomspanSessions.withId("assembler", "test.skill", 8);
+        LoomspanSession session = TestLoomspanSessions.withId("assembler", "default-test", 8);
         var binding = ai.loomspan.internal.core.TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> {
-            state.openMissionFrame(session, "test.skill", Map.of());
-            state.openFrame(session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
+            state.openMissionFrame(session, "default-test", Map.of());
+            state.openFrame(session, TraceFrameType.MODEL_CALL, "default-test#model", Map.of());
         });
         AtomicInteger executions = new AtomicInteger();
         AtomicReference<Map<String, Object>> observedArguments = new AtomicReference<>();
@@ -143,14 +143,14 @@ class SpringAiChatClientAssemblerIntegrationTest
                     factory.create(definition, mode).call(new ModelInteractionRequest(
                             "system", new RenderedMissionInput("user", List.of(), Map.of()),
                             new ModelTraceContext(ModelExecutionIdentity.from(definition.requireExecutionConfiguration()),
-                                    "test.skill", "mission"), capabilities, false)).content());
+                                    "default-test", "mission"), capabilities, false)).content());
         }
     }
 
     private static YamlSkillDefinition definition()
     {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("test.skill");
+        manifest.setName("test");
         return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest,
                 new EffectiveSkillExecutionConfiguration("gpt-test", "openai", AiDriver.OPENAI, "gpt-test", null));
     }
@@ -158,9 +158,9 @@ class SpringAiChatClientAssemblerIntegrationTest
     private static BoundCapability capability(AtomicInteger executions,
             AtomicReference<Map<String, Object>> observedArguments)
     {
-        CapabilityMetadata metadata = new CapabilityMetadata("test:lookup", "lookup", "Look up",
+        CapabilityMetadata metadata = new CapabilityMetadata("test:lookup", "tax-lookup", "Look up",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), ignored -> null, CapabilityKind.YAML_SKILL,
-                new CapabilityToolDescriptor("lookup", "Look up",
+                new CapabilityToolDescriptor("tax-lookup", "Look up",
                         "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}", null),
                 SkillInputContract.genericObject(), null);
         return new BoundCapability(metadata, java.util.List.of(), (arguments, task, sourceResults) -> {
@@ -180,7 +180,7 @@ class SpringAiChatClientAssemblerIntegrationTest
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
                 {"id":"tool","object":"chat.completion","created":1,"model":"gpt-test",
                  "choices":[{"index":0,"message":{"role":"assistant","content":null,
-                  "tool_calls":[{"id":"%s","type":"function","function":{"name":"lookup","arguments":"%s"}}]},"finish_reason":"tool_calls"}],
+                  "tool_calls":[{"id":"%s","type":"function","function":{"name":"Tax-lookup","arguments":"%s"}}]},"finish_reason":"tool_calls"}],
                  "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
                 """.formatted(id, arguments));
     }

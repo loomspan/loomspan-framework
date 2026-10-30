@@ -18,7 +18,11 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 
 /** Metadata-only outgoing contract validation, reusable with a captured namespace view. */
-final class SkillDependencyValidator {
+public final class SkillDependencyValidator {
+    public static boolean allowsNamespace(String sourceNamespace, String targetNamespace,
+            ai.loomspan.api.NamespaceVisibility targetVisibility) {
+        return sourceNamespace.equals(targetNamespace) || targetVisibility == ai.loomspan.api.NamespaceVisibility.PUBLIC;
+    }
     private final SkillInputContractResolver inputs;
     private final List<CapabilityMetadata> fixedJavaCapabilities;
     private final List<String> fixedRestHandlerBeanNames;
@@ -336,7 +340,7 @@ final class SkillDependencyValidator {
                 continue;
             }
             var targetVisibility = targetNamespace.equals(candidateNamespace) ? candidateVisibility : external.get(targetNamespace).visibility();
-            if (!source.identity().namespace().equals(targetNamespace) && targetVisibility != ai.loomspan.api.NamespaceVisibility.PUBLIC)
+            if (!allowsNamespace(source.identity().namespace(), targetNamespace, targetVisibility))
                 issues.add(error(source, "allowed_skills", "Foreign namespace '" + targetNamespace + "' is Private for child '" + child + "'"));
             YamlSkillDefinition target = definitions.get(child);
             if (target != null) visit(target, candidateNamespace, candidateVisibility, external, definitions, names,

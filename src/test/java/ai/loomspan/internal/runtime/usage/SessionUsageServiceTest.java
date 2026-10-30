@@ -29,6 +29,97 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SessionUsageServiceTest {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(GuardrailType.class)
+    void eachQuotaEnforcesTheEntryLimitWhileExecutingInAnotherNamespace(GuardrailType category) {
+        var settings = new LoomspanProperties();
+        var limits = quotas(0, 0, 0, 0, 0); limits.setMaxProviderAttempts(0);
+        switch (category) {
+            case MAX_SKILL_INVOCATIONS -> limits.setMaxSkillInvocations(2);
+            case MAX_TOOL_INVOCATIONS -> limits.setMaxToolInvocations(2);
+            case MAX_LINTER_RETRIES -> limits.setMaxLinterRetries(2);
+            case MAX_MODEL_CALLS -> limits.setMaxModelCalls(2);
+            case MAX_PROVIDER_ATTEMPTS -> limits.setMaxProviderAttempts(2);
+            case MAX_USAGE_UNITS -> limits.setMaxUsageUnits(2);
+        }
+        settings.getSession().setQuotas(limits);
+        var childSettings = new LoomspanProperties(); childSettings.getSession().setQuotas(quotas(100,100,100,100,100));
+        var entry = generation("orders", settings); var child = generation("pricing", childSettings);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("entry" + category, "orders-root", 8);
+        var snapshot = new ai.loomspan.internal.skill.SkillAdmissionSnapshot(ai.loomspan.internal.core.SkillIdentity.parse("orders-root"), Map.of("orders",entry,"pricing",child));
+        var parent = ai.loomspan.internal.core.ExecutionBinding.sessionOnly(session,snapshot).withMission(new ai.loomspan.internal.core.MissionContext(session,"orders-root","parent",null));
+        parent.branch().push(new ExecutionFrame("frame",null,OperationType.CAPABILITY,TraceFrameType.ROOT_MISSION,"orders-root",Map.of(),Instant.now()));
+        var nested = new ai.loomspan.internal.core.ExecutionBinding(session,new ai.loomspan.internal.core.MissionContext(session,"pricing-child","child",parent.mission()),parent.branch(),child,snapshot);
+        var service = new DefaultSessionUsageService(childSettings.getSession().getQuotas(),new NoOpUsageMetricsRecorder());
+        Runnable consume = () -> {
+            switch (category) {
+                case MAX_SKILL_INVOCATIONS -> service.recordMissionStart(session,"pricing-child");
+                case MAX_TOOL_INVOCATIONS -> service.recordToolCall(session,"orders-root","pricing-child");
+                case MAX_LINTER_RETRIES -> service.recordLinterOutcome(session,outcome(LinterOutcomeStatus.RETRYING,0,1));
+                case MAX_PROVIDER_ATTEMPTS -> service.reserveProviderAttempt(session,"pricing-child");
+                case MAX_MODEL_CALLS, MAX_USAGE_UNITS -> service.recordModelResponse(session,"pricing-child",IDENTITY,new ModelUsageRecord(1,0,1,UsagePrecision.EXACT,null));
+            }
+        };
+        ExecutionBindingScope.runWith(parent,consume);
+        ExecutionBindingScope.runWith(nested, () -> {
+            consume.run();
+            assertThatThrownBy(consume::run).isInstanceOf(LoomspanQuotaExceededException.class)
+                    .extracting("guardrailType","limit","observed").containsExactly(category,2L,3L);
+        });
+    }
+
+    @Test void namespaceChildrenShareEveryCounterAndUseOnlyCapturedEntryQuotas() {
+        var entryProperties = new LoomspanProperties();
+        entryProperties.getSession().setQuotas(quotas(20, 20, 20, 20, 40));
+        entryProperties.getSession().getQuotas().setMaxProviderAttempts(20);
+        var childProperties = new LoomspanProperties();
+        childProperties.getSession().setQuotas(quotas(1, 1, 1, 1, 2));
+        childProperties.getSession().getQuotas().setMaxProviderAttempts(1);
+        var entry = generation("orders", entryProperties);
+        var child = generation("pricing", childProperties);
+        var snapshot = new ai.loomspan.internal.skill.SkillAdmissionSnapshot(
+                ai.loomspan.internal.core.SkillIdentity.parse("orders-root"), Map.of("orders", entry, "pricing", child));
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("shared", "orders-root", 8);
+        var parent = ai.loomspan.internal.core.ExecutionBinding.sessionOnly(session, snapshot)
+                .withMission(new ai.loomspan.internal.core.MissionContext(session, "orders-root", "parent", null));
+        var nested = new ai.loomspan.internal.core.ExecutionBinding(session,
+                new ai.loomspan.internal.core.MissionContext(session, "pricing-child", "child", parent.mission()), parent.branch(), child, snapshot);
+        parent.branch().push(new ExecutionFrame("frame", null, OperationType.CAPABILITY,
+                TraceFrameType.ROOT_MISSION, "orders-root", Map.of(), Instant.now()));
+        var service = new DefaultSessionUsageService(childProperties.getSession().getQuotas(), new NoOpUsageMetricsRecorder());
+        Runnable consume = () -> {
+            service.recordMissionStart(session, "orders-root");
+            service.recordToolCall(session, "orders-root", "pricing-child");
+            service.recordModelResponse(session, "pricing-child", IDENTITY, new ModelUsageRecord(1, 1, 2, UsagePrecision.EXACT, null));
+            service.reserveProviderAttempt(session, "pricing-child");
+            service.recordLinterOutcome(session, outcome(LinterOutcomeStatus.RETRYING, 0, 1));
+        };
+        ExecutionBindingScope.runWith(parent, () -> { for (int i = 0; i < 6; i++) consume.run(); });
+        ExecutionBindingScope.runWith(nested, () -> { for (int i = 0; i < 3; i++) consume.run(); });
+        assertThat(service.snapshot(session)).isEqualTo(new SessionUsageSnapshot(9, 9, 9, 9, 9, 9, 9, 18, 9, 0, 0));
+        // A direct entry into pricing uses pricing's own captured quota.
+        var directSession = ai.loomspan.internal.core.TestLoomspanSessions.withId("direct", "pricing-child", 8);
+        var direct = ai.loomspan.internal.core.ExecutionBinding.sessionOnly(directSession,
+                new ai.loomspan.internal.skill.SkillAdmissionSnapshot(ai.loomspan.internal.core.SkillIdentity.parse("pricing-child"), Map.of("pricing", child)));
+        ExecutionBindingScope.runWith(direct, () -> {
+            service.recordModelResponse(directSession, "pricing-child", IDENTITY, new ModelUsageRecord(0, 0, 0, UsagePrecision.EXACT, null));
+            assertThatThrownBy(() -> service.recordModelResponse(directSession, "pricing-child", IDENTITY,
+                    new ModelUsageRecord(0, 0, 0, UsagePrecision.EXACT, null))).isInstanceOf(LoomspanQuotaExceededException.class);
+        });
+        ExecutionBindingScope.runWith(nested, () -> {
+            for (int i = 9; i < 20; i++) consume.run();
+            assertThatThrownBy(consume::run).isInstanceOf(LoomspanQuotaExceededException.class)
+                    .extracting("guardrailType", "limit").containsExactly(GuardrailType.MAX_SKILL_INVOCATIONS, 20L);
+        });
+    }
+
+    private static ai.loomspan.internal.skill.SkillGeneration generation(String namespace, LoomspanProperties properties) {
+        var registry = new ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry(Map.of(),
+                org.mockito.Mockito.mock(ai.loomspan.internal.springai.SpringAiProviderIntegration.class));
+        var runtime = new ai.loomspan.internal.skill.ExecutionRuntime(properties,
+                ai.loomspan.internal.core.TracePersistencePolicy.NEVER, registry);
+        return new ai.loomspan.internal.skill.SkillGeneration(namespace, namespace + "-captured", Map.of(), Map.of(), null, null, runtime);
+    }
 
     private static final ModelExecutionIdentity IDENTITY =
             new ModelExecutionIdentity("test-model", "test-connection", AiDriver.OPENAI, "provider-model");

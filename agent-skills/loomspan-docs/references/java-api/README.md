@@ -99,7 +99,7 @@ relevant topic set.
 | Execution observations | Source-verified | Immutable view/event values, normalization, detail-value constraints, and trust boundary |
 | Facade failures | Source-verified | Validation, authorization, safe wrapping, observer failures, and fatal errors |
 | Configuration properties | Not documented here | Public configuration behavior is user-facing but its binding types are not application Java API |
-| Framework extension SPI | Source-verified | `RestSkillHandler` is the sole supported SPI; no internal bean-replacement contract |
+| Framework extension SPI | Source-verified | `RestSkillHandler` is the sole supported SPI; qualified target identity and captured target generation ID; no internal bean-replacement contract |
 
 ## Normative Language
 
@@ -108,4 +108,4 @@ relevant topic set.
 - **SHOULD / SHOULD NOT** identifies the recommended application default.
 - **MAY** identifies an optional supported choice.
 
-Publication coverage: complete namespace management, captured metadata preparation, Private startup and removal/recreation are implemented and covered by `SkillReloaderTest`, `SkillDependencyValidatorTest` and `NamespaceStartupIntegrationTest`. Reachable snapshot/admission and temporary validation are covered by `SkillAdmissionSnapshotTest`, `SkillAdmissionContractsTest`, and `SkillReachableAdmissionTest`. Cross-namespace dispatch and observation integration remain PRs 27.4-27.5.
+Publication coverage: complete namespace management, captured metadata preparation, Private startup and removal/recreation are implemented and covered by `SkillReloaderTest`, `SkillDependencyValidatorTest` and `NamespaceStartupIntegrationTest`. Reachable snapshot/admission and temporary validation are covered by `SkillAdmissionSnapshotTest`, `SkillAdmissionContractsTest`, and `SkillReachableAdmissionTest`. Captured cross-namespace dispatch and target REST identities are verified by `NamespaceExecutionAuthorityIntegrationTest`. Serialized observation/Console integration remains PR 27.5.

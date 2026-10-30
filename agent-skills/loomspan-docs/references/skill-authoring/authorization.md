@@ -62,6 +62,15 @@ Use Spring's documented `GrantedAuthorityDefaults` bean configuration when the a
 
 A YAML parent's `allowed_skills` names the only candidate children. Java, REST, TypeSafe, and model-backed YAML children are resolved by exact name after startup registration finishes. Missing references fail startup. Authorization then filters this local set for each invocation; `@PermitAll` never makes an undeclared child visible. A denied required child can make a planning or evidence requirement unsatisfiable.
 
+At runtime every ordinary, planned and bound dispatch independently checks the actual
+executing source before switching context. A call MUST be declared directly by that
+source, resolve within the retained snapshot, target either the same namespace or a
+captured Public namespace, and pass the target's role policy. These conditions also
+filter discovery. Public does not bypass roles or declarations; roles do not bypass
+a foreign Private boundary. A Public callee cannot call back into a Private caller,
+even when that caller was the entry. Capturing a whole generation grants no authority
+to its undeclared skills. Java skills remain leaves.
+
 The facade captures the trusted caller authentication. Explicit invocation authentication has priority over session fallback. At Java and REST execution boundaries Loomspan installs a fresh SecurityContext on the actual worker thread and restores the exact previous context in finally. Nested calls and parallel workers carry their caller identity without sharing mutable contexts or mutating session authentication for another invocation.
 
 Manifest and Java policies belong to the immutable generation captured by the root, while authentication remains the actual trusted caller identity evaluated at validation, visibility, and execution boundaries. A newer generation may change policy for newly captured roots, but it neither substitutes policy into an older tree nor freezes/bypasses that tree's live caller authorization checks.
@@ -82,7 +91,8 @@ Fixed Java methods remain assigned to their original namespace across replacemen
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
-and installation plus retained reachable admission; cross-namespace child dispatch follows in PR 27.4.
+and installation, retained reachable admission and independent runtime dispatch.
+Serialized observation/Console integration remains PR 27.5.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.
 
@@ -100,8 +110,11 @@ branches reject even if the caller lacks that child's role. This does not eagerl
 child RBAC, predict branches, or grant access to unrelated skills in a retained namespace.
 Entry RBAC is checked with the operation's captured authentication; actual child role
 checks remain execution boundaries. Already admitted work retains old visibility after
-replacement/removal/recreation. PR 27.4 completes independent dispatch/context checks.
+replacement/removal/recreation. Runtime dispatch repeats source, visibility and role checks.
 
 Evidence: `SkillDependencyValidator#visit`, `DefaultSkillTemplate#authorize`,
 `SkillAdmissionSnapshotTest#validatesEveryIncomingEdgeEvenWhenItsTargetWasAlreadyVisited`,
 and `SkillReachableAdmissionTest#optionalRestrictedChildrenAreCapturedWithoutEagerRbacAndValidationNeverReserves`.
+
+Runtime evidence: `DefaultAccessGuard#hasCallAuthority`, `NamespaceAccessGuardTest`,
+and `NamespaceExecutionAuthorityIntegrationTest`.

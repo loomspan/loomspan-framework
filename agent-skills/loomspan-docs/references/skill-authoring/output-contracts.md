@@ -216,7 +216,7 @@ it Private, or changing its contract after caller preparation does not make publ
 stale, but can reject subsequent admission. Prior admitted work retains its old graph.
 
 Evidence: `SkillDependencyValidator#checkAdmission`, `SkillAdmissionContractsTest`, and
-`SkillReachableAdmissionTest`. Child dispatch and observation consumers remain PRs 27.4–27.5.
+`SkillReachableAdmissionTest`. Captured child dispatch is implemented; observation consumers remain PR 27.5.
 
 ## Presence and nullability
 
@@ -308,6 +308,7 @@ Fixed Java methods remain assigned to their original namespace across replacemen
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
-and installation plus retained reachable admission; cross-namespace child dispatch follows in PR 27.4.
+and installation, retained reachable admission and captured cross-namespace execution.
+Serialized observation/Console integration remains PR 27.5.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

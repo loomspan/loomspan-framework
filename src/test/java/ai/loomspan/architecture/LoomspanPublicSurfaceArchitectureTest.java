@@ -291,6 +291,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.skill.SkillVisibilityResolver", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.skill.SkillGeneration", "Public only as the immutable declaration authority shared across internal runtime packages."),
             Map.entry("ai.loomspan.internal.skill.SkillAdmissionSnapshot", "Public only for immutable captured generation association across internal execution packages."),
+            Map.entry("ai.loomspan.internal.skill.SkillDependencyValidator", "Public only to share preparation and runtime namespace visibility policy across internal packages."),
             Map.entry("ai.loomspan.internal.skill.ExecutionConfigurationParser", "Public only for framework-owned candidate parsing across internal and Spring integration packages."),
             Map.entry("ai.loomspan.internal.skill.ExecutionRuntime", "Public only to carry generation-owned settings and provider resources across internal packages."),
             Map.entry("ai.loomspan.internal.skill.SkillGenerationManager", "Public only for framework-owned generation preparation and auto-configuration composition."),

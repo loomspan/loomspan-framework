@@ -18,6 +18,12 @@ record StepAction(
         @JsonProperty("toolArguments") @Nullable Map<String, Object> toolArguments,
         @JsonProperty("finalResponse") @Nullable JsonNode finalResponse)
 {
+    StepAction canonicalSelection()
+    {
+        return stepAction == StepActionType.CALL_TOOL
+                ? callTool(taskId, ai.loomspan.internal.core.SkillIdentity.parse(toolName).toString(), toolArguments)
+                : this;
+    }
     /**
      * Creates a CALL_TOOL action.
      */
