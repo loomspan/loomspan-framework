@@ -236,8 +236,8 @@ class BindingIsolationIntegrationTest {
                                 var held = workers.submit(() -> template.invoke("root", Map.of("marker", "held", "freshMarker", "incorrect")));
                                 try {
                                     await(entered);
-                                    try (var update = reloader.prepare(List.of(new SkillDocument("new-root", parent("root", true)),
-                                            new SkillDocument("producer", leaf("producer")), new SkillDocument("consumer", leaf("consumer"))))) {
+                                    try (var update = reloader.prepare("default", List.of(new SkillDocument("new-root", parent("root", true)),
+                                            new SkillDocument("producer", leaf("producer")), new SkillDocument("consumer", leaf("consumer"))), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)))) {
                                         reloader.publish(update);
                                     }
                                     assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(captured.generationId());

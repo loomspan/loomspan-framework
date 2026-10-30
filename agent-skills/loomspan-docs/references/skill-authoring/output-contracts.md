@@ -279,3 +279,15 @@ Loomspan then parses and validates the returned JSON. It does not silently coerc
 - `OutputSchemaValidator` defines exact recursive validation. `OutputSchemaValidatorTest#treatsPresenceAndNullabilityAsIndependentConstraints`, `#respectsAdditionalPropertiesForNestedObjects`, `#validatesArrayItemsRecursivelyWithIndexedPaths`, `#escapesPathSignificantPropertyNamesWithoutCollisions`, and `#doesNotEnforceFormatOrDescription` protect the central rules and unambiguous diagnostics.
 - `OutputSchemaPromptAugmentor#renderContract` defines the shared effective-contract text. `OutputSchemaPromptAugmentorTest#augmentsPromptWithCompleteRecursiveEffectiveContractInDeclaredOrder` protects complete deterministic rendering, JSON-quoted enums, canonical escaped paths, and metadata isolation.
 - `OutputSchemaCallAdvisor` owns ordinary schema retries, while `StepPromptBuilder` and `StepLoopMissionExecutionEngine#validateOutputSchema` integrate the same contract with planning final responses. Their focused tests protect both prompt paths and retry behavior.
+
+## Namespace publication boundary
+
+Complete publications require namespace, supplied documents and ExecutionConfiguration.
+Startup namespaces are Private; foreign outgoing references require a Public target.
+Fixed Java methods remain assigned to their original namespace across replacement
+and explicit recreation; withdrawal preserves beans and retained work. There is no
+activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
+for complete signatures, sequencing and retirement. This slice implements preparation
+and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+
+Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

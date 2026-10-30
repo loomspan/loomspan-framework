@@ -124,7 +124,7 @@ class SkillVisibilityResolverTest {
                 () -> catalog, new SkillInputContractResolver(),
                 new org.springframework.beans.factory.support.StaticListableBeanFactory());
         manager.afterSingletonsInstantiated();
-        return manager.active();
+        return manager.active("default");
     }
 
 }

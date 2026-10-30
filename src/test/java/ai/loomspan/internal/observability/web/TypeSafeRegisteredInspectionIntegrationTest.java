@@ -39,7 +39,7 @@ class TypeSafeRegisteredInspectionIntegrationTest {
         String supplied = "# Original supplied document\n" + discovered.replace("{A: null}", "{B: null, C: null}") + "\n";
         String label = " opaque ../ Native: <label> ";
         String previous = reloader.snapshot("default").generationId();
-        reloader.publish(reloader.prepare(List.of(new SkillDocument(label, supplied))));
+        reloader.publish(reloader.prepare("default", List.of(new SkillDocument(label, supplied)), ai.loomspan.testkit.PublicationFixtures.configuration()));
         assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(previous);
         inspect(label, supplied);
     }

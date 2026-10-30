@@ -89,7 +89,7 @@ class DefaultSkillTemplateTest {
         mutableInput.put("payload", "hello");
         var admitted = handoff.handoff("invoiceParser", mutableInput);
         String generationId = admitted.generationId();
-        assertThat(generationId).isEqualTo(registry.manager().active().id()).isNotBlank();
+        assertThat(generationId).isEqualTo(registry.manager().active("default").id()).isNotBlank();
         mutableInput.clear();
         SecurityContextHolder.getContext().setAuthentication(worker);
 
@@ -461,15 +461,42 @@ class DefaultSkillTemplateTest {
                 new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
 
-        assertThatThrownBy(() -> template.invoke("missingSkill", Map.of()))
+        assertThatThrownBy(() -> template.invoke("default-missingSkill", Map.of()))
                 .isInstanceOf(SkillException.class)
                 .hasMessageContaining("Unknown skill");
-        assertThatThrownBy(() -> template.invoke("javaSkill", Map.of()))
+        assertThatThrownBy(() -> template.invoke("default-javaSkill", Map.of()))
                 .isInstanceOf(SkillException.class)
                 .hasMessageContaining("Unknown skill");
-        assertThatThrownBy(() -> template.invoke("bean#javaSkill", Map.of()))
-                .isInstanceOf(SkillException.class)
-                .hasMessageContaining("Unknown skill");
+    }
+
+    @Test
+    void invalidRootReferencesKeepTheFacadeFailureBoundary() {
+        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
+        DefaultSkillTemplate template = new DefaultSkillTemplate(registry.manager(), router,
+                new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock()),
+                new ObjectMapper(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
+        var context = new StaticApplicationContext();
+        var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(2), Executors.newSingleThreadExecutor());
+        var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
+        try {
+            for (String name : List.of("missingSkill", "bean#javaSkill", "n".repeat(33) + "-leaf")) {
+                List<org.assertj.core.api.ThrowableAssert.ThrowingCallable> operations = List.of(
+                        () -> template.validate(name, Map.of()),
+                        () -> template.validate(name, (Object) Map.of()),
+                        () -> template.invoke(name, Map.of()),
+                        () -> template.invoke(name, (Object) Map.of()),
+                        () -> template.invoke(name, Map.of(), view -> { throw new AssertionError("unexpected observer"); }),
+                        () -> template.invoke(name, (Object) Map.of(), view -> { throw new AssertionError("unexpected observer"); }),
+                        () -> handoff.handoff(name, Map.of()),
+                        () -> handoff.handoff(name, (Object) Map.of()));
+                operations.forEach(operation -> assertThatThrownBy(operation)
+                        .isInstanceOf(SkillException.class).hasCauseInstanceOf(IllegalArgumentException.class));
+            }
+            verify(router, never()).execute(any(), any(), any(), any());
+        } finally {
+            lifecycle.destroy();
+        }
     }
 
     @Test

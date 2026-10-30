@@ -31,7 +31,7 @@ class LoomspanAutoConfigurationBoundaryTest
             "LoomspanExceptionTransformer", "executionTraceProperties",
             "skillMethodBeanPostProcessor", "LoomspanSessionRunner", "skillGenerationManager",
             "skillInputContractResolver", "skillInputValidator",
-            "skillCatalog", "skillReloader", "skillRoleEvaluator", "accessGuard", "skillVisibilityResolver", "virtualFileSystem", "refResolver",
+            "skillReloader", "skillRoleEvaluator", "accessGuard", "skillVisibilityResolver", "virtualFileSystem", "refResolver",
             "missionInputMaterializer", "capabilityExecutionRouter", "missionWorkExecutor",
             "skillTemplate", "skillInvocationHandoff", "modelUsageExtractor", "usageMetricsRecorder",
             "sessionUsageService", "executionStateService", "planningService", "toolSurfaceService",

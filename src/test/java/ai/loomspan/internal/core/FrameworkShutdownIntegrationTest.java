@@ -65,7 +65,7 @@ class FrameworkShutdownIntegrationTest
         org.mockito.Mockito.when(router.execute(any(), any(), any(), any())).thenReturn("ok");
         var admitted = handoff.handoff("root", Map.of());
         String generationId = admitted.generationId();
-        assertThat(generationId).isEqualTo(registry.manager().active().id());
+        assertThat(generationId).isEqualTo(registry.manager().active("default").id());
         assertThat(lifecycle.activeRootCount()).isOne();
 
         Thread stopper = Thread.ofVirtual().start(lifecycle::stop);

@@ -61,7 +61,7 @@ Do not load every document by default. Start with the routing entry most relevan
 | Topic | Coverage | Notes |
 | --- | --- | --- |
 | Skill-tree mental model | Initial, source-verified | Shared Java/YAML identity, immutable complete generations, public activation, root capture, local visibility, lifecycle, and nesting |
-| Shared skill identity | Foundation source-verified | Local declarations, canonical qualified references, namespace/combined limits, parsed bindings, duplicates, target feedback and content fidelity; active registry/root/model/observation integration follows in PRs 27.2-27.5 |
+| Shared skill identity | Preparation/publication source-verified | Local declarations, canonical qualified references, namespace/combined limits, parsed bindings, duplicates, target feedback and content fidelity; active namespace registry, Private startup and removal are implemented; reachable root admission, model dispatch and observation integration follow in PRs 27.3-27.5 |
 | Evidence contracts | Source-verified | Immediate-root property annotations, strict scalar/placement rules, Boolean direct-child expressions, planning/final truth sets, metadata isolation, enforcement, nested mission isolation, and separation from complete result delivery and factual correctness |
 | Source verification | Initial | How an LLM should use guide, tests, fixtures, samples, and production code together |
 | Skill-design review | Initial | Cross-cutting questions; not a manifest validator |
@@ -122,3 +122,5 @@ Before accepting a change, verify that an LLM loading only the routed documents 
 - Update the routing and coverage tables whenever a topic is added, its task boundary changes, or its confidence changes.
 
 At the first production release, the repository tag should version this knowledge base with the corresponding source and tests.
+
+Publication coverage: complete namespace management, captured metadata preparation, Private startup and removal/recreation are implemented and covered by `SkillReloaderTest`, `SkillDependencyValidatorTest` and `NamespaceStartupIntegrationTest`. Reachable execution snapshot/admission, cross-namespace dispatch and observation integration remain PRs 27.3–27.5.

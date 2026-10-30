@@ -214,3 +214,15 @@ Do not automatically treat repeated business inputs as runtime metadata. Explici
 ## Coverage Boundary
 
 This document does not define every manifest field or the complete behavior of planning, inputs, outputs, RBAC, attachments, retries, quotas, or traces. Consult [README.md](README.md) for current topic coverage before advising on those areas.
+
+## Namespace publication boundary
+
+Complete publications require namespace, supplied documents and ExecutionConfiguration.
+Startup namespaces are Private; foreign outgoing references require a Public target.
+Fixed Java methods remain assigned to their original namespace across replacement
+and explicit recreation; withdrawal preserves beans and retained work. There is no
+activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
+for complete signatures, sequencing and retirement. This slice implements preparation
+and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+
+Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

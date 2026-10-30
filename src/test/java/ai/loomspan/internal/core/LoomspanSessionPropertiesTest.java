@@ -43,8 +43,8 @@ class LoomspanSessionPropertiesTest {
             assertThat(context.getBean(ExecutionTraceProperties.class).getPersistence()).isEqualTo(TracePersistencePolicy.ONERROR);
             var manager = context.getBean(ai.loomspan.internal.skill.SkillGenerationManager.class);
             context.getBean(LoomspanProperties.class).getSession().setMaxDepth(99);
-            assertThat(manager.active().runtime().properties().getSession().getMaxDepth()).isEqualTo(32);
-            var skillOnly = manager.prepare(java.util.List.of());
+            assertThat(manager.active("default").runtime().properties().getSession().getMaxDepth()).isEqualTo(32);
+            var skillOnly = manager.prepare(manager.capturePreparation("default"), java.util.List.of(), new ExecutionConfiguration("loomspan: {}"), ai.loomspan.api.NamespaceVisibility.PRIVATE, null);
             assertThat(skillOnly.runtime().properties().getSession().getMaxDepth()).isEqualTo(32);
             skillOnly.close();
         });
@@ -143,7 +143,7 @@ class LoomspanSessionPropertiesTest {
             SkillReloader reloader = context.getBean(SkillReloader.class);
             var manager = context.getBean(ai.loomspan.internal.skill.SkillGenerationManager.class);
             LoomspanSessionRunner runner = context.getBean(LoomspanSessionRunner.class);
-            var a = reloader.prepare(java.util.List.of(), new ExecutionConfiguration("""
+            var a = reloader.prepare("default", java.util.List.of(), new ExecutionConfiguration("""
                     loomspan:
                       session:
                         max-depth: 2
@@ -153,10 +153,10 @@ class LoomspanSessionPropertiesTest {
                         persistence: never
                     """));
             reloader.publish(a);
-            var captured = manager.capture();
+            var captured = manager.capture("default");
             try
             {
-                var b = reloader.prepare(java.util.List.of(), new ExecutionConfiguration("""
+                var b = reloader.prepare("default", java.util.List.of(), new ExecutionConfiguration("""
                         loomspan:
                           session:
                             max-depth: 5
@@ -171,10 +171,10 @@ class LoomspanSessionPropertiesTest {
                 assertThat(oldPolicy).isEqualTo(TracePersistencePolicy.NEVER);
                 assertThat(runner.callWithNewSession("test.entry", captured.generation(), LoomspanSession::getMaxDepth))
                         .isEqualTo(2);
-                TracePersistencePolicy newPolicy = runner.callWithNewSession("test.entry", manager.active(),
+                TracePersistencePolicy newPolicy = runner.callWithNewSession("test.entry", manager.active("default"),
                         session -> session.getExecutionTrace().persistencePolicy());
                 assertThat(newPolicy).isEqualTo(TracePersistencePolicy.ALWAYS);
-                assertThat(runner.callWithNewSession("test.entry", manager.active(), LoomspanSession::getMaxDepth))
+                assertThat(runner.callWithNewSession("test.entry", manager.active("default"), LoomspanSession::getMaxDepth))
                         .isEqualTo(5);
                 var usage = context.getBean(ai.loomspan.internal.runtime.usage.SessionUsageService.class);
                 runner.callWithNewSession("test.entry", captured.generation(), session -> {
@@ -183,7 +183,7 @@ class LoomspanSessionPropertiesTest {
                             .isInstanceOf(ai.loomspan.internal.runtime.LoomspanQuotaExceededException.class);
                     return null;
                 });
-                runner.callWithNewSession("test.entry", manager.active(), session -> {
+                runner.callWithNewSession("test.entry", manager.active("default"), session -> {
                     usage.recordMissionStart(session, "test.entry");
                     usage.recordMissionStart(session, "test.entry");
                     return null;

@@ -6,6 +6,7 @@ import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
 import ai.loomspan.internal.core.CapabilityMetadata;
+import ai.loomspan.internal.core.SkillIdentity;
 import ai.loomspan.internal.skill.SkillGeneration;
 import ai.loomspan.internal.skill.SkillGenerationManager;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
@@ -113,7 +114,7 @@ public class DefaultSkillTemplate implements SkillTemplate
 
     PreparedInput prepareObject(String skillName, Object input)
     {
-        SkillGenerationManager.Capture captured = generationManager.capture();
+        SkillGenerationManager.Capture captured = generationManager.capture(rootNamespace(skillName));
         try
         {
             if (input == null)
@@ -139,7 +140,16 @@ public class DefaultSkillTemplate implements SkillTemplate
 
     PreparedInput prepareMap(String skillName, Map<String, Object> input)
     {
-        return prepareMap(generationManager.capture(), skillName, input);
+        return prepareMap(generationManager.capture(rootNamespace(skillName)), skillName, input);
+    }
+
+    private static String rootNamespace(String skillName)
+    {
+        try { return SkillIdentity.parse(skillName).namespace(); }
+        catch (IllegalArgumentException ex)
+        {
+            throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+        }
     }
 
     private PreparedInput prepareMap(SkillGenerationManager.Capture captured, String skillName, Map<String, Object> input)

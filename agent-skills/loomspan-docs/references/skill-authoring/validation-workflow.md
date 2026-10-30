@@ -15,11 +15,11 @@ An application edits YAML skills and needs feedback before staging a complete re
 
 ## Enforced workflow
 
-1. Supply **every proposed YAML document** to `SkillReloader.validate(Collection<SkillDocument>)`. When model connections, aliases, limits, or tracing change with the skills, also supply a complete `ExecutionConfiguration` through `validate(documents, configuration)`. The skill checker then resolves aliases against that candidate. An empty collection proposes removal of all YAML, REST, and TypeSafe skills; fixed Java skills remain. If editing configured files, call `validate()` to reread configured resource locations on each call.
+1. Supply the namespace, **every proposed YAML document**, and required complete `ExecutionConfiguration` to `SkillReloader.validate(namespace, documents, configuration[, visibility])`. Omitted visibility is Private. Empty supplied documents remove previous supplied skills while retaining assigned fixed Java. Hosts load any later file contents themselves.
 2. Check `SkillValidationResult.valid()` before using `skills()` as the complete draft candidate. Each immutable `ValidatedSkill` has the exact callable name and `SkillKind` (`YAML`, `REST`, `TYPESAFE`, or fixed `JAVA`), sorted by exact case-sensitive name. Successful warning-only results keep the complete metadata. Any `ERROR` makes `valid()` false and `skills()` empty, so an empty list by itself does not distinguish failure from a valid empty candidate. Both result lists are immutable and detached from later framework operations.
 3. Inspect `issues()` for severity, source name, optional skill name, optional field path, and message. `<documents>` marks a malformed supplied entry; `<configured-resources>` marks discovery failure. Source names in supplied documents are exact-unique diagnostic labels, not paths or callable skill names.
 4. Correct errors and review warnings. The checker applies preparation's manifest, model, schema, name, child-reference, input-contract, TypeSafe literal/template declaration rules, and REST handler declaration rules. Schema-complexity warnings appear in the result without repeated editor-warning logs. Independent documents can each report a problem; an invalid document may stop its own checks, and dependent child-reference diagnostics may be deferred.
-5. When ready, call the matching `prepare()` or `prepare(documents)` overload, including the same authored execution configuration when applicable. Stage application-owned resources from the prepared candidate's `snapshot()` under its new generation ID, then `publish` that candidate. Close a candidate abandoned before publication.
+5. Call `prepare(namespace, documents, configuration[, visibility])`, stage application-owned resources from its snapshot under the candidate ID, then publish that candidate. Close an abandoned candidate.
 
 ## Limits
 
@@ -31,4 +31,4 @@ Validation is advisory. It creates no candidate or generation ID and does not ch
 - `SkillGenerationManagerTest` covers whole-set parity, fixed declarations, ID continuity, handler construction, and premature validation rejection.
 - `SkillReloaderTest` and `PublicSkillReloadIntegrationTest` protect candidate and public publication behavior.
 - `ExecutionConfigurationParserTest` protects candidate fields, defaults, reference timing, and process-setting rejection.
-- `YamlSkillCatalog.checkedConfigured/checkedSupplied`, `SkillGenerationManager.check`, and `DefaultSkillReloader.validate` own the implementation.
+- `YamlSkillCatalog.checkedConfigured/checkedSupplied`, `SkillDependencyValidator.check`, and `DefaultSkillReloader.validate` own the implementation.

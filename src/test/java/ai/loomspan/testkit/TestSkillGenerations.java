@@ -16,6 +16,11 @@ public final class TestSkillGenerations
 
     private TestSkillGenerations() {}
 
+    public static void activate(ai.loomspan.internal.skill.SkillGenerationManager manager, SkillGeneration generation) {
+        var base = manager.capturePreparation(generation.namespace()).baseId();
+        ai.loomspan.internal.skill.SkillGenerationManager.dispatch(manager.publish(generation, base));
+    }
+
     public static SkillGeneration empty() { return EMPTY; }
 
     public static SkillGeneration of(CapabilityMetadata... capabilities)

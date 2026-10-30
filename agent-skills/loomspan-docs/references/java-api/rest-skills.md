@@ -32,3 +32,15 @@ REST uses the existing public observation shape and direct mission/tool trace re
 - `ApplicationApiValueTest` and `LoomspanPublicSurfaceArchitectureTest` protect shape and boundaries.
 - `SkillGenerationManagerTest` and REST startup tests protect fixed handler selection and generation assembly.
 - `DefaultSkillTemplateTest` and `ExecutionCoordinatorTest` protect facade and lifecycle failures.
+
+## Namespace publication boundary
+
+Complete publications require namespace, supplied documents and ExecutionConfiguration.
+Startup namespaces are Private; foreign outgoing references require a Public target.
+Fixed Java methods remain assigned to their original namespace across replacement
+and explicit recreation; withdrawal preserves beans and retained work. There is no
+activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
+for complete signatures, sequencing and retirement. This slice implements preparation
+and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+
+Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

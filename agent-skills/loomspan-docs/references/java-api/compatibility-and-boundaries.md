@@ -9,7 +9,7 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the twenty-three types in the closed
+Application code MAY depend on the twenty-four types in the closed
 `ai.loomspan.api` allowlist:
 
 | Type | Supported purpose |
@@ -17,7 +17,8 @@ Application code MAY depend on the twenty-three types in the closed
 | `SkillTemplate` | Validate or invoke a named Java, REST, TypeSafe, or model-backed YAML skill |
 | `SkillInvocationHandoff` | Atomically transfer a prepared root invocation to framework ownership |
 | `AdmittedSkillInvocation` | Read the captured generation ID, execute once, or release an already-admitted root invocation |
-| `SkillReloader` | Prepare, publish, or snapshot a complete skill generation |
+| `SkillReloader` | Validate, prepare, publish, snapshot or remove a complete namespace generation |
+| `NamespaceVisibility` | Select Private or explicit Public on a complete publication |
 | `SkillDocument` | Supply one in-memory YAML document and a diagnostic source label |
 | `ExecutionConfiguration` | Supply reference-only authored YAML for a complete execution candidate |
 | `SkillValidationResult` | Inspect issues and complete candidate names/kinds after successful validation |
@@ -49,7 +50,7 @@ enum switches must handle the new value. Existing `SkillTemplate` String results
 and the five-component descriptor remain unchanged; no typed evaluation facade
 or additional SPI is introduced. See [TypeSafe authoring](../skill-authoring/typesafe-skills.md).
 
-`ExecutionConfiguration` and the `(documents, configuration)` validation and preparation overloads let a host publish model connections, aliases, limits, and tracing with skills. `PreparedSkillUpdate.close()` is a default method for source and binary compatibility with existing implementations; framework candidates release unpublished provider resources when closed. The application YAML key for trace persistence moved from top-level `execution-trace.persistence` to `loomspan.execution-trace.persistence` without an alias. Consumers must update that YAML key when adopting this revision. Existing skill-only overloads remain supported and copy the active execution settings. See [two-stage skill updates](skill-reload.md).
+`NamespaceVisibility` and namespace-first complete `SkillReloader` validation/preparation replace all incomplete/default-only overloads. Configuration is required; omitted scalars use built-in defaults, with no active/startup inheritance. Removal requires namespace and expected active ID. These are intentional pre-1.0 source/binary/behavior changes without shims. See [namespace publication](skill-reload.md).
 
 `SkillValidationResult` now has two record components, `issues` and `skills`.
 Direct constructors and record-pattern users must adopt the two-component shape
@@ -65,14 +66,6 @@ of `SkillCatalog` and direct two-argument `RestSkillInvocation` construction
 must be updated and recompiled; there is no compatibility method or constructor.
 The ID is process-local and supplied by Loomspan for handler calls, not inferred
 from business input or the current active catalog. See [two-stage skill updates](skill-reload.md).
-
-`SkillDocument` and `SkillReloader.prepare(Collection<SkillDocument>)` add an
-application-supplied complete YAML set. The no-argument method and configured
-startup remain. The new overload is abstract: application implementations of
-`SkillReloader` must implement it when recompiling. This does not create a
-supported bean-replacement SPI. Supplied source names are arbitrary diagnostic
-labels in the existing `sourcePath` inspection field; the JSON shape and exact
-framework/Console version check are unchanged.
 
 The handoff facade and handle are additive and leave every `SkillTemplate`
 signature unchanged. The three catalog types are additive. The two `SkillTemplate.validate`
@@ -137,7 +130,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the `api` package has exactly the twenty-three allowlisted public top-level types;
+- the `api` package has exactly the twenty-four allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

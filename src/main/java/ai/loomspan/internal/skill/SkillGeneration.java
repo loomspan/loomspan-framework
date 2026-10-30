@@ -17,6 +17,7 @@ import java.util.Objects;
 /** One complete immutable executable view of every skill declaration. */
 public final class SkillGeneration implements AutoCloseable
 {
+    private final ai.loomspan.api.NamespaceVisibility visibility;
     private final String namespace;
     private final String id;
     private final Map<String, CapabilityMetadata> capabilities;
@@ -42,6 +43,16 @@ public final class SkillGeneration implements AutoCloseable
             Map<String, YamlSkillDefinition> definitions, SkillCatalog skillCatalog,
             RegisteredSkillCatalog registeredSkillCatalog, ExecutionRuntime runtime)
     {
+        this(namespace, id, capabilities, definitions, skillCatalog, registeredSkillCatalog, runtime,
+                ai.loomspan.api.NamespaceVisibility.PRIVATE);
+    }
+
+    public SkillGeneration(String namespace, String id, Map<String, CapabilityMetadata> capabilities,
+            Map<String, YamlSkillDefinition> definitions, SkillCatalog skillCatalog,
+            RegisteredSkillCatalog registeredSkillCatalog, ExecutionRuntime runtime,
+            ai.loomspan.api.NamespaceVisibility visibility)
+    {
+        this.visibility = Objects.requireNonNull(visibility, "visibility must not be null");
         this.namespace = SkillIdentity.normalizeNamespace(namespace);
         this.runtime = runtime;
         this.id = requireNonBlank(id, "id");
@@ -74,6 +85,7 @@ public final class SkillGeneration implements AutoCloseable
                 : registeredSkillCatalog;
     }
 
+    public ai.loomspan.api.NamespaceVisibility visibility() { return visibility; }
     public String namespace() { return namespace; }
     public String id() { return id; }
     public CapabilityMetadata capability(String name) { return capabilities.get(name); }

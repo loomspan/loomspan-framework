@@ -267,7 +267,7 @@ class LoomspanAutoConfigurationTests {
                     assertThat(context.getBeansOfType(ChatModel.class)).isEmpty();
 
                     CapabilityMetadata metadata = context.getBean(SkillGenerationManager.class)
-                            .active().capability("deterministicTarget");
+                            .active("default").capability("deterministicTarget");
                     assertThat(metadata.skillExecution().configured()).isFalse();
                     assertThat(context.getBean(SkillTemplate.class)
                             .invoke("deterministicTarget", Map.of("input", "alpha")))
@@ -371,7 +371,7 @@ class LoomspanAutoConfigurationTests {
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/default-thinking-skill.yaml")
                 .run(context -> {
                     SkillGenerationManager generations = context.getBean(SkillGenerationManager.class);
-                    CapabilityMetadata metadata = generations.active().capability("thinkingDefaultSkill");
+                    CapabilityMetadata metadata = generations.active("default").capability("thinkingDefaultSkill");
 
                     assertThat(metadata).isNotNull();
                     assertThat(metadata.skillExecution().configured()).isTrue();
@@ -389,8 +389,8 @@ class LoomspanAutoConfigurationTests {
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/none/*.yaml")
                 .run(context -> {
                     SkillGenerationManager generations = context.getBean(SkillGenerationManager.class);
-                    assertThat(generations.active().capability("deterministicTarget")).isNotNull();
-                    assertThat(generations.active().capability("targetBean#deterministicTarget")).isNull();
+                    assertThat(generations.active("default").capability("deterministicTarget")).isNotNull();
+                    assertThat(generations.active("default").capability("targetBean#deterministicTarget")).isNull();
                 });
     }
 

@@ -73,3 +73,15 @@ Spring authorization and authentication failures remain failures; they are not s
 This topic does not promise visibility support for `@Secured`, expression annotations, pre/post filtering, arbitrary custom denial handlers, or additional Loomspan SPIs. Application-specific security may still run on its proxy, but it is outside this visibility contract.
 
 `SkillAccessPolicyResolver` uses Spring's scanner. `DefaultAccessGuard` delegates role evaluation to `SkillRoleEvaluator` using Spring's authority manager with prefix and hierarchy. `Jsr250EnforcementVerifier` validates actual advice, and `ScopedAuthentication` restores caller contexts at Java invocation. `JavaSkillAuthorizationIntegrationTests`, `JavaSkillSecurityStartupTests`, and `JavaSkillAuthenticationScopeIntegrationTests` use real Spring contexts to compare visibility and proxy enforcement.
+
+## Namespace publication boundary
+
+Complete publications require namespace, supplied documents and ExecutionConfiguration.
+Startup namespaces are Private; foreign outgoing references require a Public target.
+Fixed Java methods remain assigned to their original namespace across replacement
+and explicit recreation; withdrawal preserves beans and retained work. There is no
+activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
+for complete signatures, sequencing and retirement. This slice implements preparation
+and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+
+Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

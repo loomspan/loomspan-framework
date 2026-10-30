@@ -263,7 +263,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                     try { var path=directory.resolve("comparison.yaml");Files.writeString(path,Files.readString(path).replace("assessment","replacement")); }
                     catch(java.io.IOException ex) { throw new RuntimeException(ex); }
                     var manager=context.getBean(ai.loomspan.internal.skill.SkillGenerationManager.class);
-                    manager.activate(manager.prepare());
+                    ai.loomspan.testkit.TestSkillGenerations.activate(manager, manager.prepare(manager.capturePreparation("default"), ai.loomspan.testkit.PublicationFixtures.documents(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)), ai.loomspan.api.NamespaceVisibility.PRIVATE, null));
                 });
                 check.accept(context.getBean(SkillTemplate.class),calls);
             });

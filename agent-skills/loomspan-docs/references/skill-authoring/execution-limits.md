@@ -66,3 +66,15 @@ Defaults are defined in `LoomspanProperties.Session`, `LoomspanProperties.Shutdo
 and `ExecutionTraceProperties`. Shutdown ownership is covered by
 `FrameworkShutdownIntegrationTest`. For the distinction between model calls and
 physical attempts, use the [connection reference](model-selection-and-connections.md).
+
+## Namespace publication boundary
+
+Complete publications require namespace, supplied documents and ExecutionConfiguration.
+Startup namespaces are Private; foreign outgoing references require a Public target.
+Fixed Java methods remain assigned to their original namespace across replacement
+and explicit recreation; withdrawal preserves beans and retained work. There is no
+activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
+for complete signatures, sequencing and retirement. This slice implements preparation
+and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+
+Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

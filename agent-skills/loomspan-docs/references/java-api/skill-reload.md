@@ -5,105 +5,144 @@ applies_to: bundled-loomspan-revision
 coverage: source-verified
 ---
 
-# Two-stage skill updates
+# Complete namespace publication
 
-## Namespace metadata foundation
-
-A prepared update's `generationId()` and `snapshot().generationId()` identify the
-candidate, independently of its captured base. Its catalog identifies only the
-candidate namespace and supplied declarations plus that namespace's fixed Java
-registrations. Validation feedback uses qualified names, reserves no generation
-and retains empty metadata on errors. Catalog metadata is not authorization or
-an execution reservation. Namespace replacement under another name requires
-creation, explicit reference updates, then removal; there is no rename/inheritance.
-
-PR 27.2 replaces the existing default-only publication overloads below with complete
-namespace-targeted management and active-registry acquisition. PR 27.1 verifies
-identity/catalog foundations; later root/model/observation integration is not
-claimed by this document's earlier execution examples.
-
-## Complete execution publication
-
-Connection `request-timeout` is publishable through the existing `ExecutionConfiguration` and both credential preparation paths. Validation checks its supported drivers, exact whole-millisecond precision and `1..2147483647ms` range without resolving credentials or calling providers. Invalid candidates leave the active generation unchanged. Host-map preparation intentionally wraps non-credential errors generically with no original cause to protect supplied secrets; use `validate` for the actionable safe property path. See [provider call budgets](../skill-authoring/model-selection-and-connections.md#provider-call-budgets) for defaults, Ollama rejection and the mission/retry distinction.
-
-The timeout is copied into generation settings and actual clients. Skill-only updates retain the active value. New roots use the replacement budget, while previously admitted roots, delayed descendants and retries retain their captured clients/budget. Publication does not extend their mission deadline.
-
-Use `validate(completeDocuments, new ExecutionConfiguration(candidateYaml))` and `prepare(completeDocuments, configuration)` when model connections, aliases, session limits, or trace persistence change with the skill set. The authored YAML has one `loomspan` mapping containing only `connections`, `models`, `session`, and `execution-trace.persistence`. Its credentials must use property names through `api-key-ref`, `gemini.credentials-ref` (URI), `gemini.credentials-json-ref` (Vertex service-account JSON), or `header-refs`; direct `api-key`, `gemini.credentials-uri`, and literal `headers` are rejected. The two-argument `prepare` resolves references from Spring `Environment`. For a host-owned encrypted credential source, call `prepare(completeDocuments, configuration, credentialValues)`; Loomspan copies that map at entry, requires every referenced value from it, rejects missing, blank, and unused entries, and never falls back to Environment. Validation neither resolves references nor constructs clients or sends model requests. Preparation constructs clients but sends no model request. An explicit empty document collection replaces all YAML/REST/TypeSafe skills while preserving fixed Java declarations.
+Inject the framework-owned `SkillReloader`. Every `validate` and `prepare` takes
+one namespace, the **complete** supplied `Collection<SkillDocument>`, and a
+required `ExecutionConfiguration`. There are no configured-file, document-only,
+patch, or implicit configuration-inheritance overloads. Files are a startup input;
+hosts load any later documents themselves.
 
 ```java
-ExecutionConfiguration configuration = new ExecutionConfiguration(candidateYaml);
-SkillValidationResult feedback = reloader.validate(completeDocuments, configuration);
+ExecutionConfiguration configuration = new ExecutionConfiguration("loomspan: {}");
+SkillValidationResult feedback = reloader.validate(
+        "department", documents, configuration, NamespaceVisibility.PUBLIC);
 if (feedback.valid()) {
-    try (PreparedSkillUpdate update = reloader.prepare(completeDocuments, configuration)) {
-        configurationStore.stage(update.generationId(), restConfiguration);
-        reloader.publish(update); // transfers provider ownership to the generation
+    try (PreparedSkillUpdate update = reloader.prepare(
+            "department", documents, configuration, NamespaceVisibility.PUBLIC)) {
+        configurationStore.stage(update.generationId(), resources);
+        reloader.publish(update);
     }
 }
+SkillCatalog current = reloader.snapshot("department");
+reloader.remove("department", current.generationId());
 ```
 
-Close any candidate that will not be published. A stale or shutdown-rejected candidate is closed by the framework; a repeated publish rejection does not close its already active generation. Existing skill-only overloads use a copy of the execution settings active at preparation, including after an explicit publication. Root handoff captures the entire version, so its delayed work, descendants, provider retries, limits, and tracing retain that version. Superseded provider clients close after captured physical work finishes. Republishing earlier authored content yields another process-local ID. Process settings (shutdown, observability API/auth/retention, skill locations, Spring/server infrastructure) cannot be published. Ordinary `application.yml` remains the startup path; trace persistence now binds only at `loomspan.execution-trace.persistence` with default `ONERROR`. Applications using the former top-level key must move it under `loomspan`. External credential revocation may still fail a provider request.
+`NamespaceVisibility.PRIVATE` is the default on **every** publication, including
+replacement of a Public generation. Pass `PUBLIC` explicitly on each Public
+replacement. Visibility changes are complete publications and allocate fresh IDs.
+Namespaces normalize case and independently enforce the 32-character limit.
+Catalogs and validation feedback contain only the target's supplied declarations
+and assigned fixed Java methods; qualified catalog lookup never searches elsewhere.
+Empty supplied declarations are valid when ordinary validation permits them, and
+an empty published namespace still has its namespace and generation ID.
 
-For editor feedback, call `reloader.validate()` to reread configured resources or `reloader.validate(completeDocuments)` to check an in-memory complete replacement set. Check the result's `valid()` before treating `skills()` as a complete candidate: any `ERROR` makes it false and leaves metadata empty, while warnings retain complete metadata. Empty metadata can also mean a valid empty candidate. `issues()` provides severity, source name, optional skill name and field path, and message. Each immutable `ValidatedSkill` has a canonical qualified callable `name()` and `SkillKind` of `JAVA`, `YAML`, `REST`, or `TYPESAFE`. Successful results include fixed Java and the entire proposed YAML/REST/TypeSafe set, sorted by exact case-sensitive name; both result lists are immutable and detached from later operations. Supplied source labels are diagnostics, never paths. An empty collection proposes removal of YAML, REST, and TypeSafe skills while fixed Java skills remain.
+## Complete configuration and credentials
 
-```java
-SkillValidationResult feedback = reloader.validate(completeDocuments);
-if (feedback.valid()) {
-    List<String> restNames = feedback.skills().stream()
-            .filter(skill -> skill.kind() == SkillKind.REST)
-            .map(ValidatedSkill::name)
-            .toList();
-    // Compare restNames with application-owned routes before preparation.
-}
-```
+Only `loomspan.connections`, `loomspan.models`, `loomspan.session`, and
+`loomspan.execution-trace.persistence` are publishable. Existing nested provider
+options, request timeouts, retries, limits, quotas and attachments remain supported.
+Host shutdown, startup skill locations, observability, other application settings
+and unknown keys reject validation/preparation. Every omitted supported scalar uses
+its built-in default; previous, startup and other namespace settings do not fill
+missing values. Missing models/connections required by a declaration fail.
 
-Repeated validation does not allocate an ID, create a candidate, activate a generation, instantiate a REST handler, change fixed caches, or notify retirement listeners. Validation does not invoke skills or models or test external connectivity. Correct the draft, then `prepare` current input, stage resources using `update.snapshot()` as the authoritative description of the frozen candidate, and `publish`; validation does not guarantee or authorize these later lifecycle steps. See [draft validation workflow](../skill-authoring/validation-workflow.md).
+Credentials use explicit `api-key-ref`, `header-refs`,
+`gemini.credentials-ref` or `gemini.credentials-json-ref` references. Preparation
+normally resolves them from Spring Environment. The complete overload
+`prepare(namespace, documents, configuration, credentialValues)` copies a supplied
+map and resolves every reference from it without Environment fallback. Missing,
+blank or unused map entries fail. The full overload accepts visibility before the
+credential map. Validation does not resolve credentials, construct provider clients,
+instantiate a REST handler or invoke implementations. Preparation builds independent
+clients but sends no model request. Diagnostic content is preserved.
 
-Inject the framework-provided `SkillReloader`. Register retirement notification, read `snapshot("default").generationId()`, and stage matching application-owned REST configuration before opening your traffic gate. Acquire current immutable metadata through `reloader.snapshot("default")`; no startup catalog bean is injected. Catalog lookup is unfiltered and does not authorize an invocation.
+## Capture, concurrency and one-shot candidates
 
-```java
-AutoCloseable retirement = reloader.onGenerationRetired(id ->
-        cleanupExecutor.execute(() -> configurationStore.remove(id)));
-configurationStore.stage(reloader.snapshot("default").generationId(), initialConfiguration);
-trafficGate.open();
+Before expensive preparation, Loomspan captures the target's active generation ID
+or strict absence, together with one coherent immutable external metadata view.
+There is no caller-supplied preparation revision or public base accessor. The
+candidate receives a new process-local opaque ID that differs from its base;
+allocation order need not equal publication order. IDs never encode skill identity
+and are not durable restoration identifiers.
 
-PreparedSkillUpdate update = reloader.prepare(); // or prepare(completeDocuments)
-configurationStore.stage(update.generationId(), replacementConfiguration);
-reloader.publish(update);
+Every candidate skill and outgoing reachable reference is validated against that
+view. All references into the candidate namespace, including transitive return
+paths, use its complete candidate declarations. Omitted old skills are unavailable.
+Foreign edges require a Public target, including a path returning into the
+candidate; same-namespace composition can remain Private. Existing contracts,
+bindings and forwarding/schema cycle checks still apply. Incoming/unreachable
+callers are not scanned.
 
-// One fixed RestSkillHandler bean selects resources from the trusted invocation ID.
-RestSkillHandler handler = invocation -> configurationStore.get(invocation.generationId())
-        .call(invocation.skillName(), invocation.input());
-```
+Same-target and different-target preparations construct detached candidates
+concurrently. Each owns its definitions, diagnostics, configuration, credentials,
+derived contracts and runtime. Publication checks framework ownership, candidate
+state, lifecycle and **only the target's captured base/absence**, then atomically
+installs it. Dependency revision, deletion, visibility or recreation changes alone
+never make publication stale. There is no dependency revalidation or automatic
+retry at publication. Installation does not prove current dependency executability;
+reachable admission and cross-namespace dispatch integration follow in PRs 27.3–27.4.
 
-After the application publishes stable YAML files and prevents writes for the duration of preparation, call `PreparedSkillUpdate update = reloader.prepare()`. This synchronously validates a complete new model-backed, REST, and TypeSafe YAML set against fixed Java declarations, the active model connections, and the one fixed REST handler bean. It does not activate the candidate. Stage external artifacts under `update.generationId()`, then call `reloader.publish(update)`. `update.snapshot()` shows the candidate before publication. Publication uses the frozen candidate without file reads or revalidation. Identical YAML still gets a fresh process-local ID. Empty YAML removes all YAML skills, not Java declarations. No file transaction, Java hot swap, or handler replacement is supplied.
+A target change after capture rejects the candidate as stale. A change before
+capture becomes its base, regardless of a prior catalog read. Competing candidates
+for a continuously present target have one winner. A null base means absent,
+never wildcard: an absence candidate can publish if that target is absent again.
+A candidate based on a withdrawn incarnation remains stale after recreation.
 
-For YAML already held by the application, call `reloader.prepare(Collection<SkillDocument>)` with the complete replacement set. Each record contains `sourceName` and `yaml`; the collection and elements must be non-null, source names must be nonblank and exactly unique, and YAML must be non-null. A source name is diagnostic text, not a resource path or the callable YAML `name`; case-different labels are distinct. Loomspan copies the collection and freezes the YAML as UTF-8 during preparation. The same parser, model/REST/TypeSafe rules, child references, input contracts, roles, fixed Java declarations, and handler binding apply. An empty collection removes all YAML, REST, and TypeSafe declarations while leaving Java skills. A later no-argument `prepare()` still discovers the configured locations.
+Close abandoned candidates. Failed construction, stale publication, or shutdown
+rejection disposes only that candidate. Foreign objects are rejected without
+closing them. Already published candidates cannot publish again; closing/rejecting
+one does not close its installed generation. Shutdown checks occur before and
+after construction and at publication; slow construction is not forcibly interrupted.
 
-An application restoring its own saved documents after an ordinary restart can follow this supported-only sequence:
+## Startup, fixed Java and removal
 
-```java
-List<SkillDocument> saved = snapshotStore.loadDocuments(); // application-owned durable state
-PreparedSkillUpdate update = reloader.prepare(saved);
-configurationStore.stage(update.generationId(), snapshotStore.loadRestConfiguration());
-reloader.publish(update);
-trafficGate.open(); // application-owned readiness gate
-```
+Startup builds Private `default` from configured declarations plus its assigned
+Java methods, and a separate Private generation for each other Java assignment,
+containing only those methods. All use the same startup settings with separate
+runtimes. Same-namespace qualified startup composition works directly. Foreign
+Private startup references fail; hosts publish Public shared capabilities before
+publishing their callers. Managed hosts can start without local files and own
+readiness and ordering. Java direct entry is available immediately after startup;
+there is no activation publication or per-namespace bean lifecycle.
 
-The ordinary configured generation starts first. On every process start, REST configuration must be staged for whichever generation the application will serve; old process IDs cannot be reused. Loomspan intentionally has no startup switch, deferred activation mode, persistence store, or framework traffic gate. The application owns its durable snapshot, staging, and traffic readiness.
+Fixed Java registrations are included in every generation of their assigned
+namespace. Supplied documents cannot override, omit, relocate, copy or configure
+them. Java bean state remains host-owned. Annotation changes need redeployment.
+An empty supplied collection removes previous supplied declarations while retaining
+fixed methods; it does not merge prior supplied content.
 
-`publish` succeeds once only for an update from the same framework instance whose preparation base is still active. Foreign, fabricated, stale, repeated, and shutdown-time updates fail with unchecked `SkillReloadException`; preparation with host-supplied values uses a generic failure wrapper so the original exception cannot disclose those values. A later update requires another `prepare`. `snapshot(namespace)` never reads resources. Shutdown begun during preparation prevents a successful return. Old admitted and running trees keep their captured definitions and ID; new roots capture the new active generation.
+`remove(namespace, expectedGenerationId)` rejects a missing/wrong active ID,
+withdraws atomically and does not wait for retained work to drain. Existing owners
+can finish; new lookup fails without implicit recreation. Explicit recreation
+requires complete inputs, includes assigned fixed Java methods and allocates a fresh
+ID. Removal does not destroy beans or cascade into dependent publications.
+Public-to-Private changes are likewise prospective. Restart rebuilds Private startup
+state; runtime publications/removals are not restored. Hosts repeat their managed
+sequence and stage resources using the new process IDs.
 
-Use `AdmittedSkillInvocation.generationId()` to correlate a pending root with the application-owned durable snapshot staged for that generation before invocation. Do not use `reloader.snapshot("default").generationId()` for an already admitted handle: publication can change the current catalog before handoff returns. The handle's ID remains readable after release, retirement, or cutoff, but reading it does not retain the generation or guarantee that the application's mapping still exists. Handle a missing mapping and release an admission abandoned during lookup or recording; the application owns mapping retention and durable correlation.
+Ordinary cycles can use real valid staged publications: Public `a` already contains
+the contract called by `b`, then Public `b -> a`, then replacement Public `a -> b`.
+All intermediate versions must be callable and valid; unresolved stubs and invalid
+schema/forwarding cycles are unsupported.
 
-The application owns readiness, staging, cleanup, and retries. Publishing B does not show that all work using A has finished. During normal operation, a registered listener is selected once when a superseded published generation has no captured preparation, pending admission, running root, or physically running descendant. This includes unused generations replaced immediately; a notification can occur before `publish` returns, so stage resources first. Listeners run outside framework locks on publication, invocation, admission-release, or physical-return threads and may run concurrently. They must be thread-safe and return promptly; schedule slow cleanup on an application-owned executor. A throwing listener is logged and isolated from publication, invocation, other listeners, and later retirements. Closing the returned handle prevents future selection without waiting for already selected callbacks. There is no replay, durable delivery, ordering across generation IDs, or retry. Delivery may be omitted after shutdown begins, including for the active generation, and shutdown does not wait for cleanup. Never-published rejected or discarded candidates get no callback and require application cleanup; a rejected repeated publish does not make its previously published generation safe to remove. See [REST handler SPI](rest-skills.md) for generation-keyed handler selection. There is no historical invocation API.
+## Retirement notifications
+
+Register framework-wide `onGenerationRetired(listener)` before staging resources.
+Superseded/removed generations retire when existing invocation and physical-work
+ownership reaches zero. Retained catalogs are metadata, not resource leases.
+Callbacks and resource closing run outside registry/lifecycle synchronization.
+Listeners may run concurrently, must be thread-safe and should return promptly;
+schedule slow application cleanup elsewhere. Listener failures are isolated. Closing
+a registration prevents future selection without waiting for an already selected
+callback. There is no replay, ordering, retry or durable delivery guarantee;
+notifications during shutdown may be omitted. Never-published candidates get no
+retirement callback. There is no historical invocation API.
 
 ## Evidence
 
-- `PublicSkillReloadIntegrationTest` exercises startup ID staging, frozen publication, new REST routing, pending-admission retirement, and retained immutable catalog.
-- `PublicSkillReloadIntegrationTest` also exercises supplied REST YAML without files, old admitted work, configured alternation, and restart resubmission.
-- `PublicSkillReloadIntegrationTest` exercises both timeout credential paths, safe atomic rejection, old/new budgets,
-  repeated skill-only retention, captured child/retry calls and longer-provider-budget mission/caller cutoff.
-- `SkillGenerationManagerTest#runtimeSnapshotDetachesRequestTimeoutFromStartupMutation` protects the explicit copy.
-- `SkillReloaderTest` protects owner, base, one-shot, overlapping preparation/publication, unused-generation retirement, listener isolation, and shutdown checks.
-- `SkillGenerationManagerTest` protects complete validation, same-content fresh IDs, additions/deletions/empty set, and fixed handler reuse.
-- `LoomspanPublicSurfaceArchitectureTest` protects the closed API and sole supported SPI.
+- `SkillReloaderTest`: complete replacement, base/absence, state/lifecycle, deterministic concurrent preparation/publication, disposal and retirement.
+- `SkillDependencyValidatorTest`: candidate overlay, transitive contracts/visibility, captured metadata retirement and coherent capture races.
+- `NamespaceStartupIntegrationTest`: Private startup, direct Java, managed no-file publication, removal/recreation and restart.
+- `ExecutionConfigurationParserTest`: exact configuration/credential boundary and nested validation.
+- `LoomspanPublicSurfaceArchitectureTest`: closed supported API and sole RestSkillHandler SPI.

@@ -30,7 +30,8 @@ public class LoomspanAiAutoConfiguration
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     NamedAiConnectionRegistry namedAiConnectionRegistry(SkillGenerationManager generations)
     {
-        return generations.active().runtime().registry();
+        generations.initializeStartup();
+        return generations.active("default").runtime().registry();
     }
 
     @Bean

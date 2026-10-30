@@ -63,14 +63,14 @@ class SkillGenerationExecutionIntegrationTest
         var generations = registry.manager();
         var retired = new CopyOnWriteArrayList<String>();
         generations.onGenerationRetired(retired::add);
-        String oldId = generations.active().id();
+        String oldId = generations.active("default").id();
         var replacementGeneration = TestSkillGenerations.of(replacementCapability);
         ObjectMapper mapper = new ObjectMapper()
         {
             @Override
             public <T> T convertValue(Object fromValue, TypeReference<T> toValueTypeRef)
             {
-                SkillGenerationManager.dispatch(generations.activateAndSelect(replacementGeneration));
+                SkillGenerationManager.dispatch(generations.publish(replacementGeneration, generations.capturePreparation(replacementGeneration.namespace()).baseId()));
                 assertThat(retired).isEmpty();
                 return (T) Map.of("payload", "hello");
             }
@@ -83,7 +83,7 @@ class SkillGenerationExecutionIntegrationTest
         assertThat(retired).containsExactly(oldId);
         assertThatThrownBy(() -> template.validate("default-invoiceParser", Map.of("payload", "hello")))
                 .isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
-        generations.activate(TestSkillGenerations.empty());
+        ai.loomspan.testkit.TestSkillGenerations.activate(generations, TestSkillGenerations.empty());
         assertThat(retired).containsExactly(oldId, replacementGeneration.id());
     }
 
@@ -95,7 +95,7 @@ class SkillGenerationExecutionIntegrationTest
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(oldCapability.name(), oldCapability);
         var generations = registry.manager();
-        var oldGeneration = generations.active();
+        var oldGeneration = generations.active("default");
         var replacementGeneration = TestSkillGenerations.of(replacementCapability);
         ExecutionCoordinator coordinator = mock(ExecutionCoordinator.class);
         when(coordinator.execute(eq(oldCapability), any(), any(), any(), eq(null))).thenAnswer(invocation -> {
@@ -119,7 +119,7 @@ class SkillGenerationExecutionIntegrationTest
                 .handoff("default-invoiceParser", Map.of("payload", "hello"));
         assertThat(admitted.generationId()).isEqualTo(oldGeneration.id()).isNotBlank();
 
-        generations.activate(replacementGeneration);
+        ai.loomspan.testkit.TestSkillGenerations.activate(generations, replacementGeneration);
         assertThat(admitted.generationId()).isEqualTo(oldGeneration.id());
 
         try
@@ -145,7 +145,7 @@ class SkillGenerationExecutionIntegrationTest
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(oldCapability.name(), oldCapability);
         var generations = registry.manager();
-        String oldId = generations.active().id();
+        String oldId = generations.active("default").id();
         var replacement = TestSkillGenerations.of(replacementCapability);
         AtomicBoolean published = new AtomicBoolean();
         ObjectMapper mapper = new ObjectMapper()
@@ -154,7 +154,7 @@ class SkillGenerationExecutionIntegrationTest
             public <T> T convertValue(Object fromValue, TypeReference<T> toValueTypeRef)
             {
                 if (published.compareAndSet(false, true))
-                    SkillGenerationManager.dispatch(generations.activateAndSelect(replacement));
+                    SkillGenerationManager.dispatch(generations.publish(replacement, generations.capturePreparation(replacement.namespace()).baseId()));
                 return super.convertValue(fromValue, toValueTypeRef);
             }
         };
@@ -179,7 +179,7 @@ class SkillGenerationExecutionIntegrationTest
         try
         {
             var old = handoff.handoff("default-invoiceParser", new OldInput("hello"));
-            assertThat(generations.active().id()).isEqualTo(replacement.id());
+            assertThat(generations.active("default").id()).isEqualTo(replacement.id());
             assertThat(old.generationId()).isEqualTo(oldId).isNotBlank();
             var current = handoff.handoff("default-invoiceParser", Map.of("replacementPayload", "new"));
             assertThat(current.generationId()).isEqualTo(replacement.id());

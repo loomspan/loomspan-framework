@@ -57,7 +57,7 @@ class ObservabilityRouteRegistrarTest
         configuration.setEnabled(true);
         configuration.getAuth().setApiKey("0123456789abcdef0123456789abcdef");
         SkillGenerationManager generations = mock(SkillGenerationManager.class);
-        when(generations.active()).thenThrow(new IllegalStateException("inspection projection failed"));
+        when(generations.active("default")).thenThrow(new IllegalStateException("inspection projection failed"));
         var registrar = new ObservabilityRouteRegistrar(
                 null, null, null, new ObservabilityActivationCoordinator(),
                 properties, new ExecutionTraceProperties(), generations,
@@ -87,7 +87,7 @@ class ObservabilityRouteRegistrarTest
         SkillGenerationManager generations = mock(SkillGenerationManager.class);
         SkillGeneration generation = mock(SkillGeneration.class);
         when(generation.registeredSkillCatalog()).thenReturn(mock(RegisteredSkillCatalog.class));
-        when(generations.active()).thenReturn(generation);
+        when(generations.active("default")).thenReturn(generation);
         ObservabilityActivationCoordinator activation = new ObservabilityActivationCoordinator();
         ObservabilityRouteRegistrar registrar = new ObservabilityRouteRegistrar(
                 mappings,

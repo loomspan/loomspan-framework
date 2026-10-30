@@ -36,7 +36,7 @@ class FrameworkExecutionLifecycleTest
         var manager = new TestCapabilityRegistry().manager();
         var retired = new CopyOnWriteArrayList<String>();
         manager.onGenerationRetired(retired::add);
-        var captured = manager.capture();
+        var captured = manager.capture("default");
         String oldId = captured.generation().id();
         var root = lifecycle.admitRoot(captured.lease());
         var session = new LoomspanSession("retirement", "entry", 8);
@@ -59,7 +59,7 @@ class FrameworkExecutionLifecycleTest
             finally { child.lifecycle().owningReturned(); }
         });
         assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
-        manager.activate(ai.loomspan.testkit.TestSkillGenerations.empty());
+        ai.loomspan.testkit.TestSkillGenerations.activate(manager, ai.loomspan.testkit.TestSkillGenerations.empty());
         assertThat(retired).isEmpty();
 
         parent.lifecycle().closeNow();

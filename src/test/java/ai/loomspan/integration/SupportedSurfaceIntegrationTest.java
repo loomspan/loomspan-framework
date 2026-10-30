@@ -42,6 +42,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SupportedSurfaceIntegrationTest
 {
+    @Test void completeNamespaceManagementUsesOnlySupportedTypes() {
+        NamespaceStartupIntegrationTest.runner().run(context -> {
+            var reloader=context.getBean(ai.loomspan.api.SkillReloader.class);
+            var configuration=new ai.loomspan.api.ExecutionConfiguration("loomspan: {}");
+            assertThat(reloader.validate("EMPTY", List.of(), configuration).valid()).isTrue();
+            try(var candidate=reloader.prepare("EMPTY", List.of(), configuration,
+                    ai.loomspan.api.NamespaceVisibility.PUBLIC, Map.of())) {
+                reloader.publish(candidate);
+                var catalog=reloader.snapshot("empty");
+                assertThat(catalog.namespace()).isEqualTo("empty");
+                assertThat(catalog.generationId()).isEqualTo(candidate.generationId());
+                assertThat(catalog.skills()).isEmpty();
+                reloader.remove("Empty", catalog.generationId());
+            }
+            try(var recreated=reloader.prepare("empty", List.of(), configuration)) {
+                reloader.publish(recreated);
+                assertThat(reloader.snapshot("empty").generationId()).isEqualTo(recreated.generationId());
+            }
+        });
+        assertThat(java.util.Arrays.stream(ai.loomspan.api.SkillReloader.class.getMethods())
+                .filter(method -> method.getName().equals("prepare") || method.getName().equals("validate")))
+                .allMatch(method -> method.getParameterCount() >= 3 && method.getParameterTypes()[0] == String.class
+                        && method.getParameterTypes()[2] == ai.loomspan.api.ExecutionConfiguration.class);
+        assertThat(java.util.Arrays.stream(ai.loomspan.api.PreparedSkillUpdate.class.getMethods()).map(java.lang.reflect.Method::getName))
+                .doesNotContain("baseId", "baseGenerationId");
+    }
+
     @Test
     void invokesYamlPlannerAndBothLeafKindsThroughSupportedSurface() throws Exception
     {

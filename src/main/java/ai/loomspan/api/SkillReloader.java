@@ -4,33 +4,26 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Framework-owned two-stage update service for the complete skill set. */
+/** Framework-owned two-stage update service for complete namespace generations. */
 public interface SkillReloader
 {
-    /** Rereads configured resources and checks the complete set without changing framework state. */
-    SkillValidationResult validate();
+    /** Checks a complete namespace replacement without creating provider clients; visibility defaults to Private. */
+    SkillValidationResult validate(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration);
+    SkillValidationResult validate(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration,
+            NamespaceVisibility visibility);
 
-    /** Checks a complete proposed replacement set. Feedback is advisory; prepare checks again. */
-    SkillValidationResult validate(Collection<SkillDocument> documents);
-
-    /** Checks a complete skill and execution-configuration candidate without creating provider clients. */
-    SkillValidationResult validate(Collection<SkillDocument> documents, ExecutionConfiguration configuration);
-
-    /** Validates and freezes a candidate without changing the active generation. */
-    PreparedSkillUpdate prepare();
-
-    /** Validates and freezes a complete replacement YAML set held by the application. */
-    PreparedSkillUpdate prepare(Collection<SkillDocument> documents);
-
-    /** Freezes a complete skill and execution-configuration candidate before atomic publication. */
-    PreparedSkillUpdate prepare(Collection<SkillDocument> documents, ExecutionConfiguration configuration);
-
-    /**
-     * Freezes a complete candidate using only the supplied values for every authored credential
-     * reference. The map is copied at entry; no Spring Environment fallback is used.
-     */
-    PreparedSkillUpdate prepare(Collection<SkillDocument> documents, ExecutionConfiguration configuration,
+    /** Prepares a detached complete replacement; omitted visibility is Private even on replacement. */
+    PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration);
+    PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration,
+            NamespaceVisibility visibility);
+    /** Uses a copied credential map without Environment fallback. */
+    PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration,
             Map<String, String> credentialValues);
+    PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration,
+            NamespaceVisibility visibility, Map<String, String> credentialValues);
+
+    /** Withdraws exactly the expected active generation without waiting for retained work. */
+    void remove(String namespace, String expectedGenerationId);
 
     /** Publishes a candidate prepared by this framework instance exactly once. */
     void publish(PreparedSkillUpdate update);

@@ -286,9 +286,9 @@ class DesignatedChildResultIntegrationTest {
                                 var oldResult = executor.submit(() -> facade.invoke("root", Map.of("marker", "held")));
                                 try {
                                     await(heldProducer);
-                                    try (var update = reloader.prepare(List.of(
+                                    try (var update = reloader.prepare("default", List.of(
                                             new SkillDocument("new-root", parent("root", "newProducer", false)),
-                                            new SkillDocument("new-leaf", isolatedProducer("new"))))) {
+                                            new SkillDocument("new-leaf", isolatedProducer("new"))), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)))) {
                                         reloader.publish(update);
                                     }
                                     assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(capturedCatalog.generationId());

@@ -145,10 +145,41 @@ Validation allocates no generation and errors leave candidate metadata incomplet
 Changing a namespace name means creating another namespace, updating references
 explicitly, then removing the old namespace; no rename or inheritance is provided.
 
-This sequential implementation establishes identity/catalog foundations in PR 27.1.
-Active registry/startup/management integration follows in PR 27.2; root admission,
-model dispatch and observation consumers follow in PRs 27.3-27.5. Their integration
-checks remain outstanding in this slice.
+Publish complete namespace replacements with required configuration:
+
+```java
+ExecutionConfiguration config = new ExecutionConfiguration("loomspan: {}");
+try (PreparedSkillUpdate candidate = reloader.prepare(
+        "department", completeDocuments, config, NamespaceVisibility.PUBLIC)) {
+    reloader.publish(candidate);
+}
+SkillCatalog current = reloader.snapshot("department");
+reloader.remove("department", current.generationId());
+```
+
+`NamespaceVisibility` is the supported `PRIVATE`/`PUBLIC` enum. Omitting visibility
+always selects Private, including replacement. Each publication has complete supplied
+declarations and execution configuration; omitted settings use built-in defaults,
+with no inheritance of models, connections or previous settings. Publishable keys are
+`loomspan.connections`, `loomspan.models`, `loomspan.session`, and
+`loomspan.execution-trace.persistence`; host and unknown settings fail validation.
+Credential references resolve through Environment or a copied explicit map.
+
+Preparation validates outgoing contracts against one coherent external metadata view,
+with references returning to the target resolved against its candidate. Foreign
+targets must be Public. Detached preparations run concurrently; publication compares
+only the target's once-captured base/absence. External dependency changes do not
+make it stale. Close abandoned candidates. Removal requires the expected active ID,
+withdraws without drainage, and never triggers lookup-driven recreation.
+
+Startup creates Private default and assigned Java namespaces with separate runtimes.
+Fixed Java methods remain in every generation of their namespace and are immediately
+available for direct entry; removal preserves beans and retained work. Restart rebuilds
+Private startup state. Hosts authorize management/routing and own readiness/sequencing.
+These boundaries do not provide complete tenant isolation. See the
+[publication guide](agent-skills/loomspan-docs/references/java-api/skill-reload.md).
+Reachable execution admission, cross-namespace dispatch and observation integration
+continue in PRs 27.3–27.5; publication success establishes installation.
 
 ## Choose your integration
 

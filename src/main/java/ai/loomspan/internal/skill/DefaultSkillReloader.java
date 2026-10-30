@@ -3,6 +3,7 @@ package ai.loomspan.internal.skill;
 import ai.loomspan.internal.core.SkillIdentity;
 
 import ai.loomspan.api.PreparedSkillUpdate;
+import ai.loomspan.api.NamespaceVisibility;
 import ai.loomspan.api.ExecutionConfiguration;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillReloadException;
@@ -16,7 +17,6 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.ArrayList;
-import java.util.function.Supplier;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
 
@@ -25,8 +25,6 @@ public final class DefaultSkillReloader implements SkillReloader
 {
     private final SkillGenerationManager generations;
     private final FrameworkExecutionLifecycle lifecycle;
-    private final Object preparationLock = new Object();
-    private final Object publicationLock = new Object();
     private final Object owner = new Object();
 
     public DefaultSkillReloader(SkillGenerationManager generations, FrameworkExecutionLifecycle lifecycle)
@@ -36,86 +34,54 @@ public final class DefaultSkillReloader implements SkillReloader
         generations.deliveryEnabled(lifecycle::isAdmissionOpen);
     }
 
-    @Override
-    public SkillValidationResult validate()
-    {
-        return generations.validate();
+    @Override public SkillValidationResult validate(String namespace, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration) {
+        return validate(namespace, documents, configuration, NamespaceVisibility.PRIVATE);
     }
 
-    @Override
-    public SkillValidationResult validate(Collection<SkillDocument> documents)
-    {
-        Objects.requireNonNull(documents, "documents must not be null");
-        return generations.validate(new ArrayList<>(documents));
+    @Override public SkillValidationResult validate(String namespace, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration, NamespaceVisibility visibility) {
+        String target = SkillIdentity.normalizeNamespace(namespace);
+        Objects.requireNonNull(configuration, "configuration must not be null");
+        Objects.requireNonNull(visibility, "visibility must not be null");
+        var supplied = new ArrayList<>(Objects.requireNonNull(documents, "documents must not be null"));
+        return generations.validate(readWhileOpen(target), supplied, configuration, visibility);
     }
 
-    @Override
-    public SkillValidationResult validate(Collection<SkillDocument> documents, ExecutionConfiguration configuration)
-    {
-        Objects.requireNonNull(documents, "documents must not be null");
-        return generations.validate(new ArrayList<>(documents), configuration);
+    @Override public PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration) {
+        return prepareInternal(namespace, documents, configuration, NamespaceVisibility.PRIVATE, null);
+    }
+    @Override public PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration, NamespaceVisibility visibility) {
+        return prepareInternal(namespace, documents, configuration, visibility, null);
+    }
+    @Override public PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration, Map<String, String> credentialValues) {
+        return prepare(namespace, documents, configuration, NamespaceVisibility.PRIVATE, credentialValues);
+    }
+    @Override public PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration, NamespaceVisibility visibility, Map<String, String> credentialValues) {
+        return prepareInternal(namespace, documents, configuration, visibility,
+                new LinkedHashMap<>(Objects.requireNonNull(credentialValues, "credentialValues must not be null")));
     }
 
-    @Override
-    public PreparedSkillUpdate prepare()
-    {
-        return prepareWith(generations::prepare);
-    }
-
-    @Override
-    public PreparedSkillUpdate prepare(Collection<SkillDocument> documents)
-    {
-        return prepareWith(() -> {
-            Objects.requireNonNull(documents, "documents must not be null");
-            return generations.prepare(new ArrayList<>(documents));
-        });
-    }
-
-    @Override
-    public PreparedSkillUpdate prepare(Collection<SkillDocument> documents, ExecutionConfiguration configuration)
-    {
-        Objects.requireNonNull(documents, "documents must not be null");
-        return prepareWith(() -> generations.prepare(new ArrayList<>(documents), configuration));
-    }
-
-    @Override
-    public PreparedSkillUpdate prepare(Collection<SkillDocument> documents, ExecutionConfiguration configuration,
-            Map<String, String> credentialValues)
-    {
-        Objects.requireNonNull(documents, "documents must not be null");
-        Objects.requireNonNull(credentialValues, "credentialValues must not be null");
-        // Snapshot at entry, including null values so validation can report a safe field path.
-        Map<String, String> supplied = new LinkedHashMap<>(credentialValues);
-        return prepareWith(() -> generations.prepare(new ArrayList<>(documents), configuration, supplied), true);
-    }
-
-    private PreparedSkillUpdate prepareWith(Supplier<SkillGeneration> preparation)
-    {
-        return prepareWith(preparation, false);
-    }
-
-    private PreparedSkillUpdate prepareWith(Supplier<SkillGeneration> preparation, boolean hostSecrets)
-    {
-        synchronized (preparationLock)
-        {
-            String baseId = readWhileOpen();
-            final SkillGeneration candidate;
-            try { candidate = preparation.get(); }
-            catch (RuntimeException ex) {
-                if (hostSecrets) throw new SkillReloadException(
-                        ex instanceof ExecutionConfigurationParser.CredentialReferenceException
-                                ? ex.getMessage() : "Failed to prepare skill generation");
-                throw new SkillReloadException("Failed to prepare skill generation", ex);
-            }
-            try { checkOpen(); }
-            catch (RuntimeException | Error ex)
-            {
-                try { candidate.close(); }
-                catch (RuntimeException closeFailure) { ex.addSuppressed(closeFailure); }
-                throw ex;
-            }
-            return new Candidate(owner, baseId, candidate);
+    private PreparedSkillUpdate prepareInternal(String namespace, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration, NamespaceVisibility visibility, Map<String, String> credentials) {
+        String target = SkillIdentity.normalizeNamespace(namespace);
+        Objects.requireNonNull(configuration, "configuration must not be null");
+        Objects.requireNonNull(visibility, "visibility must not be null");
+        var supplied = new ArrayList<>(Objects.requireNonNull(documents, "documents must not be null"));
+        var view = readWhileOpen(target);
+        final SkillGeneration candidate;
+        try { candidate = generations.prepare(view, supplied, configuration, visibility, credentials); }
+        catch (RuntimeException ex) { throw new SkillReloadException("Failed to prepare skill generation: " + ex.getMessage(), ex); }
+        try { checkOpen(); }
+        catch (RuntimeException | Error ex) {
+            try { candidate.close(); } catch (RuntimeException failure) { ex.addSuppressed(failure); }
+            throw ex;
         }
+        return new Candidate(owner, view.baseId(), candidate);
     }
 
     @Override
@@ -127,21 +93,16 @@ public final class DefaultSkillReloader implements SkillReloader
             throw new SkillReloadException("Skill update belongs to another framework instance or was not prepared by Loomspan");
         try
         {
-            synchronized (publicationLock)
-            {
-                synchronized (candidate)
+            synchronized (candidate)
                 {
                     lifecycle.whileAdmissionOpen(() -> {
                         if (candidate.published)
                             throw new SkillReloadException("Skill update was already published");
                         if (candidate.closed)
                             throw new SkillReloadException("Skill update was closed");
-                        if (!generations.active().id().equals(candidate.baseId))
-                            throw new SkillReloadException("Skill update is stale; active generation changed since preparation");
-                        retirement[0] = generations.activateAndSelect(candidate.generation);
+                        retirement[0] = generations.publish(candidate.generation, candidate.baseId);
                         candidate.published = true;
                     });
-                }
             }
         }
         catch (RejectedExecutionException ex)
@@ -163,20 +124,22 @@ public final class DefaultSkillReloader implements SkillReloader
         return generations.onGenerationRetired(listener);
     }
 
-    @Override
-    public SkillCatalog snapshot(String namespace) {
-        String owner = SkillIdentity.normalizeNamespace(namespace);
-        SkillGeneration generation = generations.active();
-        if (!owner.equals(generation.namespace())) throw new SkillReloadException("No active namespace '" + owner + "'");
-        return generation.skillCatalog();
+    @Override public SkillCatalog snapshot(String namespace) {
+        return generations.active(SkillIdentity.normalizeNamespace(namespace)).skillCatalog();
     }
 
-    private String readWhileOpen()
-    {
-        final String[] result = new String[1];
-        try { lifecycle.whileAdmissionOpen(() -> result[0] = generations.active().id()); }
-        catch (RejectedExecutionException ex)
-        { throw new SkillReloadException("Cannot prepare skill update after shutdown began", ex); }
+    @Override public void remove(String namespace, String expectedGenerationId) {
+        String target = SkillIdentity.normalizeNamespace(namespace);
+        SkillGenerationManager.Retirement[] retirement = new SkillGenerationManager.Retirement[1];
+        try { lifecycle.whileAdmissionOpen(() -> retirement[0] = generations.remove(target, expectedGenerationId)); }
+        catch (RejectedExecutionException ex) { throw new SkillReloadException("Cannot remove namespace after shutdown began", ex); }
+        SkillGenerationManager.dispatch(retirement[0]);
+    }
+
+    private SkillGenerationManager.PreparationView readWhileOpen(String namespace) {
+        final SkillGenerationManager.PreparationView[] result = new SkillGenerationManager.PreparationView[1];
+        try { lifecycle.whileAdmissionOpen(() -> result[0] = generations.capturePreparation(namespace)); }
+        catch (RejectedExecutionException ex) { throw new SkillReloadException("Cannot prepare skill update after shutdown began", ex); }
         return result[0];
     }
 
@@ -210,10 +173,11 @@ public final class DefaultSkillReloader implements SkillReloader
 
         @Override public String generationId() { return generation.id(); }
         @Override public SkillCatalog snapshot() { return generation.skillCatalog(); }
-        @Override public synchronized void close()
-        {
-            if (closed || published) return;
-            closed = true;
+        @Override public void close() {
+            synchronized (this) {
+                if (closed || published) return;
+                closed = true;
+            }
             generation.close();
         }
     }

@@ -218,14 +218,14 @@ class ExecutionCoordinatorTest {
         var generations = registry.manager();
         var retired = new java.util.concurrent.CopyOnWriteArrayList<String>();
         generations.onGenerationRetired(retired::add);
-        var captured = generations.capture();
+        var captured = generations.capture("default");
         var lifecycle = new FrameworkExecutionLifecycle(new StaticApplicationContext(),
                 Duration.ofSeconds(1), Executors.newSingleThreadExecutor());
         var root = lifecycle.admitRoot(captured.lease());
         var session = new LoomspanSession("failed-frame", "restLookup", 3);
         session.attachAdmittedRoot(root);
         assertThat(root.claimExecution()).isTrue();
-        generations.activate(ai.loomspan.testkit.TestSkillGenerations.empty());
+        ai.loomspan.testkit.TestSkillGenerations.activate(generations, ai.loomspan.testkit.TestSkillGenerations.empty());
         assertThat(retired).isEmpty();
 
         ExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK)

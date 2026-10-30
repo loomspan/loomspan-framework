@@ -331,7 +331,7 @@ class TypeSafeSkillIntegrationTest {
                                         .isEqualTo(SkillKind.TYPESAFE);
                                 var entry =
                                         context.getBean(SkillGenerationManager.class)
-                                                .active()
+                                                .active("default")
                                                 .registeredSkillCatalog()
                                                 .find("judgment")
                                                 .orElseThrow();
@@ -621,7 +621,7 @@ class TypeSafeSkillIntegrationTest {
                                                 .skill("judgment")
                                                 .orElseThrow()
                                                 .outputSchema();
-                                var oldGeneration = context.getBean(SkillGenerationManager.class).active();
+                                var oldGeneration = context.getBean(SkillGenerationManager.class).active("default");
                                 var oldClient = oldGeneration.runtime().connection("native").nativeClient();
                                 var reloader = context.getBean(SkillReloader.class);
                                 var retired = new CountDownLatch(1);
@@ -634,8 +634,7 @@ class TypeSafeSkillIntegrationTest {
                                     try {
                                         assertThat(arrived.await(5, TimeUnit.SECONDS)).isTrue();
                                         reloader.publish(
-                                                reloader.prepare(
-                                                        List.of(
+                                                reloader.prepare("default", List.of(
                                                                 new SkillDocument(
                                                                         " opaque | Source ",
                                                                         leaf().replace(
@@ -643,10 +642,10 @@ class TypeSafeSkillIntegrationTest {
                                                                                             + " ${/input}",
                                                                                         "state:"
                                                                                             + " 'new"
-                                                                                            + " ${/input/caseId}'")))));
+                                                                                            + " ${/input/caseId}'"))), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class))));
                                         var supplied =
                                                 context.getBean(SkillGenerationManager.class)
-                                                        .active()
+                                                        .active("default")
                                                         .registeredSkillCatalog()
                                                         .find("judgment")
                                                         .orElseThrow();
@@ -860,15 +859,14 @@ class TypeSafeSkillIntegrationTest {
                                 assertThat(context).hasNotFailed();
                                 var reloader = context.getBean(SkillReloader.class);
                                 reloader.publish(
-                                        reloader.prepare(
-                                                List.of(
+                                        reloader.prepare("default", List.of(
                                                         new SkillDocument(
                                                                 "published leaf", blocks.get(2)),
                                                         new SkillDocument(
                                                                 "published parent",
                                                                 blocks.get(3)),
                                                         new SkillDocument("published fixed leaf", blocks.get(4)),
-                                                        new SkillDocument("published binding parent", blocks.get(5)))));
+                                                        new SkillDocument("published binding parent", blocks.get(5))), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class))));
                                 var template = context.getBean(SkillTemplate.class);
                                 String generation = reloader.snapshot("default").generationId();
                                 assertThat(template.invoke("assessContact", documentedInput, v -> sessionIds.add(v.sessionId())))
@@ -1183,10 +1181,9 @@ output_from: {skill: judgment}
                                 assertThat(context).hasNotFailed();
                                 var reloader = context.getBean(SkillReloader.class);
                                 reloader.publish(
-                                        reloader.prepare(
-                                                List.of(
+                                        reloader.prepare("default", List.of(
                                                         new SkillDocument("leaf", document),
-                                                        new SkillDocument("parent", parent))));
+                                                        new SkillDocument("parent", parent)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class))));
                                 var template = context.getBean(SkillTemplate.class);
                                 assertThat(invoke(template, Map.of("count", "3"))).isEqualTo("{}");
                                 assertThat(
@@ -1275,7 +1272,7 @@ output_from: {skill: judgment}
                     .run(context -> {
                         assertThat(context).hasNotFailed();
                         var reloader = context.getBean(SkillReloader.class);
-                        reloader.publish(reloader.prepare(List.of(new SkillDocument("leaf", document), new SkillDocument("parent", parent))));
+                        reloader.publish(reloader.prepare("default", List.of(new SkillDocument("leaf", document), new SkillDocument("parent", parent)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class))));
                         assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("parent", Map.of("candidates", Map.of("A", "first")), v -> sessionIds.add(v.sessionId())))
                                 .isInstanceOf(SkillException.class)
                                 .hasStackTraceContaining(scenario.equals("budget") ? "MAX_PROVIDER_ATTEMPTS" : "judgment");

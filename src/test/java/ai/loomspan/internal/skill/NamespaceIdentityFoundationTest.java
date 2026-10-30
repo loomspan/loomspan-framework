@@ -36,10 +36,10 @@ class NamespaceIdentityFoundationTest {
     @Test void targetFeedbackAndGenerationsUseCanonicalOwnership() {
         var manager=manager(javaSkill("alpha-fixed"),javaSkill("beta-fixed"));
         var docs=List.of(rest("search"));
-        var result=manager.validate("Alpha",docs);
+        var result=manager.validate(manager.capturePreparation("Alpha"), docs, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(result.valid()).isTrue();
         assertThat(result.skills()).extracting(ValidatedSkill::name).containsExactly("alpha-fixed","alpha-search");
-        var alpha=manager.prepare("ALPHA",docs); var beta=manager.prepare("Beta",docs);
+        var alpha=manager.prepare(manager.capturePreparation("ALPHA"), docs, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture")); var beta=manager.prepare(manager.capturePreparation("Beta"), docs, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
         assertThat(alpha.namespace()).isEqualTo("alpha"); assertThat(beta.namespace()).isEqualTo("beta");
         assertThat(alpha.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("alpha-fixed","alpha-search");
         assertThat(beta.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("beta-fixed","beta-search");
@@ -51,11 +51,11 @@ class NamespaceIdentityFoundationTest {
         assertThat(retained.skill("beta-search")).isEmpty();
     }
     @Test void validationDoesNotReserveCandidateIdsAndErrorsAreIncomplete() {
-        var manager=manager(); var first=manager.prepare("alpha",List.of(rest("search")));
-        for(int i=0;i<3;i++) assertThat(manager.validate("alpha",List.of(rest("search"))).valid()).isTrue();
-        var bad=manager.validate("alpha",List.of(rest("search"),rest("x".repeat(59))));
+        var manager=manager(); var first=manager.prepare(manager.capturePreparation("alpha"), List.of(rest("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
+        for(int i=0;i<3;i++) assertThat(manager.validate(manager.capturePreparation("alpha"), List.of(rest("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
+        var bad=manager.validate(manager.capturePreparation("alpha"), List.of(rest("search"),rest("x".repeat(59))), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(bad.valid()).isFalse(); assertThat(bad.skills()).isEmpty();
-        var second=manager.prepare("alpha",List.of(rest("search")));
+        var second=manager.prepare(manager.capturePreparation("alpha"), List.of(rest("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
         long ordinal=Long.parseLong(first.id().substring(first.id().lastIndexOf('-')+1));
         assertThat(second.id()).endsWith("-"+(ordinal+1));
     }

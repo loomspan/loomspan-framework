@@ -49,7 +49,7 @@ while execution still enforces authorization with the authentication captured at
 handoff. See [invocation.md](invocation.md).
 
 Pass `descriptor.name()` directly to invocation, validation or handoff; do not split
-it or reconstruct a local alias. PR 27.2 supplies active-registry/removal integration;
+it or reconstruct a local alias. PR 27.2 implements active-registry/removal integration;
 PR 27.3 verifies descriptor-driven root admission.
 
 ## Source Anchors
@@ -60,3 +60,15 @@ PR 27.3 verifies descriptor-driven root admission.
   protects session-free calling-authentication authorization.
 - `LoomspanPublicSurfaceArchitectureTest`
   protects the closed public surface.
+
+## Namespace publication boundary
+
+Complete publications require namespace, supplied documents and ExecutionConfiguration.
+Startup namespaces are Private; foreign outgoing references require a Public target.
+Fixed Java methods remain assigned to their original namespace across replacement
+and explicit recreation; withdrawal preserves beans and retained work. There is no
+activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
+for complete signatures, sequencing and retirement. This slice implements preparation
+and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+
+Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

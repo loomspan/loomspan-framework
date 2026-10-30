@@ -24,7 +24,7 @@ public final class TestCapabilityRegistry
         if (!name.equals(metadata.name())) throw new IllegalArgumentException("name mismatch");
         CapabilityMetadata prior = capabilities.putIfAbsent(name, metadata);
         if (prior != null) throw new CapabilityCollisionException("duplicate capability " + name);
-        if (manager != null) manager.activate(generation());
+        if (manager != null) ai.loomspan.testkit.TestSkillGenerations.activate(manager, generation());
     }
 
     public CapabilityMetadata getCapability(String name)
@@ -67,7 +67,7 @@ public final class TestCapabilityRegistry
                 () -> { throw new AssertionError("test manager must not prepare"); },
                 new ai.loomspan.internal.runtime.input.SkillInputContractResolver(),
                 new org.springframework.beans.factory.support.StaticListableBeanFactory());
-        manager.activate(generation());
+        ai.loomspan.testkit.TestSkillGenerations.activate(manager, generation());
         return manager;
     }
 }
