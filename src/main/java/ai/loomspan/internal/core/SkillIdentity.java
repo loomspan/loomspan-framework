@@ -23,6 +23,13 @@ public record SkillIdentity(String namespace, String localName)
         return new SkillIdentity(reference.substring(0, separator), reference.substring(separator + 1));
     }
 
+    /** Resolve input at an authoring or host-entry boundary, never during canonical lookup. */
+    public static SkillIdentity resolve(String reference, String ownerNamespace)
+    {
+        if (reference == null || reference.indexOf('-') >= 0) return parse(reference);
+        return new SkillIdentity(ownerNamespace, reference);
+    }
+
     public static String normalizeNamespace(String namespace)
     {
         component(namespace, "namespace", 32);

@@ -122,19 +122,20 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                   required: [caseId]
                   additionalProperties: false
                 allowed_skills:
-                  - {name: default-first, max_tasks: 2}
-                  - {name: default-second, max_tasks: 2}
+                  - {name: first, max_tasks: 2}
+                  - {name: second, max_tasks: 2}
                   - {name: default-later, required: true, max_tasks: 1}
                 output_bindings:
                   /caseId: {from: input, path: /caseId}
                   /assessment: {from: child_result, skill: default-first, path: /assessment}
-                  /rows: {from: child_result, skill: default-second, path: ''}
+                  /rows: {from: child_result, skill: second, path: ''}
                 output_schema_max_retries: 1
                 output_schema:
                   type: object
                   properties:
                     caseId: {type: string}
                     assessment:
+                      evidence: first
                       type: object
                       additionalProperties: true
                     rows:

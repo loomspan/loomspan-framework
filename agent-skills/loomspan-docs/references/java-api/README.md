@@ -92,9 +92,9 @@ relevant topic set.
 | Topic | Coverage | Notes |
 | --- | --- | --- |
 | Supported public types | Source-verified | Exact twenty-four-type allowlist and package boundaries |
-| Catalog and pre-checks | Catalog foundation source-verified | Explicit namespace acquisition, immutable qualified metadata, malformed/foreign lookup, candidate IDs; active registry/removal implemented; fresh reachable admission and temporary validation are covered by SkillReachableAdmissionTest |
+| Catalog and pre-checks | Catalog foundation source-verified | Explicit namespace acquisition, immutable qualified metadata, strict catalog lookup versus local-to-default invoke/validate/handoff resolution (SkillReachableAdmissionTest), malformed/foreign lookup, candidate IDs; active registry/removal implemented; fresh reachable admission and temporary validation are covered by SkillReachableAdmissionTest |
 | Two-stage skill updates | Source-verified | Complete skill and execution candidate, environment or host-map credential references, frozen generation, process-local ID, one-shot publication, candidate disposal, safe retirement callback, and application-owned readiness and cleanup |
-| Skill invocation | Source-verified | Direct invocation plus atomic single-use handoff with captured generation ID, input normalization and validation, result, session, security context, and observer timing |
+| Skill invocation | Source-verified | Local-to-default or explicit-qualified invocation and atomic single-use handoff (SkillReachableAdmissionTest) with captured generation ID, input normalization and validation, result, session, security context, and observer timing |
 | Java skill annotations | Source-verified | Exact shared names, direct root/child invocation, proxy constraints, and supported application usage; detailed reflected input shapes live in `skill-authoring` |
 | Execution observations | Source-verified | Immutable completed view/event values, canonical namespace identities, entry versus target generation facts, one observer flow and unchanged trust boundary; NamespaceObservationIntegrationTest and ConsoleTraceFixtureCorpusTest |
 | Facade failures | Source-verified | Validation, authorization, safe wrapping, observer failures, and fatal errors |

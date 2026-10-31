@@ -123,18 +123,29 @@ for complete schemas, object pointers, dependencies and diagnostics.
 
 ## Skill identities and catalogs
 
-Declarations keep local names such as `search`; every reference is qualified,
-including `default-search`. Java `@SkillMethod(namespace = "Tax", name = "search", description = "Search")`
+Declarations keep local names such as `search`. All `SkillTemplate` invocation,
+validation and observer overloads, and both `SkillInvocationHandoff` input forms,
+accept `search` as `default-search`, regardless of ambient execution namespace.
+Authored `allowed_skills`, `output_from.skill`, child-result input/output binding
+producers and evidence leaves may use local names relative to the containing
+skill's owner: `search` in `sales` becomes `sales-search`. Explicit `shared-search`
+keeps its cross-namespace meaning. Startup files belong to `default`; API-supplied
+documents use the validation/preparation namespace. Qualification happens before
+reference comparisons and dependency validation; raw YAML, prompts and evidence
+source positions are preserved. Java `@SkillMethod(namespace = "Tax", name = "search", description = "Search")`
 registers `tax-search`; the namespace defaults to `default`. Only namespace case
 normalizes; local-name case remains exact. Components start with an ASCII letter
 or underscore and contain ASCII letters, digits or underscores. Namespace length
 is at most 32 and total identity length at most 64 including its single hyphen.
-No shorthand, aliases, fallback search, trimming or character replacement is supported.
+Combined length is enforced after qualification. Local and qualified spellings
+of the same child are duplicates. Missing local targets fail in their resolved
+namespace; no aliases, fallback search, trimming or character replacement exists.
+Runtime keys, model tool/plan selections, REST handoffs and observations remain qualified.
 
 Inject `SkillReloader` and acquire `SkillCatalog catalog = reloader.snapshot("default")`.
 There is no injected startup catalog or no-argument acquisition. `namespace()` and
 `generationId()` identify the catalog's owner and opaque generation, even when empty.
-Descriptors and validation feedback carry qualified names. Lookup rejects malformed
+Descriptors and validation feedback carry qualified names. `SkillCatalog.skill(...)` requires qualification and rejects local or malformed
 references and returns empty for valid unknown or foreign identities. Retained
 catalogs are immutable, sorted, unfiltered metadata with no resource lease or
 execution reservation. Pass `descriptor.name()` directly to invocation/validation

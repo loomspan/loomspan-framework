@@ -36,7 +36,7 @@ Scalar entries and scalar flow lists are invalid. An unconstrained child is stil
 
 The effective minimum is `max(min_tasks if present else 0, required == true ? 1 : 0)`. Therefore `required: false` does not negate `min_tasks`, and `max_tasks: 1` permits zero or one task.
 
-References MUST be qualified and unique after namespace normalization; see [canonical identity](mental-model.md#canonical-namespace-identity). Local declaration grammar is not reference grammar. Bounds MUST be non-negative integers, `required` MUST be Boolean, and `max_tasks` MUST NOT be below the effective minimum. Unknown fields, null entries, mixed scalar/object sequences, and explicit null field values are rejected with an indexed `allowed_skills[index]...` path.
+References MAY be local to the containing owner or explicitly qualified and MUST be unique after canonical resolution; see [canonical identity](mental-model.md#canonical-namespace-identity). Local `child` and owner-qualified `sales-child` are duplicates in sales. Bounds MUST be non-negative integers, `required` MUST be Boolean, and `max_tasks` MUST NOT be below the effective minimum. Unknown fields, null entries, mixed scalar/object sequences, and explicit null field values are rejected with an indexed `allowed_skills[index]...` path.
 
 Declaring `min_tasks`, `max_tasks`, or `required` requires the parent to explicitly declare `planning_mode: true`; this includes `required: false`. A name-only object remains valid on an LLM-backed direct skill.
 

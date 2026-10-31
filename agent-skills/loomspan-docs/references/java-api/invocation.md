@@ -24,7 +24,7 @@ void validate(String skillName, Map<String, Object> input);
 ```
 
 `skillName` MUST identify a registered Java, REST, TypeSafe, or model-backed YAML skill by its exact name.
-For Java, combine its owning annotation namespace with the local annotation name (or canonical method name when omitted). Pass a catalog descriptor name unchanged. Every overload uses the shared qualified parser: namespace case normalizes, local-name case remains exact, namespace length is at most 32 and total identity length at most 64. Missing namespaces fail without creation.
+For Java, combine its owning annotation namespace with the local annotation name (or canonical method name when omitted). Pass a catalog descriptor name unchanged. Every invoke/validate/observer overload and both handoff forms accept local `search` as `default-search`, always independent of any ambient namespace. Explicit `tax-search` stays tax-scoped. Resolution happens before capture with no fallback or namespace search: namespace case normalizes, local-name case remains exact, namespace length is at most 32 and total identity length at most 64. Missing namespaces fail without creation.
 Bean names and method signatures are diagnostics, never invocation aliases.
 
 ```java
@@ -40,7 +40,7 @@ public final class InvoiceWorkflow {
 
     public String check(String invoiceText) {
         return skills.invoke(
-                "default-duplicateInvoiceChecker",
+                "duplicateInvoiceChecker",
                 Map.of("payload", invoiceText));
     }
 }
@@ -93,7 +93,7 @@ session so authorization is evaluated with the caller's security context.
 Preparation preserves the overload-specific error order. The lifecycle is:
 
 ```text
-qualified target -> parse and capture reachable generations/leases atomically with publication
+local or qualified target -> resolve (local uses default) and capture reachable generations/leases atomically with publication
 Object input -> reject null -> convert with Jackson -> prepared map
 Map input -> normalize an allowed null map to {} -> prepared map
 prepared map -> validate the entry input contract
@@ -124,7 +124,7 @@ exposing events, or when defining exception handling.
 Inject `SkillInvocationHandoff` when an application must transfer a request to
 Loomspan while holding its own dispatch gate, then execute it after releasing
 that gate. `handoff(name, object)` and `handoff(name, map)` perform the same
-qualified parsing, reachable snapshot checks, conversion, input validation and entry RBAC as direct invocation, capture
+default-local/explicit-qualified target resolution, reachable snapshot checks, conversion, input validation and entry RBAC as direct invocation, capture
 the current Spring Security authentication, and atomically reserve one root.
 They do not create a session, submit work, invoke an observer, or wait.
 
@@ -133,7 +133,7 @@ AdmittedSkillInvocation admitted;
 synchronized (dispatchGate) {
     if (dispatchClosed) return;
     SecurityContextHolder.getContext().setAuthentication(authentication);
-    admitted = handoff.handoff("default-duplicateInvoiceChecker", input);
+    admitted = handoff.handoff("duplicateInvoiceChecker", input);
 }
 try {
     String snapshotId = snapshotByGeneration.get(admitted.generationId());
@@ -200,3 +200,5 @@ the real facade; see [compatibility-and-boundaries.md](compatibility-and-boundar
   protects observer timing and exception propagation.
 - `DefaultSkillTemplateTest#capturesCurrentSecurityContextAuthenticationForRootInvocation`
   protects security-context capture.
+
+Boundary evidence: `SkillReachableAdmissionTest#localDefaultReferencesMatchQualifiedAcrossAllRootOperations` and `#nestedExecutionRejectsAndReleasesWhileValidationAndHandoffPreparationStayAllowed` cover local equivalence, no fallback and captured default preparation inside foreign execution.

@@ -12,6 +12,12 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class NamespaceIdentityFoundationTest {
+    @Test void localAuthoredReferencesUseOwningNamespace() {
+        String yaml = "name: parent\ndescription: parent\nmodel: model\nallowed_skills: [{name: child}]\n";
+        var checked = new YamlSkillCatalog(properties()).checkedSupplied("sales", List.of(new SkillDocument("local", yaml)), false);
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions().getFirst().allowedSkills()).containsExactly("sales-child");
+    }
     private LoomspanProperties properties() {
         var props = new LoomspanProperties();
         props.getSkills().setLocations(List.of("classpath:/namespace-foundation-none/*.yaml"));
@@ -50,6 +56,72 @@ class NamespaceIdentityFoundationTest {
         assertThat(retained.generationId()).isEqualTo(alpha.id()); assertThat(retained.skill("ALPHA-search")).isPresent();
         assertThat(retained.skill("beta-search")).isEmpty();
     }
+    @Test void localAndMixedAuthoredFieldsCompileWithoutRewritingContent() {
+        for (String owner : List.of("default", "sales", "other")) {
+            for (boolean qualifiedChild : List.of(false, true)) {
+                String child = qualifiedChild ? owner + "-child" : "child";
+                String producer = qualifiedChild ? "child" : owner + "-child";
+                String base = "name: parent\ndescription: Keep child and shared-child.\nmodel: model\nprompt: Keep child and shared-child exactly.\nplanning_mode: true\n";
+                String forwarding = base + "allowed_skills: [{name: " + child + ", required: true, max_tasks: 1}]\noutput_from: {skill: " + producer + "}\n";
+                String bindings = base + "allowed_skills:\n - name: " + child + "\n - name: consumer\n   input_bindings: {/id: {from: child_result, skill: " + producer + ", path: ''}}\n - name: shared-child\n"
+                        + "output_schema: {type: object, properties: {id: {type: string, evidence: 'child or shared-child'}}}\n"
+                        + "output_bindings: {/id: {from: child_result, skill: " + producer + ", path: ''}}\n";
+                for (String yaml : List.of(forwarding, bindings)) {
+                    var checked = new YamlSkillCatalog(properties()).checkedSupplied(owner, List.of(new SkillDocument("exact source", yaml)), false);
+                    assertThat(checked.issues()).as(yaml).isEmpty();
+                    var definition = checked.definitions().getFirst();
+                    assertThat(definition.allowedSkills()).contains(owner + "-child");
+                    assertThat(definition.source().bytes()).isEqualTo(yaml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    assertThat(definition.prompt()).isEqualTo("Keep child and shared-child exactly.");
+                    assertThat(definition.manifest().getName()).isEqualTo("parent");
+                    if (yaml.equals(forwarding)) assertThat(definition.outputFromSkill()).isEqualTo(owner + "-child");
+                    else {
+                        assertThat(definition.allowedSkills()).contains("shared-child", owner + "-consumer");
+                        assertThat(definition.allowedSkillConstraints().get(1).inputBindings().getFirst().skillIdentity().toString()).isEqualTo(owner + "-child");
+                        assertThat(definition.outputBindings().getFirst().skillIdentity().toString()).isEqualTo(owner + "-child");
+                        assertThat(definition.evidenceContract().canonicalExpressionForClaim("id")).isEqualTo(owner + "-child or shared-child");
+                        assertThat(definition.manifest().getOutputSchema().getProperties().get("id").getEvidence()).isEqualTo("child or shared-child");
+                    }
+                }
+            }
+        }
+        String duplicate = "name: parent\ndescription: parent\nmodel: model\nallowed_skills: [{name: child}, {name: SALES-child}]\n";
+        var checked = new YamlSkillCatalog(properties()).checkedSupplied("sales", List.of(new SkillDocument("duplicate raw", duplicate)), false);
+        assertThat(checked.issues()).singleElement().satisfies(issue -> assertThat(issue.message()).contains("duplicate allowed skill", "SALES-child"));
+        assertThat(new YamlSkillCatalog(properties()).checkedSupplied("sales", List.of(new SkillDocument("case", duplicate.replace("SALES-child", "Child"))), false).issues()).isEmpty();
+    }
+
+    @Test void localReferenceLimitsApplyToEveryStructuredPositionAndEvidenceColumnsStayAuthored() {
+        String owner = "n".repeat(32);
+        for (int size : List.of(31, 32)) for (String field : List.of("allowed", "forward", "input", "output", "evidence")) {
+            String ref = "s".repeat(size);
+            String base = "name: parent\ndescription: parent\nmodel: model\nplanning_mode: true\n";
+            String yaml = switch (field) {
+                case "allowed" -> base + "allowed_skills: [{name: " + ref + "}]\n";
+                case "forward" -> base + "allowed_skills: [{name: " + ref + ", required: true, max_tasks: 1}]\noutput_from: {skill: " + ref + "}\n";
+                case "input" -> base + "allowed_skills: [{name: consumer, input_bindings: {/id: {from: child_result, skill: " + ref + ", path: ''}}}, {name: default-child}]\n";
+                case "output" -> base + "allowed_skills: [{name: default-child}]\noutput_schema: {type: object}\noutput_bindings: {/id: {from: child_result, skill: " + ref + ", path: ''}}\n";
+                default -> base + "allowed_skills: [{name: default-child}]\noutput_schema: {type: object, properties: {id: {type: string, evidence: '" + ref + "'}}}\n";
+            };
+            // Successful producer comparison requires a matching declaration; failures must
+            // be due to combined identity length rather than target availability.
+            if (size == 31) yaml = yaml.replace("default-child", owner + "-" + ref);
+            var checked = new YamlSkillCatalog(properties()).checkedSupplied(owner, List.of(new SkillDocument("limit source", yaml)), false);
+            if (size == 31) assertThat(checked.issues()).as(field).isEmpty();
+            else assertThat(checked.issues()).as(field).anySatisfy(issue -> assertThat(issue.message()).contains("length 65", "limit 64"));
+        }
+        String base = "name: parent\ndescription: parent\nmodel: model\nallowed_skills: [{name: first}, {name: Second}]\n";
+        for (String expression : List.of("  first and second", "  first and missing", "  first and )")) {
+            var result = new YamlSkillCatalog(properties()).checkedSupplied("sales", List.of(new SkillDocument("raw diagnostic", base
+                    + "output_schema: {type: object, properties: {id: {type: string, evidence: '" + expression + "'}}}\n")), false);
+            assertThat(result.issues()).singleElement().satisfies(issue -> {
+                assertThat(issue.sourceName()).isEqualTo("raw diagnostic");
+                assertThat(issue.fieldPath()).isEqualTo("output_schema.properties.id.evidence");
+                assertThat(issue.message()).contains("column 13");
+                if (expression.contains("second")) assertThat(issue.message()).contains("sales-Second", "did you mean");
+            });
+        }
+    }
     @Test void validationDoesNotReserveCandidateIdsAndErrorsAreIncomplete() {
         var manager=manager(); var first=manager.prepare(manager.capturePreparation("alpha"), List.of(rest("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
         for(int i=0;i<3;i++) assertThat(manager.validate(manager.capturePreparation("alpha"), List.of(rest("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
@@ -72,7 +144,7 @@ class NamespaceIdentityFoundationTest {
     }
     @Test void allReferenceFamiliesRejectMalformedAndOversizedReferencesWithContext() {
         var catalog=new YamlSkillCatalog(properties());
-        for(String ref:List.of("child","a/b","a:b","a-b-c","n".repeat(33)+"-s","n".repeat(32)+"-"+"s".repeat(32))) {
+        for(String ref:List.of("-child","a/b","a:b","a-b-c","n".repeat(33)+"-s","n".repeat(32)+"-"+"s".repeat(32))) {
             for(String field:List.of("allowed","forward","input","output","evidence")) {
                 String base="name: parent\ndescription: parent\nmodel: model\nplanning_mode: true\n";
                 String yaml=switch(field) {

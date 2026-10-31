@@ -13,18 +13,18 @@ Use an `evidence` annotation on an immediate root `output_schema` property when 
 
 ```yaml
 allowed_skills:
-  - name: default-classifyIncident
-  - name: default-investigateNetwork
-  - name: default-investigateApp
+  - name: classifyIncident
+  - name: investigateNetwork
+  - name: investigateApp
 output_schema:
   type: object
   properties:
     severity:
       type: string
-      evidence: default-classifyIncident
+      evidence: classifyIncident
     likelyCause:
       type: string
-      evidence: default-classifyIncident and (default-investigateNetwork or default-investigateApp)
+      evidence: classifyIncident and (investigateNetwork or investigateApp)
   required: [severity, likelyCause]
   additionalProperties: false
 ```
@@ -57,10 +57,10 @@ primary        := SKILL_NAME | "(" expression ")"
 
 - `and` binds more tightly than `or`; parentheses override precedence.
 - Operators are case-insensitive whole tokens and render canonically in lowercase.
-- Leaves MUST be qualified identities and match a direct `allowed_skills` entry after namespace normalization; local-name case remains exact.
+- Leaves MAY be local to the containing skill's owner or explicitly qualified. Each compiled identity MUST match a direct `allowed_skills` entry after namespace normalization; mixed spellings are equivalent and local-name case remains exact. Original expression text and 1-based token columns are preserved.
 - Whitespace around and between tokens is insignificant.
 - `and` and `or` are reserved in every casing. Qualified identities such as `and-search`, `default-androidCheck` and `default-orderLookup` remain identifiers.
-- `not`, `&&`, `||`, quoted names, implicit operators, predicates, and output-value conditions are unsupported.
+- Negation, `&&`, `||`, quoted names, implicit operators, predicates, and output-value conditions are unsupported. Only `and` and `or` are reserved operator tokens.
 
 ## Truth sets
 
@@ -90,7 +90,7 @@ Schema validity checks output structure, successful-child annotations check exec
 ## Authoring procedure
 
 1. Identify immediate root output properties needing supportability enforcement.
-2. List the declaring skill's direct public children in `allowed_skills`.
+2. List the declaring skill's direct children (same-owner Private or accessible foreign Public targets) in `allowed_skills`.
 3. Put the smallest sufficient expression in each property's `evidence` annotation.
 4. Use `and` for all-required children and `or` for genuine substitutes.
 5. Verify exact casing and direct-child scope.
@@ -114,3 +114,5 @@ Evidence also does not impose unconditional generated-plan task cardinality. Use
 - `YamlSkillEvidencePropertyCatalogTest.java` (`src/test/java/ai/loomspan/internal/skill/YamlSkillEvidencePropertyCatalogTest.java`) and `YamlSkillEvidenceExpressionCatalogAdditionalTest.java` (`src/test/java/ai/loomspan/internal/skill/YamlSkillEvidenceExpressionCatalogAdditionalTest.java`) protect placement, scalar shape, exact identity, and diagnostics.
 - `OutputSchemaCallAdvisorTest.java` (`src/test/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisorTest.java`) and `StepPromptBuilderTest.java` (`src/test/java/ai/loomspan/internal/runtime/step/StepPromptBuilderTest.java`) protect metadata non-leakage.
 - `NestedSuccessfulSkillBoundaryTest.java` (`src/test/java/ai/loomspan/internal/runtime/tool/NestedSuccessfulSkillBoundaryTest.java`) protects nested boundary credit.
+
+Context/column evidence: `EvidenceExpressionParserTest#contextualLeavesPreserveGrammarTruthAndOriginalColumnsWithoutContextLeakage` and `NamespaceIdentityFoundationTest#localReferenceLimitsApplyToEveryStructuredPositionAndEvidenceColumnsStayAuthored`. Runtime truth sets contain the compiled qualified identities.

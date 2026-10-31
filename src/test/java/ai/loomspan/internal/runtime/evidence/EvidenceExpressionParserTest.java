@@ -13,6 +13,30 @@ class EvidenceExpressionParserTest
 {
     private final EvidenceExpressionParser parser = new EvidenceExpressionParser();
 
+    @Test void contextualLeavesPreserveGrammarTruthAndOriginalColumnsWithoutContextLeakage()
+    {
+        String raw = "  first and (second or shared-third)";
+        var expression = parser.parse(raw, "Sales");
+        assertThat(expression.canonical()).isEqualTo("sales-first and (sales-second or shared-third)");
+        assertThat(expression.referencedSkills()).containsExactly("sales-first", "sales-second", "shared-third");
+        assertThat(expression.evaluate(Set.of("sales-first", "sales-second"))).isTrue();
+        assertThat(expression.evaluate(Set.of("sales-first", "shared-third"))).isTrue();
+        assertThat(expression.evaluate(Set.of("sales-first"))).isFalse();
+        var all = (EvidenceExpression.AllOf) expression;
+        assertThat(((EvidenceExpression.Skill) all.expressions().getFirst()).column()).isEqualTo(3);
+        var any = (EvidenceExpression.AnyOf) all.expressions().get(1);
+        assertThat(((EvidenceExpression.Skill) any.expressions().getFirst()).column()).isEqualTo(raw.indexOf("second") + 1);
+        assertThat(parser.parse("first", "other").canonical()).isEqualTo("other-first");
+        assertThatThrownBy(() -> parser.parse("first")).isInstanceOf(EvidenceExpressionParser.ParseException.class);
+        assertThatThrownBy(() -> new EvidenceExpression.Skill("first", 1)).isInstanceOf(IllegalArgumentException.class);
+        for (String operator : Set.of("and", "AND", "Or", "OR"))
+            assertThatThrownBy(() -> parser.parse(operator, "sales")).hasMessageContaining("reserved operator");
+        assertThat(parser.parse("sales-and or and-search", "other").canonical()).isEqualTo("sales-and or and-search");
+        assertThatThrownBy(() -> parser.parse(" first and )", "sales"))
+                .isInstanceOf(EvidenceExpressionParser.ParseException.class)
+                .extracting(ex -> ((EvidenceExpressionParser.ParseException) ex).column()).isEqualTo(12);
+    }
+
     @ParameterizedTest
     @CsvSource({
             "default-a,default-a",

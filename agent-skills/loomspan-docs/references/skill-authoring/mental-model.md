@@ -29,28 +29,41 @@ Startup YAML belongs to `default`; Java `@SkillMethod.namespace` defaults to
 `default`. An empty Java annotation `name` uses the canonical method name.
 Authoritative ownership constructs one callable identity: `namespace-localName`.
 
-Every reference MUST be qualified, including same-namespace and default references:
-`default-search`, `tax-calculateTax`. This includes `allowed_skills`, evidence,
-`output_from.skill`, and input/output binding producers. Namespace case normalizes
-to lowercase; local names remain case-sensitive. `Tax-search` equals `tax-search`,
-while `tax-Search` differs. `a_b-c` and `a-b_c` differ.
+Input qualification is optional at two boundaries:
+
+| Input | Local `search` resolves to | Explicit `shared-search` |
+| --- | --- | --- |
+| All `SkillTemplate` invocation/validation/observer and handoff overloads | `default-search`, regardless of ambient execution | `shared-search` |
+| Authored references in a document owned by `sales` | `sales-search` | `shared-search` |
+
+Authored references include `allowed_skills`, evidence leaves, `output_from.skill`
+and child-result input/output binding producers. Startup ownership is `default`;
+API validation/preparation supplies the owner for the same document. Ownership is
+never inferred from available targets. Missing `sales-search` fails even if
+`default-search` or a Public `shared-search` exists. Qualification grants no
+access: declared-child, same-namespace/foreign Public visibility and RBAC rules remain.
+Catalog lookup, runtime keys, model plan/tool selections, REST handoffs and
+observations MUST use qualified identities. Namespace case normalizes to lowercase;
+local case remains exact: `Tax-search` equals `tax-search`, while `tax-Search` differs.
+`a_b-c` and `a-b_c` differ. Local `child` and explicit owner `sales-child` are
+canonical duplicates in sales; bindings may mix these spellings.
 
 Each component starts with an ASCII letter or underscore and contains only ASCII
 letters, digits or underscores. Namespace length is at most 32; total identity
 length including its single hyphen is at most 64. Thus an N-character namespace
 leaves `63 - N` local characters (`default` leaves 56). Standalone declaration
 grammar does not waive this combined limit, including for unoffered/optional skills.
-Whitespace, slash/colon separators, extra hyphens, encoding, imports, shorthand,
+Apply combined length after owner qualification. Whitespace, slash/colon separators, extra hyphens, encoding, imports,
 wildcards and fallback searches are invalid. Loomspan never trims or repairs input.
 
 Duplicate and binding comparisons use resolved canonical identities. Source labels,
 raw YAML, prompts and original evidence expression text remain unchanged. Renaming
-a namespace means creating another namespace, updating references explicitly, and
+a namespace means creating another namespace, updating explicit references to it, and
 removing the old namespace; there is no identity-preserving rename or inheritance.
 
 **Implementation boundary:** Namespace parsing, startup, publication/removal, retained
 reachable admission and captured cross-namespace execution are implemented.
-Serialized observation and Console integration remain PR 27.5.
+Captured canonical observation metadata and existing Console consumers are implemented; see `NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest`.
 
 Each root captures an immutable association of exactly the namespace generations reached
 by its declared child graph, before input conversion or validation. Every declared branch
@@ -240,6 +253,8 @@ and explicit recreation; withdrawal preserves beans and retained work. There is 
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
 and installation, retained reachable admission and captured cross-namespace execution.
-Serialized observation/Console integration remains PR 27.5.
+Captured canonical observations and existing Console consumers are verified by `NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest`.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.
+
+Boundary evidence: `SkillReachableAdmissionTest#localDefaultReferencesMatchQualifiedAcrossAllRootOperations`, `NamespaceIdentityFoundationTest#localAndMixedAuthoredFieldsCompileWithoutRewritingContent`, and `NamespaceStartupIntegrationTest#suppliedLocalDocumentsValidateAndPrepareInEachOwnerBeforePublicationWithoutFallback`.

@@ -449,7 +449,9 @@ public class YamlSkillCatalog implements InitializingBean
 
             try
             {
-                return yamlObjectMapper.treeToValue(root, YamlSkillManifest.class);
+                YamlSkillManifest manifest = yamlObjectMapper.treeToValue(root, YamlSkillManifest.class);
+                prepareReferences(manifest);
+                return manifest;
             }
             catch (UnrecognizedPropertyException ex)
             {
@@ -665,7 +667,7 @@ public class YamlSkillCatalog implements InitializingBean
                 var source = ai.loomspan.internal.runtime.input.ObjectFieldPath.parse(value.get("path").textValue(), true);
                 String producer = null;
                 if (kind.equals("child_result")) {
-                    producer = SkillIdentity.parse(value.path("skill").textValue()).toString();
+                    producer = SkillIdentity.resolve(value.path("skill").textValue(), namespace).toString();
                 }
                 new ai.loomspan.internal.runtime.input.ChildInputBinding(destination,
                         kind.equals("input") ? ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT
@@ -756,8 +758,28 @@ public class YamlSkillCatalog implements InitializingBean
 
     private SkillIdentity reference(Resource resource, String skill, String field, String value)
     {
-        try { return SkillIdentity.parse(value); }
+        try { return SkillIdentity.resolve(value, namespace); }
         catch (IllegalArgumentException ex) { throw invalidNamedSkill(resource, skill, field, ex.getMessage()); }
+    }
+
+    private void prepareReferences(YamlSkillManifest manifest)
+    {
+        // Only structured semantic fields are qualified. The source bytes, prose and
+        // evidence expressions remain authored content; evidence compiles tokens separately.
+        for (var child : manifest.getAllowedSkills())
+        {
+            child.setName(SkillIdentity.resolve(child.getName(), namespace).toString());
+            child.getInputBindings().values().forEach(this::prepareBindingReference);
+        }
+        if (manifest.getOutputFrom() != null)
+            manifest.getOutputFrom().setSkill(SkillIdentity.resolve(manifest.getOutputFrom().getSkill(), namespace).toString());
+        manifest.getOutputBindings().values().forEach(this::prepareBindingReference);
+    }
+
+    private void prepareBindingReference(YamlSkillManifest.InputBindingManifest binding)
+    {
+        if ("child_result".equals(binding.getFrom()))
+            binding.setSkill(SkillIdentity.resolve(binding.getSkill(), namespace).toString());
     }
 
     private void validateLinter(Resource resource, YamlSkillManifest manifest)
@@ -860,7 +882,7 @@ public class YamlSkillCatalog implements InitializingBean
             ai.loomspan.internal.runtime.evidence.EvidenceExpression expression;
             try
             {
-                expression = parser.parse(evidence);
+                expression = parser.parse(evidence, namespace);
             }
             catch (ai.loomspan.internal.runtime.evidence.EvidenceExpressionParser.ParseException ex)
             {

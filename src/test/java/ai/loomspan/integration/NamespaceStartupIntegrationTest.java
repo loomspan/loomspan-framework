@@ -30,6 +30,45 @@ class NamespaceStartupIntegrationTest {
             ConfigurationPropertiesAutoConfiguration.class,LoomspanJacksonAutoConfiguration.class,LoomspanAutoConfiguration.class,LoomspanAiAutoConfiguration.class))
             .withUserConfiguration(App.class).withPropertyValues("loomspan.skills.locations=classpath:/namespace-startup-no-files/*.yaml");}
 
+    @Test void suppliedLocalDocumentsValidateAndPrepareInEachOwnerBeforePublicationWithoutFallback() throws Exception {
+        try (var server = new MockWebServer()) {
+            var configuration = modelConfiguration(server);
+            var documents = List.of(caller("leaf"), new SkillDocument("leaf", "name: leaf\ndescription: REST leaf\nrest: true\n"));
+            runner().withPropertyValues("fixture-key=test-key").run(context -> {
+                assertThat(context).hasNotFailed();
+                var reloader = context.getBean(SkillReloader.class);
+                var template = context.getBean(SkillTemplate.class);
+                for (String owner : List.of("default", "sales", "other")) {
+                    assertThat(reloader.validate(owner, documents, configuration).valid()).isTrue();
+                    try (var candidate = reloader.prepare(owner, documents, configuration)) {
+                        assertThat(candidate.snapshot().skills()).extracting(SkillDescriptor::name)
+                                .contains(owner + "-parent", owner + "-leaf");
+                        reloader.publish(candidate);
+                        server.enqueue(tool(owner + "-leaf", "{}"));
+                        server.enqueue(text("done"));
+                        var views = new ArrayList<SkillExecutionView>();
+                        assertThat(template.invoke(owner + "-parent", Map.of(), views::add)).contains("done");
+                        assertThat(views.getFirst().events()).extracting(SkillExecutionEvent::route).contains(owner + "-leaf");
+                    }
+                }
+                reloader.publish(reloader.prepare("shared", documents, configuration, NamespaceVisibility.PUBLIC));
+                var missing = List.of(caller("leaf"));
+                var feedback = reloader.validate("sales", missing, configuration);
+                assertThat(feedback.valid()).isFalse();
+                assertThat(feedback.issues()).anySatisfy(issue -> assertThat(issue.message()).contains("sales-leaf"));
+                assertThatThrownBy(() -> reloader.prepare("sales", missing, configuration)).hasMessageContaining("sales-leaf");
+                // Owner-assigned Java remains available privately in the same namespace.
+                assertThat(reloader.validate("dept", List.of(caller("fixed")), configuration).valid()).isTrue();
+                reloader.publish(reloader.prepare("dept", List.of(caller("fixed")), configuration));
+                server.enqueue(tool("dept-fixed", "{\"value\":\"same owner\"}"));
+                server.enqueue(text("Java done"));
+                assertThat(template.invoke("dept-parent", Map.of())).contains("Java done");
+                assertThat(context.getBean(Methods.class).calls).hasValue(1);
+            });
+            assertThat(server.getRequestCount()).isEqualTo(8);
+        }
+    }
+
     @Test void managedWithoutLocalFilesDirectJavaRemovalRecreationAndRestart() throws Exception {
         var ids=new ArrayList<String>();
         for(int restart=0;restart<2;restart++) try (var server = new MockWebServer()) {
@@ -83,7 +122,7 @@ class NamespaceStartupIntegrationTest {
     }
 
     @Test void embeddedSameNamespaceStartupCompositionIsValidAndForeignPrivateStartupFails(@TempDir Path directory)throws Exception{
-        var file=directory.resolve("parent.yaml");Files.writeString(file,caller("default-local").yaml());
+        var file=directory.resolve("parent.yaml");Files.writeString(file,caller("local").yaml());
         try (var server = new MockWebServer()) {
             server.enqueue(tool("default-local", "{}"));
             server.enqueue(text("local caller complete"));
@@ -96,7 +135,7 @@ class NamespaceStartupIntegrationTest {
                 var reloader = context.getBean(SkillReloader.class);
                 var startup = reloader.snapshot("default");
                 assertThat(startup.skills()).extracting(SkillDescriptor::name).contains("default-parent","default-local");
-                assertThat(context.getBean(SkillTemplate.class).invoke("default-parent", Map.of())).contains("local");
+                assertThat(context.getBean(SkillTemplate.class).invoke("parent", Map.of())).contains("local");
                 assertThat(context.getBean(Methods.class).localCalls).hasValue(1);
                 assertThat(reloader.snapshot("default").generationId()).isEqualTo(startup.generationId());
             });

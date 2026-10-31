@@ -480,7 +480,7 @@ class DefaultSkillTemplateTest {
         var lifecycle = new FrameworkExecutionLifecycle(context, Duration.ofSeconds(2), Executors.newSingleThreadExecutor());
         var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
         try {
-            for (String name : List.of("missingSkill", "bean#javaSkill", "n".repeat(33) + "-leaf")) {
+            for (String name : List.of("missing-skill-extra", "bean#javaSkill", "n".repeat(33) + "-leaf")) {
                 List<org.assertj.core.api.ThrowableAssert.ThrowingCallable> operations = List.of(
                         () -> template.validate(name, Map.of()),
                         () -> template.validate(name, (Object) Map.of()),

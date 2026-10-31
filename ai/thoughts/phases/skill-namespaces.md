@@ -1,5 +1,13 @@
 # Skill Namespaces
 
+## PR 27.6 boundary correction
+
+[PR 27.6](../tickets/loomspan-pr-27.6-optional-namespace-references.md) supersedes
+conflicting mandatory-input-qualification requirements in PR 27.1–27.5.
+Qualification is optional for authored structured references and host entry;
+internal identities, catalog lookup, model selections, REST and observations
+remain canonical and qualified. Other namespace contracts remain unchanged.
+
 ## Status and purpose
 
 Prepared on October 28, 2026, from the Loomspan Cloud design discussions in the sibling `meta-hackathon` repository.
@@ -30,7 +38,7 @@ Namespace support must preserve the simplest embedded application experience whi
 
 | Deployment pattern | Intended behavior |
 |---|---|
-| Embedded application shipped through ordinary application deployment | Startup skill files and Java skills without an explicit namespace belong to Private `default`. Developers invoke qualified identities such as `default-search` using existing startup configuration, without an extra publication. |
+| Embedded application shipped through ordinary application deployment | Startup skill files and Java skills without an explicit namespace belong to Private `default`. Developers invoke local `search` or qualified `default-search` using existing startup configuration, without an extra publication. |
 | Cloud platform hosting many clients in one framework instance | The platform supplies skill declarations and execution configuration from its repositories through framework publication APIs; local skill files and execution-configuration files are not required. Hard-coded Java skills provide shared capabilities in assigned namespaces. Those namespaces start Private and the platform publishes them as Public, with complete execution configuration, before enabling cross-namespace use. Client namespaces are also populated through the APIs. |
 | Departmental deployment with application-defined Java capabilities | Application code assigns fixed Java skills to known departmental namespaces. A department later publishes its SkillPack and complete execution configuration into its namespace, automatically retaining those fixed Java registrations. Same-namespace composition works while Private; sharing with other namespaces requires Public target visibility. |
 
@@ -70,15 +78,15 @@ No reserved Public/shared namespace, cross-namespace enablement switch, or frame
 
 ### Identity rules
 
-- Use one canonical skill reference everywhere: `namespace-skillName`, including `default-search`. Require qualification for same-namespace calls as well as cross-namespace calls. There is no implicit namespace for a reference.
+- Use one canonical internal identity: `namespace-skillName`, including `default-search`. At host entry, local `search` resolves to `default-search` regardless of ambient execution. In authored references, local `search` resolves against the containing declaration's startup/publication owner; explicit qualified references keep their meaning.
 - Namespace identifiers and local declaration names contain ASCII letters, digits, or underscores, starting with a letter or underscore. Hyphens are forbidden in both components, so a qualified reference contains exactly one hyphen separator. Colons, slashes, whitespace, empty components, and additional separators are invalid.
 - Normalize namespace names to lowercase through the shared identity parser at every input boundary, including authored references, host arguments, and model-generated plan/step/tool selections. Preserve case-sensitive local skill names. Semantic identity fields, comparisons, displays, and outgoing tool definitions use the canonical spelling; raw diagnostic content remains unchanged. `Tax-calculateTax` normalizes to `tax-calculateTax`; `tax-CalculateTax` identifies a different skill. Do not trim whitespace or replace invalid characters.
 - The entire qualified identity must be at most 64 ASCII characters, including the separator. Apply this rule to every skill at Java registration, startup loading, and publication validation/preparation, and to every supplied reference. There are no exceptions for host entry, Java/REST skills, same-namespace calls, or skills not currently offered as model tools. Namespace identifiers are limited to 32 ASCII characters, with canonical grammar `[a-z_][a-z0-9_]{0,31}` after normalization. Enforce the namespace limit in management operations, Java registration, and every qualified reference, independently of the combined limit. A 32-character namespace leaves 31 characters for a skill name; `default` leaves 56.
-- A supplied declaration's `name` and `@SkillMethod.name` remain local definition components, using `[A-Za-z_][A-Za-z0-9_]{0,63}`. Publication supplies declaration ownership; `@SkillMethod.namespace` supplies Java ownership and defaults to `default`. Construct and validate the canonical identity from these components. These definition components are not accepted as standalone skill references and introduce no alternate reference syntax.
-- All authored child references, including allowed skills, `output_from`, and input/output bindings, use the canonical qualified form. Catalog descriptor names and lookups, invocation/validation/handoff arguments, capability names, plans, provider tool names, REST handoffs, traces, metrics, and diagnostic skill identities use that same form.
+- A supplied declaration's `name` and `@SkillMethod.name` remain local definition components, using `[A-Za-z_][A-Za-z0-9_]{0,63}`. Publication supplies declaration ownership; `@SkillMethod.namespace` supplies Java ownership and defaults to `default`. Construct and validate the canonical identity from these components. Declaration components remain local. Local reference input is accepted only at the host and authoring boundaries and compiles to the existing canonical identity.
+- Authored allowed skills, `output_from`, child-result input/output binding producers and evidence leaves may be local or qualified. Resolve them in shared startup/API preparation before comparisons, dependency validation and executable construction. Compile evidence identifier leaves using owner context without changing grammar, original expression text or token positions. Preserve original YAML bytes and prose. Catalog descriptors/lookups, capability names, plans, provider tools, REST handoffs, traces, metrics and diagnostic skill identities remain qualified.
 - Use one internal identity parser/formatter and structured identity at resolution and authorization boundaries. Parse declarations/references during preparation and host arguments at operation entry; avoid repeated string splitting during execution. Compare resolved identities for duplicate detection and binding validation.
-- Do not introduce local shorthand, aliases, imports, wildcards, fallback lookup, caller-relative names, provider-name encoding, or alternate qualified formats. Do not search Public namespaces implicitly or introduce namespace inheritance.
-- Namespace renaming is creation of a new namespace followed by removal of the old one, not an identity-preserving rename operation. References must be updated explicitly.
+- Beyond the two input boundaries, do not introduce runtime shorthand, aliases, imports, wildcards, fallback lookup, ambient-caller-relative names, provider-name encoding, or alternate qualified formats. Missing local targets fail in their resolved namespace even when another namespace has the same local name. Compare canonical identities for duplicate detection and mixed-spelling binding validation; enforce combined length after qualification. Do not search Public namespaces implicitly or introduce namespace inheritance.
+- Namespace renaming is creation of a new namespace followed by removal of the old one, not an identity-preserving rename operation. Explicit references to the old namespace must be updated; local authored references follow the new owner.
 
 ### Generation layering and identity representations
 
@@ -88,9 +96,9 @@ The captured snapshot maps canonical namespace identifiers to their selected gen
 
 | Context | Representation |
 |---|---|
-| Declaration `name` and Java annotation `name` | Local definition component, combined with authoritative namespace ownership when constructing the skill identity; never a standalone reference. |
+| Declaration `name` and Java annotation `name` | Local definition component, combined with authoritative namespace ownership when constructing the skill identity; local input resolves only at the specified boundaries. |
 | Parsed resolution and authorization | Internal structured identity with canonical lowercase namespace and case-sensitive local name. |
-| All skill-reference strings and runtime capability names | Canonical `namespace-skillName`, at most 64 characters, including same-namespace and `default` references. |
+| Prepared skill references and runtime capability names | Canonical `namespace-skillName`, at most 64 characters after qualification, including same-namespace and `default` references. |
 | Generation identifiers | Existing opaque IDs, unique across all namespaces within a framework instance and never reused, including after removal/recreation. Do not encode skill identity into these IDs. |
 
 Bound child tools, plans, child-result matching, input/output bindings, catalogs, and execution records use the same canonical reference. Provider adapters transmit it unchanged; no provider-to-framework name translation is needed. Diagnostics without a known skill retain their existing unavailable/null behavior. Routes identifying something other than a skill retain their existing meaning.
@@ -326,9 +334,9 @@ The accepted tradeoffs and limits are:
 
 ### Namespace entry and call authority
 
-`SkillTemplate` remains a root-invocation API that creates a fresh execution session. All invocation, validation, observer-invocation, and `SkillInvocationHandoff` overloads accept the same fully qualified skill reference. For example, `template.invoke("tax-calculateTax", input)` enters tax, and `template.invoke("default-search", input)` enters default. There is no implicit default namespace for an invocation argument.
+`SkillTemplate` remains a root-invocation API that creates a fresh execution session. All invocation, validation, observer-invocation, and both `SkillInvocationHandoff` input overloads accept a local default name or an explicit qualified reference. For example, `template.invoke("tax-calculateTax", input)` enters tax, and `template.invoke("default-search", input)` enters default. Local `search` always selects `default-search`, independent of any ambient executing namespace, with no fallback.
 
-Remove the proposed namespace invocation views. Do not add `inNamespace(...)`, separate namespace arguments, qualified/unqualified overload pairs, or another public invocation facade. Parse the target identity once at the operation boundary using the common parser, normalize namespace case, preserve skill-name case, and enforce the 32-character namespace and combined 64-character limits. Reject unqualified and malformed references. Read/capture authentication at the existing operation boundary and capture generations through validation or admission as specified below. Operations resolve current namespace existence and fail if it is absent; they never create namespaces implicitly.
+Remove the proposed namespace invocation views. Do not add `inNamespace(...)`, separate namespace arguments, qualified/unqualified overload pairs, or another public invocation facade. Parse the target identity once at the operation boundary using the common parser, normalize namespace case, preserve skill-name case, and enforce the 32-character namespace and combined 64-character limits. Resolve unqualified input against default; reject malformed qualified references without trying local reinterpretation. Read/capture authentication at the existing operation boundary and capture generations through validation or admission as specified below. Operations resolve current namespace existence and fail if it is absent; they never create namespaces implicitly.
 
 The hosting application authorizes the entry namespace identified by the skill reference before invoking the framework. The reference is a host API argument, not a namespace override in invocation input or model-generated arguments. The framework applies existing entry-skill RBAC and dependency-admission checks. Host-authorized entry into a Private namespace is permitted: Private visibility restricts calls between namespaces, not initial host entry. No namespace-membership system or new authorization SPI is introduced. Root invocation preserves existing nested-root rejection.
 
@@ -350,7 +358,7 @@ Extend the existing access guard and reuse its role evaluator. Discovery uses th
 
 ### Root validation semantics
 
-`SkillTemplate.validate()` checks input, entry-skill authorization, and reachable dependency validity against a temporary consistent snapshot, then releases it without reserving admission. Invocation captures and validates independently. Validation accepts the same qualified reference as root invocation, including an explicit `default-` prefix for skills in default. The parsed identity supplies the target namespace; no namespace view or unqualified argument is supported.
+`SkillTemplate.validate()` checks input, entry-skill authorization, and reachable dependency validity against a temporary consistent snapshot, then releases it without reserving admission. Invocation captures and validates independently. Validation accepts the same local/default or explicit qualified reference as root invocation. The resolved identity supplies the target namespace; no namespace view is added.
 
 Reuse the admission dependency capture and validation logic rather than maintaining a second policy implementation. Follow the entry skill's declared reachable graph, capture one generation per reached namespace, and protect resources through temporary ownership as required by the existing capture protocol. Validate reference existence, namespace visibility, contracts, and dependency-derived metadata assumptions exactly as for admission. Release all temporary ownership on success or failure. Validation does not register an admitted root, reserve execution, run skills, call providers, or return a reusable execution snapshot.
 
@@ -404,7 +412,7 @@ Runtime removal must still leave a namespace absent until explicit recreation; l
 
 Accepted tradeoffs: all startup namespaces initially receive the same settings even when some do not use the configured providers; different settings or Public visibility require a complete publication; runtime state does not alter startup configuration. No publication is required merely to activate Java methods, and no persistence, automatic restoration, or new namespace configuration loader is introduced.
 
-**Accepted startup composition boundary.** Startup skill files in `default` can call skills in `default`, including its fixed Java skills, using qualified references such as `default-search` without an extra publication. A startup declaration referencing another namespace cannot pass ordinary visibility validation while that target is Private. Do not defer validation or exempt Java targets from visibility checks. Hosts needing cross-namespace composition publish the target namespace as Public and then publish its callers through the ordinary APIs; those caller declarations are not loaded as startup skill files. This is an explicit managed-deployment choice, not an initialization step imposed on ordinary embedded applications.
+**Accepted startup composition boundary.** Startup skill files in `default` can call skills in `default`, including its fixed Java skills, using local `search` or qualified `default-search` without an extra publication. A startup declaration referencing another namespace cannot pass ordinary visibility validation while that target is Private. Do not defer validation or exempt Java targets from visibility checks. Hosts needing cross-namespace composition publish the target namespace as Public and then publish its callers through the ordinary APIs; those caller declarations are not loaded as startup skill files. This is an explicit managed-deployment choice, not an initialization step imposed on ordinary embedded applications.
 
 Keep automatic Private startup and API-driven publication as the complete mechanism. Add no startup visibility setting, Java visibility annotation, dependency-aware startup loader, framework bootstrap coordinator, or separate activation workflow.
 
@@ -492,7 +500,7 @@ These scenarios verify the contracts above. Keep existing validators and lifecyc
 ### Verify: Generation layering and identity representations
 
 - Two namespaces can declare local `search`, producing distinct `a-search` and `b-search` identities in generation maps, catalogs, tools, plans, bindings, routes, and diagnostics.
-- Same-namespace and `default` references remain fully qualified. Unqualified, slash-separated, colon-separated, and malformed references are rejected; namespace case normalization preserves duplicate detection and skill-name case.
+- Prepared/runtime references remain qualified. Authored local input resolves to the owner and host local input to default; slash-separated, colon-separated and malformed references are rejected; namespace case normalization preserves duplicate detection and skill-name case.
 - A cross-namespace child switches current settings while preserving entry limits, session identity, and the captured snapshot; returning or throwing restores its parent context, including parallel branches.
 - Authorization uses the source namespace before the switch, so entering a Public namespace cannot grant callback authority into a Private caller.
 - Trace/event/API identity and the captured generation mapping remain accurate after publication/removal. Update existing consumers and fixtures without adding Console features.
@@ -509,12 +517,12 @@ These scenarios verify the contracts above. Keep existing validators and lifecyc
 
 ### Verify: Common tool and skill-reference representation
 
-- One target has the same qualified name for same-namespace calls, cross-namespace calls, direct host entry, catalog lookup, and every model/framework record.
+- One target has the same qualified name after same-namespace authored compilation, cross-namespace calls and host entry resolution, and in catalog lookup and every model/framework record.
 - `a_b-c` and `a-b_c` remain distinct; normalization changes only namespace case.
 - Namespace identifiers of 32 characters pass the namespace limit and 33 fail, including management operations and references whose combined length is otherwise valid. Combined identities of 64 characters pass the naming limit and 65 fail when their components are valid. Cover Java registration, startup declarations, publication, optional children, host arguments, and model-generated selections. A declaration with an oversized identity fails even when never offered as a tool.
 - Model-generated plan, step, and tool selections normalize namespace case through the shared parser before bound-surface lookup. Verify matching against the canonical target, preservation of skill-name case, rejection of unbound targets after normalization, and preservation of raw model output in diagnostics.
 - Bound callbacks, ordinary and planned execution, input/output bindings, authorization, and trace correlation all use the canonical target unchanged.
-- Unqualified and obsolete slash/colon formats are rejected. Adapters introduce no encoding, fallback names, or compatibility aliases.
+- Unqualified model/runtime selections and obsolete slash/colon formats are rejected. Adapters introduce no encoding, fallback names, or compatibility aliases.
 
 ### Verify: REST handoff and retirement identity
 
@@ -550,7 +558,7 @@ Ticket verification should include parent and child namespaces with different at
 
 ### Verify: Root operations
 
-Ticket tests must cover qualified catalog descriptor names passed directly to all root operations; default and non-default targets; namespace normalization with skill-name case preserved; invalid, unqualified, and oversized arguments; operation behavior after replacement/removal/recreation; concurrent calls into different namespaces; and authentication captured at each operation. Exercise validation, both input forms, observer invocation, and handoff without duplicating authorization/admission logic. Update README and supported-surface tests directly; no namespace-view API or new public identity type is required.
+Ticket tests must cover qualified catalog descriptor names passed directly to all root operations; default and non-default targets; namespace normalization with skill-name case preserved; local/default equivalence, missing default without foreign fallback, malformed and oversized arguments; operation behavior after replacement/removal/recreation; concurrent calls into different namespaces; and authentication captured at each operation. Exercise validation, both input forms, observer invocation, and handoff without duplicating authorization/admission logic. Update README and supported-surface tests directly; no namespace-view API or new public identity type is required.
 
 ### Verify: Root validation
 
@@ -574,7 +582,7 @@ Acceptance coverage must verify that existing Console displays, lookups, correla
 
 ### Verify: Startup and restart
 
-Acceptance coverage should verify that default contains both startup declarations and its assigned Java registrations, while other startup namespaces contain only their assigned Java registrations. Demonstrate embedded same-namespace startup with qualified references and no extra publication, startup rejection of a foreign Private target, API publication of Public shared Java capabilities followed by callers, and departmental same-namespace SkillPack publication retaining fixed Java registrations. The managed-host sequence must also work without local skill or execution-configuration files; restart returns to the accepted Private startup state until the host repeats its publications.
+Acceptance coverage should verify that default contains both startup declarations and its assigned Java registrations, while other startup namespaces contain only their assigned Java registrations. Demonstrate embedded same-namespace startup with local or qualified references and no extra publication, startup rejection of a foreign Private target, API publication of Public shared Java capabilities followed by callers, and departmental same-namespace SkillPack publication retaining fixed Java registrations. The managed-host sequence must also work without local skill or execution-configuration files; restart returns to the accepted Private startup state until the host repeats its publications.
 
 ## Existing identity findings relevant to both proposals
 

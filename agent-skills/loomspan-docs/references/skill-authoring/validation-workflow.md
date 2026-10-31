@@ -7,7 +7,7 @@ coverage: focused-source-verified
 
 # Validate a draft skill set
 
-All skill references use [canonical qualified identities](mental-model.md#canonical-namespace-identity), including same-namespace children and binding producers. Declarations keep local `name` components.
+Authored child references and binding producers MAY be local to the containing skill's namespace or explicitly qualified; local `search` in `sales` compiles to `sales-search`. Mixed spellings compare canonically and never search other namespaces. Runtime/model names remain qualified. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and boundary rules. Declarations keep local `name` components.
 
 ## Applies when
 

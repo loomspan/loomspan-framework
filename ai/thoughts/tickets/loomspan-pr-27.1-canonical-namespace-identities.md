@@ -1,5 +1,11 @@
 # PR 27.1 — Establish canonical namespace identities and catalogs
 
+> Superseded input rule: [PR 27.6](loomspan-pr-27.6-optional-namespace-references.md)
+> permits local host input in `default` and owner-relative local authored references.
+> Its boundary rules supersede conflicting mandatory-qualification or rejection
+> requirements here. Internal identities, catalog lookup, model/runtime selections,
+> access, publication and observation contracts remain unchanged.
+
 ## Outcome
 
 Give every skill one unambiguous `namespace-skillName` identity across definitions, catalogs, and references, providing the foundation for independently published namespaces.

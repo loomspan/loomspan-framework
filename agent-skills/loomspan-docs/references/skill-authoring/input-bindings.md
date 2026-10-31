@@ -14,7 +14,7 @@ receiving input contract remains authoritative; the calling model generates only
 unbound arguments under a separate projected contract. Binding grants no access
 and does not change invocation limits or the captured configuration generation.
 
-All skill references use [canonical qualified identities](mental-model.md#canonical-namespace-identity), including same-namespace children and binding producers. Declarations keep local `name` components.
+Authored child references and binding producers MAY be local to the containing skill's namespace or explicitly qualified; local `search` in `sales` compiles to `sales-search`. Mixed spellings compare canonically and never search other namespaces. Runtime/model names remain qualified. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and boundary rules. Declarations keep local `name` components.
 
 ## Automatic assigned dispatch
 
@@ -95,19 +95,19 @@ input_schema:
   required: [requestId, records]
   additionalProperties: false
 allowed_skills:
-  - name: default-producer
+  - name: producer
     required: true
     max_tasks: 1
     input_bindings:
       /caseId: {from: input, path: /requestId}
-  - name: default-consumer
+  - name: consumer
     required: true
     max_tasks: 1
     input_bindings:
       /caseId: {from: input, path: /requestId}
       /context/records: {from: input, path: /records}
       /context/assessment: {from: child_result, skill: default-producer, path: /data}
-output_from: {skill: default-consumer}
+output_from: {skill: consumer}
 ```
 
 ```yaml

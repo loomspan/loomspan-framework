@@ -7,7 +7,7 @@ coverage: source-verified
 
 # Skill Authorization
 
-All skill references use [canonical qualified identities](mental-model.md#canonical-namespace-identity), including same-namespace children and binding producers. Declarations keep local `name` components.
+Authored child references and binding producers MAY be local to the containing skill's namespace or explicitly qualified; local `search` in `sales` compiles to `sales-search`. Mixed spellings compare canonically and never search other namespaces. Runtime/model names remain qualified. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and boundary rules. Declarations keep local `name` components.
 
 ## Applicability
 
@@ -92,7 +92,7 @@ and explicit recreation; withdrawal preserves beans and retained work. There is 
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
 and installation, retained reachable admission and independent runtime dispatch.
-Serialized observation/Console integration remains PR 27.5.
+Captured canonical observation identities and existing Console consumers are covered by `NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest`.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.
 

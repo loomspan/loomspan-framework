@@ -1,5 +1,11 @@
 # PR 27.3 — Admit roots against retained reachable namespace snapshots
 
+> Superseded input rule: [PR 27.6](loomspan-pr-27.6-optional-namespace-references.md)
+> permits local host input in `default` and owner-relative local authored references.
+> Its boundary rules supersede conflicting mandatory-qualification or rejection
+> requirements here. Internal identities, catalog lookup, model/runtime selections,
+> access, publication and observation contracts remain unchanged.
+
 ## Outcome
 
 Make invocation and queued handoff stable across publication/removal by capturing exactly the namespace generations needed by the entry skill's declared reachable graph. Root validation checks the same dependency rules without reserving execution.

@@ -6,6 +6,18 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.*;
 
 class SkillIdentityTest {
+    @Test void resolvesOnlyAtExplicitBoundariesWithExistingGrammarAndLimits() {
+        assertThat(SkillIdentity.resolve("Search", "Sales").toString()).isEqualTo("sales-Search");
+        assertThat(SkillIdentity.resolve("Shared-Search", "sales").toString()).isEqualTo("shared-Search");
+        assertThat(SkillIdentity.resolve("s".repeat(56), "default").toString()).hasSize(64);
+        String owner = "n".repeat(32);
+        assertThat(SkillIdentity.resolve("s".repeat(31), owner).toString()).hasSize(64);
+        assertThatThrownBy(() -> SkillIdentity.resolve("s".repeat(32), owner)).hasMessageContaining("length 65");
+        assertThatThrownBy(() -> SkillIdentity.resolve("s".repeat(57), "default")).hasMessageContaining("length 65");
+        for (String invalid : new String[]{null, "", " ", " x", "x ", "-child", "sales-", "a-b-c", "a/b", "a:b", "é"})
+            assertThatThrownBy(() -> SkillIdentity.resolve(invalid, "sales")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SkillIdentity.parse("Search")).isInstanceOf(IllegalArgumentException.class);
+    }
     @Test void canonicalizesOnlyNamespace() {
         assertThat(SkillIdentity.parse("Tax-search")).isEqualTo(SkillIdentity.parse("tax-search"));
         assertThat(SkillIdentity.parse("tax-Search")).isNotEqualTo(SkillIdentity.parse("tax-search"));

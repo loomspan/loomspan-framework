@@ -7,7 +7,7 @@ coverage: source-verified
 
 # Output Contracts
 
-All skill references use [canonical qualified identities](mental-model.md#canonical-namespace-identity), including same-namespace children and binding producers. Declarations keep local `name` components.
+Authored child references and binding producers MAY be local to the containing skill's namespace or explicitly qualified; local `search` in `sales` compiles to `sales-search`. Mixed spellings compare canonically and never search other namespaces. Runtime/model names remain qualified. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and boundary rules. Declarations keep local `name` components.
 
 ## Applicability
 
@@ -216,7 +216,7 @@ it Private, or changing its contract after caller preparation does not make publ
 stale, but can reject subsequent admission. Prior admitted work retains its old graph.
 
 Evidence: `SkillDependencyValidator#checkAdmission`, `SkillAdmissionContractsTest`, and
-`SkillReachableAdmissionTest`. Captured child dispatch is implemented; observation consumers remain PR 27.5.
+`SkillReachableAdmissionTest`. Captured child dispatch is implemented; canonical observation consumers are covered by `NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest`.
 
 ## Presence and nullability
 
@@ -309,6 +309,6 @@ and explicit recreation; withdrawal preserves beans and retained work. There is 
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
 for complete signatures, sequencing and retirement. This slice implements preparation
 and installation, retained reachable admission and captured cross-namespace execution.
-Serialized observation/Console integration remains PR 27.5.
+Captured canonical observation identities and existing Console consumers are covered by `NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest`.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

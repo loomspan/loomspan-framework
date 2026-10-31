@@ -345,19 +345,19 @@ class DeclaredChildInputBindingsIntegrationTest {
               required: [requestId, records]
               additionalProperties: false
             allowed_skills:
-              - name: default-producer
+              - name: producer
                 required: true
                 max_tasks: 1
                 input_bindings:
                   /caseId: {from: input, path: /requestId}
-              - name: default-consumer
+              - name: consumer
                 required: true
                 max_tasks: 1
                 input_bindings:
                   /caseId: {from: input, path: /requestId}
                   /context/records: {from: input, path: /records}
                   /context/assessment: {from: child_result, skill: default-producer, path: /data}
-            output_from: {skill: default-consumer}
+            output_from: {skill: consumer}
             """; }
     private static String producer(String kind) { return """
             name: producer

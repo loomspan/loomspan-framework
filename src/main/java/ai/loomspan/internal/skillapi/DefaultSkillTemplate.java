@@ -147,7 +147,7 @@ public class DefaultSkillTemplate implements SkillTemplate
 
     private SkillGenerationManager.Capture captureRoot(String skillName)
     {
-        try { return generationManager.capture(SkillIdentity.parse(skillName)); }
+        try { return generationManager.capture(SkillIdentity.resolve(skillName, "default")); }
         catch (SkillException ex) { throw ex; }
         catch (RuntimeException ex)
         {

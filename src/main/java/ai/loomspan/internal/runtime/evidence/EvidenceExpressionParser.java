@@ -1,5 +1,7 @@
 package ai.loomspan.internal.runtime.evidence;
 
+import ai.loomspan.internal.core.SkillIdentity;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,9 +10,17 @@ public final class EvidenceExpressionParser
     private String source;
     private int offset;
     private Token lookahead;
+    private String ownerNamespace;
 
     public EvidenceExpression parse(String expression)
     {
+        return parse(expression, null);
+    }
+
+    /** Compile authored identifier leaves using ownership while retaining original token positions. */
+    public EvidenceExpression parse(String expression, String ownerNamespace)
+    {
+        this.ownerNamespace = ownerNamespace == null ? null : SkillIdentity.normalizeNamespace(ownerNamespace);
         source = expression == null ? "" : expression;
         offset = 0;
         lookahead = nextToken();
@@ -58,7 +68,8 @@ public final class EvidenceExpressionParser
         if (token.type == TokenType.IDENTIFIER)
         {
             consume();
-            try { return new EvidenceExpression.Skill(token.text, token.start + 1); }
+            try { return new EvidenceExpression.Skill(ownerNamespace == null ? SkillIdentity.parse(token.text)
+                    : SkillIdentity.resolve(token.text, ownerNamespace), token.start + 1); }
             catch (IllegalArgumentException ex) { throw error(token, ex.getMessage()); }
         }
         if (token.type == TokenType.LPAREN)

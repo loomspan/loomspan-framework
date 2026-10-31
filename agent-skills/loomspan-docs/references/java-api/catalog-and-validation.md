@@ -31,7 +31,7 @@ Child-local evidence annotations are omitted from metadata; it does not install
 a parent validator or guarantee factual correctness. See [output contracts](../skill-authoring/output-contracts.md). Retain a catalog as metadata or acquire another through `SkillReloader.snapshot(namespace)` for current discovery. Discovery is not authorization. See [skill-reload.md](skill-reload.md).
 
 Use `SkillTemplate.validate(name, map)` or `validate(name, object)` before asynchronous
-dispatch. Both freshly capture the entry's entire declared reachable graph and perform the same qualified parsing, conversion, input/dependency contract checks, error mapping, and entry role-policy evaluation used by invocation preparation. A null Object is
+dispatch. Both freshly capture the entry's entire declared reachable graph and perform the same local-to-default or explicit-qualified resolution, conversion, input/dependency contract checks, error mapping, and entry role-policy evaluation used by invocation preparation. A null Object is
 always rejected before conversion; a null Map is accepted only for generic or
 empty-permitting contracts. Authorization denial remains an unwrapped Spring Security
 `AccessDeniedException` with the capability name.
@@ -51,7 +51,7 @@ while execution still enforces authorization with the authentication captured at
 handoff. See [invocation.md](invocation.md).
 
 Pass `descriptor.name()` directly to invocation, validation or handoff; do not split
-it or reconstruct a local alias. A retained catalog continues describing its prepared contracts; it never pins later
+it when invoking a non-default target. Local names are accepted by root operations only as default references; `SkillCatalog.skill(...)` remains qualified-only. A retained catalog continues describing its prepared contracts; it never pins later
 validation, invocation or handoff. Each operation captures the then-current active view.
 
 ## Source Anchors

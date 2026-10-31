@@ -103,7 +103,7 @@ after construction and at publication; slow construction is not forcibly interru
 Startup builds Private `default` from configured declarations plus its assigned
 Java methods, and a separate Private generation for each other Java assignment,
 containing only those methods. All use the same startup settings with separate
-runtimes. Same-namespace qualified startup composition works directly. Foreign
+runtimes. Same-namespace local or qualified startup composition works directly. Supplied authored local references resolve against the validation/preparation owner before dependency checks; publishing the same document in another owner changes those local targets without rewriting source bytes. Foreign
 Private startup references fail; hosts publish Public shared capabilities before
 publishing their callers. Managed hosts can start without local files and own
 readiness and ordering. Java direct entry is available immediately after startup;
