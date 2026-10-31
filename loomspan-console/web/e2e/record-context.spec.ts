@@ -7,8 +7,8 @@ import { expectNoSeriousAccessibilityViolations } from "./accessibility";
 test("record context and expanded responses stay readable with long nested skill names", async ({ page, consoleProcess }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   const fixture = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../loomspan-console-fixtures/traces/current-plan-semantic-evidence.ndjson");
-  const skill = "hotelSelectionWithAnIntentionallyLongSkillName";
-  const trace = fs.readFileSync(fixture, "utf8").replaceAll("shared.skill", skill);
+  const skill = "default-hotelSelectionWithAnIntentionallyLongSkillName";
+  const trace = fs.readFileSync(fixture, "utf8").replaceAll("default-shared_skill", skill);
   await page.goto(consoleProcess.pairingUrl);
   await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
   await page.goto(`${consoleProcess.origin}/trace-storage`);

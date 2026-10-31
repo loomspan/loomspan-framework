@@ -30,7 +30,9 @@ function makeTraceMetadata(traceId: string, sessionId: string, outcome: string, 
     traceId,
     sessionId,
     generationId: traceId,
-    entrySkill: "CheckDns",
+    entryNamespace: "default",
+    namespaceGenerationIds: { default: traceId },
+    entrySkill: "default-test_entry",
     outcome,
     // Both Java-produced fixture artifacts complete at this instant. The
     // console's processor deliberately checks this metadata against the
@@ -43,11 +45,12 @@ function makeTraceMetadata(traceId: string, sessionId: string, outcome: string, 
 }
 
 function metadataFromArtifact(body: Buffer): string {
-  const records = body.toString("utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line) as { traceId: string; sessionId: string; timestamp: number; recordType: string; metadata?: { outcome?: string; generationId?: string } });
+  const records = body.toString("utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line) as { traceId: string; sessionId: string; timestamp: number; recordType: string; metadata?: { outcome?: string; generationId: string; entrySkill: string; entryNamespace: string; namespaceGenerationIds: Record<string, string> } });
   const first = records[0];
   const completion = records.findLast((record) => record.recordType === "TRACE_COMPLETED");
   return JSON.stringify({
-    targetScopeId: "scope-1", traceId: first.traceId, sessionId: first.sessionId, generationId: first.metadata?.generationId, entrySkill: "CheckDns",
+    targetScopeId: "scope-1", traceId: first.traceId, sessionId: first.sessionId, generationId: first.metadata?.generationId, entrySkill: first.metadata?.entrySkill,
+    entryNamespace: first.metadata?.entryNamespace, namespaceGenerationIds: first.metadata?.namespaceGenerationIds,
     outcome: completion?.metadata?.outcome ?? "SUCCEEDED",
     finalizedAt: new Date((completion?.timestamp ?? first.timestamp) * 1000).toISOString(),
     sizeBytes: body.length, persistencePolicy: "ALWAYS", applicationTraceExpiresAt: "2026-08-01T12:00:00Z",
@@ -62,7 +65,7 @@ function makeLargeChunkedPayloadArtifact(): Buffer {
   const chunkCount = 36;
   const chunkBytes = 64 * 1024;
   const records: Array<Record<string, unknown>> = [
-    { ...common, sequence: 1, recordType: "TRACE_STARTED", metadata: { tracePath: "generated/large-chunked-payload.ndjson", consoleCompatibilityVersion: "1.0.0-beta.9-SNAPSHOT", generationId: traceId }, data: { sessionId } },
+    { ...common, sequence: 1, recordType: "TRACE_STARTED", metadata: { tracePath: "generated/large-chunked-payload.ndjson", consoleCompatibilityVersion: "1.0.0-beta.9-SNAPSHOT", generationId: traceId, entrySkill: "default-test_entry", entryNamespace: "default", namespaceGenerationIds: { default: traceId } }, data: { sessionId } },
     { ...common, sequence: 2, recordType: "TRACE_CAPTURE_POLICY_RECORDED", metadata: { persistencePolicy: "ALWAYS" }, data: null },
     { ...common, sequence: 3, recordType: "MODEL_REQUEST_SENT", metadata: { retrySequenceId: "retry-1", attemptId: "attempt-1", attemptNumber: 1, attemptReason: "INITIAL", providerAttemptNumber: 1, payloadId: "payload-large", chunkCount, payloadChunked: true, contentType: "application/json" }, data: null },
   ];
@@ -135,18 +138,18 @@ function makeTargetServer(initial: TargetState) {
     if (pathname === "/_loomspan/observability/v1/skills") {
       response.writeHead(200, headers);
       response.end(JSON.stringify({
-        items: [{ registeredName: "root.skill", source: "REST", sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml", href: "skills/root.skill" }],
+        items: [{ registeredName: "default-root_skill", source: "REST", sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml", href: "skills/default-root_skill" }],
         hasMore: false, nextCursor: null, observedAt: "2026-07-27T00:00:00Z",
       }));
       return;
     }
-    if (pathname === "/_loomspan/observability/v1/skills/root.skill") {
+    if (pathname === "/_loomspan/observability/v1/skills/default-root_skill") {
       response.writeHead(200, headers);
       response.end(JSON.stringify({
-        registeredName: "root.skill",
+        registeredName: "default-root_skill",
         source: "REST",
         sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml",
-        yaml: "name: root.skill\ndescription: inert REST fixture\nrest: true\ninstructions: '<script>window.location=\\\"https://attacker.invalid\\\"</script><a href=\\\"/target\\\">connect</a>'\n",
+        yaml: "name: default-root_skill\ndescription: inert REST fixture\nrest: true\ninstructions: '<script>window.location=\\\"https://attacker.invalid\\\"</script><a href=\\\"/target\\\">connect</a>'\n",
       }));
       return;
     }
@@ -276,11 +279,11 @@ async function navigateToTraceDetail(page: import("@playwright/test").Page, cons
   await expect(page.getByRole("heading", { name: "Trace Catalog" })).toBeVisible();
   await expect(page.getByRole("columnheader").first()).toHaveText("Entry skill");
   const traceRow = page.locator("tbody tr", { hasText: traceId });
-  await expect(traceRow.getByRole("cell").first()).toHaveText("CheckDns");
+  await expect(traceRow.getByRole("cell").first()).toHaveText("default-test_entry");
   await page.getByRole("link", { name: traceId }).click();
   await expect(page.getByRole("heading", { name: "Trace Detail" })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator("dt", { hasText: "Entry skill" }).locator("xpath=following-sibling::dd[1]"))
-    .toHaveText("CheckDns");
+    .toHaveText("default-test_entry");
 }
 
 async function acquireAndOpenExplorer(page: import("@playwright/test").Page, consoleProcess: { origin: string }, traceId: string) {
@@ -455,12 +458,12 @@ test("WF-UNFAMILIAR-SKILL-PATH retains repeated invocation selection across view
   await repeated.nth(1).click();
   await expect(page).toHaveURL(/frameId=skill-2/);
   await page.getByRole("tab", { name: "Timeline" }).click();
-  await expect(page.locator('.trace-timeline-row[aria-current="true"]')).toContainText("root.skill");
+  await expect(page.locator('.trace-timeline-row[aria-current="true"]')).toContainText("default-root_skill");
   await page.reload();
-  await expect(page.locator('.trace-timeline-row[aria-current="true"]')).toContainText("root.skill", { timeout: 15_000 });
+  await expect(page.locator('.trace-timeline-row[aria-current="true"]')).toContainText("default-root_skill", { timeout: 15_000 });
   await expectNoSeriousAccessibilityViolations(page);
   await page.getByRole("tab", { name: "Timeline" }).click();
-  const skillLink = page.getByRole("link", { name: "root.skill" });
+  const skillLink = page.getByRole("link", { name: "default-root_skill" });
   await expect(skillLink).toBeVisible();
   await skillLink.click();
   await expect(page.getByRole("heading", { name: "Skill Detail" })).toBeVisible();
@@ -610,7 +613,7 @@ test("WF-AS-04 installed evidence remains after auth rejection while raw downloa
   await page.goto(`${consoleProcess.origin}/traces/trace-single-attempt-success?targetScopeId=${encodeURIComponent(scopeId)}`);
   await expect(page.getByRole("heading", { name: "Trace Detail" })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator("dt", { hasText: "Entry skill" }).locator("xpath=following-sibling::dd[1]"))
-    .toHaveText("CheckDns");
+    .toHaveText("default-test_entry");
   await expect(page.getByRole("heading", { name: "Trace explorer" })).toBeVisible({ timeout: 15_000 });
 
   // Restore the credential. The local copy remains installed (so acquisition
