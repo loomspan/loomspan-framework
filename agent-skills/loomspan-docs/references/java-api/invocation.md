@@ -48,8 +48,8 @@ public final class InvoiceWorkflow {
 
 The return value is text. A caller that requires machine-readable output
 SHOULD give the producing model YAML skill an `output_schema` and then parse the returned JSON
-according to the application's own boundary policy. Java results use Jackson
-serialization and do not have a YAML output schema.
+according to the application's own boundary policy. Java null/void results become empty text, Strings remain exact, and other values
+use Jackson JSON. Java methods have no YAML output schema; see [Java results](java-skills.md#inputs-results-and-lifecycle).
 
 [TypeSafe leaves](../skill-authoring/typesafe-skills.md) use the same String facade:
 the complete named `answers` object becomes JSON text without a provider-envelope
@@ -59,8 +59,8 @@ resolved-request checks run during invocation before any provider attempt.
 
 An explicit planning `output_from` parent returns its designated accepted direct
 child task's existing String unchanged after every accepted task succeeds. It
-makes no final model request or duplicate parent validation. Java result text
-retains Jackson representation, including quoted Java Strings; REST returns
+makes no final model request or duplicate parent validation. Java Strings remain exact, null/void becomes empty text, and other Java results
+use JSON; REST returns
 handler text with no envelope extraction. Effective catalog schema is metadata,
 not a new Java/REST validation guarantee. Read [output contracts](../skill-authoring/output-contracts.md).
 
@@ -145,7 +145,7 @@ try {
 }
 ```
 
-`generationId()` returns the nonblank, process-local entry namespace generation ID captured during preparation, before object conversion and input validation. A newer generation may be active when handoff returns, but this handle retains the entire captured association, including dependency visibility. Cross-namespace child dispatch is completed in PR 27.4. The ID remains stable after execution, failure, release, retirement, or cutoff; concurrent reads do not claim or extend the admission. It is not a durable snapshot identifier. Stage and retain the application-owned generation-to-snapshot mapping according to application policy before admitting traffic, and record correlation before invocation. A missing mapping must be handled explicitly because cleanup can remove it after ownership ends, including cutoff, while the handle still exposes the ID. `release()` in `finally` covers lookup and recording failures and is harmless after invocation claims the admission.
+`generationId()` returns the nonblank, process-local entry namespace generation ID captured during preparation, before object conversion and input validation. A newer generation may be active when handoff returns, but this handle retains the entire captured association, including dependency visibility. Cross-namespace child dispatch uses the captured association. The ID remains stable after execution, failure, release, retirement, or cutoff; concurrent reads do not claim or extend the admission. It is not a durable snapshot identifier. Stage and retain the application-owned generation-to-snapshot mapping according to application policy before admitting traffic, and record correlation before invocation. A missing mapping must be handled explicitly because cleanup can remove it after ownership ends, including cutoff, while the handle still exposes the ID. `release()` in `finally` covers lookup and recording failures and is harmless after invocation claims the admission.
 
 The handle is single-use. Exactly one invocation, explicit idempotent release,
 or framework cutoff can win; a losing invocation fails as `SkillException`

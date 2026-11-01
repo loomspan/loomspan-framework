@@ -309,7 +309,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             runner.run(context -> {
                 assertThat(context).hasNotFailed();
                 String result=context.getBean(SkillTemplate.class).invoke("default-root", input);
-                assertThat(result).isEqualTo(consumerKind.equals("java") ? JSON.writeValueAsString("COMPLETE") : "COMPLETE");
+                assertThat(result).isEqualTo("COMPLETE");
             });
         }
         assertThat(failure.get()).isNull(); assertThat(actions).hasSize(1);

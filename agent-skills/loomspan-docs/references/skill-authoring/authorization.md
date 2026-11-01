@@ -75,7 +75,7 @@ The facade captures the trusted caller authentication. Explicit invocation authe
 
 Manifest and Java policies belong to the immutable generation captured by the root, while authentication remains the actual trusted caller identity evaluated at validation, visibility, and execution boundaries. A newer generation may change policy for newly captured roots, but it neither substitutes policy into an older tree nor freezes/bypasses that tree's live caller authorization checks.
 
-Spring authorization and authentication failures remain failures; they are not serialized into successful tool text. Denied business methods do not run and do not earn successful task/evidence credit. Ordinary Java exception-to-text behavior is separate and remains unchanged.
+Spring authorization and authentication failures remain failures; they are not serialized into successful tool text. Denied business methods do not run and do not earn successful task/evidence credit. Ordinary Java method and serialization exceptions also remain failures. See [Java failure behavior](../java-api/java-skills.md#designated-java-failures).
 
 ## Boundaries and evidence
 

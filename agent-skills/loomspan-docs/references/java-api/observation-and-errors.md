@@ -120,7 +120,8 @@ application callback.
 | Skill is unknown, mismatched, or otherwise fails through the facade | `SkillException` or a subtype |
 | Spring Security denies access | The original `AccessDeniedException` propagates |
 | Spring authentication failure at a Java proxy | Remains a failure; never successful tool text |
-| Runtime implementation failure | Safe `SkillException` message with the original cause |
+| Designated Java `RecoverableSkillException` | Propagates as a `SkillException` subtype; exact message and optional diagnostic cause retained |
+| Runtime implementation or Java serialization failure | Safe `SkillException` message with the original cause |
 | Admitted handle already executed, released, or cut off | Safe `SkillException`; no new session or work |
 | Observer throws after success | The observer's runtime exception propagates unchanged |
 | Mapping or observer throws after execution failure | The original execution failure remains primary; the later failure is suppressed |
@@ -139,9 +140,17 @@ Catch the narrow validation exception when the application can correct or
 report caller input. Catch `SkillException` at a boundary that can add
 application context or choose a safe response. Do not collapse
 `AccessDeniedException` into an ordinary execution error. Java authorization
-denials do not receive success/task/evidence credit. Ordinary Java method
-exceptions retain their established exception-to-text behavior; REST handler failures bypass
-that adapter and reach the facade for the handling above.
+denials do not receive success/task/evidence credit. Ordinary Java method and
+serialization failures remain failures and reach the facade handling above. A
+Java application wrapper is preserved at the Java boundary; the facade may wrap
+that runtime exception in `SkillException` as described in the table.
+
+`RecoverableSkillException` accepts only a non-null, nonblank message and an
+optional diagnostic cause. The message remains exact; cause text is never fallback
+feedback. Only transparent reflection/proxy wrappers preserve its designated
+classification. An ordinary application wrapper remains terminal. This revision
+establishes Java-boundary classification; standard tool/planner disposition is
+PR 28.5. See [Java failures](java-skills.md#designated-java-failures).
 
 ## Source Anchors
 
@@ -153,6 +162,7 @@ that adapter and reach the facade for the handling above.
 
 - `SkillExecutionView.java` and `SkillExecutionEvent.java` define value
   validation and immutable copying.
+- `SkillExecutorTest` and `SharedJavaDiscoveryInvocationTest` protect designated failure constructors, exact messages, shared propagation and infrastructure/application wrapper distinctions.
 - `ApplicationApiValueTest` protects record shape, immutability, detail-value
   validation, normalization, and public exception constructors.
 - `DefaultSkillTemplateTest#preservesAccessDeniedExceptionInstance` protects

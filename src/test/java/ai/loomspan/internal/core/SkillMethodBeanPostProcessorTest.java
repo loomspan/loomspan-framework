@@ -8,9 +8,6 @@ import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import ai.loomspan.internal.runtime.input.SkillInputSchemaNode;
 import org.junit.jupiter.api.Test;
 import ai.loomspan.api.SkillParam;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -25,11 +22,24 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@ExtendWith(OutputCaptureExtension.class)
 class SkillMethodBeanPostProcessorTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
+
+    @Test
+    void preservesExactStringResult() {
+        var registry = new TestCapabilityRegistry();
+        var processor = processor(registry);
+        process(processor, new ExactTextBean(), "exactText");
+        assertThat(registry.getCapability("default-exactText").invoker().invoke(Map.of()))
+                .isEqualTo("  text\n");
+    }
+
+    static class ExactTextBean {
+        @SkillMethod(description = "Exact text")
+        public String exactText() { return "  text\n"; }
+    }
 
     @Test
     void registersAnnotatedMethodAsCallableSkill() {
@@ -120,7 +130,7 @@ class SkillMethodBeanPostProcessorTest {
         Object rawResult = metadata.invoker().invoke(arguments);
 
         assertThat(rawResult).isInstanceOf(String.class);
-        assertThat(objectMapper.readValue((String) rawResult, String.class)).isEqualTo("alpha:true");
+        assertThat(rawResult).isEqualTo("alpha:true");
     }
 
     @Test
@@ -137,7 +147,7 @@ class SkillMethodBeanPostProcessorTest {
         Object rawResult = metadata.invoker().invoke(arguments);
 
         assertThat(rawResult).isInstanceOf(String.class);
-        assertThat(objectMapper.readValue((String) rawResult, String.class)).isEqualTo("base:default");
+        assertThat(rawResult).isEqualTo("base:default");
     }
 
     @Test
@@ -190,33 +200,14 @@ class SkillMethodBeanPostProcessorTest {
     }
 
     @Test
-    void returnsTransformedErrorWhenSkillMethodThrowsWrappedBusinessException() {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
-        SkillMethodBeanPostProcessor processor = processor(registry);
-
+    void propagatesBusinessWrapperAndItsDiagnosticCause() {
+        var registry = new TestCapabilityRegistry();
+        var processor = processor(registry);
         process(processor, new ThrowingInvocationBean(), "throwingInvocationBean");
-
-        CapabilityMetadata metadata = registry.getCapability("default-throwingOperation");
-
-        assertThat(metadata.invoker().invoke(Map.of())).isEqualTo("ERROR: IllegalArgumentException. HINT: boom");
-    }
-
-    @Test
-    void logsStackTraceButOmitsItFromReturnedPayload(CapturedOutput output) {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
-        SkillMethodBeanPostProcessor processor = processor(registry);
-
-        process(processor, new ThrowingInvocationBean(), "throwingInvocationBean");
-
-        CapabilityMetadata metadata = registry.getCapability("default-throwingOperation");
-        Object rawResult = metadata.invoker().invoke(Map.of());
-
-        assertThat(rawResult).isEqualTo("ERROR: IllegalArgumentException. HINT: boom");
-        assertThat(output.getAll()).contains("Java skill 'default-throwingOperation' failed during deterministic execution");
-        assertThat(output.getAll()).contains("java.lang.IllegalStateException: wrapper");
-        assertThat(output.getAll()).contains("Caused by: java.lang.IllegalArgumentException: boom");
-        assertThat(rawResult.toString()).doesNotContain("at ai.loomspan");
-        assertThat(rawResult.toString()).doesNotContain("IllegalStateException: wrapper");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                registry.getCapability("default-throwingOperation").invoker().invoke(Map.of()))
+                .isInstanceOf(IllegalStateException.class).hasMessage("wrapper")
+                .hasCauseInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -232,7 +223,7 @@ class SkillMethodBeanPostProcessorTest {
                 method.getParameters()[0].getName(),
                 new ByteArrayResource("hello text".getBytes(StandardCharsets.UTF_8))));
 
-        assertThat(objectMapper.readValue((String) rawResult, String.class)).isEqualTo("hello text");
+        assertThat(rawResult).isEqualTo("hello text");
     }
 
     @Test
@@ -248,7 +239,7 @@ class SkillMethodBeanPostProcessorTest {
                 method.getParameters()[0].getName(),
                 new ByteArrayResource(new byte[]{0x01, 0x02, 0x03})));
 
-        assertThat(objectMapper.readValue((String) rawResult, String.class)).isEqualTo("010203");
+        assertThat(rawResult).isEqualTo("010203");
     }
 
     @Test
@@ -271,8 +262,8 @@ class SkillMethodBeanPostProcessorTest {
                 streamMethod.getParameters()[0].getName(),
                 new ByteArrayResource("hello stream".getBytes(StandardCharsets.UTF_8))));
 
-        assertThat(objectMapper.readValue((String) resourceResult, String.class)).isEqualTo("hello resource");
-        assertThat(objectMapper.readValue((String) streamResult, String.class)).isEqualTo("hello stream");
+        assertThat(resourceResult).isEqualTo("hello resource");
+        assertThat(streamResult).isEqualTo("hello stream");
     }
 
     @Test
@@ -313,7 +304,7 @@ class SkillMethodBeanPostProcessorTest {
                                         new ByteArrayResource(new byte[]{0x01, 0x02}),
                                         new ByteArrayResource(new byte[]{0x0A, 0x0B}))))));
 
-        assertThat(objectMapper.readValue((String) rawResult, String.class)).isEqualTo("hello title|0102,0a0b");
+        assertThat(rawResult).isEqualTo("hello title|0102,0a0b");
     }
 
     @Test
@@ -332,7 +323,7 @@ class SkillMethodBeanPostProcessorTest {
                         new ByteArrayResource("beta".getBytes(StandardCharsets.UTF_8)),
                         new ByteArrayResource("gamma".getBytes(StandardCharsets.UTF_8)))));
 
-        assertThat(objectMapper.readValue((String) rawResult, String.class)).isEqualTo("alpha|beta|gamma");
+        assertThat(rawResult).isEqualTo("alpha|beta|gamma");
     }
 
     @Test

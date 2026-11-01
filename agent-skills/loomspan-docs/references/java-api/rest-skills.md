@@ -23,7 +23,7 @@ If REST manifests exist, the application MUST expose exactly one handler bean. T
 
 The captured caller `Authentication` is available through `SecurityContextHolder` on the actual handler thread and the previous context is restored. Authentication, trace/session identifiers, and descriptions are not invocation components.
 
-The handler is called once. An empty string is a successful result; null fails with `handler returned null`. `AccessDeniedException` remains unwrapped, an existing `SkillException` remains intact at the facade, and other runtime failures become a safe `SkillException` with their cause. Unlike annotation-defined Java skills, REST failures do not use the Java exception-to-text adapter. JVM `Error` is not caught.
+The handler is called once. An empty string is a successful result; null fails with `handler returned null`. `AccessDeniedException` remains unwrapped, an existing `SkillException` remains intact at the facade, and other runtime failures become a safe `SkillException` with their cause. Java method and serialization failures also propagate; neither Java nor REST uses an exception-to-successful-text adapter. JVM `Error` is not caught.
 
 REST uses the existing public observation shape and direct mission/tool trace records without model attempts or a trace kind field. Console's registered-skill catalog supplies the distinct `REST` label and manifest location/text.
 

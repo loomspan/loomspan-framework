@@ -6,7 +6,6 @@ import ai.loomspan.internal.chat.SkillAdvisorResolver;
 import ai.loomspan.internal.model.ModelInteractionFactory;
 import ai.loomspan.internal.chat.SkillChatModelResolver;
 import ai.loomspan.internal.springai.SpringAiModelInteractionFactory;
-import ai.loomspan.internal.core.LoomspanExceptionTransformer;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.ExecutionCoordinator;
@@ -148,7 +147,6 @@ class LoomspanAutoConfigurationTests {
                         "loomspan.skills.locations=classpath:/skills/none/**/*.yaml")
                 .run(context -> {
                     assertThat(context).hasSingleBean(LoomspanSessionRunner.class);
-                    assertThat(context).hasSingleBean(LoomspanExceptionTransformer.class);
                     assertThat(context).hasSingleBean(ExecutionTraceProperties.class);
                     assertThat(context).hasSingleBean(SkillGenerationManager.class);
                     assertThat(context).hasSingleBean(LoomspanProperties.class);
@@ -271,7 +269,7 @@ class LoomspanAutoConfigurationTests {
                     assertThat(metadata.skillExecution().configured()).isFalse();
                     assertThat(context.getBean(SkillTemplate.class)
                             .invoke("default-deterministicTarget", Map.of("input", "alpha")))
-                            .isEqualTo("\"mapped:alpha\"");
+                            .isEqualTo("mapped:alpha");
                 });
     }
 

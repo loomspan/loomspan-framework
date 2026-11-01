@@ -363,6 +363,14 @@ change between betas, including breaking changes. Pin an exact version and revie
 
 The supported Java API is the closed allowlist in `ai.loomspan.api`, summarized
 in the [public API reference](agent-skills/loomspan-docs/references/java-api/compatibility-and-boundaries.md).
+It contains 27 public top-level types, including `SkillExecutor`, the five-component
+`SkillExecutorInvocation` record, and `RecoverableSkillException`. Java callable
+methods and reference-only executors share discovery and proxy invocation. Successful
+null/void results become empty text, Strings remain exact, and other results become
+JSON; failures propagate. This revision provides executor declaration/invocation
+foundations; YAML binding and orchestration integration remain subsequent delivery.
+See [Java declarations and results](agent-skills/loomspan-docs/references/java-api/java-skills.md).
+
 The catalog descriptor is `SkillDescriptor(name, description, kind, inputSchema,
 outputSchema)`; `SkillKind` includes `YAML`, `JAVA`, `REST`, and `TYPESAFE`.
 Nullable `outputSchema` describes effective output shape, including

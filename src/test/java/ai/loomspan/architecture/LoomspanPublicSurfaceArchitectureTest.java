@@ -33,6 +33,9 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.api.SkillExecutionView",
             "ai.loomspan.api.SkillExecutionEvent",
             "ai.loomspan.api.SkillMethod",
+            "ai.loomspan.api.SkillExecutor",
+            "ai.loomspan.api.SkillExecutorInvocation",
+            "ai.loomspan.api.RecoverableSkillException",
             "ai.loomspan.api.SkillParam",
             "ai.loomspan.api.SkillException",
             "ai.loomspan.api.SkillReloadException",
@@ -62,6 +65,8 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.autoconfigure.AiDriver");
 
     private static final Map<String, String> TECHNICALLY_PUBLIC_INTERNAL_TYPES = Map.ofEntries(
+            Map.entry("ai.loomspan.internal.util.ImmutableContainers", "Public only for shared invocation-record and configuration container copying across framework packages."),
+            Map.entry("ai.loomspan.internal.core.SkillExecutorRegistration", "Public only for fixed executor declaration handoff to generation ownership."),
             Map.entry("ai.loomspan.internal.typesafe.TypeSafeDeclaration", "Public only for framework-owned immutable native declaration and schema collaboration."),
             Map.entry("ai.loomspan.internal.typesafe.TypeSafeClient", "Public only for framework-owned concrete native connection lifecycle."),
             Map.entry("ai.loomspan.internal.typesafe.TypeSafeExecutor", "Public only for framework-owned captured mission evaluation dispatch."),
@@ -120,7 +125,6 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.core.AdvisorTraceContext", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.AdvisorTraceFact", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.AdvisorTraceRecorder", "Public only for Java collaboration between distinct internal subsystem packages."),
-            Map.entry("ai.loomspan.internal.core.LoomspanExceptionTransformer", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.LoomspanSession", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.LoomspanSessionRunner", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.FrameworkExecutionLifecycle", "Public only so framework auto-configuration can wire the internal shutdown owner."),
@@ -131,7 +135,6 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.core.CapabilityKind", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.CapabilityMetadata", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.CapabilityToolDescriptor", "Public only for Java collaboration between distinct internal subsystem packages."),
-            Map.entry("ai.loomspan.internal.core.DefaultLoomspanExceptionTransformer", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.DefaultExecutionTraceRecorder", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.ExecutionCoordinator", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.ExecutionBinding", "Public only for immutable execution identity collaboration between internal runtime packages."),

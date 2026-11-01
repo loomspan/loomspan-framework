@@ -1,9 +1,7 @@
 package ai.loomspan.autoconfigure;
 
-import ai.loomspan.internal.core.LoomspanExceptionTransformer;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
-import ai.loomspan.internal.core.DefaultLoomspanExceptionTransformer;
 import ai.loomspan.internal.core.ExecutionCoordinator;
 import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
 import ai.loomspan.internal.core.SkillMethodBeanPostProcessor;
@@ -82,22 +80,13 @@ public class LoomspanAutoConfiguration
     }
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    LoomspanExceptionTransformer LoomspanExceptionTransformer()
-    {
-        return new DefaultLoomspanExceptionTransformer();
-    }
-
-    @Bean
-    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     static SkillMethodBeanPostProcessor skillMethodBeanPostProcessor(
             LoomspanJacksonCodecs codecs,
-            LoomspanExceptionTransformer LoomspanExceptionTransformer,
             SkillInputContractResolver skillInputContractResolver)
     {
         return SkillMethodBeanPostProcessor.create(
                 codecs.applicationConversion(),
                 codecs.schemaTree(),
-                LoomspanExceptionTransformer,
                 skillInputContractResolver);
     }
 

@@ -9,7 +9,7 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the twenty-four types in the closed
+Application code MAY depend on the twenty-seven types in the closed
 `ai.loomspan.api` allowlist:
 
 | Type | Supported purpose |
@@ -31,6 +31,9 @@ Application code MAY depend on the twenty-four types in the closed
 | `SkillExecutionView` | Observe the completed invocation session |
 | `SkillExecutionEvent` | Read a current-version diagnostic event |
 | `SkillMethod` | Mark an application bean method as a directly callable Java skill |
+| `SkillExecutor` | Mark a reference-only Java execution method; no callable registration or schema |
+| `SkillExecutorInvocation` | Construct or receive the five-component executor handoff with copied map/list containers |
+| `RecoverableSkillException` | Signal a designated Java failure with exact corrective text and an optional diagnostic cause |
 | `SkillParam` | Describe and declare requiredness for a Java skill parameter |
 | `SkillException` | Catch a safe Loomspan facade failure |
 | `SkillReloadException` | Catch an operational preparation or publication failure |
@@ -45,9 +48,11 @@ annotations on application-owned beans, and consume the public value records.
 
 ## Compatibility Changes in This Revision
 
+`SkillExecutor`, `SkillExecutorInvocation` and `RecoverableSkillException` are deliberate additive API types. Java successful results now preserve non-null Strings exactly, use empty text for null/void, and JSON-serialize other values. Java method and serialization failures propagate; exception-to-successful-text conversion is removed. Update callers that decoded JSON-quoted Java Strings or relied on successful error text. This intentional pre-1.0 behavior change has no compatibility mode. See [Java declarations](java-skills.md) for the exact contract and executor delivery boundary.
+
 `SkillKind.TYPESAFE` adds native evaluation identity. Applications with exhaustive
-enum switches must handle the new value. Existing `SkillTemplate` String results
-and the five-component descriptor remain unchanged; no typed evaluation facade
+enum switches must handle the new value. The `SkillTemplate` String return type
+and five-component descriptor remain unchanged; no typed evaluation facade
 or additional SPI is introduced. See [TypeSafe authoring](../skill-authoring/typesafe-skills.md).
 
 `NamespaceVisibility` and namespace-first complete `SkillReloader` validation/preparation replace all incomplete/default-only overloads. Configuration is required; omitted scalars use built-in defaults, with no active/startup inheritance. Removal requires namespace and expected active ID. These are intentional pre-1.0 source/binary/behavior changes without shims. See [namespace publication](skill-reload.md).
@@ -130,7 +135,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the `api` package has exactly the twenty-four allowlisted public top-level types;
+- the `api` package has exactly the twenty-seven allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

@@ -33,7 +33,7 @@ class SkillMethodTargetDiscoveryIntegrationTests
         assertThat(schema.path("required"))
                 .noneMatch(node -> "externalInput".equals(node.asText()) || "internalInput".equals(node.asText()));
         assertThat(target.invoker().invoke(Map.of("externalInput", "alpha")))
-                .isEqualTo("\"interface:alpha\"");
+                .isEqualTo("interface:alpha");
     }
 
     @Test
@@ -48,7 +48,7 @@ class SkillMethodTargetDiscoveryIntegrationTests
         CapabilityMetadata target = harness.registry().getCapability("default-convert");
         assertThat(target.tool().inputSchema()).contains("genericInput").doesNotContain("implementationInput");
         assertThat(target.invoker().invoke(Map.of("genericInput", "alpha")))
-                .isEqualTo("\"generic:alpha\"");
+                .isEqualTo("generic:alpha");
     }
 
     @Test
@@ -62,7 +62,7 @@ class SkillMethodTargetDiscoveryIntegrationTests
                 .extracting(CapabilityMetadata::name)
                 .containsExactly("default-execute");
         assertThat(harness.registry().getCapability("default-execute").invoker().invoke(Map.of("input", "alpha")))
-                .isEqualTo("\"class:alpha\"");
+                .isEqualTo("class:alpha");
         assertThat(adviceCalls).hasValue(1);
     }
 
@@ -81,9 +81,9 @@ class SkillMethodTargetDiscoveryIntegrationTests
         assertThat(registry.getAllCapabilities()).extracting(CapabilityMetadata::name)
                 .containsExactlyInAnyOrder("default-executeText", "default-executeNumber");
         assertThat(registry.getCapability("default-executeText").invoker().invoke(Map.of("input", "alpha")))
-                .isEqualTo("\"alpha\"");
+                .isEqualTo("alpha");
         assertThat(registry.getCapability("default-executeNumber").invoker().invoke(Map.of("input", 42)))
-                .isEqualTo("\"42\"");
+                .isEqualTo("42");
     }
 
     @Test
@@ -94,7 +94,7 @@ class SkillMethodTargetDiscoveryIntegrationTests
 
         assertThat(harness.registry().getCapability("default-execute").invoker()
                 .invoke(Map.of("input", "alpha")))
-                .isEqualTo("\"annotated:alpha\"");
+                .isEqualTo("annotated:alpha");
     }
 
     @Test
@@ -125,7 +125,7 @@ class SkillMethodTargetDiscoveryIntegrationTests
 
         assertThat(harness.registry().getCapability("default-execute").invoker()
                 .invoke(Map.of("publicInput", "alpha")))
-                .isEqualTo("\"alpha\"");
+                .isEqualTo("alpha");
     }
 
     @Test
@@ -141,7 +141,7 @@ class SkillMethodTargetDiscoveryIntegrationTests
             factory.setProxyTargetClass(true);
             factory.addAdvice((org.aopalliance.intercept.MethodInterceptor) invocation -> { throw failure; });
             TestHarness harness = process(factory.getProxy(), "deniedSkill");
-            RuntimeException expected = failure.getCause() instanceof RuntimeException cause ? cause : failure;
+            RuntimeException expected = failure;
             assertThatThrownBy(() -> harness.registry().getCapability("default-denied").invoker().invoke(Map.of()))
                     .isSameAs(expected);
             assertThat(businessCalls).hasValue(0);

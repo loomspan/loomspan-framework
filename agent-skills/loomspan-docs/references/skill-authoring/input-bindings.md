@@ -231,7 +231,7 @@ binding MUST resolve even if its receiving property is optional. Null transfers
 only when the complete receiving contract accepts it.
 
 Accepted result text is decoded once as a complete JSON value, preserving large
-integers and decimal values. JSON-quoted Java strings decode once. Plain or
+integers and decimal values. JSON-quoted result strings decode once; Java methods return their String values exactly, so plain Java text receives no automatic quoting. Plain or
 malformed JSON text stays verbatim text; selecting its nested fields fails.
 Ordinary nested JSON-looking strings remain strings. Original accepted text stays
 unchanged for diagnostics and forwarding. Arrays retain order and absent optional

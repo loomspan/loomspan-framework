@@ -5,7 +5,7 @@ applies_to: bundled-loomspan-revision
 coverage: source-verified
 ---
 
-# Annotation-defined Java Skills
+# Java Skill and Executor Declarations
 
 ## Declare one skill
 
@@ -50,15 +50,60 @@ The example registers `default-invoiceExists`. See the [identity rules](../skill
 
 The Java signature and parameter metadata supply the input contract for root validation, tool publication, and planner guidance. Read [reflected Java input contracts](../skill-authoring/input-contracts.md) for scalars, Object, generic and typed maps, DTOs, collections, runtime references, and null semantics.
 
-Java results retain Jackson serialization into the facade's textual result. Java declarations do not have a YAML output schema, prompt, model, or planning configuration. A Java method may implement application-owned I/O, but Loomspan itself makes no model request to execute that Java skill.
+Successful Java values use one conversion contract for both declaration roles:
+
+| Returned value | Text |
+| --- | --- |
+| `null` or `void` | Empty String |
+| Non-null `String`, including empty or whitespace-only text | Exact original String, without JSON quoting |
+| Any other non-null value | JSON using the application Jackson mapper |
+
+Serialization failures and application exceptions propagate as failures. There is no exception-to-successful-text adapter. Java callable declarations do not have a YAML output schema, prompt, model, or planning configuration. A method may implement application-owned I/O; Loomspan makes no model request merely to execute it.
 
 Java roots and children use the common mission lifecycle. Root observers receive available completed history after success or post-session failure. Java children retain the enclosing tool boundary, and only successful completion contributes their exact direct name to task/evidence accounting. Parent mission state resumes after return or failure.
 
 Java work uses the same bounded mission submission, timeout, interruption, and cleanup path as model execution. A timed-out or interrupted invocation closes its mission and fences late runtime writes, even if application code ignores interruption. This does not undo application side effects; Java implementations SHOULD honor cancellation and provide their own I/O bounds.
 
+## Reference-only executor declaration
+
+`@SkillExecutor` is a runtime method annotation with exactly these elements:
+
+```java
+String name() default "";
+String namespace() default "default";
+String config() default "";
+```
+
+An executor method MUST accept exactly one `SkillExecutorInvocation` parameter. It supports the same return values as `@SkillMethod`. Omitted names and namespace normalization follow the callable identity rules above. `config` records an optional configuration path; empty selects no configuration.
+
+Executor discovery and proxy invocation are implemented in this revision. End-to-end YAML executor binding, namespace configuration selection and retained executor routing are delivered by PR 28.3. Declaring an executor does not currently make it usable by a YAML skill. An executor is reference-only: it has no generated callable schema, catalog entry, `allowed_skills` membership or `SkillTemplate` invocation route. Callable and executor names have separate indexes, so both roles may share one qualified identity; duplicates within either role fail. A bean may declare either or both roles.
+
+The public record has exactly five components, in this order:
+
+```java
+Map<String, Object> input;
+Map<String, Object> skillConfig;
+Map<String, Object> executorConfig;
+String skillName;
+String executorConfigGenerationId;
+```
+
+Its public constructor requires every component to be non-null and both metadata strings to be nonblank; valid strings retain their exact text. All three maps are defensively copied recursively into unmodifiable map/list containers, preserving nulls. Other leaves retain identity, including Spring `Resource` handles, arrays and arbitrary application objects. This does not freeze those objects or copy/freeze resource bytes. There is no builder, authentication field, context bag or internal runtime value in the record.
+
+## Designated Java failures
+
+`RecoverableSkillException extends SkillException` has exactly two constructors:
+
+```java
+RecoverableSkillException(String message);
+RecoverableSkillException(String message, Throwable cause);
+```
+
+Messages MUST be non-null and nonblank. Valid messages, including surrounding whitespace, remain unchanged. An optional cause supplies diagnostics and never substitutes its message as feedback. The shared Java-boundary policy recognizes this subtype through transparent `InvocationTargetException` and `UndeclaredThrowableException` wrappers only. An ordinary application wrapper around it remains terminal; arbitrary cause-chain search is not performed. Direct invocation still throws the exception. Standard tool feedback and orchestration disposition are PR 28.5, so this declaration does not promise automatic retries or a planner correction loop. See [facade errors](observation-and-errors.md) for supported caller handling.
+
 ## Spring invocation and authorization
 
-Loomspan invokes the final Spring-managed bean so advice remains active. Skill methods MUST be invocable through the bean's actual proxy; prefer public methods and interfaces compatible with the chosen proxy strategy. Discovery includes relevant lazy beans. Uninvocable declarations fail startup instead of silently disappearing.
+Loomspan invokes the final Spring-managed bean so advice remains active. Both Java declaration roles MUST be invocable through the bean's actual proxy; prefer public methods and interfaces compatible with the chosen proxy strategy. Discovery includes relevant lazy beans, including executor-only beans. Interface annotations, canonical generic bridges and equivalent interface contracts share one discovery pass. Incompatible interface contracts fail even when the implementation is annotated. A method cannot acquire both roles across implementation/interface declarations. Uninvocable declarations fail startup instead of silently disappearing.
 
 Supported visibility policies are JSR-250 `@RolesAllowed`, `@PermitAll`, and `@DenyAll`, resolved using Spring's class/method/interface rules. Applications declaring these policies MUST enable `@EnableMethodSecurity(jsr250Enabled = true)` and provide actual applicable method-security advice. Read [authorization](../skill-authoring/authorization.md) for role prefixes, hierarchy, startup checks, and caller authentication isolation.
 
@@ -66,14 +111,15 @@ Do not import registries, descriptors, invokers, or discovery components from `a
 
 ## Source anchors
 
-- `SkillMethod` and `SkillParam` define the supported annotations; their API tests protect defaults and retention.
-- `SkillMethodBeanPostProcessor` and its tests define canonical discovery, reflected inputs, and invocation of the final bean.
+- `SkillMethod`, `SkillParam`, `SkillExecutor`, `SkillExecutorInvocation` and `RecoverableSkillException` define the supported declarations and values; `SkillExecutorTest` protects the new annotation/constructor/copy contracts.
+- `SharedJavaDiscoveryInvocationTest` covers shared result conversion, actual reflection/JDK/CGLIB wrappers, mixed-role identity indexes, lazy executor discovery, unsafe dispatch and real method security.
+- `SkillMethodBeanPostProcessor` and its tests define shared canonical discovery and callable reflected inputs; `JavaSkillInvoker` owns final managed-proxy invocation and conversion for both roles.
 - `SkillGenerationManager#prepare` finishes all declaration sources and validates child references before a complete immutable generation can activate.
 - `SupportedSurfaceIntegrationTest` exercises the supported facade and application-owned methods.
 - `MissionWorkExecutor` is the shared work/cutoff owner; `JavaSkillMissionCutoffTest` protects timeout, caller interruption, and noncooperative late returns.
 - `DefaultRegisteredSkillCatalogTest`, `ConsoleRestFixtureCorpusTest`, and Console `SkillCatalog.test.tsx` / `SkillDetail.test.tsx` protect mixed-source diagnostics.
 
-Private, final, and static skill methods on a CGLIB class proxy fail startup because they cannot dispatch safely through the proxy's target and advice. Plain unproxied bean methods retain reflected invocation. `JavaSkillIntegrationTest` covers the stateful class-proxy regression.
+Private, final, and static methods of either Java role on a CGLIB class proxy fail startup because they cannot dispatch safely through the proxy's target and advice. Plain unproxied bean methods retain reflected invocation. `JavaSkillIntegrationTest` covers the stateful class-proxy regression.
 
 ## Namespace publication boundary
 
@@ -82,7 +128,9 @@ Startup namespaces are Private; foreign outgoing references require a Public tar
 Fixed Java methods remain assigned to their original namespace across replacement
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
-for complete signatures, sequencing and retirement. This slice implements preparation
-and installation; reachable admission/dispatch integration follows in PRs 27.3–27.4.
+for complete signatures, sequencing and retirement. Fresh callable admission captures
+reachable namespace generations; retained execution uses that association across
+replacement, removal and recreation. Each dispatch enforces the source's declared
+children and captured target visibility. Executor binding/retention remains PR 28.3.
 
-Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.
+Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`, `SkillReachableAdmissionTest`, and `NamespaceExecutionAuthorityIntegrationTest`.

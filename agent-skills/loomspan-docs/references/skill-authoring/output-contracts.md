@@ -16,7 +16,7 @@ and return the complete provider answers without answer validation or repair.
 The authored `output_schema` rules below apply to ordinary chat skills. A parent
 can bind from or forward a TypeSafe child's result under the existing rules.
 
-Use this topic to choose final synthesis, declared output assembly with `output_bindings`, or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract gives the model provider-neutral instructions, validates the returned JSON exactly, and can drive semantic retries. Java skills have no YAML `output_schema`; their returned-value behavior is Jackson serialization of the Java result.
+Use this topic to choose final synthesis, declared output assembly with `output_bindings`, or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract gives the model provider-neutral instructions, validates the returned JSON exactly, and can drive semantic retries. Java skills have no YAML `output_schema`; their null/void results become empty text, Strings remain exact, and other results become JSON. See [Java results](../java-api/java-skills.md#inputs-results-and-lifecycle).
 
 The root schema MUST have `type: object`. Supported node types are `object`, `array`, `string`, `integer`, `number`, and `boolean`.
 
@@ -41,7 +41,7 @@ A forwarding parent MUST NOT declare `output_schema`, `output_schema_max_retries
 
 The plan MUST contain exactly one task bound to the designated child. Required-child visibility, plan validation and its single combined correction remain applicable. Runtime retains that accepted task ID and executes every accepted task, including optional work and work ordered after the selected task. Full joins, authorization, limits, failure and cancellation remain enforced. Missing, ambiguous, failed, stale, or mismatched selection fails without fallback synthesis.
 
-Successful completion returns the complete retained String without parsing, serialization, field extraction, citation changes, or transport unwrapping. Empty and whitespace text, Java JSON string quoting, long values, and array order remain intact. Forwarding creates no parent final model request, final-output validation, correction or synthetic completion step. N accepted tasks need N `max_steps` slots; ordinary synthesis needs N+1. Planning and physical-provider budgets remain separate. See [planning task constraints](planning-task-constraints.md), [concurrency](planning-concurrency.md), and [forwarding diagnostics](traces-and-debugging.md#designated-child-completion).
+Successful completion returns the complete retained String without parsing, serialization, field extraction, citation changes, or transport unwrapping. Empty and whitespace text, exact Java Strings, JSON from non-string Java values, long values, and array order remain intact. Forwarding creates no parent final model request, final-output validation, correction or synthetic completion step. N accepted tasks need N `max_steps` slots; ordinary synthesis needs N+1. Planning and physical-provider budgets remain separate. See [planning task constraints](planning-task-constraints.md), [concurrency](planning-concurrency.md), and [forwarding diagnostics](traces-and-debugging.md#designated-child-completion).
 
 ## Minimal forwarding examples
 
@@ -93,7 +93,7 @@ allowed_skills:
 output_from: {skill: default-finishReport}
 ```
 
-The returned Framework text is `"Report complete"`, including JSON quotes from the existing Jackson Java result boundary. No output schema is inferred from the Java return type.
+The returned Framework text is `Report complete`, without JSON quotes. No output schema is inferred from the Java return type.
 
 REST producer using the same parent declaration:
 

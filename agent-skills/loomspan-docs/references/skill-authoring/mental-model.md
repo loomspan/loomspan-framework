@@ -109,7 +109,7 @@ A YAML skill declares a configured `model`. It can declare private `prompt`, sch
 
 ### Java skill
 
-An application Spring bean's `@SkillMethod` declares one directly callable skill. The annotation owns its name and description; the method signature and `@SkillParam` own inputs. Java supplies the returned value, serialized using Jackson. No companion YAML, Java output schema, model settings, or synthetic plan is created.
+An application Spring bean's `@SkillMethod` declares one directly callable skill. The annotation owns its name and description; the method signature and `@SkillParam` own inputs. Java supplies the returned value: null/void becomes empty text, Strings remain exact, and other values use Jackson JSON. See [Java results and failures](../java-api/java-skills.md#inputs-results-and-lifecycle). No companion YAML, Java output schema, model settings, or synthetic plan is created.
 
 Distinct overloaded methods MAY have distinct explicit skill names. Same/default names collide. Spring proxy, interface, and bridge methods are canonicalized, and invocation resolves the final managed bean so configured advice runs. Methods must be invocable through that bean's proxy; relevant lazy declarations are deliberately initialized during startup.
 

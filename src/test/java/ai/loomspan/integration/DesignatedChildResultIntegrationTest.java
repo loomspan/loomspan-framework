@@ -347,7 +347,7 @@ class DesignatedChildResultIntegrationTest {
     private static String expected(String kind) {
         return switch (kind) {
             case "model" -> MODEL_RESULT;
-            case "java" -> JSON.writeValueAsString(JAVA_RESULT);
+            case "java" -> JAVA_RESULT;
             case "rest" -> REST_RESULT;
             case "native" -> "{\"report\":{\"type\":\"noul\",\"noul\":0.5,\"extension\":\"kept\"}}";
             case "native-empty" -> "{}";

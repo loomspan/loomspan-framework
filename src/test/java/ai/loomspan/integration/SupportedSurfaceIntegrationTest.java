@@ -42,6 +42,41 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SupportedSurfaceIntegrationTest
 {
+    @Test void javaFoundationUsesOnlySupportedTypesAndKeepsExecutorsReferenceOnly()
+    {
+        NamespaceStartupIntegrationTest.runner().withBean(JavaFoundation.class).run(context -> {
+            assertThat(context).hasNotFailed();
+            var skills = context.getBean(SkillTemplate.class);
+            assertThat(skills.invoke("default-foundationText", Map.of())).isEqualTo("  exact text\n");
+            assertThat(skills.invoke("default-foundationNull", Map.of())).isEmpty();
+            var recoverable = org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default-foundationRecoverable", Map.of()));
+            assertThat(recoverable).isInstanceOf(ai.loomspan.api.RecoverableSkillException.class).hasMessage("correct input");
+            var terminal = org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default-foundationTerminal", Map.of()));
+            assertThat(terminal).isInstanceOf(SkillException.class).hasRootCauseInstanceOf(IllegalStateException.class);
+            assertThat(context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skills())
+                    .extracting(ai.loomspan.api.SkillDescriptor::name).doesNotContain("default-foundationExecutor");
+            assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default-foundationExecutor", Map.of())))
+                    .isInstanceOf(SkillException.class);
+            assertThat(context.getBean(JavaFoundation.class).executorCalls).hasValue(0);
+            var invocation = new ai.loomspan.api.SkillExecutorInvocation(Map.of(), Map.of(), Map.of(), "sales-create", "generation");
+            assertThat(invocation.skillName()).isEqualTo("sales-create");
+        });
+    }
+
+    static class JavaFoundation
+    {
+        final AtomicInteger executorCalls = new AtomicInteger();
+        @SkillMethod(name="foundationText", description="Exact text") public String text() { return "  exact text\n"; }
+        @SkillMethod(name="foundationNull", description="Empty text") public void empty() {}
+        @SkillMethod(name="foundationRecoverable", description="Designated failure") public String recoverable() {
+            throw new ai.loomspan.api.RecoverableSkillException("correct input");
+        }
+        @SkillMethod(name="foundationTerminal", description="Terminal failure") public String terminal() { throw new IllegalStateException("terminal"); }
+        @ai.loomspan.api.SkillExecutor(name="foundationExecutor") public String execute(ai.loomspan.api.SkillExecutorInvocation invocation) {
+            executorCalls.incrementAndGet(); return invocation.skillName();
+        }
+    }
+
     @Test void completeNamespaceManagementUsesOnlySupportedTypes() {
         NamespaceStartupIntegrationTest.runner().run(context -> {
             var reloader=context.getBean(ai.loomspan.api.SkillReloader.class);
