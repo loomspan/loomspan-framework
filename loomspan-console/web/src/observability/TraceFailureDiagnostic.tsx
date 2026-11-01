@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { getTraceFailureDiagnostic } from "../api/client";
 import type { TraceFailure, TraceFailureDiagnostic as Diagnostic, TraceSource } from "../api/contracts";
 
-export function TraceFailureDiagnostic({ traceId, source = "TARGET", failure, scopeGeneration = 0, verifyScope }: {
+export function TraceFailureDiagnostic({ traceId, source = "TARGET", failure, scopeGeneration = 0, verifyScope, onSelectFailure }: {
 	traceId: string;
 	source?: TraceSource;
   failure?: TraceFailure;
+  onSelectFailure?: (failureId: string) => void;
   scopeGeneration?: number;
   verifyScope?: (response: Diagnostic) => Promise<Diagnostic>;
 }) {
@@ -84,7 +85,10 @@ export function TraceFailureDiagnostic({ traceId, source = "TARGET", failure, sc
     }
   };
   return <section className="failure-diagnostics" aria-label="Failure diagnostics">
-    <h4>{failure.terminal ? "Terminal failure" : "Recovered failure"}</h4>
+    <h4>{failure.classification === "RECOVERABLE" ? "Recoverable failure" : "Terminal failure"}</h4>
+    {failure.terminal && <p>Selected as the completion failure.</p>}
+    {failure.exceptionMessage !== null && <pre>{failure.exceptionMessage}</pre>}
+    {failure.causedByFailureId && <p>Recorded cause: <button type="button" onClick={() => onSelectFailure?.(failure.causedByFailureId!)}>{failure.causedByFailureId}</button></p>}
     {failure.exceptionType && <p><code>{failure.exceptionType}</code>{failure.contextSummary && ` - ${failure.contextSummary}`}</p>}
     {diagnostics.length === 0 ? <p>No diagnostic text was recorded.</p> : <ul className="failure-diagnostic-list">{diagnostics.map((descriptor) => <li key={descriptor.ordinal}>
       <span>{descriptor.kind === "JAVA_STACK_TRACE" ? "Java stack trace" : `Text diagnostic (${descriptor.kind})`} / {descriptor.contentType} / {descriptor.decodedBytes} bytes</span>

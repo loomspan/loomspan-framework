@@ -1205,3 +1205,41 @@ func categoryOfSafe(err *consolecore.Error) string {
 func bytesReader(data []byte) *bytes.Reader {
 	return bytes.NewReader(data)
 }
+
+func TestCurrentCorpusExplicitFailureMeaning(t *testing.T) {
+	for _, name := range []string{"nonterminal-error-then-success", "recoverable-failed-completion", "terminal-wrapper-recorded-cause", "terminal-unlinked-success"} {
+		t.Run(name, func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join(fixtureRoot(t), "traces", name+".ndjson"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			outcome := "SUCCEEDED"
+			if name == "recoverable-failed-completion" || name == "terminal-wrapper-recorded-cause" {
+				outcome = "FAILED"
+			}
+			h := newServiceTestHarnessForOutcomeAndVersion(t, "trace-"+name, string(raw), outcome, fixtureCompatibilityVersion)
+			page, domain := h.service.QueryFailures(context.Background(), targetEvidence(h.scopeID), FailureQuery{Handle: h.handle, PageSize: 10})
+			if domain != nil || len(page.Items) == 0 {
+				t.Fatalf("facts=%+v domain=%v", page, domain)
+			}
+			first := page.Items[0]
+			if name == "terminal-unlinked-success" {
+				if first.Classification != "TERMINAL" || first.Terminal {
+					t.Fatalf("facts=%+v", first)
+				}
+				return
+			}
+			if first.Classification != "RECOVERABLE" || first.ExceptionMessage == nil || *first.ExceptionMessage != "  correct this\n雪\t" {
+				t.Fatalf("exact facts=%+v", first)
+			}
+			if first.Terminal != (name == "recoverable-failed-completion") {
+				t.Fatalf("completion conflated: %+v", first)
+			}
+			if name == "terminal-wrapper-recorded-cause" {
+				if len(page.Items) != 2 || page.Items[1].Classification != "TERMINAL" || page.Items[1].CausedByFailureID != first.FailureID || !page.Items[1].Terminal {
+					t.Fatalf("wrapper facts=%+v", page.Items)
+				}
+			}
+		})
+	}
+}

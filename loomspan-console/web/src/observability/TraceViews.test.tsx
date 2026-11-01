@@ -222,7 +222,7 @@ test("usage preserves returned values and record-row evidence actions remain del
         ]}
         failures={[
           {
-            failureId: "failure",
+            classification: "TERMINAL", exceptionMessage: null, failureId: "failure",
             terminal: true,
             sequence: 2,
             timestampMillis: 0,

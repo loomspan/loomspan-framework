@@ -185,7 +185,7 @@ func TestRejectedPropertySpellingsInsideUntrustedEvidenceRoundTripUnchanged(t *t
 		Facts:   traceanalysis.RecordFacts{Failures: []traceanalysis.FailureSummary{{ContextSummary: sentinel}}},
 	})
 	encodedRecord, _ := json.Marshal(record)
-	if record.Content == nil || record.Content.InlineContent != sentinel || strings.Contains(string(encodedRecord), "contextSummary") {
+	if record.Content == nil || record.Content.InlineContent != sentinel || !strings.Contains(string(encodedRecord), "contextSummary") || record.Failures[0].ContextSummary != sentinel {
 		t.Fatalf("record evidence changed: %#v", record)
 	}
 	for _, value := range []traceanalysis.ByteRangeResult{

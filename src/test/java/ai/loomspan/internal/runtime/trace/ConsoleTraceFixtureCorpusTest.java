@@ -93,6 +93,9 @@ class ConsoleTraceFixtureCorpusTest
             "missing-response-usage",
             "unattributed-usage",
             "nonterminal-error-then-success",
+            "recoverable-failed-completion",
+            "terminal-wrapper-recorded-cause",
+            "terminal-unlinked-success",
             "chunked-payload",
             "chunked-json-payload",
             "nested-frame-usage",
@@ -887,6 +890,7 @@ class ConsoleTraceFixtureCorpusTest
     {
         Path trace = root.resolve("traces").resolve(name + ".ndjson");
         AtomicInteger ids = new AtomicInteger();
+        AtomicInteger failureIds = new AtomicInteger();
         String entrySkill = name.equals("namespace-captured-context") ? "orders-search" : name.equals("java-root-success") ? "default-javaLookup" : "default-test_entry";
         DefaultExecutionTraceHandle handle = name.equals("namespace-captured-context")
                 ? new DefaultExecutionTraceHandle("trace-" + name, "session-" + name, entrySkill,
@@ -906,7 +910,7 @@ class ConsoleTraceFixtureCorpusTest
                         CLOCK, () -> "payload-" + ids.incrementAndGet(), "fixture-thread",
                         "traces/" + name + ".ndjson");
         LoomspanSession session = TestLoomspanSessions.withTraceHandle(
-                "session-" + name, entrySkill, CLOCK, handle, () -> failureIdFor(name));
+                "session-" + name, entrySkill, CLOCK, handle, () -> name.equals("terminal-wrapper-recorded-cause") ? "failure-" + failureIds.incrementAndGet() : failureIdFor(name));
 
         Usage attributed = Usage.ZERO;
         Usage terminal = Usage.ZERO;
@@ -1095,10 +1099,25 @@ class ConsoleTraceFixtureCorpusTest
             }
             case "nonterminal-error-then-success" ->
             {
-                session.recordFailure(fixtureFailure("recoverable cleanup failure"),
+                session.recordFailure(designatedFixtureFailure(),
                         Map.of("message", "recoverable cleanup failure"), null);
                 appendAttempt(handle, "retry-1", "attempt-1", 1, 5, 2, "EXACT");
                 attributed = terminal = new Usage(5, 2);
+            }
+            case "recoverable-failed-completion" -> {
+                terminalFailureId = session.recordFailure(designatedFixtureFailure(), Map.of("message", "Direct invocation failed"), null);
+                outcome = "FAILED";
+            }
+            case "terminal-wrapper-recorded-cause" -> {
+                var cause = designatedFixtureFailure();
+                session.recordFailure(cause, Map.of("message", "Application call failed"), null);
+                var wrapper = new IllegalStateException("terminal application wrapper", cause);
+                wrapper.setStackTrace(new StackTraceElement[0]);
+                terminalFailureId = session.recordFailure(wrapper, Map.of("message", "Outer execution failed"), null);
+                outcome = "FAILED";
+            }
+            case "terminal-unlinked-success" -> {
+                session.recordFailure(fixtureFailure("terminal unrelated call"), Map.of("message", "Recorded terminal call"), null);
             }
             case "chunked-payload" ->
             {
@@ -1356,6 +1375,7 @@ class ConsoleTraceFixtureCorpusTest
         handle.append(TraceRecordType.ERROR_RECORDED, modelA, TraceFrameType.MODEL_CALL,
                 Map.of("failureId", "failure-model-a"), ordered(
                         "message", "worker a model failure",
+                        "classification", "TERMINAL", "exceptionMessage", "worker a model failure",
                         "exceptionType", "java.lang.IllegalStateException",
                         "diagnostics", List.of(ordered(
                                 "kind", "JAVA_STACK_TRACE",
@@ -2106,6 +2126,12 @@ class ConsoleTraceFixtureCorpusTest
         return result;
     }
 
+    private static ai.loomspan.api.RecoverableSkillException designatedFixtureFailure() {
+        var failure = new ai.loomspan.api.RecoverableSkillException("  correct this\n\u96ea\t", fixtureFailure("diagnostic cause"));
+        failure.setStackTrace(new StackTraceElement[0]);
+        return failure;
+    }
+
     private static String failureIdFor(String name)
     {
         return switch (name)
@@ -2118,6 +2144,7 @@ class ConsoleTraceFixtureCorpusTest
             case "timeout-step-failure" -> "failure-timeout-step";
             case "terminal-provider-failure-actionable" -> "failure-terminal-provider";
             case "native-evaluation-malformed-response", "native-evaluation-provider-failure" -> "failure-native";
+            case "recoverable-failed-completion", "terminal-unlinked-success" -> "failure-explicit";
             default -> throw new IllegalStateException("Unexpected fixture failure for " + name);
         };
     }
@@ -2576,7 +2603,7 @@ class ConsoleTraceFixtureCorpusTest
                     "usage", Usage.ZERO.asMap(),
                     "usageComplete", false));
             case "missing-response-usage" -> List.of(expectedAttempt(name, "retry-1", "attempt-1", 1));
-            case "java-root-success", "namespace-captured-context", "assembled-input-result" -> List.of();
+            case "java-root-success", "namespace-captured-context", "assembled-input-result", "recoverable-failed-completion", "terminal-wrapper-recorded-cause", "terminal-unlinked-success" -> List.of();
             case "nested-frame-usage" -> List.of(
                     expectedAttempt(name, "retry-framed", "attempt-framed", 1),
                     expectedAttempt(name, "retry-unframed", "attempt-unframed", 1));
@@ -2954,6 +2981,8 @@ class ConsoleTraceFixtureCorpusTest
         metadata.put("failureId", "failure-after-completion");
         trailing.set("metadata", metadata);
         tools.jackson.databind.node.ObjectNode data = JSON.createObjectNode();
+        data.put("classification", "TERMINAL");
+        data.put("exceptionMessage", "failure after completion");
         data.put("exceptionType", "java.lang.IllegalStateException");
         data.put("message", "failure after completion");
         tools.jackson.databind.node.ObjectNode diagnostic = JSON.createObjectNode();

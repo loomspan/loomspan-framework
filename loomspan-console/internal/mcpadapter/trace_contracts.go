@@ -273,6 +273,10 @@ type validationDTO struct {
 	AttemptNumber   int64  `json:"attemptNumber"`
 }
 type failureDTO struct {
+	ContextSummary            string          `json:"contextSummary,omitempty"`
+	Classification            string          `json:"classification"`
+	ExceptionMessage          *string         `json:"exceptionMessage"`
+	CausedByFailureID         string          `json:"causedByFailureId,omitempty"`
 	FailureID                 string          `json:"failureId"`
 	Terminal                  bool            `json:"terminal"`
 	Sequence                  int64           `json:"sequence"`

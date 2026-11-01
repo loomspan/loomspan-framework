@@ -104,15 +104,7 @@ public final class MissionWorkExecutor
                         session, branch, capturedBinding.requireMission(), cutoff, primary.cause());
                 throw propagatePrimary(primary.cause());
             }
-            if (cause instanceof RuntimeException runtimeException)
-            {
-                throw runtimeException;
-            }
-            if (cause instanceof Error error)
-            {
-                throw error;
-            }
-            throw new IllegalStateException("Mission execution failed for skill '" + skillName + "'", cause);
+            throw ai.loomspan.internal.core.SkillFailurePolicy.propagate(ex);
         }
         catch (CancellationException ex)
         {

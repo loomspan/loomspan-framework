@@ -513,8 +513,19 @@ A recovered provider failure remains an attempt fact and does not create an `ERR
 If finalization itself cannot append a completion record, do not infer one. A missing completion means the artifact is incomplete, not implicitly failed or successful.
 
 Each recorded Java throwable includes one `JAVA_STACK_TRACE` diagnostic attached
-to the closest active frame that observed it. Propagation of the same throwable,
-or of a normal wrapper whose cause was already recorded, reuses the failure ID.
+to the closest active frame that observed it. Propagation of the same effective throwable through recognized reflection/proxy,
+worker-future or Spring AI callback wrappers reuses the failure ID. An application
+wrapper has a distinct failure ID, even around an already-recorded recoverable
+cause; optional `causedByFailureId` links to that earlier record. Provider-attempt
+correlation is independent and does not merge these identities.
+
+The payload records authoritative `classification` (`RECOVERABLE` or `TERMINAL`),
+exact nullable `exceptionMessage`, and separate contextual `message`. Readers
+MUST use classification instead of inferring it from exception names or eventual
+mission success. Completion's `terminalFailureId` identifies the selected failure
+independently; recoverable direct/step failures still terminate. Recoverability
+does not prove model correction. Standard designated feedback follows failed
+recording and uses ordinary cumulative budgets and the original parent deadline.
 Console lists only bounded descriptors until the developer deliberately loads a
 selected diagnostic. The stack is opaque recorded text, not a parsed stack model
 or an inferred root cause.
@@ -542,7 +553,7 @@ cross-version application contracts.
 3. Group model request and terminal attempt facts by retry sequence and order by attempt number. For each failed attempt, read normalized facts first and load its selected diagnostic content only when needed. Treat recovery as proven only by a later successful response in that sequence.
 4. Follow validator mutation facts back to the exact attempt.
 5. Compare attributed response usage with terminal usage; treat a positive remainder as unattributed and a negative remainder as contradictory.
-6. Inspect linked error facts and frame relationships, keeping recovered errors separate from the terminal cause.
+6. Inspect linked error facts and frame relationships, keeping earlier errors separate from the completion-linked failure and reading explicit classification without assuming correction.
 7. For a tool invocation, inspect its single `TOOL_CALL_STARTED` fact and then
    its explicit completed or failed terminal fact. Treat a missing terminal as
    unknown; select **Tool input** only when argument inspection is necessary.

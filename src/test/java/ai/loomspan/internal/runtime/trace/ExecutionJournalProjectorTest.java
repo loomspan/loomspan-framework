@@ -137,6 +137,21 @@ class ExecutionJournalProjectorTest {
     }
 
     @Test
+    void errorProjectionPreservesClassificationExactMessageAndBothFailureIdentities() {
+        var error = new TraceRecord("trace", "session", 1, Instant.parse("2026-03-24T12:00:00Z"),
+                TraceRecordType.ERROR_RECORDED, "frame", null, null, "default-skill", "main",
+                Map.of("failureId", "outer", "causedByFailureId", "prior"),
+                OBJECT_MAPPER.valueToTree(Map.of("classification", "TERMINAL", "exceptionMessage", "  exact\n\u96ea\t",
+                        "message", "Contextual summary", "exceptionType", "java.lang.IllegalStateException")));
+        var payload = new ExecutionJournalProjector().project(List.of(error)).getEntriesSnapshot().getFirst().payload();
+        assertThat(payload.path("classification").asText()).isEqualTo("TERMINAL");
+        assertThat(payload.path("exceptionMessage").asText()).isEqualTo("  exact\n\u96ea\t");
+        assertThat(payload.path("message").asText()).isEqualTo("Contextual summary");
+        assertThat(payload.path("failureId").asText()).isEqualTo("outer");
+        assertThat(payload.path("causedByFailureId").asText()).isEqualTo("prior");
+    }
+
+    @Test
     void preservesDistinctToolFailureAndErrorRecords() {
         ExecutionJournalProjector projector = new ExecutionJournalProjector();
         TraceRecord toolFailure = new TraceRecord(

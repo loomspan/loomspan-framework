@@ -468,7 +468,7 @@ func (service *Service) QueryFailures(ctx context.Context, scopeID evidence.Refe
 			Sequence: f.Sequence, TimestampMillis: f.TimestampMillis, RecordType: f.RecordType,
 			FrameID: f.FrameID, Route: f.Route, AttemptID: f.AttemptID,
 			RetrySequenceID: f.RetrySequenceID, ValidationStatus: f.ValidationStatus,
-			ExceptionType: f.ExceptionType, ContextSummary: f.ContextSummary, Diagnostics: diagnostics,
+			Classification: f.Classification, ExceptionMessage: f.ExceptionMessage, CausedByFailureID: f.CausedByFailureID, ExceptionType: f.ExceptionType, ContextSummary: f.ContextSummary, Diagnostics: diagnostics,
 			ProviderAttemptContentRef: providerAttemptContentRef,
 		}, nil
 	})
@@ -488,6 +488,9 @@ func (service *Service) QueryFailures(ctx context.Context, scopeID evidence.Refe
 
 // failureSummary is the internal parsed failure fact.
 type failureSummary struct {
+	Classification           string                 `json:"classification"`
+	ExceptionMessage         *string                `json:"exceptionMessage"`
+	CausedByFailureID        string                 `json:"causedByFailureId,omitempty"`
 	FailureID                string                 `json:"failureId"`
 	Terminal                 bool                   `json:"terminal"`
 	Sequence                 int64                  `json:"sequence"`

@@ -1,0 +1,42 @@
+{
+  "case" : "recoverable-failed-completion",
+  "valid" : true,
+  "traceId" : "trace-recoverable-failed-completion",
+  "sessionId" : "session-recoverable-failed-completion",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-recoverable-failed-completion",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-recoverable-failed-completion"
+  },
+  "outcome" : "FAILED",
+  "terminalFailureId" : "failure-explicit",
+  "attributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "terminalUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ ],
+  "retries" : [ ],
+  "validationLinks" : [ ],
+  "frames" : [ ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

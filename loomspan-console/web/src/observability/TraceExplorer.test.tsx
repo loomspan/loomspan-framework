@@ -189,7 +189,7 @@ test("loads a plan failure and focuses the existing failure panel", async () => 
   api.getTraceFailures.mockResolvedValueOnce({
     source: "TARGET",
     targetScopeId: "scope-1",
-    items: [{ failureId: "failure-1", terminal: false, sequence: 9, frameId: "f-1" }],
+    items: [{ classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "failure-1", terminal: false, sequence: 9, frameId: "f-1" }],
     hasMore: false,
     nextCursor: null,
   });
@@ -428,14 +428,14 @@ test("records omit detached fact indexes and do not load their collections", asy
 test("failure deep links continue pages until the selected fact is found", async () => {
   api.getTraceFailures
     .mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [], hasMore: true, nextCursor: "failures-next" })
-    .mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "failure-late", terminal: false }], hasMore: false, nextCursor: null });
+    .mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "failure-late", terminal: false }], hasMore: false, nextCursor: null });
   render(<MemoryRouter initialEntries={["/?view=records&failureId=failure-late"]}><TraceExplorer traceId="trace-1" /></MemoryRouter>);
-  await screen.findByRole("heading", { name: "Recovered failure" });
+  await screen.findByRole("heading", { name: "Terminal failure" });
   expect(api.getTraceFailures).toHaveBeenLastCalledWith("trace-1", "failures-next", "TARGET");
 });
 
 test("failure selection follows its linked frame", async () => {
-  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "failure-1", terminal: false, sequence: 2, frameId: "f-1" }], hasMore: false, nextCursor: null });
+  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "failure-1", terminal: false, sequence: 2, frameId: "f-1" }], hasMore: false, nextCursor: null });
   render(<MemoryRouter initialEntries={["/?failureId=failure-1"]}><TraceExplorer traceId="trace-1" /><LocationProbe /></MemoryRouter>);
   await vi.waitFor(() => expect(screen.getByLabelText("location")).toHaveTextContent("failureId=failure-1"));
   await vi.waitFor(() => expect(screen.getByLabelText("location")).toHaveTextContent("frameId=f-1"));
@@ -443,7 +443,7 @@ test("failure selection follows its linked frame", async () => {
 
 test("frame selection follows its first linked failure", async () => {
   api.getTraceFrames.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ frameId: "f-1", parentFrameId: null, childFrameIds: [], frameType: "SKILL", route: "hello", inclusiveDurationMillis: null, selfDurationMillis: null, failureIds: ["failure-1"] }], hasMore: false, nextCursor: null });
-  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "failure-1", terminal: false, sequence: 2, frameId: "f-1" }], hasMore: false, nextCursor: null });
+  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "failure-1", terminal: false, sequence: 2, frameId: "f-1" }], hasMore: false, nextCursor: null });
   render(<MemoryRouter><TraceExplorer traceId="trace-1" /><LocationProbe /></MemoryRouter>);
   fireEvent.click(await screen.findByRole("button", { name: "hello" }));
   await vi.waitFor(() => expect(screen.getByLabelText("location")).toHaveTextContent("frameId=f-1"));
@@ -458,7 +458,7 @@ test("a terminal failure does not pin navigation to its frame", async () => {
   ], hasMore: false, nextCursor: null };
   const detailedPage = { ...framePage, items: framePage.items.map((frame) => ({ ...frame, attemptIds: [], retrySequenceIds: [], validationStatuses: [] })) };
   api.getTraceFrames.mockResolvedValueOnce(framePage).mockResolvedValueOnce(detailedPage);
-  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "terminal-1", terminal: true, sequence: 4, frameId: "model" }], hasMore: false, nextCursor: null });
+  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "terminal-1", terminal: true, sequence: 4, frameId: "model" }], hasMore: false, nextCursor: null });
 
   render(<MemoryRouter><TraceExplorer traceId="trace-1" /><LocationProbe /></MemoryRouter>);
   await vi.waitFor(() => expect(screen.getByLabelText("location")).toHaveTextContent("frameId=model"));
@@ -509,7 +509,7 @@ test("failure focus selects the recorded terminal failure and never loads raw pa
   const attemptPayload = JSON.stringify({ diagnostics: [{ kind: "LOOMSPAN_PROVIDER_GUIDANCE", contentType: "text/plain; charset=utf-8", text: "Check loomspan.connections.primary.api-key", truncated: false, captureLimitBytes: 8192 }] });
   api.getContentRange.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", actualStart: 0, actualEnd: attemptPayload.length, totalLength: attemptPayload.length, contentType: "application/json", encoding: "TEXT", content: attemptPayload, hasMore: false, nextCursor: null });
   api.getTraceAnalysisSummary.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", traceId: "trace-1", sessionId: "session-1", outcome: "FAILED", terminalFailureId: "terminal-1", recordCount: 120, frameCount: 1, attemptCount: 1, retryCount: 1, validationCount: 1, failureCount: 2, payloadCount: 1, gapCount: 1, uncertaintyCount: 1, rootFrameIds: ["f-1"], usageComplete: false, configuredLimits: null });
-  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "recovered", terminal: false, sequence: 3, timestampMillis: 3, recordType: "ERROR_RECORDED", frameId: "", route: "", attemptId: "", retrySequenceId: "", validationStatus: "" }], hasMore: true, nextCursor: "failure-next" }).mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "terminal-1", terminal: true, sequence: 119, timestampMillis: 119, recordType: "ERROR_RECORDED", frameId: "f-1", route: "hello", attemptId: "a-1", retrySequenceId: "r-1", validationStatus: "exhausted", providerAttemptContentRef: "opaque-attempt" }], hasMore: false, nextCursor: null });
+  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "recovered", terminal: false, sequence: 3, timestampMillis: 3, recordType: "ERROR_RECORDED", frameId: "", route: "", attemptId: "", retrySequenceId: "", validationStatus: "" }], hasMore: true, nextCursor: "failure-next" }).mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "terminal-1", terminal: true, sequence: 119, timestampMillis: 119, recordType: "ERROR_RECORDED", frameId: "f-1", route: "hello", attemptId: "a-1", retrySequenceId: "r-1", validationStatus: "exhausted", providerAttemptContentRef: "opaque-attempt" }], hasMore: false, nextCursor: null });
   render(<MemoryRouter><TraceExplorer traceId="trace-1" /><LocationProbe /></MemoryRouter>);
   expect(await screen.findByRole("heading", { name: "Terminal failure evidence" })).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Trace failure details" })).toHaveClass("trace-failure-panel");
@@ -528,7 +528,7 @@ test("failure focus selects the recorded terminal failure and never loads raw pa
 test("view error from the exact failure record focuses the failure panel", async () => {
   api.getTraceAnalysisSummary.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", traceId: "trace-1", sessionId: "session-1", outcome: "FAILED", terminalFailureId: "terminal-1", recordCount: 15, frameCount: 1, attemptCount: 1, retryCount: 1, validationCount: 0, failureCount: 1, payloadCount: 1, gapCount: 0, uncertaintyCount: 0, rootFrameIds: ["f-1"], usageComplete: false, configuredLimits: null });
   api.getTraceRecords.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ sequence: 15, type: "ERROR_RECORDED", frameId: "f-1", route: "hello", timestampMillis: 15, representation: "LOGICAL", content: { role: "RECONSTRUCTED", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, contentRef: "p-1" } }], hasMore: false, nextCursor: null });
-  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ failureId: "terminal-1", terminal: true, sequence: 15, timestampMillis: 15, recordType: "ERROR_RECORDED", frameId: "f-1", route: "hello", attemptId: "a-1", retrySequenceId: "r-1", validationStatus: "" }], hasMore: false, nextCursor: null });
+  api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "terminal-1", terminal: true, sequence: 15, timestampMillis: 15, recordType: "ERROR_RECORDED", frameId: "f-1", route: "hello", attemptId: "a-1", retrySequenceId: "r-1", validationStatus: "" }], hasMore: false, nextCursor: null });
   render(<MemoryRouter initialEntries={["/?view=records"]}><TraceExplorer traceId="trace-1" /></MemoryRouter>);
 
   fireEvent.click(await screen.findByRole("button", { name: "View error" }));

@@ -544,7 +544,7 @@ function TraceExplorerEvidence({ traceId, source = "TARGET", onArtifactUnavailab
         <TraceFailureFocus summary={summary} failure={selectedFailure} frame={selectedFrame} onView={showFailureView}
           traceId={traceId} source={source} scopeGeneration={source === "TARGET" ? scopeGeneration : 0}
           verifyScope={verifyScope} onArtifactUnavailable={(value) => reportError(value, true)} />
-        <TraceFailureDiagnostic traceId={traceId} source={source} failure={selectedFailure} scopeGeneration={source === "TARGET" ? scopeGeneration : 0} verifyScope={verifyScope} />
+        <TraceFailureDiagnostic onSelectFailure={viewFailure} traceId={traceId} source={source} failure={selectedFailure} scopeGeneration={source === "TARGET" ? scopeGeneration : 0} verifyScope={verifyScope} />
       </section>}
       {breadcrumbs.length > 0 && <nav className="trace-breadcrumbs" aria-label="Selected frame breadcrumbs">{breadcrumbs.map((frame, index) => <span key={frame.frameId}>{index > 0 && " / "}<button type="button" onClick={() => selectFrame(frame.frameId)}>{frame.route || frame.frameId}</button></span>)}</nav>}
       {selectedFrame && <section className="trace-frame-skills" aria-labelledby="selected-frame-skills"><h4 id="selected-frame-skills">Recorded skill names</h4>{(selectedFrame.skillNames?.length ?? 0) === 0 ? <p className="trace-step-note">No recorded skill name is associated with this frame.</p> : <ul>{selectedFrame.skillNames.map((name) => <li key={name}>{registeredSkills?.has(name) ? <Link to={scopeBoundPath(`/skills/${encodeURIComponent(name)}`, currentScopeID)}>{name}</Link> : <><code>{name}</code> <span className="trace-step-note">not in current registered catalog</span></>}</li>)}</ul>}</section>}

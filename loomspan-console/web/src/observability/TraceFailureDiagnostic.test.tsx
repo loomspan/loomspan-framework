@@ -4,7 +4,7 @@ import * as api from "../api/client";
 import { TraceFailureDiagnostic } from "./TraceFailureDiagnostic";
 
 vi.mock("../api/client", () => ({ getTraceFailureDiagnostic: vi.fn() }));
-const failure = { failureId: "failure-1", terminal: true, sequence: 1, timestampMillis: 1, recordType: "ERROR_RECORDED", frameId: "frame-1", route: "model", attemptId: "", retrySequenceId: "", validationStatus: "", exceptionType: "java.lang.IllegalStateException", contextSummary: "failed", diagnostics: [{ ordinal: 0, kind: "JAVA_STACK_TRACE", contentType: "text/plain; charset=utf-8", truncated: true, captureLimitBytes: 1048576, decodedBytes: 20 }] };
+const failure = { classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "failure-1", terminal: true, sequence: 1, timestampMillis: 1, recordType: "ERROR_RECORDED", frameId: "frame-1", route: "model", attemptId: "", retrySequenceId: "", validationStatus: "", exceptionType: "java.lang.IllegalStateException", contextSummary: "failed", diagnostics: [{ ordinal: 0, kind: "JAVA_STACK_TRACE", contentType: "text/plain; charset=utf-8", truncated: true, captureLimitBytes: 1048576, decodedBytes: 20 }] };
 
 beforeEach(() => {
   vi.mocked(api.getTraceFailureDiagnostic).mockResolvedValue({ source: "TARGET", targetScopeId: "scope-1", failureId: "failure-1", descriptor: failure.diagnostics[0], text: "line one\n<script>x</script>" });
@@ -121,3 +121,18 @@ test("keeps imported diagnostic state across unrelated target generations", asyn
 	rerender(<TraceFailureDiagnostic traceId="trace-1" source="IMPORTED" failure={failure} scopeGeneration={2} />);
 	expect(screen.getByText("imported diagnostic")).toBeInTheDocument();
 });
+
+for (const classification of ["RECOVERABLE", "TERMINAL"] as const) {
+  for (const terminal of [false, true]) {
+    test(`renders ${classification} independently from completion ${terminal}`, () => {
+      const select = vi.fn();
+      render(<TraceFailureDiagnostic traceId="t" failure={{ ...failure, classification, terminal, exceptionMessage: "  exact\n<script>x</script>", causedByFailureId: "prior" }} onSelectFailure={select} />);
+      expect(screen.getByRole("heading", { name: classification === "RECOVERABLE" ? "Recoverable failure" : "Terminal failure" })).toBeInTheDocument();
+      expect(screen.queryByText("Selected as the completion failure.") !== null).toBe(terminal);
+      expect(screen.queryByText("Recovered failure")).toBeNull();
+      expect(document.querySelector("script")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "prior" }));
+      expect(select).toHaveBeenCalledWith("prior");
+    });
+  }
+}

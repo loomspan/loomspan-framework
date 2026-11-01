@@ -110,7 +110,7 @@ class LoomspanSessionTest {
     }
 
     @Test
-    void recordsThrowableOnceAndReusesRecordedCause() {
+    void recordsThrowableOnceAndKeepsApplicationWrapperIdentity() {
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_skill");
         IllegalStateException cause = new IllegalStateException("same");
         String first = recordFailure(session, cause, Map.of("message", "failed"));
@@ -118,8 +118,57 @@ class LoomspanSessionTest {
         String wrapped = recordFailure(session, new RuntimeException("wrapper", cause), Map.of("message", "failed"));
         String distinct = recordFailure(session, new IllegalStateException("same"), Map.of("message", "failed"));
         assertThat(repeated).isEqualTo(first);
-        assertThat(wrapped).isEqualTo(first);
+        assertThat(wrapped).isNotEqualTo(first);
         assertThat(distinct).isNotEqualTo(first);
+    }
+
+    @Test
+    void transparentIdentityAndApplicationCauseLinkPreserveAuthoritativeFacts() {
+        for (boolean wrapperFirst : java.util.List.of(false, true)) {
+            var session = TestLoomspanSessions.create(8, "default-test_skill");
+            var cause = new ai.loomspan.api.RecoverableSkillException("  correct this\n\u96ea\t", new Exception("diagnostic cause"));
+            var transparent = new java.util.concurrent.ExecutionException(new java.lang.reflect.InvocationTargetException(cause));
+            String id = recordFailure(session, wrapperFirst ? transparent : cause, Map.of("message", "context", "classification", "WRONG"));
+            assertThat(recordFailure(session, wrapperFirst ? cause : transparent, Map.of("message", "later"))).isEqualTo(id);
+            String wrapped = recordFailure(session, new IllegalStateException("outer", cause), Map.of("message", "outer context"));
+            assertThat(wrapped).isNotEqualTo(id);
+            var errors = new java.util.ArrayList<TraceRecord>();
+            session.readTraceRecords(record -> { if (record.recordType() == TraceRecordType.ERROR_RECORDED) errors.add(record); });
+            assertThat(errors).hasSize(2);
+            assertThat(errors.getFirst().data().path("classification").asText()).isEqualTo("RECOVERABLE");
+            assertThat(errors.getFirst().data().path("exceptionMessage").asText()).isEqualTo(cause.getMessage());
+            assertThat(errors.getFirst().data().path("message").asText()).isEqualTo("context");
+            assertThat(errors.getLast().metadata()).containsEntry("causedByFailureId", id);
+            assertThat(errors.getLast().data().path("classification").asText()).isEqualTo("TERMINAL");
+            assertThat(errors.getLast().data().path("exceptionMessage").asText()).isEqualTo("outer");
+        }
+    }
+
+    @Test
+    void canonicalClassificationHonorsTheSameTransparentWrapperBoundAsDisposition() {
+        for (int depth : List.of(63, 64, 65, 100, 128)) {
+            var session = TestLoomspanSessions.create(8, "default-test_skill");
+            Throwable failure = new ai.loomspan.api.RecoverableSkillException("  correct this\n\u96ea\t");
+            for (int index = 0; index < depth; index++) {
+                failure = new java.util.concurrent.ExecutionException(null, failure);
+            }
+            Throwable effective = SkillFailurePolicy.unwrapInvocationFailure(failure);
+            boolean recoverable = SkillFailurePolicy.recoverable(failure) != null;
+            assertThat(recoverable).isEqualTo(depth <= 64);
+            recordFailure(session, failure, Map.of("message", "context"));
+            var errors = new java.util.ArrayList<TraceRecord>();
+            session.readTraceRecords(record -> { if (record.recordType() == TraceRecordType.ERROR_RECORDED) errors.add(record); });
+            assertThat(errors).hasSize(1);
+            assertThat(errors.getFirst().data().path("classification").asText())
+                    .as("canonical classification at wrapper depth %s", depth)
+                    .isEqualTo(recoverable ? "RECOVERABLE" : "TERMINAL");
+            assertThat(errors.getFirst().data().path("exceptionType").asText()).isEqualTo(effective.getClass().getName());
+            if (effective.getMessage() == null) {
+                assertThat(errors.getFirst().data().path("exceptionMessage").isNull()).isTrue();
+            } else {
+                assertThat(errors.getFirst().data().path("exceptionMessage").asText()).isEqualTo(effective.getMessage());
+            }
+        }
     }
 
     @Test
@@ -141,6 +190,21 @@ class LoomspanSessionTest {
     }
 
     @Test
+    void providerCorrelationDoesNotMergeDistinctFailureIdentities() {
+        var session = TestLoomspanSessions.create(8, "default-test_skill");
+        var cause = new ai.loomspan.api.RecoverableSkillException("correct", new Exception("details"));
+        session.registerProviderFailure(cause, Map.of("attemptId", "attempt", "retrySequenceId", "retry"));
+        String first = recordFailure(session, cause, Map.of("message", "initial"));
+        String outer = recordFailure(session, new IllegalStateException("terminal wrapper", cause), Map.of("message", "outer"));
+        assertThat(outer).isNotEqualTo(first);
+        var errors = new java.util.ArrayList<TraceRecord>();
+        session.readTraceRecords(record -> { if (record.recordType() == TraceRecordType.ERROR_RECORDED) errors.add(record); });
+        assertThat(errors).hasSize(2).allSatisfy(record -> assertThat(record.metadata())
+                .containsEntry("attemptId", "attempt").containsEntry("retrySequenceId", "retry"));
+        assertThat(errors.getLast().metadata()).containsEntry("causedByFailureId", first);
+    }
+
+    @Test
     void boundsCyclicAndDeepCauseTraversal() {
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_skill");
         RuntimeException first = new RuntimeException("first");
@@ -150,7 +214,7 @@ class LoomspanSessionTest {
 
         assertTimeoutPreemptively(Duration.ofSeconds(1), () -> {
             String cycleId = recordFailure(session, first, Map.of("message", "failed"));
-            assertThat(recordFailure(session, second, Map.of("message", "failed"))).isEqualTo(cycleId);
+            assertThat(recordFailure(session, second, Map.of("message", "failed"))).isNotEqualTo(cycleId);
 
             Throwable deep = new IllegalStateException("root");
             for (int index = 0; index < 100; index++) {

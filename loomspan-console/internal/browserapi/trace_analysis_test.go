@@ -447,13 +447,13 @@ func TestTraceAnalysisMapsCompactFailureDescriptorsAndSelectedDiagnostic(t *test
 	router, _, cookie, fake := traceAnalysisRouter(t)
 	descriptor := traceanalysis.DiagnosticDescriptor{Ordinal: 0, Kind: "JAVA_STACK_TRACE", ContentType: "text/plain; charset=utf-8", Truncated: true, CaptureLimitBytes: 1048576, DecodedBytes: 10}
 	fake.failurePage = traceanalysis.Page[traceanalysis.FailureSummary]{Items: []traceanalysis.FailureSummary{{
-		FailureID: "failure-1", Terminal: true, ExceptionType: "java.lang.IllegalStateException", ContextSummary: "provider failed", Diagnostics: []traceanalysis.DiagnosticDescriptor{descriptor},
+		Classification: "RECOVERABLE", ExceptionMessage: func() *string { v := "  exact\n雪\t"; return &v }(), CausedByFailureID: "prior", FailureID: "failure-1", Terminal: true, ExceptionType: "java.lang.IllegalStateException", ContextSummary: "provider failed", Diagnostics: []traceanalysis.DiagnosticDescriptor{descriptor},
 	}}}
 	failures := traceAnalysisRequest(router, "/api/console/v1/traces/analysis/failures", `{"source":"TARGET","traceId":"trace-1"}`, cookie)
 	if failures.Code != http.StatusOK {
 		t.Fatalf("failures status=%d body=%s", failures.Code, failures.Body.String())
 	}
-	for _, expected := range []string{`"exceptionType":"java.lang.IllegalStateException"`, `"contextSummary":"provider failed"`, `"kind":"JAVA_STACK_TRACE"`, `"decodedBytes":10`} {
+	for _, expected := range []string{`"classification":"RECOVERABLE"`, `"exceptionMessage":"  exact\n雪\t"`, `"causedByFailureId":"prior"`, `"exceptionType":"java.lang.IllegalStateException"`, `"contextSummary":"provider failed"`, `"kind":"JAVA_STACK_TRACE"`, `"decodedBytes":10`} {
 		if !strings.Contains(failures.Body.String(), expected) {
 			t.Errorf("missing %s in %s", expected, failures.Body.String())
 		}

@@ -150,18 +150,22 @@ public final class LoomspanSession
         lock.lock();
         try
         {
+            Throwable effective = SkillFailurePolicy.unwrapInvocationFailure(failure);
+            RecordedFailure existing = failuresByThrowable.get(effective);
+            if (existing != null)
+            {
+                failuresByThrowable.put(failure, existing);
+                return existing.failureId();
+            }
             Throwable current = failure;
             ProviderAttemptLink attemptLink = null;
+            String causedByFailureId = null;
             Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
             for (int depth = 0; current != null && depth < 64 && visited.add(current); depth++, current = current.getCause())
             {
                 if (attemptLink == null) attemptLink = providerAttemptsByThrowable.get(current);
-                RecordedFailure existing = failuresByThrowable.get(current);
-                if (existing != null)
-                {
-                    failuresByThrowable.put(failure, existing);
-                    return existing.failureId();
-                }
+                RecordedFailure recordedCause = failuresByThrowable.get(SkillFailurePolicy.unwrapInvocationFailure(current));
+                if (causedByFailureId == null && recordedCause != null) causedByFailureId = recordedCause.failureId();
             }
 
             String failureId;
@@ -178,13 +182,17 @@ public final class LoomspanSession
             Object message = payload.get("message");
             TraceFailureMetadata.addTo(payload, failure,
                     message instanceof String text && !text.isBlank() ? text : "Execution failed");
+            payload.put("exceptionMessage", effective.getMessage());
             payload.put("diagnostics", List.of(BoundedStackTraceCapture.capture(failure)));
-            failuresByThrowable.put(failure, new RecordedFailure(failureId, origin == null ? null : origin.frameId(), attemptLink));
+            RecordedFailure recorded = new RecordedFailure(failureId, origin == null ? null : origin.frameId(), attemptLink);
+            failuresByThrowable.put(effective, recorded);
+            failuresByThrowable.put(failure, recorded);
             try
             {
                 markTraceErrored();
                 java.util.LinkedHashMap<String, Object> metadata = new java.util.LinkedHashMap<>();
                 metadata.put("failureId", failureId);
+                if (causedByFailureId != null) metadata.put("causedByFailureId", causedByFailureId);
                 if (attemptLink != null)
                 {
                     metadata.put("attemptId", attemptLink.attemptId());

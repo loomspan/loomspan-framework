@@ -272,6 +272,14 @@ public final class ExecutionJournalProjector
                 record.data() != null && record.data().isTextual() ? record.data().asText() : null,
                 "Error recorded"));
 
+        if (data != null && data.isObject()) {
+            if (data.has("classification")) payload.put("classification", data.get("classification"));
+            if (data.has("exceptionMessage")) payload.put("exceptionMessage", data.get("exceptionMessage"));
+        }
+        String causedByFailureId = metadataText(record, "causedByFailureId");
+        if (causedByFailureId != null) payload.put("causedByFailureId", causedByFailureId);
+        String failureId = metadataText(record, "failureId");
+        if (failureId != null) payload.put("failureId", failureId);
         String exceptionType = firstNonBlank(metadataText(record, "exceptionType"), jsonText(data, "exceptionType"));
         if (exceptionType != null)
         {

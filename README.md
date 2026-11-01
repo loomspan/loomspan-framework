@@ -379,7 +379,13 @@ It contains 25 public top-level types, including `SkillExecutor`, the five-compo
 `SkillExecutorInvocation` record, and `RecoverableSkillException`. Java callable
 methods and reference-only executors share discovery and proxy invocation. Successful
 null/void results become empty text, Strings remain exact, and other results become
-JSON; failures propagate. YAML executor leaves retain their definitions and use captured registrations,
+JSON; failures propagate. Only designated `RecoverableSkillException` failures become
+failed-call feedback in standard tool calling, after failed recording and with the
+exact application message. Direct invocation and explicit steps still throw;
+ordinary application wrappers remain terminal. Feedback earns no successful-result
+credit and continuation uses existing budgets and the original parent timeout.
+Canonical diagnostics record classification independently from completion linkage.
+YAML executor leaves retain their definitions and use captured registrations,
 selected executor configuration and executor generation identity during execution.
 Validation and discovery evaluate declarative metadata without running argument-dependent
 advice. Actual invocation supplies real arguments to Spring advice, which can still deny

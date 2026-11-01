@@ -50,7 +50,7 @@ test("shows the diagnostic action once on the canonical error when a failed step
   const onSelectFailure = vi.fn();
   const failed = { ...record(12, "STEP_FAILED", "handleBilling#step-1"), failureId: "failure-step" };
   const error = { ...record(11, "ERROR_RECORDED", "handleBilling#step-1"), failureId: "failure-step" };
-  const failure: TraceFailure = { failureId: "failure-step", terminal: false, sequence: 11, timestampMillis: 11, recordType: "ERROR_RECORDED", frameId: "frame", route: "handleBilling#step-1", attemptId: "", retrySequenceId: "", validationStatus: "" };
+  const failure: TraceFailure = { classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "failure-step", terminal: false, sequence: 11, timestampMillis: 11, recordType: "ERROR_RECORDED", frameId: "frame", route: "handleBilling#step-1", attemptId: "", retrySequenceId: "", validationStatus: "" };
   render(<TraceRecords traceId="trace-1" records={[error, failed]} failures={[failure]} onSelectRecord={vi.fn()} onSelectFailure={onSelectFailure} onContent={vi.fn()} />);
 
   const actions = screen.getAllByRole("button", { name: "View error" });

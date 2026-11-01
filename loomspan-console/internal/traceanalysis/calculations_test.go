@@ -102,7 +102,7 @@ func errorRecord(seq int, failureID string, _ bool) string {
 	return `{"traceId":"t","sessionId":"s","sequence":` + itoa(seq) +
 		`,"timestamp":` + timestampForSeq(seq) +
 		`,"recordType":"ERROR_RECORDED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th",` +
-		`"metadata":{"failureId":"` + failureID + `"},"data":{"exceptionType":"java.lang.IllegalStateException","message":"failed","diagnostics":[{"kind":"JAVA_STACK_TRACE","contentType":"text/plain; charset=utf-8","text":"stack","truncated":false,"captureLimitBytes":1048576}]}}`
+		`"metadata":{"failureId":"` + failureID + `"},"data":{"classification":"TERMINAL","exceptionMessage":"failed","exceptionType":"java.lang.IllegalStateException","message":"failed","diagnostics":[{"kind":"JAVA_STACK_TRACE","contentType":"text/plain; charset=utf-8","text":"stack","truncated":false,"captureLimitBytes":1048576}]}}`
 }
 
 func boolStr(b bool) string {
@@ -812,13 +812,13 @@ func TestValidationsLinkOnlyToRecordedAttemptIdentity(t *testing.T) {
 	}
 }
 
-// TestFailuresKeepRecoveredErrorsSeparateFromTerminalFailure proves a
-// nonterminal ERROR_RECORDED (recovered error) is indexed as a nonterminal
+// TestFailuresKeepUnlinkedErrorsSeparateFromCompletionFailure proves a
+// unlinked ERROR_RECORDED is indexed independently from the completion
 // failure while a separate terminal ERROR_RECORDED resolves the terminal
 // outcome. The two are distinct facts.
-func TestFailuresKeepRecoveredErrorsSeparateFromTerminalFailure(t *testing.T) {
+func TestFailuresKeepUnlinkedErrorsSeparateFromCompletionFailure(t *testing.T) {
 	raw := startedRecord(1) + "\n" +
-		errorRecord(2, "recovered-error", false) + "\n" + // nonterminal recovered error
+		errorRecord(2, "recovered-error", false) + "\n" + // earlier error, without implying correction
 		errorRecord(3, "fatal-error", true) + "\n" + // terminal failure
 		completionRecord(4, "FAILED", 0, 0, 0, "fatal-error") + "\n"
 	m, cat, ok := processTrace(t, raw)

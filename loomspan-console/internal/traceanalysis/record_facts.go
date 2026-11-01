@@ -173,7 +173,7 @@ func materializeRecordFacts(stored persistedRecordFacts, rec *Record, filter Rec
 				return RecordFacts{}, err
 			}
 		}
-		facts.Failures = append(facts.Failures, FailureSummary{Context: traceCtx, FailureID: f.FailureID, Terminal: f.Terminal, Sequence: f.Sequence, TimestampMillis: f.TimestampMillis, RecordType: f.RecordType, FrameID: f.FrameID, Route: f.Route, AttemptID: f.AttemptID, RetrySequenceID: f.RetrySequenceID, ValidationStatus: f.ValidationStatus, ExceptionType: f.ExceptionType, ContextSummary: f.ContextSummary, Diagnostics: diagnostics})
+		facts.Failures = append(facts.Failures, FailureSummary{Context: traceCtx, FailureID: f.FailureID, Terminal: f.Terminal, Sequence: f.Sequence, TimestampMillis: f.TimestampMillis, RecordType: f.RecordType, FrameID: f.FrameID, Route: f.Route, AttemptID: f.AttemptID, RetrySequenceID: f.RetrySequenceID, ValidationStatus: f.ValidationStatus, Classification: f.Classification, ExceptionMessage: f.ExceptionMessage, CausedByFailureID: f.CausedByFailureID, ExceptionType: f.ExceptionType, ContextSummary: f.ContextSummary, Diagnostics: diagnostics})
 	}
 	for _, p := range stored.Payloads {
 		contentRef, err := encodeEnvelopeContentReference(ref, handle, p.PayloadID)

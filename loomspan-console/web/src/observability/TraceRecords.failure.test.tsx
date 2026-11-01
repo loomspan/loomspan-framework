@@ -4,7 +4,7 @@ import type { TraceFailure, TraceRecord } from "../api/contracts";
 import { TraceRecords } from "./TraceRecords";
 
 const failure: TraceFailure = {
-  failureId: "failure-15",
+  classification: "TERMINAL", exceptionMessage: null, failureId: "failure-15",
   terminal: true,
   sequence: 15,
   timestampMillis: 15,

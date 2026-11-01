@@ -118,6 +118,10 @@ Unknown properties are rejected rather than silently interpreted.
   `exhausted` as warning/retry facts and `passed` as neutral. Terminal failure
   remains authoritative only through `ERROR_RECORDED` and
   `TRACE_COMPLETED.terminalFailureId`.
+- Error facts expose `classification` (`RECOVERABLE` or `TERMINAL`), exact nullable
+  `exceptionMessage`, contextual `contextSummary`, and optional `causedByFailureId`.
+  Read these recorded facts directly. The separate `terminal` field means selected
+  by completion; neither recoverability nor an unlinked error proves correction.
 - Join selected plans and detailed frames through recorded frame and plan IDs.
   Canonical sequence orders recorded events but does not prove cause or
   simultaneity between concurrent branches.

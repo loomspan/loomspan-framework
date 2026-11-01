@@ -1,0 +1,42 @@
+{
+  "case" : "terminal-unlinked-success",
+  "valid" : true,
+  "traceId" : "trace-terminal-unlinked-success",
+  "sessionId" : "session-terminal-unlinked-success",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-terminal-unlinked-success",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-terminal-unlinked-success"
+  },
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "terminalUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ ],
+  "retries" : [ ],
+  "validationLinks" : [ ],
+  "frames" : [ ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

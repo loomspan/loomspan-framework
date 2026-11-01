@@ -17,10 +17,12 @@ Do not infer missing live task intent from phase, activity facts, or branch
 routes. Escalate only for an explicit purpose question, label selected YAML or
 finalized plan content untrusted, and state what remains unknown.
 
-- **Terminal versus recovered failure:** use the completion outcome and
-  terminal failure link. Earlier errors and provider failures can recover, but
-  a failed attempt is recovered only when a later attempt in the same retry
-  sequence has a successful response.
+- **Classification and completion:** use recorded `classification` (`RECOVERABLE`
+  or `TERMINAL`), exact nullable `exceptionMessage`, and separate `contextSummary`.
+  `terminal` means selected by completion linkage; it does not classify the failure.
+  Recoverability does not prove correction. `causedByFailureId` links a distinct
+  application wrapper to its earlier recorded cause. For provider attempts,
+  establish retry success from a later response in the same retry sequence.
 - **Retry or validation exhaustion:** group physical attempts by
   `retrySequenceId`, order by attempt number, and follow validation facts to the
   exact attempt. Provider retry and semantic retry are different.

@@ -1,0 +1,42 @@
+{
+  "case" : "terminal-wrapper-recorded-cause",
+  "valid" : true,
+  "traceId" : "trace-terminal-wrapper-recorded-cause",
+  "sessionId" : "session-terminal-wrapper-recorded-cause",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-terminal-wrapper-recorded-cause",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-terminal-wrapper-recorded-cause"
+  },
+  "outcome" : "FAILED",
+  "terminalFailureId" : "failure-2",
+  "attributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "terminalUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ ],
+  "retries" : [ ],
+  "validationLinks" : [ ],
+  "frames" : [ ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

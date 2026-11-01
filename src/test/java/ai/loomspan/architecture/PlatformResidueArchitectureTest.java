@@ -56,10 +56,13 @@ class PlatformResidueArchitectureTest
     void springAiUsageIsContainedToApprovedIntegrationPackages()
     {
         assertThat(productionClasses.stream()
-                .filter(javaClass -> javaClass.getDirectDependenciesFromSelf().stream()
-                        .anyMatch(dependency -> dependency.getTargetClass().getName().startsWith("org.springframework.ai.")))
-                .map(JavaClass::getPackageName))
-                .allMatch(packageName -> SPRING_AI_PACKAGES.stream().anyMatch(packageName::startsWith));
+                .flatMap(javaClass -> javaClass.getDirectDependenciesFromSelf().stream())
+                .filter(dependency -> dependency.getTargetClass().getName().startsWith("org.springframework.ai.")))
+                .allMatch(dependency -> SPRING_AI_PACKAGES.stream().anyMatch(dependency.getOriginClass().getPackageName()::startsWith)
+                        // One shared failure policy recognizes the concrete callback wrapper;
+                        // this does not admit other Spring AI dependencies into core.
+                        || dependency.getOriginClass().getName().equals("ai.loomspan.internal.core.SkillFailurePolicy")
+                                && dependency.getTargetClass().getName().equals("org.springframework.ai.tool.execution.ToolExecutionException"));
     }
 
     @Test

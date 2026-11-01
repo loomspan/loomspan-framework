@@ -101,7 +101,18 @@ RecoverableSkillException(String message);
 RecoverableSkillException(String message, Throwable cause);
 ```
 
-Messages MUST be non-null and nonblank. Valid messages, including surrounding whitespace, remain unchanged. An optional cause supplies diagnostics and never substitutes its message as feedback. The shared Java-boundary policy recognizes this subtype through transparent `InvocationTargetException` and `UndeclaredThrowableException` wrappers only. An ordinary application wrapper around it remains terminal; arbitrary cause-chain search is not performed. Direct invocation still throws the exception. The exception does not provide automatic retries or a planner correction loop. See [facade errors](observation-and-errors.md) for supported caller handling.
+Messages MUST be non-null and nonblank. Valid messages, including surrounding whitespace, remain unchanged. An optional cause supplies diagnostics and never substitutes its message as feedback. The shared policy recognizes this subtype through transparent reflection/proxy (`InvocationTargetException`, `UndeclaredThrowableException`), worker-future (`ExecutionException`), and Spring AI callback (`ToolExecutionException`) wrappers. An ordinary application wrapper around it is a distinct terminal failure; classification never searches arbitrary causes.
+
+| Invocation route | Designated recoverable failure | Other failure |
+| --- | --- | --- |
+| Direct `SkillTemplate.invoke()` | Throws through the existing facade boundary, preserving message and cause | Throws through the existing facade boundary |
+| Standard tool calling | Records failure, then sends failed-call feedback permitting model correction | Terminates; no failure feedback |
+| Explicit step planning | Terminates; no correction loop | Terminates |
+
+Standard feedback uses the original tool-call ID/name and a JSON body with `status: "failed"`, `correctionPermitted: true`, and the exact application `message`. It is never a successful skill result, success credit, or a value for successful-result bindings. The model may choose normal continuation, but the exception does not replay work automatically. Failed calls and subsequent model/tool work consume the existing budgets with no reset or refund; the parent timeout continues. Authorization, quotas, timeout, cancellation and shutdown remain terminal controls. See [facade errors](observation-and-errors.md) for supported caller handling.
+
+Evidence: `ExplicitJavaFailureHandlingIntegrationTest`, `SharedJavaDiscoveryInvocationTest`, `LoomspanSessionTest`, and the lifecycle/usage regression suites.
+
 
 ## Spring invocation and authorization
 

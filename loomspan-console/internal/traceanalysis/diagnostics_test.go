@@ -31,6 +31,7 @@ func diagnostic(kind, text string, truncated any, limit int) map[string]any {
 
 func diagnosticData(values ...map[string]any) map[string]any {
 	return map[string]any{
+		"classification": "TERMINAL", "exceptionMessage": "failed",
 		"exceptionType": "java.lang.IllegalStateException",
 		"message":       "failed",
 		"diagnostics":   values,
@@ -190,5 +191,90 @@ func TestFailuresRejectDuplicateIDsAndDeriveTerminalityOnlyFromCompletion(t *tes
 	recoveredWithLegacyFlag := startedRecord(1) + "\n" + diagnosticRecord(2, "recovered", diagnosticData(diagnostic("K", "x", false, 1)), map[string]any{"terminal": true}) + "\n" + completionRecord(3, "SUCCEEDED", 0, 0, 0, "") + "\n"
 	if _, category, ok := processTrace(t, recoveredWithLegacyFlag); !ok {
 		t.Fatalf("legacy flag incorrectly controlled terminality: %s", category)
+	}
+}
+
+func TestExplicitFailureClassificationAndRecordedCauseAreIndependentOfCompletion(t *testing.T) {
+	exact := "  correct this\n雪\t"
+	for _, completion := range []string{"SUCCEEDED", "FAILED"} {
+		data := diagnosticData(diagnostic("JAVA_STACK_TRACE", "stack", false, 64))
+		data["classification"], data["exceptionMessage"] = "RECOVERABLE", exact
+		endID := ""
+		if completion == "FAILED" {
+			endID = "recoverable"
+		}
+		raw := startedRecord(1) + "\n" + diagnosticRecord(2, "recoverable", data, nil) + "\n" + completionRecord(3, completion, 0, 0, 0, endID) + "\n"
+		_, category, ok := processTrace(t, raw)
+		if !ok {
+			t.Fatalf("%s category=%s", completion, category)
+		}
+		if got := explicitFailureFacts(t, raw)[0]; got.Classification != "RECOVERABLE" || got.ExceptionMessage == nil || *got.ExceptionMessage != exact || got.Terminal != (completion == "FAILED") {
+			t.Fatalf("facts=%+v", got)
+		}
+	}
+	for _, mutation := range []string{"missing", "unknown", "number", "missing message", "null message", "blank message", "number message"} {
+		data := diagnosticData(diagnostic("K", "stack", false, 64))
+		data["classification"] = "RECOVERABLE"
+		switch mutation {
+		case "missing":
+			delete(data, "classification")
+		case "unknown":
+			data["classification"] = "MAYBE"
+		case "number":
+			data["classification"] = 2
+		case "missing message":
+			delete(data, "exceptionMessage")
+		case "null message":
+			data["exceptionMessage"] = nil
+		case "blank message":
+			data["exceptionMessage"] = "  "
+		case "number message":
+			data["exceptionMessage"] = 2
+		}
+		raw := startedRecord(1) + "\n" + diagnosticRecord(2, "f", data, nil) + "\n" + completionRecord(3, "SUCCEEDED", 0, 0, 0, "") + "\n"
+		if _, category, ok := processTrace(t, raw); ok || category != CategoryUnsupportedValue {
+			t.Fatalf("%s valid=%v category=%s", mutation, ok, category)
+		}
+	}
+	for _, cause := range []any{"prior", "missing", "outer", "", nil, 42} {
+		first := diagnosticData(diagnostic("K", "cause", false, 64))
+		first["classification"] = "RECOVERABLE"
+		outer := diagnosticData(diagnostic("K", "outer", false, 64))
+		raw := startedRecord(1) + "\n" + diagnosticRecord(2, "prior", first, nil) + "\n" + diagnosticRecord(3, "outer", outer, map[string]any{"causedByFailureId": cause}) + "\n" + completionRecord(4, "FAILED", 0, 0, 0, "outer") + "\n"
+		_, category, ok := processTrace(t, raw)
+		if cause == "prior" {
+			if !ok || explicitFailureFacts(t, raw)[1].CausedByFailureID != "prior" || explicitFailureFacts(t, raw)[1].Classification != "TERMINAL" {
+				t.Fatalf("valid cause category=%s", category)
+			}
+		} else if ok || category != CategoryUnsupportedValue {
+			t.Fatalf("cause=%v valid=%v category=%s", cause, ok, category)
+		}
+	}
+}
+
+func explicitFailureFacts(t *testing.T, raw string) []FailureSummary {
+	t.Helper()
+	outcome := "SUCCEEDED"
+	if strings.Contains(raw, `"outcome":"FAILED"`) {
+		outcome = "FAILED"
+	}
+	h := newServiceTestHarnessForOutcomeAndVersion(t, "t", raw, outcome, "")
+	page, domain := h.service.QueryFailures(context.Background(), targetEvidence(h.scopeID), FailureQuery{Handle: h.handle, PageSize: 10})
+	if domain != nil {
+		t.Fatal(domain)
+	}
+	return page.Items
+}
+
+func TestRecoverableMessageUsesProducerBlankContract(t *testing.T) {
+	for _, message := range []string{"\u00a0", "\u2007", "\u202f", "\u001c", " \n\t", ""} {
+		data := diagnosticData(diagnostic("K", "stack", false, 64))
+		data["classification"], data["exceptionMessage"] = "RECOVERABLE", message
+		raw := startedRecord(1) + "\n" + diagnosticRecord(2, "f", data, nil) + "\n" + completionRecord(3, "SUCCEEDED", 0, 0, 0, "") + "\n"
+		_, _, ok := processTrace(t, raw)
+		want := message == "\u00a0" || message == "\u2007" || message == "\u202f"
+		if ok != want {
+			t.Fatalf("message %q valid=%v want=%v", message, ok, want)
+		}
 	}
 }

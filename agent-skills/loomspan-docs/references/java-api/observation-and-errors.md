@@ -146,10 +146,14 @@ that runtime exception in `SkillException` as described in the table.
 
 `RecoverableSkillException` accepts only a non-null, nonblank message and an
 optional diagnostic cause. The message remains exact; cause text is never fallback
-feedback. Only transparent reflection/proxy wrappers preserve its designated
-classification. An ordinary application wrapper remains terminal. This classification
-applies at the Java invocation boundary; it does not
-provide automatic retries or a planner correction loop. See [Java failures](java-skills.md#designated-java-failures).
+feedback. Transparent reflection/proxy, worker-future and Spring AI callback wrappers preserve its designated
+classification. An ordinary application wrapper remains terminal. Direct invocation and explicit steps still terminate. Standard tool calling permits
+failed-call feedback after failure recording; no automatic replay or explicit-step
+correction loop is added. See [Java failures](java-skills.md#designated-java-failures).
+
+Canonical error facts and their observer projection carry `classification` (`RECOVERABLE` or `TERMINAL`) and exact nullable `exceptionMessage` separately from contextual `message`. `causedByFailureId`, when present, links a distinct application wrapper to an already-recorded cause. Transparent propagation reuses identity; application wrappers retain their own terminal identity. Classification says whether standard feedback is permitted, never whether correction happened. Completion linkage is independent: a recoverable failure can terminate direct or explicit-step execution.
+
+Standard tool feedback happens after failed tool/skill recording and cannot become successful output or successful-result binding evidence. Observer history therefore retains the failure even when the standard parent ultimately succeeds. `ExplicitJavaFailureHandlingIntegrationTest` and `LoomspanSessionTest` exercise these boundaries.
 
 ## Source Anchors
 

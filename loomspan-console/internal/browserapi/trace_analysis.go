@@ -282,7 +282,7 @@ func (router *Router) traceAnalysisFailures(w http.ResponseWriter, r *http.Reque
 		for _, d := range x.Diagnostics {
 			diagnostics = append(diagnostics, diagnosticDescriptorDTO{Ordinal: d.Ordinal, Kind: d.Kind, ContentType: d.ContentType, Truncated: d.Truncated, CaptureLimitBytes: d.CaptureLimitBytes, DecodedBytes: d.DecodedBytes})
 		}
-		items = append(items, failureDTO{FailureID: x.FailureID, Terminal: x.Terminal, Sequence: x.Sequence, TimestampMillis: x.TimestampMillis, RecordType: x.RecordType, FrameID: x.FrameID, Route: x.Route, AttemptID: x.AttemptID, RetrySequenceID: x.RetrySequenceID, ValidationStatus: x.ValidationStatus, ExceptionType: x.ExceptionType, ContextSummary: x.ContextSummary, Diagnostics: diagnostics, ProviderAttemptContentRef: x.ProviderAttemptContentRef})
+		items = append(items, failureDTO{FailureID: x.FailureID, Terminal: x.Terminal, Sequence: x.Sequence, TimestampMillis: x.TimestampMillis, RecordType: x.RecordType, FrameID: x.FrameID, Route: x.Route, AttemptID: x.AttemptID, RetrySequenceID: x.RetrySequenceID, ValidationStatus: x.ValidationStatus, Classification: x.Classification, ExceptionMessage: x.ExceptionMessage, CausedByFailureID: x.CausedByFailureID, ExceptionType: x.ExceptionType, ContextSummary: x.ContextSummary, Diagnostics: diagnostics, ProviderAttemptContentRef: x.ProviderAttemptContentRef})
 	}
 	router.writeEvidenceJSON(w, s, pageDTO[failureDTO]{Source: s.Source, TargetScopeID: string(s.TargetScope), Items: items, HasMore: v.HasMore, NextCursor: nullCursor(v.NextCursor)})
 }
@@ -686,6 +686,9 @@ type validationDTO struct {
 	AttemptNumber   int64  `json:"attemptNumber"`
 }
 type failureDTO struct {
+	Classification            string                    `json:"classification"`
+	ExceptionMessage          *string                   `json:"exceptionMessage"`
+	CausedByFailureID         string                    `json:"causedByFailureId,omitempty"`
 	FailureID                 string                    `json:"failureId"`
 	Terminal                  bool                      `json:"terminal"`
 	Sequence                  int64                     `json:"sequence"`

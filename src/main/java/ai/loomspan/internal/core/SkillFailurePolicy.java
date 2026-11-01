@@ -4,30 +4,34 @@ import ai.loomspan.api.RecoverableSkillException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;
 
-/** The Java invocation boundary only: never searches an application's arbitrary cause chain. */
-final class SkillFailurePolicy
+/** One failure policy for invocation, orchestration and canonical recording. */
+public final class SkillFailurePolicy
 {
     private SkillFailurePolicy() {}
 
-    static Throwable unwrapInvocationFailure(Throwable failure)
+    public static Throwable unwrapInvocationFailure(Throwable failure)
     {
-        while (true)
+        var visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+        for (int depth = 0; depth < 64 && visited.add(failure); depth++)
         {
             Throwable target;
             if (failure instanceof InvocationTargetException wrapper) target = wrapper.getTargetException();
             else if (failure instanceof UndeclaredThrowableException wrapper) target = wrapper.getUndeclaredThrowable();
+            else if (failure instanceof java.util.concurrent.ExecutionException wrapper) target = wrapper.getCause();
+            else if (failure instanceof org.springframework.ai.tool.execution.ToolExecutionException wrapper) target = wrapper.getCause();
             else return failure;
             if (target == null || target == failure) return failure;
             failure = target;
         }
+        return failure;
     }
 
-    static RecoverableSkillException recoverable(Throwable failure)
+    public static RecoverableSkillException recoverable(Throwable failure)
     {
         return unwrapInvocationFailure(failure) instanceof RecoverableSkillException recoverable ? recoverable : null;
     }
 
-    static RuntimeException propagate(Throwable failure)
+    public static RuntimeException propagate(Throwable failure)
     {
         Throwable unwrapped = unwrapInvocationFailure(failure);
         if (unwrapped instanceof RuntimeException runtime) return runtime;

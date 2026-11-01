@@ -37,6 +37,20 @@ func (g *failureGraph) onErrorRecord(rec *Record) *consolecore.Error {
 	if _, dup := g.failures[failureID]; dup {
 		return invalidityError(CategoryInvalidTerminalFailure, rec.TraceID)
 	}
+	var metadata map[string]json.RawMessage
+	if err := json.Unmarshal(rec.Metadata, &metadata); err != nil {
+		return invalidityError(CategoryUnsupportedValue, rec.TraceID)
+	}
+	if raw, present := metadata["causedByFailureId"]; present {
+		var causeID string
+		if err := json.Unmarshal(raw, &causeID); err != nil || causeID == "" || causeID == failureID {
+			return invalidityError(CategoryUnsupportedValue, rec.TraceID)
+		}
+		if _, exists := g.failures[causeID]; !exists {
+			return invalidityError(CategoryUnsupportedValue, rec.TraceID)
+		}
+		fact.CausedByFailureID = causeID
+	}
 	g.failures[failureID] = fact
 	g.order = append(g.order, failureID)
 	return nil
@@ -50,9 +64,11 @@ type diagnosticValue struct {
 	CaptureLimitBytes int     `json:"captureLimitBytes"`
 }
 type failureData struct {
-	ExceptionType string            `json:"exceptionType"`
-	Message       string            `json:"message"`
-	Diagnostics   []diagnosticValue `json:"diagnostics"`
+	Classification   string            `json:"classification"`
+	ExceptionMessage *string           `json:"exceptionMessage"`
+	ExceptionType    string            `json:"exceptionType"`
+	Message          string            `json:"message"`
+	Diagnostics      []diagnosticValue `json:"diagnostics"`
 }
 
 func (g *failureGraph) validateDiagnostics(assembler *payloadAssembler, traceID string) *consolecore.Error {
@@ -69,6 +85,20 @@ func (g *failureGraph) validateDiagnostics(assembler *payloadAssembler, traceID 
 		if err := json.Unmarshal(raw, &data); err != nil {
 			return invalidityError(CategoryUnsupportedValue, traceID)
 		}
+		if data.Classification != "RECOVERABLE" && data.Classification != "TERMINAL" {
+			return invalidityError(CategoryUnsupportedValue, traceID)
+		}
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &fields); err != nil {
+			return invalidityError(CategoryUnsupportedValue, traceID)
+		}
+		if _, exists := fields["exceptionMessage"]; !exists {
+			return invalidityError(CategoryUnsupportedValue, traceID)
+		}
+		if data.Classification == "RECOVERABLE" && (data.ExceptionMessage == nil || javaBlankMessage(*data.ExceptionMessage)) {
+			return invalidityError(CategoryUnsupportedValue, traceID)
+		}
+		fact.Classification, fact.ExceptionMessage = data.Classification, data.ExceptionMessage
 		fact.ExceptionType, fact.ContextSummary = data.ExceptionType, data.Message
 		if len(data.Diagnostics) == 0 {
 			return invalidityError(CategoryUnsupportedValue, traceID)
@@ -92,6 +122,19 @@ func (g *failureGraph) validateDiagnostics(assembler *payloadAssembler, traceID 
 		g.failures[id] = fact
 	}
 	return nil
+}
+
+// Match the producer's String.isBlank contract, including its exclusion of
+// nonbreaking spaces. Go's strings.TrimSpace accepts a different set.
+func javaBlankMessage(message string) bool {
+	for _, r := range message {
+		if !(r >= '\t' && r <= '\r' || r >= '\u001c' && r <= '\u0020' ||
+			r == '\u1680' || r >= '\u2000' && r <= '\u2006' || r >= '\u2008' && r <= '\u200a' ||
+			r == '\u2028' || r == '\u2029' || r == '\u205f' || r == '\u3000') {
+			return false
+		}
+	}
+	return true
 }
 
 // metadataBoolStrict returns the boolean metadata value and whether it was

@@ -21,7 +21,9 @@ public final class TraceFailureMetadata
         {
             throw new IllegalArgumentException("safeMessage must not be blank");
         }
-        metadata.put("exceptionType", failure.getClass().getName());
+        Throwable effective = SkillFailurePolicy.unwrapInvocationFailure(failure);
+        metadata.put("classification", SkillFailurePolicy.recoverable(failure) == null ? "TERMINAL" : "RECOVERABLE");
+        metadata.put("exceptionType", effective.getClass().getName());
         metadata.put("message", safeMessage);
     }
 }

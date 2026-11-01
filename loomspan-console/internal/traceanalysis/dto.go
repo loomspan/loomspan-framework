@@ -320,6 +320,9 @@ type ValidationSummary struct {
 
 // FailureSummary is one ERROR_RECORDED failure fact.
 type FailureSummary struct {
+	Classification            string
+	ExceptionMessage          *string
+	CausedByFailureID         string
 	Context                   TraceContext
 	FailureID                 string
 	Terminal                  bool

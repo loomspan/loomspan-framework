@@ -347,7 +347,7 @@ export type TraceAttempt = { retrySequenceId: string; attemptId: string; attempt
   retryDelaySource?: string; httpStatus?: number; providerErrorType?: string;
   providerErrorCode?: string; contentRef?: string; usage: TraceUsageValue; usageComplete: boolean };
 export type TraceRetry = { retrySequenceId: string; usage: TraceUsageValue; usageComplete: boolean };
-export type TraceFailure = { failureId: string; terminal: boolean; sequence: number; timestampMillis: number;
+export type TraceFailure = { classification: "RECOVERABLE" | "TERMINAL"; exceptionMessage: string | null; causedByFailureId?: string; failureId: string; terminal: boolean; sequence: number; timestampMillis: number;
   recordType: string; frameId: string; route: string; attemptId: string;
   retrySequenceId: string; validationStatus: string; exceptionType?: string; contextSummary?: string; diagnostics?: TraceDiagnosticDescriptor[];
   providerAttemptContentRef?: string };

@@ -43,7 +43,7 @@ a permitted read merely because an earlier status fact was degraded.
   slow, expensive, concurrent, active, recently imported, or unfamiliar-path
   investigation.
 - Read [Common failure patterns](references/common-failure-patterns.md) before
-  interpreting terminal versus recovered errors, retries, guardrails, gaps,
+  interpreting explicit failure classification, completion linkage, retries, guardrails, gaps,
   concurrency, or incomplete evidence.
 - Read [Runtime evidence model](references/runtime-model.md) when identity,
   scope, liveness, provenance, ownership, or transient evidence matters.

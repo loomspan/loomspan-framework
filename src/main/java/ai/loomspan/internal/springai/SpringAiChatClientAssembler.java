@@ -50,6 +50,13 @@ final class SpringAiChatClientAssembler
                         org.springframework.ai.chat.client.advisor.ToolCallingAdvisor.builder()
                                 .toolCallingManager(new CanonicalToolCallingManager(
                                         org.springframework.ai.model.tool.ToolCallingManager.builder()
+                                                .toolExecutionExceptionProcessor(failure -> {
+                                                    var recoverable = ai.loomspan.internal.core.SkillFailurePolicy.recoverable(failure);
+                                                    if (recoverable == null) throw ai.loomspan.internal.core.SkillFailurePolicy.propagate(failure);
+                                                    return ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace().writeValueAsString(
+                                                            java.util.Map.of("status", "failed", "correctionPermitted", true,
+                                                                    "message", recoverable.getMessage()));
+                                                })
                                                 .observationRegistry(observationRegistry).build()))));
     }
 
