@@ -1,5 +1,8 @@
 package ai.loomspan.internal.security;
 
+import ai.loomspan.internal.core.CapabilityMetadata;
+import ai.loomspan.internal.skill.SkillAdmissionSnapshot;
+import ai.loomspan.internal.skill.YamlSkillDefinition;
 import org.springframework.lang.Nullable;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.authorization.AuthoritiesAuthorizationManager;
@@ -29,12 +32,25 @@ public final class SkillRoleEvaluator
         };
     }
 
-    public void checkAccess(String capabilityName, SkillAccessPolicy policy,
+    public boolean canAccess(CapabilityMetadata capability, SkillAdmissionSnapshot snapshot,
             @Nullable Authentication authentication)
     {
-        if (!canAccess(policy, authentication))
+        var definition = snapshot.generation(capability.identity().namespace()).definition(capability.name());
+        // Resolve the required admitted binding even when YAML denies: missing admission is an invariant failure.
+        if (definition != null && definition.form() == YamlSkillDefinition.Form.EXECUTOR)
         {
-            throw new AccessDeniedException("Access denied for capability '" + capabilityName + "'");
+            var executorPolicy = snapshot.executorBinding(capability.name()).registration().accessPolicy();
+            return canAccess(capability.accessPolicy(), authentication) && canAccess(executorPolicy, authentication);
+        }
+        return canAccess(capability.accessPolicy(), authentication);
+    }
+
+    public void checkAccess(CapabilityMetadata capability, SkillAdmissionSnapshot snapshot,
+            @Nullable Authentication authentication)
+    {
+        if (!canAccess(capability, snapshot, authentication))
+        {
+            throw new AccessDeniedException("Access denied for capability '" + capability.name() + "'");
         }
     }
 }

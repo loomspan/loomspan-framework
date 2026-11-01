@@ -280,7 +280,7 @@ public class DefaultSkillTemplate implements SkillTemplate
 
     void authorize(PreparedInput prepared, Authentication authentication)
     {
-        roleEvaluator.checkAccess(prepared.capability().name(), prepared.capability().accessPolicy(), authentication);
+        roleEvaluator.checkAccess(prepared.capability(), prepared.snapshot(), authentication);
     }
 
     private String executeValidated(CapabilityMetadata capability,

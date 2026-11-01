@@ -159,6 +159,55 @@ class ExecutorGenerationExecutionIntegrationTest {
             }
         });
     }
+    @Test void securedExecutorHandoffSurvivesForeignReplacementRemovalAndRecreation(@TempDir Path directory) throws Exception {
+        var settings = directory.resolve("application.yml");
+        Files.writeString(settings,"loomspan: {executor-config: {infra: {settings: {version: startup}}}}\n");
+        context(directory).withUserConfiguration(SecuredBeans.class)
+                .withInitializer(new ConfigDataApplicationContextInitializer())
+                .withPropertyValues("spring.config.location="+settings.toUri()).run(context -> {
+            assertThat(context).hasNotFailed();
+            var reloader = context.getBean(SkillReloader.class);
+            var template = context.getBean(SkillTemplate.class);
+            var handoff = context.getBean(SkillInvocationHandoff.class);
+            var bean = context.getBean(Executors.class);
+            var first = publish(reloader,"infra",List.of(),config("first"),NamespaceVisibility.PUBLIC);
+            var secured = new SkillDocument("secured",leaf("secured","infra-secured").yaml()+"rbac_roles: [SALES]\n");
+            publish(reloader,"caller",List.of(secured),new ExecutionConfiguration("loomspan: {}"),NamespaceVisibility.PRIVATE);
+            var previous = SecurityContextHolder.getContext();
+            var captured = SecurityContextHolder.createEmptyContext();
+            var principal = UsernamePasswordAuthenticationToken.authenticated("writer","unused",
+                    org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("ROLE_SALES","ROLE_WRITE"));
+            captured.setAuthentication(principal); SecurityContextHolder.setContext(captured);
+            try {
+                var old = handoff.handoff("caller-secured",Map.of("value","old"));
+                var removed = handoff.handoff("caller-secured",Map.of("value","removed"));
+                var next = publish(reloader,"infra",List.of(),config("second"),NamespaceVisibility.PUBLIC);
+                assertThat(template.invoke("caller-secured",Map.of())).isEqualTo("second");
+                assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(next.generationId());
+                reloader.remove("infra",next.generationId());
+                assertThatThrownBy(() -> handoff.handoff("caller-secured",Map.of())).isInstanceOf(SkillException.class);
+                var ambient = SecurityContextHolder.createEmptyContext();
+                ambient.setAuthentication(UsernamePasswordAuthenticationToken.authenticated("other","unused",List.of()));
+                SecurityContextHolder.setContext(ambient);
+                assertThat(removed.invoke()).isEqualTo("first");
+                assertThat(SecurityContextHolder.getContext()).isSameAs(ambient);
+                var recreated = publish(reloader,"infra",List.of(),config("third"),NamespaceVisibility.PUBLIC);
+                assertThat(old.invoke()).isEqualTo("first");
+                assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(first.generationId());
+                assertThat(bean.authentications).allSatisfy(authentication -> assertThat(authentication).isSameAs(principal));
+                assertThatThrownBy(() -> template.validate("caller-secured",Map.of()))
+                        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                SecurityContextHolder.setContext(captured);
+                assertThat(template.invoke("caller-secured",Map.of())).isEqualTo("third");
+                assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(recreated.generationId());
+                publish(reloader,"caller",List.of(new SkillDocument("secured",secured.yaml().replace("[SALES]","[OTHER]"))),
+                        new ExecutionConfiguration("loomspan: {}"),NamespaceVisibility.PRIVATE);
+                assertThatThrownBy(() -> template.validate("caller-secured",Map.of()))
+                        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            } finally { SecurityContextHolder.setContext(previous); }
+        });
+    }
+
     private static ApplicationContextRunner context(Path directory) {
         return new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class,
                 LoomspanJacksonAutoConfiguration.class, LoomspanAutoConfiguration.class, LoomspanAiAutoConfiguration.class))
@@ -175,6 +224,18 @@ class ExecutorGenerationExecutionIntegrationTest {
         var candidate = reloader.prepare(namespace, docs, config, visibility); reloader.publish(candidate); return candidate;
     }
     @Configuration(proxyBeanMethods = false) static class Beans { @Bean Executors executors() { return new Executors(); } }
+    @Configuration(proxyBeanMethods = false)
+    @org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity(jsr250Enabled=true,proxyTargetClass=true)
+    static class SecuredBeans {
+        @Bean SecuredExecutor securedExecutor(Executors executors) { return new SecuredExecutor(executors); }
+    }
+    static class SecuredExecutor {
+        private final Executors executors;
+        SecuredExecutor(Executors executors) { this.executors = executors; }
+        @SkillExecutor(namespace="infra",name="secured",config="settings")
+        @jakarta.annotation.security.RolesAllowed("WRITE")
+        public String secured(SkillExecutorInvocation invocation) { return executors.configured(invocation); }
+    }
     @Configuration(proxyBeanMethods = false) static class DefaultBeans { @Bean DefaultExecutor defaultExecutor() { return new DefaultExecutor(); } }
     static class DefaultExecutor {
         SkillExecutorInvocation invocation;

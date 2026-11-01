@@ -208,6 +208,70 @@ class ExecutorDependencyResolutionTest {
             }
         } finally { manager.destroy(); }
     }
+    @Test void retainedSnapshotsSelectTheirOwnExecutorPolicy() {
+        var caller = org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("writer", "unused",
+                org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("ROLE_SALES", "ROLE_WRITE"));
+        for (boolean oldAllows : List.of(false,true)) {
+            var calls = new java.util.concurrent.atomic.AtomicInteger();
+            var oldRegistration = new SkillExecutorRegistration(SkillIdentity.parse("infra-run"), "",
+                    SkillAccessPolicy.roles(List.of(oldAllows ? "WRITE" : "OTHER")), new SkillSource(null,"old","run"),
+                    invocation -> { calls.incrementAndGet(); return "old"; });
+            var newRegistration = new SkillExecutorRegistration(SkillIdentity.parse("infra-run"), "",
+                    SkillAccessPolicy.roles(List.of(oldAllows ? "OTHER" : "WRITE")), new SkillSource(null,"new","run"),
+                    invocation -> { calls.incrementAndGet(); return "new"; });
+            var manager = manager(List.of(oldRegistration),Map.of());
+            try {
+                var oldOwner = publish(manager,"infra",List.of(leaf("unrelated","run")),"loomspan: {}",NamespaceVisibility.PUBLIC);
+                var root = new SkillDocument("root","name: root\ndescription: root\nmodel: model\nallowed_skills: [{name: caller-leaf}]\n");
+                publish(manager,"caller",List.of(root,new SkillDocument("leaf",leaf("leaf","infra-run").yaml()+"rbac_roles: [SALES]\n")),
+                        SkillReloaderTest.MODEL.yaml(),NamespaceVisibility.PRIVATE);
+                var retained = admit(manager,"caller-root");
+                var callerGeneration = retained.entryGeneration();
+                var replacement = new SkillGeneration("infra","new-owner",Map.of(),Map.of(),null,null,null,
+                        NamespaceVisibility.PUBLIC,Map.of("infra-run",newRegistration),Map.of("version","new"));
+                var validator = new SkillDependencyValidator(new SkillInputContractResolver(),List.of());
+                var fresh = validator.checkAdmission(new SkillAdmissionSnapshot(retained.entry(),
+                        Map.of("caller",callerGeneration,"infra",replacement)));
+                assertThat(retained.executorBinding("caller-leaf").registration()).isSameAs(oldRegistration);
+                assertThat(fresh.executorBinding("caller-leaf").registration()).isSameAs(newRegistration);
+                assertThat(retained.executorBinding("caller-leaf").generationId()).isEqualTo(oldOwner.id());
+                assertThat(fresh.executorBinding("caller-leaf").generationId()).isEqualTo(replacement.id());
+                SkillGenerationManager.dispatch(manager.remove("infra",oldOwner.id()));
+                for (var snapshot : List.of(retained,fresh)) {
+                    boolean allowed = snapshot == retained ? oldAllows : !oldAllows;
+                    var capability = snapshot.resolve(SkillIdentity.parse("caller-leaf"));
+                    assertThat(capability).isSameAs(callerGeneration.capability("caller-leaf"));
+                    var evaluator = new ai.loomspan.internal.security.SkillRoleEvaluator(null,null);
+                    assertThat(evaluator.canAccess(capability,snapshot,caller)).isEqualTo(allowed);
+                    var guard = new ai.loomspan.internal.security.DefaultAccessGuard(evaluator);
+                    var session = TestLoomspanSessions.withId("retained-policy","caller-root",4);
+                    session.setAuthentication(caller);
+                    var binding = ExecutionBinding.sessionOnly(session,snapshot).withTarget(snapshot.resolve(snapshot.entry()),
+                            new MissionContext(session,"caller-root","source",null));
+                    ExecutionBindingScope.runWith(binding,() -> {
+                        var visible = new DefaultSkillVisibilityResolver(guard).visibleSkillsFor("caller-root",session,null);
+                        assertThat(visible.contains(capability)).isEqualTo(allowed);
+                        if (allowed) {
+                            guard.checkAccess(capability,session,null);
+                            assertThat(snapshot.executorBinding(capability.name()).registration().invoker().apply(
+                                    new SkillExecutorInvocation(Map.of(),Map.of(),Map.of(),capability.name(),"test")))
+                                    .isEqualTo(snapshot == retained ? "old" : "new");
+                        } else assertThatThrownBy(() -> guard.checkAccess(capability,session,null))
+                                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                        if (snapshot == retained) assertThatThrownBy(() -> guard.checkAccess(
+                                oldOwner.capability("infra-unrelated"),session,caller))
+                                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                    });
+                    var rootView = new SkillAdmissionSnapshot(capability.identity(),snapshot.generations(),snapshot.executorBindings());
+                    var rootSession = TestLoomspanSessions.withId("retained-root",capability.name(),4);
+                    ExecutionBindingScope.runWith(ExecutionBinding.sessionOnly(rootSession,rootView),() ->
+                            assertThat(guard.canAccess(capability,rootSession,caller)).isEqualTo(allowed));
+                }
+                assertThat(calls).hasValue(1);
+            } finally { manager.destroy(); }
+        }
+    }
+
     private record ManagerOwner(SkillGenerationManager manager) implements AutoCloseable {
         @Override public void close() { manager.destroy(); }
     }

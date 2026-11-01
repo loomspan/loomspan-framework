@@ -163,7 +163,8 @@ across replacement, removal, and recreation. Handoff's `generationId()` identifi
 the entry generation and has no ownership side effects.
 
 `SkillTemplate.validate()` checks the same captured dependency policy, input, and entry
-RBAC with temporary leases, then releases them. It creates no session, invokes no
+RBAC with temporary leases, then releases them. For executor leaves, entry RBAC requires
+both YAML and captured Java executor policies. It creates no session, invokes no
 skill/provider, and reserves no root. Later invocation can fail after dependency,
 authentication, or lifecycle changes; use handoff when reserved admission is needed.
 Admission leases already constructed runtimes. It is not a transaction over external
@@ -213,7 +214,9 @@ executor data is uninterpreted and separate from skill config.
 
 Executor leaves execute as `SkillKind.JAVA` through captured namespace generations.
 The executor namespace owns its fixed registrations and immutable configuration;
-local references use the YAML owner and foreign references require a Public target. See
+local references use the YAML owner and foreign references require a Public target.
+Validation, planner filtering and execution require both the YAML and captured Java
+executor policies against the same caller; role alternatives remain within each policy. See
 [executor authoring](agent-skills/loomspan-docs/references/skill-authoring/executor-skills.md).
 
 Preparation validates outgoing contracts against one coherent external metadata view,
@@ -378,6 +381,9 @@ methods and reference-only executors share discovery and proxy invocation. Succe
 null/void results become empty text, Strings remain exact, and other results become
 JSON; failures propagate. YAML executor leaves retain their definitions and use captured registrations,
 selected executor configuration and executor generation identity during execution.
+Validation and discovery evaluate declarative metadata without running argument-dependent
+advice. Actual invocation supplies real arguments to Spring advice, which can still deny
+a validated candidate; caller security contexts restore after success or failure.
 See [Java declarations and results](agent-skills/loomspan-docs/references/java-api/java-skills.md).
 
 The catalog descriptor is `SkillDescriptor(name, description, kind, inputSchema,

@@ -38,7 +38,8 @@ public class DefaultAccessGuard implements AccessGuard
         Objects.requireNonNull(capability, "capability must not be null");
         Authentication authentication = resolveAuthentication(invocationAuthentication, session);
 
-        return hasCallAuthority(capability, session) && evaluator.canAccess(capability.accessPolicy(), authentication);
+        return hasCallAuthority(capability, session)
+                && evaluator.canAccess(capability, ExecutionBindingScope.requireCurrent().snapshot(), authentication);
     }
 
     @Override
@@ -47,7 +48,7 @@ public class DefaultAccessGuard implements AccessGuard
         Objects.requireNonNull(capability, "capability must not be null");
         if (!hasCallAuthority(capability, session))
             throw new AccessDeniedException("Call to capability '" + capability.name() + "' is not authorized from the current captured source");
-        evaluator.checkAccess(capability.name(), capability.accessPolicy(),
+        evaluator.checkAccess(capability, ExecutionBindingScope.requireCurrent().snapshot(),
                 resolveAuthentication(invocationAuthentication, session));
     }
 

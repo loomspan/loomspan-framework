@@ -109,6 +109,8 @@ Loomspan invokes the final Spring-managed bean so advice remains active. Both Ja
 
 Supported visibility policies are JSR-250 `@RolesAllowed`, `@PermitAll`, and `@DenyAll`, resolved using Spring's class/method/interface rules. Applications declaring these policies MUST enable `@EnableMethodSecurity(jsr250Enabled = true)` and provide actual applicable method-security advice. Read [authorization](../skill-authoring/authorization.md) for role prefixes, hierarchy, startup checks, and caller authentication isolation.
 
+An annotation-only callable uses its captured Java policy. An executor YAML leaf requires its YAML policy AND the captured executor's Java policy, with role alternatives inside each constituent. Validation, handoff entry checks and planner discovery evaluate that metadata without invoking business code or argument-dependent advice. Actual root/child execution rechecks authorization and invokes the proxy with actual business arguments; `@PreAuthorize` and other applicable advice may therefore deny a candidate that passed validation. Both forms install the captured caller on the mission worker and restore the exact prior security context after success, advice denial and business failure. Catalog metadata remains unfiltered. See [composed declaration boundaries](../skill-authoring/authorization.md#compose-executor-declaration-boundaries).
+
 Do not import registries, descriptors, invokers, or discovery components from `ai.loomspan.internal`. Loomspan exposes no supported Java SPI; annotation-based registration creates no SPI or bean replacement contract.
 
 ## Source anchors
@@ -118,6 +120,7 @@ Do not import registries, descriptors, invokers, or discovery components from `a
 - `SkillMethodBeanPostProcessor` and its tests define shared canonical discovery and callable reflected inputs; `JavaSkillInvoker` owns final managed-proxy invocation and conversion for both roles.
 - `SkillGenerationManager#prepare` finishes all declaration sources and validates child references before a complete immutable generation can activate.
 - `SupportedSurfaceIntegrationTest` exercises the supported facade and application-owned methods.
+- `SharedDeclarativeAuthorizationIntegrationTest` covers real JDK/CGLIB argument-dependent advice through root/child mission dispatch, shared pre-check/filter rules, rechecks, caller capture and exact worker-context restoration.
 - `MissionWorkExecutor` is the shared work/cutoff owner; `JavaSkillMissionCutoffTest` protects timeout, caller interruption, and noncooperative late returns.
 - `ExecutorDependencyResolutionTest` covers reference roles, exact configuration paths, retained generation binding, and reachable-only capture; `ExecutorGenerationExecutionIntegrationTest` covers the real executor invocation route. Current diagnostic source displays do not expose complete executor provenance.
 

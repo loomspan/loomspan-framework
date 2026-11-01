@@ -63,6 +63,53 @@ class DefaultAccessGuardTest {
         assertThat(canAccess(capability, session, authentication("ROLE_ALLOWED"))).isTrue();
     }
 
+    @Test
+    void executorJavaPolicyCannotBeBypassedByPermissiveYaml() {
+        var fixture = ExecutorPolicyFixture.create(SkillAccessPolicy.unrestricted(), SkillAccessPolicy.roles(Set.of("JAVA_WRITE")));
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("composed", fixture.capability().name(), 2);
+        ai.loomspan.internal.core.ExecutionBindingScope.runWith(
+                ai.loomspan.internal.core.ExecutionBinding.sessionOnly(session, fixture.snapshot()), () -> {
+            assertThat(accessGuard.canAccess(fixture.capability(), session, authentication("ROLE_YAML_READ"))).isFalse();
+            assertThatThrownBy(() -> accessGuard.checkAccess(fixture.capability(), session, authentication("ROLE_YAML_READ")))
+                    .isInstanceOf(AccessDeniedException.class).hasMessageContaining(fixture.capability().name());
+            assertThat(accessGuard.canAccess(fixture.capability(), session, authentication("ROLE_JAVA_WRITE"))).isTrue();
+        });
+    }
+
+    @Test
+    void usesOneResolvedCallerForEveryConstituent() {
+        var fixture = ExecutorPolicyFixture.create(SkillAccessPolicy.yamlRoles(Set.of("SALES")), SkillAccessPolicy.roles(Set.of("DATABASE_WRITE")));
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("same-caller", fixture.capability().name(), 2);
+        var both = authentication("ROLE_SALES", "ROLE_DATABASE_WRITE");
+        var onlyYaml = authentication("ROLE_SALES");
+        var onlyJava = authentication("ROLE_DATABASE_WRITE");
+        var previous = org.springframework.security.core.context.SecurityContextHolder.getContext();
+        var ambient = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        ambient.setAuthentication(both);
+        org.springframework.security.core.context.SecurityContextHolder.setContext(ambient);
+        try {
+            ai.loomspan.internal.core.ExecutionBindingScope.runWith(
+                    ai.loomspan.internal.core.ExecutionBinding.sessionOnly(session, fixture.snapshot()), () -> {
+                session.setAuthentication(both);
+                for (var explicit : java.util.List.of(onlyYaml, onlyJava)) {
+                    assertThat(accessGuard.canAccess(fixture.capability(), session, explicit)).isFalse();
+                    assertThatThrownBy(() -> accessGuard.checkAccess(fixture.capability(), session, explicit))
+                            .isInstanceOf(AccessDeniedException.class);
+                }
+                assertThat(accessGuard.canAccess(fixture.capability(), session, null)).isTrue();
+                session.setAuthentication(onlyJava);
+                assertThat(accessGuard.canAccess(fixture.capability(), session, onlyYaml)).isFalse();
+                assertThat(accessGuard.canAccess(fixture.capability(), session, both)).isTrue();
+                assertThat(session.getAuthentication().orElseThrow()).isSameAs(onlyJava);
+            });
+            var empty = ai.loomspan.internal.core.TestLoomspanSessions.withId("no-caller", fixture.capability().name(), 2);
+            ai.loomspan.internal.core.ExecutionBindingScope.runWith(
+                    ai.loomspan.internal.core.ExecutionBinding.sessionOnly(empty, fixture.snapshot()), () ->
+                    assertThat(accessGuard.canAccess(fixture.capability(), empty, null)).isFalse());
+            assertThat(org.springframework.security.core.context.SecurityContextHolder.getContext()).isSameAs(ambient);
+        } finally { org.springframework.security.core.context.SecurityContextHolder.setContext(previous); }
+    }
+
     private boolean canAccess(CapabilityMetadata capability, LoomspanSession session, Authentication authentication) {
         return ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(rootBinding(capability, session),
                 () -> accessGuard.canAccess(capability, session, authentication));

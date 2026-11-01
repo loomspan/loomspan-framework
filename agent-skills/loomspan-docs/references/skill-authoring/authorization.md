@@ -58,6 +58,18 @@ All skill kinds use Spring's authority evaluation. The default prefix is `ROLE_`
 
 Use Spring's documented `GrantedAuthorityDefaults` bean configuration when the application uses a different prefix. Do not encode prefix handling in skill names, prompts, or business inputs.
 
+## Compose executor declaration boundaries
+
+An annotation-only `@SkillMethod` uses its captured Java declarative policy. Model and TypeSafe YAML skills use their YAML policy. An executor YAML leaf MUST satisfy **both** its YAML `rbac_roles` policy **and** the Java policy on its captured executor registration, against the same trusted caller.
+
+Alternatives stay inside each declaration. For example, YAML `rbac_roles: [SALES, SUPPORT]` and executor `@RolesAllowed("DATABASE_WRITE")` mean `(SALES OR SUPPORT) AND DATABASE_WRITE`. A caller with only SALES or only DATABASE_WRITE is denied. Unrestricted/`@PermitAll` on one side never overrides a restrictive other side; `@DenyAll` denies the conjunction. Prefix and hierarchy rules apply to both constituents.
+
+Temporary root validation, invoke/handoff entry checks, planner filtering, and actual root/child dispatch use this shared declarative rule. Validation and discovery inspect metadata only: they do not run business methods, argument-dependent security expressions, providers, or application configuration-validation callbacks. Only the entry is authorized during root preparation; child roles are checked when filtering or calling that child. Every dispatch rechecks the caller even if the child was previously visible.
+
+Actual invocation uses the final Spring proxy with actual arguments. Application `@PreAuthorize` expressions and other applicable advice run there and can deny a declaratively visible, successfully validated candidate. Declarative evaluation does not predict that advice. Management/catalog metadata remains unfiltered by these runtime decisions.
+
+Evidence: `SkillRoleEvaluatorTest`, `DefaultAccessGuardTest#usesOneResolvedCallerForEveryConstituent`, and `SharedDeclarativeAuthorizationIntegrationTest` cover conjunction, one resolved caller, metadata-only checks, dispatch rechecks, actual argument advice and worker restoration for both Java forms. `ExecutorDependencyResolutionTest#retainedSnapshotsSelectTheirOwnExecutorPolicy` protects captured policy selection.
+
 ## Local visibility and caller scope
 
 A YAML parent's `allowed_skills` names the only candidate children. Java, TypeSafe, and model-backed YAML children are resolved by exact name after startup registration finishes. Missing references fail startup. Authorization then filters this local set for each invocation; `@PermitAll` never makes an undeclared child visible. A denied required child can make a planning or evidence requirement unsatisfiable.
@@ -65,7 +77,7 @@ A YAML parent's `allowed_skills` names the only candidate children. Java, TypeSa
 At runtime every ordinary, planned and bound dispatch independently checks the actual
 executing source before switching context. A call MUST be declared directly by that
 source, resolve within the retained snapshot, target either the same namespace or a
-captured Public namespace, and pass the target's role policy. These conditions also
+captured Public namespace, and pass the target's composed declarative policy. These conditions also
 filter discovery. Public does not bypass roles or declarations; roles do not bypass
 a foreign Private boundary. A Public callee cannot call back into a Private caller,
 even when that caller was the entry. Capturing a whole generation grants no authority
@@ -81,7 +93,7 @@ Spring authorization and authentication failures remain failures; they are not s
 
 This topic does not promise visibility support for `@Secured`, expression annotations, pre/post filtering, arbitrary custom denial handlers, or additional Loomspan SPIs. Application-specific security may still run on its proxy, but it is outside this visibility contract.
 
-`SkillAccessPolicyResolver` uses Spring's scanner. `DefaultAccessGuard` delegates role evaluation to `SkillRoleEvaluator` using Spring's authority manager with prefix and hierarchy. `Jsr250EnforcementVerifier` validates actual advice, and `ScopedAuthentication` restores caller contexts at Java invocation. `JavaSkillAuthorizationIntegrationTests`, `JavaSkillSecurityStartupTests`, and `JavaSkillAuthenticationScopeIntegrationTests` use real Spring contexts to compare visibility and proxy enforcement.
+`SkillAccessPolicyResolver` uses Spring's scanner. `DefaultSkillTemplate` and `DefaultAccessGuard` delegate snapshot-aware declarative composition and evaluation to `SkillRoleEvaluator` using Spring's authority manager with prefix and hierarchy. `Jsr250EnforcementVerifier` validates actual advice, and `ScopedAuthentication` restores caller contexts at Java invocation. `JavaSkillAuthorizationIntegrationTests`, `JavaSkillSecurityStartupTests`, and `JavaSkillAuthenticationScopeIntegrationTests` use real Spring contexts to compare visibility and proxy enforcement.
 
 ## Namespace publication boundary
 
