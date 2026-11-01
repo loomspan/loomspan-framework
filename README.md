@@ -400,3 +400,9 @@ TypeSafe, or Java/executor output validation. The descriptor
 has a five-argument constructor. Loomspan exposes no supported Java SPI. Types under `internal` and
 `autoconfigure` are not application extension APIs; Loomspan does not expose an
 internal bean-replacement contract.
+
+Catalogs classify both annotated methods and executor-backed YAML as `JAVA`;
+reference-only executors are absent from callable discovery. Console diagnostics
+keep execution kind separate from declaration provenance, showing authored YAML
+and source labels alongside executor identity and Java implementation. See
+[skill diagnostics](agent-skills/loomspan-docs/references/skill-authoring/observability-http.md#skill-classification-and-declaration).

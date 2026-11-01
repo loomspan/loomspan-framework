@@ -59,9 +59,9 @@ func (client *fixtureObservabilityClient) Get(_ context.Context, endpoint string
 	case strings.HasSuffix(endpoint, "/instance"):
 		body = `{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.9-SNAPSHOT","observedAt":"2026-07-27T00:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":1,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`
 	case strings.Contains(endpoint, "/skills/"):
-		body = `{"registeredName":"default-CheckDns","source": "YAML", "sourcePath":"classpath:/skills/check-dns.yaml","yaml":"name: CheckDns"}`
+		body = `{"registeredName":"default-CheckDns","kind":"YAML","declaration":"YAML", "sourcePath":"classpath:/skills/check-dns.yaml","yaml":"name: CheckDns"}`
 	case strings.Contains(endpoint, "/skills"):
-		body = `{"items":[{"registeredName":"default-CheckDns","source": "YAML", "sourcePath":"classpath:/skills/check-dns.yaml"}],"hasMore":false,"nextCursor":null,"observedAt":"2026-07-27T00:00:00Z"}`
+		body = `{"items":[{"registeredName":"default-CheckDns","kind":"YAML","declaration":"YAML", "sourcePath":"classpath:/skills/check-dns.yaml"}],"hasMore":false,"nextCursor":null,"observedAt":"2026-07-27T00:00:00Z"}`
 	case strings.Contains(endpoint, "/active-executions/"):
 		body = client.activeExecutionBody()
 	case strings.Contains(endpoint, "/active-executions"):

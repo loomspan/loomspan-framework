@@ -133,7 +133,7 @@ Do not import registries, descriptors, invokers, or discovery components from `a
 - `SupportedSurfaceIntegrationTest` exercises the supported facade and application-owned methods.
 - `SharedDeclarativeAuthorizationIntegrationTest` covers real JDK/CGLIB argument-dependent advice through root/child mission dispatch, shared pre-check/filter rules, rechecks, caller capture and exact worker-context restoration.
 - `MissionWorkExecutor` is the shared work/cutoff owner; `JavaSkillMissionCutoffTest` protects timeout, caller interruption, and noncooperative late returns.
-- `ExecutorDependencyResolutionTest` covers reference roles, exact configuration paths, retained generation binding, and reachable-only capture; `ExecutorGenerationExecutionIntegrationTest` covers the real executor invocation route. Current diagnostic source displays do not expose complete executor provenance.
+- `ExecutorDependencyResolutionTest` covers reference roles, exact configuration paths, retained generation binding, and reachable-only capture; `ExecutorGenerationExecutionIntegrationTest` covers the real executor invocation route. `ExecutorGenerationExecutionTest` and `DefaultRegisteredSkillCatalogTest` cover retained YAML/source labels, resolved executor identity, and Java implementation diagnostics; see [skill diagnostics](../skill-authoring/observability-http.md#skill-classification-and-declaration).
 
 Private, final, and static methods of either Java role on a CGLIB class proxy fail startup because they cannot dispatch safely through the proxy's target and advice. Plain unproxied bean methods retain reflected invocation. `JavaSkillIntegrationTest` covers the stateful class-proxy regression.
 

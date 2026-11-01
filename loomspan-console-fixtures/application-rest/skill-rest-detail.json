@@ -1,1 +1,0 @@
-{"registeredName":"default-FetchDns","source":"YAML","sourcePath":"opaque label","yaml":"# Executor DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application executor\r\nexecutor: fetchDns\r\n","outputSchema":null}

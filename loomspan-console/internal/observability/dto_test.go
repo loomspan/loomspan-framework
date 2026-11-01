@@ -34,13 +34,13 @@ func TestSkillPageDecodesFromFixture(t *testing.T) {
 	if len(page.Items) != 4 {
 		t.Fatalf("expected 4 items, got %d", len(page.Items))
 	}
-	if page.Items[1].Source != "REST" || page.Items[1].SourcePath == "" {
-		t.Fatalf("missing REST summary: %#v", page.Items[1])
+	if page.Items[1].Kind != "JAVA" || page.Items[1].SourcePath == "" {
+		t.Fatalf("missing executor summary: %#v", page.Items[1])
 	}
-	if page.Items[2].Source != "JAVA" || page.Items[2].BeanName != "dnsSkills" {
+	if page.Items[2].Kind != "JAVA" || page.Items[2].BeanName != "dnsSkills" {
 		t.Fatalf("missing Java summary: %#v", page.Items[2])
 	}
-	if page.Items[3].Source != "TYPESAFE" || page.Items[3].SourcePath == "" {
+	if page.Items[3].Kind != "TYPESAFE" || page.Items[3].SourcePath == "" {
 		t.Fatalf("missing TYPESAFE summary: %#v", page.Items[3])
 	}
 	if page.Items[0].RegisteredName != "default-CheckDns" {
@@ -54,13 +54,13 @@ func TestSkillPageDecodesFromFixture(t *testing.T) {
 	}
 }
 
-func TestRestSkillDetailDecodesFromFixture(t *testing.T) {
+func TestExecutorSkillDetailDecodesFromFixture(t *testing.T) {
 	var detail SkillDetail
-	if err := json.Unmarshal(readFixture(t, "skill-rest-detail.json"), &detail); err != nil {
+	if err := json.Unmarshal(readFixture(t, "skill-executor-detail.json"), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.Source != "REST" || detail.SourcePath != "opaque label" || !strings.Contains(detail.Yaml, "rest: true") {
-		t.Fatalf("unexpected REST detail: %#v", detail)
+	if detail.Kind != "JAVA" || detail.SourcePath != "opaque label" || !strings.Contains(detail.Yaml, "executor: fetchDns") {
+		t.Fatalf("unexpected executor detail: %#v", detail)
 	}
 	if err := validateSkillDetail(detail, "default-FetchDns"); err != nil {
 		t.Fatal(err)
@@ -72,7 +72,7 @@ func TestTypeSafeSkillDetailDecodesFromFixture(t *testing.T) {
 	if err := json.Unmarshal(readFixture(t, "skill-typesafe-detail.json"), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.Source != "TYPESAFE" || detail.SourcePath != "opaque label" || !strings.Contains(detail.Yaml, "typesafe:") || detail.OutputSchema == nil {
+	if detail.Kind != "TYPESAFE" || detail.SourcePath != "opaque label" || !strings.Contains(detail.Yaml, "typesafe:") || detail.OutputSchema == nil {
 		t.Fatalf("unexpected TypeSafe detail: %#v", detail)
 	}
 	if err := validateSkillDetail(detail, detail.RegisteredName); err != nil {
@@ -370,7 +370,7 @@ func TestJavaSkillDetailFixtureHasOnlyJavaLocation(t *testing.T) {
 	if err := validateSkillDetail(detail, "default-LookupDns"); err != nil {
 		t.Fatal(err)
 	}
-	if detail.Source != "JAVA" || detail.BeanName != "dnsSkills" || detail.Method != "example.DnsSkills.lookup(java.lang.String)" || detail.SourcePath != "" || detail.Yaml != "" {
+	if detail.Kind != "JAVA" || detail.BeanName != "dnsSkills" || detail.Method != "example.DnsSkills.lookup(java.lang.String)" || detail.SourcePath != "" || detail.Yaml != "" {
 		t.Fatalf("unexpected Java detail: %#v", detail)
 	}
 }
@@ -378,16 +378,16 @@ func TestJavaSkillDetailFixtureHasOnlyJavaLocation(t *testing.T) {
 func TestSkillSourceVariantsRejectMalformedDetails(t *testing.T) {
 	for _, detail := range []SkillDetail{
 		{RegisteredName: "skill", SourcePath: "skill.yaml", Yaml: "name: skill"},
-		{RegisteredName: "skill", Source: "UNKNOWN"},
-		{RegisteredName: "skill", Source: "YAML", Yaml: "name: skill"},
-		{RegisteredName: "skill", Source: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill", BeanName: "bean"},
-		{RegisteredName: "skill", Source: "TYPESAFE", Yaml: "name: skill"},
-		{RegisteredName: "skill", Source: "TYPESAFE", SourcePath: "skill.yaml"},
-		{RegisteredName: "skill", Source: "TYPESAFE", SourcePath: "skill.yaml", Yaml: "name: skill", Method: "lookup()"},
-		{RegisteredName: "skill", Source: "JAVA", BeanName: "bean"},
-		{RegisteredName: "skill", Source: "JAVA", Method: "lookup()"},
-		{RegisteredName: "skill", Source: "JAVA", BeanName: "bean", Method: "lookup()", SourcePath: "skill.yaml"},
-		{RegisteredName: "skill", Source: "JAVA", BeanName: "bean", Method: "lookup()", Yaml: "name: skill"},
+		{RegisteredName: "skill", Kind: "UNKNOWN", Declaration: "YAML"},
+		{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", Yaml: "name: skill"},
+		{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill", BeanName: "bean"},
+		{RegisteredName: "skill", Kind: "TYPESAFE", Declaration: "YAML", Yaml: "name: skill"},
+		{RegisteredName: "skill", Kind: "TYPESAFE", Declaration: "YAML", SourcePath: "skill.yaml"},
+		{RegisteredName: "skill", Kind: "TYPESAFE", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill", Method: "lookup()"},
+		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean"},
+		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", Method: "lookup()"},
+		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean", Method: "lookup()", SourcePath: "skill.yaml"},
+		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean", Method: "lookup()", Yaml: "name: skill"},
 	} {
 		if err := validateSkillDetail(detail, "skill"); err == nil {
 			t.Errorf("accepted malformed source: %#v", detail)
@@ -397,12 +397,12 @@ func TestSkillSourceVariantsRejectMalformedDetails(t *testing.T) {
 
 func TestSkillDecodersRejectInapplicableFieldsByPresence(t *testing.T) {
 	for _, body := range []string{
-		`{"registeredName":"javaSkill","source":"JAVA","beanName":"bean","method":"lookup()","sourcePath":""}`,
-		`{"registeredName":"javaSkill","source":"JAVA","beanName":"bean","method":"lookup()","yaml":null}`,
-		`{"registeredName":"restSkill","source":"REST","sourcePath":"skill.yaml","beanName":null}`,
-		`{"registeredName":"restSkill","source":"REST","sourcePath":"skill.yaml","method":""}`,
-		`{"registeredName":"nativeSkill","source":"TYPESAFE","sourcePath":"skill.yaml","beanName":null}`,
-		`{"registeredName":"nativeSkill","source":"TYPESAFE","sourcePath":"skill.yaml","method":""}`,
+		`{"registeredName":"javaSkill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","sourcePath":""}`,
+		`{"registeredName":"javaSkill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","yaml":null}`,
+		`{"registeredName":"modelSkill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
+		`{"registeredName":"modelSkill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","method":""}`,
+		`{"registeredName":"nativeSkill","kind":"TYPESAFE","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
+		`{"registeredName":"nativeSkill","kind":"TYPESAFE","declaration":"YAML","sourcePath":"skill.yaml","method":""}`,
 	} {
 		var detail SkillDetail
 		if err := json.Unmarshal([]byte(body), &detail); err == nil {
@@ -411,9 +411,9 @@ func TestSkillDecodersRejectInapplicableFieldsByPresence(t *testing.T) {
 	}
 
 	for _, body := range []string{
-		`{"registeredName":"javaSkill","source":"JAVA","beanName":"bean","method":"lookup()","sourcePath":null}`,
-		`{"registeredName":"restSkill","source":"REST","sourcePath":"skill.yaml","beanName":null}`,
-		`{"registeredName":"nativeSkill","source":"TYPESAFE","sourcePath":"skill.yaml","beanName":null}`,
+		`{"registeredName":"javaSkill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","sourcePath":null}`,
+		`{"registeredName":"modelSkill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
+		`{"registeredName":"nativeSkill","kind":"TYPESAFE","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
 	} {
 		var summary SkillSummary
 		if err := json.Unmarshal([]byte(body), &summary); err == nil {

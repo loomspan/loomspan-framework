@@ -406,7 +406,9 @@ recorded-response accounting; one batch does not multiply by question count.
 Error-body usage is not ingested, and these counters are not a provider billing
 ledger.
 
-Console/MCP catalog `source: TYPESAFE` is separate from public `SkillKind`.
+Console/MCP catalogs report execution `kind: TYPESAFE` and `declaration: YAML`;
+the public catalog also uses `SkillKind.TYPESAFE`. See
+[skill diagnostics](observability-http.md#skill-classification-and-declaration).
 Details show original YAML, generated schema, and the captured source label;
 supplied opaque labels remain verbatim and have no Java bean/method fields.
 Native request/response content uses `payloadType: evaluation` with request,

@@ -76,7 +76,7 @@ func TestObservabilityServiceReturnsSkillPageFromFixture(t *testing.T) {
 	if domain != nil {
 		t.Fatal(domain)
 	}
-	if len(page.Items) != 4 || page.Items[0].RegisteredName != "default-CheckDns" || page.Items[1].Source != "REST" || page.Items[3].Source != "TYPESAFE" {
+	if len(page.Items) != 4 || page.Items[0].RegisteredName != "default-CheckDns" || page.Items[1].Kind != "JAVA" || page.Items[3].Kind != "TYPESAFE" {
 		t.Fatalf("unexpected page: %#v", page)
 	}
 	if page.HasMore {
@@ -197,7 +197,7 @@ func TestObservabilityServiceRejectsSemanticallyInvalidSuccessResponses(t *testi
 		},
 		{
 			name: "detail identifier mismatch",
-			body: `{"registeredName":"OtherSkill","source": "YAML", "sourcePath":"classpath:/other.yaml","yaml":"name: OtherSkill"}`,
+			body: `{"registeredName":"OtherSkill","kind":"YAML","declaration":"YAML", "sourcePath":"classpath:/other.yaml","yaml":"name: OtherSkill"}`,
 			call: func(service *Service, scope target.Scope) *consolecore.Error {
 				_, domain := service.GetSkill(context.Background(), scope, "default-CheckDns")
 				return domain
@@ -313,7 +313,7 @@ func TestObservabilityServicePreservesNativeDetailFixture(t *testing.T) {
 	if domain != nil {
 		t.Fatal(domain)
 	}
-	if detail.Source != "TYPESAFE" || detail.SourcePath != expected.SourcePath || detail.Yaml != expected.Yaml || detail.OutputSchema == nil || *detail.OutputSchema != *expected.OutputSchema {
+	if detail.Kind != "TYPESAFE" || detail.SourcePath != expected.SourcePath || detail.Yaml != expected.Yaml || detail.OutputSchema == nil || *detail.OutputSchema != *expected.OutputSchema {
 		t.Fatalf("expected=%#v actual=%#v", expected, detail)
 	}
 }

@@ -37,7 +37,7 @@ func TestListSkillsGoldenStructuredResultAndText(t *testing.T) {
 		if !strings.HasSuffix(parsed.Path, "/skills") || parsed.Query().Get("pageSize") != "2" {
 			return nil, errors.New("unexpected endpoint: " + endpoint)
 		}
-		return []byte(`{"items":[{"registeredName":"skill-☃","source": "REST", "sourcePath":"nested/skill.yaml","href":"/_ignored"}],"hasMore":true,"nextCursor":"next-1","observedAt":"2026-08-13T20:30:00.000000123Z"}`), nil
+		return []byte(`{"items":[{"registeredName":"skill-☃","kind":"JAVA","declaration":"YAML","executorName":"default-fetchDns","beanName":"dnsSkills","method":"example.DnsSkills.fetch()", "sourcePath":"nested/skill.yaml","href":"/_ignored"}],"hasMore":true,"nextCursor":"next-1","observedAt":"2026-08-13T20:30:00.000000123Z"}`), nil
 	})
 	result, envelope, err := handleListSkills(context.Background(), options, listSkillsInput{PageSize: 2})
 	if err != nil || result.IsError || envelope.Result == nil || envelope.Error != nil {
@@ -78,7 +78,7 @@ func TestGetSkillGoldenPreservesUnchangedYAML(t *testing.T) {
 		if !strings.Contains(endpoint, "/skills/") {
 			return nil, errors.New("unexpected endpoint: " + endpoint)
 		}
-		return json.Marshal(map[string]any{"registeredName": "skill-☃", "source": "REST", "sourcePath": `C:\\deployed\\skill.yaml`, "yaml": yaml})
+		return json.Marshal(map[string]any{"registeredName": "skill-☃", "kind": "JAVA", "declaration": "YAML", "executorName": "default-fetchDns", "beanName": "dnsSkills", "method": "example.DnsSkills.fetch()", "sourcePath": `C:\\deployed\\skill.yaml`, "yaml": yaml})
 	})
 	result, envelope, err := handleGetSkill(context.Background(), options, getSkillInput{RegisteredName: "skill-☃"})
 	if err != nil || result.IsError || envelope.Result == nil {
@@ -96,7 +96,7 @@ func TestListSkillsMaximumPageHas64WholeItems(t *testing.T) {
 	for index := range items {
 		items[index] = map[string]string{
 			"registeredName": fmt.Sprintf("skill-%02d", index),
-			"source":         "YAML", "sourcePath": fmt.Sprintf("skills/skill-%02d.yaml", index),
+			"kind":           "YAML", "declaration": "YAML", "sourcePath": fmt.Sprintf("skills/skill-%02d.yaml", index),
 		}
 	}
 	body, err := json.Marshal(map[string]any{
@@ -123,7 +123,7 @@ func TestListSkillsMaximumPageHas64WholeItems(t *testing.T) {
 func TestGetSkillMaximumAcceptedYAMLRoundTripsWithoutTruncation(t *testing.T) {
 	yaml := "name: maximum\nspec: |\n  " + strings.Repeat("x", 3*1024*1024) + "\n"
 	body, err := json.Marshal(map[string]any{
-		"registeredName": "maximum", "source": "YAML", "sourcePath": "skills/maximum.yaml", "yaml": yaml,
+		"registeredName": "maximum", "kind": "YAML", "declaration": "YAML", "sourcePath": "skills/maximum.yaml", "yaml": yaml,
 	})
 	if err != nil {
 		t.Fatal(err)

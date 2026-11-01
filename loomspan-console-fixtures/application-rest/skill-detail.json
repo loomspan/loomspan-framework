@@ -1,1 +1,1 @@
-{"registeredName":"default-CheckDns","source":"YAML","sourcePath":"classpath:/skills/check-dns.yaml","yaml":"# DNS check\r\nname: CheckDns\r\n","outputSchema":null}
+{"registeredName":"default-CheckDns","kind":"YAML","declaration":"YAML","sourcePath":"classpath:/skills/check-dns.yaml","yaml":"# DNS check\r\nname: CheckDns\r\n","outputSchema":null}

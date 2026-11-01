@@ -283,28 +283,40 @@ func compactEvidenceSchema() *jsonschema.Schema {
 	return compactObject([]string{"traceId", "sessionId", "observedAt"}, map[string]*jsonschema.Schema{"traceId": compactString(), "sessionId": compactString(), "observedAt": compactString()}, true)
 }
 
+// Classification and declaration impose independent constraints on one current shape.
 func skillSourceSchema(detail bool) *jsonschema.Schema {
-	manifestProps := func(source string) map[string]*jsonschema.Schema {
-		return map[string]*jsonschema.Schema{"registeredName": compactString(), "source": {Type: "string", Enum: []any{source}}, "sourcePath": compactString()}
+	nonblank := func() *jsonschema.Schema {
+		minimum := 1
+		return &jsonschema.Schema{Type: "string", MinLength: &minimum}
 	}
-	yamlProps := manifestProps("YAML")
-	yamlProps["source"].Enum = []any{"YAML", "REST", "TYPESAFE"}
-	yamlRequired := []string{"registeredName", "source", "sourcePath"}
+	props := map[string]*jsonschema.Schema{"registeredName": nonblank(), "kind": {Enum: []any{"YAML", "JAVA", "TYPESAFE"}}, "declaration": {Enum: []any{"YAML", "SKILL_METHOD"}}, "sourcePath": nonblank(), "executorName": nonblank(), "beanName": nonblank(), "method": nonblank()}
+	required := []string{"registeredName", "kind", "declaration"}
+	yamlRequired := []string{"sourcePath"}
 	if detail {
-		yamlProps["yaml"] = compactString()
+		props["yaml"] = nonblank()
+		props["outputSchema"] = &jsonschema.Schema{Types: []string{"string", "null"}}
+		required = append(required, "outputSchema")
 		yamlRequired = append(yamlRequired, "yaml")
 	}
-	javaProps := map[string]*jsonschema.Schema{"registeredName": compactString(), "source": {Type: "string", Enum: []any{"JAVA"}}, "beanName": compactString(), "method": compactString()}
-	javaRequired := []string{"registeredName", "source", "beanName", "method"}
-	if detail {
-		for _, props := range []map[string]*jsonschema.Schema{yamlProps, javaProps} {
-			props["outputSchema"] = &jsonschema.Schema{Types: []string{"string", "null"}}
-		}
-		yamlRequired = append(yamlRequired, "outputSchema")
-		javaRequired = append(javaRequired, "outputSchema")
+	base := compactObject(required, props, false)
+	is := func(field, value string) *jsonschema.Schema {
+		return &jsonschema.Schema{Properties: map[string]*jsonschema.Schema{field: {Enum: []any{value}}}}
 	}
-	return &jsonschema.Schema{AnyOf: []*jsonschema.Schema{
-		compactObject(yamlRequired, yamlProps, true),
-		compactObject(javaRequired, javaProps, true),
-	}}
+	forbid := func(fields ...string) *jsonschema.Schema {
+		p := map[string]*jsonschema.Schema{}
+		for _, f := range fields {
+			p[f] = compactFalseSchema()
+		}
+		return &jsonschema.Schema{Properties: p}
+	}
+	method := forbid("sourcePath", "executorName")
+	if detail {
+		method.Properties["yaml"] = compactFalseSchema()
+	}
+	method.Properties["kind"] = &jsonschema.Schema{Enum: []any{"JAVA"}}
+	base.AllOf = []*jsonschema.Schema{
+		{If: is("kind", "JAVA"), Then: &jsonschema.Schema{Required: []string{"beanName", "method"}}, Else: forbid("beanName", "method", "executorName")},
+		{If: is("declaration", "YAML"), Then: &jsonschema.Schema{Required: yamlRequired, If: is("kind", "JAVA"), Then: &jsonschema.Schema{Required: []string{"executorName"}}}, Else: method},
+	}
+	return base
 }

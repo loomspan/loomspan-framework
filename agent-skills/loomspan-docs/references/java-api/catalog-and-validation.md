@@ -20,6 +20,10 @@ return empty without consulting another catalog. Every registered kind is includ
 even when authorization denies execution. Catalogs remain unchanged after replacement
 or removal and hold no executable resource lease, authorization or execution reservation.
 
+Both annotated methods and executor-backed YAML have `kind: JAVA`; reference-only
+executor registrations are absent. Declaration provenance is internal diagnostic
+metadata, inspected through Console or [HTTP diagnostics](../skill-authoring/observability-http.md#skill-classification-and-declaration), rather than another application Java API.
+
 Each `SkillDescriptor` has five components: `name`, `description`, `kind`,
 `inputSchema`, and nullable `outputSchema`. `inputSchema` is the exact registered
 JSON input-schema string shown to models. `outputSchema` is normalized effective

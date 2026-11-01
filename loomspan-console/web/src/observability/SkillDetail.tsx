@@ -63,16 +63,19 @@ export function SkillDetailView() {
 
       {detail && (
         <>
-          <dl className={`status-grid skill-detail-facts${detail.source === "JAVA" ? " java-skill-detail-facts" : ""}`}>
+          <dl className={`status-grid skill-detail-facts${detail.kind === "JAVA" ? " java-skill-detail-facts" : ""}`}>
             <div>
               <dt>Registered name</dt>
               <dd>{detail.registeredName}</dd>
             </div>
-            <div><dt>Source</dt><dd>{detail.source === "JAVA" ? "Java" : detail.source}</dd></div>
-            {detail.source === "JAVA" ? <>
+            <div><dt>Execution kind</dt><dd>{detail.kind === "JAVA" ? "Java" : detail.kind}</dd></div>
+            <div><dt>Declaration</dt><dd>{detail.declaration}</dd></div>
+            {detail.executorName && <div><dt>Executor</dt><dd><code>{detail.executorName}</code></dd></div>}
+            {detail.kind === "JAVA" && <>
               <div><dt>Bean</dt><dd><code>{detail.beanName}</code></dd></div>
               <div className="skill-detail-method"><dt>Method</dt><dd><code>{formatJavaSkillMethod(detail.method)}</code></dd></div>
-            </> : <div>
+            </>}
+            {detail.declaration === "YAML" && <div>
               <dt>Source label</dt>
               <dd><code className="source-path">{detail.sourcePath}</code></dd>
             </div>}
@@ -83,7 +86,7 @@ export function SkillDetailView() {
             <p className="observability-note">Generation metadata describing skill results.</p>
             {detail.outputSchema === null ? <p>Unspecified</p> : <pre className="yaml-block" aria-label="Effective output schema">{detail.outputSchema}</pre>}
           </section>
-          {detail.source !== "JAVA" && <section className="view-subsection" aria-labelledby="skill-yaml-title">
+          {detail.declaration === "YAML" && <section className="view-subsection" aria-labelledby="skill-yaml-title">
             <h3 id="skill-yaml-title">Skill YAML</h3>
             <pre className="yaml-block" aria-label="Skill YAML source">{detail.yaml}</pre>
           </section>}

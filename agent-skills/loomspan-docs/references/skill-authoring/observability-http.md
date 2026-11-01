@@ -40,6 +40,28 @@ their frame-open sequence, and an empty array means no frame is currently open.
 These live and finalized-trace shapes are same-version diagnostic contracts,
 not application APIs.
 
+## Skill classification and declaration
+
+`kind` identifies execution; `declaration` identifies authorship. Both are required.
+
+| Form | kind | declaration | Locations |
+| --- | --- | --- | --- |
+| Model manifest | YAML | YAML | sourcePath |
+| TypeSafe manifest | TYPESAFE | YAML | sourcePath |
+| Executor manifest | JAVA | YAML | sourcePath, executorName, beanName, method |
+| Annotated method | JAVA | SKILL_METHOD | beanName, method |
+
+Details include unchanged `yaml` for every YAML declaration, including Java execution,
+and nullable effective `outputSchema`. Java outputSchema is null. Summaries omit both
+detail fields. Inapplicable locations are omitted. `executorName` is the resolved
+qualified reference; its original spelling remains in YAML. Locations are diagnostic
+text, never invocation aliases. Reference-only executors are absent from callable
+catalogs; a same-name callable remains a single entry. No REST skill kind exists.
+
+Evidence: `DefaultRegisteredSkillCatalogTest`, `RegisteredSkillEntryTest`,
+`ExecutorGenerationExecutionTest`, `ConsoleRestFixtureCorpusTest`, and Console
+`TestAllCallableFormsPreserveProvenanceAndRejectInvalidContracts`.
+
 ## Canonical identity and captured generations
 
 The existing skills list/detail/count inspect all currently published namespace

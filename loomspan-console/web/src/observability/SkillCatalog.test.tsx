@@ -34,20 +34,19 @@ beforeEach(() => {
 
 test("skill catalog renders items in a table", () => {
   view.current.skills.items = [
-    { registeredName: "default-CheckDns", source: "YAML", sourcePath: "/skills/check_dns.yaml" },
-    { registeredName: "FetchDns", source: "REST", sourcePath: "/skills/fetch_dns.yaml" },
-    { registeredName: "EvaluateDns", source: "TYPESAFE", sourcePath: "opaque <label>" },
-    { registeredName: "BuildProject", source: "JAVA", beanName: "buildSkills", method: "public java.lang.String example.Build.build(java.lang.String,boolean)" },
+    { registeredName: "default-CheckDns", kind: "YAML", declaration: "YAML", sourcePath: "/skills/check_dns.yaml" },
+    { registeredName: "FetchDns", kind: "JAVA", declaration: "YAML", executorName: "default-fetchDns", beanName: "dnsSkills", method: "example.DnsSkills.fetch()", sourcePath: "/skills/fetch_dns.yaml" },
+    { registeredName: "EvaluateDns", kind: "TYPESAFE", declaration: "YAML", sourcePath: "opaque <label>" },
+    { registeredName: "BuildProject", kind: "JAVA", declaration: "SKILL_METHOD", beanName: "buildSkills", method: "public java.lang.String example.Build.build(java.lang.String,boolean)" },
   ];
   render(<SkillCatalog />);
   expect(screen.getByText("default-CheckDns")).toBeInTheDocument();
   expect(screen.getByText("BuildProject")).toBeInTheDocument();
-  expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Execution kind" })).toBeInTheDocument();
   expect(screen.getByText("YAML")).toBeInTheDocument();
-  expect(screen.getByText("REST")).toBeInTheDocument();
+  expect(screen.getAllByText("Java")).toHaveLength(2);
   expect(screen.getByText("TYPESAFE")).toBeInTheDocument();
   expect(screen.getByText("opaque <label>")).toBeInTheDocument();
-  expect(screen.getByText("Java")).toBeInTheDocument();
   expect(screen.getByText("example.Build.build()")).toBeInTheDocument();
   expect(screen.queryByText(/buildSkills:/)).toBeNull();
   expect(screen.getByText("/skills/check_dns.yaml")).toBeInTheDocument();
@@ -83,7 +82,7 @@ test("skill catalog shows retry button on error", () => {
 });
 
 test("skill catalog shows load more button when hasMore is true", () => {
-  view.current.skills.items = [{ registeredName: "default-CheckDns", source: "YAML", sourcePath: "/skills/check_dns.yaml" }];
+  view.current.skills.items = [{ registeredName: "default-CheckDns", kind: "YAML", declaration: "YAML", sourcePath: "/skills/check_dns.yaml" }];
   view.current.skills.hasMore = true;
   view.current.skills.nextCursor = "cursor-1";
   render(<SkillCatalog />);
@@ -91,7 +90,7 @@ test("skill catalog shows load more button when hasMore is true", () => {
 });
 
 test("skill catalog actions request refresh, retry, and continuation", async () => {
-  view.current.skills.items = [{ registeredName: "default-CheckDns", source: "YAML", sourcePath: "/skills/check_dns.yaml" }];
+  view.current.skills.items = [{ registeredName: "default-CheckDns", kind: "YAML", declaration: "YAML", sourcePath: "/skills/check_dns.yaml" }];
   view.current.skills.hasMore = true;
   view.current.skills.nextCursor = "cursor-1";
   view.current.skills.error = new BrowserAPIError("TARGET_UNAVAILABLE", "Target down", 503);

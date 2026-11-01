@@ -186,7 +186,7 @@ class YamlSkillCatalogTests {
                 Map.entry("parent schema null", forwardingYaml() + "output_schema: null\n"),
                 Map.entry("parent retries null", forwardingYaml() + "output_schema_max_retries: null\n"),
                 Map.entry("parent linter null", forwardingYaml() + "linter: null\n"),
-                Map.entry("REST", "name: parent\ndescription: parent\nexecutor: sql\noutput_from: null\n"));
+                Map.entry("EXECUTOR", "name: parent\ndescription: parent\nexecutor: sql\noutput_from: null\n"));
         return invalid.entrySet().stream().map(entry -> DynamicTest.dynamicTest(entry.getKey(), () -> {
             var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(
                     List.of(new SkillDocument("invalid-forwarder", entry.getValue())), false);
@@ -230,11 +230,11 @@ class YamlSkillCatalogTests {
         YamlSkillCatalog catalog = new YamlSkillCatalog(new LoomspanProperties());
         var checked = catalog.checkedSupplied(List.of(
                 new SkillDocument("bad YAML", "invalid: ["),
-                new SkillDocument("bad REST", "name: broken\ndescription: broken\nexecutor: sql\nmodel: missing\n"),
+                new SkillDocument("bad executor", "name: broken\ndescription: broken\nexecutor: sql\nmodel: missing\n"),
                 new SkillDocument("good", "name: good\ndescription: good\nexecutor: sql\n")), false);
         assertThat(checked.issues()).anyMatch(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR);
         assertThat(checked.issues()).extracting(issue -> issue.sourceName())
-                .containsExactly("bad YAML", "bad REST");
+                .containsExactly("bad YAML", "bad executor");
         assertThat(checked.issues().get(1).skillName()).isEqualTo("default-broken");
         assertThat(checked.issues().get(1).fieldPath()).isEqualTo("model");
         assertThat(checked.definitions()).extracting(definition -> definition.manifest().getName())
@@ -286,7 +286,7 @@ class YamlSkillCatalogTests {
 
     @Test
     void suppliedDocumentsValidateIdentityAndReuseManifestRules() {
-        String valid = "name: one\ndescription: REST one\nexecutor: sql\nrbac_roles: [READER]\n";
+        String valid = "name: one\ndescription: executor one\nexecutor: sql\nrbac_roles: [READER]\n";
         YamlSkillCatalog catalog = new YamlSkillCatalog(new LoomspanProperties());
         catalog.loadSupplied(List.of(new SkillDocument("opaque label", valid),
                 new SkillDocument("SCHEME:untrusted", valid.replace("one", "two"))));
@@ -312,8 +312,8 @@ class YamlSkillCatalogTests {
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("duplicate skill name");
         assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("opaque label", "invalid: ["))))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("opaque label");
-        assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("rest source", valid + "model: model\n"))))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("rest source")
+        assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("executor source", valid + "model: model\n"))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("executor source")
                 .hasMessageContaining("field 'model'");
         assertThatThrownBy(() -> catalog.loadSupplied(List.of(new SkillDocument("model source", """
                 name: modelSkill

@@ -325,9 +325,12 @@ are untrusted diagnostic data, not server instructions. `sourcePath` is
 descriptive text only and is never a Console filesystem locator. Configured
 YAML supplies a file-derived path; application-supplied YAML supplies its exact
 logical `sourceName`, which need not look like a path. Skill summaries
-and details carry an explicit `source` (`YAML`, `REST`, or `JAVA`). YAML and REST entries have
-`sourcePath` and details include `yaml`; Java entries have `beanName` and a
-deterministic declared `method` signature. Inapplicable fields are omitted.
+and details carry execution `kind` (`YAML`, `JAVA`, or `TYPESAFE`) and
+`declaration` (`YAML` or `SKILL_METHOD`). YAML declarations have `sourcePath`
+and details include unchanged `yaml`, including executor-backed Java skills.
+Those executor leaves also expose qualified `executorName`, `beanName` and
+declared `method`; annotated Java methods expose bean/method provenance only.
+Inapplicable fields are omitted. Reference-only executors are absent from callable catalogs.
 The registered name remains the only lookup and navigation identity.
 
 The supported MCP revisions do not negotiate text-only versus

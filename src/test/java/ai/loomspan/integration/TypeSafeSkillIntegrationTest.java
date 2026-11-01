@@ -335,7 +335,7 @@ class TypeSafeSkillIntegrationTest {
                                                 .registeredSkillCatalog()
                                                 .find("default-judgment")
                                                 .orElseThrow();
-                                assertThat(entry.source()).isEqualTo("TYPESAFE");
+                                assertThat(entry.kind()).isEqualTo("TYPESAFE");
                                 assertThat(entry.yaml()).isEqualTo(leaf());
                                 assertThat(entry.sourcePath()).endsWith("judgment.yaml");
                                 assertThat(entry.beanName()).isNull();
@@ -649,7 +649,7 @@ class TypeSafeSkillIntegrationTest {
                                                         .registeredSkillCatalog()
                                                         .find("default-judgment")
                                                         .orElseThrow();
-                                        assertThat(supplied.source()).isEqualTo("TYPESAFE");
+                                        assertThat(supplied.kind()).isEqualTo("TYPESAFE");
                                         assertThat(supplied.sourcePath())
                                                 .isEqualTo(" opaque | Source ");
                                         assertThat(supplied.beanName()).isNull();

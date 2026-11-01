@@ -147,7 +147,7 @@ class JavaSkillLifecycleIntegrationTest {
 
                 invoker, SkillKind.JAVA, CapabilityToolDescriptor.generic(name, "Java test"),
 
-                new SkillSource(null, "testBean", name + "()"));
+                new SkillSource(null, "testBean", name + "()", null));
 
     }
 

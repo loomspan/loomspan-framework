@@ -31,18 +31,18 @@ type authTransport struct {
 func TestCompatible2025ProtocolInitializesListsAndCallsRealRuntimeTool(t *testing.T) {
 	const (
 		prePR28ToolsListResponseBytes  = 34371
-		expectedToolsListResponseBytes = 25184
+		expectedToolsListResponseBytes = 25596
 	)
 	credentials := fakeCredentials{state: mcpcredential.Snapshot{State: mcpcredential.Enabled, Generation: 4}, key: "secret"}
 	options := newMCPTestOptions(t, func(endpoint string) ([]byte, error) {
 		if strings.Contains(endpoint, "/skills?") {
-			return []byte(`{"items":[{"registeredName":"skill-☃","source": "YAML", "sourcePath":"nested/skill.yaml"}],"hasMore":false,"nextCursor":null,"observedAt":"2026-08-13T20:30:00Z"}`), nil
+			return []byte(`{"items":[{"registeredName":"skill-☃","kind":"YAML","declaration":"YAML", "sourcePath":"nested/skill.yaml"}],"hasMore":false,"nextCursor":null,"observedAt":"2026-08-13T20:30:00Z"}`), nil
 		}
 		if strings.Contains(endpoint, "/skills/") {
 			if strings.HasSuffix(endpoint, "/missing") {
 				return nil, &applicationclient.Failure{Kind: applicationclient.FailureNotFound}
 			}
-			return []byte(`{"registeredName":"skill-☃","source": "YAML", "sourcePath":"nested/skill.yaml","yaml":"name: skill-☃\n"}`), nil
+			return []byte(`{"registeredName":"skill-☃","kind":"YAML","declaration":"YAML", "sourcePath":"nested/skill.yaml","yaml":"name: skill-☃\n"}`), nil
 		}
 		return nil, fmt.Errorf("unexpected endpoint: %s", endpoint)
 	})
@@ -156,13 +156,13 @@ func TestStatelessStreamableHTTPInitializesListsAndCallsRuntime(t *testing.T) {
 	tracker := NewTracker()
 	options := newMCPTestOptions(t, func(endpoint string) ([]byte, error) {
 		if strings.Contains(endpoint, "/skills?") {
-			return []byte(`{"items":[{"registeredName":"skill-☃","source": "YAML", "sourcePath":"nested/skill.yaml"}],"hasMore":false,"nextCursor":null,"observedAt":"2026-08-13T20:30:00Z"}`), nil
+			return []byte(`{"items":[{"registeredName":"skill-☃","kind":"YAML","declaration":"YAML", "sourcePath":"nested/skill.yaml"}],"hasMore":false,"nextCursor":null,"observedAt":"2026-08-13T20:30:00Z"}`), nil
 		}
 		if strings.Contains(endpoint, "/skills/") {
 			if strings.HasSuffix(endpoint, "/missing") {
 				return nil, &applicationclient.Failure{Kind: applicationclient.FailureNotFound}
 			}
-			return []byte(`{"registeredName":"skill-☃","source": "YAML", "sourcePath":"nested/skill.yaml","yaml":"name: skill-☃\n"}`), nil
+			return []byte(`{"registeredName":"skill-☃","kind":"YAML","declaration":"YAML", "sourcePath":"nested/skill.yaml","yaml":"name: skill-☃\n"}`), nil
 		}
 		return nil, fmt.Errorf("unexpected endpoint: %s", endpoint)
 	})

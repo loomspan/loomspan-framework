@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 class ExecutorDependencyResolutionTest {
     static SkillExecutorRegistration executor(String name, String path) {
         return new SkillExecutorRegistration(SkillIdentity.parse(name), path, SkillAccessPolicy.unrestricted(),
-                new SkillSource(null, "bean", "run"), invocation -> "unused");
+                new SkillSource(null, "bean", "run", null), invocation -> "unused");
     }
     static SkillGenerationManager manager(List<SkillExecutorRegistration> registrations, Map<String, Object> startup) {
         return manager(registrations, startup, new SkillInputContractResolver());
@@ -111,6 +111,13 @@ class ExecutorDependencyResolutionTest {
             var retained = manager.validateAdmission(capture.snapshot());
             var view = manager.capturePreparation("caller");
             var candidate = manager.prepare(view, List.of(leaf("leaf", "infra-run")), new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE, null);
+            var provenance = candidate.registeredSkillCatalog().find("caller-leaf").orElseThrow();
+            assertThat(provenance.kind()).isEqualTo("JAVA");
+            assertThat(provenance.declaration()).isEqualTo("YAML");
+            assertThat(provenance.executorName()).isEqualTo("infra-run");
+            assertThat(provenance.beanName()).isEqualTo("bean");
+            assertThat(provenance.method()).isEqualTo("run");
+            assertThat(provenance.sourcePath()).isEqualTo("leaf");
             var replacement = publish(manager, "infra", List.of(), "loomspan: {executor-config: {infra: {settings: {version: 2}}}}", NamespaceVisibility.PRIVATE);
             assertThat(retired).doesNotContain(old.id());
             SkillGenerationManager.dispatch(manager.publish(candidate, view.baseId()));
@@ -120,6 +127,8 @@ class ExecutorDependencyResolutionTest {
             SkillGenerationManager.dispatch(manager.remove("infra", replacement.id()));
             assertThatThrownBy(() -> admit(manager, "caller-leaf")).hasMessageContaining("No active namespace");
             var recreated = publish(manager, "infra", List.of(), "loomspan: {executor-config: {infra: {settings: {version: 3}}}}", NamespaceVisibility.PUBLIC);
+            assertThat(candidate.registeredSkillCatalog().find("caller-leaf").orElseThrow()).isEqualTo(provenance);
+            assertThat(provenance.yaml()).contains("executor: infra-run");
             var fresh = admit(manager, "caller-leaf").executorBinding("caller-leaf");
             assertThat(fresh.generationId()).isEqualTo(recreated.id());
             assertThat(fresh.configuration()).containsEntry("version", 3);
@@ -214,10 +223,10 @@ class ExecutorDependencyResolutionTest {
         for (boolean oldAllows : List.of(false,true)) {
             var calls = new java.util.concurrent.atomic.AtomicInteger();
             var oldRegistration = new SkillExecutorRegistration(SkillIdentity.parse("infra-run"), "",
-                    SkillAccessPolicy.roles(List.of(oldAllows ? "WRITE" : "OTHER")), new SkillSource(null,"old","run"),
+                    SkillAccessPolicy.roles(List.of(oldAllows ? "WRITE" : "OTHER")), new SkillSource(null,"old","run", null),
                     invocation -> { calls.incrementAndGet(); return "old"; });
             var newRegistration = new SkillExecutorRegistration(SkillIdentity.parse("infra-run"), "",
-                    SkillAccessPolicy.roles(List.of(oldAllows ? "OTHER" : "WRITE")), new SkillSource(null,"new","run"),
+                    SkillAccessPolicy.roles(List.of(oldAllows ? "OTHER" : "WRITE")), new SkillSource(null,"new","run", null),
                     invocation -> { calls.incrementAndGet(); return "new"; });
             var manager = manager(List.of(oldRegistration),Map.of());
             try {

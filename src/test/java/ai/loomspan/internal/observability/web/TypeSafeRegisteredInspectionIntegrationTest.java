@@ -51,13 +51,15 @@ class TypeSafeRegisteredInspectionIntegrationTest {
         assertThat(summary.size()).isEqualTo(1);
         var item = summary.get(0);
         assertThat(item.path("registeredName").asText()).isEqualTo("default-judgment");
-        assertThat(item.path("source").asText()).isEqualTo("TYPESAFE");
+        assertThat(item.path("kind").asText()).isEqualTo("TYPESAFE");
+        assertThat(item.path("declaration").asText()).isEqualTo("YAML");
         assertThat(item.path("sourcePath").asText()).isEqualTo(location).isNotBlank();
         for (String omitted : List.of("yaml", "outputSchema", "beanName", "method")) assertThat(item.has(omitted)).isFalse();
         var detail = JSON.readTree(mvc.perform(get(ObservabilityApiPaths.SKILLS + "/default-judgment")
                 .header(ObservabilityApiKeyFilter.API_KEY_HEADER, KEY)).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
-        assertThat(detail.path("source").asText()).isEqualTo("TYPESAFE");
+        assertThat(detail.path("kind").asText()).isEqualTo("TYPESAFE");
+        assertThat(detail.path("declaration").asText()).isEqualTo("YAML");
         assertThat(detail.path("sourcePath").asText()).isEqualTo(location);
         assertThat(detail.path("yaml").asText()).isEqualTo(yaml);
         assertThat(detail.path("outputSchema").asText()).isEqualTo(reloader.snapshot("default").skill("default-judgment").orElseThrow().outputSchema());

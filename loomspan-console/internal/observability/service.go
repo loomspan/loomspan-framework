@@ -283,17 +283,30 @@ func validateSkillSummary(skill SkillSummary) error {
 	if strings.TrimSpace(skill.RegisteredName) == "" {
 		return errors.New("skill identity is missing")
 	}
-	switch skill.Source {
-	case "YAML", "REST", "TYPESAFE":
-		if strings.TrimSpace(skill.SourcePath) == "" || skill.BeanName != "" || skill.Method != "" {
-			return fmt.Errorf("%s skill requires sourcePath and must not contain Java locations", skill.Source)
+	if skill.Kind != "YAML" && skill.Kind != "TYPESAFE" && skill.Kind != "JAVA" {
+		return errors.New("invalid skill kind")
+	}
+	switch skill.Declaration {
+	case "YAML":
+		if strings.TrimSpace(skill.SourcePath) == "" {
+			return errors.New("YAML declaration requires sourcePath")
 		}
-	case "JAVA":
-		if strings.TrimSpace(skill.BeanName) == "" || strings.TrimSpace(skill.Method) == "" || skill.SourcePath != "" {
-			return errors.New("Java skill requires beanName and method and must not contain sourcePath")
+		if skill.Kind == "JAVA" {
+			if strings.TrimSpace(skill.ExecutorName) == "" {
+				return errors.New("executor declaration requires executorName")
+			}
+		} else if skill.ExecutorName != "" || skill.BeanName != "" || skill.Method != "" {
+			return errors.New("model declaration forbids Java locations")
+		}
+	case "SKILL_METHOD":
+		if skill.Kind != "JAVA" || skill.SourcePath != "" || skill.ExecutorName != "" {
+			return errors.New("invalid SkillMethod declaration")
 		}
 	default:
-		return errors.New("skill source must be YAML, REST, TYPESAFE or JAVA")
+		return errors.New("invalid skill declaration")
+	}
+	if skill.Kind == "JAVA" && (strings.TrimSpace(skill.BeanName) == "" || strings.TrimSpace(skill.Method) == "") {
+		return errors.New("Java execution requires beanName and method")
 	}
 	return nil
 }
@@ -306,17 +319,17 @@ func validateSkillDetail(skill SkillDetail, requestedName string) error {
 		}
 	}
 	if err := validateSkillSummary(SkillSummary{RegisteredName: skill.RegisteredName,
-		Source: skill.Source, SourcePath: skill.SourcePath, BeanName: skill.BeanName, Method: skill.Method}); err != nil {
+		Kind: skill.Kind, Declaration: skill.Declaration, ExecutorName: skill.ExecutorName, SourcePath: skill.SourcePath, BeanName: skill.BeanName, Method: skill.Method}); err != nil {
 		return err
 	}
 	if skill.RegisteredName != requestedName {
 		return errors.New("registered name does not match the requested resource")
 	}
-	if (skill.Source == "YAML" || skill.Source == "REST" || skill.Source == "TYPESAFE") && skill.Yaml == "" {
+	if skill.Declaration == "YAML" && skill.Yaml == "" {
 		return errors.New("skill YAML is missing")
 	}
-	if skill.Source == "JAVA" && skill.Yaml != "" {
-		return errors.New("Java skill must not contain YAML")
+	if skill.Declaration == "SKILL_METHOD" && skill.Yaml != "" {
+		return errors.New("SkillMethod declaration must not contain YAML")
 	}
 	return nil
 }

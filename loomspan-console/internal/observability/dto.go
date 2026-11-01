@@ -22,7 +22,9 @@ type InstanceStatus struct {
 
 type SkillSummary struct {
 	RegisteredName string `json:"registeredName"`
-	Source         string `json:"source"`
+	Kind           string `json:"kind"`
+	Declaration    string `json:"declaration"`
+	ExecutorName   string `json:"executorName,omitempty"`
 	SourcePath     string `json:"sourcePath,omitempty"`
 	BeanName       string `json:"beanName,omitempty"`
 	Method         string `json:"method,omitempty"`
@@ -32,7 +34,9 @@ type SkillSummary struct {
 type SkillDetail struct {
 	TargetScopeID  string  `json:"targetScopeId"`
 	RegisteredName string  `json:"registeredName"`
-	Source         string  `json:"source"`
+	Kind           string  `json:"kind"`
+	Declaration    string  `json:"declaration"`
+	ExecutorName   string  `json:"executorName,omitempty"`
 	SourcePath     string  `json:"sourcePath,omitempty"`
 	BeanName       string  `json:"beanName,omitempty"`
 	Method         string  `json:"method,omitempty"`
@@ -135,14 +139,17 @@ type ListRequest struct {
 }
 
 // Reject source-inapplicable fields even when an upstream sends an empty value.
-func validateSkillWireFields(data []byte, source string, detail bool) error {
+func validateSkillWireFields(data []byte, kind, declaration string, detail bool) error {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
-	forbidden := []string{"beanName", "method"}
-	if source == "JAVA" {
-		forbidden = []string{"sourcePath", "yaml"}
+	forbidden := []string{"source"}
+	if kind != "JAVA" {
+		forbidden = append(forbidden, "beanName", "method", "executorName")
+	}
+	if declaration == "SKILL_METHOD" {
+		forbidden = append(forbidden, "sourcePath", "yaml", "executorName")
 	}
 	if !detail {
 		forbidden = append(forbidden, "yaml", "outputSchema")
@@ -165,7 +172,7 @@ func (skill *SkillSummary) UnmarshalJSON(data []byte) error {
 	if err := validateSkillSummary(candidate); err != nil {
 		return err
 	}
-	if err := validateSkillWireFields(data, candidate.Source, false); err != nil {
+	if err := validateSkillWireFields(data, candidate.Kind, candidate.Declaration, false); err != nil {
 		return err
 	}
 	*skill = candidate
@@ -182,7 +189,7 @@ func (skill *SkillDetail) UnmarshalJSON(data []byte) error {
 	if err := validateSkillDetail(candidate, candidate.RegisteredName); err != nil {
 		return err
 	}
-	if err := validateSkillWireFields(data, candidate.Source, true); err != nil {
+	if err := validateSkillWireFields(data, candidate.Kind, candidate.Declaration, true); err != nil {
 		return err
 	}
 	*skill = candidate

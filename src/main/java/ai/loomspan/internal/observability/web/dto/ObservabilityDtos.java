@@ -32,19 +32,19 @@ public final class ObservabilityDtos
             Duration traceCatalogMetadataTtl) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record SkillSummary(String registeredName, String source, String sourcePath, String beanName, String method, String href)
+    public record SkillSummary(String registeredName, String kind, String declaration, String sourcePath, String executorName, String beanName, String method, String href)
     {
         public SkillSummary
         {
-            RegisteredSkillEntry.validateLocation(registeredName, source, sourcePath, beanName, method);
+            RegisteredSkillEntry.validateLocation(registeredName, kind, declaration, sourcePath, executorName, beanName, method);
         }
     }
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record SkillDetail(String registeredName, String source, String sourcePath, String beanName, String method, String yaml, @JsonInclude(JsonInclude.Include.ALWAYS) String outputSchema)
+    public record SkillDetail(String registeredName, String kind, String declaration, String sourcePath, String executorName, String beanName, String method, String yaml, @JsonInclude(JsonInclude.Include.ALWAYS) String outputSchema)
     {
         public SkillDetail
         {
-            new RegisteredSkillEntry(registeredName, source, sourcePath, beanName, method, yaml, outputSchema);
+            new RegisteredSkillEntry(registeredName, kind, declaration, sourcePath, executorName, beanName, method, yaml, outputSchema);
         }
     }
     public record FramePathEntry(String frameId, TraceFrameType frameType, String route)

@@ -16,11 +16,11 @@ Catalogs describe one callable skill with its actual execution kind and declarat
 
 ## Acceptance criteria
 
-- [ ] Both Java forms are classified JAVA in public/diagnostic catalogs, while reference-only executors are absent from callable surfaces. Same-name callable/executor identities remain unambiguous.
-- [ ] Console skill details show unchanged executor-leaf YAML/source information plus executor identity and Java implementation; SkillMethod, model-backed YAML, and TypeSafe provenance still render correctly.
-- [ ] Framework, Go service/DTO validation, browser/MCP outputs and schemas, TypeScript contracts/UI, and current fixtures agree on provenance and classification. Tests reject obsolete assumptions that Java execution forbids YAML.
-- [ ] REST skill-kind/provenance branches and compatibility mappings are absent from current contracts/fixtures. `CapabilityKind` removal or concrete distinct-behavior justification remains traceable; no duplicate classification is reintroduced.
-- [ ] Relevant Java/Go/Console contract and fixture checks, supported-surface architecture checks for production type changes, and documentation updates pass. The exact-version compatibility-marker assessment is recorded.
+- [x] Both Java forms are classified JAVA in public/diagnostic catalogs, while reference-only executors are absent from callable surfaces. Same-name callable/executor identities remain unambiguous.
+- [x] Console skill details show unchanged executor-leaf YAML/source information plus executor identity and Java implementation; SkillMethod, model-backed YAML, and TypeSafe provenance still render correctly.
+- [x] Framework, Go service/DTO validation, browser/MCP outputs and schemas, TypeScript contracts/UI, and current fixtures agree on provenance and classification. Tests reject obsolete assumptions that Java execution forbids YAML.
+- [x] REST skill-kind/provenance branches and compatibility mappings are absent from current contracts/fixtures. `CapabilityKind` removal or concrete distinct-behavior justification remains traceable; no duplicate classification is reintroduced.
+- [x] Relevant Java/Go/Console contract and fixture checks, supported-surface architecture checks for production type changes, and documentation updates pass. The exact-version compatibility-marker assessment is recorded.
 
 ## Context and sequencing
 

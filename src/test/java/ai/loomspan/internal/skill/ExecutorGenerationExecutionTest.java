@@ -33,6 +33,26 @@ class ExecutorGenerationExecutionTest {
         assertThat(candidate.capability("default-leaf").kind().toString()).contains("JAVA");
         assertThat(candidate.definition("default-leaf").config()).containsEntry("operation", "echo");
         assertThat(candidate.definition("default-leaf").source().bytes()).isEqualTo(yaml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var detail = candidate.registeredSkillCatalog().find("default-leaf").orElseThrow();
+        assertThat(detail.kind()).isEqualTo("JAVA");
+        assertThat(detail.declaration()).isEqualTo("YAML");
+        assertThat(detail.executorName()).isEqualTo("default-run");
+        assertThat(detail.beanName()).isEqualTo("executor");
+        assertThat(detail.method()).contains("ExecutorBean.run(");
+        assertThat(detail.yaml()).isEqualTo(yaml);
+        assertThat(detail.sourcePath()).isEqualTo("leaf.yml");
+        assertThat(candidate.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("default-leaf");
+        assertThat(candidate.registeredSkillCatalog().find("default-run")).isEmpty();
+        var sameName = manager.prepare(manager.capturePreparation("default"),
+                List.of(new SkillDocument("opaque label", "# authored\r\nname: run\r\ndescription: leaf\r\nexecutor: default-run\r\n")),
+                new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE, null);
+        assertThat(sameName.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("default-run");
+        assertThat(sameName.registeredSkillCatalog().registeredSkillCount()).isOne();
+        var sameDetail = sameName.registeredSkillCatalog().find("default-run").orElseThrow();
+        assertThat(sameDetail.executorName()).isEqualTo("default-run");
+        assertThat(sameDetail.sourcePath()).isEqualTo("opaque label");
+        assertThat(sameDetail.yaml()).startsWith("# authored\r\n");
+        sameName.close();
         assertThat(bean.calls).isZero();
         candidate.close();
         manager.destroy();

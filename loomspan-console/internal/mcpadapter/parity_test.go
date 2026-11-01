@@ -4,15 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/live"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // WF-X-R7/WF-SP-R7/WF-SP-R9: browser responses serialize the shared
@@ -22,7 +25,7 @@ func TestBrowserAndMCPPreserveSameSkillFacts(t *testing.T) {
 	schema := "{ \"type\": \"object\", \"description\": \"<schema>\" }"
 	browserFact := observability.SkillDetail{
 		OutputSchema:   &schema,
-		RegisteredName: "skill-☃", Source: "TYPESAFE", SourcePath: `opaque <label>`,
+		RegisteredName: "skill-☃", Kind: "TYPESAFE", Declaration: "YAML", SourcePath: `opaque <label>`,
 		Yaml: "name: skill-☃\ntypesafe:\n  state: preserved\n  questions:\n    ready: {type: noul, instructions: Ready?}\n",
 	}
 	body, err := json.Marshal(browserFact)
@@ -35,7 +38,7 @@ func TestBrowserAndMCPPreserveSameSkillFacts(t *testing.T) {
 		t.Fatalf("envelope=%#v err=%v", envelope, err)
 	}
 	mcpFact := envelope.Result.Skill
-	if mcpFact.Source != browserFact.Source || mcpFact.RegisteredName != browserFact.RegisteredName || mcpFact.SourcePath != browserFact.SourcePath || mcpFact.YAML != browserFact.Yaml || mcpFact.OutputSchema == nil || *mcpFact.OutputSchema != schema {
+	if mcpFact.Kind != browserFact.Kind || mcpFact.RegisteredName != browserFact.RegisteredName || mcpFact.SourcePath != browserFact.SourcePath || mcpFact.YAML != browserFact.Yaml || mcpFact.OutputSchema == nil || *mcpFact.OutputSchema != schema {
 		t.Fatalf("browser=%#v MCP=%#v", browserFact, mcpFact)
 	}
 	if envelope.Result.ObservedAt != options.Now().UTC() {
@@ -44,7 +47,7 @@ func TestBrowserAndMCPPreserveSameSkillFacts(t *testing.T) {
 }
 
 func TestBrowserAndMCPPreserveNativeSummaryFacts(t *testing.T) {
-	body := []byte(`{"items":[{"registeredName":"native","source":"TYPESAFE","sourcePath":" opaque ../ Native: <label> "}],"hasMore":false,"nextCursor":null,"observedAt":"2026-10-11T00:00:00Z"}`)
+	body := []byte(`{"items":[{"registeredName":"native","kind":"TYPESAFE","declaration":"YAML","sourcePath":" opaque ../ Native: <label> "}],"hasMore":false,"nextCursor":null,"observedAt":"2026-10-11T00:00:00Z"}`)
 	options := newMCPTestOptions(t, func(string) ([]byte, error) { return body, nil })
 	_, envelope, err := handleListSkills(context.Background(), options, listSkillsInput{})
 	if err != nil || envelope.Result == nil {
@@ -54,7 +57,7 @@ func TestBrowserAndMCPPreserveNativeSummaryFacts(t *testing.T) {
 		t.Fatalf("unexpected items: %#v", envelope.Result.Items)
 	}
 	item := envelope.Result.Items[0]
-	if item.Source != "TYPESAFE" || item.RegisteredName != "native" || item.SourcePath != " opaque ../ Native: <label> " {
+	if item.Kind != "TYPESAFE" || item.RegisteredName != "native" || item.SourcePath != " opaque ../ Native: <label> " {
 		t.Fatalf("summary changed: %#v", item)
 	}
 	encoded, err := json.Marshal(item)
@@ -176,11 +179,78 @@ func TestBrowserAndMCPPreserveJavaSkillFixture(t *testing.T) {
 		t.Fatalf("envelope=%#v err=%v", envelope, err)
 	}
 	got := envelope.Result.Skill
-	if got.Source != browser.Source || got.RegisteredName != browser.RegisteredName || got.BeanName != browser.BeanName || got.Method != browser.Method || got.YAML != "" || got.SourcePath != "" {
+	if got.Kind != browser.Kind || got.RegisteredName != browser.RegisteredName || got.BeanName != browser.BeanName || got.Method != browser.Method || got.YAML != "" || got.SourcePath != "" {
 		t.Fatalf("browser=%#v MCP=%#v", browser, got)
 	}
 	validateTypedEnvelope(t, "skill-detail", skillDetailOutputSchema(), *envelope.Result)
 	if text == nil {
 		t.Fatal("missing Java diagnostic text")
+	}
+}
+
+func TestAllCallableFormsPreserveProvenanceAndRejectInvalidContracts(t *testing.T) {
+	for _, fixture := range []string{"skill-detail.json", "skill-typesafe-detail.json", "skill-java-detail.json", "skill-executor-detail.json"} {
+		t.Run(fixture, func(t *testing.T) {
+			body, err := os.ReadFile(filepath.Join("..", "..", "..", "loomspan-console-fixtures", "application-rest", fixture))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var browser observability.SkillDetail
+			if err := json.Unmarshal(body, &browser); err != nil {
+				t.Fatal(err)
+			}
+			options := newMCPTestOptions(t, func(string) ([]byte, error) { return body, nil })
+			result, envelope, err := handleGetSkill(context.Background(), options, getSkillInput{RegisteredName: browser.RegisteredName})
+			if err != nil || envelope.Result == nil {
+				t.Fatalf("result=%#v err=%v", envelope, err)
+			}
+			got := envelope.Result.Skill
+			if got.Kind != browser.Kind || got.Declaration != browser.Declaration || got.ExecutorName != browser.ExecutorName || got.SourcePath != browser.SourcePath || got.BeanName != browser.BeanName || got.Method != browser.Method || got.YAML != browser.Yaml {
+				t.Fatalf("browser=%#v MCP=%#v", browser, got)
+			}
+			validateTypedEnvelope(t, "skill-detail", skillDetailOutputSchema(), *envelope.Result)
+			text := result.Content[0].(*mcp.TextContent).Text
+			if browser.Declaration == "YAML" && !strings.Contains(text, "yaml:\n"+browser.Yaml) {
+				t.Fatalf("source changed: %s", text)
+			}
+			if browser.ExecutorName != "" && (!strings.Contains(text, browser.ExecutorName) || !strings.Contains(text, browser.BeanName) || !strings.Contains(text, browser.Method)) {
+				t.Fatalf("missing implementation: %s", text)
+			}
+			var fields map[string]any
+			if err := json.Unmarshal(body, &fields); err != nil {
+				t.Fatal(err)
+			}
+			checkInvalid := func(field string, value any) {
+				t.Helper()
+				changed := maps.Clone(fields)
+				changed[field] = value
+				encoded, _ := json.Marshal(changed)
+				var decoded observability.SkillDetail
+				if json.Unmarshal(encoded, &decoded) == nil {
+					t.Fatalf("accepted malformed DTO: %s", encoded)
+				}
+				if validateCompactInstance(t, skillSourceSchema(true), changed) == nil {
+					t.Fatalf("accepted malformed schema: %s", encoded)
+				}
+			}
+			checkInvalid("kind", "REST")
+			checkInvalid("declaration", "UNKNOWN")
+			checkInvalid("kind", nil)
+			checkInvalid("declaration", nil)
+			forbidden := []string{"executorName", "beanName", "method"}
+			if browser.Declaration == "SKILL_METHOD" {
+				forbidden = []string{"sourcePath", "yaml", "executorName"}
+			}
+			if browser.Kind == "JAVA" && browser.Declaration == "YAML" {
+				forbidden = nil
+				checkInvalid("executorName", "")
+				checkInvalid("beanName", nil)
+				checkInvalid("method", "")
+			}
+			for _, field := range forbidden {
+				checkInvalid(field, nil)
+				checkInvalid(field, "")
+			}
+		})
 	}
 }

@@ -246,7 +246,7 @@ test("trace plans request whole authoritative plan pages", async () => {
 
 test("get skill detail sends registeredName in body", async () => {
   const fetch = vi.fn().mockResolvedValue(
-    new Response(JSON.stringify({ registeredName: "MySkill", source: "YAML", sourcePath: "/path", yaml: "key: value" }), {
+    new Response(JSON.stringify({ registeredName: "MySkill", kind: "YAML", declaration: "YAML", sourcePath: "/path", yaml: "key: value" }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     }),

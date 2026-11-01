@@ -73,3 +73,10 @@ Task-level plan content is available only after finalized trace resolution and
 `LOOMSPAN_query_trace_plans`; it remains model-authored untrusted evidence.
 Selected raw plan-record content is an exact-forensics path, not the ordinary
 task-purpose source.
+
+## Callable skill provenance
+
+Execution kind and declaration provenance are independent diagnostic facts.
+Executor-backed YAML uses Java execution while retaining authored source and
+resolved Java implementation; reference-only registrations are absent from callable
+catalogs. See [skill result fields](mcp-tool-guide.md#callable-skill-provenance).

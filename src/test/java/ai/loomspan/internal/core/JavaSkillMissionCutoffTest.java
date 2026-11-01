@@ -147,7 +147,7 @@ class JavaSkillMissionCutoffTest
         var registry = new TestCapabilityRegistry();
         registry.register("default-javaRoot", new CapabilityMetadata("default-javaRoot", "default-javaRoot", "Java work",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), invoker, SkillKind.JAVA,
-                CapabilityToolDescriptor.generic("default-javaRoot", "Java work"), new SkillSource(null, "bean", "work()")));
+                CapabilityToolDescriptor.generic("default-javaRoot", "Java work"), new SkillSource(null, "bean", "work()", null)));
         var state = new DefaultExecutionStateService(Clock.systemUTC());
         MissionExecutionEngine noModel = (s,d,o,i,m,t,p,a) -> { throw new AssertionError("Java dispatched model work"); };
         var generation = registry.generation();

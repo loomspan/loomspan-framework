@@ -47,22 +47,24 @@ class ObservabilityJsonCodecContractTest
     void skillDetailsRoundTripWithOnlyApplicableSourceFields() throws Exception
     {
         var java = new ai.loomspan.internal.observability.web.dto.ObservabilityDtos.SkillDetail(
-                "Lookup", "JAVA", null, "lookupBean", "example.Lookup.find(java.lang.String)", null, null);
+                "Lookup", "JAVA", "SKILL_METHOD", null, null, "lookupBean", "example.Lookup.find(java.lang.String)", null, null);
         String encoded = new String(codec.write(java), StandardCharsets.UTF_8);
-        assertThat(encoded).contains("\"source\":\"JAVA\"", "\"beanName\":\"lookupBean\"")
+        assertThat(encoded).contains("\"kind\":\"JAVA\"", "\"declaration\":\"SKILL_METHOD\"", "\"beanName\":\"lookupBean\"")
                 .doesNotContain("sourcePath", "yaml");
         assertThat(codec.read(encoded.getBytes(StandardCharsets.UTF_8), java.getClass())).isEqualTo(java);
     }
 
     @Test
-    void rejectsMissingUnknownAndInconsistentSkillSources()
+    void rejectsMissingUnknownAndInconsistentSkillProvenance()
     {
         for (String value : new String[] {
                 "{\"registeredName\":\"Lookup\",\"sourcePath\":\"a.yaml\",\"yaml\":\"name: Lookup\"}",
-                "{\"registeredName\":\"Lookup\",\"source\":\"OTHER\"}",
-                "{\"registeredName\":\"Lookup\",\"source\":\"JAVA\",\"beanName\":\"bean\"}",
-                "{\"registeredName\":\"Lookup\",\"source\":\"JAVA\",\"beanName\":\"bean\",\"method\":\"lookup()\",\"yaml\":\"invalid\"}",
-                "{\"registeredName\":\"Lookup\",\"source\":\"YAML\",\"sourcePath\":\"a.yaml\",\"beanName\":\"bean\",\"yaml\":\"x\"}" })
+                "{\"registeredName\":\"Lookup\",\"kind\":\"OTHER\",\"declaration\":\"YAML\"}",
+                "{\"registeredName\":\"Lookup\",\"kind\":\"REST\",\"declaration\":\"YAML\",\"sourcePath\":\"a.yaml\",\"yaml\":\"x\"}",
+                "{\"registeredName\":\"Lookup\",\"kind\":\"JAVA\",\"declaration\":\"SKILL_METHOD\",\"beanName\":\"bean\"}",
+                "{\"registeredName\":\"Lookup\",\"kind\":\"JAVA\",\"declaration\":\"SKILL_METHOD\",\"beanName\":\"bean\",\"method\":\"lookup()\",\"yaml\":\"invalid\"}",
+                "{\"registeredName\":\"Lookup\",\"kind\":\"YAML\",\"declaration\":\"YAML\",\"sourcePath\":\"a.yaml\",\"beanName\":\"bean\",\"yaml\":\"x\"}",
+                "{\"registeredName\":\"Lookup\",\"kind\":\"JAVA\",\"declaration\":\"YAML\",\"sourcePath\":\"a.yaml\",\"beanName\":\"bean\",\"method\":\"lookup()\",\"yaml\":\"executor: run\"}" })
         {
             assertThatThrownBy(() -> codec.read(value.getBytes(StandardCharsets.UTF_8),
                     ai.loomspan.internal.observability.web.dto.ObservabilityDtos.SkillDetail.class))

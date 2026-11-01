@@ -208,7 +208,7 @@ class SkillReloaderTest {
         var registrations=new ArrayList<SkillExecutorRegistration>();
         for (String namespace: List.of("a", "b")) registrations.add(new SkillExecutorRegistration(
                 new SkillIdentity(namespace, "fixture"), "", ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),
-                new SkillSource(null, "fixture", "execute"), invocation -> {invocations.incrementAndGet(); return "ok";}));
+                new SkillSource(null, "fixture", "execute", null), invocation -> {invocations.incrementAndGet(); return "ok";}));
         when(processor.executors()).thenReturn(registrations);
         var properties=new LoomspanProperties();properties.getSkills().setLocations(List.of("classpath:/publication-no-files/*.yaml"));
         var manager=new SkillGenerationManager(processor,()->new YamlSkillCatalog(properties),new SkillInputContractResolver());

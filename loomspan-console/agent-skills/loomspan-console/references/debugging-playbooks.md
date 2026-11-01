@@ -5,7 +5,7 @@ These playbooks define goals and stopping conditions, not exact tool sequences.
 ## WF-TYPESAFE-EVALUATION
 
 Discover the registered leaf through `LOOMSPAN_list_skills`, then inspect its
-`LOOMSPAN_get_skill` detail for `TYPESAFE` source, original YAML, location and
+`LOOMSPAN_get_skill` detail for `kind: TYPESAFE` and `declaration: YAML`, original YAML, location and
 descriptive output schema. Opaque supplied source labels are not filesystem
 provenance; TypeSafe entries have no Java bean/method location.
 Resolve the execution's trace and frame, then query request/response/failure

@@ -25,7 +25,7 @@ class ExecutorConfigurationManagerTests {
         var invocations = new AtomicInteger();
         when(javaSkills.executors()).thenReturn(List.of(new ai.loomspan.internal.core.SkillExecutorRegistration(
                 new ai.loomspan.internal.core.SkillIdentity("sales", "fixture"), "", ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),
-                new ai.loomspan.internal.core.SkillSource(null, "bean", "execute"), invocation -> { invocations.incrementAndGet(); return "unused"; })));
+                new ai.loomspan.internal.core.SkillSource(null, "bean", "execute", null), invocation -> { invocations.incrementAndGet(); return "unused"; })));
         var captured = new ArrayList<ExecutorConfiguration>();
         var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties),
                 new SkillInputContractResolver(), properties, new StandardEnvironment(), (config, policy) -> {

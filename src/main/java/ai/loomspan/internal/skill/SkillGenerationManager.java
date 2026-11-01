@@ -248,7 +248,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
                     definition.form() == YamlSkillDefinition.Form.EXECUTOR ? SkillKind.JAVA
                             : definition.typesafe() ? SkillKind.TYPESAFE : SkillKind.YAML,
                     new CapabilityToolDescriptor(name, description, inputs.toJsonSchema(contract), checked.outputSchemas().get(name)),
-                    contract, new SkillSource(definition.source().diagnosticName(), null, null));
+                    contract, diagnosticSource(definition, checked));
             putCapability(capabilities, metadata);
         }
         ExecutionRuntime runtime = runtimeFactory == null ? null : runtimeFactory.apply(properties, policy);
@@ -257,6 +257,15 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
                         .collect(java.util.stream.Collectors.toMap(ai.loomspan.internal.core.SkillExecutorRegistration::name, registration -> registration)),
                 properties.getExecutorConfig().namespaces().getOrDefault(checked.namespace(), Map.of())); }
         catch (RuntimeException | Error ex) { if (runtime != null) runtime.close(); throw ex; }
+    }
+
+    private static SkillSource diagnosticSource(YamlSkillDefinition definition, SkillDependencyValidator.CheckedSet checked)
+    {
+        if (definition.form() != YamlSkillDefinition.Form.EXECUTOR)
+            return new SkillSource(definition.source().diagnosticName(), null, null, null);
+        var registration = checked.executorBindings().get(definition.identity().toString()).registration();
+        return new SkillSource(definition.source().diagnosticName(), registration.source().beanName(),
+                registration.source().method(), registration.name());
     }
 
     /** The caller dispatches the returned notification only after leaving publication locks. */

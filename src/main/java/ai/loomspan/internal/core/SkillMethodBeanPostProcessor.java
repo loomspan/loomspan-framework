@@ -204,7 +204,7 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
         SkillIdentity identity = identity(beanName, method, annotation.namespace(), annotation.name(), "SkillExecutor");
         var policy = new ai.loomspan.internal.security.SkillAccessPolicyResolver().resolve(method, targetClass);
         var registration = new SkillExecutorRegistration(identity, annotation.config(), policy,
-                new SkillSource(null, beanName, method.toGenericString()),
+                new SkillSource(null, beanName, method.toGenericString(), null),
                 invocation -> javaInvoker.invoke(beanFactory, beanName, method, contract, identity.toString(),
                         new Object[] { Objects.requireNonNull(invocation, "invocation must not be null") }));
         var existing = executorsByName.putIfAbsent(identity.toString(), registration);
@@ -229,7 +229,7 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
                 SkillExecutionDescriptor.none(), policy, invoker, SkillKind.JAVA,
                 new CapabilityToolDescriptor(name, capabilityDescription, inputSchema, null),
                 inputContractResolver.resolveJavaCapability(inputSchema),
-                new SkillSource(null, beanName, method.toGenericString()));
+                new SkillSource(null, beanName, method.toGenericString(), null));
         CapabilityMetadata existing = capabilitiesByName.putIfAbsent(name, metadata);
         if (existing != null)
         {

@@ -122,21 +122,14 @@ export type InstanceStatus = {
 };
 
 type SkillLocation =
-  | { source: "YAML"; sourcePath: string; beanName?: never; method?: never }
-  | { source: "REST"; sourcePath: string; beanName?: never; method?: never }
-  | { source: "TYPESAFE"; sourcePath: string; beanName?: never; method?: never }
-  | { source: "JAVA"; sourcePath?: never; beanName: string; method: string };
+  | { kind: "YAML" | "TYPESAFE"; declaration: "YAML"; sourcePath: string; executorName?: never; beanName?: never; method?: never }
+  | { kind: "JAVA"; declaration: "YAML"; sourcePath: string; executorName: string; beanName: string; method: string }
+  | { kind: "JAVA"; declaration: "SKILL_METHOD"; sourcePath?: never; executorName?: never; beanName: string; method: string };
 
-export type SkillSummary = SkillLocation & {
-  registeredName: string;
-  href?: string;
-};
-
+export type SkillSummary = SkillLocation & { registeredName: string; href?: string };
 export type SkillDetail = { targetScopeId: string; registeredName: string; outputSchema: string | null } & (
-  | { source: "YAML"; sourcePath: string; yaml: string; beanName?: never; method?: never }
-  | { source: "REST"; sourcePath: string; yaml: string; beanName?: never; method?: never }
-  | { source: "TYPESAFE"; sourcePath: string; yaml: string; beanName?: never; method?: never }
-  | { source: "JAVA"; beanName: string; method: string; sourcePath?: never; yaml?: never }
+  | (Extract<SkillLocation, { declaration: "YAML" }> & { yaml: string })
+  | (Extract<SkillLocation, { declaration: "SKILL_METHOD" }> & { yaml?: never })
 );
 
 export type FramePathEntry = {

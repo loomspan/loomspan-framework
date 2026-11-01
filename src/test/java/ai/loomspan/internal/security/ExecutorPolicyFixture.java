@@ -13,9 +13,10 @@ record ExecutorPolicyFixture(CapabilityMetadata capability, SkillAdmissionSnapsh
                 new org.springframework.core.io.FileSystemResource("leaf.yaml"), manifest, null);
         var capability = new CapabilityMetadata("yaml:caller-leaf", "caller-leaf", "leaf", null, yaml,
                 arguments -> { throw new AssertionError("Metadata checks must not invoke business code"); },
-                SkillKind.JAVA, CapabilityToolDescriptor.generic("caller-leaf", "leaf"), null);
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("caller-leaf", "leaf"),
+                new SkillSource("leaf.yaml", "bean", "run", "infra-run"));
         var registration = new SkillExecutorRegistration(SkillIdentity.parse("infra-run"), "", java,
-                new SkillSource(null, "bean", "run"), invocation -> { throw new AssertionError("Unexpected invocation"); });
+                new SkillSource(null, "bean", "run", null), invocation -> { throw new AssertionError("Unexpected invocation"); });
         var caller = new SkillGeneration("caller", "caller-generation", Map.of(capability.name(), capability),
                 Map.of(capability.name(), definition));
         var owner = new SkillGeneration("infra", "owner-generation", Map.of(), Map.of(), null, null, null,

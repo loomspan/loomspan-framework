@@ -29,7 +29,7 @@ class NamespaceIdentityFoundationTest {
     private CapabilityMetadata javaSkill(String name) {
         return new CapabilityMetadata("java source", name, "Java", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(),
                 args -> { throw new AssertionError("validation must not execute Java"); }, SkillKind.JAVA,
-                null, new SkillSource(null,"bean","method"));
+                null, new SkillSource(null,"bean","method", null));
     }
     private SkillGenerationManager manager(CapabilityMetadata... fixed) {
         var processor = mock(SkillMethodBeanPostProcessor.class); when(processor.capabilities()).thenReturn(List.of(fixed));

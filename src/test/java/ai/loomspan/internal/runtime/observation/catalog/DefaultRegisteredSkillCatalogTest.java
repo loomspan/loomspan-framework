@@ -45,11 +45,11 @@ class DefaultRegisteredSkillCatalogTest
         assertThat(catalog.find("alpha")).isEmpty();
         assertThat(catalog.registeredSkillCount()).isEqualTo(3);
         assertThat(catalog.find("JavaLookup").orElseThrow()).isEqualTo(new RegisteredSkillEntry(
-                "JavaLookup", "JAVA", null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null, null));
+                "JavaLookup", "JAVA", "SKILL_METHOD", null, null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null, null));
     }
 
     @Test
-    void preservesExecutorAsYamlManifestSource() throws Exception
+    void preservesExecutorJavaKindAndYamlDeclaration() throws Exception
     {
         String executorYaml = "name: FetchDns\ndescription: fetch DNS\nexecutor: infrastructure-dns\n";
         DefaultRegisteredSkillCatalog catalog = catalog(List.of(executorDefinition("FetchDns", executorYaml)), false);
@@ -57,14 +57,16 @@ class DefaultRegisteredSkillCatalogTest
         assertThat(catalog.listAfter(null, 10)).singleElement().satisfies(summary ->
         {
             assertThat(summary.registeredName()).isEqualTo("FetchDns");
-            assertThat(summary.source()).isEqualTo("YAML");
+            assertThat(summary.kind()).isEqualTo("JAVA");
             assertThat(summary.sourcePath()).isEqualTo("FetchDns.yaml");
-            assertThat(summary.beanName()).isNull();
-            assertThat(summary.method()).isNull();
+            assertThat(summary.beanName()).isEqualTo("executorBean");
+            assertThat(summary.declaration()).isEqualTo("YAML");
+            assertThat(summary.executorName()).isEqualTo("default-infrastructure-dns");
+            assertThat(summary.method()).isEqualTo("example.Executor.execute()");
         });
         assertThat(catalog.find("FetchDns").orElseThrow()).satisfies(entry ->
         {
-            assertThat(entry.source()).isEqualTo("YAML");
+            assertThat(entry.kind()).isEqualTo("JAVA");
             assertThat(entry.yaml()).isEqualTo(executorYaml);
         });
     }
@@ -99,7 +101,10 @@ class DefaultRegisteredSkillCatalogTest
             var metadata = mock(CapabilityMetadata.class);
             when(metadata.name()).thenReturn(definition.manifest().getName());
             when(metadata.tool()).thenReturn(ai.loomspan.internal.core.CapabilityToolDescriptor.generic(definition.manifest().getName(), "description"));
-            when(metadata.kind()).thenReturn(SkillKind.YAML);
+            when(metadata.kind()).thenReturn(definition.form() == YamlSkillDefinition.Form.EXECUTOR ? SkillKind.JAVA : SkillKind.YAML);
+            when(metadata.source()).thenReturn(definition.form() == YamlSkillDefinition.Form.EXECUTOR
+                    ? new SkillSource(null, "executorBean", "example.Executor.execute()", "default-infrastructure-dns")
+                    : new SkillSource(definition.source().diagnosticName(), null, null, null));
             definitionsByName.put(metadata.name(), definition);
             entries.add(metadata);
         }
@@ -108,7 +113,7 @@ class DefaultRegisteredSkillCatalogTest
             var metadata = mock(CapabilityMetadata.class);
             when(metadata.name()).thenReturn("JavaLookup");
             when(metadata.kind()).thenReturn(SkillKind.JAVA);
-            when(metadata.source()).thenReturn(new SkillSource(null, "lookupBean", "example.Lookup.lookup(java.lang.String)"));
+            when(metadata.source()).thenReturn(new SkillSource(null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null));
             entries.add(metadata);
         }
         return new DefaultRegisteredSkillCatalog(entries, definitionsByName);

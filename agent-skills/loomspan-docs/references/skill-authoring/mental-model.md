@@ -128,7 +128,7 @@ Optional primitive parameters are invalid because omission binds null; use refer
 
 Java roots and children participate in the common skill mission lifecycle. Java executes without a framework model request and shares bounded mission timeout, interruption, and late-write cutoff handling. A successful child contributes its exact name at the parent tool boundary; a denial or failure contributes no success. The parent mission resumes on every exit.
 
-Public execution kinds are `YAML`, `TYPESAFE`, and `JAVA`. Executor-backed YAML executes as Java while retaining its YAML definition. Framework diagnostic entries use declaration ownership for the original source; current Console displays do not provide a complete executor provenance model. Pagination and links use only the registered name.
+Public execution kinds are `YAML`, `TYPESAFE`, and `JAVA`. Executor-backed YAML executes as Java while retaining its YAML definition. Framework and Console diagnostics use declaration ownership for original source presentation and retain the resolved executor identity and Java implementation alongside it; see [skill diagnostics](observability-http.md#skill-classification-and-declaration). Pagination and links use only the registered name.
 
 ## Root, Planner, Specialist, and Leaf Are Roles
 
@@ -259,4 +259,4 @@ Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartup
 
 Boundary evidence: `SkillReachableAdmissionTest#localDefaultReferencesMatchQualifiedAcrossAllRootOperations`, `NamespaceIdentityFoundationTest#localAndMixedAuthoredFieldsCompileWithoutRewritingContent`, and `NamespaceStartupIntegrationTest#suppliedLocalDocumentsValidateAndPrepareInEachOwnerBeforePublicationWithoutFallback`.
 
-Executor YAML leaves execute through generation-owned Java registrations and captured configuration bindings. Their public execution kind is `JAVA`; their YAML definitions remain available. `rest:` is unsupported manifest syntax. Read [executor leaves](executor-skills.md) for declaration rules and limitations.
+Executor YAML leaves execute through generation-owned Java registrations and captured configuration bindings. Their public execution kind is `JAVA`; diagnostics retain their YAML declaration/source plus resolved executor identity and Java implementation. Annotated Java methods retain bean/method provenance. Execution classification and declaration provenance are separate; see [HTTP diagnostics](observability-http.md#skill-classification-and-declaration). `rest:` is unsupported manifest syntax. Read [executor leaves](executor-skills.md) for declaration rules and limitations.

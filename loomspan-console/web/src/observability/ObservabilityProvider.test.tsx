@@ -241,7 +241,7 @@ test("expired pagination cursor restarts from the first page", async () => {
     .mockRejectedValueOnce(new BrowserAPIError("STALE_CURSOR", "expired", 409))
     .mockResolvedValueOnce({
       targetScopeId: "scope-1",
-      items: [{ registeredName: "fresh", source: "YAML", sourcePath: "classpath:/fresh.yaml" }],
+      items: [{ registeredName: "fresh", kind: "YAML", declaration: "YAML", sourcePath: "classpath:/fresh.yaml" }],
       hasMore: false,
       nextCursor: null,
       observedAt: "2026-07-27T00:00:00Z",
@@ -393,7 +393,7 @@ test("older pagination response cannot overwrite a newer refresh", async () => {
   await act(async () => {
     resolveNew({
       targetScopeId: "scope-1",
-      items: [{ registeredName: "new", source: "YAML", sourcePath: "classpath:/new.yaml" }],
+      items: [{ registeredName: "new", kind: "YAML", declaration: "YAML", sourcePath: "classpath:/new.yaml" }],
       hasMore: false,
       nextCursor: null,
       observedAt: "2026-07-27T00:00:00Z",
@@ -405,7 +405,7 @@ test("older pagination response cannot overwrite a newer refresh", async () => {
   await act(async () => {
     resolveOld({
       targetScopeId: "scope-1",
-      items: [{ registeredName: "old", source: "YAML", sourcePath: "classpath:/old.yaml" }],
+      items: [{ registeredName: "old", kind: "YAML", declaration: "YAML", sourcePath: "classpath:/old.yaml" }],
       hasMore: false,
       nextCursor: null,
       observedAt: "2026-07-27T00:00:00Z",

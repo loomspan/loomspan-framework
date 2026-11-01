@@ -539,7 +539,7 @@ test("view error from the exact failure record focuses the failure panel", async
 test("selected frames link only exact current registered skill names", async () => {
 	const framePage = { source: "TARGET", targetScopeId: "scope-1", items: [{ frameId: "f-1", parentFrameId: null, childFrameIds: [], frameType: "SKILL", route: "root.child", inclusiveDurationMillis: 1, selfDurationMillis: 1, skillNames: ["exact.skill", "Missing.Skill"] }], hasMore: false, nextCursor: null };
 	api.getTraceFrames.mockResolvedValueOnce(framePage).mockResolvedValueOnce(framePage);
-  api.listSkills.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ registeredName: "exact.skill", source: "YAML", sourcePath: "<unsafe>" }, { registeredName: "missing.skill", source: "YAML", sourcePath: "other" }], hasMore: false, nextCursor: null });
+  api.listSkills.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ registeredName: "exact.skill", kind: "YAML", declaration: "YAML", sourcePath: "<unsafe>" }, { registeredName: "missing.skill", kind: "YAML", declaration: "YAML", sourcePath: "other" }], hasMore: false, nextCursor: null });
   render(<MemoryRouter initialEntries={["/?view=plans&frameId=f-1"]}><TraceExplorer traceId="trace-1" /></MemoryRouter>);
   expect(await screen.findByRole("link", { name: "exact.skill" })).toHaveAttribute("href", "/skills/exact.skill?targetScopeId=scope-1");
   expect(screen.getByText("Missing.Skill").closest("li")).toHaveTextContent("not in current registered catalog");

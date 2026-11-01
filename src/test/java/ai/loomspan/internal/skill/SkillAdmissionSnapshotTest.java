@@ -26,7 +26,7 @@ class SkillAdmissionSnapshotTest {
         var javaSkills = mock(SkillMethodBeanPostProcessor.class);
         var leaf = new CapabilityMetadata("java:leaf", "default-leaf", "leaf", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(), arguments -> invoked.incrementAndGet(),
-                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-leaf", "leaf"), new SkillSource(null, "bean", "leaf()"));
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-leaf", "leaf"), new SkillSource(null, "bean", "leaf()", null));
         when(javaSkills.capabilities()).thenReturn(List.of(leaf));
         var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties),
                 new SkillInputContractResolver(), properties, null,

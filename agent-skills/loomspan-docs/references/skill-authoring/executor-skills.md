@@ -64,7 +64,9 @@ The invocation receives validated/reference-resolved input, the executing YAML l
 
 Validation and discovery execute no application code or argument-dependent advice. Invocation still runs the final Spring proxy with actual arguments, so application advice may reject a leaf that passed declarative validation. Catalog visibility is unchanged.
 
-Public catalogs classify these leaves as Java while Framework retains their YAML source. Current diagnostic displays do not expose a complete executor provenance model.
+Public catalogs classify these leaves as `JAVA`. Diagnostic catalogs report `kind: JAVA` and `declaration: YAML`, retaining unchanged authored `yaml` and descriptive `sourcePath` alongside resolved qualified `executorName`, `beanName` and declared `method`. The authored executor reference remains unchanged in YAML even when it used a local name. Reference-only registrations never appear as callable skills. See [HTTP diagnostics](observability-http.md#skill-classification-and-declaration) for the complete shape matrix.
+
+Evidence: `DefaultRegisteredSkillCatalogTest`, `ExecutorGenerationExecutionTest`, `ConsoleRestFixtureCorpusTest`, and Console `TestAllCallableFormsPreserveProvenanceAndRejectInvalidContracts` cover classification, source fidelity, same-name roles and Java/Go/MCP agreement.
 
 ## Evidence and next topics
 

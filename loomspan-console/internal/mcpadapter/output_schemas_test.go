@@ -105,7 +105,7 @@ func TestEveryInstalledToolRepresentativeOutputsValidateAgainstBothSchemas(t *te
 			validateTypedEnvelope(t, "skills-list", skillListOutputSchema(), skillListResult{ObservedAt: now, Items: []skillSummaryDTO{}})
 		}},
 		{"skill-detail", func(t *testing.T) {
-			validateTypedEnvelope(t, "skill-detail", skillDetailOutputSchema(), skillDetailResult{ObservedAt: now, Skill: skillDetailDTO{RegisteredName: "skill", Source: "YAML", SourcePath: "skill.yaml", YAML: "name: skill"}})
+			validateTypedEnvelope(t, "skill-detail", skillDetailOutputSchema(), skillDetailResult{ObservedAt: now, Skill: skillDetailDTO{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", YAML: "name: skill"}})
 		}},
 		{"executions-list", func(t *testing.T) {
 			validateTypedEnvelope(t, "executions-list", executionListOutputSchema(), executionListResult{ObservedAt: now, Items: []executionListItemDTO{}})
@@ -167,10 +167,10 @@ func TestCompactSchemasRetainDecisionAndNavigationFields(t *testing.T) {
 		instance any
 	}{
 		{"runtime", runtimeOutputSchema(), map[string]any{"observedAt": "2026-08-19T00:00:00Z", "targetSelection": "NONE", "targetConnection": "DISCONNECTED", "targetAuthentication": "UNKNOWN", "javaGoCompatibility": "UNKNOWN", "runtimeIdentity": "UNKNOWN", "liveMonitoring": "UNAVAILABLE"}},
-		{"skills-list", skillListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"registeredName": "skill", "source": "YAML", "sourcePath": "skill.yaml"}}, "hasMore": false}}},
-		{"skill-detail", skillDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": map[string]any{"registeredName": "skill", "source": "YAML", "sourcePath": "skill.yaml", "yaml": "name: skill", "outputSchema": nil}}}},
-		{"typesafe-list", skillListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"registeredName": "skill", "source": "TYPESAFE", "sourcePath": "opaque label"}}, "hasMore": false}}},
-		{"typesafe-detail", skillDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": map[string]any{"registeredName": "skill", "source": "TYPESAFE", "sourcePath": "opaque label", "yaml": "name: skill\ntypesafe: {}", "outputSchema": "{\"type\":\"object\"}"}}}},
+		{"skills-list", skillListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"registeredName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml"}}, "hasMore": false}}},
+		{"skill-detail", skillDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": map[string]any{"registeredName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml", "yaml": "name: skill", "outputSchema": nil}}}},
+		{"typesafe-list", skillListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"registeredName": "skill", "kind": "TYPESAFE", "declaration": "YAML", "sourcePath": "opaque label"}}, "hasMore": false}}},
+		{"typesafe-detail", skillDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": map[string]any{"registeredName": "skill", "kind": "TYPESAFE", "declaration": "YAML", "sourcePath": "opaque label", "yaml": "name: skill\ntypesafe: {}", "outputSchema": "{\"type\":\"object\"}"}}}},
 		{"executions-list", executionListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"sessionId": "s", "traceId": "t", "status": "RUNNING", "phase": "STEP", "updatedAt": "2026-08-19T00:00:00Z", "activeBranchCount": 0}}, "hasMore": false}}},
 		{"execution-detail", executionDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "execution": map[string]any{"sessionId": "s", "traceId": "t", "status": "RUNNING", "phase": "STEP", "activeBranches": []any{}, "usage": map[string]any{}, "configuredLimits": map[string]any{}}}}},
 		{"activity", activityOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"cursor": "c", "sessionId": "s", "traceId": "t", "timestamp": "2026-08-19T00:00:00Z", "kind": "STEP_COMPLETED", "facts": map[string]any{}}}, "hasMore": false, "coverage": map[string]any{}}}},

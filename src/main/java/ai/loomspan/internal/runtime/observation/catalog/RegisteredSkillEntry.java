@@ -3,41 +3,48 @@ package ai.loomspan.internal.runtime.observation.catalog;
 import java.util.Objects;
 
 /** Immutable source-specific diagnostic snapshot of one callable registration. */
-public record RegisteredSkillEntry(String registeredName, String source, String sourcePath,
-        String beanName, String method, String yaml, String outputSchema)
+public record RegisteredSkillEntry(String registeredName, String kind, String declaration, String sourcePath,
+        String executorName, String beanName, String method, String yaml, String outputSchema)
 {
     public RegisteredSkillEntry
     {
-        validateLocation(registeredName, source, sourcePath, beanName, method);
-        if ("YAML".equals(source) || "TYPESAFE".equals(source)) Objects.requireNonNull(yaml, "yaml must not be null");
-        else if (yaml != null) throw new IllegalArgumentException("Java skills must not contain YAML");
+        validateLocation(registeredName, kind, declaration, sourcePath, executorName, beanName, method);
+        if ("YAML".equals(declaration)) Objects.requireNonNull(yaml, "yaml must not be null");
+        else if (yaml != null) throw new IllegalArgumentException("SkillMethod declarations must not contain YAML");
     }
 
     public Summary summary()
     {
-        return new Summary(registeredName, source, sourcePath, beanName, method);
+        return new Summary(registeredName, kind, declaration, sourcePath, executorName, beanName, method);
     }
 
-    public record Summary(String registeredName, String source, String sourcePath, String beanName, String method)
+    public record Summary(String registeredName, String kind, String declaration, String sourcePath, String executorName, String beanName, String method)
     {
-        public Summary { validateLocation(registeredName, source, sourcePath, beanName, method); }
+        public Summary { validateLocation(registeredName, kind, declaration, sourcePath, executorName, beanName, method); }
     }
 
-    public static void validateLocation(String name, String source, String path, String bean, String method)
+    public static void validateLocation(String name, String kind, String declaration, String path, String executor, String bean, String method)
     {
         requireNonBlank(name, "registeredName");
-        if ("YAML".equals(source) || "TYPESAFE".equals(source))
+        if (!"YAML".equals(kind) && !"TYPESAFE".equals(kind) && !"JAVA".equals(kind))
+            throw new IllegalArgumentException("kind must be YAML, TYPESAFE or JAVA");
+        if ("YAML".equals(declaration))
         {
             requireNonBlank(path, "sourcePath");
-            if (bean != null || method != null) throw new IllegalArgumentException(source + " skills must not contain Java locations");
+            if ("JAVA".equals(kind)) requireNonBlank(executor, "executorName");
+            else if (executor != null || bean != null || method != null)
+                throw new IllegalArgumentException("Model and TypeSafe declarations must not contain Java locations");
         }
-        else if ("JAVA".equals(source))
+        else if ("SKILL_METHOD".equals(declaration))
         {
+            if (!"JAVA".equals(kind) || path != null || executor != null)
+                throw new IllegalArgumentException("SkillMethod declarations require JAVA and forbid sourcePath/executorName");
+        }
+        else throw new IllegalArgumentException("declaration must be YAML or SKILL_METHOD");
+        if ("JAVA".equals(kind)) {
             requireNonBlank(bean, "beanName");
             requireNonBlank(method, "method");
-            if (path != null) throw new IllegalArgumentException("Java skills must not contain sourcePath");
         }
-        else throw new IllegalArgumentException("source must be YAML, TYPESAFE or JAVA");
     }
 
     private static void requireNonBlank(String value, String name)

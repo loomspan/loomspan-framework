@@ -31,6 +31,11 @@ func assertJSONGolden(t *testing.T, name string, value any) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if os.Getenv("LOOMSPAN_UPDATE_SNAPSHOTS") == "1" {
+		if err := os.WriteFile(filepath.Join("testdata", name), append(actual, '\n'), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	expected, err := os.ReadFile(filepath.Join("testdata", name))
 	if err != nil {
 		t.Fatal(err)

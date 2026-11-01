@@ -15,12 +15,12 @@ public final class ObservabilityDtoMapper
     public ObservabilityDtos.SkillSummary skill(RegisteredSkillEntry.Summary source)
     {
         return new ObservabilityDtos.SkillSummary(
-                source.registeredName(), source.source(), source.sourcePath(), source.beanName(), source.method(), "skills/" + encodePathSegment(source.registeredName()));
+                source.registeredName(), source.kind(), source.declaration(), source.sourcePath(), source.executorName(), source.beanName(), source.method(), "skills/" + encodePathSegment(source.registeredName()));
     }
 
     public ObservabilityDtos.SkillDetail skill(RegisteredSkillEntry source)
     {
-        return new ObservabilityDtos.SkillDetail(source.registeredName(), source.source(), source.sourcePath(), source.beanName(), source.method(), source.yaml(), source.outputSchema());
+        return new ObservabilityDtos.SkillDetail(source.registeredName(), source.kind(), source.declaration(), source.sourcePath(), source.executorName(), source.beanName(), source.method(), source.yaml(), source.outputSchema());
     }
 
     public ObservabilityDtos.ActiveExecution active(

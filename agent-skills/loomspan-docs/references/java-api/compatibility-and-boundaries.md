@@ -135,7 +135,7 @@ view.
 - supported public signatures do not expose `internal` or `autoconfigure`
   types.
 
-Framework and Console use the coordinated exact project version as their compatibility marker; there is no independent schema counter, range negotiation, legacy reader, or snapshot-to-snapshot compatibility rule. Only dual `development` markers bypass the version promise while retaining ordinary complete validation. Execution classification and declaration source are distinct: public executor leaves classify as Java while their retained declaration is YAML. Current diagnostic displays do not provide a complete executor provenance model.
+Framework and Console use the coordinated exact project version as their compatibility marker; there is no independent schema counter, range negotiation, legacy reader, or snapshot-to-snapshot compatibility rule. Only dual `development` markers bypass the version promise while retaining ordinary complete validation. Execution classification and declaration source are distinct: public executor leaves classify as Java while their retained declaration is YAML. Diagnostics preserve that source alongside the resolved executor identity and Java implementation; see [skill diagnostics](../skill-authoring/observability-http.md#skill-classification-and-declaration).
 
 ## Source Anchors
 

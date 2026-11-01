@@ -7,7 +7,7 @@ import (
 )
 
 func TestSkillDetailOutputSchemaMetadataPreservesTextAndRejectsMalformedShapes(t *testing.T) {
-	skill := SkillDetail{RegisteredName: "parent", Source: "YAML", SourcePath: "parent.yaml", Yaml: "name: parent\noutput_from: {skill: child}"}
+	skill := SkillDetail{RegisteredName: "parent", Kind: "YAML", Declaration: "YAML", SourcePath: "parent.yaml", Yaml: "name: parent\noutput_from: {skill: child}"}
 	schema := "{\n  \"type\":\"object\",\"description\":\"<script>unchanged</script>\"\n}"
 	skill.OutputSchema = &schema
 	encoded, err := json.Marshal(skill)

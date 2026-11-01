@@ -80,7 +80,7 @@ func TestDomainErrorResultIsStructuredMarkedAndSafe(t *testing.T) {
 func TestPR17TextFallbacksHaveExactOrderEscapingAndFinalNewline(t *testing.T) {
 	result := skillListResult{
 		ObservedAt: time.Date(2026, 8, 13, 20, 0, 0, 123, time.FixedZone("offset", -7*60*60)),
-		Items:      []skillSummaryDTO{{RegisteredName: "name\nquoted\"", Source: "YAML", SourcePath: "skills/a.yaml"}},
+		Items:      []skillSummaryDTO{{RegisteredName: "name\nquoted\"", Kind: "YAML", Declaration: "YAML", SourcePath: "skills/a.yaml"}},
 	}
 	text := skillListText(result)
 	wantPrefix := "observedAt: \"2026-08-14T03:00:00.000000123Z\"\ncount: 1\nhasMore: false\ncontinuation: -\n"

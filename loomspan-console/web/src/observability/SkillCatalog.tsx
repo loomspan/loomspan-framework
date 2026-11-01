@@ -52,7 +52,7 @@ export function SkillCatalog() {
           <thead>
             <tr>
               <th scope="col">Registered name</th>
-              <th scope="col">Source</th>
+              <th scope="col">Execution kind</th>
               <th scope="col">Location</th>
             </tr>
           </thead>
@@ -64,8 +64,8 @@ export function SkillCatalog() {
                   <td className="identifier-cell">
                     <Link to={scopeBoundPath(`/skills/${encodeURIComponent(s.registeredName)}`, skills.targetScopeId)}>{s.registeredName}</Link>
                   </td>
-                  <td>{s.source === "JAVA" ? "Java" : s.source}</td>
-                  <td className="path-cell"><code className="source-path">{s.source === "JAVA" ? formatJavaSkillMethod(s.method) : s.sourcePath}</code></td>
+                  <td>{s.kind === "JAVA" ? "Java" : s.kind}</td>
+                  <td className="path-cell"><code className="source-path">{s.declaration === "SKILL_METHOD" ? formatJavaSkillMethod(s.method) : s.sourcePath}</code></td>
                 </tr>
               );
             })}

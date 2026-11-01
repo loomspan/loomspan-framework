@@ -556,7 +556,7 @@ class SkillGenerationManagerTest
 
     private static ai.loomspan.internal.core.SkillExecutorRegistration executor(String name, AtomicInteger calls) {
         return new ai.loomspan.internal.core.SkillExecutorRegistration(new ai.loomspan.internal.core.SkillIdentity("default", name), "",
-                SkillAccessPolicy.unrestricted(), new SkillSource(null, "executor", "execute"), invocation -> { calls.incrementAndGet(); return "ok"; });
+                SkillAccessPolicy.unrestricted(), new SkillSource(null, "executor", "execute", null), invocation -> { calls.incrementAndGet(); return "ok"; });
     }
 
     private static LoomspanProperties loadingProperties(Path directory)
@@ -590,7 +590,7 @@ class SkillGenerationManagerTest
         return new CapabilityMetadata("java:" + name, canonical, name, SkillExecutionDescriptor.none(),
                 SkillAccessPolicy.unrestricted(), arguments -> name, SkillKind.JAVA,
                 CapabilityToolDescriptor.generic(canonical, name),
-                new SkillSource(null, "testBean", name + "()"));
+                new SkillSource(null, "testBean", name + "()", null));
     }
 
     private static YamlSkillDefinition yamlSkill(String name, List<String> allowed)

@@ -29,7 +29,7 @@ public final class TestSkillGenerations
                 ai.loomspan.internal.core.SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),
                 input -> "ok", ai.loomspan.api.SkillKind.JAVA,
                 ai.loomspan.internal.core.CapabilityToolDescriptor.generic("default-leaf", "fixture"),
-                new ai.loomspan.internal.core.SkillSource(null, "fixture", "leaf()"));
+                new ai.loomspan.internal.core.SkillSource(null, "fixture", "leaf()", null));
     }
 
     public static ai.loomspan.internal.skill.SkillAdmissionSnapshot snapshot(SkillGeneration generation) {
