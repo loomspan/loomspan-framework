@@ -6,7 +6,6 @@ import ai.loomspan.internal.core.*;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import java.time.Duration;
 import java.util.*;
@@ -203,29 +202,35 @@ class SkillReloaderTest {
         }
     }
 
-    @Test void concurrentRestPreparationReusesOnlyCompletedFixedInitialization() throws Exception {
+    @Test void concurrentExecutorPreparationReusesCompletedFixedDiscovery() throws Exception {
         var processor=mock(SkillMethodBeanPostProcessor.class);when(processor.capabilities()).thenReturn(List.of());
-        var beans=new org.springframework.beans.factory.support.DefaultListableBeanFactory();
-        var instances=new AtomicInteger();var invocations=new AtomicInteger();
-        var definition=new org.springframework.beans.factory.support.RootBeanDefinition(RestSkillHandler.class);
-        definition.setScope("prototype");definition.setInstanceSupplier(()->{instances.incrementAndGet();return (RestSkillHandler) invocation->{invocations.incrementAndGet();return "ok";};});
-        beans.registerBeanDefinition("handler",definition);
+        var invocations=new AtomicInteger();
+        var registrations=new ArrayList<SkillExecutorRegistration>();
+        for (String namespace: List.of("a", "b")) registrations.add(new SkillExecutorRegistration(
+                new SkillIdentity(namespace, "fixture"), "", ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),
+                new SkillSource(null, "fixture", "execute"), invocation -> {invocations.incrementAndGet(); return "ok";}));
+        when(processor.executors()).thenReturn(registrations);
         var properties=new LoomspanProperties();properties.getSkills().setLocations(List.of("classpath:/publication-no-files/*.yaml"));
-        var manager=new SkillGenerationManager(processor,()->new YamlSkillCatalog(properties),new SkillInputContractResolver(),beans);
+        var manager=new SkillGenerationManager(processor,()->new YamlSkillCatalog(properties),new SkillInputContractResolver());
         manager.initializeStartup();
         var lifecycle=new FrameworkExecutionLifecycle(mock(ApplicationContext.class),Duration.ofMillis(100),Executors.newSingleThreadExecutor());
         var reloader=new DefaultSkillReloader(manager,lifecycle);var start=new CountDownLatch(1);
-        var docs=List.of(new SkillDocument("rest","name: leaf\ndescription: leaf\nrest: true\n"));
+        var docs=List.of(new SkillDocument("executor","name: leaf\ndescription: leaf\nexecutor: fixture\n"));
         try(var workers=Executors.newVirtualThreadPerTaskExecutor()){
             var a=workers.submit(()->{await(start);return reloader.prepare("a",docs,EMPTY);});
             var b=workers.submit(()->{await(start);return reloader.prepare("b",docs,EMPTY);});start.countDown();
             var first=a.get(5,TimeUnit.SECONDS);var second=b.get(5,TimeUnit.SECONDS);
-            assertThat(instances).hasValue(1);assertThat(invocations).hasValue(0);verify(processor,times(1)).capabilities();
+            assertThat(invocations).hasValue(0);verify(processor,times(1)).capabilities();verify(processor,times(1)).executors();
             reloader.publish(first);reloader.publish(second);
-            assertThat(manager.active("a").capability("a-leaf").invoker().invoke(Map.of())).isEqualTo("ok");
-            assertThat(manager.active("b").capability("b-leaf").invoker().invoke(Map.of())).isEqualTo("ok");
-            assertThat(instances).hasValue(1);assertThat(invocations).hasValue(2);
-        }
+            for (String namespace : List.of("a", "b")) {
+                var capture=manager.capture(new SkillIdentity(namespace,"leaf"));
+                try {
+                    var binding=manager.validateAdmission(capture.snapshot()).executorBinding(namespace+"-leaf");
+                    assertThat(binding.registration().invoker().apply(new SkillExecutorInvocation(Map.of(),Map.of(),binding.configuration(),namespace+"-leaf",binding.generationId()))).isEqualTo("ok");
+                } finally { capture.lease().close(); }
+            }
+            assertThat(invocations).hasValue(2);
+        } finally { lifecycle.destroy(); manager.destroy(); }
     }
 
     @Test void targetPublicationDuringBlockedPreparationRejectsItsOriginalCapturedBase() throws Exception {
@@ -285,7 +290,7 @@ class SkillReloaderTest {
         Fixture(BiFunction<LoomspanProperties,TracePersistencePolicy,ExecutionRuntime> factory){
             startup.getSkills().setLocations(List.of("classpath:/publication-no-files/*.yaml"));startup.getSession().setMaxDepth(91);
             var javaSkills=mock(SkillMethodBeanPostProcessor.class);when(javaSkills.capabilities()).thenReturn(List.of());
-            manager=new SkillGenerationManager(javaSkills,()->new YamlSkillCatalog(startup),new SkillInputContractResolver(),new StaticListableBeanFactory(),startup,null,factory==null?SkillReloaderTest::runtime:factory);
+            manager=new SkillGenerationManager(javaSkills,()->new YamlSkillCatalog(startup),new SkillInputContractResolver(),startup,null,factory==null?SkillReloaderTest::runtime:factory);
             manager.initializeStartup();lifecycle=new FrameworkExecutionLifecycle(mock(ApplicationContext.class),Duration.ofMillis(100),Executors.newSingleThreadExecutor());
             reloader=new DefaultSkillReloader(manager,lifecycle);
         }

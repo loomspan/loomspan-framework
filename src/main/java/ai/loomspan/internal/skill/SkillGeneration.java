@@ -25,6 +25,8 @@ public final class SkillGeneration implements AutoCloseable
     private final SkillCatalog skillCatalog;
     private final RegisteredSkillCatalog registeredSkillCatalog;
     private final ExecutionRuntime runtime;
+    private final Map<String, ai.loomspan.internal.core.SkillExecutorRegistration> executors;
+    private final Map<String, Object> executorConfiguration;
 
     public SkillGeneration(String namespace, String id, Map<String, CapabilityMetadata> capabilities,
             Map<String, YamlSkillDefinition> definitions)
@@ -52,12 +54,29 @@ public final class SkillGeneration implements AutoCloseable
             RegisteredSkillCatalog registeredSkillCatalog, ExecutionRuntime runtime,
             ai.loomspan.api.NamespaceVisibility visibility)
     {
+        this(namespace, id, capabilities, definitions, skillCatalog, registeredSkillCatalog, runtime, visibility,
+                Map.of(), Map.of());
+    }
+
+    public SkillGeneration(String namespace, String id, Map<String, CapabilityMetadata> capabilities,
+            Map<String, YamlSkillDefinition> definitions, SkillCatalog skillCatalog,
+            RegisteredSkillCatalog registeredSkillCatalog, ExecutionRuntime runtime,
+            ai.loomspan.api.NamespaceVisibility visibility,
+            Map<String, ai.loomspan.internal.core.SkillExecutorRegistration> executors,
+            Map<String, Object> executorConfiguration)
+    {
         this.visibility = Objects.requireNonNull(visibility, "visibility must not be null");
         this.namespace = SkillIdentity.normalizeNamespace(namespace);
         this.runtime = runtime;
         this.id = requireNonBlank(id, "id");
         this.capabilities = immutableExactMap(capabilities, "capabilities");
         this.definitions = immutableExactMap(definitions, "definitions");
+        this.executors = immutableExactMap(executors, "executors");
+        this.executorConfiguration = ai.loomspan.internal.util.ImmutableContainers.copyMap(executorConfiguration);
+        this.executors.forEach((name, registration) -> {
+            if (!this.namespace.equals(registration.identity().namespace()) || !name.equals(registration.name()))
+                throw new IllegalArgumentException("executor key must match registration identity and namespace");
+        });
         for (Map.Entry<String, CapabilityMetadata> entry : this.capabilities.entrySet())
             if (!this.namespace.equals(entry.getValue().identity().namespace()) || !entry.getKey().equals(entry.getValue().name()))
                 throw new IllegalArgumentException("capability key must match metadata name");
@@ -68,10 +87,11 @@ public final class SkillGeneration implements AutoCloseable
                 throw new IllegalArgumentException("definition key must match manifest name");
             CapabilityMetadata metadata = this.capabilities.get(entry.getKey());
             var definition = entry.getValue();
-            var expectedKind = definition.typesafe() ? ai.loomspan.internal.core.CapabilityKind.TYPESAFE_SKILL
-                    : ai.loomspan.internal.core.CapabilityKind.YAML_SKILL;
+            var expectedKind = definition.form() == YamlSkillDefinition.Form.EXECUTOR ? ai.loomspan.api.SkillKind.JAVA
+                    : definition.typesafe() ? ai.loomspan.api.SkillKind.TYPESAFE
+                    : ai.loomspan.api.SkillKind.YAML;
             if (metadata == null || metadata.kind() != expectedKind)
-                throw new IllegalArgumentException("definition must have matching YAML or TYPESAFE capability '"
+                throw new IllegalArgumentException("definition must have matching " + expectedKind + " capability '"
                         + entry.getKey() + "'");
         }
         List<CapabilityMetadata> ordered = this.capabilities.values().stream()
@@ -94,6 +114,8 @@ public final class SkillGeneration implements AutoCloseable
     public SkillCatalog skillCatalog() { return skillCatalog; }
     public RegisteredSkillCatalog registeredSkillCatalog() { return registeredSkillCatalog; }
     public ExecutionRuntime runtime() { return runtime; }
+    public Map<String, ai.loomspan.internal.core.SkillExecutorRegistration> executors() { return executors; }
+    public Map<String, Object> executorConfiguration() { return executorConfiguration; }
     @Override public void close() { if (runtime != null) runtime.close(); }
 
     public boolean owns(CapabilityMetadata capability)

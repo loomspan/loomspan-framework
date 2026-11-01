@@ -53,11 +53,11 @@ normally resolves them from Spring Environment. The complete overload
 `prepare(namespace, documents, configuration, credentialValues)` copies a supplied
 map and resolves every reference from it without Environment fallback. Missing,
 blank or unused map entries fail. The full overload accepts visibility before the
-credential map. Validation does not resolve credentials, construct provider clients,
-instantiate a REST handler or invoke implementations. Preparation builds independent
+credential map. Validation does not resolve credentials, construct provider clients, or
+invoke application implementations. Preparation builds independent
 clients but sends no model request. Diagnostic content is preserved.
 
-`loomspan.executor-config` uses namespace-indexed maps, with the same structural rules and immutable data as startup YAML. Publication permits only its target namespace; foreign entries fail even when empty. Omission supplies no executor data and never inherits startup or prior-generation configuration. Nested maps/lists, null leaves, empty containers, scalar types and exact case/dotted data keys are preserved. Executor-owned `api-key-ref` and `${...}` strings are ordinary content; they do not consume credential references or undergo interpolation. Executor data is parsed and validated, but runtime generation binding is unavailable. See [executor configuration](../skill-authoring/executor-skills.md).
+`loomspan.executor-config` uses namespace-indexed maps, with the same structural rules and immutable data as startup YAML. Publication permits only its target namespace; foreign entries fail even when empty. Omission supplies no executor data and never inherits startup or prior-generation configuration. Nested maps/lists, null leaves, empty containers, scalar types and exact case/dotted data keys are preserved. Executor-owned `api-key-ref` and `${...}` strings are ordinary content; they do not consume credential references or undergo interpolation. Each generation owns its assigned fixed executors and immutable executor data. Startup/preparation validate annotation paths and selected map structure without application execution. Admission resolves only root-reachable executor dependencies against captured generations, and invocation consumes the captured binding without live lookup. See [executor configuration](../skill-authoring/executor-skills.md).
 
 ## Capture, concurrency and one-shot candidates
 
@@ -68,8 +68,8 @@ candidate receives a new process-local opaque ID that differs from its base;
 allocation order need not equal publication order. IDs never encode skill identity
 and are not durable restoration identifiers.
 
-Every candidate skill and outgoing reachable reference is validated against that
-view. All references into the candidate namespace, including transitive return
+Every candidate skill and outgoing callable/executor reference is validated against that
+view. Preparation retains no foreign runtime lease and stores no foreign executor configuration or policy in the caller generation. All references into the candidate namespace, including transitive return
 paths, use its complete candidate declarations. Omitted old skills are unavailable.
 Foreign edges require a Public target, including a path returning into the
 candidate; same-namespace composition can remain Private. Existing contracts,
@@ -178,4 +178,4 @@ retirement callback. There is no historical invocation API.
 - `NamespaceStartupIntegrationTest`: actual embedded and file-free managed caller execution, explicit Public sharing, prospective visibility changes, departmental complete replacement retaining fixed Java, removal/recreation and Private restart.
 - `SkillDependencyValidatorTest#transitiveReturnUsesCandidateDeclarationsContractsAndVisibility`: staged ordinary cycles with candidate return paths and unchanged forwarding-cycle rejection.
 - `ExecutionConfigurationParserTest`: exact configuration/credential boundary and nested validation.
-- `LoomspanPublicSurfaceArchitectureTest`: closed supported API and sole RestSkillHandler SPI.
+- `LoomspanPublicSurfaceArchitectureTest`: closed supported API and absence of extension SPIs.

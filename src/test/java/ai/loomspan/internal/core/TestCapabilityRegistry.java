@@ -65,8 +65,7 @@ public final class TestCapabilityRegistry
         if (manager != null) return manager;
         manager = new SkillGenerationManager(new SkillMethodBeanPostProcessor(),
                 () -> { throw new AssertionError("test manager must not prepare"); },
-                new ai.loomspan.internal.runtime.input.SkillInputContractResolver(),
-                new org.springframework.beans.factory.support.StaticListableBeanFactory());
+                new ai.loomspan.internal.runtime.input.SkillInputContractResolver());
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, generation());
         return manager;
     }

@@ -2,10 +2,8 @@ package ai.loomspan.internal.skill;
 
 import ai.loomspan.internal.core.SkillIdentity;
 
-import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.NamespaceVisibility;
 import ai.loomspan.api.SkillReloadException;
-import ai.loomspan.api.RestSkillInvocation;
 import ai.loomspan.api.SkillDocument;
 import ai.loomspan.api.ExecutionConfiguration;
 import ai.loomspan.autoconfigure.LoomspanProperties;
@@ -15,7 +13,6 @@ import ai.loomspan.api.SkillValidationIssue;
 import ai.loomspan.api.SkillValidationResult;
 import ai.loomspan.api.SkillKind;
 import ai.loomspan.api.ValidatedSkill;
-import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.SkillExecutionDescriptor;
@@ -23,13 +20,11 @@ import ai.loomspan.internal.core.SkillMethodBeanPostProcessor;
 import ai.loomspan.internal.core.SkillSource;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import ai.loomspan.internal.security.SkillAccessPolicy;
-import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.DisposableBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -52,7 +47,6 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     private final SkillMethodBeanPostProcessor javaSkills;
     private final Supplier<YamlSkillCatalog> yamlCatalogFactory;
     private final SkillInputContractResolver inputs;
-    private final ListableBeanFactory beans;
     private final LoomspanProperties startupProperties;
     private final Environment environment;
     private final BiFunction<LoomspanProperties, TracePersistencePolicy, ExecutionRuntime> runtimeFactory;
@@ -67,27 +61,24 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     private final String generationNamespace = UUID.randomUUID().toString();
     private final AtomicLong issuedGenerationIds = new AtomicLong();
     private volatile List<CapabilityMetadata> fixedJavaCapabilities;
-    private volatile List<String> fixedRestHandlerBeanNames;
-    private volatile RestSkillHandler fixedRestHandler;
+    private volatile List<ai.loomspan.internal.core.SkillExecutorRegistration> fixedExecutors;
 
     public SkillGenerationManager(SkillMethodBeanPostProcessor javaSkills,
             Supplier<YamlSkillCatalog> yamlCatalogFactory,
-            SkillInputContractResolver inputs,
-            ListableBeanFactory beans)
+            SkillInputContractResolver inputs)
     {
-        this(javaSkills, yamlCatalogFactory, inputs, beans, null, null, null);
+        this(javaSkills, yamlCatalogFactory, inputs, null, null, null);
     }
 
     public SkillGenerationManager(SkillMethodBeanPostProcessor javaSkills,
             Supplier<YamlSkillCatalog> yamlCatalogFactory,
-            SkillInputContractResolver inputs, ListableBeanFactory beans,
+            SkillInputContractResolver inputs,
             LoomspanProperties startupProperties, Environment environment,
             BiFunction<LoomspanProperties, TracePersistencePolicy, ExecutionRuntime> runtimeFactory)
     {
         this.javaSkills = Objects.requireNonNull(javaSkills, "javaSkills must not be null");
         this.yamlCatalogFactory = Objects.requireNonNull(yamlCatalogFactory, "yamlCatalogFactory must not be null");
         this.inputs = Objects.requireNonNull(inputs, "inputs must not be null");
-        this.beans = Objects.requireNonNull(beans, "beans must not be null");
         this.startupProperties = startupProperties;
         this.environment = environment;
         this.runtimeFactory = runtimeFactory;
@@ -104,12 +95,13 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             LoomspanProperties properties = startupProperties == null ? new LoomspanProperties() : startupProperties;
             YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
             var configured = catalog.checkedConfigured(true);
-            built.add(prepareCatalog(check("default", configured, NamespaceVisibility.PRIVATE, Map.of()), properties,
+            built.add(prepareCatalog(check("default", configured, NamespaceVisibility.PRIVATE, Map.of(), properties.getExecutorConfig()), properties,
                     properties.getExecutionTrace().getPersistence(), NamespaceVisibility.PRIVATE));
-            for (String namespace : fixedJavaCapabilities.stream().map(cap -> cap.identity().namespace()).distinct().toList()) {
+            for (String namespace : java.util.stream.Stream.concat(fixedJavaCapabilities.stream().map(cap -> cap.identity().namespace()),
+                    fixedExecutors.stream().map(registration -> registration.identity().namespace())).distinct().toList()) {
                 if (namespace.equals("default")) continue;
                 built.add(prepareCatalog(check(namespace, new YamlSkillCatalog(properties).checkedSupplied(namespace, List.of(), true),
-                        NamespaceVisibility.PRIVATE, Map.of()), properties, properties.getExecutionTrace().getPersistence(), NamespaceVisibility.PRIVATE));
+                        NamespaceVisibility.PRIVATE, Map.of(), properties.getExecutorConfig()), properties, properties.getExecutionTrace().getPersistence(), NamespaceVisibility.PRIVATE));
             }
             synchronized (generationMonitor) {
                 if (destroyed) throw new IllegalStateException("Framework has shut down");
@@ -163,7 +155,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         Objects.requireNonNull(visibility, "visibility must not be null");
         var parsed = ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, false);
         var checked = check(view.namespace(), new YamlSkillCatalog(parsed.properties()).checkedSupplied(view.namespace(), documents, true),
-                visibility, view.namespaces());
+                visibility, view.namespaces(), parsed.executorConfig());
         checked.requireValid();
         parsed = credentialValues == null ? ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, true)
                 : ExecutionConfigurationParser.parse(view.namespace(), configuration, credentialValues);
@@ -178,7 +170,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         try {
             var parsed = ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, false);
             return validationResult(check(view.namespace(), new YamlSkillCatalog(parsed.properties()).checkedSupplied(view.namespace(), documents, false),
-                    visibility, view.namespaces()));
+                    visibility, view.namespaces(), parsed.executorConfig()));
         } catch (RuntimeException ex) {
             return new SkillValidationResult(List.of(new SkillValidationIssue(SkillValidationIssue.Severity.ERROR,
                     "<configuration>", null, "configuration", ex.getMessage())), List.of());
@@ -186,12 +178,14 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     }
 
     private SkillDependencyValidator.CheckedSet check(String namespace, YamlSkillCatalog.CheckedDocuments documents,
-            NamespaceVisibility visibility, Map<String, SkillGeneration> external) {
-        return new SkillDependencyValidator(inputs, fixedJavaCapabilities).check(namespace, documents, visibility, external);
+            NamespaceVisibility visibility, Map<String, SkillGeneration> external, ExecutorConfiguration configuration) {
+        return new SkillDependencyValidator(inputs, fixedJavaCapabilities).check(namespace, documents, visibility, external,
+                fixedExecutors.stream().filter(registration -> registration.identity().namespace().equals(namespace)).toList(),
+                configuration.namespaces().getOrDefault(namespace, Map.of()));
     }
 
     private void requireInitialized() {
-        if (fixedJavaCapabilities == null || fixedRestHandlerBeanNames == null)
+        if (fixedJavaCapabilities == null || fixedExecutors == null)
             throw new IllegalStateException("Skill validation requires completed framework startup");
     }
 
@@ -218,10 +212,11 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             return new SkillValidationResult(issues, List.of());
         List<ValidatedSkill> skills = new ArrayList<>();
         for (CapabilityMetadata javaCapability : fixedJavaCapabilities.stream().filter(cap -> cap.identity().namespace().equals(checked.namespace())).toList())
-            skills.add(new ValidatedSkill(javaCapability.name(), javaCapability.kind().publicKind()));
+            skills.add(new ValidatedSkill(javaCapability.name(), javaCapability.kind()));
         for (YamlSkillDefinition definition : checked.definitions())
             skills.add(new ValidatedSkill(definition.identity().toString(),
-                    definition.typesafe() ? SkillKind.TYPESAFE : SkillKind.YAML));
+                    definition.form() == YamlSkillDefinition.Form.EXECUTOR ? SkillKind.JAVA
+                            : definition.typesafe() ? SkillKind.TYPESAFE : SkillKind.YAML));
         skills.sort(Comparator.comparing(ValidatedSkill::name));
         return new SkillValidationResult(issues, skills);
     }
@@ -243,21 +238,24 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             definitionsByName.put(name, definition);
             String description = definition.manifest().getDescription();
             var contract = checked.contracts().get(definition);
-            if (definition.form() == YamlSkillDefinition.Form.EXECUTOR)
-                throw new IllegalStateException("Executor generation binding is not implemented yet");
             CapabilityMetadata metadata = new CapabilityMetadata(
                     "yaml:" + definition.source().diagnosticName(),
                     definition.identity(), description,
-                    SkillExecutionDescriptor.from(definition.requireExecutionConfiguration()),
+                    definition.form() == YamlSkillDefinition.Form.EXECUTOR ? SkillExecutionDescriptor.none()
+                            : SkillExecutionDescriptor.from(definition.requireExecutionConfiguration()),
                     SkillAccessPolicy.yamlRoles(definition.rbacRoles()),
                     arguments -> { throw new IllegalStateException("YAML skills require model execution"); },
-                    definition.typesafe() ? CapabilityKind.TYPESAFE_SKILL : CapabilityKind.YAML_SKILL,
+                    definition.form() == YamlSkillDefinition.Form.EXECUTOR ? SkillKind.JAVA
+                            : definition.typesafe() ? SkillKind.TYPESAFE : SkillKind.YAML,
                     new CapabilityToolDescriptor(name, description, inputs.toJsonSchema(contract), checked.outputSchemas().get(name)),
                     contract, new SkillSource(definition.source().diagnosticName(), null, null));
             putCapability(capabilities, metadata);
         }
         ExecutionRuntime runtime = runtimeFactory == null ? null : runtimeFactory.apply(properties, policy);
-        try { return new SkillGeneration(checked.namespace(), generationId, capabilities, definitionsByName, null, null, runtime, visibility); }
+        try { return new SkillGeneration(checked.namespace(), generationId, capabilities, definitionsByName, null, null, runtime, visibility,
+                fixedExecutors.stream().filter(registration -> registration.identity().namespace().equals(checked.namespace()))
+                        .collect(java.util.stream.Collectors.toMap(ai.loomspan.internal.core.SkillExecutorRegistration::name, registration -> registration)),
+                properties.getExecutorConfig().namespaces().getOrDefault(checked.namespace(), Map.of())); }
         catch (RuntimeException | Error ex) { if (runtime != null) runtime.close(); throw ex; }
     }
 
@@ -323,7 +321,17 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
                     throw new ai.loomspan.api.SkillException("Unknown skill '" + identity + "'");
                 if (!visited.add(identity)) continue;
                 var definition = generation.definition(identity.toString());
-                if (definition != null) definition.allowedSkills().forEach(child -> pending.add(SkillIdentity.parse(child)));
+                if (definition != null) {
+                    definition.allowedSkills().forEach(child -> pending.add(SkillIdentity.parse(child)));
+                    if (definition.form() == YamlSkillDefinition.Form.EXECUTOR) {
+                        var executor = SkillIdentity.resolve(definition.executor(), identity.namespace());
+                        selected.computeIfAbsent(executor.namespace(), namespace -> {
+                            var current = active.get(namespace);
+                            if (current == null) throw new SkillReloadException("No active namespace '" + namespace + "'");
+                            return current;
+                        });
+                    }
+                }
             }
             var snapshot = new SkillAdmissionSnapshot(entry, selected);
             var states = selected.values().stream().map(generation -> published.get(generation.id())).toList();
@@ -334,8 +342,8 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     }
 
     /** Expensive policy checks use retained immutable metadata, outside the registry monitor. */
-    public void validateAdmission(SkillAdmissionSnapshot snapshot) {
-        new SkillDependencyValidator(inputs, fixedJavaCapabilities).checkAdmission(snapshot);
+    public SkillAdmissionSnapshot validateAdmission(SkillAdmissionSnapshot snapshot) {
+        return new SkillDependencyValidator(inputs, fixedJavaCapabilities).checkAdmission(snapshot);
     }
 
     public void deliveryEnabled(BooleanSupplier condition)
@@ -439,18 +447,8 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     private synchronized void initializeFixedDependencies()
     {
         if (fixedJavaCapabilities != null) return;
-        List<CapabilityMetadata> completedJava = List.copyOf(javaSkills.capabilities());
-        String[] names = beans.getBeanNamesForType(RestSkillHandler.class, true, false);
-        Arrays.sort(names);
-        fixedRestHandlerBeanNames = List.of(names);
-        fixedJavaCapabilities = completedJava;
-    }
-
-    private synchronized RestSkillHandler requireRestHandler()
-    {
-        if (fixedRestHandler == null)
-            fixedRestHandler = beans.getBean(fixedRestHandlerBeanNames.getFirst(), RestSkillHandler.class);
-        return fixedRestHandler;
+        fixedJavaCapabilities = List.copyOf(javaSkills.capabilities());
+        fixedExecutors = List.copyOf(javaSkills.executors());
     }
 
     private static void putCapability(Map<String, CapabilityMetadata> capabilities, CapabilityMetadata metadata)
@@ -462,11 +460,4 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
                     + "; conflicting declaration at " + metadata.id());
     }
 
-    private static String invokeRest(RestSkillHandler handler, String name, String generationId,
-            Map<String, Object> arguments)
-    {
-        String result = handler.handle(new RestSkillInvocation(name, arguments, generationId));
-        if (result == null) throw new IllegalStateException("REST skill '" + name + "' handler returned null");
-        return result;
-    }
 }

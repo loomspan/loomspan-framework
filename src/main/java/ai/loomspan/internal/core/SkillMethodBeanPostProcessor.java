@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -225,7 +226,7 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
         var policy = new ai.loomspan.internal.security.SkillAccessPolicyResolver()
                 .resolve(method, targetClass);
         CapabilityMetadata metadata = new CapabilityMetadata(location, identity, capabilityDescription,
-                SkillExecutionDescriptor.none(), policy, invoker, CapabilityKind.JAVA_SKILL,
+                SkillExecutionDescriptor.none(), policy, invoker, SkillKind.JAVA,
                 new CapabilityToolDescriptor(name, capabilityDescription, inputSchema, null),
                 inputContractResolver.resolveJavaCapability(inputSchema),
                 new SkillSource(null, beanName, method.toGenericString()));

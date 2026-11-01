@@ -1,6 +1,6 @@
 package ai.loomspan.integration;
 
-import ai.loomspan.api.RestSkillHandler;
+import ai.loomspan.testkit.FixtureExecutor;
 import ai.loomspan.api.SkillMethod;
 import ai.loomspan.api.SkillTemplate;
 import okhttp3.mockwebserver.Dispatcher;
@@ -130,12 +130,12 @@ class DeclaredChildInputBindingsIntegrationTest {
             Files.writeString(skills.resolve("consumer.yaml"), """
                     name: consumer
                     description: Second explicit task
-                    rest: true
+                    executor: fixture
                     input_schema: {type: object, additionalProperties: false}
                     """);
         }
         Files.writeString(skills.resolve("root.yaml"), root);
-        Files.writeString(skills.resolve("producer.yaml"), producer(scenario.equals("provider-quota") ? "model" : "rest") + "rbac_roles: [ALLOWED]\n");
+        Files.writeString(skills.resolve("producer.yaml"), producer(scenario.equals("provider-quota") ? "model" : "executor") + "rbac_roles: [ALLOWED]\n");
         var revoked = new java.util.concurrent.atomic.AtomicBoolean();
         var authentication = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                 "caller", "unused", org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("ROLE_ALLOWED")) {
@@ -160,12 +160,12 @@ class DeclaredChildInputBindingsIntegrationTest {
                 }
             });
             server.start();
-            new ApplicationContextRunner().withUserConfiguration(App.class).withBean(RestSkillHandler.class, () -> invocation -> {
+            new ApplicationContextRunner().withUserConfiguration(App.class).withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
                 if (invocation.skillName().equals("default-producer")) assertThat(invocation.input()).containsEntry("caseId", "case-one");
                 if (scenario.equals("approval")) throw new org.springframework.security.access.AccessDeniedException("Explicit application approval absent");
                 sideEffects.incrementAndGet();
                 return "COMPLETE";
-            }).withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
+            })).withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
                     "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=" + server.url("/v1"),
                     "loomspan.connections.local.api-key=local-test", "loomspan.connections.local.provider-retry.enabled=false",
                     "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=deterministic",
@@ -237,8 +237,8 @@ class DeclaredChildInputBindingsIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"model,model,false", "model,java,true", "model,rest,false", "java,model,true",
-            "java,java,false", "java,rest,true", "rest,model,false", "rest,java,true", "rest,rest,false"})
+    @CsvSource({"model,model,false", "model,java,true", "model,executor,false", "java,model,true",
+            "java,java,false", "java,executor,true", "executor,model,false", "executor,java,true", "executor,executor,false"})
     void deliversLargeBoundEvidenceFromEmptyModelArguments(String producerKind, String consumerKind, boolean reasoning) throws Exception {
         Path skills = Files.createDirectory(directory.resolve("skills"));
         Files.writeString(skills.resolve("root.yaml"), parent());
@@ -293,13 +293,13 @@ class DeclaredChildInputBindingsIntegrationTest {
                 }
             }); server.start();
             ApplicationContextRunner runner=new ApplicationContextRunner().withUserConfiguration(App.class)
-                    .withBean(RestSkillHandler.class,()-> invocation -> {
+                    .withBean(FixtureExecutor.class,()-> new FixtureExecutor(invocation -> {
                         if (invocation.skillName().equals("default-producer")) {
                             assertThat(invocation.input()).containsEntry("caseId","case-one");
                             return JSON.writeValueAsString(Map.of("data",assessment("case-one")));
                         }
                         received.set(invocation.input()); return "COMPLETE";
-                    }).withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations="+skills.toUri()+"*.yaml",
+                    })).withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations="+skills.toUri()+"*.yaml",
                             "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url="+server.url("/v1"),
                             "loomspan.connections.local.api-key=local-test", "loomspan.connections.local.provider-retry.enabled=false",
                             "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=deterministic",
@@ -362,7 +362,7 @@ class DeclaredChildInputBindingsIntegrationTest {
     private static String producer(String kind) { return """
             name: producer
             description: Assess one case
-            """ + (kind.equals("rest") ? "rest: true\n" : "model: local\nprompt: PRODUCER. Return the complete assessment.\n"
+            """ + (kind.equals("executor") ? "executor: fixture\n" : "model: local\nprompt: PRODUCER. Return the complete assessment.\n"
                     + "output_schema_max_retries: 1\noutput_schema:\n  type: object\n  properties:\n    data: {type: object, additionalProperties: true}\n  required: [data]\n  additionalProperties: false\n") + """
             input_schema:
               type: object
@@ -374,7 +374,7 @@ class DeclaredChildInputBindingsIntegrationTest {
     private static String consumer(String kind) { return """
             name: consumer
             description: Compare complete evidence
-            """ + (kind.equals("rest") ? "rest: true\n" : "model: local\nprompt: CONSUMER. Use the supplied evidence.\n") + """
+            """ + (kind.equals("executor") ? "executor: fixture\n" : "model: local\nprompt: CONSUMER. Use the supplied evidence.\n") + """
             input_schema:
               type: object
               properties:

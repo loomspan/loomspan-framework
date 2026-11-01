@@ -5,7 +5,7 @@ import ai.loomspan.internal.runtime.evidence.EvidenceContract;
 import ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration;
 import ai.loomspan.internal.skill.YamlSkillDefinition;
 import ai.loomspan.internal.core.CapabilityMetadata;
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.SkillSource;
 import static org.mockito.Mockito.*;
 import ai.loomspan.internal.skill.YamlSkillManifest;
@@ -99,7 +99,7 @@ class DefaultRegisteredSkillCatalogTest
             var metadata = mock(CapabilityMetadata.class);
             when(metadata.name()).thenReturn(definition.manifest().getName());
             when(metadata.tool()).thenReturn(ai.loomspan.internal.core.CapabilityToolDescriptor.generic(definition.manifest().getName(), "description"));
-            when(metadata.kind()).thenReturn(CapabilityKind.YAML_SKILL);
+            when(metadata.kind()).thenReturn(SkillKind.YAML);
             definitionsByName.put(metadata.name(), definition);
             entries.add(metadata);
         }
@@ -107,7 +107,7 @@ class DefaultRegisteredSkillCatalogTest
         {
             var metadata = mock(CapabilityMetadata.class);
             when(metadata.name()).thenReturn("JavaLookup");
-            when(metadata.kind()).thenReturn(CapabilityKind.JAVA_SKILL);
+            when(metadata.kind()).thenReturn(SkillKind.JAVA);
             when(metadata.source()).thenReturn(new SkillSource(null, "lookupBean", "example.Lookup.lookup(java.lang.String)"));
             entries.add(metadata);
         }

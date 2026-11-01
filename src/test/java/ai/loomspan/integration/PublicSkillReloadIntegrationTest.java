@@ -3,8 +3,8 @@ package ai.loomspan.integration;
 import ai.loomspan.api.PreparedSkillUpdate;
 import ai.loomspan.api.ExecutionConfiguration;
 import ai.loomspan.api.SkillInvocationHandoff;
-import ai.loomspan.api.RestSkillHandler;
-import ai.loomspan.api.RestSkillInvocation;
+import ai.loomspan.testkit.FixtureExecutor;
+import ai.loomspan.api.SkillExecutorInvocation;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillReloadException;
 import ai.loomspan.api.SkillReloader;
@@ -509,14 +509,14 @@ class PublicSkillReloadIntegrationTest
             throws Exception
     {
         Path configured = directory.resolve("configured.yaml");
-        Files.writeString(configured, "name: configured\ndescription: configured\nrest: true\n");
+        Files.writeString(configured, "name: configured\ndescription: configured\nexecutor: fixture\n");
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(
                         ConfigurationPropertiesAutoConfiguration.class,
                         ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
                         LoomspanAutoConfiguration.class,
                         ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
-                .withUserConfiguration(RestConfiguration.class)
+                .withUserConfiguration(ExecutorConfiguration.class)
                 .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
@@ -525,23 +525,23 @@ class PublicSkillReloadIntegrationTest
                     SkillValidationResult configuredFeedback = reloader.validate("default", ai.loomspan.testkit.PublicationFixtures.documents(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
                     assertThat(configuredFeedback.valid()).isTrue();
                     assertThat(configuredFeedback.skills().stream()
-                            .filter(skill -> skill.kind() == SkillKind.REST)
+                            .filter(skill -> skill.kind() == SkillKind.JAVA)
                             .map(ValidatedSkill::name).toList()).containsExactly("default-configured");
-                    String supplied = "name: supplied\ndescription: supplied\nrest: true\n";
+                    String supplied = "name: supplied\ndescription: supplied\nexecutor: fixture\n";
                     var documents = List.of(new SkillDocument(directory.resolve("absent.yaml").toString(), supplied));
                     SkillValidationResult proposed = reloader.validate("default", documents, ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
                     assertThat(proposed.valid()).isTrue();
-                    List<String> proposedRestNames = proposed.skills().stream()
-                            .filter(skill -> skill.kind() == SkillKind.REST)
+                    List<String> proposedExecutorNames = proposed.skills().stream()
+                            .filter(skill -> skill.kind() == SkillKind.JAVA)
                             .map(ValidatedSkill::name).toList();
-                    assertThat(proposedRestNames).containsExactly("default-supplied");
+                    assertThat(proposedExecutorNames).containsExactly("default-supplied");
                     assertThat(Files.exists(directory.resolve("absent.yaml"))).isFalse();
                     assertThat(reloader.snapshot("default").generationId()).isEqualTo(initial);
                     assertThat(reloader.snapshot("default").skill("default-configured")).isPresent();
                     assertThat(reloader.snapshot("default").skill("default-supplied")).isEmpty();
                     PreparedSkillUpdate candidate = reloader.prepare("default", documents, ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
                     assertThat(candidate.snapshot().skill("default-supplied")).isPresent();
-                    try { Files.writeString(configured, "name: broken\ndescription: broken\nrest: true\nmodel: forbidden\n"); }
+                    try { Files.writeString(configured, "name: broken\ndescription: broken\nexecutor: fixture\nmodel: forbidden\n"); }
                     catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
                     assertThat(reloader.validate("default", ai.loomspan.testkit.PublicationFixtures.documents(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class))).valid()).isFalse();
                     assertThat(reloader.validate("default", documents, ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class))).valid()).isTrue();
@@ -555,14 +555,14 @@ class PublicSkillReloadIntegrationTest
     @Test
     void retirementWaitsForPendingOldGenerationThenCleansUpAfterRelease(@TempDir Path directory)
     {
-        String yaml = "name: leaf\ndescription: REST leaf\nrest: true\n";
+        String yaml = "name: leaf\ndescription: EXECUTOR leaf\nexecutor: fixture\n";
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(
                         ConfigurationPropertiesAutoConfiguration.class,
                         ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
                         LoomspanAutoConfiguration.class,
                         ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
-                .withUserConfiguration(RestConfiguration.class)
+                .withUserConfiguration(ExecutorConfiguration.class)
                 .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
@@ -571,54 +571,54 @@ class PublicSkillReloadIntegrationTest
                     List<String> retired = new CopyOnWriteArrayList<>();
                     try (AutoCloseable registration = reloader.onGenerationRetired(id -> {
                         retired.add(id);
-                        RestConfiguration.config.remove(id);
+                        ExecutorConfiguration.config.remove(id);
                     }))
                     {
                         String initial = reloader.snapshot("default").generationId();
-                        RestConfiguration.config.put(initial, "initial");
+                        ExecutorConfiguration.config.put(initial, "initial");
                         PreparedSkillUpdate first = reloader.prepare("default", List.of(new SkillDocument("A", yaml)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
-                        RestConfiguration.config.put(first.generationId(), "A");
+                        ExecutorConfiguration.config.put(first.generationId(), "A");
                         reloader.publish(first);
                         assertThat(retired).containsExactly(initial);
                         var pending = handoff.handoff("default-leaf", Map.of("message", "old"));
                         assertThat(pending.generationId()).isEqualTo(first.generationId()).isNotBlank();
                         PreparedSkillUpdate second = reloader.prepare("default", List.of(new SkillDocument("B", yaml)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
-                        RestConfiguration.config.put(second.generationId(), "B");
+                        ExecutorConfiguration.config.put(second.generationId(), "B");
                         reloader.publish(second);
                         assertThat(retired).doesNotContain(first.generationId());
-                        assertThat(RestConfiguration.config).containsKey(first.generationId());
+                        assertThat(ExecutorConfiguration.config).containsKey(first.generationId());
                         assertThat(pending.generationId()).isEqualTo(first.generationId());
                         pending.release();
                         assertThat(retired).containsExactly(initial, first.generationId());
                         assertThat(pending.generationId()).isEqualTo(first.generationId());
-                        assertThat(RestConfiguration.config).doesNotContainKey(first.generationId());
-                        assertThat(RestConfiguration.config).containsKey(second.generationId());
+                        assertThat(ExecutorConfiguration.config).doesNotContainKey(first.generationId());
+                        assertThat(ExecutorConfiguration.config).containsKey(second.generationId());
                         var invokedPending = handoff.handoff("default-leaf", Map.of("message", "older"));
                         assertThat(invokedPending.generationId()).isEqualTo(second.generationId());
                         PreparedSkillUpdate third = reloader.prepare("default", List.of(new SkillDocument("C", yaml)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
-                        RestConfiguration.config.put(third.generationId(), "C");
+                        ExecutorConfiguration.config.put(third.generationId(), "C");
                         reloader.publish(third);
                         assertThat(retired).doesNotContain(second.generationId());
                         assertThat(invokedPending.invoke()).isEqualTo("B:older");
-                        assertThat(RestConfiguration.lastInvocation.get().generationId())
+                        assertThat(ExecutorConfiguration.lastInvocation.get().executorConfigGenerationId())
                                 .isEqualTo(invokedPending.generationId());
                         assertThat(retired).containsExactly(initial, first.generationId(), second.generationId());
                         assertThat(invokedPending.generationId()).isEqualTo(second.generationId());
-                        assertThat(RestConfiguration.config).containsKey(third.generationId());
+                        assertThat(ExecutorConfiguration.config).containsKey(third.generationId());
                         var failingPending = handoff.handoff("default-leaf", Map.of("message", "fail"));
                         assertThat(failingPending.generationId()).isEqualTo(third.generationId());
                         PreparedSkillUpdate fourth = reloader.prepare("default", List.of(new SkillDocument("D", yaml)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
-                        RestConfiguration.config.put(fourth.generationId(), "D");
+                        ExecutorConfiguration.config.put(fourth.generationId(), "D");
                         reloader.publish(fourth);
                         assertThatThrownBy(failingPending::invoke).isInstanceOf(ai.loomspan.api.SkillException.class);
-                        assertThat(RestConfiguration.lastInvocation.get().generationId())
+                        assertThat(ExecutorConfiguration.lastInvocation.get().executorConfigGenerationId())
                                 .isEqualTo(failingPending.generationId());
                         assertThat(failingPending.generationId()).isEqualTo(third.generationId());
                         assertThat(retired).containsExactly(initial, first.generationId(),
                                 second.generationId(), third.generationId());
                     }
                 });
-        RestConfiguration.config.clear();
+        ExecutorConfiguration.config.clear();
     }
 
     @Test
@@ -665,14 +665,14 @@ class PublicSkillReloadIntegrationTest
     @Test
     void preparesSuppliedYamlWithoutFilesThroughSupportedApis(@TempDir Path directory)
     {
-        String yaml = "name: suppliedLeaf\ndescription: Supplied REST skill\nrest: true\n";
+        String yaml = "name: suppliedLeaf\ndescription: Supplied EXECUTOR skill\nexecutor: fixture\n";
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(
                         ConfigurationPropertiesAutoConfiguration.class,
                         ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
                         LoomspanAutoConfiguration.class,
                         ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
-                .withUserConfiguration(RestConfiguration.class)
+                .withUserConfiguration(ExecutorConfiguration.class)
                 .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
@@ -682,7 +682,7 @@ class PublicSkillReloadIntegrationTest
                     PreparedSkillUpdate candidate = reloader.prepare("default", List.of(new SkillDocument("opaque label", yaml)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
                     assertThat(candidate.snapshot().skill("default-suppliedLeaf")).isPresent();
                     assertThat(reloader.snapshot("default").skills()).isEmpty();
-                    RestConfiguration.config.put(candidate.generationId(), "S");
+                    ExecutorConfiguration.config.put(candidate.generationId(), "S");
                     reloader.publish(candidate);
                     assertThat(context.getBean(SkillTemplate.class).invoke("default-suppliedLeaf", Map.of("message", "hi")))
                             .isEqualTo("S:hi");
@@ -694,7 +694,7 @@ class PublicSkillReloadIntegrationTest
                     var admitted = context.getBean(SkillInvocationHandoff.class)
                             .handoff("default-suppliedLeaf", Map.of("message", "old"));
                     PreparedSkillUpdate replacement = reloader.prepare("default", List.of(new SkillDocument("other label", yaml)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
-                    RestConfiguration.config.put(replacement.generationId(), "T");
+                    ExecutorConfiguration.config.put(replacement.generationId(), "T");
                     reloader.publish(replacement);
                     assertThat(admitted.invoke()).isEqualTo("S:old");
                     assertThat(context.getBean(SkillTemplate.class).invoke("default-suppliedLeaf", Map.of("message", "new")))
@@ -707,7 +707,7 @@ class PublicSkillReloadIntegrationTest
                     assertThatThrownBy(() -> reloader.publish(competingSupplied))
                             .isInstanceOf(SkillReloadException.class).hasMessageContaining("stale");
                 });
-        RestConfiguration.config.clear();
+        ExecutorConfiguration.config.clear();
     }
 
     @Test
@@ -715,8 +715,8 @@ class PublicSkillReloadIntegrationTest
     {
         List<SkillDocument> saved = List.of(new SkillDocument("durable revision", """
                 name: restored
-                description: Restored REST skill
-                rest: true
+                description: Restored EXECUTOR skill
+                executor: fixture
                 """));
         String first = restoreInFreshContext(directory, saved);
         String second = restoreInFreshContext(directory, saved);
@@ -732,7 +732,7 @@ class PublicSkillReloadIntegrationTest
                         ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
                         LoomspanAutoConfiguration.class,
                         ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
-                .withUserConfiguration(RestConfiguration.class)
+                .withUserConfiguration(ExecutorConfiguration.class)
                 .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
@@ -740,12 +740,12 @@ class PublicSkillReloadIntegrationTest
                     assertThat(reloader.snapshot("default").skills()).isEmpty();
                     PreparedSkillUpdate candidate = reloader.prepare("default", saved, ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
                     generation[0] = candidate.generationId();
-                    RestConfiguration.config.put(generation[0], "R");
+                    ExecutorConfiguration.config.put(generation[0], "R");
                     reloader.publish(candidate);
                     assertThat(context.getBean(SkillTemplate.class).invoke("default-restored", Map.of()))
                             .isEqualTo("R:null");
                 });
-        RestConfiguration.config.clear();
+        ExecutorConfiguration.config.clear();
         return generation[0];
     }
 
@@ -756,7 +756,7 @@ class PublicSkillReloadIntegrationTest
         String valid = """
                 name: reloadLeaf
                 description: Initial description
-                rest: true
+                executor: fixture
                 input_schema:
                   type: object
                   properties:
@@ -773,7 +773,7 @@ class PublicSkillReloadIntegrationTest
                         ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
                         LoomspanAutoConfiguration.class,
                         ai.loomspan.autoconfigure.LoomspanAiAutoConfiguration.class))
-                .withUserConfiguration(RestConfiguration.class)
+                .withUserConfiguration(ExecutorConfiguration.class)
                 .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
@@ -783,7 +783,7 @@ class PublicSkillReloadIntegrationTest
                     SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
                     SkillCatalog startup = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
                     String initial = startup.generationId();
-                    RestConfiguration.config.put(initial, "A");
+                    ExecutorConfiguration.config.put(initial, "A");
                     assertThat(template.invoke("default-reloadLeaf", Map.of("message", "hello"))).isEqualTo("A:hello");
                     assertThat(template.invoke("default-reloadLeaf", Map.of("message", "trusted", "generationId", "spoofed")))
                             .isEqualTo("A:trusted");
@@ -793,7 +793,7 @@ class PublicSkillReloadIntegrationTest
                     PreparedSkillUpdate candidate = reloader.prepare("default", ai.loomspan.testkit.PublicationFixtures.documents(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
                     assertThat(candidate.generationId()).isNotEqualTo(initial);
                     assertThat(candidate.snapshot().generationId()).isEqualTo(candidate.generationId());
-                    RestConfiguration.config.put(candidate.generationId(), "B");
+                    ExecutorConfiguration.config.put(candidate.generationId(), "B");
                     try { Files.writeString(yaml, "invalid: ["); }
                     catch (java.io.IOException ex) { throw new IllegalStateException(ex); }
                     reloader.publish(candidate);
@@ -803,11 +803,11 @@ class PublicSkillReloadIntegrationTest
                     assertThat(reloader.snapshot("default").generationId()).isEqualTo(candidate.generationId());
                     assertThat(admittedOld.generationId()).isEqualTo(initial);
                     assertThat(admittedOld.invoke()).isEqualTo("A:delayed");
-                    assertThat(RestConfiguration.lastInvocation.get().generationId()).isEqualTo(initial);
+                    assertThat(ExecutorConfiguration.lastInvocation.get().executorConfigGenerationId()).isEqualTo(initial);
                     var admittedNew = handoff.handoff("default-reloadLeaf", new ReloadRequest("new"));
                     assertThat(admittedNew.generationId()).isEqualTo(candidate.generationId());
                     assertThat(admittedNew.invoke()).isEqualTo("B:new");
-                    assertThat(RestConfiguration.lastInvocation.get().generationId())
+                    assertThat(ExecutorConfiguration.lastInvocation.get().executorConfigGenerationId())
                             .isEqualTo(admittedNew.generationId());
                     assertThat(template.invoke("default-reloadLeaf", Map.of("message", "world"))).isEqualTo("B:world");
                     assertThatThrownBy(() -> reloader.publish(candidate)).isInstanceOf(SkillReloadException.class);
@@ -819,7 +819,7 @@ class PublicSkillReloadIntegrationTest
                     PreparedSkillUpdate competing = reloader.prepare("default", ai.loomspan.testkit.PublicationFixtures.documents(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
                     assertThat(sameYaml.generationId()).isNotEqualTo(candidate.generationId())
                             .isNotEqualTo(competing.generationId());
-                    RestConfiguration.config.put(sameYaml.generationId(), "C");
+                    ExecutorConfiguration.config.put(sameYaml.generationId(), "C");
                     reloader.publish(sameYaml);
                     assertThat(template.invoke("default-reloadLeaf", Map.of("message", "again"))).isEqualTo("C:again");
                     assertThatThrownBy(() -> reloader.publish(competing)).isInstanceOf(SkillReloadException.class)
@@ -833,24 +833,24 @@ class PublicSkillReloadIntegrationTest
                     assertThat(reloader.snapshot("default").skills()).isEmpty();
                     assertThat(startup.skill("default-reloadLeaf")).isPresent();
                 });
-        RestConfiguration.config.clear();
+        ExecutorConfiguration.config.clear();
     }
 
     @Configuration(proxyBeanMethods = false)
-    static class RestConfiguration
+    static class ExecutorConfiguration
     {
         static final Map<String, String> config = new ConcurrentHashMap<>();
-        static final AtomicReference<RestSkillInvocation> lastInvocation = new AtomicReference<>();
+        static final AtomicReference<SkillExecutorInvocation> lastInvocation = new AtomicReference<>();
 
         @Bean
-        RestSkillHandler handler()
+        FixtureExecutor handler()
         {
-            return invocation -> {
+            return new FixtureExecutor(invocation -> {
                 lastInvocation.set(invocation);
                 if ("fail".equals(invocation.input().get("message")))
                     throw new IllegalStateException("handler failed");
-                return config.get(invocation.generationId()) + ":" + invocation.input().get("message");
-            };
+                return config.get(invocation.executorConfigGenerationId()) + ":" + invocation.input().get("message");
+            });
         }
     }
 

@@ -30,10 +30,10 @@ finalization or mapping fails and does not depend on Console storage or trace pe
 The same timing applies to `AdmittedSkillInvocation.invoke(observer)`; an
 explicit release racing a claimed execution cannot end root ownership early.
 
-Java, REST, and model-backed YAML roots all produce a skill mission and terminal outcome. Java and REST
-execution do not create a model interaction merely for observation. Existing
+Java and model-backed YAML roots all produce a skill mission and terminal outcome. Java
+execution does not create a model interaction merely for observation. Existing
 canonical mission-frame records project into `SKILL_STARTED` and `SKILL_FINISHED`
-events for both direct sources, so a Java- or REST-only root has a meaningful public observer
+events for direct Java execution, so a Java-only root has a meaningful public observer
 view even without model or tool events.
 
 ## Captured namespace identity
@@ -53,8 +53,7 @@ execution, even after current publication changes or removal/recreation. They ar
 same-release diagnostics, not an additional supported Java snapshot API.
 
 `AdmittedSkillInvocation.generationId()` identifies the entry generation;
-`RestSkillInvocation.generationId()` identifies the executing REST target's
-captured generation. They may differ in a cross-namespace call. Public skill-call
+`SkillExecutorInvocation.executorConfigGenerationId()` identifies the captured executor namespace generation, which can differ from both the entry generation and the executing YAML leaf's owner. Public skill-call
 visibility grants neither observation nor configuration access. Host catalog
 metadata remains unfiltered under existing observation authorization, while
 runtime discovery enforces execution permissions.

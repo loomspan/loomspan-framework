@@ -32,7 +32,7 @@ public final class DefaultSkillCatalog implements SkillCatalog
             if (!metadata.identity().namespace().equals(this.namespace))
                 throw new IllegalArgumentException("catalog capability belongs to another namespace: " + metadata.name());
             SkillDescriptor descriptor = new SkillDescriptor(metadata.name(), metadata.description(),
-                    metadata.kind().publicKind(), metadata.tool().inputSchema(), metadata.tool().outputSchema());
+                    metadata.kind(), metadata.tool().inputSchema(), metadata.tool().outputSchema());
             if (built.putIfAbsent(metadata.name(), descriptor) != null)
             {
                 throw new IllegalArgumentException("Duplicate registered skill name '" + metadata.name() + "'");

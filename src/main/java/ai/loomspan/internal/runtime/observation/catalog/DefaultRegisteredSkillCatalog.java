@@ -2,7 +2,7 @@ package ai.loomspan.internal.runtime.observation.catalog;
 
 import ai.loomspan.internal.skill.YamlSkillDefinition;
 import ai.loomspan.internal.core.CapabilityMetadata;
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import org.springframework.lang.Nullable;
 
 import java.nio.ByteBuffer;
@@ -31,17 +31,17 @@ public final class DefaultRegisteredSkillCatalog implements RegisteredSkillCatal
         {
             String name = metadata.name();
             RegisteredSkillEntry entry;
-            if (metadata.kind() == CapabilityKind.YAML_SKILL || metadata.kind() == CapabilityKind.REST_SKILL || metadata.kind() == CapabilityKind.TYPESAFE_SKILL)
+            if (definitions.containsKey(name))
             {
                 var definition = Objects.requireNonNull(definitions.get(name), "manifest registration must have a definition");
                 entry = new RegisteredSkillEntry(name,
-                        metadata.kind().publicKind().name(),
+                        definition.typesafe() ? "TYPESAFE" : "YAML",
                         pathResolver.resolve(definition.source()),
                         null, null, decode(definition.source().bytes(), name), metadata.tool().outputSchema());
             }
-            else if (metadata.kind() == CapabilityKind.JAVA_SKILL)
+            else if (metadata.kind() == SkillKind.JAVA)
             {
-                entry = new RegisteredSkillEntry(name, metadata.kind().publicKind().name(), null,
+                entry = new RegisteredSkillEntry(name, metadata.kind().name(), null,
                         metadata.source().beanName(), metadata.source().method(), null, null);
             }
             else throw new IllegalStateException("Unsupported capability kind " + metadata.kind());

@@ -1,5 +1,6 @@
 package ai.loomspan.internal.runtime.trace;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.core.*;
 import ai.loomspan.internal.runtime.input.*;
@@ -28,7 +29,7 @@ class DeclaredChildInputBindingsTraceTest {
                 {"type":"object","properties":{"caseId":{"type":"string"},"evidence":{"type":"object","additionalProperties":true},"count":{"type":"integer"}},"required":["caseId","evidence","count"],"additionalProperties":false}
                 """);
         return new CapabilityMetadata("java:consumer", "default-consumer", "consume", SkillExecutionDescriptor.none(),
-                SkillAccessPolicy.unrestricted(), args -> "DONE", CapabilityKind.JAVA_SKILL,
+                SkillAccessPolicy.unrestricted(), args -> "DONE", SkillKind.JAVA,
                 new CapabilityToolDescriptor("default-consumer", "consume", resolver.toJsonSchema(contract), null), contract, null);
     }
     private static YamlSkillDefinition definition(List<ChildInputBinding> bindings) {

@@ -25,7 +25,7 @@ Each `SkillDescriptor` has five components: `name`, `description`, `kind`,
 JSON input-schema string shown to models. `outputSchema` is normalized effective
 output metadata: the ordinary model producer's shape or a TypeSafe leaf's generated
 descriptive schema, inherited through a
-forwarding chain, or null for Java, REST and model producers without a schema.
+forwarding chain, or null for Java (including executor YAML) and model producers without a schema.
 Native descriptive metadata does not validate or repair TypeSafe answers.
 Child-local evidence annotations are omitted from metadata; it does not install
 a parent validator or guarantee factual correctness. See [output contracts](../skill-authoring/output-contracts.md). Retain a catalog as metadata or acquire another through `SkillReloader.snapshot(namespace)` for current discovery. Discovery is not authorization. See [skill-reload.md](skill-reload.md).

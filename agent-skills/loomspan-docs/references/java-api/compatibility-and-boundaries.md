@@ -9,12 +9,12 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the twenty-seven types in the closed
+Application code MAY depend on the twenty-five types in the closed
 `ai.loomspan.api` allowlist:
 
 | Type | Supported purpose |
 | --- | --- |
-| `SkillTemplate` | Validate or invoke a named Java, REST, TypeSafe, or model-backed YAML skill |
+| `SkillTemplate` | Validate or invoke a named Java, TypeSafe, or model-backed YAML skill |
 | `SkillInvocationHandoff` | Atomically transfer a prepared root invocation to framework ownership |
 | `AdmittedSkillInvocation` | Read the captured generation ID, execute once, or release an already-admitted root invocation |
 | `SkillReloader` | Validate, prepare, publish, snapshot or remove a complete namespace generation |
@@ -27,7 +27,7 @@ Application code MAY depend on the twenty-seven types in the closed
 | `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog and close it if unused |
 | `SkillCatalog` | Discover an immutable immutable namespace generation catalog, acquired explicitly or from a prepared candidate |
 | `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
-| `SkillKind` | Distinguish YAML, Java, REST, and TYPESAFE registrations |
+| `SkillKind` | Distinguish YAML, Java, and TYPESAFE registrations |
 | `SkillExecutionView` | Observe the completed invocation session |
 | `SkillExecutionEvent` | Read a current-version diagnostic event |
 | `SkillMethod` | Mark an application bean method as a directly callable Java skill |
@@ -39,8 +39,6 @@ Application code MAY depend on the twenty-seven types in the closed
 | `SkillReloadException` | Catch an operational preparation or publication failure |
 | `SkillInputValidationException` | Distinguish invalid caller input |
 | `SkillInputValidationIssue` | Inspect structured validation issues |
-| `RestSkillHandler` | Implement every YAML-declared REST leaf through the sole supported SPI |
-| `RestSkillInvocation` | Receive the exact skill name, immutable validated/resolved input, and captured generation ID |
 
 Changes to these types are compatibility-sensitive. Application code SHOULD
 still use the narrowest type needed: inject or mock `SkillTemplate`, use the
@@ -63,14 +61,9 @@ and recompile; the former one-argument constructor is removed. The new
 `ValidatedSkill` record supplies immutable candidate name/kind metadata. See
 [two-stage skill updates](skill-reload.md) for the valid-first contract.
 
-Two-stage updates deliberately add `SkillReloader`, `PreparedSkillUpdate`, and
-`SkillReloadException` to the supported API. `SkillCatalog` now requires
-`generationId()`, and `RestSkillInvocation` is a three-component record with
-`generationId` alongside name and input. Existing application implementations
-of `SkillCatalog` and direct two-argument `RestSkillInvocation` construction
-must be updated and recompiled; there is no compatibility method or constructor.
-The ID is process-local and supplied by Loomspan for handler calls, not inferred
-from business input or the current active catalog. See [two-stage skill updates](skill-reload.md).
+Applications use annotated `@SkillExecutor` methods and executor YAML leaves for application-owned operations. These are intentional pre-1.0 source, binary and behavior changes without compatibility shims. Executor-backed YAML skills classify as `SkillKind.JAVA`; their YAML definitions remain available. See [executor leaves](../skill-authoring/executor-skills.md).
+
+`SkillCatalog.generationId()` identifies its process-local immutable namespace generation. Executor invocations receive the captured executor namespace generation ID separately from the executing YAML skill identity. See [two-stage skill updates](skill-reload.md).
 
 The handoff facade and handle are additive and leave every `SkillTemplate`
 signature unchanged. The three catalog types are additive. The two `SkillTemplate.validate`
@@ -106,8 +99,7 @@ Application code MUST NOT treat these areas as supported extension API:
   model factories, or virtual-file-system components;
 - bean names or method signatures as alternative skill invocation identities.
 
-Loomspan exposes only `RestSkillHandler` as a supported Java SPI and no supported contract for
-replacing framework beans. Do not recommend an internal type merely because it
+Loomspan exposes no supported Java SPI or contract for replacing framework beans. Do not recommend an internal type merely because it
 is accessible to the Java compiler or application context.
 
 Documented configuration keys and behavior remain user-visible contracts even
@@ -127,29 +119,23 @@ allow the YAML skill to call its exact name through `allowed_skills`, and observ
 
 `SupportedSurfaceIntegrationTest` is the source anchor for this composition:
 it verifies a single `SkillTemplate` bean, invokes an LLM-backed YAML skill
-through a local OpenAI-compatible endpoint, permits application Java and REST
-leaf calls, directly invokes the REST leaf, and receives a public observation
+through a local OpenAI-compatible endpoint, permits application Java
+leaf calls, directly invokes an executor YAML leaf, and receives a public observation
 view.
 
 ## Architecture Invariants
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the `api` package has exactly the twenty-seven allowlisted public top-level types;
+- the `api` package has exactly the twenty-five allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;
-- the only supported SPI is `RestSkillHandler`; no separate `spi` package exists;
+- no supported Java SPI or internal bean-replacement contract exists;
 - supported public signatures do not expose `internal` or `autoconfigure`
   types.
 
-REST is also a semantic expansion of the framework-to-Console protocol in
-beta 4 even though the JSON record shape did not gain a separate version
-field. Framework and Console therefore retain the coordinated exact project
-version as their compatibility marker; there is no independent schema counter,
-range negotiation, legacy reader, or snapshot-to-snapshot compatibility rule.
-Only dual `development` markers bypass the version promise while retaining
-ordinary complete validation.
+Framework and Console use the coordinated exact project version as their compatibility marker; there is no independent schema counter, range negotiation, legacy reader, or snapshot-to-snapshot compatibility rule. Only dual `development` markers bypass the version promise while retaining ordinary complete validation. Execution classification and declaration source are distinct: public executor leaves classify as Java while their retained declaration is YAML. Current diagnostic displays do not provide a complete executor provenance model.
 
 ## Source Anchors
 

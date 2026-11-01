@@ -3,7 +3,7 @@ package ai.loomspan.internal.runtime.tool;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.ExecutionFrame;
@@ -164,7 +164,7 @@ class DefaultCapabilityInvokerTest {
         var sourceMetadata = new CapabilityMetadata("yaml:source", source.identity().toString(), "source",
                 SkillExecutionDescriptor.from(source.executionConfiguration()),
                 ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(), input -> "unused",
-                CapabilityKind.YAML_SKILL, CapabilityToolDescriptor.generic(source.identity().toString(), "source"), null);
+                SkillKind.YAML, CapabilityToolDescriptor.generic(source.identity().toString(), "source"), null);
         var generation = ai.loomspan.testkit.TestSkillGenerations.of(
                 Map.of(sourceMetadata.name(), sourceMetadata, metadata.name(), metadata),
                 Map.of(source.identity().toString(), source));
@@ -234,7 +234,7 @@ class DefaultCapabilityInvokerTest {
                 "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
+                arguments -> "child:" + arguments.get("value"), SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
     }
 

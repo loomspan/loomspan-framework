@@ -1,6 +1,6 @@
 package ai.loomspan.integration;
 
-import ai.loomspan.api.RestSkillHandler;
+import ai.loomspan.testkit.FixtureExecutor;
 import ai.loomspan.api.SkillDocument;
 import ai.loomspan.api.SkillReloader;
 import ai.loomspan.api.SkillTemplate;
@@ -77,7 +77,7 @@ class BindingIsolationIntegrationTest {
                 }
             }); server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class)
-                    .withBean(RestSkillHandler.class, () -> invocation -> {
+                    .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
                         assertThat(invocation.input()).containsEntry("marker", "original");
                         if (invocation.skillName().equals("default-producer")) {
                             firstEntered.countDown(); await(releaseFirst);
@@ -95,7 +95,7 @@ class BindingIsolationIntegrationTest {
                         assertThat(invocation.input().get("evidence")).isEqualTo(Map.of("amount", new java.math.BigInteger("9007199254740993"), "source", "first"));
                         assertThat(invocation.input().get("secondEvidence")).isEqualTo(Map.of("rows", List.of("original"), "source", "second"));
                         return "COMPLETE";
-                    }).withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
+                    })).withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
                             "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=" + server.url("/v1"),
                             "loomspan.connections.local.api-key=local-test", "loomspan.connections.local.provider-retry.enabled=false",
                             "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=deterministic",
@@ -146,13 +146,13 @@ class BindingIsolationIntegrationTest {
                 }
             }); server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class)
-                    .withBean(RestSkillHandler.class, () -> invocation -> {
+                    .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
                         if (invocation.skillName().equals("default-producer")) {
                             producerCalls.incrementAndGet();
                             return JSON.writeValueAsString(Map.of("data", Map.of("marker", invocation.input().get("marker"))));
                         }
                         consumerCalls.incrementAndGet(); return "must not dispatch";
-                    }).withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
+                    })).withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
                             "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=" + server.url("/v1"),
                             "loomspan.connections.local.api-key=local-test", "loomspan.connections.local.provider-retry.enabled=false",
                             "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=deterministic",
@@ -206,7 +206,7 @@ class BindingIsolationIntegrationTest {
             });
             server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class)
-                    .withBean(RestSkillHandler.class, () -> invocation -> {
+                    .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
                         String marker = (String) invocation.input().get("marker");
                         if (invocation.skillName().equals("default-producer")) {
                             if (!reload || marker.equals("held")) {
@@ -220,7 +220,7 @@ class BindingIsolationIntegrationTest {
                         delivered.add(invocation.input());
                         assertThat(invocation.input().get("evidence")).isEqualTo(Map.of("marker", marker));
                         return JSON.writeValueAsString(Map.of("marker", marker));
-                    }).withPropertyValues("spring.main.web-application-type=none",
+                    })).withPropertyValues("spring.main.web-application-type=none",
                             "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
                             "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=" + server.url("/v1"),
                             "loomspan.connections.local.api-key=local-test", "loomspan.connections.local.provider-retry.enabled=false",
@@ -319,7 +319,7 @@ class BindingIsolationIntegrationTest {
     private static String leaf(String name) { return """
             name: %s
             description: Exact invocation-local evidence
-            rest: true
+            executor: fixture
             input_schema:
               type: object
               properties:

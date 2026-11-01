@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.model.ModelInteractionFactory;
 import ai.loomspan.internal.runtime.LoomspanMissionTimeoutException;
@@ -196,7 +197,7 @@ class ExecutionCoordinatorTest {
             String name = definition.identity().toString();
             registry.register(name, new CapabilityMetadata("yaml:" + name, name, name,
                     SkillExecutionDescriptor.from(configuration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                    arguments -> { throw new AssertionError("YAML must enter its mission engine"); }, CapabilityKind.YAML_SKILL,
+                    arguments -> { throw new AssertionError("YAML must enter its mission engine"); }, SkillKind.YAML,
                     CapabilityToolDescriptor.generic(name, name), resolver.resolveYamlCapability(definition), null));
         }
         return coordinator(catalog, registry,
@@ -208,21 +209,21 @@ class ExecutionCoordinatorTest {
     @Test
     void failedMissionFrameOpenReleasesRetiredGeneration()
     {
-        CapabilityMetadata rest = new CapabilityMetadata(
-                "rest:lookup", "default-restLookup", "REST lookup", SkillExecutionDescriptor.none(),
+        CapabilityMetadata javaSkill = new CapabilityMetadata(
+                "java:lookup", "default-directLookup", "Java lookup", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "unused", CapabilityKind.REST_SKILL,
-                CapabilityToolDescriptor.generic("default-restLookup", "REST lookup"), null);
+                arguments -> "unused", SkillKind.JAVA,
+                CapabilityToolDescriptor.generic("default-directLookup", "Java lookup"), null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
-        registry.register(rest.name(), rest);
+        registry.register(javaSkill.name(), javaSkill);
         var generations = registry.manager();
         var retired = new java.util.concurrent.CopyOnWriteArrayList<String>();
         generations.onGenerationRetired(retired::add);
-        var captured = generations.capture(SkillIdentity.parse(rest.name()));
+        var captured = generations.capture(SkillIdentity.parse(javaSkill.name()));
         var lifecycle = new FrameworkExecutionLifecycle(new StaticApplicationContext(),
                 Duration.ofSeconds(1), Executors.newSingleThreadExecutor());
         var root = lifecycle.admitRoot(captured.lease());
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.create("failed-frame", "default-restLookup", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.create("failed-frame", "default-directLookup", 3);
         session.attachAdmittedRoot(root);
         assertThat(root.claimExecution()).isTrue();
         ai.loomspan.testkit.TestSkillGenerations.activate(generations, ai.loomspan.testkit.TestSkillGenerations.empty());
@@ -239,15 +240,15 @@ class ExecutionCoordinatorTest {
         };
         ExecutionCoordinator coordinator = coordinator(new StubYamlSkillCatalog(), registry,
                 (currentSkillName, sessionState, authentication) -> List.of(),
-                (definition, mode) -> { throw new AssertionError("REST must not create a model interaction"); },
+                (definition, mode) -> { throw new AssertionError("Java must not create a model interaction"); },
                 (value, currentSession) -> value, null, state, fixedPlanningService(state),
                 (currentSession, definition, objective, missionInput, model, tools, planning, authentication) -> {
-                    throw new AssertionError("REST must not enter a model execution engine");
+                    throw new AssertionError("Java must not enter a model execution engine");
                 }, null);
 
         try
         {
-            assertThatThrownBy(() -> coordinator.execute("default-restLookup", "lookup", session, null))
+            assertThatThrownBy(() -> coordinator.execute("default-directLookup", "lookup", session, null))
                     .isInstanceOf(IllegalStateException.class).hasMessage("frame-open-failed");
             root.completeExecution();
             assertThat(retired).containsExactly(captured.snapshot().entryGeneration().id());
@@ -256,42 +257,42 @@ class ExecutionCoordinatorTest {
     }
 
     @Test
-    void executesRestOnTheDirectWorkerWithResolvedInputAndNoModelAttempt()
+    void executesJavaOnTheDirectWorkerWithResolvedInputAndNoModelAttempt()
     {
         var resolved = new ByteArrayResource(new byte[] {1, 2, 3});
         var handlerAuthentication = new java.util.concurrent.atomic.AtomicReference<String>();
         var handlerInput = new java.util.concurrent.atomic.AtomicReference<Map<String, Object>>();
-        CapabilityMetadata rest = new CapabilityMetadata(
-                "rest:lookup", "default-restLookup", "REST lookup", SkillExecutionDescriptor.none(),
-                ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("REST_USER")),
+        CapabilityMetadata javaSkill = new CapabilityMetadata(
+                "java:lookup", "default-directLookup", "Java lookup", SkillExecutionDescriptor.none(),
+                ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("JAVA_USER")),
                 arguments -> {
                     handlerAuthentication.set(org.springframework.security.core.context.SecurityContextHolder
                             .getContext().getAuthentication().getName());
                     handlerInput.set(arguments);
                     return "resolved";
-                }, CapabilityKind.REST_SKILL,
-                CapabilityToolDescriptor.generic("default-restLookup", "REST lookup"), null);
+                }, SkillKind.JAVA,
+                CapabilityToolDescriptor.generic("default-directLookup", "Java lookup"), null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
-        registry.register(rest.name(), rest);
+        registry.register(javaSkill.name(), javaSkill);
         ExecutionStateService state = fixedStateService();
         ExecutionCoordinator coordinator = coordinator(
                 new StubYamlSkillCatalog(), registry,
                 (currentSkillName, sessionState, authentication) -> List.of(),
-                (definition, mode) -> { throw new AssertionError("REST must not create a model interaction"); },
+                (definition, mode) -> { throw new AssertionError("Java must not create a model interaction"); },
                 (value, session) -> "ref://attachment".equals(value) ? resolved : value,
                 null, state, fixedPlanningService(state),
                 (session, definition, objective, missionInput, model, tools, planning, authentication) -> {
-                    throw new AssertionError("REST must not enter a model execution engine");
+                    throw new AssertionError("Java must not enter a model execution engine");
                 }, null);
         var caller = UsernamePasswordAuthenticationToken.authenticated(
-                "rest-caller", "unused", AuthorityUtils.createAuthorityList("ROLE_REST_USER"));
+                "java-caller", "unused", AuthorityUtils.createAuthorityList("ROLE_JAVA_USER"));
         LoomspanSession session = TestLoomspanSessions.withId(
-                "session-rest", "default-restLookup", 2, null, TracePersistencePolicy.ALWAYS);
+                "session-java", "default-directLookup", 2, null, TracePersistencePolicy.ALWAYS);
 
         assertThat(coordinator.execute(
-                "default-restLookup", "Resolve the attachment", Map.of("attachment", "ref://attachment"), session, caller))
+                "default-directLookup", "Resolve the attachment", Map.of("attachment", "ref://attachment"), session, caller))
                 .isEqualTo("resolved");
-        assertThat(handlerAuthentication).hasValue("rest-caller");
+        assertThat(handlerAuthentication).hasValue("java-caller");
         assertThat(handlerInput.get()).containsEntry("attachment", resolved);
         assertThat(readTraceRecords(session)).extracting(TraceRecord::recordType)
                 .contains(TraceRecordType.FRAME_OPENED, TraceRecordType.FRAME_CLOSED, TraceRecordType.TRACE_COMPLETED)
@@ -317,7 +318,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ROOT")),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
@@ -325,7 +326,7 @@ class ExecutionCoordinatorTest {
                 "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "child", CapabilityKind.JAVA_SKILL,
+                arguments -> "child", SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -386,7 +387,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ROOT")),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
@@ -394,7 +395,7 @@ class ExecutionCoordinatorTest {
                 "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "child", CapabilityKind.JAVA_SKILL,
+                arguments -> "child", SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -452,7 +453,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
@@ -460,7 +461,7 @@ class ExecutionCoordinatorTest {
                 "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
+                arguments -> "child:" + arguments.get("value"), SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -554,7 +555,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
@@ -562,7 +563,7 @@ class ExecutionCoordinatorTest {
                 "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
+                arguments -> "child:" + arguments.get("value"), SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -619,7 +620,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -673,7 +674,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -728,14 +729,14 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
         registry.register("default-top_entry", new CapabilityMetadata("yaml:parent", "default-top_entry", "parent",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),
-                input -> "unused", CapabilityKind.YAML_SKILL,
+                input -> "unused", SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-top_entry", "parent"), null));
 
         ExecutionStateService stateService = fixedStateService();
@@ -794,7 +795,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -842,7 +843,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -896,7 +897,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -940,7 +941,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -993,7 +994,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -1066,7 +1067,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
@@ -1074,7 +1075,7 @@ class ExecutionCoordinatorTest {
                 "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
+                arguments -> "child:" + arguments.get("value"), SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -1134,7 +1135,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
@@ -1144,7 +1145,7 @@ class ExecutionCoordinatorTest {
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 args -> {
                     throw new IllegalStateException("tool exploded");
-                }, CapabilityKind.JAVA_SKILL,
+                }, SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -1214,7 +1215,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(rootExecutionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
@@ -1225,7 +1226,7 @@ class ExecutionCoordinatorTest {
                 arguments -> {
                     throw new UnsupportedOperationException("should route through coordinator");
                 },
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-childLlmSkill", "child llm"),
                 null);
         CapabilityMetadata marsAnalyzerMetadata = new CapabilityMetadata(
@@ -1233,7 +1234,7 @@ class ExecutionCoordinatorTest {
                 "default-marsAnalyzer",
                 "mars analyzer",
                 SkillExecutionDescriptor.from(childExecutionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "analysis:" + arguments.get("topic"), CapabilityKind.JAVA_SKILL,
+                arguments -> "analysis:" + arguments.get("topic"), SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-marsAnalyzer", "mars analyzer"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -1340,7 +1341,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
@@ -1348,7 +1349,7 @@ class ExecutionCoordinatorTest {
                 "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")),
-                arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
+                arguments -> "child:" + arguments.get("value"), SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -1410,7 +1411,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(rootExecutionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
@@ -1421,7 +1422,7 @@ class ExecutionCoordinatorTest {
                 arguments -> {
                     throw new UnsupportedOperationException("should route through coordinator");
                 },
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-childLlmSkill", "child llm"),
                 null);
         CapabilityMetadata marsAnalyzerMetadata = new CapabilityMetadata(
@@ -1429,7 +1430,7 @@ class ExecutionCoordinatorTest {
                 "default-marsAnalyzer",
                 "mars analyzer",
                 SkillExecutionDescriptor.from(childExecutionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")),
-                arguments -> "analysis:" + arguments.get("topic"), CapabilityKind.JAVA_SKILL,
+                arguments -> "analysis:" + arguments.get("topic"), SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-marsAnalyzer", "mars analyzer"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -1524,7 +1525,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
 
@@ -1588,7 +1589,7 @@ class ExecutionCoordinatorTest {
                 "yaml:root", "default-rootVisibleSkill", "root",
                 SkillExecutionDescriptor.from(executionConfiguration),
                 ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "root", CapabilityKind.YAML_SKILL,
+                arguments -> "root", SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"), null);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         registry.register(rootMetadata.name(), rootMetadata);
@@ -1663,7 +1664,7 @@ class ExecutionCoordinatorTest {
                 "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
+                arguments -> "child:" + arguments.get("value"), SkillKind.JAVA,
                 new CapabilityToolDescriptor("default-allowedVisibleSkill", "child", methodSchema, null), null);
 
         ExecutionStateService stateService = fixedStateService();
@@ -1698,7 +1699,7 @@ class ExecutionCoordinatorTest {
                 "root",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "root",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
                 null);
         CapabilityMetadata childMetadata = new CapabilityMetadata(
@@ -1706,7 +1707,7 @@ class ExecutionCoordinatorTest {
                 "default-allowedVisibleSkill",
                 "child",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "child:" + arguments.get("value"), CapabilityKind.JAVA_SKILL,
+                arguments -> "child:" + arguments.get("value"), SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
 
         TestCapabilityRegistry registry = new TestCapabilityRegistry();

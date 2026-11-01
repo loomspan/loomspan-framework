@@ -2,7 +2,7 @@ package ai.loomspan.internal.runtime.planning;
 
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.core.LoomspanSession;
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.ExecutionPlan;
@@ -1387,7 +1387,7 @@ class PlanningServiceTest {
                         "test-connection", AiDriver.OPENAI,
                         "openai/gpt-5",
                         "medium")), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
-                arguments -> "ok", CapabilityKind.JAVA_SKILL,
+                arguments -> "ok", SkillKind.JAVA,
                 CapabilityToolDescriptor.generic(name, "child"), null);
     }
 

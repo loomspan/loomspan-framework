@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.model.ModelInteraction;
 import ai.loomspan.internal.model.ModelInteractionFactory;
 import ai.loomspan.internal.model.ModelInteractionMode;
@@ -100,9 +101,8 @@ public class ExecutionCoordinator
             throw new IllegalArgumentException("Capability '" + rootCapability.name()
                     + "' does not belong to the current skill generation");
         accessGuard.checkAccess(rootCapability, session, authentication);
-        YamlSkillDefinition definition = rootCapability.kind() == CapabilityKind.YAML_SKILL || rootCapability.kind() == CapabilityKind.TYPESAFE_SKILL
-                ? targetGeneration.definition(rootCapability.name()) : null;
-        if ((rootCapability.kind() == CapabilityKind.YAML_SKILL || rootCapability.kind() == CapabilityKind.TYPESAFE_SKILL) && definition == null)
+        YamlSkillDefinition definition = targetGeneration.definition(rootCapability.name());
+        if ((rootCapability.kind() == SkillKind.YAML || rootCapability.kind() == SkillKind.TYPESAFE) && definition == null)
             throw new IllegalArgumentException("Unknown captured YAML skill '" + rootCapability.name() + "'");
         MissionContext parentMission = baseBinding.mission();
         boolean topLevelInvocation = parentMission == null;
@@ -155,17 +155,22 @@ public class ExecutionCoordinator
 
         try
         {
-            if (rootCapability.kind() == CapabilityKind.TYPESAFE_SKILL)
+            if (rootCapability.kind() == SkillKind.TYPESAFE)
                 return missionWorkExecutor.executeEvaluation(session, definition, missionInput == null ? Map.of() : missionInput);
-            if (rootCapability.kind() == CapabilityKind.JAVA_SKILL
-                    || rootCapability.kind() == CapabilityKind.REST_SKILL)
+            if (rootCapability.kind() == SkillKind.JAVA)
             {
                 Authentication caller = accessGuard.resolveAuthentication(authentication, session);
                 return missionWorkExecutor.execute(session, skillName, () -> {
                     try (var ignored = scopedAuthentication.open(caller))
                     {
-                        return String.valueOf(rootCapability.invoker().invoke(refResolver.resolveArguments(
-                                missionInput == null ? Map.of() : missionInput, session, rootCapability.inputContract())));
+                        var resolved = refResolver.resolveArguments(missionInput == null ? Map.of() : missionInput,
+                                session, rootCapability.inputContract());
+                        if (definition != null && definition.form() == YamlSkillDefinition.Form.EXECUTOR) {
+                            var binding = parentBinding.snapshot().executorBinding(skillName);
+                            return binding.registration().invoker().apply(new ai.loomspan.api.SkillExecutorInvocation(
+                                    resolved, definition.config(), binding.configuration(), skillName, binding.generationId()));
+                        }
+                        return String.valueOf(rootCapability.invoker().invoke(resolved));
                     }
                 });
             }

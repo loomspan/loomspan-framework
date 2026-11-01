@@ -42,7 +42,7 @@ API validation/preparation supplies the owner for the same document. Ownership i
 never inferred from available targets. Missing `sales-search` fails even if
 `default-search` or a Public `shared-search` exists. Qualification grants no
 access: declared-child, same-namespace/foreign Public visibility and RBAC rules remain.
-Catalog lookup, runtime keys, model plan/tool selections, REST handoffs and
+Catalog lookup, runtime keys, model plan/tool selections, executor handoffs and
 observations MUST use qualified identities. Namespace case normalizes to lowercase;
 local case remains exact: `Tax-search` equals `tax-search`, while `tax-Search` differs.
 `a_b-c` and `a-b_c` differ. Local `child` and explicit owner `sales-child` are
@@ -67,7 +67,7 @@ Captured canonical observation metadata and existing Console consumers are imple
 
 Each root captures an immutable association of exactly the namespace generations reached
 by its declared child graph, before input conversion or validation. Every declared branch
-counts, including optional and role-restricted children; Java skills are leaves. Each
+counts, including optional and role-restricted children; Java skills are leaves. Executor dependencies retain their owning namespace without traversing unrelated callables. Each
 reached whole generation is retained once, but unrelated skills are not traversed and
 unrelated namespaces are not retained. Definitions, contracts, models, connections,
 limits and captured visibility remain stable across publication, removal and recreation.
@@ -128,7 +128,7 @@ Optional primitive parameters are invalid because omission binds null; use refer
 
 Java roots and children participate in the common skill mission lifecycle. Java executes without a framework model request and shares bounded mission timeout, interruption, and late-write cutoff handling. A successful child contributes its exact name at the parent tool boundary; a denial or failure contributes no success. The parent mission resumes on every exit.
 
-Console's catalog shows `YAML`, `REST`, `TYPESAFE`, or `Java` explicitly. YAML, REST, and TypeSafe details show the source label and original YAML; Java details show the bean and deterministic declared method signature. Pagination and links use only the registered name.
+Public execution kinds are `YAML`, `TYPESAFE`, and `JAVA`. Executor-backed YAML executes as Java while retaining its YAML definition. Framework diagnostic entries use declaration ownership for the original source; current Console displays do not provide a complete executor provenance model. Pagination and links use only the registered name.
 
 ## Root, Planner, Specialist, and Leaf Are Roles
 
@@ -144,7 +144,7 @@ A YAML skill can be a root in one tree and a nested specialist in another if its
 
 ## Visibility Is Local
 
-`allowed_skills` defines the candidate child Java, REST, TypeSafe, or model-backed YAML skills for one LLM-backed skill. It is not transitive.
+`allowed_skills` defines the candidate child Java, TypeSafe, or model-backed YAML skills for one LLM-backed skill. It is not transitive.
 
 If a root allows `network-investigate`, and that skill allows `network-checkDns`, the root sees `network-investigate`; it does not automatically see `network-checkDns`.
 
@@ -238,7 +238,7 @@ Do not automatically treat repeated business inputs as runtime metadata. Explici
 - `YamlSkillCatalog` validates model-backed manifests and rejects legacy mappings. `SkillGenerationManager#prepare` assembles and validates a detached complete generation; `ExecutionBinding` carries that exact generation through execution.
 - `DefaultSkillVisibilityResolver` filters the local shared child surface. `CapabilityExecutionRouter` and `ExecutionCoordinator` own dispatch and common isolated mission boundaries.
 - `SupportedSurfaceIntegrationTest` demonstrates application methods called through the supported facade.
-- `DefaultRegisteredSkillCatalogTest`, `ConsoleRestFixtureCorpusTest`, and Console component tests cover all four diagnostic source variants.
+- `DefaultRegisteredSkillCatalogTest` covers declaration-source diagnostics; `ExecutorGenerationExecutionTest` covers retained executor YAML and public Java classification.
 
 ## Coverage Boundary
 
@@ -259,4 +259,4 @@ Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartup
 
 Boundary evidence: `SkillReachableAdmissionTest#localDefaultReferencesMatchQualifiedAcrossAllRootOperations`, `NamespaceIdentityFoundationTest#localAndMixedAuthoredFieldsCompileWithoutRewritingContent`, and `NamespaceStartupIntegrationTest#suppliedLocalDocumentsValidateAndPrepareInEachOwnerBeforePublicationWithoutFallback`.
 
-Executor YAML declarations and immutable configuration can be parsed and validated, but executor-backed YAML skills cannot currently be prepared or executed. `rest:` is unsupported manifest syntax. Read [executor leaves](executor-skills.md) for declaration rules and limitations.
+Executor YAML leaves execute through generation-owned Java registrations and captured configuration bindings. Their public execution kind is `JAVA`; their YAML definitions remain available. `rest:` is unsupported manifest syntax. Read [executor leaves](executor-skills.md) for declaration rules and limitations.

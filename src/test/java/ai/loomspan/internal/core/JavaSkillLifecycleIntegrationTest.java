@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 
 
 import ai.loomspan.internal.runtime.MissionExecutionEngine;
@@ -144,7 +145,7 @@ class JavaSkillLifecycleIntegrationTest {
 
         return new CapabilityMetadata(name, name, "Java test", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(),
 
-                invoker, CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic(name, "Java test"),
+                invoker, SkillKind.JAVA, CapabilityToolDescriptor.generic(name, "Java test"),
 
                 new SkillSource(null, "testBean", name + "()"));
 

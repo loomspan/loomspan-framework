@@ -1,6 +1,6 @@
 package ai.loomspan.testkit;
 
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.SkillExecutionDescriptor;
@@ -41,7 +41,7 @@ public final class TestBoundCapabilities {
                 description == null || description.isBlank() ? name : description,
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()),
                 input -> null,
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 new CapabilityToolDescriptor(name, description == null || description.isBlank() ? name : description, inputSchema, null),
                 contract,
                 null);

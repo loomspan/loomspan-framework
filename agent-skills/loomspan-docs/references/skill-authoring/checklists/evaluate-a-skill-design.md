@@ -34,7 +34,7 @@ Reject an entry design that requires callers to understand internal child propag
 
 ## 3. Design the Capability Surface
 
-- Does every Java, REST, TypeSafe, or model-backed YAML registered name match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` and use the exact same case in every reference?
+- Does every Java, TypeSafe, or model-backed YAML registered name match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` and use the exact same case in every reference?
 - Do `SkillTemplate`, `allowed_skills`, plans, and evidence-expression references use registered names rather than bean/method diagnostic locations?
 - Which direct child capabilities does each LLM-backed skill need?
 - Are those children declared locally through `allowed_skills`?
@@ -105,7 +105,7 @@ For completion design, read [output contracts](../output-contracts.md):
 - Are parent schema, output retries, linter and copy instructions absent, with producer-owned policies retained?
 - Are all accepted tasks expected to finish, with sibling failure and cancellation tested?
 - Does the budget distinguish N forwarding assignments from N+1 ordinary synthesis slots?
-- Is available derived schema treated as metadata, with Java/REST schema unspecified and no inherited evidence validation?
+- Is available derived schema treated as metadata, with Java/executor schema unspecified and no inherited evidence validation?
 
 ## 7. Preserve Production Safeguards
 

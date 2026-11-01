@@ -54,13 +54,13 @@ A YAML skill can declare the equivalent role policy:
 rbac_roles: [FINANCE, ADMIN]
 ```
 
-All skill kinds use Spring's authority evaluation. The default prefix is `ROLE_`, so `FINANCE` requires authority `ROLE_FINANCE`. `GrantedAuthorityDefaults` configures a custom or empty prefix, and a configured `RoleHierarchy` applies to Java, REST, TypeSafe, and model-backed YAML skills. Role names are not raw authorities: writing `ROLE_FINANCE` with the default prefix requires `ROLE_ROLE_FINANCE`; Loomspan does not strip prefixes. Omitted or empty YAML roles are unrestricted.
+All skill kinds use Spring's authority evaluation. The default prefix is `ROLE_`, so `FINANCE` requires authority `ROLE_FINANCE`. `GrantedAuthorityDefaults` configures a custom or empty prefix, and a configured `RoleHierarchy` applies to Java, TypeSafe, and model-backed YAML skills. Role names are not raw authorities: writing `ROLE_FINANCE` with the default prefix requires `ROLE_ROLE_FINANCE`; Loomspan does not strip prefixes. Omitted or empty YAML roles are unrestricted.
 
 Use Spring's documented `GrantedAuthorityDefaults` bean configuration when the application uses a different prefix. Do not encode prefix handling in skill names, prompts, or business inputs.
 
 ## Local visibility and caller scope
 
-A YAML parent's `allowed_skills` names the only candidate children. Java, REST, TypeSafe, and model-backed YAML children are resolved by exact name after startup registration finishes. Missing references fail startup. Authorization then filters this local set for each invocation; `@PermitAll` never makes an undeclared child visible. A denied required child can make a planning or evidence requirement unsatisfiable.
+A YAML parent's `allowed_skills` names the only candidate children. Java, TypeSafe, and model-backed YAML children are resolved by exact name after startup registration finishes. Missing references fail startup. Authorization then filters this local set for each invocation; `@PermitAll` never makes an undeclared child visible. A denied required child can make a planning or evidence requirement unsatisfiable.
 
 At runtime every ordinary, planned and bound dispatch independently checks the actual
 executing source before switching context. A call MUST be declared directly by that
@@ -71,7 +71,7 @@ a foreign Private boundary. A Public callee cannot call back into a Private call
 even when that caller was the entry. Capturing a whole generation grants no authority
 to its undeclared skills. Java skills remain leaves.
 
-The facade captures the trusted caller authentication. Explicit invocation authentication has priority over session fallback. At Java and REST execution boundaries Loomspan installs a fresh SecurityContext on the actual worker thread and restores the exact previous context in finally. Nested calls and parallel workers carry their caller identity without sharing mutable contexts or mutating session authentication for another invocation.
+The facade captures the trusted caller authentication. Explicit invocation authentication has priority over session fallback. At Java execution boundaries Loomspan installs a fresh SecurityContext on the actual worker thread and restores the exact previous context in finally. Nested calls and parallel workers carry their caller identity without sharing mutable contexts or mutating session authentication for another invocation.
 
 Manifest and Java policies belong to the immutable generation captured by the root, while authentication remains the actual trusted caller identity evaluated at validation, visibility, and execution boundaries. A newer generation may change policy for newly captured roots, but it neither substitutes policy into an older tree nor freezes/bypasses that tree's live caller authorization checks.
 

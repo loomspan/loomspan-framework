@@ -23,7 +23,7 @@ void validate(String skillName, Object input);
 void validate(String skillName, Map<String, Object> input);
 ```
 
-`skillName` MUST identify a registered Java, REST, TypeSafe, or model-backed YAML skill by its exact name.
+`skillName` MUST identify a registered Java, TypeSafe, or model-backed YAML skill by its exact name.
 For Java, combine its owning annotation namespace with the local annotation name (or canonical method name when omitted). Pass a catalog descriptor name unchanged. Every invoke/validate/observer overload and both handoff forms accept local `search` as `default-search`, always independent of any ambient namespace. Explicit `tax-search` stays tax-scoped. Resolution happens before capture with no fallback or namespace search: namespace case normalizes, local-name case remains exact, namespace length is at most 32 and total identity length at most 64. Missing namespaces fail without creation.
 Bean names and method signatures are diagnostics, never invocation aliases.
 
@@ -60,9 +60,8 @@ resolved-request checks run during invocation before any provider attempt.
 An explicit planning `output_from` parent returns its designated accepted direct
 child task's existing String unchanged after every accepted task succeeds. It
 makes no final model request or duplicate parent validation. Java Strings remain exact, null/void becomes empty text, and other Java results
-use JSON; REST returns
-handler text with no envelope extraction. Effective catalog schema is metadata,
-not a new Java/REST validation guarantee. Read [output contracts](../skill-authoring/output-contracts.md).
+use JSON. Executor YAML leaves share this Java result contract. Effective catalog schema is metadata,
+not a new Java/executor validation guarantee. Read [output contracts](../skill-authoring/output-contracts.md).
 
 ## Choose an Input Overload
 
@@ -112,8 +111,8 @@ unchanged. On execution failure, mapping or observer failure is suppressed behin
 original failure. Keep observers small and reliable because they remain within root
 ownership and the shutdown deadline.
 
-Java and REST roots use the same mission and observer lifecycle without a framework model
-request. Direct children are credited at the parent boundary only after success. REST handler semantics are documented in [rest-skills.md](rest-skills.md).
+Java roots use the same mission and observer lifecycle without a framework model
+request. Direct children are credited at the parent boundary only after success. Executor construction and result semantics are documented in [Java declarations](java-skills.md).
 Read [authorization](../skill-authoring/authorization.md) for caller scope and proxy enforcement.
 
 Read [observation-and-errors.md](observation-and-errors.md) before persisting or
@@ -160,7 +159,7 @@ cutoff. Finalization and observer delivery remain within root ownership.
 ## Reachable retention and nesting
 
 Capture traverses every declared child transitively, including optional or role-restricted
-branches. Java skills are leaves. It retains each reached whole generation once and
+branches. Callable Java methods and executor YAML skills are leaves. Executor dependencies select and retain their namespace without traversing unrelated callable declarations or granting authority to call them. It retains each reached whole generation once and
 ignores unrelated skills and namespaces. Dependency checks rerun existing visibility,
 forwarding, binding and planning rules before execution; foreign targets must be Public.
 Snapshot membership does not permit calling undeclared children. Admission does not

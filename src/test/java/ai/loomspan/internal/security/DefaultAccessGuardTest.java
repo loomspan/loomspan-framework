@@ -2,7 +2,7 @@ package ai.loomspan.internal.security;
 
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.core.LoomspanSession;
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.SkillExecutionDescriptor;
@@ -87,7 +87,7 @@ class DefaultAccessGuardTest {
                 new SkillExecutionDescriptor("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium"),
                 SkillAccessPolicy.yamlRoles(roles),
                 arguments -> "ok",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic(name, name),
                 null);
     }

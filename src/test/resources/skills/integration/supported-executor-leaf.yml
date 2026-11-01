@@ -1,6 +1,6 @@
-name: supportedRestLeaf
-description: Echo a message through the application REST handler.
-rest: true
+name: supportedExecutorLeaf
+description: Echo a message through the application EXECUTOR handler.
+executor: fixture
 input_schema:
   type: object
   properties:
@@ -11,4 +11,4 @@ input_schema:
       items:
         type: string
   required: [message]
-rbac_roles: [REST_USER]
+rbac_roles: [EXECUTOR_USER]

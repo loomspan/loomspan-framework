@@ -33,7 +33,7 @@ class NamespaceStartupIntegrationTest {
     @Test void suppliedLocalDocumentsValidateAndPrepareInEachOwnerBeforePublicationWithoutFallback() throws Exception {
         try (var server = new MockWebServer()) {
             var configuration = modelConfiguration(server);
-            var documents = List.of(caller("leaf"), new SkillDocument("leaf", "name: leaf\ndescription: REST leaf\nrest: true\n"));
+            var documents = List.of(caller("leaf"), new SkillDocument("leaf", "name: leaf\ndescription: executor leaf\nexecutor: fixture\n"));
             runner().withPropertyValues("fixture-key=test-key").run(context -> {
                 assertThat(context).hasNotFailed();
                 var reloader = context.getBean(SkillReloader.class);
@@ -87,7 +87,7 @@ class NamespaceStartupIntegrationTest {
             template.validate("caller-parent", Map.of());
             var pendingCaller = context.getBean(SkillInvocationHandoff.class).handoff("caller-parent", Map.of());
             assertThat(pendingCaller.generationId()).isEqualTo(callers.generationId());
-            var supplied=new SkillDocument("departmental","name: supplied\ndescription: supplied\nrest: true\n");
+            var supplied=new SkillDocument("departmental","name: supplied\ndescription: supplied\nexecutor: fixture\n");
             reloader.publish(reloader.prepare("dept",List.of(supplied),EMPTY));
             assertThat(reloader.snapshot("dept").skills()).extracting(SkillDescriptor::name).containsExactly("dept-fixed","dept-supplied");
             // Omitted visibility is Private on replacement; fresh admission fails, captured work still runs.
@@ -99,7 +99,7 @@ class NamespaceStartupIntegrationTest {
                     .contains("caller-parent", "dept-fixed");
             reloader.publish(reloader.prepare("dept", List.of(), EMPTY));
             assertThat(reloader.snapshot("dept").skills()).extracting(SkillDescriptor::name).containsExactly("dept-fixed");
-            assertThat(reloader.validate("dept",List.of(new SkillDocument("collision","name: fixed\ndescription: collision\nrest: true\n")),EMPTY).valid()).isFalse();
+            assertThat(reloader.validate("dept",List.of(new SkillDocument("collision","name: fixed\ndescription: collision\nexecutor: fixture\n")),EMPTY).valid()).isFalse();
             var admitted=context.getBean(SkillInvocationHandoff.class).handoff("dept-fixed",Map.of("value","retained"));
             String current=reloader.snapshot("dept").generationId();reloader.remove("dept",current);
             assertThat(bean.destroyed).hasValue(0);
@@ -165,7 +165,14 @@ class NamespaceStartupIntegrationTest {
     }
     @Configuration(proxyBeanMethods=false)static class App{
         @Bean Methods methods(){return new Methods();}
-        @Bean RestSkillHandler rest(){return invocation->"rest";}
+        @Bean Executors executors(){return new Executors();}
+    }
+    static class Executors {
+        @SkillExecutor(namespace="sales", name="fixture") public String sales(SkillExecutorInvocation invocation) { return "executor"; }
+        @SkillExecutor(namespace="other", name="fixture") public String other(SkillExecutorInvocation invocation) { return "executor"; }
+        @SkillExecutor(namespace="shared", name="fixture") public String shared(SkillExecutorInvocation invocation) { return "executor"; }
+        @SkillExecutor(name="fixture") public String local(SkillExecutorInvocation invocation) { return "executor"; }
+        @SkillExecutor(namespace="dept", name="fixture") public String dept(SkillExecutorInvocation invocation) { return "executor"; }
     }
     static class Methods{
         final AtomicInteger calls=new AtomicInteger(),localCalls=new AtomicInteger(),destroyed=new AtomicInteger();

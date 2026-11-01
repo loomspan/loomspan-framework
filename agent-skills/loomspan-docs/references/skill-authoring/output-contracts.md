@@ -101,7 +101,7 @@ A chain `prepareReport -> coordinateReport -> finishReport` works when each forw
 
 Top-level `output_bindings` uses the same destination-keyed map and descriptors as [input bindings](input-bindings.md). Its destination is this skill's output. `from: input` selects this invocation's validated input; `from: child_result` selects exactly one successful accepted direct-child task, with `skill` naming the producer. `path: ""` selects the whole source. A nonempty source path selects an object subtree. Object JSON Pointers support `~0` and `~1`; array traversal, transforms and interpolation are unsupported. Entire selected arrays retain their order.
 
-A model-backed skill MUST declare an object `output_schema`. `output_from` and `output_bindings` MUST NOT coexist, including explicit null declarations. Destination paths MUST be nonempty and nonoverlapping. Duplicate YAML keys and unknown descriptor fields are rejected. Known source/destination paths and compatible types are checked against the captured complete generation. Open or unspecified source schemas require runtime checks; Java return types and REST response text never invent producer contracts.
+A model-backed skill MUST declare an object `output_schema`. `output_from` and `output_bindings` MUST NOT coexist, including explicit null declarations. Destination paths MUST be nonempty and nonoverlapping. Duplicate YAML keys and unknown descriptor fields are rejected. Known source/destination paths and compatible types are checked against the captured complete generation. Open or unspecified source schemas require runtime checks; Java return types and executor result text never invent producer contracts.
 
 This full assembly combines two direct-child objects with the current input identifier. `assistant` must be a configured model alias; declare each producer separately with its own input contract. The selected child results must be objects compatible with these destination schemas.
 
@@ -167,7 +167,7 @@ Missing paths differ from explicit null. Unavailable, ambiguous, failed, cross-i
 
 `RESULT_ASSEMBLED` identifies ownership and whether a model contribution was required. Its payload is the validated assembled output, while original model and child records retain their evidence. See [assembly diagnostics](traces-and-debugging.md#declared-output-assembly).
 
-Implementation evidence: `OutputBindingProjection`, `OutputBindingComposition`, `ChildInputBindingAssembler`, `PlanOutputBindingProducerValidator`, and the ordinary and step mission engines. `OutputBindingCompositionTest` protects projection, ownership conflicts and exact insertion; `OutputBindingIsolationTest` protects concurrent/nested invocation and generation snapshots. `DeclaredOutputBindingsOrdinaryIntegrationTest` and `DeclaredOutputBindingsPlanningIntegrationTest` exercise facade completion and correction, including model/Java/REST sources. `ConsoleTraceFixtureCorpusTest` exports current Java assembly authority for Console readers.
+Implementation evidence: `OutputBindingProjection`, `OutputBindingComposition`, `ChildInputBindingAssembler`, `PlanOutputBindingProducerValidator`, and the ordinary and step mission engines. `OutputBindingCompositionTest` protects projection, ownership conflicts and exact insertion; `OutputBindingIsolationTest` protects concurrent/nested invocation and generation snapshots. `DeclaredOutputBindingsOrdinaryIntegrationTest` and `DeclaredOutputBindingsPlanningIntegrationTest` exercise facade completion and correction, including model/Java/executor sources. `ConsoleTraceFixtureCorpusTest` exports current Java assembly authority for Console readers.
 
 ## Effective output metadata
 
@@ -186,7 +186,7 @@ fully bound success and failure require no final synthesis or repair request.
 
 Public `SkillDescriptor.outputSchema()`, planner tool descriptions, and Console skill detail expose nullable normalized JSON-object schema text from the captured complete generation. Ordinary model skills expose their authored output shape; forwarding parents derive it through their selected-child chain. Shape, constraints, descriptions and provider-neutral `nullable` semantics are retained, while child-local `evidence` annotations are omitted. This text describes Loomspan's supported schema vocabulary; it is not a provider-native JSON Schema response format.
 
-Java, REST, and model producers without a schema leave this metadata null, never a fabricated `{}`. Derived metadata is immutable and does not become a parent's authored validator, evidence requirement, linter, or retry policy. The actual model producer retains its own validation and correction; Java/REST do not gain output-validation guarantees. Metadata and structured validation do not establish factual correctness.
+Java and model producers without a schema leave this metadata null, never a fabricated `{}`. Derived metadata is immutable and does not become a parent's authored validator, evidence requirement, linter, or retry policy. The actual model producer retains its own validation and correction; Java/executor do not gain output-validation guarantees. Metadata and structured validation do not establish factual correctness.
 
 ### Prepared contracts and fresh admission
 
@@ -281,7 +281,7 @@ Loomspan then parses and validates the returned JSON. It does not silently coerc
 - `YamlSkillCatalogTests` protects strict `output_from` declarations and conflicts; `SkillGenerationManagerTest` protects complete-set chains, cycles and unspecified schemas.
 - `DefaultSkillCatalogTest`, `PlanningServiceTest` and `LoomspanPublicSurfaceArchitectureTest` protect generation-bound metadata and the five-component supported descriptor.
 - `StepLoopMissionExecutionEngineTest` protects exact accepted-task selection, N-slot admission, all-work completion and failure/cutoff behavior.
-- `DesignatedChildResultIntegrationTest#forwardsModelJavaAndRestResultsThroughSkillTemplate` and `#forwardingChainRetainsProducerValidationAndExactResult` exercise model, Java, REST, unspecified schema and chained result boundaries through `SkillTemplate`, with producer-owned validation and no parent final model request. `#parallelRootsForwardOnlyTheirOwnTaskResults` and `#runningForwardingTreeKeepsCapturedSchemaAndTargetAfterReload` protect invocation and generation isolation; `#ordinarySynthesisRemainsAvailable` protects the ordinary completion path.
+- `DesignatedChildResultIntegrationTest#forwardsModelJavaAndExecutorResultsThroughSkillTemplate` and `#forwardingChainRetainsProducerValidationAndExactResult` exercise model, Java, executor YAML, unspecified schema and chained result boundaries through `SkillTemplate`, with producer-owned validation and no parent final model request. `#parallelRootsForwardOnlyTheirOwnTaskResults` and `#runningForwardingTreeKeepsCapturedSchemaAndTargetAfterReload` protect invocation and generation isolation; `#ordinarySynthesisRemainsAvailable` protects the ordinary completion path.
 
 ## Implementation and test anchors
 

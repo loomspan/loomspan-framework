@@ -1,1 +1,1 @@
-{"registeredName":"default-FetchDns","source":"REST","sourcePath":"opaque label","yaml":"# REST DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application handler\r\nrest: true\r\n","outputSchema":null}
+{"registeredName":"default-FetchDns","source":"YAML","sourcePath":"opaque label","yaml":"# Executor DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application executor\r\nexecutor: fetchDns\r\n","outputSchema":null}

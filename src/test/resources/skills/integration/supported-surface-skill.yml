@@ -6,4 +6,4 @@ concurrency: false
 max_steps: 3
 allowed_skills:
   - name: default-supportedJavaLeaf
-  - name: default-supportedRestLeaf
+  - name: default-supportedExecutorLeaf

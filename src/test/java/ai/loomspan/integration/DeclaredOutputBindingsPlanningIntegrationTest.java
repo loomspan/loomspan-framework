@@ -1,6 +1,6 @@
 package ai.loomspan.integration;
 
-import ai.loomspan.api.RestSkillHandler;
+import ai.loomspan.testkit.FixtureExecutor;
 import ai.loomspan.api.SkillTemplate;
 import ai.loomspan.api.SkillMethod;
 import okhttp3.mockwebserver.*;
@@ -106,7 +106,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
         }
     }
 
-    @ParameterizedTest @CsvSource({"false,rest", "true,rest", "false,java", "true,java", "false,model", "true,model"})
+    @ParameterizedTest @CsvSource({"false,executor", "true,executor", "false,java", "true,java", "false,model", "true,model"})
     void assemblesUniqueProducersAfterAllWorkAndCorrectsOnlyModelFields(boolean mixed, String kind) throws Exception {
         String schema = """
                 name: root
@@ -145,8 +145,8 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                 + "  required: [caseId, assessment, rows" + (mixed ? ", summary" : "") + "]\n  additionalProperties: false\n";
         Files.writeString(directory.resolve("root.yaml"), schema);
         for (String child : List.of("second", "later")) Files.writeString(directory.resolve(child+".yaml"),
-                "name: " + child + "\ndescription: Direct source\nrest: true\n");
-        if (kind.equals("rest")) Files.writeString(directory.resolve("first.yaml"),"name: first\ndescription: Direct source\nrest: true\n");
+                "name: " + child + "\ndescription: Direct source\nexecutor: fixture\n");
+        if (kind.equals("executor")) Files.writeString(directory.resolve("first.yaml"),"name: first\ndescription: Direct source\nexecutor: fixture\n");
         if (kind.equals("model")) Files.writeString(directory.resolve("first.yaml"),"name: first\ndescription: Direct model source\nmodel: local\nprompt: EXACT_PRODUCER. Return the assessment object.\n");
         AtomicInteger plans = new AtomicInteger(), finals = new AtomicInteger(), later = new AtomicInteger(), children = new AtomicInteger();
         AtomicReference<Throwable> failure = new AtomicReference<>();
@@ -174,14 +174,14 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                 } catch(Throwable ex) { failure.compareAndSet(null,ex); return new MockResponse().setResponseCode(500); }
             }});
             server.start();
-            ApplicationContextRunner runner = new ApplicationContextRunner().withUserConfiguration(App.class).withBean(RestSkillHandler.class, () -> invocation -> {
+            ApplicationContextRunner runner = new ApplicationContextRunner().withUserConfiguration(App.class).withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
                 children.incrementAndGet();
                 return switch(invocation.skillName()) {
                     case "default-first" -> EXACT;
                     case "default-second" -> "[3,1,2]";
                     default -> { later.incrementAndGet(); yield "unrelated completed"; }
                 };
-            }).withPropertyValues("spring.main.web-application-type=none","loomspan.skills.locations="+directory.toUri()+"*.yaml",
+            })).withPropertyValues("spring.main.web-application-type=none","loomspan.skills.locations="+directory.toUri()+"*.yaml",
                     "loomspan.connections.local.driver=openai","loomspan.connections.local.base-url="+server.url("/v1"),
                     "loomspan.connections.local.api-key=local-test","loomspan.connections.local.provider-retry.enabled=false",
                     "loomspan.models.local.connection=local","loomspan.models.local.provider-model=deterministic","loomspan.session.mission-timeout=30s");
@@ -197,7 +197,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                     });
         }
         assertThat(failure.get()).isNull(); assertThat(plans.get()).isEqualTo(2);
-        assertThat(finals.get()).isEqualTo(mixed ? 2 : 0); assertThat(children.get()).isEqualTo(kind.equals("rest") ? 3 : 2);
+        assertThat(finals.get()).isEqualTo(mixed ? 2 : 0); assertThat(children.get()).isEqualTo(kind.equals("executor") ? 3 : 2);
     }
     private static Map<String,Object> task(String name) {
         return Map.of("taskId",name,"title",name,"status","PENDING","capabilityName","default-" + name,"intent","work","dependsOn",List.of(),"expectedOutputs",List.of("result"));

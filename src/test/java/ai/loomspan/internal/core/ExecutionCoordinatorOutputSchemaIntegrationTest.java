@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.chat.DefaultSkillAdvisorResolver;
 import ai.loomspan.internal.model.ModelInteractionFactory;
@@ -149,7 +150,7 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                 definition.manifest().getDescription(),
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic(definition.identity().toString(), definition.manifest().getDescription()),
                 null);
         registry.register(metadata.name(), metadata);

@@ -1,7 +1,7 @@
 package ai.loomspan.integration;
 
-import ai.loomspan.api.RestSkillHandler;
-import ai.loomspan.api.RestSkillInvocation;
+import ai.loomspan.testkit.FixtureExecutor;
+import ai.loomspan.api.SkillExecutorInvocation;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillException;
 import ai.loomspan.api.SkillExecutionView;
@@ -114,7 +114,7 @@ class SupportedSurfaceIntegrationTest
                     .setBody("""
                             {"id":"chatcmpl-supported-surface","object":"chat.completion","created":1,
                              "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"capabilityName\\\":\\\"default-supportedSurfaceSkill\\\",\\\"createdAt\\\":\\\"2026-09-12T12:00:00Z\\\",\\\"status\\\":\\\"VALID\\\",\\\"tasks\\\":[{\\\"taskId\\\":\\\"java-task\\\",\\\"title\\\":\\\"Call Java leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"default-supportedJavaLeaf\\\",\\\"intent\\\":\\\"Echo through Java\\\",\\\"dependsOn\\\":[],\\\"expectedOutputs\\\":[\\\"Java echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"},{\\\"taskId\\\":\\\"rest-task\\\",\\\"title\\\":\\\"Call REST leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"default-supportedRestLeaf\\\",\\\"intent\\\":\\\"Echo through REST\\\",\\\"dependsOn\\\":[\\\"java-task\\\"],\\\"expectedOutputs\\\":[\\\"REST echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"}]}"},
+                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"capabilityName\\\":\\\"default-supportedSurfaceSkill\\\",\\\"createdAt\\\":\\\"2026-09-12T12:00:00Z\\\",\\\"status\\\":\\\"VALID\\\",\\\"tasks\\\":[{\\\"taskId\\\":\\\"java-task\\\",\\\"title\\\":\\\"Call Java leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"default-supportedJavaLeaf\\\",\\\"intent\\\":\\\"Echo through Java\\\",\\\"dependsOn\\\":[],\\\"expectedOutputs\\\":[\\\"Java echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"},{\\\"taskId\\\":\\\"executor-task\\\",\\\"title\\\":\\\"Call EXECUTOR leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"default-supportedExecutorLeaf\\\",\\\"intent\\\":\\\"Echo through EXECUTOR\\\",\\\"dependsOn\\\":[\\\"java-task\\\"],\\\"expectedOutputs\\\":[\\\"EXECUTOR echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"}]}"},
                                          "finish_reason":"stop"}],
                              "usage":{"prompt_tokens":3,"completion_tokens":3,"total_tokens":6}}
                             """));
@@ -130,9 +130,9 @@ class SupportedSurfaceIntegrationTest
             server.enqueue(new MockResponse()
                     .setHeader("Content-Type", "application/json")
                     .setBody("""
-                            {"id":"chatcmpl-supported-surface-rest","object":"chat.completion","created":1,
+                            {"id":"chatcmpl-supported-surface-executor","object":"chat.completion","created":1,
                              "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"CALL_TOOL\\\",\\\"taskId\\\":\\\"rest-task\\\",\\\"toolName\\\":\\\"default-supportedRestLeaf\\\",\\\"toolArguments\\\":{\\\"message\\\":\\\"hello through the public API\\\"}}"},
+                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"CALL_TOOL\\\",\\\"taskId\\\":\\\"executor-task\\\",\\\"toolName\\\":\\\"default-supportedExecutorLeaf\\\",\\\"toolArguments\\\":{\\\"message\\\":\\\"hello through the public API\\\"}}"},
                                          "finish_reason":"stop"}],
                              "usage":{"prompt_tokens":4,"completion_tokens":3,"total_tokens":7}}
                             """));
@@ -173,31 +173,31 @@ class SupportedSurfaceIntegrationTest
                         assertThat(catalog.namespace()).isEqualTo("default");
                         assertThat(catalog.skills()).extracting(descriptor -> descriptor.name())
                                 .isSorted()
-                                .contains("default-supportedSurfaceSkill", "default-supportedJavaLeaf", "default-supportedRestLeaf");
+                                .contains("default-supportedSurfaceSkill", "default-supportedJavaLeaf", "default-supportedExecutorLeaf");
                         assertThat(catalog.skill("default-supportedJavaLeaf")).get()
                                 .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.JAVA);
-                        assertThat(catalog.skill("default-supportedRestLeaf")).get()
-                                .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.REST);
+                        assertThat(catalog.skill("default-supportedExecutorLeaf")).get()
+                                .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.JAVA);
                         assertThat(catalog.skill("default-supportedSurfaceSkill")).get()
                                 .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.YAML);
                         assertThat(catalog.skill("default-missing")).isEmpty();
                         AtomicReference<SkillExecutionView> observed = new AtomicReference<>();
                         var authorized = UsernamePasswordAuthenticationToken.authenticated(
-                                "supported-caller", "unused", AuthorityUtils.createAuthorityList("ROLE_REST_USER"));
+                                "supported-caller", "unused", AuthorityUtils.createAuthorityList("ROLE_EXECUTOR_USER"));
                         try {
                             SecurityContextHolder.getContext().setAuthentication(authorized);
                             skills.validate("default-supportedSurfaceSkill",
                                     Map.of("message", "hello through the public API"));
                             skills.validate("default-supportedJavaLeaf", new DirectRequest("precheck"));
-                            skills.validate("default-supportedRestLeaf", new DirectRequest("precheck"));
-                            var admitted = handoff.handoff("default-supportedRestLeaf", new DirectRequest("handed-off"));
+                            skills.validate("default-supportedExecutorLeaf", new DirectRequest("precheck"));
+                            var admitted = handoff.handoff("default-supportedExecutorLeaf", new DirectRequest("handed-off"));
                             assertThat(admitted.generationId()).isEqualTo(catalog.generationId());
                             SecurityContextHolder.clearContext();
-                            assertThat(admitted.invoke()).isEqualTo("REST: handed-off");
-                            assertThat(SupportedSkillConfiguration.lastInvocation.get().generationId())
+                            assertThat(admitted.invoke()).isEqualTo("EXECUTOR: handed-off");
+                            assertThat(SupportedSkillConfiguration.lastInvocation.get().executorConfigGenerationId())
                                     .isEqualTo(admitted.generationId());
                             assertThat(SupportedSkillConfiguration.lastInvocation.get().skillName())
-                                    .isEqualTo("default-supportedRestLeaf");
+                                    .isEqualTo("default-supportedExecutorLeaf");
                             admitted.release();
                             assertThat(SupportedSkillConfiguration.handlerAuthentication)
                                     .hasValue("supported-caller");
@@ -208,7 +208,7 @@ class SupportedSurfaceIntegrationTest
                             assertThat(admittedRoot.generationId()).isEqualTo(catalog.generationId());
                             assertThat(admittedRoot.invoke(observed::set))
                                     .isEqualTo("supported surface response");
-                            assertThat(SupportedSkillConfiguration.lastInvocation.get().generationId())
+                            assertThat(SupportedSkillConfiguration.lastInvocation.get().executorConfigGenerationId())
                                     .isEqualTo(admittedRoot.generationId());
                             admittedRoot.release();
 
@@ -221,8 +221,8 @@ class SupportedSurfaceIntegrationTest
                             Map<String, Object> mutableInput = new LinkedHashMap<>();
                             mutableInput.put("message", "direct");
                             mutableInput.put("values", mutableValues);
-                            assertThat(skills.invoke("default-supportedRestLeaf", mutableInput))
-                                    .isEqualTo("REST: direct");
+                            assertThat(skills.invoke("default-supportedExecutorLeaf", mutableInput))
+                                    .isEqualTo("EXECUTOR: direct");
                             mutableValues.add("late");
                             assertThat((List<Object>) SupportedSkillConfiguration.lastInvocation.get().input().get("values"))
                                     .containsExactly("first");
@@ -235,15 +235,15 @@ class SupportedSurfaceIntegrationTest
 
                             AtomicInteger preSessionObserverCalls = new AtomicInteger();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
-                                    "default-supportedRestLeaf", Map.of(), ignored -> preSessionObserverCalls.incrementAndGet())))
+                                    "default-supportedExecutorLeaf", Map.of(), ignored -> preSessionObserverCalls.incrementAndGet())))
                                     .isInstanceOf(SkillInputValidationException.class);
                             assertThat(preSessionObserverCalls).hasValue(0);
 
                             AtomicReference<SkillExecutionView> failedView = new AtomicReference<>();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
-                                    "default-supportedRestLeaf", Map.of("message", "fail"), failedView::set)))
+                                    "default-supportedExecutorLeaf", Map.of("message", "fail"), failedView::set)))
                                     .isInstanceOf(SkillException.class)
-                                    .hasMessage("Skill 'default-supportedRestLeaf' execution failed.");
+                                    .hasMessage("Skill 'default-supportedExecutorLeaf' execution failed.");
                             assertThat(failedView.get()).isNotNull();
                             assertThat(failedView.get().events()).isNotEmpty();
 
@@ -251,16 +251,16 @@ class SupportedSurfaceIntegrationTest
                                     UsernamePasswordAuthenticationToken.authenticated(
                                             "denied-caller", "unused", AuthorityUtils.NO_AUTHORITIES));
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(
-                                    () -> skills.validate("default-supportedRestLeaf", Map.of("message", "denied"))))
+                                    () -> skills.validate("default-supportedExecutorLeaf", Map.of("message", "denied"))))
                                     .isInstanceOf(AccessDeniedException.class);
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(
                                     () -> skills.validate("default-supportedJavaLeaf", Map.of("message", "denied"))))
                                     .isInstanceOf(AccessDeniedException.class);
                             AtomicReference<SkillExecutionView> rejectedView = new AtomicReference<>();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
-                                    "default-supportedRestLeaf", Map.of("message", "denied"), rejectedView::set)))
+                                    "default-supportedExecutorLeaf", Map.of("message", "denied"), rejectedView::set)))
                                     .isInstanceOf(AccessDeniedException.class)
-                                    .hasMessage("Access denied for capability 'default-supportedRestLeaf'");
+                                    .hasMessage("Access denied for capability 'default-supportedExecutorLeaf'");
                             assertThat(rejectedView.get()).isNull();
                             assertThat(SupportedSkillConfiguration.handlerCalls).hasValue(authorizedCalls + 1);
                         }
@@ -277,27 +277,27 @@ class SupportedSurfaceIntegrationTest
                     .contains("\"model\":\"integration-model\"")
                     .contains("hello through the public API")
                     .contains("Create an ordered flight plan")
-                    .contains("default-supportedJavaLeaf", "default-supportedRestLeaf");
+                    .contains("default-supportedJavaLeaf", "default-supportedExecutorLeaf");
 
             RecordedRequest javaRequest = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(javaRequest).isNotNull();
             String javaBody = javaRequest.getBody().readUtf8();
             assertThat(javaBody)
                     .contains("java-task", "default-supportedJavaLeaf")
-                    .doesNotContain("REST: hello through the public API");
+                    .doesNotContain("EXECUTOR: hello through the public API");
             JsonNode javaPayload = new ObjectMapper().readTree(javaBody);
             assertThat(requestMessages(javaPayload))
                     .containsOnlyOnce("--- TOOL ARGUMENT SHAPE ---")
                     .contains("\"message\": \"<string>\"")
                     .doesNotContain("\"values\":");
 
-            RecordedRequest restRequest = server.takeRequest(2, TimeUnit.SECONDS);
-            assertThat(restRequest).isNotNull();
-            String restBody = restRequest.getBody().readUtf8();
-            assertThat(restBody)
-                    .contains("rest-task", "default-supportedRestLeaf", "Java: hello through the public API");
-            JsonNode restPayload = new ObjectMapper().readTree(restBody);
-            assertThat(requestMessages(restPayload))
+            RecordedRequest executorRequest = server.takeRequest(2, TimeUnit.SECONDS);
+            assertThat(executorRequest).isNotNull();
+            String executorBody = executorRequest.getBody().readUtf8();
+            assertThat(executorBody)
+                    .contains("executor-task", "default-supportedExecutorLeaf", "Java: hello through the public API");
+            JsonNode executorPayload = new ObjectMapper().readTree(executorBody);
+            assertThat(requestMessages(executorPayload))
                     .containsOnlyOnce("--- TOOL ARGUMENT SHAPE ---")
                     .contains("\"message\": \"<string>\"", "\"values\": [ \"<string>\" ]");
 
@@ -305,7 +305,7 @@ class SupportedSurfaceIntegrationTest
             assertThat(finalRequest).isNotNull();
             assertThat(finalRequest.getBody().readUtf8())
                     .contains("Java: hello through the public API")
-                    .contains("REST: hello through the public API");
+                    .contains("EXECUTOR: hello through the public API");
         }
     }
 
@@ -321,7 +321,7 @@ class SupportedSurfaceIntegrationTest
     static class SupportedSkillConfiguration
     {
         private static final AtomicReference<String> handlerAuthentication = new AtomicReference<>();
-        private static final AtomicReference<RestSkillInvocation> lastInvocation = new AtomicReference<>();
+        private static final AtomicReference<SkillExecutorInvocation> lastInvocation = new AtomicReference<>();
         private static final AtomicInteger handlerCalls = new AtomicInteger();
 
         @Bean
@@ -331,25 +331,25 @@ class SupportedSurfaceIntegrationTest
         }
 
         @Bean
-        RestSkillHandler restSkillHandler()
+        FixtureExecutor executorSkillHandler()
         {
-            return invocation -> {
+            return new FixtureExecutor(invocation -> {
                 handlerCalls.incrementAndGet();
                 handlerAuthentication.set(SecurityContextHolder.getContext().getAuthentication().getName());
                 lastInvocation.set(invocation);
                 if ("fail".equals(invocation.input().get("message")))
                 {
-                    throw new IllegalStateException("application REST failure");
+                    throw new IllegalStateException("application EXECUTOR failure");
                 }
-                return "REST: " + invocation.input().get("message");
-            };
+                return "EXECUTOR: " + invocation.input().get("message");
+            });
         }
     }
 
     static class SupportedTarget
     {
         @SkillMethod(name = "supportedJavaLeaf", description = "Echo a message through an application-owned Java leaf.")
-        @RolesAllowed("REST_USER")
+        @RolesAllowed("EXECUTOR_USER")
         String echo(@SkillParam(description = "Message supplied by the parent skill.") String message)
         {
             return "Java: " + message;

@@ -1,6 +1,6 @@
 package ai.loomspan.integration;
 
-import ai.loomspan.api.RestSkillHandler;
+import ai.loomspan.testkit.FixtureExecutor;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillDocument;
 import ai.loomspan.api.SkillReloader;
@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DesignatedChildResultIntegrationTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String MODEL_RESULT = "  {\"report\":\"\u5b8c\u6574 report\"}  ";
-    private static final String REST_RESULT = "  {\"status\":\"business-failure\",\"rows\":[3,1,2]}\n";
+    private static final String EXECUTOR_RESULT = "  {\"status\":\"business-failure\",\"rows\":[3,1,2]}\n";
     private static final String JAVA_RESULT = "Quoted \"report\"\n";
     @TempDir Path directory;
 
@@ -55,8 +55,8 @@ class DesignatedChildResultIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"model", "java", "rest", "no-schema", "native", "native-empty"})
-    void forwardsModelJavaAndRestResultsThroughSkillTemplate(String kind) throws Exception {
+    @ValueSource(strings = {"model", "java", "executor", "no-schema", "native", "native-empty"})
+    void forwardsModelJavaAndExecutorResultsThroughSkillTemplate(String kind) throws Exception {
         Capture capture = run(kind, false);
         assertThat(capture.result).isEqualTo(expected(kind));
         assertThat(capture.laterCalls.get()).isEqualTo(1);
@@ -100,8 +100,8 @@ class DesignatedChildResultIntegrationTest {
         if (kind.equals("synthesis")) rootYaml = rootYaml.replace("output_from: {skill: default-producer}\n", "").replace("max_steps: 2", "max_steps: 3");
         write(skills, "root", rootYaml);
         if (chain) write(skills, "middle", parent("middle", "producer", false));
-        write(skills, "later", "name: later\ndescription: Complete later accepted work\nrest: true\n");
-        if (kind.equals("rest") || kind.equals("synthesis")) write(skills, "producer", "name: producer\ndescription: Produce report\nrest: true\n");
+        write(skills, "later", "name: later\ndescription: Complete later accepted work\nexecutor: fixture\n");
+        if (kind.equals("executor") || kind.equals("synthesis")) write(skills, "producer", "name: producer\ndescription: Produce report\nexecutor: fixture\n");
         if (kind.startsWith("native")) write(skills, "producer", """
                 name: producer
                 description: Evaluate native report
@@ -174,14 +174,14 @@ class DesignatedChildResultIntegrationTest {
             });
             server.start();
             ApplicationContextRunner runner = new ApplicationContextRunner().withUserConfiguration(App.class)
-                    .withBean(RestSkillHandler.class, () -> invocation -> {
+                    .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
                         if (invocation.skillName().equals("default-later")) {
                             capture.laterCalls.incrementAndGet();
                             return "LATER_WORK_COMPLETE";
                         }
                         assertThat(invocation.skillName()).isEqualTo("default-producer");
-                        return REST_RESULT;
-                    })
+                        return EXECUTOR_RESULT;
+                    }))
                     .withPropertyValues("spring.main.web-application-type=none",
                             "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
                             "loomspan.connections.local.driver=openai",
@@ -348,7 +348,7 @@ class DesignatedChildResultIntegrationTest {
         return switch (kind) {
             case "model" -> MODEL_RESULT;
             case "java" -> JAVA_RESULT;
-            case "rest" -> REST_RESULT;
+            case "executor" -> EXECUTOR_RESULT;
             case "native" -> "{\"report\":{\"type\":\"noul\",\"noul\":0.5,\"extension\":\"kept\"}}";
             case "native-empty" -> "{}";
             default -> " \nUNSTRUCTURED_REPORT \u5b8c\u6574\n ";

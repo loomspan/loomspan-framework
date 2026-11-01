@@ -8,7 +8,7 @@ import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanStackOverflowException;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.ExecutionPlan;
@@ -3453,7 +3453,7 @@ class StepLoopMissionExecutionEngineTest {
                 "default-invoiceParser",
                 SkillExecutionDescriptor.from(EXECUTION_CONFIGURATION), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-invoiceParser", "default-invoiceParser"),
                 null);
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);

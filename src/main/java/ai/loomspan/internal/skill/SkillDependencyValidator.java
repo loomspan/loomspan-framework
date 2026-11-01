@@ -28,7 +28,8 @@ public final class SkillDependencyValidator {
         this.inputs = inputs; this.fixedJavaCapabilities = javaCapabilities;
     }
     record CheckedSet(String namespace, List<YamlSkillDefinition> definitions,
-            Map<YamlSkillDefinition, SkillInputContract> contracts, Map<String, String> outputSchemas, List<SkillValidationIssue> issues)
+            Map<YamlSkillDefinition, SkillInputContract> contracts, Map<String, String> outputSchemas, List<SkillValidationIssue> issues,
+            Map<String, SkillAdmissionSnapshot.ExecutorBinding> executorBindings)
     {
         void requireValid()
         {
@@ -38,7 +39,8 @@ public final class SkillDependencyValidator {
     }
 
     CheckedSet check(String namespace, YamlSkillCatalog.CheckedDocuments documents,
-            ai.loomspan.api.NamespaceVisibility visibility, Map<String, SkillGeneration> external)
+            ai.loomspan.api.NamespaceVisibility visibility, Map<String, SkillGeneration> external,
+            List<ai.loomspan.internal.core.SkillExecutorRegistration> fixedExecutors, Map<String, Object> configuration)
     {
         List<SkillValidationIssue> issues = new ArrayList<>(documents.issues());
         LinkedHashMap<String, CapabilityMetadata> names = new LinkedHashMap<>();
@@ -58,10 +60,21 @@ public final class SkillDependencyValidator {
                 definitions.putAll(generation.definitions());
             }
         });
-        return checkGraph(namespace, documents, visibility, external, names, definitions, issues);
+        var owners = namespaceViews(external);
+        var registrations = new LinkedHashMap<String, ai.loomspan.internal.core.SkillExecutorRegistration>();
+        fixedExecutors.forEach(registration -> registrations.put(registration.name(), registration));
+        var candidate = new NamespaceView(visibility, registrations, configuration, "candidate");
+        owners.put(namespace, candidate);
+        // Every assigned fixed declaration is validated for the complete candidate, even without a callable.
+        for (var registration : fixedExecutors) {
+            try { selectConfiguration(registration, configuration); }
+            catch (IllegalStateException ex) { issues.add(new SkillValidationIssue(SkillValidationIssue.Severity.ERROR,
+                    registration.source().toString(), registration.name(), "executor.config", ex.getMessage())); }
+        }
+        return checkGraph(namespace, documents, names, definitions, issues, owners);
     }
 
-    void checkAdmission(SkillAdmissionSnapshot snapshot) {
+    SkillAdmissionSnapshot checkAdmission(SkillAdmissionSnapshot snapshot) {
         var names = new LinkedHashMap<String, CapabilityMetadata>();
         var definitions = new LinkedHashMap<String, YamlSkillDefinition>();
         snapshot.generations().values().forEach(generation -> {
@@ -70,8 +83,7 @@ public final class SkillDependencyValidator {
         });
         var root = definitions.get(snapshot.entry().toString());
         var documents = new YamlSkillCatalog.CheckedDocuments(root == null ? List.of() : List.of(root), List.of());
-        var checked = checkGraph(snapshot.entry().namespace(), documents, snapshot.entryGeneration().visibility(),
-                snapshot.generations(), names, definitions, new ArrayList<>());
+        var checked = checkGraph(snapshot.entry().namespace(), documents, names, definitions, new ArrayList<>(), namespaceViews(snapshot.generations()));
         checked.requireValid();
         var mapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion();
         for (var definition : checked.contracts().keySet()) {
@@ -82,18 +94,23 @@ public final class SkillDependencyValidator {
                     recomputed == null ? null : mapper.readTree(recomputed)))
                 throw new IllegalStateException("Prepared output contract changed for skill '" + name + "'; republish its namespace");
         }
+        return new SkillAdmissionSnapshot(snapshot.entry(), snapshot.generations(), checked.executorBindings());
     }
 
     private CheckedSet checkGraph(String namespace, YamlSkillCatalog.CheckedDocuments documents,
-            ai.loomspan.api.NamespaceVisibility visibility, Map<String, SkillGeneration> external,
             Map<String, CapabilityMetadata> names, Map<String, YamlSkillDefinition> definitions,
-            List<SkillValidationIssue> issues) {
+            List<SkillValidationIssue> issues, Map<String, NamespaceView> owners) {
         Map<YamlSkillDefinition, SkillInputContract> contracts = new LinkedHashMap<>();
         List<YamlSkillDefinition> reachable = new ArrayList<>();
         Set<String> visited = new HashSet<>();
         for (YamlSkillDefinition root : documents.definitions())
-            visit(root, namespace, visibility, external, definitions, names, visited, reachable, issues, documents.issues());
+            visit(root, namespace, owners, definitions, names, visited, reachable, issues, documents.issues());
+        Map<String, SkillAdmissionSnapshot.ExecutorBinding> executorBindings = new LinkedHashMap<>();
         for (YamlSkillDefinition definition : reachable) {
+            if (definition.form() == YamlSkillDefinition.Form.EXECUTOR) {
+                try { executorBindings.put(definition.identity().toString(), resolveExecutor(definition, owners)); }
+                catch (IllegalStateException ex) { issues.add(error(definition, "executor", ex.getMessage())); }
+            }
             try { contracts.put(definition, inputs.resolveYamlCapability(definition)); }
             catch (IllegalStateException ex) { issues.add(error(definition, "input_schema", ex.getMessage())); }
         }
@@ -118,7 +135,60 @@ public final class SkillDependencyValidator {
                     new LinkedHashSet<>(), issues, unknownFailedName, failedNames);
         for (YamlSkillDefinition definition : reachable)
             validateOutputBindings(definition, contracts.get(definition), schemas, issues);
-        return new CheckedSet(namespace, documents.definitions(), Map.copyOf(contracts), Map.copyOf(schemas), List.copyOf(issues));
+        return new CheckedSet(namespace, documents.definitions(), Map.copyOf(contracts), Map.copyOf(schemas), List.copyOf(issues), Map.copyOf(executorBindings));
+    }
+
+    private record NamespaceView(ai.loomspan.api.NamespaceVisibility visibility,
+            Map<String, ai.loomspan.internal.core.SkillExecutorRegistration> executors,
+            Map<String, Object> configuration, String generationId) {}
+
+    private static Map<String, NamespaceView> namespaceViews(Map<String, SkillGeneration> generations) {
+        var result = new LinkedHashMap<String, NamespaceView>();
+        generations.forEach((namespace, generation) -> result.put(namespace,
+                new NamespaceView(generation.visibility(), generation.executors(), generation.executorConfiguration(), generation.id())));
+        return result;
+    }
+
+    private record Reference(SkillIdentity identity, NamespaceView owner) {}
+
+    /** Both reference roles share canonical identity and namespace access before role-specific shape checks. */
+    private static Reference resolveReference(String authored, String sourceNamespace, String role,
+            Map<String, NamespaceView> owners) {
+        var identity = SkillIdentity.resolve(authored, sourceNamespace);
+        var owner = owners.get(identity.namespace());
+        if (owner == null) throw new IllegalStateException("Unknown " + role + " '" + identity + "'");
+        if (!allowsNamespace(sourceNamespace, identity.namespace(), owner.visibility()))
+            throw new IllegalStateException("Foreign namespace '" + identity.namespace() + "' is Private for " + role + " '" + identity + "'");
+        return new Reference(identity, owner);
+    }
+
+    private static SkillAdmissionSnapshot.ExecutorBinding resolveExecutor(YamlSkillDefinition definition,
+            Map<String, NamespaceView> owners) {
+        var reference = resolveReference(definition.executor(), definition.identity().namespace(), "executor", owners);
+        var owner = reference.owner();
+        var registration = owner.executors().get(reference.identity().toString());
+        if (registration == null) throw new IllegalStateException("Unknown executor '" + reference.identity() + "'");
+        return new SkillAdmissionSnapshot.ExecutorBinding(registration,
+                selectConfiguration(registration, owner.configuration()), owner.generationId());
+    }
+
+    /** Exact dot-path selection belongs to dependency binding, never invocation or domain validation. */
+    private static Map<String, Object> selectConfiguration(ai.loomspan.internal.core.SkillExecutorRegistration registration,
+            Map<String, Object> configuration) {
+        String path = registration.config();
+        if (path == null || path.isEmpty()) return Map.of();
+        if (!path.equals(path.strip()) || path.isBlank() || java.util.Arrays.stream(path.split("\\.", -1)).anyMatch(String::isEmpty))
+            throw new IllegalStateException("Invalid executor config path '" + path + "' for '" + registration.name() + "'");
+        Object selected = configuration;
+        for (String segment : path.split("\\.")) {
+            if (!(selected instanceof Map<?, ?> map) || !map.containsKey(segment))
+                throw new IllegalStateException("Executor config path '" + path + "' must select a map for '" + registration.name() + "'");
+            selected = map.get(segment);
+        }
+        if (!(selected instanceof Map<?, ?> map))
+            throw new IllegalStateException("Executor config path '" + path + "' must select a map for '" + registration.name() + "'");
+        @SuppressWarnings("unchecked") var result = (Map<String, Object>) map;
+        return ai.loomspan.internal.util.ImmutableContainers.copyMap(result);
     }
 
     private static void validateOutputBindings(YamlSkillDefinition definition, SkillInputContract input,
@@ -312,8 +382,7 @@ public final class SkillDependencyValidator {
     }
 
     private static void visit(YamlSkillDefinition source, String candidateNamespace,
-            ai.loomspan.api.NamespaceVisibility candidateVisibility, Map<String, SkillGeneration> external,
-            Map<String, YamlSkillDefinition> definitions, Map<String, CapabilityMetadata> names,
+            Map<String, NamespaceView> owners, Map<String, YamlSkillDefinition> definitions, Map<String, CapabilityMetadata> names,
             Set<String> visited, List<YamlSkillDefinition> reachable, List<SkillValidationIssue> issues,
             List<SkillValidationIssue> documentIssues) {
         if (!visited.add(source.identity().toString())) return;
@@ -322,15 +391,17 @@ public final class SkillDependencyValidator {
             String targetNamespace = SkillIdentity.parse(child).namespace();
             boolean suppressed = targetNamespace.equals(candidateNamespace) && documentIssues.stream().anyMatch(issue ->
                     issue.severity() == SkillValidationIssue.Severity.ERROR && (issue.skillName() == null || child.equals(issue.skillName())));
+            try { resolveReference(child, source.identity().namespace(), "child skill", owners); }
+            catch (IllegalStateException ex) {
+                if (!suppressed) issues.add(error(source, "allowed_skills", ex.getMessage()));
+                continue;
+            }
             if (!names.containsKey(child)) {
                 if (!suppressed) issues.add(error(source, "allowed_skills", "Unknown child skill '" + child + "'"));
                 continue;
             }
-            var targetVisibility = targetNamespace.equals(candidateNamespace) ? candidateVisibility : external.get(targetNamespace).visibility();
-            if (!allowsNamespace(source.identity().namespace(), targetNamespace, targetVisibility))
-                issues.add(error(source, "allowed_skills", "Foreign namespace '" + targetNamespace + "' is Private for child '" + child + "'"));
             YamlSkillDefinition target = definitions.get(child);
-            if (target != null) visit(target, candidateNamespace, candidateVisibility, external, definitions, names,
+            if (target != null) visit(target, candidateNamespace, owners, definitions, names,
                     visited, reachable, issues, documentIssues);
         }
     }

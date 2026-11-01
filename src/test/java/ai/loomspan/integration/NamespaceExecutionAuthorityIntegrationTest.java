@@ -46,7 +46,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
             server.enqueue(tool("tax-lookup")); server.enqueue(text("done"));
             context(directory).run(context -> {
                 var reload = context.getBean(SkillReloader.class);
-                reload.publish(reload.prepare("tax", List.of(rest()), config(server,"tax",1,"always"), NamespaceVisibility.PUBLIC,Map.of("key","tax")));
+                reload.publish(reload.prepare("tax", List.of(executor()), config(server,"tax",1,"always"), NamespaceVisibility.PUBLIC,Map.of("key","tax")));
                 reload.publish(reload.prepare("orders",List.of(model("root","tax-lookup")),config(server,"orders",20,"never"),Map.of("key","orders")));
                 Captures.values.clear();
                 assertThat(context.getBean(SkillTemplate.class).invoke("orders-root",Map.of())).isEqualTo("done");
@@ -61,7 +61,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
             context(directory).run(context -> {
                 var reload = context.getBean(SkillReloader.class);
                 var configuration = new ExecutionConfiguration(config(server, "tax", 1, "never").yaml().replace("mission-timeout: 10s", "mission-timeout: 100ms"));
-                var prepared = reload.prepare("tax", List.of(rest()), configuration, Map.of("key", "tax"));
+                var prepared = reload.prepare("tax", List.of(executor()), configuration, Map.of("key", "tax"));
                 reload.publish(prepared);
                 var pending = context.getBean(SkillInvocationHandoff.class).handoff("tax-lookup", Map.of());
                 try { Thread.sleep(180); } catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
@@ -81,7 +81,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
             if (!fails) server.enqueue(text("{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"joined\"}"));
             context(directory).run(context -> {
                 var reload = context.getBean(SkillReloader.class);
-                var zero = new SkillDocument("lookup", rest().yaml() + "input_schema: {type: object, properties: {}, additionalProperties: false}\n");
+                var zero = new SkillDocument("lookup", executor().yaml() + "input_schema: {type: object, properties: {}, additionalProperties: false}\n");
                 for (String namespace : List.of("tax", "rates")) reload.publish(reload.prepare(namespace, List.of(zero),
                         config(server, namespace, 1, "never"), NamespaceVisibility.PUBLIC, Map.of("key", namespace)));
                 var root = new SkillDocument("root", "name: root\ndescription: parallel\nmodel: selected\nplanning_mode: true\nconcurrency: true\nmax_steps: 3\n"
@@ -127,7 +127,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
                 var reload = context.getBean(SkillReloader.class);
                 String schema = automatic ? "input_schema:\n  type: object\n  properties: {}\n  additionalProperties: false\n"
                         : "input_schema:\n  type: object\n  properties:\n    value: {type: string}\n  required: [value]\n";
-                reload.publish(reload.prepare("tax", List.of(new SkillDocument("lookup", rest().yaml() + schema)),
+                reload.publish(reload.prepare("tax", List.of(new SkillDocument("lookup", executor().yaml() + schema)),
                         config(server, "tax", 1, "never"), NamespaceVisibility.PUBLIC, Map.of("key", "tax")));
                 String root = "name: root\ndescription: planner\nmodel: selected\nplanning_mode: true\nmax_steps: 3\n"
                         + "allowed_skills: [{name: tax-lookup, required: true, max_tasks: 1}]\noutput_from: {skill: tax-lookup}\n";
@@ -141,7 +141,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
             assertThat(server.getRequestCount()).isEqualTo(automatic ? 1 : 3);
         }
     }
-    @Test void retainedForeignModelsAndRestUseTargetContextAndEntryBudgetAfterRemoval(@TempDir Path directory) throws Exception {
+    @Test void retainedForeignModelsAndExecutorUseTargetContextAndEntryBudgetAfterRemoval(@TempDir Path directory) throws Exception {
         try (var ordersServer = new MockWebServer(); var pricingServer = new MockWebServer(); var replacementServer = new MockWebServer()) {
             ordersServer.enqueue(tool("Pricing-model"));
             ordersServer.enqueue(tool("orders-lookup"));
@@ -151,11 +151,11 @@ class NamespaceExecutionAuthorityIntegrationTest {
             context(directory).run(context -> {
                 assertThat(context).hasNotFailed();
                 var reload = context.getBean(SkillReloader.class);
-                var tax = reload.prepare("tax", List.of(rest()), config(pricingServer, "tax", 1, "never"), NamespaceVisibility.PUBLIC, Map.of("key", "tax-key"));
+                var tax = reload.prepare("tax", List.of(executor()), config(pricingServer, "tax", 1, "never"), NamespaceVisibility.PUBLIC, Map.of("key", "tax-key"));
                 reload.publish(tax);
                 var pricing = reload.prepare("pricing", List.of(model("model", "tax-lookup")), config(pricingServer, "pricing", 1, "never"), NamespaceVisibility.PUBLIC, Map.of("key", "pricing-key"));
                 reload.publish(pricing);
-                var orders = reload.prepare("orders", List.of(model("root", "pricing-model", "orders-lookup"), rest()),
+                var orders = reload.prepare("orders", List.of(model("root", "pricing-model", "orders-lookup"), executor()),
                         config(ordersServer, "orders", 20, "always"), Map.of("key", "orders-key"));
                 reload.publish(orders);
                 var previous = SecurityContextHolder.getContext();
@@ -176,9 +176,9 @@ class NamespaceExecutionAuthorityIntegrationTest {
                     assertThat(Captures.values).hasSize(2);
                     var foreign = Captures.values.getFirst(); var local = Captures.values.getLast();
                     assertThat(foreign.invocation.skillName()).isEqualTo("tax-lookup");
-                    assertThat(foreign.invocation.generationId()).isEqualTo(tax.generationId());
+                    assertThat(foreign.invocation.executorConfigGenerationId()).isEqualTo(tax.generationId());
                     assertThat(local.invocation.skillName()).isEqualTo("orders-lookup");
-                    assertThat(local.invocation.generationId()).isEqualTo(orders.generationId());
+                    assertThat(local.invocation.executorConfigGenerationId()).isEqualTo(orders.generationId());
                     assertThat(foreign.binding.entryGeneration().id()).isEqualTo(orders.generationId());
                     assertThat(foreign.binding.currentNamespace()).isEqualTo("tax");
                     assertThat(local.binding.currentNamespace()).isEqualTo("orders");
@@ -215,7 +215,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
         return new SkillDocument(name, "name: " + name + "\ndescription: model\nmodel: selected\nplanning_mode: false\n"
                 + (children.length == 0 ? "" : "allowed_skills:\n" + Arrays.stream(children).map(child -> "  - name: " + child + "\n").reduce("", String::concat)));
     }
-    private static SkillDocument rest() { return new SkillDocument("lookup", "name: lookup\ndescription: lookup\nrest: true\n"); }
+    private static SkillDocument executor() { return new SkillDocument("lookup", "name: lookup\ndescription: lookup\nexecutor: fixture\n"); }
     private static ExecutionConfiguration config(MockWebServer server, String provider, int calls, String persistence) {
         return new ExecutionConfiguration("""
                 loomspan:
@@ -249,15 +249,21 @@ class NamespaceExecutionAuthorityIntegrationTest {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"id\":\"test\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"test\",\"choices\":[{\"index\":0,\"message\":" + message
                 + ",\"finish_reason\":\"" + finish + "\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1,\"total_tokens\":2}}");
     }
-    record Capture(RestSkillInvocation invocation, ExecutionBinding binding, org.springframework.security.core.Authentication caller,
+    record Capture(SkillExecutorInvocation invocation, ExecutionBinding binding, org.springframework.security.core.Authentication caller,
                    org.springframework.security.core.context.SecurityContext security, TracePersistencePolicy persistence,
                    int maxDepth, Map<String,Object> configuredLimits) {}
+    static class CapturingExecutors {
+        @SkillExecutor(namespace="tax", name="fixture") public String tax(SkillExecutorInvocation invocation) { return Captures.capture(invocation); }
+        @SkillExecutor(namespace="rates", name="fixture") public String rates(SkillExecutorInvocation invocation) { return Captures.capture(invocation); }
+        @SkillExecutor(namespace="orders", name="fixture") public String orders(SkillExecutorInvocation invocation) { return Captures.capture(invocation); }
+    }
     @Configuration(proxyBeanMethods = false) static class Captures {
         static final List<Capture> values = new CopyOnWriteArrayList<>();
         static volatile java.util.concurrent.CyclicBarrier barrier;
         static volatile String failureName;
         @SuppressWarnings("unchecked")
-        @Bean RestSkillHandler handler() { return invocation -> {
+        @Bean CapturingExecutors executors() { return new CapturingExecutors(); }
+        private static String capture(SkillExecutorInvocation invocation) {
             var binding = ExecutionBindingScope.requireCurrent();
             var records = new ArrayList<TraceRecord>(); binding.session().readTraceRecords(records::add);
             values.add(new Capture(invocation, binding, SecurityContextHolder.getContext().getAuthentication(), SecurityContextHolder.getContext(),
@@ -268,6 +274,6 @@ class NamespaceExecutionAuthorityIntegrationTest {
             catch (Exception ex) { throw new IllegalStateException("Parallel branches did not meet", ex); }
             if (invocation.skillName().equals(failureName)) throw new IllegalStateException("child failed");
             return "looked-up";
-        }; }
+        }
     }
 }

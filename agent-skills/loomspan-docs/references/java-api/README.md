@@ -51,10 +51,8 @@ The allowlist currently contains only:
 - `SkillReloadException`
 - `SkillInputValidationException`
 - `SkillInputValidationIssue`
-- `RestSkillHandler`
-- `RestSkillInvocation`
 
-All twenty-seven are public top-level types in `ai.loomspan.api`. A Java
+All twenty-five are public top-level types in `ai.loomspan.api`. A Java
 `public` modifier does not make any other Loomspan type supported API. Read
 [compatibility-and-boundaries.md](compatibility-and-boundaries.md) before
 advising an application to depend on another Loomspan type.
@@ -94,15 +92,15 @@ relevant topic set.
 
 | Topic | Coverage | Notes |
 | --- | --- | --- |
-| Supported public types | Source-verified | Exact twenty-seven-type allowlist and package boundaries |
+| Supported public types | Source-verified | Exact twenty-five-type allowlist and package boundaries |
 | Catalog and pre-checks | Source-verified | Explicit namespace acquisition, immutable qualified metadata, strict catalog lookup versus local-to-default invoke/validate/handoff resolution (SkillReachableAdmissionTest), malformed/foreign lookup, candidate IDs, active namespace registry and removal; fresh reachable admission and temporary validation are covered by SkillReachableAdmissionTest |
 | Two-stage skill updates | Source-verified | Complete skill and execution candidate, environment or host-map credential references, frozen generation, process-local ID, one-shot publication, candidate disposal, safe retirement callback, and application-owned readiness and cleanup |
 | Skill invocation | Source-verified | Local-to-default or explicit-qualified invocation and atomic single-use handoff (SkillReachableAdmissionTest) with captured generation ID, input normalization and validation, result, session, security context, and observer timing |
-| Java declarations and results | Source-verified | Callable/executor discovery shares proxy/security checks; exact string/null/JSON results, constructor copying and designated failures are covered by `SkillExecutorTest`, `SharedJavaDiscoveryInvocationTest` and `SupportedSurfaceIntegrationTest`. YAML executor binding is unavailable; designated exceptions do not provide automatic retries or planner correction loops. Reflected callable inputs live in `skill-authoring`. |
+| Java declarations and results | Source-verified | Callable/executor discovery shares proxy/security checks; exact string/null/JSON results, constructor copying and designated failures are covered by `SkillExecutorTest`, `SharedJavaDiscoveryInvocationTest` and `SupportedSurfaceIntegrationTest`. Captured YAML executor binding and execution are covered by `ExecutorDependencyResolutionTest` and `ExecutorGenerationExecutionIntegrationTest`; designated exceptions do not provide automatic retries or planner correction loops. Reflected callable inputs live in `skill-authoring`. |
 | Execution observations | Source-verified | Immutable completed view/event values, canonical namespace identities, entry versus target generation facts, one observer flow and unchanged trust boundary; NamespaceObservationIntegrationTest and ConsoleTraceFixtureCorpusTest |
 | Facade failures | Source-verified | Validation, authorization, safe wrapping, observer failures, and fatal errors |
 | Configuration properties | Not documented here | Public configuration behavior is user-facing but its binding types are not application Java API |
-| Framework extension SPI | Source-verified | `RestSkillHandler` is the sole supported SPI; qualified target identity and captured target generation ID; no internal bean-replacement contract |
+| Framework extension SPI | Source-verified | No supported Java SPI or internal bean-replacement contract; annotations register application-owned methods |
 
 ## Normative Language
 
@@ -111,4 +109,4 @@ relevant topic set.
 - **SHOULD / SHOULD NOT** identifies the recommended application default.
 - **MAY** identifies an optional supported choice.
 
-Publication coverage: complete namespace management, captured metadata preparation, Private startup and removal/recreation are implemented and covered by `SkillReloaderTest`, `SkillDependencyValidatorTest` and `NamespaceStartupIntegrationTest`. Reachable snapshot/admission and temporary validation are covered by `SkillAdmissionSnapshotTest`, `SkillAdmissionContractsTest`, and `SkillReachableAdmissionTest`. Captured cross-namespace dispatch and target REST identities are verified by `NamespaceExecutionAuthorityIntegrationTest`. Captured namespace observation metadata and existing Console consumers are verified through NamespaceObservationIntegrationTest, focused HTTP/trace tests and ConsoleTraceFixtureCorpusTest, with entry-scoped generation IDs and independent observation authorization.
+Publication coverage: complete namespace management, captured metadata preparation, Private startup and removal/recreation are implemented and covered by `SkillReloaderTest`, `SkillDependencyValidatorTest` and `NamespaceStartupIntegrationTest`. Reachable snapshot/admission and temporary validation are covered by `SkillAdmissionSnapshotTest`, `SkillAdmissionContractsTest`, and `SkillReachableAdmissionTest`. Captured cross-namespace dispatch is verified by `NamespaceExecutionAuthorityIntegrationTest`; executor configuration-owner identities are covered by `ExecutorGenerationExecutionIntegrationTest`. Captured namespace observation metadata and existing Console consumers are verified through NamespaceObservationIntegrationTest, focused HTTP/trace tests and ConsoleTraceFixtureCorpusTest, with entry-scoped generation IDs and independent observation authorization.

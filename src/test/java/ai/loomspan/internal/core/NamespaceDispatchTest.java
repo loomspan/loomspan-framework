@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.api.NamespaceVisibility;
 import ai.loomspan.internal.security.*;
 import ai.loomspan.internal.skill.*;
@@ -29,13 +30,13 @@ class NamespaceDispatchTest {
                 assertThat(selected.entryNamespace()).isEqualTo("orders");
                 assertThat(selected.mission().parent().orElseThrow().skillName()).isEqualTo("orders-root");
                 return "ok";
-            }, CapabilityKind.REST_SKILL, CapabilityToolDescriptor.generic("tax-leaf", "leaf"), null);
+            }, SkillKind.JAVA, CapabilityToolDescriptor.generic("tax-leaf", "leaf"), null);
             var manifest = new YamlSkillManifest(); manifest.setName("root");
             var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "orders", new ByteArrayResource(new byte[0]), manifest,
                     new EffectiveSkillExecutionConfiguration("model", "connection", ai.loomspan.autoconfigure.AiDriver.OPENAI, "provider", null),
                     null, null, declared ? List.of(new AllowedSkillConstraint(target.name(), null, null, false, List.of())) : List.of());
             var root = new CapabilityMetadata("source", "orders-root", "root", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), input -> "unused",
-                    CapabilityKind.YAML_SKILL, CapabilityToolDescriptor.generic("orders-root", "root"), null);
+                    SkillKind.YAML, CapabilityToolDescriptor.generic("orders-root", "root"), null);
             var emptyCatalog = new ai.loomspan.internal.runtime.observation.catalog.DefaultRegisteredSkillCatalog(List.of(), Map.of());
             var orders = new SkillGeneration("orders", "orders-old", Map.of(root.name(), root), Map.of(root.name(), definition), null, emptyCatalog);
             var tax = new SkillGeneration("tax", "tax-old", Map.of(target.name(), target), Map.of(), null, emptyCatalog, null, visibility);

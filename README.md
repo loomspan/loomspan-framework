@@ -1,8 +1,9 @@
 # Loomspan Framework
 
 Loomspan brings AI reasoning into applications through reusable **skills**. A skill
-can reason with a language model, evaluate TypeSafe primitives, call a Java service, or delegate an operation
-to an application-owned REST integration. Compose those capabilities into a
+can reason with a language model, evaluate TypeSafe primitives, call an annotated
+Java service, or execute a YAML-configured operation through an application-owned
+Java executor. Compose those capabilities into a
 hierarchy so a model can break down a task while your application controls which
 operations it can use.
 
@@ -92,14 +93,14 @@ provides the dependency, configuration, file locations, and runnable application
 The brief gives an engineer a starting point: reported payment/order mismatches,
 a possible connection to the deployment, and checks needed to establish the cause.
 To investigate beyond the supplied message, expose order lookups or deployment
-history as Java or REST skills and let a planning parent call those allowed
+history as Java skills and let a planning parent call those allowed
 capabilities. See the [skill-tree guide](agent-skills/loomspan-docs/references/skill-authoring/mental-model.md).
 
 When one direct child supplies the complete answer, an explicit model planner
 can use `output_from: {skill: default-finish}` with a required, unique `finish` task. It
 still completes all accepted work, then returns that child's existing text
 unchanged without a parent synthesis request. See [output contracts](agent-skills/loomspan-docs/references/skill-authoring/output-contracts.md)
-for syntax, schema ownership, and model/Java/REST examples.
+for syntax, schema ownership, and model/Java/executor examples.
 
 A model skill can declare top-level `output_bindings` to assemble exact values
 from its validated input and successful accepted direct children into its object
@@ -140,7 +141,7 @@ is at most 32 and total identity length at most 64 including its single hyphen.
 Combined length is enforced after qualification. Local and qualified spellings
 of the same child are duplicates. Missing local targets fail in their resolved
 namespace; no aliases, fallback search, trimming or character replacement exists.
-Runtime keys, model tool/plan selections, REST handoffs and observations remain qualified.
+Runtime keys, model tool/plan selections, executor handoffs and observations remain qualified.
 
 Inject `SkillReloader` and acquire `SkillCatalog catalog = reloader.snapshot("default")`.
 There is no injected startup catalog or no-argument acquisition. `namespace()` and
@@ -152,8 +153,9 @@ execution reservation. Pass `descriptor.name()` directly to invocation/validatio
 or handoff; the catalog does not authorize or pin that later admission.
 
 Every root invocation and handoff freshly captures exactly the namespace generations
-reached by the entry's declared child graph, including optional and role-restricted
-branches. Missing dependencies, foreign Private targets, invalid bindings, or changed
+reached by the entry's declared child graph and its executor dependencies, including
+optional and role-restricted branches. Retaining an executor namespace does not
+traverse its unrelated skills or grant callable authority. Missing dependencies, foreign Private targets, invalid bindings, or changed
 prepared forwarding contracts reject before execution. Unrelated broken skills do not
 block entry. Entry RBAC is checked without eagerly authorizing children; Private permits
 authorized direct host entry. Retained work keeps its captured generations and visibility
@@ -209,8 +211,9 @@ only its target namespace. Omission is empty with no inheritance. Nested nulls,
 empty containers, scalar types and exact case/dotted keys survive YAML loading;
 executor data is uninterpreted and separate from skill config.
 
-Executor declarations and configuration can be parsed and validated, but
-executor-backed YAML skills cannot currently be prepared or executed. See
+Executor leaves execute as `SkillKind.JAVA` through captured namespace generations.
+The executor namespace owns its fixed registrations and immutable configuration;
+local references use the YAML owner and foreign references require a Public target. See
 [executor authoring](agent-skills/loomspan-docs/references/skill-authoring/executor-skills.md).
 
 Preparation validates outgoing contracts against one coherent external metadata view,
@@ -309,7 +312,7 @@ Trace start, live execution and finalized trace metadata retain `entryNamespace`
 and `namespaceGenerationIds`, the captured namespace-to-generation map. Session
 `generationId` always identifies the entry generation. A known record's
 `executingNamespace`/`executingGenerationId` describe its executing owner, separately
-from a REST invocation's captured target ID. These facts remain accurate after
+from an executor invocation's captured configuration-owner ID. These facts remain accurate after
 replacement, removal and recreation. Unknown-skill diagnostics retain unavailable
 values, and routes naming model/planning operations keep their operation meaning.
 Canonical prompts, inputs, outputs, tools, evidence and diagnostics are preserved;
@@ -349,7 +352,7 @@ confidence do not establish judgment correctness or live parity between routes.
   dependency or select a Cloud authentication scheme.
 
 Model-backed skills need a named connection using the OpenAI, Anthropic, Gemini,
-or Ollama driver. Native TypeSafe leaves require the `typesafe` driver. Java and REST leaves can execute without a framework model call.
+or Ollama driver. Native TypeSafe leaves require the `typesafe` driver. Java leaves can execute without a framework model call.
 
 Loomspan is **in beta**. Supported Java APIs and documented configuration can
 change between betas, including breaking changes. Pin an exact version and review
@@ -369,20 +372,19 @@ change between betas, including breaking changes. Pin an exact version and revie
 
 The supported Java API is the closed allowlist in `ai.loomspan.api`, summarized
 in the [public API reference](agent-skills/loomspan-docs/references/java-api/compatibility-and-boundaries.md).
-It contains 27 public top-level types, including `SkillExecutor`, the five-component
+It contains 25 public top-level types, including `SkillExecutor`, the five-component
 `SkillExecutorInvocation` record, and `RecoverableSkillException`. Java callable
 methods and reference-only executors share discovery and proxy invocation. Successful
 null/void results become empty text, Strings remain exact, and other results become
-JSON; failures propagate. Reference-only executor declarations are discovered,
-but YAML executor binding and execution are unavailable.
+JSON; failures propagate. YAML executor leaves retain their definitions and use captured registrations,
+selected executor configuration and executor generation identity during execution.
 See [Java declarations and results](agent-skills/loomspan-docs/references/java-api/java-skills.md).
 
 The catalog descriptor is `SkillDescriptor(name, description, kind, inputSchema,
-outputSchema)`; `SkillKind` includes `YAML`, `JAVA`, `REST`, and `TYPESAFE`.
+outputSchema)`; `SkillKind` includes `YAML`, `JAVA`, and `TYPESAFE`.
 Nullable `outputSchema` describes effective output shape, including
 forwarding chains and native descriptive schemas, without adding parent,
-TypeSafe, or Java/REST output validation. The descriptor
-has a five-argument constructor. `RestSkillHandler` is the sole supported Java SPI,
-but no supported YAML declaration binds it. Types under `internal` and
+TypeSafe, or Java/executor output validation. The descriptor
+has a five-argument constructor. Loomspan exposes no supported Java SPI. Types under `internal` and
 `autoconfigure` are not application extension APIs; Loomspan does not expose an
 internal bean-replacement contract.

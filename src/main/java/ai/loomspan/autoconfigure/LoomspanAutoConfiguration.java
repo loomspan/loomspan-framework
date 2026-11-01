@@ -158,7 +158,6 @@ public class LoomspanAutoConfiguration
             LoomspanJacksonCodecs codecs,
             SkillMethodBeanPostProcessor skillMethodBeanPostProcessor,
             SkillInputContractResolver skillInputContractResolver,
-            org.springframework.beans.factory.ListableBeanFactory beanFactory,
             org.springframework.core.env.Environment environment,
             org.springframework.core.io.ResourceLoader resourceLoader,
             org.springframework.beans.factory.ObjectProvider<io.micrometer.observation.ObservationRegistry> observationRegistryProvider)
@@ -168,7 +167,7 @@ public class LoomspanAutoConfiguration
                 () -> new YamlSkillCatalog(fixedSkillLoadingProperties,
                         new org.springframework.core.io.support.PathMatchingResourcePatternResolver(),
                         codecs.skillYaml()),
-                skillInputContractResolver, beanFactory, properties, environment,
+                skillInputContractResolver, properties, environment,
                 (effective, policy) -> new ai.loomspan.internal.skill.ExecutionRuntime(effective, policy,
                         new ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry(effective.getConnections(),
                                 new ai.loomspan.internal.springai.SpringAiProviderIntegration(resourceLoader,

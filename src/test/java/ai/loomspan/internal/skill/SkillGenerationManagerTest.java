@@ -2,13 +2,11 @@ package ai.loomspan.internal.skill;
 
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.autoconfigure.LoomspanProperties;
-import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.SkillDocument;
 import ai.loomspan.api.ExecutionConfiguration;
 import ai.loomspan.api.SkillValidationIssue;
 import ai.loomspan.api.SkillKind;
 import ai.loomspan.api.ValidatedSkill;
-import ai.loomspan.internal.core.CapabilityKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.SkillExecutionDescriptor;
@@ -18,10 +16,6 @@ import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import ai.loomspan.internal.security.SkillAccessPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.beans.factory.support.DefaultListableBeanFactory;
-import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.core.io.ByteArrayResource;
 
 import java.nio.charset.StandardCharsets;
@@ -46,7 +40,7 @@ class SkillGenerationManagerTest
         properties.getConnections().put("native", connection);
         var model = new LoomspanProperties.ModelCatalogEntry(); model.setConnection("native"); model.setProviderModel("jev"); properties.getModels().put("native", model);
         var javaSkills = mock(SkillMethodBeanPostProcessor.class); when(javaSkills.capabilities()).thenReturn(List.of());
-        var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties), new SkillInputContractResolver(), new StaticListableBeanFactory());
+        var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties), new SkillInputContractResolver());
         manager.afterSingletonsInstantiated();
         String leaf = """
                 name: producer
@@ -97,7 +91,7 @@ class SkillGenerationManagerTest
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of());
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
-                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), new StaticListableBeanFactory());
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver());
         manager.afterSingletonsInstantiated();
         String parent = """
                 name: parent
@@ -153,7 +147,7 @@ class SkillGenerationManagerTest
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of());
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
-                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), new StaticListableBeanFactory());
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver());
         manager.afterSingletonsInstantiated();
         String parent = """
                 name: parent
@@ -209,10 +203,8 @@ class SkillGenerationManagerTest
     void resolvesForwardingMetadataThroughChainsWithoutInheritingEvidence(@TempDir Path directory) {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));
-        StaticListableBeanFactory beans = new StaticListableBeanFactory();
-        beans.addBean("handler", (RestSkillHandler) invocation -> "raw");
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
-                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), beans);
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver());
         manager.afterSingletonsInstantiated();
         var documents = List.of(forwardingDocument("outer", "inner"), forwardingDocument("inner", "producer"),
                 new SkillDocument("producer", """
@@ -258,7 +250,7 @@ class SkillGenerationManagerTest
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of());
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
-                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), new StaticListableBeanFactory());
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver());
         manager.afterSingletonsInstantiated();
         String original = manager.active("default").id();
         for (var candidate : List.of(List.of(forwardingDocument("self", "self")),
@@ -311,8 +303,7 @@ class SkillGenerationManagerTest
                 .withProperty("host.key", "deployment-key");
         var registries = new java.util.ArrayList<ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry>();
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
-                () -> new YamlSkillCatalog(startup), new SkillInputContractResolver(),
-                new StaticListableBeanFactory(), startup, environment, (effective, policy) -> {
+                () -> new YamlSkillCatalog(startup), new SkillInputContractResolver(), startup, environment, (effective, policy) -> {
                     var registry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
                     registries.add(registry);
                     return new ExecutionRuntime(effective, policy, registry);
@@ -358,7 +349,7 @@ class SkillGenerationManagerTest
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of());
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
-                () -> catalog(), new SkillInputContractResolver(), new StaticListableBeanFactory());
+                () -> catalog(), new SkillInputContractResolver());
         manager.afterSingletonsInstantiated();
         var firstRegistry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
         var secondRegistry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
@@ -385,48 +376,41 @@ class SkillGenerationManagerTest
     {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("Zjava")));
-        DefaultListableBeanFactory beans = new DefaultListableBeanFactory();
-        AtomicInteger constructions = new AtomicInteger();
-        RootBeanDefinition handler = new RootBeanDefinition(RestSkillHandler.class);
-        handler.setScope(BeanDefinition.SCOPE_PROTOTYPE);
-        handler.setInstanceSupplier(() -> {
-            constructions.incrementAndGet();
-            return (RestSkillHandler) invocation -> "ok";
-        });
-        beans.registerBeanDefinition("handler", handler);
+        AtomicInteger executorCalls = new AtomicInteger();
+        when(javaSkills.executors()).thenReturn(List.of(executor("sql", executorCalls)));
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
-                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), beans);
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver());
         manager.afterSingletonsInstantiated();
         String activeId = manager.active("default").id();
         AtomicInteger retirements = new AtomicInteger();
         manager.onGenerationRetired(ignored -> retirements.incrementAndGet());
         var first = manager.validate(manager.capturePreparation("default"), List.of(
                 new SkillDocument("opaque model source", "name: ayaml\ndescription: model\nmodel: model\n"),
-                new SkillDocument("opaque REST source", "name: Brest\ndescription: route\nexecutor: sql\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+                new SkillDocument("opaque executor source", "name: Bexecutor\ndescription: route\nexecutor: sql\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(first.valid()).isTrue();
         assertThat(first.skills()).containsExactly(
-                new ValidatedSkill("default-Brest", SkillKind.YAML),
+                new ValidatedSkill("default-Bexecutor", SkillKind.JAVA),
                 new ValidatedSkill("default-Zjava", SkillKind.JAVA),
                 new ValidatedSkill("default-ayaml", SkillKind.YAML));
         assertThat(first.skills()).extracting(ValidatedSkill::name).doesNotHaveDuplicates();
         assertThat(manager.active("default").id()).isEqualTo(activeId);
-        assertThat(manager.active("default").skillCatalog().skill("default-Brest")).isEmpty();
-        assertThat(constructions).hasValue(0);
+        assertThat(manager.active("default").skillCatalog().skill("default-Bexecutor")).isEmpty();
+        assertThat(executorCalls).hasValue(0);
         assertThat(retirements).hasValue(0);
 
         var replacement = manager.validate(manager.capturePreparation("default"), List.of(
                 new SkillDocument("kind changed", "name: ayaml\ndescription: route\nexecutor: sql\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(replacement.skills()).containsExactly(
                 new ValidatedSkill("default-Zjava", SkillKind.JAVA),
-                new ValidatedSkill("default-ayaml", SkillKind.YAML));
+                new ValidatedSkill("default-ayaml", SkillKind.JAVA));
         assertThat(first.skills()).containsExactly(
-                new ValidatedSkill("default-Brest", SkillKind.YAML),
+                new ValidatedSkill("default-Bexecutor", SkillKind.JAVA),
                 new ValidatedSkill("default-Zjava", SkillKind.JAVA),
                 new ValidatedSkill("default-ayaml", SkillKind.YAML));
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).skills()).containsExactly(new ValidatedSkill("default-Zjava", SkillKind.JAVA));
         assertThat(retirements).hasValue(0);
         assertThat(manager.prepare(manager.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture")).id()).endsWith("-2");
-        assertThat(constructions).hasValue(0);
+        assertThat(executorCalls).hasValue(0);
     }
 
     @Test
@@ -482,21 +466,14 @@ class SkillGenerationManagerTest
     }
 
     @Test
-    void validationIsRepeatableAndLeavesIdsHandlersAndFixedSnapshotUntouched(@TempDir Path directory)
+    void validationIsRepeatableAndLeavesIdsExecutorsAndFixedSnapshotUntouched(@TempDir Path directory)
     {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));
-        AtomicInteger handlers = new AtomicInteger();
-        DefaultListableBeanFactory beans = new DefaultListableBeanFactory();
-        RootBeanDefinition handler = new RootBeanDefinition(RestSkillHandler.class);
-        handler.setScope(BeanDefinition.SCOPE_PROTOTYPE);
-        handler.setInstanceSupplier(() -> {
-            handlers.incrementAndGet();
-            return (RestSkillHandler) invocation -> "ok";
-        });
-        beans.registerBeanDefinition("handler", handler);
+        AtomicInteger executorCalls = new AtomicInteger();
+        when(javaSkills.executors()).thenReturn(List.of(executor("sql", executorCalls)));
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
-                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), beans);
+                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver());
         assertThatThrownBy(() -> manager.validate(manager.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("startup");
         manager.afterSingletonsInstantiated();
@@ -507,10 +484,10 @@ class SkillGenerationManagerTest
         assertThat(first.valid()).isTrue();
         assertThat(second).isEqualTo(first);
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("bad", "invalid: [")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isFalse();
-        assertThat(handlers).hasValue(0);
+        assertThat(executorCalls).hasValue(0);
         assertThat(manager.active("default").id()).isEqualTo(activeId);
         assertThat(manager.prepare(manager.capturePreparation("default"), proposed, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture")).id()).endsWith("-2");
-        assertThat(handlers).hasValue(0);
+        assertThat(executorCalls).hasValue(0);
         verify(javaSkills).capabilities();
     }
 
@@ -541,43 +518,20 @@ class SkillGenerationManagerTest
     }
 
     @Test
-    void removedRestSyntaxRejectsWithoutConstructingHandlerBeans(@TempDir Path directory)
+    void removedRestSyntaxRejectsAtValidationAndPreparation(@TempDir Path directory)
     {
-        SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        var javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of());
-        List<SkillDocument> rest = List.of(new SkillDocument("REST draft",
-                "name: leaf\ndescription: leaf\nrest: true\n"));
-        SkillGenerationManager none = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
-        none.afterSingletonsInstantiated();
-        var noHandlerFeedback = none.validate(none.capturePreparation("default"), rest, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
-        assertThat(noHandlerFeedback.skills()).isEmpty();
-        assertThat(noHandlerFeedback.issues()).anySatisfy(issue ->
-                assertThat(issue.message()).contains("unknown field"));
-        assertThatThrownBy(() -> none.prepare(none.capturePreparation("default"), rest, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"))).hasMessageContaining("unknown field");
-        assertThat(none.validate(none.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
-
-        DefaultListableBeanFactory beans = new DefaultListableBeanFactory();
-        AtomicInteger constructions = new AtomicInteger();
-        for (String name : List.of("first", "second"))
-        {
-            RootBeanDefinition handler = new RootBeanDefinition(RestSkillHandler.class);
-            handler.setScope(BeanDefinition.SCOPE_PROTOTYPE);
-            handler.setInstanceSupplier(() -> {
-                constructions.incrementAndGet();
-                return (RestSkillHandler) invocation -> "ok";
-            });
-            beans.registerBeanDefinition(name, handler);
-        }
-        SkillGenerationManager multiple = new SkillGenerationManager(javaSkills,
-                () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver(), beans);
-        multiple.afterSingletonsInstantiated();
-        var multipleHandlerFeedback = multiple.validate(multiple.capturePreparation("default"), rest, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
-        assertThat(multipleHandlerFeedback.skills()).isEmpty();
-        assertThat(multipleHandlerFeedback.issues()).anySatisfy(issue ->
-                assertThat(issue.message()).contains("unknown field"));
-        assertThatThrownBy(() -> multiple.prepare(multiple.capturePreparation("default"), rest, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"))).hasMessageContaining("unknown field");
-        assertThat(constructions).hasValue(0);
-        assertThat(multiple.validate(multiple.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
+        var manager = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
+        manager.afterSingletonsInstantiated();
+        var removedSyntax = List.of(new SkillDocument("removed", "name: leaf\ndescription: leaf\nrest: true\n"));
+        var result = manager.validate(manager.capturePreparation("default"), removedSyntax,
+                ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+        assertThat(result.skills()).isEmpty();
+        assertThat(result.issues()).anySatisfy(issue -> assertThat(issue.message()).contains("unknown field"));
+        assertThatThrownBy(() -> manager.prepare(manager.capturePreparation("default"), removedSyntax,
+                ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, Map.of()))
+                .hasMessageContaining("unknown field");
     }
 
     @Test
@@ -597,8 +551,12 @@ class SkillGenerationManagerTest
     private static SkillGenerationManager manager(SkillMethodBeanPostProcessor javaSkills,
             java.util.function.Supplier<YamlSkillCatalog> catalogs)
     {
-        return new SkillGenerationManager(javaSkills, catalogs, new SkillInputContractResolver(),
-                new StaticListableBeanFactory());
+        return new SkillGenerationManager(javaSkills, catalogs, new SkillInputContractResolver());
+    }
+
+    private static ai.loomspan.internal.core.SkillExecutorRegistration executor(String name, AtomicInteger calls) {
+        return new ai.loomspan.internal.core.SkillExecutorRegistration(new ai.loomspan.internal.core.SkillIdentity("default", name), "",
+                SkillAccessPolicy.unrestricted(), new SkillSource(null, "executor", "execute"), invocation -> { calls.incrementAndGet(); return "ok"; });
     }
 
     private static LoomspanProperties loadingProperties(Path directory)
@@ -630,7 +588,7 @@ class SkillGenerationManagerTest
     {
         String canonical = "default-" + name;
         return new CapabilityMetadata("java:" + name, canonical, name, SkillExecutionDescriptor.none(),
-                SkillAccessPolicy.unrestricted(), arguments -> name, CapabilityKind.JAVA_SKILL,
+                SkillAccessPolicy.unrestricted(), arguments -> name, SkillKind.JAVA,
                 CapabilityToolDescriptor.generic(canonical, name),
                 new SkillSource(null, "testBean", name + "()"));
     }

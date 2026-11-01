@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -57,7 +58,7 @@ class FrameworkShutdownIntegrationTest
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         CapabilityMetadata metadata = new CapabilityMetadata("test:root", "default-root", "Root",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
-                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("default-root", "Root"), null);
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-root", "Root"), null);
         registry.register("default-root", metadata);
         var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
@@ -164,7 +165,7 @@ class FrameworkShutdownIntegrationTest
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         registry.register("default-root", new CapabilityMetadata("test:root", "default-root", "Root",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
-                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("default-root", "Root"), null));
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-root", "Root"), null));
         var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         context.addApplicationListener(lifecycle);
@@ -325,7 +326,7 @@ class FrameworkShutdownIntegrationTest
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityMetadata metadata = new CapabilityMetadata("test:root", "default-root", "Root",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
-                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("default-root", "Root"), null);
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-root", "Root"), null);
         registry.register("default-root", metadata);
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         org.mockito.Mockito.when(router.execute(any(), any(), any(), any())).thenReturn("ok");

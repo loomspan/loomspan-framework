@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
 import org.springframework.lang.Nullable;
 
@@ -14,7 +15,7 @@ public record CapabilityMetadata(
         SkillExecutionDescriptor skillExecution,
         SkillAccessPolicy accessPolicy,
         CapabilityInvoker invoker,
-        CapabilityKind kind,
+        SkillKind kind,
         CapabilityToolDescriptor tool,
         SkillInputContract inputContract,
         @Nullable SkillSource source)
@@ -42,7 +43,7 @@ public record CapabilityMetadata(
 
     public CapabilityMetadata(String id, String name, String description,
             SkillExecutionDescriptor skillExecution, SkillAccessPolicy accessPolicy,
-            CapabilityInvoker invoker, CapabilityKind kind, CapabilityToolDescriptor tool,
+            CapabilityInvoker invoker, SkillKind kind, CapabilityToolDescriptor tool,
             SkillInputContract inputContract, @Nullable SkillSource source)
     {
         this(id, SkillIdentity.parse(name), description, skillExecution, accessPolicy, invoker, kind, tool, inputContract, source);
@@ -54,7 +55,7 @@ public record CapabilityMetadata(
             SkillExecutionDescriptor skillExecution,
             SkillAccessPolicy accessPolicy,
             CapabilityInvoker invoker,
-            CapabilityKind kind,
+            SkillKind kind,
             CapabilityToolDescriptor tool,
             @Nullable SkillSource source)
     {

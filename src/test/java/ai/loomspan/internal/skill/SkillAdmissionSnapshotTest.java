@@ -6,7 +6,6 @@ import ai.loomspan.internal.core.*;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.context.ApplicationContext;
 
 import java.time.Duration;
@@ -27,10 +26,10 @@ class SkillAdmissionSnapshotTest {
         var javaSkills = mock(SkillMethodBeanPostProcessor.class);
         var leaf = new CapabilityMetadata("java:leaf", "default-leaf", "leaf", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(), arguments -> invoked.incrementAndGet(),
-                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("default-leaf", "leaf"), new SkillSource(null, "bean", "leaf()"));
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-leaf", "leaf"), new SkillSource(null, "bean", "leaf()"));
         when(javaSkills.capabilities()).thenReturn(List.of(leaf));
         var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties),
-                new SkillInputContractResolver(), new StaticListableBeanFactory(), properties, null,
+                new SkillInputContractResolver(), properties, null,
                 (p, policy) -> { built.incrementAndGet(); return runtime(p, policy); });
         manager.initializeStartup();
         int completedStartupBuilds = built.get();
@@ -161,8 +160,7 @@ class SkillAdmissionSnapshotTest {
         var properties = new LoomspanProperties();
         properties.getSkills().setLocations(List.of("classpath:/publication-no-files/*.yaml"));
         var javaSkills = mock(SkillMethodBeanPostProcessor.class); when(javaSkills.capabilities()).thenReturn(List.of());
-        var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties), inputs,
-                new StaticListableBeanFactory(), properties, null, SkillReloaderTest::runtime);
+        var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties), inputs, properties, null, SkillReloaderTest::runtime);
         manager.initializeStartup();
         var lifecycle = new FrameworkExecutionLifecycle(mock(ApplicationContext.class), Duration.ofMillis(100), Executors.newSingleThreadExecutor());
         var reloader = new DefaultSkillReloader(manager, lifecycle);

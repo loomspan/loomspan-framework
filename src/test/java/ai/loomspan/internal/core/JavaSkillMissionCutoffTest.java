@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.runtime.LoomspanMissionTimeoutException;
 import ai.loomspan.internal.runtime.MissionExecutionEngine;
 import ai.loomspan.internal.runtime.MissionWorkExecutor;
@@ -145,7 +146,7 @@ class JavaSkillMissionCutoffTest
     {
         var registry = new TestCapabilityRegistry();
         registry.register("default-javaRoot", new CapabilityMetadata("default-javaRoot", "default-javaRoot", "Java work",
-                SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), invoker, CapabilityKind.JAVA_SKILL,
+                SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), invoker, SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-javaRoot", "Java work"), new SkillSource(null, "bean", "work()")));
         var state = new DefaultExecutionStateService(Clock.systemUTC());
         MissionExecutionEngine noModel = (s,d,o,i,m,t,p,a) -> { throw new AssertionError("Java dispatched model work"); };

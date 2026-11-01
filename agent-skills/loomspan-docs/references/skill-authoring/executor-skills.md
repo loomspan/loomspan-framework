@@ -2,12 +2,12 @@
 audience: loomspan-skill-builder
 status: development
 applies_to: bundled-loomspan-revision
-coverage: structural-source-verified
+coverage: source-verified
 ---
 
 # Executor leaf declarations and configuration
 
-An executor leaf declares an operation owned by application Java code, with YAML supplying its input contract, roles and operation configuration. Loomspan parses and validates these declarations and preserves their configuration. Executor-backed YAML skills cannot currently be prepared or executed. The example below shows accepted declaration syntax.
+An executor leaf declares an operation owned by application Java code, with YAML supplying its input contract, roles and operation configuration. Loomspan prepares and executes these leaves through the shared Java route, classifies them as `SkillKind.JAVA`, and retains their YAML declarations and exact configuration. The example below shows accepted declaration syntax.
 
 ```yaml
 name: fetchAccount
@@ -50,11 +50,25 @@ The section and each namespace root MUST be maps. Namespace names follow the exi
 
 Published `ExecutionConfiguration` uses the same layout and accepts only its target namespace, rejecting even an empty foreign entry. Each publication is complete replacement: omitted executor configuration is empty and never inherits startup or prior-generation data. Skill `config` and namespace executor configuration remain separate; Framework does not merge, interpolate, resolve credentials, validate executor domain data, or call application validation code. See [complete namespace publication](../java-api/skill-reload.md).
 
-The `config` element on `@SkillExecutor` records an optional namespace-relative configuration path; its default is the empty string. Configuration-path validation and runtime binding are unavailable. Do not rely on an annotation path selecting namespace data for execution. See [Java declarations](../java-api/java-skills.md#reference-only-executor-declaration) for the annotation contract.
+The `config` element on `@SkillExecutor` selects an optional dot-separated map path relative to the executor namespace. Omission or an explicitly empty string supplies an empty immutable map. Whitespace-only paths, surrounding whitespace and empty segments (`.x`, `x.`, `x..y`) fail without trimming. Selection uses exact case-sensitive map keys: no array indexing, expressions, wildcard, fallback lookup or literal-dot key addressing is supported. Explicit missing, null, scalar, list and non-map intermediate selections fail; an empty selected map succeeds. Literal dotted keys inside the selected subtree remain unchanged data. The shared dependency validator validates this structure during startup/preparation and resolves the reached binding during admission; invocation does not reselect it. See [Java declarations](../java-api/java-skills.md#reference-only-executor-declaration).
+
+## Dependency capture and lifecycle
+
+A local executor reference resolves only in the declaring YAML skill's namespace. A qualified reference selects that exact namespace and name without fallback. Same-namespace executors may be Private; foreign executor namespaces MUST be Public. The `default` namespace has no implicit Public visibility. Callable names and executor names have separate indexes, so one qualified identity may exist in both roles. An executor registration alone is never a callable root, child, catalog skill or tool.
+
+Each namespace generation owns its fixed executor registrations and immutable configuration alongside its callable declarations. Namespaces containing only executors initialize as Private. A complete replacement or explicit recreation restores assigned registrations with newly supplied configuration; it never inherits old configuration. Removal blocks fresh dependent admission, preserves the application/Spring beans, and allows retained work to finish. Application code owns resources, domain validation and shutdown; Loomspan adds no executor preparation or cleanup callbacks.
+
+Preparation overlays the complete candidate namespace on captured foreign metadata, invokes no application code and retains no foreign runtime lease. Foreign changes after preparation do not invalidate target-base publication; each fresh admission validates the graph it captures. Admission follows only root-reachable callable edges and their executor dependencies, selecting one coherent generation per needed namespace. Retaining an executor namespace does not traverse unrelated skills or grant authority to call them.
+
+The invocation receives validated/reference-resolved input, the executing YAML leaf's `config` and qualified name, the selected executor configuration map, and the executor namespace generation ID even when no config path is declared. Retained execution uses only that captured registration and map across replacement, removal and recreation. Both Java forms share mission execution, caller authentication scope, observation, timeout and cancellation behavior. YAML roles and Spring method advice retain their existing boundaries; executor dependency retention does not itself compose those policies into one declarative authorization policy.
+
+Public catalogs classify these leaves as Java while Framework retains their YAML source. Current diagnostic displays do not expose a complete executor provenance model.
 
 ## Evidence and next topics
 
 - `ExecutorDeclarationTests`, `YamlSkillCatalogTests`, `YamlSkillDefinitionTest` and `TypeSafeDeclarationTests`: explicit forms, presence checks, ordinary input schemas and immutable copies.
 - `ExecutorConfigurationTests`, `ExecutionConfigurationParserTest` and `ExecutorConfigurationStartupTests`: namespace structure, target enforcement, complete replacement, real Config Data loading, exact values and ordinary Spring behavior.
+- `ExecutorDependencyResolutionTest`: local/qualified roles, visibility, exact paths/maps, executor-only startup, retained binding, target-base publication and root-reachable capture.
+- `ExecutorGenerationExecutionTest` and `ExecutorGenerationExecutionIntegrationTest`: YAML retention, public JAVA classification and captured invocation construction.
 - [Java skills](../java-api/java-skills.md): annotation discovery, invocation record and application result/failure contracts.
 - [Model selection](model-selection-and-connections.md): separate Framework provider configuration.

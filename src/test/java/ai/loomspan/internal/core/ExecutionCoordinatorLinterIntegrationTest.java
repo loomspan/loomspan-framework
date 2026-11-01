@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.chat.DefaultSkillAdvisorResolver;
 import ai.loomspan.internal.model.ModelInteractionFactory;
@@ -85,7 +86,7 @@ class ExecutionCoordinatorLinterIntegrationTest {
                 "default-lintedSkill",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-lintedSkill", "default-lintedSkill"),
                 null);
         registry.register(metadata.name(), metadata);

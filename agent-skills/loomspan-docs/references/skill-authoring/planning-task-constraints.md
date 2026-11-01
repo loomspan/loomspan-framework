@@ -28,7 +28,7 @@ Scalar entries and scalar flow lists are invalid. An unconstrained child is stil
 
 | Field | Required | Default | Enforced meaning |
 | --- | --- | --- | --- |
-| `name` | Yes | None | Exact, case-sensitive registered Java, REST, TypeSafe, or model-backed YAML name of the direct child. |
+| `name` | Yes | None | Exact, case-sensitive registered Java, TypeSafe, or model-backed YAML name of the direct child. |
 | `min_tasks` | No | `0` | Minimum generated plan tasks bound to `name`. |
 | `max_tasks` | No | Unbounded | Maximum generated plan tasks bound to `name`; zero is allowed. |
 | `required` | No | `false` | When true, makes the effective minimum at least one. |
@@ -40,7 +40,7 @@ References MAY be local to the containing owner or explicitly qualified and MUST
 
 Declaring `min_tasks`, `max_tasks`, or `required` requires the parent to explicitly declare `planning_mode: true`; this includes `required: false`. A name-only object remains valid on an LLM-backed direct skill.
 
-All exact child references are resolved at completed startup registration. Missing children fail startup independently of authorization. Java, REST, TypeSafe, and model-backed YAML children use the same generated-plan counting and successful-completion rules.
+All exact child references are resolved at completed startup registration. Missing children fail startup independently of authorization. Java, TypeSafe, and model-backed YAML children use the same generated-plan counting and successful-completion rules.
 
 ## Runtime semantics
 

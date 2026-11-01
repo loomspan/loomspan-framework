@@ -1,6 +1,6 @@
 package ai.loomspan.integration;
 
-import ai.loomspan.api.RestSkillHandler;
+import ai.loomspan.testkit.FixtureExecutor;
 import ai.loomspan.api.SkillExecutionView;
 import ai.loomspan.api.SkillMethod;
 import ai.loomspan.api.SkillTemplate;
@@ -220,7 +220,7 @@ class PlannerEvidenceFlowIntegrationTest {
             Files.writeString(skills.resolve(name + ".yaml"), """
                     name: %s
                     description: Return independent evidence
-                    rest: true
+                    executor: fixture
                     """.formatted(name));
         }
         Capture capture = new Capture();
@@ -302,7 +302,7 @@ class PlannerEvidenceFlowIntegrationTest {
                             return super.sourceA();
                         }
                     })
-                    .withBean(RestSkillHandler.class, () -> invocation -> {
+                    .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
                         if (Boolean.TRUE.equals(invocation.input().get("unrelated")))
                             return "UNRELATED_MISSION_SENTINEL";
                         String id = invocation.skillName().equals("default-sourceB") ? String.valueOf(invocation.input().getOrDefault("source", "sourceB")) : invocation.skillName().substring("default-".length());
@@ -318,7 +318,7 @@ class PlannerEvidenceFlowIntegrationTest {
                         if (expanded && id.equals("nestedSource")) return JSON.writeValueAsString(Map.of(
                                 "quote", evidence("N", true), "citation", "citation:FACT_N_TAIL", "private", "CHILD_PRIVATE_SENTINEL"));
                         return JSON.writeValueAsString(Map.of("text", evidence(source, longResults)));
-                    })
+                    }))
                     .withPropertyValues("spring.main.web-application-type=none",
                             "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
                             "loomspan.connections.local.driver=openai",

@@ -7,7 +7,7 @@ import ai.loomspan.api.SkillInputValidationException;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
 import ai.loomspan.internal.core.CapabilityInvoker;
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.TestCapabilityRegistry;
@@ -293,7 +293,7 @@ class DefaultSkillTemplateTest {
                 "yaml:invoiceParser", "default-invoiceParser", "Invoice parser",
                 SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")),
-                noopInvoker(), CapabilityKind.JAVA_SKILL,
+                noopInvoker(), SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"),
                 yamlSkillMetadata().inputContract(), null);
         registry.register("default-invoiceParser", restricted);
@@ -360,7 +360,7 @@ class DefaultSkillTemplateTest {
         registry.register("default-generic", new CapabilityMetadata(
                 "yaml:generic", "default-generic", "Generic", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(), noopInvoker(),
-                CapabilityKind.JAVA_SKILL, CapabilityToolDescriptor.generic("default-generic", "Generic"), null));
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-generic", "Generic"), null));
         DefaultSkillTemplate template = new DefaultSkillTemplate(
                 registry.manager(), router, new LoomspanSessionRunner(4), new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
@@ -524,7 +524,7 @@ class DefaultSkillTemplateTest {
                 "Invoice parser",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 noopInvoker(),
-                CapabilityKind.JAVA_SKILL,
+                SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"),
                 new SkillInputContract(
                         SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
@@ -630,7 +630,7 @@ class DefaultSkillTemplateTest {
                 "Invoice parser",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 noopInvoker(),
-                CapabilityKind.JAVA_SKILL,
+                SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"),
                 new SkillInputContract(
                         SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,

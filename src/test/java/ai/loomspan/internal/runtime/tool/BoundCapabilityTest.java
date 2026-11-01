@@ -1,6 +1,6 @@
 package ai.loomspan.internal.runtime.tool;
 
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.SkillExecutionDescriptor;
@@ -38,7 +38,7 @@ class BoundCapabilityTest
     private static CapabilityMetadata metadata()
     {
         return new CapabilityMetadata("test:null", "default-nullableTool", "Nullable tool",
-                SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), ignored -> null, CapabilityKind.YAML_SKILL,
+                SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), ignored -> null, SkillKind.YAML,
                 new CapabilityToolDescriptor("default-nullableTool", "Nullable tool",
                         "{\"type\":\"object\",\"properties\":{\"optional\":{\"type\":\"string\"}}}", null),
                 null, null);

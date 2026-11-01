@@ -6,7 +6,6 @@ import ai.loomspan.internal.core.*;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import ai.loomspan.internal.security.SkillAccessPolicy;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -29,14 +28,13 @@ class NamespaceIdentityFoundationTest {
     private SkillDocument modelLeaf(String name) { return new SkillDocument("raw source " + name, "name: " + name + "\ndescription: leaf\nmodel: model\n"); }
     private CapabilityMetadata javaSkill(String name) {
         return new CapabilityMetadata("java source", name, "Java", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(),
-                args -> { throw new AssertionError("validation must not execute Java"); }, CapabilityKind.JAVA_SKILL,
+                args -> { throw new AssertionError("validation must not execute Java"); }, SkillKind.JAVA,
                 null, new SkillSource(null,"bean","method"));
     }
     private SkillGenerationManager manager(CapabilityMetadata... fixed) {
         var processor = mock(SkillMethodBeanPostProcessor.class); when(processor.capabilities()).thenReturn(List.of(fixed));
-        var beans = new StaticListableBeanFactory(); beans.addBean("handler", (RestSkillHandler) request -> request.skillName()+"@"+request.generationId());
         var props=properties();
-        var manager = new SkillGenerationManager(processor, () -> new YamlSkillCatalog(props), new SkillInputContractResolver(), beans);
+        var manager = new SkillGenerationManager(processor, () -> new YamlSkillCatalog(props), new SkillInputContractResolver());
         manager.afterSingletonsInstantiated(); return manager;
     }
     @Test void targetFeedbackAndGenerationsUseCanonicalOwnership() {
@@ -210,8 +208,8 @@ class NamespaceIdentityFoundationTest {
         assertThatThrownBy(() -> new SkillGeneration("beta","id",Map.of(metadata.name(),metadata),Map.of())).hasMessageContaining("capability key");
         var checked=new YamlSkillCatalog(properties()).checkedSupplied("alpha",List.of(modelLeaf("search")),false);
         var definition=checked.definitions().getFirst();
-        assertThatThrownBy(() -> new SkillGeneration("alpha","bad-kind",Map.of(metadata.name(),new CapabilityMetadata("yaml", "alpha-search", "wrong kind", SkillExecutionDescriptor.none(), null, args -> "unused", CapabilityKind.JAVA_SKILL, null, null)),Map.of("alpha-search",definition)))
-                .hasMessageContaining("matching YAML or TYPESAFE capability");
+        assertThatThrownBy(() -> new SkillGeneration("alpha","bad-kind",Map.of(metadata.name(),new CapabilityMetadata("yaml", "alpha-search", "wrong kind", SkillExecutionDescriptor.none(), null, args -> "unused", SkillKind.JAVA, null, null)),Map.of("alpha-search",definition)))
+                .hasMessageContaining("matching YAML capability");
         assertThatThrownBy(() -> new SkillGeneration("alpha","local-definition",Map.of(metadata.name(),metadata),Map.of("search",definition)))
                 .hasMessageContaining("definition key");
         var empty=new SkillGeneration("Alpha","opaque",Map.of(),Map.of());

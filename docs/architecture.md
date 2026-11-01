@@ -3,19 +3,19 @@
 Loomspan composes application capabilities into a hierarchy. A root skill receives
 an application request. A model-backed skill can reason directly or, with
 `planning_mode: true`, create a task plan using its allowed direct children.
-A child can itself be a model-backed skill, an annotated Java method, or a REST
-leaf implemented by the application.
+A child can itself be a model-backed skill, an annotated Java method, or an executor YAML
+leaf implemented by application Java code.
 
 ```text
 Application request
   -> model-backed entry skill
        -> specialist model-backed skill
        -> Java application service
-       -> application-handled REST leaf
+       -> YAML-configured Java executor leaf
 ```
 
 These are possible roles, not mandatory layers. A single YAML skill can handle a
-small reasoning task. Java and REST skills can also be invoked directly without
+small reasoning task. Java skills and executor YAML leaves can also be invoked directly without
 a framework model call. The [skill-tree reference](../agent-skills/loomspan-docs/references/skill-authoring/mental-model.md)
 defines exact naming, visibility, and composition semantics.
 
@@ -44,9 +44,9 @@ require design, testing, and evaluation; they do not remove the need for code.
 
 ## What the application controls
 
-- **Capabilities:** Java methods and the REST handler own application operations
-  and their side effects. A REST manifest does not define endpoint credentials or
-  provide a generic HTTP client; the application handler owns that integration.
+- **Capabilities:** Java methods and configured executors own application operations
+  and their side effects. Executor configuration is domain data; the application
+  owns its service clients, resources and shutdown.
 - **Composition:** each model-backed parent declares its direct child surface.
   Child visibility is local, not transitive. Authorization is enforced separately.
 - **Contracts:** input validation, structured-output validation, and optional
@@ -76,6 +76,6 @@ See [setup](setup.md).
 ## Supported extension boundary
 
 Use the closed [application-facing Java API](../agent-skills/loomspan-docs/references/java-api/compatibility-and-boundaries.md).
-`RestSkillHandler` is the sole supported Java SPI. Framework internals and Spring
+Loomspan exposes no supported Java SPI or internal bean-replacement contract. Framework internals and Spring
 integration machinery are not extension contracts. The architecture test
 `LoomspanPublicSurfaceArchitectureTest` defines the exact public allowlist.

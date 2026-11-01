@@ -121,8 +121,7 @@ class SkillVisibilityResolverTest {
     private static SkillGeneration generation(YamlSkillCatalog catalog)
     {
         var manager = new SkillGenerationManager(new ai.loomspan.internal.core.SkillMethodBeanPostProcessor(),
-                () -> catalog, new SkillInputContractResolver(),
-                new org.springframework.beans.factory.support.StaticListableBeanFactory());
+                () -> catalog, new SkillInputContractResolver());
         manager.afterSingletonsInstantiated();
         return manager.active("default");
     }

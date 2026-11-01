@@ -1,5 +1,6 @@
 package ai.loomspan.internal.runtime.step;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.api.SkillDocument;
@@ -85,7 +86,7 @@ class Pr18RecordedHandoffDiagnosticTest {
         assertRecordedBoundaries(contract);
         Files.writeString(output.resolve("resolved-input-contract.json"), json.writeValueAsString(contract));
         var metadata = new CapabilityMetadata("yaml:compareOptions", "default-compareOptions", childManifest.getDescription(),
-                SkillExecutionDescriptor.from(config), null, args -> null, CapabilityKind.YAML_SKILL,
+                SkillExecutionDescriptor.from(config), null, args -> null, SkillKind.YAML,
                 CapabilityToolDescriptor.generic("default-compareOptions", childManifest.getDescription()), contract, null);
         BoundCapability tool = new BoundCapability(metadata, java.util.List.of(), (args,taskId, sourceResults) -> { throw new AssertionError("capture must not execute tool"); });
         Map<String,String> assignment = (Map<String,String>)data.get("task");

@@ -7,7 +7,6 @@ import ai.loomspan.internal.core.SkillMethodBeanPostProcessor;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.core.env.StandardEnvironment;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,11 +23,12 @@ class ExecutorConfigurationManagerTests {
         var javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of());
         var invocations = new AtomicInteger();
-        var beans = new StaticListableBeanFactory();
-        beans.addBean("handler", (ai.loomspan.api.RestSkillHandler) invocation -> { invocations.incrementAndGet(); return "unused"; });
+        when(javaSkills.executors()).thenReturn(List.of(new ai.loomspan.internal.core.SkillExecutorRegistration(
+                new ai.loomspan.internal.core.SkillIdentity("sales", "fixture"), "", ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),
+                new ai.loomspan.internal.core.SkillSource(null, "bean", "execute"), invocation -> { invocations.incrementAndGet(); return "unused"; })));
         var captured = new ArrayList<ExecutorConfiguration>();
         var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties),
-                new SkillInputContractResolver(), beans, properties, new StandardEnvironment(), (config, policy) -> {
+                new SkillInputContractResolver(), properties, new StandardEnvironment(), (config, policy) -> {
                     captured.add(config.getExecutorConfig()); return null;
                 });
         manager.afterSingletonsInstantiated();

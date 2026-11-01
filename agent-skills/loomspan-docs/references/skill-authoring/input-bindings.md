@@ -9,7 +9,7 @@ coverage: source-verified
 
 Use `input_bindings` on a structured `allowed_skills` entry of an explicit
 `planning_mode: true` parent to transfer authoritative values into a direct child.
-Model, TypeSafe, annotation-only Java, and REST children use the same feature. The complete
+Model, TypeSafe, annotation-only Java, and executor YAML children use the same feature. The complete
 receiving input contract remains authoritative; the calling model generates only
 unbound arguments under a separate projected contract. Binding grants no access
 and does not change invocation limits or the captured configuration generation.
@@ -70,8 +70,8 @@ Unknown/null fields, invalid escapes, duplicate raw YAML keys and duplicate or
 overlapping destination paths are rejected. Known closed/type boundaries and
 parent input source paths are checked against the complete generation. Open or
 unconstrained source branches and undeclared producer output shapes require
-runtime validation. No output shape is inferred from a Java return type or REST
-text. Unknown, self-referencing and cyclic producers are rejected.
+runtime validation. No output shape is inferred from a Java return type or executor
+result text. Unknown, self-referencing and cyclic producers are rejected.
 
 ## Complete example
 

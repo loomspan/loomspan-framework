@@ -3,7 +3,7 @@ package ai.loomspan.internal.runtime.tool;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.ExecutionFrame;
@@ -121,12 +121,12 @@ class SuccessfulSkillCompletionBoundaryTest
     private static CapabilityMetadata capability()
     {
         return new CapabilityMetadata(
-                "rest:child",
+                "java:child",
                 "default-investigateNetwork",
                 "Investigate the network",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
-                CapabilityKind.REST_SKILL,
+                SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-investigateNetwork", "Investigate the network"),
                 null);
     }

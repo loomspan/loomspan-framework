@@ -1,5 +1,6 @@
 package ai.loomspan.internal.security;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.api.NamespaceVisibility;
 import ai.loomspan.internal.core.*;
 import ai.loomspan.internal.skill.*;
@@ -12,7 +13,7 @@ class NamespaceAccessGuardTest {
     @Test void declaredPublicTargetStillRequiresRolesAndRetainedOwnership() {
         var source = capability("orders-root");
         var target = new CapabilityMetadata("tax", "tax-calculateTax", "tax", SkillExecutionDescriptor.none(),
-                SkillAccessPolicy.yamlRoles(Set.of("TAX")), args -> "ok", CapabilityKind.YAML_SKILL,
+                SkillAccessPolicy.yamlRoles(Set.of("TAX")), args -> "ok", SkillKind.YAML,
                 CapabilityToolDescriptor.generic("tax-calculateTax", "tax"), null);
         var orders = generation("orders", NamespaceVisibility.PRIVATE, source, List.of(target.name()));
         var tax = generation("tax", NamespaceVisibility.PUBLIC, target, List.of());
@@ -93,7 +94,7 @@ class NamespaceAccessGuardTest {
 
     static CapabilityMetadata capability(String name) {
         return new CapabilityMetadata(name, name, name, SkillExecutionDescriptor.none(),
-                SkillAccessPolicy.unrestricted(), args -> "ok", CapabilityKind.YAML_SKILL,
+                SkillAccessPolicy.unrestricted(), args -> "ok", SkillKind.YAML,
                 CapabilityToolDescriptor.generic(name, name), null);
     }
     static SkillGeneration generation(String namespace, NamespaceVisibility visibility, CapabilityMetadata capability, List<String> children) {

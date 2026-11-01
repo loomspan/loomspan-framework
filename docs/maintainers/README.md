@@ -10,7 +10,7 @@ define the contributor workflow.
 
 | Task | Instructions and executable authority | Verification |
 | --- | --- | --- |
-| Java implementation or supported API | Root guidance, `src/`, and root `pom.xml`. Only the architecture test's allowlisted `ai.loomspan.api` types are supported application API; `RestSkillHandler` is the sole supported Java SPI. | Run focused tests and `LoomspanPublicSurfaceArchitectureTest` after production-type changes. Run supported-surface tests for API changes. |
+| Java implementation or supported API | Root guidance, `src/`, and root `pom.xml`. Only the architecture test's allowlisted `ai.loomspan.api` types are supported application API; Loomspan exposes no supported Java SPI or internal bean-replacement contract. | Run focused tests and `LoomspanPublicSurfaceArchitectureTest` after production-type changes. Run supported-surface tests for API changes. |
 | Console implementation or packaging | [Console guidance](../../loomspan-console/AGENTS.md) and [build instructions](../../loomspan-console/README.md). Console is an independent Go module with an embedded React application. | Use the affected subtree's checks; Java `mvn test` does not build or verify Console. |
 | Documentation or Agent Skill references | [Documentation placement](../README.md#documentation-placement), matching source and named tests. Keep one authoritative contract and link to it. | Check local links, heading targets, examples, version consistency and any affected skill validation. |
 | Versioning and publication | [Release procedure](releases.md), the version script, and the two release workflows. | Verify the exact release commit and both publication outcomes. |

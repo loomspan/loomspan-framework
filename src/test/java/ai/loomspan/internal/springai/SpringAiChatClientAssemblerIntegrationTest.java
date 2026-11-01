@@ -1,5 +1,6 @@
 package ai.loomspan.internal.springai;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.linter.LinterCallAdvisor;
@@ -159,7 +160,7 @@ class SpringAiChatClientAssemblerIntegrationTest
             AtomicReference<Map<String, Object>> observedArguments)
     {
         CapabilityMetadata metadata = new CapabilityMetadata("test:lookup", "tax-lookup", "Look up",
-                SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), ignored -> null, CapabilityKind.YAML_SKILL,
+                SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), ignored -> null, SkillKind.YAML,
                 new CapabilityToolDescriptor("tax-lookup", "Look up",
                         "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}", null),
                 SkillInputContract.genericObject(), null);

@@ -154,7 +154,7 @@ class ConsoleRestFixtureCorpusTest
                 "11111111-1111-4111-8111-111111111111", "1.0.0-beta.9-SNAPSHOT", OBSERVED, true,
                 4, 1, 1, TracePersistencePolicy.ONERROR, Duration.ofMinutes(15), Duration.ofHours(24)));
         result.put("skills-page.json", new ObservabilityDtos.Page<>(List.of(skill,
-                new ObservabilityDtos.SkillSummary("default-FetchDns", "REST", "classpath:/skills/fetch-dns.yaml",
+                new ObservabilityDtos.SkillSummary("default-FetchDns", "YAML", "classpath:/skills/fetch-dns.yaml",
                         null, null, "skills/default-FetchDns"), new ObservabilityDtos.SkillSummary(
                 "default-LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", "skills/default-LookupDns"),
                 new ObservabilityDtos.SkillSummary("default-EvaluateDns", "TYPESAFE", "opaque label", null, null, "skills/default-EvaluateDns")), false, null, OBSERVED));
@@ -163,8 +163,8 @@ class ConsoleRestFixtureCorpusTest
         result.put("skill-java-detail.json", new ObservabilityDtos.SkillDetail(
                 "default-LookupDns", "JAVA", null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", null, null));
         result.put("skill-rest-detail.json", new ObservabilityDtos.SkillDetail(
-                "default-FetchDns", "REST", "opaque label", null, null,
-                "# REST DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application handler\r\nrest: true\r\n", null));
+                "default-FetchDns", "YAML", "opaque label", null, null,
+                "# Executor DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application executor\r\nexecutor: fetchDns\r\n", null));
         String nativeYaml = "name: EvaluateDns\ndescription: Evaluate DNS evidence\nmodel: evaluation\ninput_schema: {type: object}\n"
                 + "typesafe:\n  state: '${/input}'\n  questions:\n    healthy: {type: noul, instructions: 'Is DNS healthy?'}\n";
         var nativeDeclaration = ai.loomspan.internal.typesafe.TypeSafeDeclaration.compile(

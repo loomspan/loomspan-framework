@@ -1,5 +1,6 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.linter.LinterOutcome;
 import ai.loomspan.internal.linter.LinterOutcomeStatus;
@@ -186,7 +187,7 @@ class ExecutionCoordinatorMissionContextIntegrationTest
                 name,
                 SkillExecutionDescriptor.from(CONFIG), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
-                CapabilityKind.YAML_SKILL,
+                SkillKind.YAML,
                 CapabilityToolDescriptor.generic(name, name),
                 null);
     }

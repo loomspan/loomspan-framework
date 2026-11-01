@@ -3,7 +3,7 @@ package ai.loomspan.internal.runtime.step;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.ExecutionBinding;
@@ -609,7 +609,7 @@ class ConcurrentGroupedExecutionIntegrationTest
                 name,
                 name,
                 SkillExecutionDescriptor.from(CONFIG), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of("ALLOWED")),
-                invocation::apply, mapped ? CapabilityKind.JAVA_SKILL : CapabilityKind.YAML_SKILL,
+                invocation::apply, mapped ? SkillKind.JAVA : SkillKind.YAML,
                 new CapabilityToolDescriptor(name, name, schema, null),
                 new ai.loomspan.internal.runtime.input.SkillInputContractResolver().resolveFromToolSchema(schema), null);
     }

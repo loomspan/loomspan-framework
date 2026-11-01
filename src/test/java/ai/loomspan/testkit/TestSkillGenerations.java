@@ -1,5 +1,6 @@
 package ai.loomspan.testkit;
 
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.skill.SkillGeneration;
 import ai.loomspan.internal.skill.YamlSkillDefinition;
@@ -26,7 +27,7 @@ public final class TestSkillGenerations
     public static CapabilityMetadata leaf() {
         return new CapabilityMetadata("test:leaf", "default-leaf", "fixture",
                 ai.loomspan.internal.core.SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),
-                input -> "ok", ai.loomspan.internal.core.CapabilityKind.JAVA_SKILL,
+                input -> "ok", ai.loomspan.api.SkillKind.JAVA,
                 ai.loomspan.internal.core.CapabilityToolDescriptor.generic("default-leaf", "fixture"),
                 new ai.loomspan.internal.core.SkillSource(null, "fixture", "leaf()"));
     }

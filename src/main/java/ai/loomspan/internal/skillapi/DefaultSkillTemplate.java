@@ -170,8 +170,8 @@ public class DefaultSkillTemplate implements SkillTemplate
                         .toList();
                 throw new SkillInputValidationException(buildValidationMessage(skillName, validation), issues);
             }
-            generationManager.validateAdmission(captured.snapshot());
-            return new PreparedInput(captured.snapshot(), capability, validation, captured.lease());
+            var admitted = generationManager.validateAdmission(captured.snapshot());
+            return new PreparedInput(admitted, capability, validation, captured.lease());
         }
         catch (AccessDeniedException | SkillException ex)
         {

@@ -2,7 +2,7 @@ package ai.loomspan.internal.skillapi;
 
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
-import ai.loomspan.internal.core.CapabilityKind;
+import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.ExecutionBindingScope;
@@ -209,7 +209,7 @@ class SkillGenerationExecutionIntegrationTest
                                 null, List.of(), null, null, false, true)),
                         List.of(requiredField), Boolean.FALSE, null, List.of(), null, null, false, true));
         return new CapabilityMetadata(id, "default-invoiceParser", "Invoice parser",
-                SkillExecutionDescriptor.none(), policy, arguments -> "unused", CapabilityKind.JAVA_SKILL,
+                SkillExecutionDescriptor.none(), policy, arguments -> "unused", SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"), input, null);
     }
 }

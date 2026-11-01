@@ -17,7 +17,7 @@ class ApplicationApiValueTest
     @Test
     void publicCatalogAndValidationExposeOnlyTheTicketedShape() throws Exception
     {
-        assertThat(SkillKind.values()).containsExactly(SkillKind.YAML, SkillKind.JAVA, SkillKind.REST, SkillKind.TYPESAFE);
+        assertThat(SkillKind.values()).containsExactly(SkillKind.YAML, SkillKind.JAVA, SkillKind.TYPESAFE);
         assertThat(SkillDescriptor.class.getRecordComponents())
                 .extracting(component -> List.of(component.getName(), component.getType()))
                 .containsExactly(
@@ -68,7 +68,7 @@ class ApplicationApiValueTest
     }
 
     @Test
-    void restInvocationDeeplyCopiesContainersAndPreservesLeavesAndNulls()
+    void executorInvocationDeeplyCopiesContainersAndPreservesLeavesAndNulls()
     {
         Object leaf = new ByteArrayResource(new byte[] {1, 2, 3});
         List<Object> values = new ArrayList<>();
@@ -83,9 +83,9 @@ class ApplicationApiValueTest
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("nested", nested);
 
-        RestSkillInvocation invocation = new RestSkillInvocation("tax-lookup", input, "generation-a");
+        SkillExecutorInvocation invocation = new SkillExecutorInvocation(input, Map.of(), Map.of(), "tax-lookup", "generation-a");
         assertThat(invocation.skillName()).isEqualTo("tax-lookup");
-        assertThat(invocation.generationId()).isEqualTo("generation-a");
+        assertThat(invocation.executorConfigGenerationId()).isEqualTo("generation-a");
         values.add("late");
         nonStringKeyedValues.add("late");
         nonStringKeyed.put(8, "late");
@@ -103,24 +103,17 @@ class ApplicationApiValueTest
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> ((Map<Object, Object>) copiedNested.get("nonStringKeyed")).put(8, "x"))
                 .isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> new RestSkillInvocation(null, Map.of(), "generation-a")).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new RestSkillInvocation("tax-lookup", null, "generation-a")).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new RestSkillInvocation("tax-lookup", Map.of(), null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillExecutorInvocation(Map.of(), Map.of(), Map.of(), null, "generation-a")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillExecutorInvocation(null, Map.of(), Map.of(), "tax-lookup", "generation-a")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillExecutorInvocation(Map.of(), Map.of(), Map.of(), "tax-lookup", null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    void restSpiExposesOnlyTheTicketedJdkSignature()
+    void executorInvocationExposesOnlyTheAgreedInvocationData()
     {
-        assertThat(RestSkillInvocation.class.getRecordComponents())
+        assertThat(SkillExecutorInvocation.class.getRecordComponents())
                 .extracting(component -> component.getName())
-                .containsExactly("skillName", "input", "generationId");
-        assertThat(RestSkillHandler.class.getDeclaredMethods())
-                .singleElement()
-                .satisfies(method -> {
-                    assertThat(method.getName()).isEqualTo("handle");
-                    assertThat(method.getReturnType()).isEqualTo(String.class);
-                    assertThat(method.getParameterTypes()).containsExactly(RestSkillInvocation.class);
-                });
+                .containsExactly("input", "skillConfig", "executorConfig", "skillName", "executorConfigGenerationId");
     }
 
     @Test

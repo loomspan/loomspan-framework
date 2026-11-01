@@ -49,8 +49,6 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.api.ExecutionConfiguration",
             "ai.loomspan.api.SkillInputValidationException",
             "ai.loomspan.api.SkillInputValidationIssue",
-            "ai.loomspan.api.RestSkillHandler",
-            "ai.loomspan.api.RestSkillInvocation",
             "ai.loomspan.api.SkillCatalog",
             "ai.loomspan.api.SkillDescriptor",
             "ai.loomspan.api.SkillKind");
@@ -136,7 +134,6 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.core.LoomspanStackOverflowException", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.CapabilityExecutionRouter", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.CapabilityInvoker", "Public only for Java collaboration between distinct internal subsystem packages."),
-            Map.entry("ai.loomspan.internal.core.CapabilityKind", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.CapabilityMetadata", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.CapabilityToolDescriptor", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.DefaultExecutionTraceRecorder", "Public only for Java collaboration between distinct internal subsystem packages."),
@@ -322,7 +319,7 @@ class LoomspanPublicSurfaceArchitectureTest
             .collect(Collectors.toSet());
 
     @Test
-    void apiPackageContainsExactlyNineteenApprovedPublicTypes()
+    void apiPackageContainsExactlyApprovedPublicTypes()
     {
         assertThat(publicTopLevelTypesIn("ai.loomspan.api"))
                 .containsExactlyInAnyOrderElementsOf(API_TYPES);
