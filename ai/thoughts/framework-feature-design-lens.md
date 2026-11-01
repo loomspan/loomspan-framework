@@ -172,6 +172,14 @@ Before choosing derivation over emission, identify:
 - whether every valid execution, including failure before later lifecycle records, retains enough canonical information; and
 - whether emission would create a duplicate authority or instead eliminate one.
 
+### 13. Keep product documentation about the current system
+
+The README, product documentation, and packaged skills are living descriptions of the system available to their readers. Describe current behavior, supported contracts, constraints, and usable examples directly. Keep them understandable without access to internal tickets, pull requests, implementation plans, or delivery history.
+
+Do not add PR numbers, ticket identifiers, implementation-slice summaries, completion receipts, or promises that behavior will arrive in a later PR. Keep work tracking, sequencing, verification-run results, and handoff notes in tickets, research, plans, and review artifacts under `ai/thoughts/`. Stable source and test references may support a documented contract; they should not narrate the work that produced it. Consumer-relevant release and migration information belongs in release or upgrade guidance.
+
+When a feature is incomplete, state the actual current limitation and its effect on the reader. Do not describe planned behavior as supported, hide a limitation by removing its qualification, or substitute a future delivery reference for an explanation. Review documentation changes against the current executable system and remove obsolete recipes and tracking language as part of the same change.
+
 ## Feature Review Questions
 
 Use the questions that are relevant to the proposal. They are prompts for discussion, not a scorecard.
@@ -200,6 +208,7 @@ Use the questions that are relevant to the proposal. They are prompts for discus
 - Does the feature remove orchestration plumbing from the public developer experience?
 - Does it reduce the number of concepts, or merely the number of declarations?
 - Is important behavior implicit, surprising, or dependent on a distant caller?
+- Do the README, documentation, and packaged skills describe current behavior and limitations without PR-based tracking, delivery sequencing, or implementation-history narrative?
 
 ### Data and state
 
