@@ -31,7 +31,7 @@ class NamespaceDispatchTest {
                 return "ok";
             }, CapabilityKind.REST_SKILL, CapabilityToolDescriptor.generic("tax-leaf", "leaf"), null);
             var manifest = new YamlSkillManifest(); manifest.setName("root");
-            var definition = new YamlSkillDefinition("orders", new ByteArrayResource(new byte[0]), manifest,
+            var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "orders", new ByteArrayResource(new byte[0]), manifest,
                     new EffectiveSkillExecutionConfiguration("model", "connection", ai.loomspan.autoconfigure.AiDriver.OPENAI, "provider", null),
                     null, null, declared ? List.of(new AllowedSkillConstraint(target.name(), null, null, false, List.of())) : List.of());
             var root = new CapabilityMetadata("source", "orders-root", "root", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), input -> "unused",

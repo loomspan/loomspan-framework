@@ -49,23 +49,23 @@ class DefaultRegisteredSkillCatalogTest
     }
 
     @Test
-    void preservesRestAsDistinctManifestBackedSource() throws Exception
+    void preservesExecutorAsYamlManifestSource() throws Exception
     {
-        String restYaml = "name: FetchDns\ndescription: fetch DNS\nrest: true\n";
-        DefaultRegisteredSkillCatalog catalog = catalog(List.of(restDefinition("FetchDns", restYaml)), false);
+        String executorYaml = "name: FetchDns\ndescription: fetch DNS\nexecutor: infrastructure-dns\n";
+        DefaultRegisteredSkillCatalog catalog = catalog(List.of(executorDefinition("FetchDns", executorYaml)), false);
 
         assertThat(catalog.listAfter(null, 10)).singleElement().satisfies(summary ->
         {
             assertThat(summary.registeredName()).isEqualTo("FetchDns");
-            assertThat(summary.source()).isEqualTo("REST");
+            assertThat(summary.source()).isEqualTo("YAML");
             assertThat(summary.sourcePath()).isEqualTo("FetchDns.yaml");
             assertThat(summary.beanName()).isNull();
             assertThat(summary.method()).isNull();
         });
         assertThat(catalog.find("FetchDns").orElseThrow()).satisfies(entry ->
         {
-            assertThat(entry.source()).isEqualTo("REST");
-            assertThat(entry.yaml()).isEqualTo(restYaml);
+            assertThat(entry.source()).isEqualTo("YAML");
+            assertThat(entry.yaml()).isEqualTo(executorYaml);
         });
     }
 
@@ -77,7 +77,7 @@ class DefaultRegisteredSkillCatalogTest
                 definition.resource(),
                 definition.source().locationPattern(),
                 new byte[] {(byte) 0xC3, (byte) 0x28});
-        YamlSkillDefinition withInvalidSource = new YamlSkillDefinition("default",
+        YamlSkillDefinition withInvalidSource = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 definition.resource(),
                 definition.manifest(),
                 definition.executionConfiguration(),
@@ -99,9 +99,7 @@ class DefaultRegisteredSkillCatalogTest
             var metadata = mock(CapabilityMetadata.class);
             when(metadata.name()).thenReturn(definition.manifest().getName());
             when(metadata.tool()).thenReturn(ai.loomspan.internal.core.CapabilityToolDescriptor.generic(definition.manifest().getName(), "description"));
-            when(metadata.kind()).thenReturn(definition.rest()
-                    ? CapabilityKind.REST_SKILL
-                    : CapabilityKind.YAML_SKILL);
+            when(metadata.kind()).thenReturn(CapabilityKind.YAML_SKILL);
             definitionsByName.put(metadata.name(), definition);
             entries.add(metadata);
         }
@@ -123,7 +121,7 @@ class DefaultRegisteredSkillCatalogTest
         manifest.setName(name);
         manifest.setDescription("description");
         manifest.setModel("model");
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new FileSystemResource(file),
                 manifest,
                 new EffectiveSkillExecutionConfiguration(
@@ -135,14 +133,14 @@ class DefaultRegisteredSkillCatalogTest
                         yaml.getBytes(StandardCharsets.UTF_8)));
     }
 
-    private YamlSkillDefinition restDefinition(String name, String yaml) throws Exception
+    private YamlSkillDefinition executorDefinition(String name, String yaml) throws Exception
     {
         Path file = Files.writeString(tempDir.resolve(name + ".yaml"), yaml, StandardCharsets.UTF_8);
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName(name);
         manifest.setDescription("description");
-        manifest.setRest(true);
-        return new YamlSkillDefinition("default",
+        manifest.setExecutor("pendingExecutor");
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.EXECUTOR, "default",
                 new FileSystemResource(file),
                 manifest,
                 null,

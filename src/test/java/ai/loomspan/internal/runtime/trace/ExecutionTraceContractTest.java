@@ -436,7 +436,7 @@ class ExecutionTraceContractTest {
         manifest.setName("duplicateInvoiceChecker");
         manifest.setDescription("default-duplicateInvoiceChecker");
         manifest.setModel("gpt-5");
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 EXECUTION_CONFIGURATION,
@@ -449,7 +449,7 @@ class ExecutionTraceContractTest {
         manifest.setName(ai.loomspan.internal.core.SkillIdentity.parse(name).localName());
         manifest.setDescription(name);
         manifest.setModel("gpt-5");
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 EXECUTION_CONFIGURATION);

@@ -103,8 +103,7 @@ Startup namespaces are Private; foreign outgoing references require a Public tar
 Fixed Java methods remain assigned to their original namespace across replacement
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
-for complete signatures, sequencing and retirement. This slice implements preparation
+for complete signatures, sequencing and retirement. Namespace updates support preparation
 and installation, retained reachable admission and captured target dispatch.
-Serialized observation/Console integration remains PR 27.5.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.

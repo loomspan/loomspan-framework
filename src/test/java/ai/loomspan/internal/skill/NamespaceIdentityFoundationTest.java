@@ -26,7 +26,7 @@ class NamespaceIdentityFoundationTest {
         var model = new LoomspanProperties.ModelCatalogEntry(); model.setConnection("connection"); model.setProviderModel("model"); model.setThinkingLevels(Set.of("medium"));
         props.setModels(Map.of("model", model)); return props;
     }
-    private SkillDocument rest(String name) { return new SkillDocument("raw source " + name, "name: " + name + "\ndescription: leaf\nrest: true\n"); }
+    private SkillDocument modelLeaf(String name) { return new SkillDocument("raw source " + name, "name: " + name + "\ndescription: leaf\nmodel: model\n"); }
     private CapabilityMetadata javaSkill(String name) {
         return new CapabilityMetadata("java source", name, "Java", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(),
                 args -> { throw new AssertionError("validation must not execute Java"); }, CapabilityKind.JAVA_SKILL,
@@ -41,7 +41,7 @@ class NamespaceIdentityFoundationTest {
     }
     @Test void targetFeedbackAndGenerationsUseCanonicalOwnership() {
         var manager=manager(javaSkill("alpha-fixed"),javaSkill("beta-fixed"));
-        var docs=List.of(rest("search"));
+        var docs=List.of(modelLeaf("search"));
         var result=manager.validate(manager.capturePreparation("Alpha"), docs, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(result.valid()).isTrue();
         assertThat(result.skills()).extracting(ValidatedSkill::name).containsExactly("alpha-fixed","alpha-search");
@@ -50,7 +50,8 @@ class NamespaceIdentityFoundationTest {
         assertThat(alpha.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("alpha-fixed","alpha-search");
         assertThat(beta.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("beta-fixed","beta-search");
         assertThat(alpha.definitions()).containsOnlyKeys("alpha-search");
-        assertThat(alpha.capability("alpha-search").invoker().invoke(Map.of())).isEqualTo("alpha-search@"+alpha.id());
+        assertThat(alpha.capability("alpha-search").identity().toString()).isEqualTo("alpha-search");
+        assertThat(alpha.definition("alpha-search").requireExecutionConfiguration().frameworkModel()).isEqualTo("model");
         assertThat(alpha.id()).isNotEqualTo(beta.id());
         var retained=alpha.skillCatalog(); alpha.close();
         assertThat(retained.generationId()).isEqualTo(alpha.id()); assertThat(retained.skill("ALPHA-search")).isPresent();
@@ -123,24 +124,24 @@ class NamespaceIdentityFoundationTest {
         }
     }
     @Test void validationDoesNotReserveCandidateIdsAndErrorsAreIncomplete() {
-        var manager=manager(); var first=manager.prepare(manager.capturePreparation("alpha"), List.of(rest("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
-        for(int i=0;i<3;i++) assertThat(manager.validate(manager.capturePreparation("alpha"), List.of(rest("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
-        var bad=manager.validate(manager.capturePreparation("alpha"), List.of(rest("search"),rest("x".repeat(59))), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+        var manager=manager(); var first=manager.prepare(manager.capturePreparation("alpha"), List.of(modelLeaf("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
+        for(int i=0;i<3;i++) assertThat(manager.validate(manager.capturePreparation("alpha"), List.of(modelLeaf("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
+        var bad=manager.validate(manager.capturePreparation("alpha"), List.of(modelLeaf("search"),modelLeaf("x".repeat(59))), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(bad.valid()).isFalse(); assertThat(bad.skills()).isEmpty();
-        var second=manager.prepare(manager.capturePreparation("alpha"), List.of(rest("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
+        var second=manager.prepare(manager.capturePreparation("alpha"), List.of(modelLeaf("search")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
         long ordinal=Long.parseLong(first.id().substring(first.id().lastIndexOf('-')+1));
         assertThat(second.id()).endsWith("-"+(ordinal+1));
     }
-    @Test void declarationsEnforceBothLimitsEvenForUnofferedRestSkills() {
+    @Test void declarationsEnforceBothLimitsEvenForUnofferedSkills() {
         String ns="n".repeat(32);
         var catalog=new YamlSkillCatalog(properties());
-        var valid=catalog.checkedSupplied(ns,List.of(rest("s".repeat(31))),false); assertThat(valid.issues()).isEmpty();
-        var oversized=catalog.checkedSupplied(ns,List.of(rest("s".repeat(32))),false);
+        var valid=catalog.checkedSupplied(ns,List.of(modelLeaf("s".repeat(31))),false); assertThat(valid.issues()).isEmpty();
+        var oversized=catalog.checkedSupplied(ns,List.of(modelLeaf("s".repeat(32))),false);
         assertThat(oversized.issues()).singleElement().satisfies(issue -> {
             assertThat(issue.fieldPath()).isEqualTo("name"); assertThat(issue.sourceName()).startsWith("raw source");
             assertThat(issue.message()).contains("length 65","limit 64");
         });
-        assertThatThrownBy(() -> catalog.checkedSupplied(ns+"n",List.of(rest("x")),false)).hasMessageContaining("length 33").hasMessageContaining("limit 32");
+        assertThatThrownBy(() -> catalog.checkedSupplied(ns+"n",List.of(modelLeaf("x")),false)).hasMessageContaining("length 33").hasMessageContaining("limit 32");
     }
     @Test void allReferenceFamiliesRejectMalformedAndOversizedReferencesWithContext() {
         var catalog=new YamlSkillCatalog(properties());
@@ -207,10 +208,10 @@ class NamespaceIdentityFoundationTest {
         var metadata=javaSkill("alpha-search");
         assertThatThrownBy(() -> new SkillGeneration("alpha","id",Map.of("search",metadata),Map.of())).hasMessageContaining("capability key");
         assertThatThrownBy(() -> new SkillGeneration("beta","id",Map.of(metadata.name(),metadata),Map.of())).hasMessageContaining("capability key");
-        var checked=new YamlSkillCatalog(properties()).checkedSupplied("alpha",List.of(rest("search")),false);
+        var checked=new YamlSkillCatalog(properties()).checkedSupplied("alpha",List.of(modelLeaf("search")),false);
         var definition=checked.definitions().getFirst();
-        assertThatThrownBy(() -> new SkillGeneration("alpha","bad-kind",Map.of(metadata.name(),new CapabilityMetadata("yaml", "alpha-search", "wrong kind", SkillExecutionDescriptor.none(), null, args -> "unused", CapabilityKind.YAML_SKILL, null, null)),Map.of("alpha-search",definition)))
-                .hasMessageContaining("matching YAML, REST or TYPESAFE capability");
+        assertThatThrownBy(() -> new SkillGeneration("alpha","bad-kind",Map.of(metadata.name(),new CapabilityMetadata("yaml", "alpha-search", "wrong kind", SkillExecutionDescriptor.none(), null, args -> "unused", CapabilityKind.JAVA_SKILL, null, null)),Map.of("alpha-search",definition)))
+                .hasMessageContaining("matching YAML or TYPESAFE capability");
         assertThatThrownBy(() -> new SkillGeneration("alpha","local-definition",Map.of(metadata.name(),metadata),Map.of("search",definition)))
                 .hasMessageContaining("definition key");
         var empty=new SkillGeneration("Alpha","opaque",Map.of(),Map.of());

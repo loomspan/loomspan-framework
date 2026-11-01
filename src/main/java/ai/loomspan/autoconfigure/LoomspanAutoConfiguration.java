@@ -65,6 +65,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @AutoConfiguration
+@org.springframework.context.annotation.Import(ai.loomspan.internal.autoconfigure.ExecutorConfigurationBinding.class)
 @EnableConfigurationProperties({
         LoomspanProperties.class
 })

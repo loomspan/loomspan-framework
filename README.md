@@ -13,7 +13,7 @@ duplicate.
 ## Why Loomspan?
 
 - **Combine reasoning with application code.** Use model-backed YAML skills,
-  TypeSafe Choice/Noul/Score evaluations, annotated Java methods, and REST leaves in the same skill tree.
+  TypeSafe Choice/Noul/Score evaluations and annotated Java methods in the same skill tree.
 - **Let the model plan within explicit boundaries.** Declare allowed child
   skills, validate inputs and structured outputs, and apply authorization policies.
 - **Bound execution.** Configure mission deadlines, nesting limits, and usage
@@ -177,11 +177,6 @@ while a child uses its own timeout. Managed workers preserve caller identity thr
 standard Spring Security and restore the parent context after success or failure.
 See [execution limits](agent-skills/loomspan-docs/references/skill-authoring/execution-limits.md).
 
-The sole `RestSkillHandler` receives `RestSkillInvocation` with the qualified target
-`skillName`, unchanged business `input`, and the captured target `generationId`.
-For `orders-root` calling `tax-lookup`, this ID belongs to tax; the admitted root's
-ID still belongs to orders. Replacement/removal does not reroute retained REST work.
-
 A prepared update's ID and snapshot identify its candidate, not its base.
 Validation allocates no generation and errors leave candidate metadata incomplete.
 Changing a namespace name means creating another namespace, updating references
@@ -203,9 +198,20 @@ reloader.remove("department", current.generationId());
 always selects Private, including replacement. Each publication has complete supplied
 declarations and execution configuration; omitted settings use built-in defaults,
 with no inheritance of models, connections or previous settings. Publishable keys are
-`loomspan.connections`, `loomspan.models`, `loomspan.session`, and
+`loomspan.connections`, `loomspan.models`, `loomspan.session`, `loomspan.executor-config`, and
 `loomspan.execution-trace.persistence`; host and unknown settings fail validation.
 Credential references resolve through Environment or a copied explicit map.
+
+Executor leaf declarations use `executor:` and optional map-valued `config:`;
+`rest:` is unsupported syntax. `loomspan.executor-config` contains namespace-owned
+maps: startup YAML can contain multiple namespaces, while a publication accepts
+only its target namespace. Omission is empty with no inheritance. Nested nulls,
+empty containers, scalar types and exact case/dotted keys survive YAML loading;
+executor data is uninterpreted and separate from skill config.
+
+Executor declarations and configuration can be parsed and validated, but
+executor-backed YAML skills cannot currently be prepared or executed. See
+[executor authoring](agent-skills/loomspan-docs/references/skill-authoring/executor-skills.md).
 
 Preparation validates outgoing contracts against one coherent external metadata view,
 with references returning to the target resolved against its candidate. Foreign
@@ -367,15 +373,16 @@ It contains 27 public top-level types, including `SkillExecutor`, the five-compo
 `SkillExecutorInvocation` record, and `RecoverableSkillException`. Java callable
 methods and reference-only executors share discovery and proxy invocation. Successful
 null/void results become empty text, Strings remain exact, and other results become
-JSON; failures propagate. This revision provides executor declaration/invocation
-foundations; YAML binding and orchestration integration remain subsequent delivery.
+JSON; failures propagate. Reference-only executor declarations are discovered,
+but YAML executor binding and execution are unavailable.
 See [Java declarations and results](agent-skills/loomspan-docs/references/java-api/java-skills.md).
 
 The catalog descriptor is `SkillDescriptor(name, description, kind, inputSchema,
 outputSchema)`; `SkillKind` includes `YAML`, `JAVA`, `REST`, and `TYPESAFE`.
 Nullable `outputSchema` describes effective output shape, including
 forwarding chains and native descriptive schemas, without adding parent,
-TypeSafe, or Java/REST output validation. This
-revision uses only the five-argument constructor. `RestSkillHandler` is the sole supported Java SPI. Types under `internal` and
+TypeSafe, or Java/REST output validation. The descriptor
+has a five-argument constructor. `RestSkillHandler` is the sole supported Java SPI,
+but no supported YAML declaration binds it. Types under `internal` and
 `autoconfigure` are not application extension APIs; Loomspan does not expose an
 internal bean-replacement contract.

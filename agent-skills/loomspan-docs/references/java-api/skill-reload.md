@@ -39,7 +39,7 @@ an empty published namespace still has its namespace and generation ID.
 
 ## Complete configuration and credentials
 
-Only `loomspan.connections`, `loomspan.models`, `loomspan.session`, and
+Only `loomspan.connections`, `loomspan.models`, `loomspan.session`, `loomspan.executor-config`, and
 `loomspan.execution-trace.persistence` are publishable. Existing nested provider
 options, request timeouts, retries, limits, quotas and attachments remain supported.
 Host shutdown, startup skill locations, observability, other application settings
@@ -56,6 +56,8 @@ blank or unused map entries fail. The full overload accepts visibility before th
 credential map. Validation does not resolve credentials, construct provider clients,
 instantiate a REST handler or invoke implementations. Preparation builds independent
 clients but sends no model request. Diagnostic content is preserved.
+
+`loomspan.executor-config` uses namespace-indexed maps, with the same structural rules and immutable data as startup YAML. Publication permits only its target namespace; foreign entries fail even when empty. Omission supplies no executor data and never inherits startup or prior-generation configuration. Nested maps/lists, null leaves, empty containers, scalar types and exact case/dotted data keys are preserved. Executor-owned `api-key-ref` and `${...}` strings are ordinary content; they do not consume credential references or undergo interpolation. Executor data is parsed and validated, but runtime generation binding is unavailable. See [executor configuration](../skill-authoring/executor-skills.md).
 
 ## Capture, concurrency and one-shot candidates
 

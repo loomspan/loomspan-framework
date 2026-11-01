@@ -95,16 +95,6 @@ output_from: {skill: default-finishReport}
 
 The returned Framework text is `Report complete`, without JSON quotes. No output schema is inferred from the Java return type.
 
-REST producer using the same parent declaration:
-
-```yaml
-name: finishReport
-description: Produce the complete report through the application handler.
-rest: true
-```
-
-The application's sole `RestSkillHandler` returns non-null text. That text is forwarded unchanged, including any application envelope; null remains a failure. The leaf has unspecified output schema and no new Framework output validation. See [REST leaves](rest-skills.md).
-
 A chain `prepareReport -> coordinateReport -> finishReport` works when each forwarding parent independently declares its selected direct child as required and unique. Every level completes its entire accepted plan and forwards its own selected task result; no level may select a grandchild directly.
 
 ## Declared output assembly
@@ -307,7 +297,7 @@ Startup namespaces are Private; foreign outgoing references require a Public tar
 Fixed Java methods remain assigned to their original namespace across replacement
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
-for complete signatures, sequencing and retirement. This slice implements preparation
+for complete signatures, sequencing and retirement. Namespace updates support preparation
 and installation, retained reachable admission and captured cross-namespace execution.
 Captured canonical observation identities and existing Console consumers are covered by `NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest`.
 

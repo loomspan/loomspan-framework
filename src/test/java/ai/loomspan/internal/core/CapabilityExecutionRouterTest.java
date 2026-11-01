@@ -187,7 +187,7 @@ class CapabilityExecutionRouterTest {
         manifest.setName("childLlmSkill");
         manifest.setDescription("default-childLlmSkill");
         manifest.setModel("gpt-5");
-        ai.loomspan.internal.skill.YamlSkillDefinition definition = new ai.loomspan.internal.skill.YamlSkillDefinition("default",
+        ai.loomspan.internal.skill.YamlSkillDefinition definition = new ai.loomspan.internal.skill.YamlSkillDefinition(ai.loomspan.internal.skill.YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 new ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration(
@@ -415,7 +415,7 @@ class CapabilityExecutionRouterTest {
             manifest.setName(capability.identity().localName());
             manifest.setDescription(capability.description());
             manifest.setModel("gpt-5");
-            definitions.put(capability.name(), new ai.loomspan.internal.skill.YamlSkillDefinition("default",
+            definitions.put(capability.name(), new ai.loomspan.internal.skill.YamlSkillDefinition(ai.loomspan.internal.skill.YamlSkillDefinition.Form.MODEL, "default",
                     new ByteArrayResource(new byte[0]), manifest, configuration));
         }
         // These nested-call fixtures have an explicit model-backed source with exactly this child.
@@ -423,7 +423,7 @@ class CapabilityExecutionRouterTest {
         parent.setName("test_entry"); parent.setDescription("Parent fixture"); parent.setModel("gpt-5");
         parent.setAllowedSkills(List.of(new ai.loomspan.internal.skill.YamlSkillManifest.AllowedSkillManifest(
                 capability.name(), null, null, null)));
-        var source = new ai.loomspan.internal.skill.YamlSkillDefinition("default",
+        var source = new ai.loomspan.internal.skill.YamlSkillDefinition(ai.loomspan.internal.skill.YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]), parent, configuration);
         capabilities.put(source.identity().toString(), new CapabilityMetadata("yaml:parent", source.identity().toString(), "Parent fixture",
                 SkillExecutionDescriptor.from(configuration), ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),

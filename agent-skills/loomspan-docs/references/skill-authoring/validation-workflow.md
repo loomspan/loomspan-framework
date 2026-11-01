@@ -11,7 +11,7 @@ Authored child references and binding producers MAY be local to the containing s
 
 ## Applies when
 
-An application edits YAML skills and needs feedback before staging a complete replacement generation. Use the [Java update API](../java-api/skill-reload.md) to integrate this workflow. For individual manifest rules, load the relevant topic for [models](model-selection-and-connections.md), [REST skills](rest-skills.md), [inputs](input-contracts.md), [TypeSafe evaluations](typesafe-skills.md), or [outputs](output-contracts.md).
+An application edits YAML skills and needs feedback before staging a complete replacement generation. Use the [Java update API](../java-api/skill-reload.md) to integrate this workflow. For individual manifest rules, load the relevant topic for [models](model-selection-and-connections.md), [executor declarations](executor-skills.md), [inputs](input-contracts.md), [TypeSafe evaluations](typesafe-skills.md), or [outputs](output-contracts.md).
 
 ## Enforced workflow
 

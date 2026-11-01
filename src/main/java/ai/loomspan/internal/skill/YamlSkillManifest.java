@@ -27,7 +27,8 @@ public class YamlSkillManifest
 {
     enum Field
     {
-        REST("rest"),
+        EXECUTOR("executor"),
+        CONFIG("config"),
         TYPESAFE("typesafe"),
         MODEL("model"),
         THINKING_LEVEL("thinking_level"),
@@ -62,7 +63,13 @@ public class YamlSkillManifest
     private String description;
     private String model;
     private String prompt;
-    private Boolean rest;
+    private String executor;
+    @JsonIgnore
+    private Map<String, Object> config = Map.of();
+    @JsonIgnore
+    private YamlSkillDefinition.Form declarationForm;
+    void declarationForm(YamlSkillDefinition.Form form) { declarationForm = form; }
+    YamlSkillDefinition.Form declarationForm() { return declarationForm; }
     private tools.jackson.databind.JsonNode typesafe;
     @JsonIgnore
     private ai.loomspan.internal.typesafe.TypeSafeDeclaration compiledTypesafe;
@@ -161,15 +168,14 @@ public class YamlSkillManifest
         return prompt;
     }
 
-    public Boolean getRest()
-    {
-        return rest;
-    }
-
-    public void setRest(Boolean rest)
-    {
-        declaredFields.add(Field.REST);
-        this.rest = rest;
+    public String getExecutor() { return executor; }
+    public void setExecutor(String value) { declaredFields.add(Field.EXECUTOR); executor = value; }
+    @JsonIgnore
+    public Map<String, Object> getConfig() { return config; }
+    @JsonProperty("config")
+    public void setConfig(Map<String, Object> value) {
+        declaredFields.add(Field.CONFIG);
+        config = ai.loomspan.internal.util.ImmutableContainers.copyMap(java.util.Objects.requireNonNull(value));
     }
 
     public void setPrompt(String prompt)

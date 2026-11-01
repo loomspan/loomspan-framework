@@ -216,7 +216,6 @@ and access configuration when integrating it.
 ## Develop further
 
 - Add [Java skills](../agent-skills/loomspan-docs/references/java-api/java-skills.md)
-  or [REST leaves](../agent-skills/loomspan-docs/references/skill-authoring/rest-skills.md)
   for application operations.
 - Design a [skill tree](../agent-skills/loomspan-docs/references/skill-authoring/mental-model.md)
   when the model needs controlled child capabilities or planning.

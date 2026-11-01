@@ -15,6 +15,11 @@ import java.util.List;
  */
 public final class YamlSkillDefinition
 {
+    public enum Form { MODEL, TYPESAFE, EXECUTOR }
+    private final Form form;
+    public Form form() { return form; }
+    public String executor() { return manifest.getExecutor(); }
+    public java.util.Map<String, Object> config() { return manifest.getConfig(); }
     private final Resource resource;
     private final YamlSkillManifest manifest;
     private final EffectiveSkillExecutionConfiguration executionConfiguration;
@@ -34,7 +39,7 @@ public final class YamlSkillDefinition
     private static final ObjectMapper COPY_MAPPER =
             ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion();
 
-    public YamlSkillDefinition(String namespace, Resource resource, YamlSkillManifest manifest,
+    public YamlSkillDefinition(Form form, String namespace, Resource resource, YamlSkillManifest manifest,
             EffectiveSkillExecutionConfiguration executionConfiguration, EvidenceContract evidenceContract,
             YamlSkillSource source, List<AllowedSkillConstraint> allowedSkillConstraints)
     {
@@ -46,23 +51,10 @@ public final class YamlSkillDefinition
         source = source == null
                 ? new YamlSkillSource(resource, resource.getDescription(), new byte[0])
                 : source;
-        if (isRestManifest(manifest) == (executionConfiguration != null))
-        {
-            throw new IllegalArgumentException(isRestManifest(manifest)
-                    ? "REST skill definitions must not have an execution configuration"
-                    : "LLM-backed YAML skill definitions require an execution configuration");
-        }
-        if (manifest.isDeclared(YamlSkillManifest.Field.CONCURRENCY)
-                && !Boolean.TRUE.equals(manifest.getPlanningMode()))
-        {
-            throw new IllegalArgumentException(
-                    "LLM-backed YAML skill definitions may declare 'concurrency' only when planning_mode is explicitly true");
-        }
-        if (manifest.isDeclared(YamlSkillManifest.Field.CONCURRENCY)
-                && manifest.getConcurrency() == null)
-        {
-            throw new IllegalArgumentException("LLM-backed YAML skill definitions require a non-null 'concurrency' value");
-        }
+        this.form = java.util.Objects.requireNonNull(form, "form must not be null");
+        if (form == Form.EXECUTOR) java.util.Objects.requireNonNull(manifest.getExecutor(), "executor reference must not be null");
+        if ((form == Form.EXECUTOR) == (executionConfiguration != null))
+            throw new IllegalArgumentException("executor definitions require absent model execution configuration; model/TypeSafe definitions require execution configuration");
         this.resource = java.util.Objects.requireNonNull(resource);
         this.manifest = manifest;
         this.executionConfiguration = executionConfiguration;
@@ -75,28 +67,28 @@ public final class YamlSkillDefinition
         this.preparedOutputBindings = compileOutputBindings();
     }
 
-    public YamlSkillDefinition(String namespace, Resource resource,
+    public YamlSkillDefinition(Form form, String namespace, Resource resource,
             YamlSkillManifest manifest,
             EffectiveSkillExecutionConfiguration executionConfiguration)
     {
-        this(namespace, resource, manifest, executionConfiguration, EvidenceContract.empty(), null, null);
+        this(form, namespace, resource, manifest, executionConfiguration, EvidenceContract.empty(), null, null);
     }
 
-    public YamlSkillDefinition(String namespace, Resource resource,
+    public YamlSkillDefinition(Form form, String namespace, Resource resource,
             YamlSkillManifest manifest,
             EffectiveSkillExecutionConfiguration executionConfiguration,
             EvidenceContract evidenceContract)
     {
-        this(namespace, resource, manifest, executionConfiguration, evidenceContract, null, null);
+        this(form, namespace, resource, manifest, executionConfiguration, evidenceContract, null, null);
     }
 
-    public YamlSkillDefinition(String namespace, Resource resource,
+    public YamlSkillDefinition(Form form, String namespace, Resource resource,
             YamlSkillManifest manifest,
             EffectiveSkillExecutionConfiguration executionConfiguration,
             EvidenceContract evidenceContract,
             YamlSkillSource source)
     {
-        this(namespace, resource, manifest, executionConfiguration, evidenceContract, source, null);
+        this(form, namespace, resource, manifest, executionConfiguration, evidenceContract, source, null);
     }
 
     public List<String> allowedSkills()
@@ -181,16 +173,11 @@ public final class YamlSkillDefinition
         return !hasDeclaredInputSchema();
     }
 
-    public boolean typesafe() { return manifest.isTypesafeDeclared(); }
+    public boolean typesafe() { return form == Form.TYPESAFE; }
 
     public ai.loomspan.internal.typesafe.TypeSafeDeclaration typeSafeDeclaration() {
         if (!typesafe()) throw new IllegalStateException("Skill has no TypeSafe declaration");
         return manifest.compiledTypesafe();
-    }
-
-    public boolean rest()
-    {
-        return isRestManifest(manifest);
     }
 
     public int outputSchemaMaxRetries()
@@ -245,9 +232,12 @@ public final class YamlSkillDefinition
         }
         tools.jackson.databind.node.ObjectNode tree = COPY_MAPPER.valueToTree(source);
         tree.remove("typesafe");
+        // Executor config is ignored for serialization and copied directly below.
         YamlSkillManifest copy = COPY_MAPPER.treeToValue(tree, YamlSkillManifest.class);
         // Share the immutable compiled declaration while detaching its mutable authored JSON.
         copy.copyTypesafeFrom(source);
+        if (source.isDeclared(YamlSkillManifest.Field.CONFIG)) copy.setConfig(source.getConfig());
+        copy.declarationForm(source.declarationForm());
         copy.restoreDeclaredFields(source.declaredFields());
         return copy;
     }
@@ -259,8 +249,4 @@ public final class YamlSkillDefinition
         return source == null ? null : COPY_MAPPER.convertValue(source, type);
     }
 
-    private static boolean isRestManifest(YamlSkillManifest manifest)
-    {
-        return manifest.isDeclared(YamlSkillManifest.Field.REST) && Boolean.TRUE.equals(manifest.getRest());
-    }
 }

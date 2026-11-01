@@ -34,7 +34,7 @@ class DeclaredChildInputBindingsTraceTest {
     private static YamlSkillDefinition definition(List<ChildInputBinding> bindings) {
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("parent"); manifest.setDescription("default-parent"); manifest.setModel("model"); manifest.setPlanningMode(true);
-        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest,
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest,
                 new EffectiveSkillExecutionConfiguration("model", "local", AiDriver.OPENAI, "local", null),
                 ai.loomspan.internal.runtime.evidence.EvidenceContract.empty(), null,
                 List.of(new AllowedSkillConstraint("default-consumer", null, null, false, bindings)));

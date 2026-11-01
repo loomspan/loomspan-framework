@@ -580,12 +580,12 @@ class ConcurrentGroupedExecutionIntegrationTest
         YamlSkillManifest manifest = manifest(name, allowedSkills);
         manifest.setPlanningMode(true);
         manifest.setConcurrency(true);
-        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, CONFIG);
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, CONFIG);
     }
 
     private static YamlSkillDefinition directDefinition(String name, List<String> allowedSkills)
     {
-        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest(name, allowedSkills), CONFIG);
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest(name, allowedSkills), CONFIG);
     }
 
     private static YamlSkillManifest manifest(String name, List<String> allowedSkills)

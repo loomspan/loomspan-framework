@@ -113,7 +113,7 @@ class YamlSkillCatalogTests {
         for (String yaml : List.of(forwardingYaml() + "output_bindings: null\n",
                 "name: bound\ndescription: bound\nmodel: forward-model\noutput_bindings: {/id: {from: input, path: /id}}",
                 "name: bound\ndescription: bound\nmodel: forward-model\noutput_schema: {type: string}\noutput_bindings: {/id: {from: input, path: /id}}",
-                "name: bound\ndescription: bound\nrest: true\noutput_bindings: {/id: {from: input, path: /id}}")) {
+                "name: bound\ndescription: bound\nexecutor: sql\noutput_bindings: {/id: {from: input, path: /id}}")) {
             var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(List.of(new SkillDocument("invalid-output", yaml)), false);
             assertThat(checked.definitions()).isEmpty();
             assertThat(checked.issues()).hasSize(1);
@@ -186,7 +186,7 @@ class YamlSkillCatalogTests {
                 Map.entry("parent schema null", forwardingYaml() + "output_schema: null\n"),
                 Map.entry("parent retries null", forwardingYaml() + "output_schema_max_retries: null\n"),
                 Map.entry("parent linter null", forwardingYaml() + "linter: null\n"),
-                Map.entry("REST", "name: parent\ndescription: parent\nrest: true\noutput_from: null\n"));
+                Map.entry("REST", "name: parent\ndescription: parent\nexecutor: sql\noutput_from: null\n"));
         return invalid.entrySet().stream().map(entry -> DynamicTest.dynamicTest(entry.getKey(), () -> {
             var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(
                     List.of(new SkillDocument("invalid-forwarder", entry.getValue())), false);
@@ -230,8 +230,8 @@ class YamlSkillCatalogTests {
         YamlSkillCatalog catalog = new YamlSkillCatalog(new LoomspanProperties());
         var checked = catalog.checkedSupplied(List.of(
                 new SkillDocument("bad YAML", "invalid: ["),
-                new SkillDocument("bad REST", "name: broken\ndescription: broken\nrest: true\nmodel: missing\n"),
-                new SkillDocument("good", "name: good\ndescription: good\nrest: true\n")), false);
+                new SkillDocument("bad REST", "name: broken\ndescription: broken\nexecutor: sql\nmodel: missing\n"),
+                new SkillDocument("good", "name: good\ndescription: good\nexecutor: sql\n")), false);
         assertThat(checked.issues()).anyMatch(issue -> issue.severity() == SkillValidationIssue.Severity.ERROR);
         assertThat(checked.issues()).extracting(issue -> issue.sourceName())
                 .containsExactly("bad YAML", "bad REST");
@@ -270,7 +270,7 @@ class YamlSkillCatalogTests {
     @Test
     void validationReportsSuppliedEntryProblemsWithoutResolvingLabels() {
         YamlSkillCatalog catalog = new YamlSkillCatalog(new LoomspanProperties());
-        String rest = "name: one\ndescription: one\nrest: true\n";
+        String rest = "name: one\ndescription: one\nexecutor: sql\n";
         var checked = catalog.checkedSupplied(java.util.Arrays.asList(
                 null,
                 new SkillDocument(" ", rest),
@@ -286,7 +286,7 @@ class YamlSkillCatalogTests {
 
     @Test
     void suppliedDocumentsValidateIdentityAndReuseManifestRules() {
-        String valid = "name: one\ndescription: REST one\nrest: true\nrbac_roles: [READER]\n";
+        String valid = "name: one\ndescription: REST one\nexecutor: sql\nrbac_roles: [READER]\n";
         YamlSkillCatalog catalog = new YamlSkillCatalog(new LoomspanProperties());
         catalog.loadSupplied(List.of(new SkillDocument("opaque label", valid),
                 new SkillDocument("SCHEME:untrusted", valid.replace("one", "two"))));
@@ -353,12 +353,12 @@ class YamlSkillCatalogTests {
             });
 
     @Test
-    void loadsRestSkillWithoutModel() throws Exception {
-        Path manifest = writeManifest("rest-valid.yaml", "name: restLookup\ndescription: REST lookup\nrest: true\n");
+    void loadsExecutorLeafWithoutModel() throws Exception {
+        Path manifest = writeManifest("rest-valid.yaml", "name: restLookup\ndescription: Executor lookup\nexecutor: sql\n");
         modelFreeContextRunner.withPropertyValues("loomspan.skills.locations=" + manifest.toUri()).run(context -> {
             assertThat(context).hasNotFailed();
             YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class).getSkill("default-restLookup");
-            assertThat(definition.rest()).isTrue();
+            assertThat(definition.form() == YamlSkillDefinition.Form.EXECUTOR).isTrue();
             assertThat(definition.executionConfiguration()).isNull();
             assertThat(definition.hasGenericInputContract()).isTrue();
         });
@@ -366,7 +366,7 @@ class YamlSkillCatalogTests {
 
     @TestFactory
     List<DynamicTest> rejectsInvalidRestValuesAndForbiddenFieldsByPresence() {
-        List<String> invalidValues = List.of("false", "null", "'true'", "1", "[]", "{}");
+        List<String> invalidValues = List.of("true", "false", "null", "'true'", "1", "[]", "{}");
         List<DynamicTest> tests = new java.util.ArrayList<>();
         for (String value : invalidValues) tests.add(DynamicTest.dynamicTest("rest=" + value, () -> {
             Path manifest = writeManifest("rest-value-" + tests.size() + ".yaml",
@@ -374,7 +374,7 @@ class YamlSkillCatalogTests {
             modelFreeContextRunner.withPropertyValues("loomspan.skills.locations=" + manifest.toUri()).run(context -> {
                 assertThat(context).hasFailed();
                 assertThat(context.getStartupFailure()).hasStackTraceContaining("invalidRest")
-                        .hasStackTraceContaining("field 'rest'").hasStackTraceContaining("omit 'rest'");
+                        .hasStackTraceContaining("field 'rest'").hasStackTraceContaining("unknown field");
             });
         }));
         Map<String, String> emptyValues = Map.ofEntries(
@@ -386,12 +386,12 @@ class YamlSkillCatalogTests {
             for (String value : List.of("null", field.getValue())) {
                 tests.add(DynamicTest.dynamicTest("forbidden " + field.getKey() + "=" + value, () -> {
                     Path manifest = writeManifest("rest-field-" + field.getKey() + "-" + tests.size() + ".yaml",
-                            "name: invalidRest\ndescription: Invalid REST\nrest: true\n" + field.getKey() + ": " + value + "\n");
+                            "name: invalidRest\ndescription: Invalid executor\nexecutor: sql\n" + field.getKey() + ": " + value + "\n");
                     modelFreeContextRunner.withPropertyValues("loomspan.skills.locations=" + manifest.toUri()).run(context -> {
                         assertThat(context).hasFailed();
                         assertThat(context.getStartupFailure()).hasStackTraceContaining("invalidRest")
                                 .hasStackTraceContaining("field '" + field.getKey() + "'")
-                                .hasStackTraceContaining("not allowed for REST");
+                                .hasStackTraceContaining("not allowed for executor");
                     });
                 }));
             }

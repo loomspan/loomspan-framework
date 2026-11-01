@@ -8,8 +8,7 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.bind.BindException;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.springframework.core.env.Environment;
-import tools.jackson.dataformat.yaml.YAMLMapper;
-import tools.jackson.core.StreamReadFeature;
+import ai.loomspan.internal.serialization.YamlValues;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,10 +19,8 @@ import java.util.HashSet;
 /** Strict boundary between authored candidate YAML and runtime configuration. */
 public final class ExecutionConfigurationParser
 {
-    private static final YAMLMapper YAML = YAMLMapper.builder()
-            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private static final Set<String> ROOT = Set.of("loomspan");
-    private static final Set<String> PUBLISHABLE = Set.of("connections", "models", "session", "execution-trace");
+    private static final Set<String> PUBLISHABLE = Set.of("connections", "models", "session", "execution-trace", "executor-config");
     private static final Set<String> CONNECTION = Set.of("driver", "base-url", "request-timeout", "api-key-ref", "header-refs", "openai", "gemini", "provider-retry");
     private static final Set<String> MODEL = Set.of("connection", "provider-model", "thinking-levels");
     private static final Set<String> SESSION = Set.of("max-depth", "mission-timeout", "quotas", "attachments");
@@ -32,28 +29,30 @@ public final class ExecutionConfigurationParser
 
     private ExecutionConfigurationParser() {}
 
-    public static Parsed parse(ExecutionConfiguration authored, Environment environment, boolean resolveReferences)
+    public static Parsed parse(String targetNamespace, ExecutionConfiguration authored, Environment environment, boolean resolveReferences)
     {
-        return parse(authored, environment, null, resolveReferences);
+        return parse(targetNamespace, authored, environment, null, resolveReferences);
     }
 
-    public static Parsed parse(ExecutionConfiguration authored, Map<String, String> supplied)
+    public static Parsed parse(String targetNamespace, ExecutionConfiguration authored, Map<String, String> supplied)
     {
-        return parse(authored, null, supplied, true);
+        return parse(targetNamespace, authored, null, supplied, true);
     }
 
-    private static Parsed parse(ExecutionConfiguration authored, Environment environment,
+    private static Parsed parse(String targetNamespace, ExecutionConfiguration authored, Environment environment,
             Map<String, String> supplied, boolean resolveReferences)
     {
         if (authored == null) throw new IllegalArgumentException("configuration must not be null");
         Set<String> used = new HashSet<>();
         try
         {
-            Object decoded = YAML.readValue(authored.yaml(), Object.class);
+            Object decoded = YamlValues.read(authored.yaml());
             Map<String, Object> document = object(decoded, "configuration");
             keys(document, ROOT, "configuration");
             Map<String, Object> loomspan = object(document.get("loomspan"), "loomspan");
             keys(loomspan, PUBLISHABLE, "loomspan");
+            ExecutorConfiguration executorConfig = loomspan.containsKey("executor-config")
+                    ? ExecutorConfiguration.from(loomspan.get("executor-config")).requireTarget(targetNamespace) : ExecutorConfiguration.empty();
             Map<String, Object> flat = new LinkedHashMap<>();
             Map<String, Object> connections = optionalObject(loomspan.get("connections"), "loomspan.connections");
             for (var entry : connections.entrySet())
@@ -120,16 +119,17 @@ public final class ExecutionConfigurationParser
                 throw new CredentialReferenceException("credentialValues contains an unused reference");
             LoomspanProperties properties = new Binder(new MapConfigurationPropertySource(flat))
                     .bind("loomspan", Bindable.of(LoomspanProperties.class)).orElseGet(LoomspanProperties::new);
+            properties.setExecutorConfig(executorConfig);
             properties.afterPropertiesSet();
             validateSession(properties.getSession());
-            return new Parsed(properties, properties.getExecutionTrace().getPersistence());
+            return new Parsed(properties, properties.getExecutionTrace().getPersistence(), executorConfig);
         }
         catch (BindException ex) { throw new IllegalArgumentException(ex.getName() + " has an invalid value"); }
         catch (IllegalArgumentException | IllegalStateException ex) { throw ex; }
         catch (RuntimeException ex) { throw new IllegalArgumentException("Invalid execution configuration; check field types and values"); }
     }
 
-    public record Parsed(LoomspanProperties properties, TracePersistencePolicy tracePersistence) {}
+    public record Parsed(LoomspanProperties properties, TracePersistencePolicy tracePersistence, ExecutorConfiguration executorConfig) {}
 
     private static void validateSession(LoomspanProperties.Session session)
     {

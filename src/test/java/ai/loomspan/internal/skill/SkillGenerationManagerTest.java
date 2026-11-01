@@ -228,7 +228,7 @@ class SkillGenerationManagerTest
                           additionalProperties: false
                         """),
                 forwardingDocument("javaParent", "fixedJava"), forwardingDocument("restParent", "restLeaf"),
-                new SkillDocument("restLeaf", "name: restLeaf\ndescription: REST leaf\nrest: true\n"),
+                new SkillDocument("restLeaf", "name: restLeaf\ndescription: Unspecified output model leaf\nmodel: model\n"),
                 forwardingDocument("plainParent", "plain"),
                 new SkillDocument("plain", "name: plain\ndescription: plain\nmodel: model\n"));
         assertThat(manager.validate(manager.capturePreparation("default"), documents, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
@@ -402,10 +402,10 @@ class SkillGenerationManagerTest
         manager.onGenerationRetired(ignored -> retirements.incrementAndGet());
         var first = manager.validate(manager.capturePreparation("default"), List.of(
                 new SkillDocument("opaque model source", "name: ayaml\ndescription: model\nmodel: model\n"),
-                new SkillDocument("opaque REST source", "name: Brest\ndescription: route\nrest: true\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+                new SkillDocument("opaque REST source", "name: Brest\ndescription: route\nexecutor: sql\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(first.valid()).isTrue();
         assertThat(first.skills()).containsExactly(
-                new ValidatedSkill("default-Brest", SkillKind.REST),
+                new ValidatedSkill("default-Brest", SkillKind.YAML),
                 new ValidatedSkill("default-Zjava", SkillKind.JAVA),
                 new ValidatedSkill("default-ayaml", SkillKind.YAML));
         assertThat(first.skills()).extracting(ValidatedSkill::name).doesNotHaveDuplicates();
@@ -415,12 +415,12 @@ class SkillGenerationManagerTest
         assertThat(retirements).hasValue(0);
 
         var replacement = manager.validate(manager.capturePreparation("default"), List.of(
-                new SkillDocument("kind changed", "name: ayaml\ndescription: route\nrest: true\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+                new SkillDocument("kind changed", "name: ayaml\ndescription: route\nexecutor: sql\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(replacement.skills()).containsExactly(
                 new ValidatedSkill("default-Zjava", SkillKind.JAVA),
-                new ValidatedSkill("default-ayaml", SkillKind.REST));
+                new ValidatedSkill("default-ayaml", SkillKind.YAML));
         assertThat(first.skills()).containsExactly(
-                new ValidatedSkill("default-Brest", SkillKind.REST),
+                new ValidatedSkill("default-Brest", SkillKind.YAML),
                 new ValidatedSkill("default-Zjava", SkillKind.JAVA),
                 new ValidatedSkill("default-ayaml", SkillKind.YAML));
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).skills()).containsExactly(new ValidatedSkill("default-Zjava", SkillKind.JAVA));
@@ -501,7 +501,7 @@ class SkillGenerationManagerTest
                 .hasMessageContaining("startup");
         manager.afterSingletonsInstantiated();
         String activeId = manager.active("default").id();
-        List<SkillDocument> proposed = List.of(new SkillDocument("draft", "name: restSkill\ndescription: rest\nrest: true\n"));
+        List<SkillDocument> proposed = List.of(new SkillDocument("draft", "name: restSkill\ndescription: model\nmodel: model\n"));
         var first = manager.validate(manager.capturePreparation("default"), proposed, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         var second = manager.validate(manager.capturePreparation("default"), proposed, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(first.valid()).isTrue();
@@ -510,7 +510,7 @@ class SkillGenerationManagerTest
         assertThat(handlers).hasValue(0);
         assertThat(manager.active("default").id()).isEqualTo(activeId);
         assertThat(manager.prepare(manager.capturePreparation("default"), proposed, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture")).id()).endsWith("-2");
-        assertThat(handlers).hasValue(1);
+        assertThat(handlers).hasValue(0);
         verify(javaSkills).capabilities();
     }
 
@@ -541,7 +541,7 @@ class SkillGenerationManagerTest
     }
 
     @Test
-    void restHandlerDeclarationChecksAreAdvisoryAndDoNotConstructBeans(@TempDir Path directory)
+    void removedRestSyntaxRejectsWithoutConstructingHandlerBeans(@TempDir Path directory)
     {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of());
@@ -552,8 +552,8 @@ class SkillGenerationManagerTest
         var noHandlerFeedback = none.validate(none.capturePreparation("default"), rest, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(noHandlerFeedback.skills()).isEmpty();
         assertThat(noHandlerFeedback.issues()).anySatisfy(issue ->
-                assertThat(issue.message()).contains("found none"));
-        assertThatThrownBy(() -> none.prepare(none.capturePreparation("default"), rest, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"))).hasMessageContaining("found none");
+                assertThat(issue.message()).contains("unknown field"));
+        assertThatThrownBy(() -> none.prepare(none.capturePreparation("default"), rest, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"))).hasMessageContaining("unknown field");
         assertThat(none.validate(none.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
 
         DefaultListableBeanFactory beans = new DefaultListableBeanFactory();
@@ -574,8 +574,8 @@ class SkillGenerationManagerTest
         var multipleHandlerFeedback = multiple.validate(multiple.capturePreparation("default"), rest, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(multipleHandlerFeedback.skills()).isEmpty();
         assertThat(multipleHandlerFeedback.issues()).anySatisfy(issue ->
-                assertThat(issue.message()).contains("first, second"));
-        assertThatThrownBy(() -> multiple.prepare(multiple.capturePreparation("default"), rest, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"))).hasMessageContaining("first, second");
+                assertThat(issue.message()).contains("unknown field"));
+        assertThatThrownBy(() -> multiple.prepare(multiple.capturePreparation("default"), rest, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"))).hasMessageContaining("unknown field");
         assertThat(constructions).hasValue(0);
         assertThat(multiple.validate(multiple.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
     }
@@ -649,23 +649,9 @@ class SkillGenerationManagerTest
         {
             @Override public String getFilename() { return name + ".yaml"; }
         };
-        return new YamlSkillDefinition("default", resource, manifest,
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", resource, manifest,
                 new EffectiveSkillExecutionConfiguration("model", "connection", AiDriver.OPENAI,
                         "provider-model", "medium"));
     }
 
-    private static YamlSkillDefinition restSkill(String name)
-    {
-        YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName(name);
-        manifest.setDescription(name);
-        manifest.setRest(true);
-        byte[] yaml = ("name: " + name + "\ndescription: " + name + "\nrest: true\n")
-                .getBytes(StandardCharsets.UTF_8);
-        ByteArrayResource resource = new ByteArrayResource(yaml, name + ".yaml")
-        {
-            @Override public String getFilename() { return name + ".yaml"; }
-        };
-        return new YamlSkillDefinition("default", resource, manifest, null);
-    }
 }

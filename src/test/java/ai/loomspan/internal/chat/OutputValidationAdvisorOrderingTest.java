@@ -26,7 +26,7 @@ class OutputValidationAdvisorOrderingTest {
         schema.setRequired(List.of("result")); schema.setAdditionalProperties(false); manifest.setOutputSchema(schema);
         var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern(".*GOOD.*"); regex.setMessage("Use GOOD");
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(1); linter.setRegex(regex); manifest.setLinter(linter);
-        var definition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest,
+        var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest,
                 new EffectiveSkillExecutionConfiguration("model", "connection", AiDriver.OPENAI, "model", "medium"),
                 TestEvidenceContracts.compiled(Map.of("claim", "default-missingProducer")));
         var requests = new ArrayList<Prompt>();

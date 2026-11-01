@@ -9,7 +9,7 @@ coverage: design-guidance
 
 Use this guidance when designing or reviewing inputs that an application or a
 parent model must supply to a skill. It applies across declaration styles; consult
-[reflected Java contracts](input-contracts.md), [REST manifests](rest-skills.md)
+[reflected Java contracts](input-contracts.md), [executor manifests](executor-skills.md)
 and version-matched schema support before choosing syntax. This is design advice,
 not an additional schema language or a promise of measured model accuracy.
 

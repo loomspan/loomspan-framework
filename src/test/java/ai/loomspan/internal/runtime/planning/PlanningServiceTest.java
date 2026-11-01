@@ -1104,7 +1104,7 @@ class PlanningServiceTest {
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setConcurrency(false);
-        YamlSkillDefinition definition = new YamlSkillDefinition("default",
+        YamlSkillDefinition definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
 
         ExecutionPlan accepted = initializePlan(planningService,
@@ -1408,7 +1408,7 @@ class PlanningServiceTest {
         Map<String, String> contract = Map.of(
                 "vendorName", "default-invoiceParser",
                 "isDuplicate", "default-invoiceParser and default-expenseLookup");
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 EXECUTION_CONFIGURATION,
@@ -1425,7 +1425,7 @@ class PlanningServiceTest {
                 new YamlSkillManifest.AllowedSkillManifest("default-invoiceParser", null, null, null),
                 new YamlSkillManifest.AllowedSkillManifest("default-expenseLookup", 1, null, null)));
         Map<String, String> contract = Map.of("isDuplicate", "default-invoiceParser and default-expenseLookup");
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 EXECUTION_CONFIGURATION,
@@ -1441,7 +1441,7 @@ class PlanningServiceTest {
         manifest.setName(ai.loomspan.internal.core.SkillIdentity.parse(name).localName());
         manifest.setDescription(name);
         manifest.setModel("gpt-5");
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 EXECUTION_CONFIGURATION);
@@ -1457,7 +1457,7 @@ class PlanningServiceTest {
                 .map(constraint -> new YamlSkillManifest.AllowedSkillManifest(
                         constraint.name(), constraint.minTasks(), constraint.maxTasks(), constraint.required()))
                 .toList());
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION,
                 ai.loomspan.internal.runtime.evidence.EvidenceContract.empty(), null, List.of(constraints));
     }
@@ -1468,7 +1468,7 @@ class PlanningServiceTest {
         manifest.setDescription("Short planner-facing summary");
         manifest.setModel("gpt-5");
         manifest.setPrompt(prompt);
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 EXECUTION_CONFIGURATION);

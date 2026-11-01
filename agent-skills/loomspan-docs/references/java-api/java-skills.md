@@ -76,7 +76,7 @@ String config() default "";
 
 An executor method MUST accept exactly one `SkillExecutorInvocation` parameter. It supports the same return values as `@SkillMethod`. Omitted names and namespace normalization follow the callable identity rules above. `config` records an optional configuration path; empty selects no configuration.
 
-Executor discovery and proxy invocation are implemented in this revision. End-to-end YAML executor binding, namespace configuration selection and retained executor routing are delivered by PR 28.3. Declaring an executor does not currently make it usable by a YAML skill. An executor is reference-only: it has no generated callable schema, catalog entry, `allowed_skills` membership or `SkillTemplate` invocation route. Callable and executor names have separate indexes, so both roles may share one qualified identity; duplicates within either role fail. A bean may declare either or both roles.
+Loomspan discovers executor methods and preserves Spring proxy invocation. YAML executor binding, namespace configuration selection and retained executor routing are unavailable. Declaring an executor does not make it usable by a YAML skill. An executor is reference-only: it has no generated callable schema, catalog entry, `allowed_skills` membership or `SkillTemplate` invocation route. Callable and executor names have separate indexes, so both roles may share one qualified identity; duplicates within either role fail. A bean may declare either or both roles.
 
 The public record has exactly five components, in this order:
 
@@ -99,7 +99,7 @@ RecoverableSkillException(String message);
 RecoverableSkillException(String message, Throwable cause);
 ```
 
-Messages MUST be non-null and nonblank. Valid messages, including surrounding whitespace, remain unchanged. An optional cause supplies diagnostics and never substitutes its message as feedback. The shared Java-boundary policy recognizes this subtype through transparent `InvocationTargetException` and `UndeclaredThrowableException` wrappers only. An ordinary application wrapper around it remains terminal; arbitrary cause-chain search is not performed. Direct invocation still throws the exception. Standard tool feedback and orchestration disposition are PR 28.5, so this declaration does not promise automatic retries or a planner correction loop. See [facade errors](observation-and-errors.md) for supported caller handling.
+Messages MUST be non-null and nonblank. Valid messages, including surrounding whitespace, remain unchanged. An optional cause supplies diagnostics and never substitutes its message as feedback. The shared Java-boundary policy recognizes this subtype through transparent `InvocationTargetException` and `UndeclaredThrowableException` wrappers only. An ordinary application wrapper around it remains terminal; arbitrary cause-chain search is not performed. Direct invocation still throws the exception. The exception does not provide automatic retries or a planner correction loop. See [facade errors](observation-and-errors.md) for supported caller handling.
 
 ## Spring invocation and authorization
 
@@ -131,6 +131,6 @@ activation API or configuration inheritance. See [publication](../java-api/skill
 for complete signatures, sequencing and retirement. Fresh callable admission captures
 reachable namespace generations; retained execution uses that association across
 replacement, removal and recreation. Each dispatch enforces the source's declared
-children and captured target visibility. Executor binding/retention remains PR 28.3.
+children and captured target visibility. Executor binding and retention are unavailable.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`, `SkillReachableAdmissionTest`, and `NamespaceExecutionAuthorityIntegrationTest`.

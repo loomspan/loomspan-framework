@@ -2,7 +2,6 @@ package ai.loomspan.internal.skill;
 
 import ai.loomspan.internal.core.SkillIdentity;
 
-import ai.loomspan.api.RestSkillHandler;
 import ai.loomspan.api.SkillValidationIssue;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
@@ -25,9 +24,8 @@ public final class SkillDependencyValidator {
     }
     private final SkillInputContractResolver inputs;
     private final List<CapabilityMetadata> fixedJavaCapabilities;
-    private final List<String> fixedRestHandlerBeanNames;
-    SkillDependencyValidator(SkillInputContractResolver inputs, List<CapabilityMetadata> javaCapabilities, List<String> restNames) {
-        this.inputs = inputs; this.fixedJavaCapabilities = javaCapabilities; this.fixedRestHandlerBeanNames = restNames;
+    SkillDependencyValidator(SkillInputContractResolver inputs, List<CapabilityMetadata> javaCapabilities) {
+        this.inputs = inputs; this.fixedJavaCapabilities = javaCapabilities;
     }
     record CheckedSet(String namespace, List<YamlSkillDefinition> definitions,
             Map<YamlSkillDefinition, SkillInputContract> contracts, Map<String, String> outputSchemas, List<SkillValidationIssue> issues)
@@ -98,17 +96,6 @@ public final class SkillDependencyValidator {
         for (YamlSkillDefinition definition : reachable) {
             try { contracts.put(definition, inputs.resolveYamlCapability(definition)); }
             catch (IllegalStateException ex) { issues.add(error(definition, "input_schema", ex.getMessage())); }
-        }
-        List<YamlSkillDefinition> rest = documents.definitions().stream().filter(YamlSkillDefinition::rest).toList();
-        if (!rest.isEmpty() && fixedRestHandlerBeanNames.size() != 1)
-        {
-            String message = fixedRestHandlerBeanNames.isEmpty()
-                    ? "REST skill manifests require exactly one RestSkillHandler bean; found none for "
-                        + rest.stream().map(definition -> definition.source().diagnosticName()).sorted()
-                                .reduce((left, right) -> left + ", " + right).orElseThrow()
-                    : "REST skill manifests require exactly one RestSkillHandler bean; found "
-                        + String.join(", ", fixedRestHandlerBeanNames);
-            issues.add(error(rest.getFirst(), "rest", message));
         }
         // A nameless failed document could have declared any child; a named failure obscures only its own name.
         boolean unknownFailedName = documents.issues().stream()
@@ -288,7 +275,7 @@ public final class SkillDependencyValidator {
             if (target != null) schema = resolveOutputSchema(target, definitions, names, schemas,
                     resolved, visiting, issues, unknownFailedName, failedNames);
         }
-        else if (!definition.rest() && definition.outputSchema() != null) {
+        else if (definition.form() != YamlSkillDefinition.Form.EXECUTOR && definition.outputSchema() != null) {
             var mapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion();
             schema = mapper.writeValueAsString(outputSchemaMetadata(definition.outputSchema()));
         }

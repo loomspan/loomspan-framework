@@ -148,10 +148,10 @@ fixture, not a predicted or live judgment:
 Presence of an object-valued `typesafe` block selects `SkillKind.TYPESAFE`.
 `name`, `description`, `model`, and an object `input_schema` are required. Existing
 `rbac_roles` are permitted and enforced. Attachment nodes are prohibited.
-Remove all of `rest`, `prompt`, `thinking_level`, `planning_mode`, `concurrency`,
+Remove all of `executor`, `config`, `prompt`, `thinking_level`, `planning_mode`, `concurrency`,
 `max_steps`, `allowed_skills`, `linter`, `output_schema`,
 `output_schema_max_retries`, `output_from`, and `output_bindings` from the leaf;
-their presence fails even when null, false, or empty.
+their presence fails even when null, false, or empty. `rest` is unsupported manifest syntax for every declaration form.
 
 The block contains only `state` and a nonempty object `questions`. State is a
 string, object, or array. Question IDs are literal object keys; each question

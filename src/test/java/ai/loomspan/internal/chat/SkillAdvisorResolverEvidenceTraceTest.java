@@ -148,7 +148,7 @@ class SkillAdvisorResolverEvidenceTraceTest
         schema.setAdditionalProperties(false);
         manifest.setOutputSchema(schema);
 
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 new EffectiveSkillExecutionConfiguration(

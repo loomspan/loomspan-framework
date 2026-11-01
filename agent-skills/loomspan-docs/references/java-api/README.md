@@ -76,12 +76,12 @@ when exact source inspection is required.
 | Developer need | Read first | Then read |
 | --- | --- | --- |
 | Determine whether a Loomspan type or extension point is supported | [compatibility-and-boundaries.md](compatibility-and-boundaries.md) | The relevant API topic below |
-| Invoke or atomically hand off a Java, REST, TypeSafe, or model-backed YAML skill from application code | [invocation.md](invocation.md) | [observation-and-errors.md](observation-and-errors.md) when observing or handling failures |
+| Invoke or atomically hand off a Java, TypeSafe, or model-backed YAML skill from application code | [invocation.md](invocation.md) | [observation-and-errors.md](observation-and-errors.md) when observing or handling failures |
 | Discover skills or pre-check a root request | [catalog-and-validation.md](catalog-and-validation.md) | [invocation.md](invocation.md) for execution-time guarantees |
 | Validate a proposed complete skill set and inspect candidate names/kinds | [skill-reload.md](skill-reload.md) | [draft validation workflow](../skill-authoring/validation-workflow.md) for authoring feedback |
-| Prepare, publish, and retire complete skill and execution generations from complete application-supplied documents and configuration | [skill-reload.md](skill-reload.md) | [rest-skills.md](rest-skills.md) for generation-keyed configuration |
+| Prepare, publish, and retire complete skill and execution generations from complete application-supplied documents and configuration | [skill-reload.md](skill-reload.md) | [executor configuration](../skill-authoring/executor-skills.md) for namespace data rules |
 | Declare an application method as a callable skill or reference-only executor | [java-skills.md](java-skills.md) | [reflected input contracts](../skill-authoring/input-contracts.md) for complete input-shape guidance |
-| Implement application REST leaves | [rest-skills.md](rest-skills.md) | [REST manifests](../skill-authoring/rest-skills.md) |
+| Understand executor declaration syntax, configuration and current limitations | [executor declarations](../skill-authoring/executor-skills.md) | [Java declarations](java-skills.md) |
 | Consume an execution view or diagnose facade failures | [observation-and-errors.md](observation-and-errors.md) | [invocation.md](invocation.md) for lifecycle timing |
 | Mock Loomspan in an application unit test | [invocation.md](invocation.md) | [compatibility-and-boundaries.md](compatibility-and-boundaries.md) for the supported testing boundary |
 | Perform a framework integration test | [compatibility-and-boundaries.md](compatibility-and-boundaries.md) | [invocation.md](invocation.md) |
@@ -95,10 +95,10 @@ relevant topic set.
 | Topic | Coverage | Notes |
 | --- | --- | --- |
 | Supported public types | Source-verified | Exact twenty-seven-type allowlist and package boundaries |
-| Catalog and pre-checks | Catalog foundation source-verified | Explicit namespace acquisition, immutable qualified metadata, strict catalog lookup versus local-to-default invoke/validate/handoff resolution (SkillReachableAdmissionTest), malformed/foreign lookup, candidate IDs; active registry/removal implemented; fresh reachable admission and temporary validation are covered by SkillReachableAdmissionTest |
+| Catalog and pre-checks | Source-verified | Explicit namespace acquisition, immutable qualified metadata, strict catalog lookup versus local-to-default invoke/validate/handoff resolution (SkillReachableAdmissionTest), malformed/foreign lookup, candidate IDs, active namespace registry and removal; fresh reachable admission and temporary validation are covered by SkillReachableAdmissionTest |
 | Two-stage skill updates | Source-verified | Complete skill and execution candidate, environment or host-map credential references, frozen generation, process-local ID, one-shot publication, candidate disposal, safe retirement callback, and application-owned readiness and cleanup |
 | Skill invocation | Source-verified | Local-to-default or explicit-qualified invocation and atomic single-use handoff (SkillReachableAdmissionTest) with captured generation ID, input normalization and validation, result, session, security context, and observer timing |
-| Java declarations and results | Source-verified foundation | Callable/executor discovery shares proxy/security checks; exact string/null/JSON results, constructor copying and designated failures are covered by `SkillExecutorTest`, `SharedJavaDiscoveryInvocationTest` and `SupportedSurfaceIntegrationTest`. Executor YAML binding is PR 28.3; tool/planner disposition is PR 28.5. Reflected callable inputs live in `skill-authoring`. |
+| Java declarations and results | Source-verified | Callable/executor discovery shares proxy/security checks; exact string/null/JSON results, constructor copying and designated failures are covered by `SkillExecutorTest`, `SharedJavaDiscoveryInvocationTest` and `SupportedSurfaceIntegrationTest`. YAML executor binding is unavailable; designated exceptions do not provide automatic retries or planner correction loops. Reflected callable inputs live in `skill-authoring`. |
 | Execution observations | Source-verified | Immutable completed view/event values, canonical namespace identities, entry versus target generation facts, one observer flow and unchanged trust boundary; NamespaceObservationIntegrationTest and ConsoleTraceFixtureCorpusTest |
 | Facade failures | Source-verified | Validation, authorization, safe wrapping, observer failures, and fatal errors |
 | Configuration properties | Not documented here | Public configuration behavior is user-facing but its binding types are not application Java API |

@@ -13,11 +13,11 @@ Use this document to establish shared vocabulary and choose the broad shape of a
 
 ## Core Model
 
-Loomspan combines model-driven YAML skills, native TypeSafe evaluation leaves, application-handled YAML REST leaves, and deterministic Java `@SkillMethod` skills. Each declaration is one callable capability. An LLM-backed skill reasons about its mission and can invoke only the direct child skills exposed to it.
+Loomspan combines model-driven YAML skills, native TypeSafe evaluation leaves, and deterministic Java `@SkillMethod` skills. Each declaration is one callable capability. An LLM-backed skill reasons about its mission and can invoke only the direct child skills exposed to it.
 
 ```text
-Application code -> Java, REST, TypeSafe, or model-backed YAML entry skill
-YAML planner -> YAML specialist -> Java @SkillMethod or REST leaf
+Application code -> Java, TypeSafe, or model-backed YAML entry skill
+YAML planner -> YAML specialist -> Java @SkillMethod
 ```
 
 Not every tree needs every level. Java skills can be roots without a model; a simple reasoning skill can be one YAML declaration.
@@ -101,7 +101,7 @@ captured-generation boundaries still apply.
 
 ### Entry skill
 
-An entry is any registered Java, REST, TypeSafe, or model-backed YAML skill invoked through `SkillTemplate`. The facade accepts a map or an object convertible to a map, validates its effective input contract, and creates a fresh session. Callers SHOULD understand the entry contract without understanding the tree below it.
+An entry is any registered Java, TypeSafe, or model-backed YAML skill invoked through `SkillTemplate`. The facade accepts a map or an object convertible to a map, validates its effective input contract, and creates a fresh session. Callers SHOULD understand the entry contract without understanding the tree below it.
 
 ### Model-backed YAML skill
 
@@ -251,10 +251,12 @@ Startup namespaces are Private; foreign outgoing references require a Public tar
 Fixed Java methods remain assigned to their original namespace across replacement
 and explicit recreation; withdrawal preserves beans and retained work. There is no
 activation API or configuration inheritance. See [publication](../java-api/skill-reload.md)
-for complete signatures, sequencing and retirement. This slice implements preparation
+for complete signatures, sequencing and retirement. Namespace updates support preparation
 and installation, retained reachable admission and captured cross-namespace execution.
 Captured canonical observations and existing Console consumers are verified by `NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest`.
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.
 
 Boundary evidence: `SkillReachableAdmissionTest#localDefaultReferencesMatchQualifiedAcrossAllRootOperations`, `NamespaceIdentityFoundationTest#localAndMixedAuthoredFieldsCompileWithoutRewritingContent`, and `NamespaceStartupIntegrationTest#suppliedLocalDocumentsValidateAndPrepareInEachOwnerBeforePublicationWithoutFallback`.
+
+Executor YAML declarations and immutable configuration can be parsed and validated, but executor-backed YAML skills cannot currently be prepared or executed. `rest:` is unsupported manifest syntax. Read [executor leaves](executor-skills.md) for declaration rules and limitations.

@@ -136,7 +136,7 @@ class NestedSuccessfulSkillBoundaryTest
         manifest.setDescription("Handle incident");
         manifest.setModel("gpt-5");
         manifest.setAllowedSkills(List.of(new YamlSkillManifest.AllowedSkillManifest("default-investigateNetwork", null, null, null)));
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 new EffectiveSkillExecutionConfiguration(

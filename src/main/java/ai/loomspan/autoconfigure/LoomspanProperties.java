@@ -29,6 +29,10 @@ public class LoomspanProperties implements InitializingBean
 {
     private static final Pattern HTTP_TOKEN = Pattern.compile("^[!#$%&'*+.^_`|~0-9A-Za-z-]+$");
 
+    private ai.loomspan.internal.skill.ExecutorConfiguration executorConfig = ai.loomspan.internal.skill.ExecutorConfiguration.empty();
+    public ai.loomspan.internal.skill.ExecutorConfiguration getExecutorConfig() { return executorConfig; }
+    public void setExecutorConfig(ai.loomspan.internal.skill.ExecutorConfiguration value) { executorConfig = java.util.Objects.requireNonNull(value); }
+
     @Valid
     private Session session = new Session();
 

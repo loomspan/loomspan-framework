@@ -174,7 +174,7 @@ class DefaultMissionInputMaterializerTest
         root.setProperties(Map.of("image", image));
         manifest.setInputSchema(root);
 
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 new EffectiveSkillExecutionConfiguration("model", "test-connection", AiDriver.OPENAI, "gpt-4.1-mini", null));

@@ -120,7 +120,7 @@ class EvidencePlanningIntegrationTest
                 "userMessage", "default-draftIncidentResponse");
         EffectiveSkillExecutionConfiguration configuration = new EffectiveSkillExecutionConfiguration(
                 "gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
-        return new YamlSkillDefinition("default",
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
                 configuration,

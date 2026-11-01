@@ -11,7 +11,7 @@ coverage: initial-source-verified
 
 Use this topic for an annotation-defined Java skill. Loomspan reflects its Java signature and `@SkillParam` metadata as the provider-facing schema, planner guidance, and root/child runtime validation contract. There is no companion YAML or input-contract inheritance layer.
 
-For REST manifests, use [REST leaf skills](rest-skills.md): their optional `input_schema` uses the YAML validator and their public handler receives a recursively immutable snapshot after reference resolution.
+For executor YAML input contracts, use [executor leaf declarations](executor-skills.md): their optional `input_schema` uses the ordinary YAML validator.
 
 This topic does not define the complete pure-YAML `input_schema` language.
 

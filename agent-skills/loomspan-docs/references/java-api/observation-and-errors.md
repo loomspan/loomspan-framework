@@ -148,9 +148,9 @@ that runtime exception in `SkillException` as described in the table.
 `RecoverableSkillException` accepts only a non-null, nonblank message and an
 optional diagnostic cause. The message remains exact; cause text is never fallback
 feedback. Only transparent reflection/proxy wrappers preserve its designated
-classification. An ordinary application wrapper remains terminal. This revision
-establishes Java-boundary classification; standard tool/planner disposition is
-PR 28.5. See [Java failures](java-skills.md#designated-java-failures).
+classification. An ordinary application wrapper remains terminal. This classification
+applies at the Java invocation boundary; it does not
+provide automatic retries or a planner correction loop. See [Java failures](java-skills.md#designated-java-failures).
 
 ## Source Anchors
 

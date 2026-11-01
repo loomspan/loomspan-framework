@@ -56,13 +56,6 @@ public class YamlSkillCatalog implements InitializingBean
     private static final int OUTPUT_SCHEMA_WARNING_REQUIRED = 8;
     private String namespace = "default";
     private static final Set<String> ALLOWED_SKILL_ENTRY_FIELDS = Set.of("name", "min_tasks", "max_tasks", "required", "input_bindings");
-    private static final Set<YamlSkillManifest.Field> REST_FORBIDDEN_FIELDS = Set.of(
-            YamlSkillManifest.Field.MODEL, YamlSkillManifest.Field.PROMPT,
-            YamlSkillManifest.Field.THINKING_LEVEL, YamlSkillManifest.Field.ALLOWED_SKILLS,
-            YamlSkillManifest.Field.PLANNING_MODE, YamlSkillManifest.Field.CONCURRENCY,
-            YamlSkillManifest.Field.MAX_STEPS, YamlSkillManifest.Field.LINTER,
-            YamlSkillManifest.Field.OUTPUT_SCHEMA, YamlSkillManifest.Field.OUTPUT_SCHEMA_MAX_RETRIES,
-            YamlSkillManifest.Field.OUTPUT_FROM, YamlSkillManifest.Field.OUTPUT_BINDINGS);
     private final LoomspanProperties modelsProperties;
     private final LoomspanProperties.Skills skillProperties;
     private final ResourcePatternResolver resourcePatternResolver;
@@ -331,31 +324,20 @@ public class YamlSkillCatalog implements InitializingBean
         validateRequiredField(resource, "name", manifest.getName());
         validateRequiredField(resource, "description", manifest.getDescription());
 
-        boolean rest = Boolean.TRUE.equals(manifest.getRest());
+        var form = manifest.declarationForm();
         validateInputSchema(resource, manifest);
-        if (rest)
-        {
-            for (YamlSkillManifest.Field field : REST_FORBIDDEN_FIELDS)
-            {
-                if (manifest.isDeclared(field))
-                {
-                    throw invalidNamedSkill(resource, manifest, field.yamlName(),
-                            "field is not allowed for REST skills; remove it");
-                }
-            }
-            return new YamlSkillDefinition(namespace, resource, manifest, null, EvidenceContract.empty(), source, List.of());
-        }
+        if (form == YamlSkillDefinition.Form.EXECUTOR)
+            return new YamlSkillDefinition(form, namespace, resource, manifest, null, EvidenceContract.empty(), source, List.of());
 
-        if (manifest.isTypesafeDeclared()) {
+        if (form == YamlSkillDefinition.Form.TYPESAFE) {
             if (manifest.getInputSchema() == null) throw invalidNamedSkill(resource, manifest, "input_schema", "is required for TypeSafe skills");
             rejectTypeSafeAttachments(resource, manifest, manifest.getInputSchema(), "input_schema");
             if (!StringUtils.hasText(manifest.getModel())) throw invalidNamedSkill(resource, manifest, "model", "required field is missing or blank");
             var model = resolveModelCatalogEntry(resource, manifest);
             var connection = modelsProperties.getConnections().get(model.getConnection());
             if (connection == null || !"TYPESAFE".equals(connection.getDriver().name())) throw invalidNamedSkill(resource, manifest, "model", "TypeSafe skill requires a typesafe driver connection");
-            return new YamlSkillDefinition(namespace, resource, manifest, new EffectiveSkillExecutionConfiguration(manifest.getModel(), model.getConnection(), connection.getDriver(), model.getProviderModel(), null), EvidenceContract.empty(), source, List.of());
+            return new YamlSkillDefinition(form, namespace, resource, manifest, new EffectiveSkillExecutionConfiguration(manifest.getModel(), model.getConnection(), connection.getDriver(), model.getProviderModel(), null), EvidenceContract.empty(), source, List.of());
         }
-        validateConcurrency(resource, manifest);
         if (!StringUtils.hasText(manifest.getModel()))
         {
             throw invalidNamedSkill(resource, manifest, "model", "required field is missing or blank; declare a configured model");
@@ -382,7 +364,7 @@ public class YamlSkillCatalog implements InitializingBean
                 effectiveThinkingLevel);
 
         return new YamlSkillDefinition(
-                namespace, resource,
+                form, namespace, resource,
                 manifest,
                 effectiveConfiguration,
                 evidenceContract,
@@ -419,7 +401,20 @@ public class YamlSkillCatalog implements InitializingBean
     {
         try (InputStream inputStream = new ByteArrayInputStream(bytes))
         {
-            JsonNode root = yamlObjectMapper.readTree(inputStream);
+            Object decoded = ai.loomspan.internal.serialization.YamlValues.read(inputStream);
+            Object executorConfig = null;
+            boolean configPresent = decoded instanceof Map<?, ?> map && map.containsKey("config");
+            if (configPresent) {
+                var fields = new java.util.LinkedHashMap<>((Map<?, ?>) decoded);
+                executorConfig = fields.remove("config");
+                decoded = fields;
+            }
+            JsonNode root = yamlObjectMapper.valueToTree(decoded);
+            if (configPresent && root instanceof tools.jackson.databind.node.ObjectNode object) {
+                // Form validation needs presence/type, never a JSON conversion of domain data.
+                object.set("config", executorConfig instanceof Map<?, ?>
+                        ? yamlObjectMapper.createObjectNode() : yamlObjectMapper.nullNode());
+            }
             if (root == null || !root.isObject())
             {
                 throw invalidSkill(resource, "manifest", "root document must be an object");
@@ -440,16 +435,26 @@ public class YamlSkillCatalog implements InitializingBean
                 throw invalidNamedSkill(resource, skillName, "mapping",
                         "mapping is no longer supported; declare the Java skill once with @SkillMethod and remove its YAML wrapper");
             }
-            validateRawTypeSafe(resource, root, skillName);
-            validateRawRest(resource, root, skillName);
-            validateRawConcurrency(resource, root, skillName);
+            var form = validateDeclarationForm(resource, root, skillName);
             validateRawOutputBindings(resource, root, skillName);
             validateRawOutputFrom(resource, root, skillName);
             validateRawAllowedSkills(resource, root, skillName);
 
             try
             {
+                if (configPresent) ((tools.jackson.databind.node.ObjectNode)root).remove("config");
                 YamlSkillManifest manifest = yamlObjectMapper.treeToValue(root, YamlSkillManifest.class);
+                if (configPresent) {
+                    var data = new java.util.LinkedHashMap<String, Object>();
+                    for (var entry : ((Map<?, ?>)executorConfig).entrySet()) {
+                        if (!(entry.getKey() instanceof String key))
+                            throw invalidNamedSkill(resource, skillName, "config", "map keys must be textual");
+                        data.put(key, entry.getValue());
+                    }
+                    manifest.setConfig(data);
+                }
+                manifest.declarationForm(form);
+                if (form == YamlSkillDefinition.Form.EXECUTOR) manifest.setExecutor(reference(resource, skillName, "executor", manifest.getExecutor()).toString());
                 prepareReferences(manifest);
                 return manifest;
             }
@@ -466,20 +471,38 @@ public class YamlSkillCatalog implements InitializingBean
         {
             throw invalidSkill(resource, toFieldPath(ex), describeMappingFailure(ex));
         }
+        catch (org.snakeyaml.engine.v2.exceptions.YamlEngineException ex)
+        {
+            throw invalidSkill(resource, "manifest", "malformed YAML: " + ex.getMessage());
+        }
         catch (IOException ex)
         {
             throw new DocumentReadException("Failed to read YAML skill from " + describe(resource), ex);
         }
     }
 
-    private void validateRawTypeSafe(Resource resource, JsonNode root, String skillName) {
-        if (!root.has("typesafe")) return;
-        for (String field : List.of("rest", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
-            if (root.has(field)) throw invalidNamedSkill(resource, skillName, field, "field is not allowed for TypeSafe skills; remove it");
-        try { ai.loomspan.internal.typesafe.TypeSafeDeclaration.compile(root.get("typesafe")); }
-        catch (ai.loomspan.internal.typesafe.TypeSafeDeclaration.ValidationException ex) {
-            throw invalidNamedSkill(resource, skillName, ex.path(), ex.detail());
+    /** The sole owner of authored declaration applicability, including field presence. */
+    private YamlSkillDefinition.Form validateDeclarationForm(Resource resource, JsonNode root, String skillName) {
+        var form = root.has("executor") ? YamlSkillDefinition.Form.EXECUTOR
+                : root.has("typesafe") ? YamlSkillDefinition.Form.TYPESAFE : YamlSkillDefinition.Form.MODEL;
+        if (form == YamlSkillDefinition.Form.EXECUTOR) {
+            for (String field : List.of("typesafe", "model", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
+                if (root.has(field)) throw invalidNamedSkill(resource, skillName, field, "field is not allowed for executor leaves; remove it");
+            JsonNode executor = root.get("executor");
+            if (!executor.isString()) throw invalidNamedSkill(resource, skillName, "executor", "must be a nonblank textual reference");
+            reference(resource, skillName, "executor", executor.textValue());
+            if (root.has("config") && !root.get("config").isObject())
+                throw invalidNamedSkill(resource, skillName, "config", "must be a non-null map");
+        } else {
+            if (root.has("config")) throw invalidNamedSkill(resource, skillName, "config", "is permitted only on executor leaves");
+            if (form == YamlSkillDefinition.Form.TYPESAFE) {
+                for (String field : List.of("prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
+                    if (root.has(field)) throw invalidNamedSkill(resource, skillName, field, "field is not allowed for TypeSafe skills; remove it");
+                try { ai.loomspan.internal.typesafe.TypeSafeDeclaration.compile(root.get("typesafe")); }
+                catch (ai.loomspan.internal.typesafe.TypeSafeDeclaration.ValidationException ex) { throw invalidNamedSkill(resource, skillName, ex.path(), ex.detail()); }
+            } else validateRawConcurrency(resource, root, skillName);
         }
+        return form;
     }
 
     private void rejectTypeSafeAttachments(Resource resource, YamlSkillManifest manifest, YamlSkillManifest.InputSchemaManifest schema, String path) {
@@ -514,25 +537,6 @@ public class YamlSkillCatalog implements InitializingBean
         }
         if (!selected)
             throw invalidNamedSkill(resource, skillName, "output_from.skill", "must select a direct allowed child with required: true and max_tasks: 1");
-    }
-
-    private void validateRawRest(Resource resource, JsonNode root, String skillName)
-    {
-        if (!root.has("rest")) return;
-        JsonNode rest = root.get("rest");
-        if (rest == null || !rest.isBoolean() || !rest.booleanValue())
-        {
-            throw invalidNamedSkill(resource, skillName, "rest",
-                    "must be boolean true; omit 'rest' for non-REST skills");
-        }
-        for (YamlSkillManifest.Field field : REST_FORBIDDEN_FIELDS)
-        {
-            if (root.has(field.yamlName()))
-            {
-                throw invalidNamedSkill(resource, skillName, field.yamlName(),
-                        "field is not allowed for REST skills; remove it");
-            }
-        }
     }
 
     private void validateRawAllowedSkills(Resource resource, JsonNode root, String skillName)
@@ -699,23 +703,6 @@ public class YamlSkillCatalog implements InitializingBean
         if (concurrency == null || !concurrency.isBoolean())
         {
             throw invalidNamedSkill(resource, skillName, "concurrency", "must be a non-null Boolean");
-        }
-    }
-
-    private void validateConcurrency(Resource resource, YamlSkillManifest manifest)
-    {
-        if (!manifest.isDeclared(YamlSkillManifest.Field.CONCURRENCY))
-        {
-            return;
-        }
-        if (!Boolean.TRUE.equals(manifest.getPlanningMode()))
-        {
-            throw invalidNamedSkill(resource, manifest, "concurrency",
-                    "may be declared only when planning_mode is explicitly true; remove concurrency or enable planning_mode");
-        }
-        if (manifest.getConcurrency() == null)
-        {
-            throw invalidNamedSkill(resource, manifest, "concurrency", "must be a non-null Boolean");
         }
     }
 

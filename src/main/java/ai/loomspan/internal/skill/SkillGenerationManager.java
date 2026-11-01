@@ -161,12 +161,12 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             NamespaceVisibility visibility, Map<String, String> credentialValues) {
         requireInitialized();
         Objects.requireNonNull(visibility, "visibility must not be null");
-        var parsed = ExecutionConfigurationParser.parse(configuration, environment, false);
+        var parsed = ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, false);
         var checked = check(view.namespace(), new YamlSkillCatalog(parsed.properties()).checkedSupplied(view.namespace(), documents, true),
                 visibility, view.namespaces());
         checked.requireValid();
-        parsed = credentialValues == null ? ExecutionConfigurationParser.parse(configuration, environment, true)
-                : ExecutionConfigurationParser.parse(configuration, credentialValues);
+        parsed = credentialValues == null ? ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, true)
+                : ExecutionConfigurationParser.parse(view.namespace(), configuration, credentialValues);
         return prepareCatalog(checked, parsed.properties(), parsed.tracePersistence(), visibility);
     }
 
@@ -176,7 +176,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         Objects.requireNonNull(visibility, "visibility must not be null");
         Objects.requireNonNull(configuration, "configuration must not be null");
         try {
-            var parsed = ExecutionConfigurationParser.parse(configuration, environment, false);
+            var parsed = ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, false);
             return validationResult(check(view.namespace(), new YamlSkillCatalog(parsed.properties()).checkedSupplied(view.namespace(), documents, false),
                     visibility, view.namespaces()));
         } catch (RuntimeException ex) {
@@ -187,7 +187,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
 
     private SkillDependencyValidator.CheckedSet check(String namespace, YamlSkillCatalog.CheckedDocuments documents,
             NamespaceVisibility visibility, Map<String, SkillGeneration> external) {
-        return new SkillDependencyValidator(inputs, fixedJavaCapabilities, fixedRestHandlerBeanNames).check(namespace, documents, visibility, external);
+        return new SkillDependencyValidator(inputs, fixedJavaCapabilities).check(namespace, documents, visibility, external);
     }
 
     private void requireInitialized() {
@@ -221,7 +221,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             skills.add(new ValidatedSkill(javaCapability.name(), javaCapability.kind().publicKind()));
         for (YamlSkillDefinition definition : checked.definitions())
             skills.add(new ValidatedSkill(definition.identity().toString(),
-                    definition.rest() ? SkillKind.REST : definition.typesafe() ? SkillKind.TYPESAFE : SkillKind.YAML));
+                    definition.typesafe() ? SkillKind.TYPESAFE : SkillKind.YAML));
         skills.sort(Comparator.comparing(ValidatedSkill::name));
         return new SkillValidationResult(issues, skills);
     }
@@ -236,8 +236,6 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         LinkedHashMap<String, CapabilityMetadata> capabilities = new LinkedHashMap<>();
         for (CapabilityMetadata metadata : fixedJavaCapabilities.stream().filter(cap -> cap.identity().namespace().equals(checked.namespace())).toList()) putCapability(capabilities, metadata);
 
-        List<YamlSkillDefinition> restDefinitions = definitions.stream().filter(YamlSkillDefinition::rest).toList();
-        RestSkillHandler restHandler = restDefinitions.isEmpty() ? null : requireRestHandler();
         LinkedHashMap<String, YamlSkillDefinition> definitionsByName = new LinkedHashMap<>();
         for (YamlSkillDefinition definition : definitions)
         {
@@ -245,17 +243,15 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             definitionsByName.put(name, definition);
             String description = definition.manifest().getDescription();
             var contract = checked.contracts().get(definition);
-            boolean rest = definition.rest();
-            RestSkillHandler handler = restHandler;
+            if (definition.form() == YamlSkillDefinition.Form.EXECUTOR)
+                throw new IllegalStateException("Executor generation binding is not implemented yet");
             CapabilityMetadata metadata = new CapabilityMetadata(
-                    (rest ? "rest:" : "yaml:") + definition.source().diagnosticName(),
+                    "yaml:" + definition.source().diagnosticName(),
                     definition.identity(), description,
-                    rest ? SkillExecutionDescriptor.none()
-                            : SkillExecutionDescriptor.from(definition.requireExecutionConfiguration()),
+                    SkillExecutionDescriptor.from(definition.requireExecutionConfiguration()),
                     SkillAccessPolicy.yamlRoles(definition.rbacRoles()),
-                    rest ? arguments -> invokeRest(handler, name, generationId, arguments)
-                            : arguments -> { throw new IllegalStateException("YAML skills require model execution"); },
-                    rest ? CapabilityKind.REST_SKILL : definition.typesafe() ? CapabilityKind.TYPESAFE_SKILL : CapabilityKind.YAML_SKILL,
+                    arguments -> { throw new IllegalStateException("YAML skills require model execution"); },
+                    definition.typesafe() ? CapabilityKind.TYPESAFE_SKILL : CapabilityKind.YAML_SKILL,
                     new CapabilityToolDescriptor(name, description, inputs.toJsonSchema(contract), checked.outputSchemas().get(name)),
                     contract, new SkillSource(definition.source().diagnosticName(), null, null));
             putCapability(capabilities, metadata);
@@ -339,7 +335,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
 
     /** Expensive policy checks use retained immutable metadata, outside the registry monitor. */
     public void validateAdmission(SkillAdmissionSnapshot snapshot) {
-        new SkillDependencyValidator(inputs, fixedJavaCapabilities, fixedRestHandlerBeanNames).checkAdmission(snapshot);
+        new SkillDependencyValidator(inputs, fixedJavaCapabilities).checkAdmission(snapshot);
     }
 
     public void deliveryEnabled(BooleanSupplier condition)

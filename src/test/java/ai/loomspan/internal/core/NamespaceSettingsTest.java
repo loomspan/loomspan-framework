@@ -28,7 +28,7 @@ class NamespaceSettingsTest {
         var schema = new YamlSkillManifest.InputSchemaManifest(); schema.setType("object");
         var image = new YamlSkillManifest.InputSchemaManifest(); image.setType("attachment"); image.setMediaType("image"); image.setAllowedContentTypes(List.of("image/jpeg"));
         schema.setProperties(Map.of("image", image)); manifest.setInputSchema(schema);
-        var definition = new YamlSkillDefinition("tax", new ByteArrayResource(new byte[0]), manifest,
+        var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "tax", new ByteArrayResource(new byte[0]), manifest,
                 new EffectiveSkillExecutionConfiguration("model", "connection", AiDriver.OPENAI, "provider", null));
         var resource = new ByteArrayResource(new byte[]{(byte)255,(byte)216,(byte)255,1,2,3,4,5}) {
             @Override public String getFilename() { return "image.jpg"; }

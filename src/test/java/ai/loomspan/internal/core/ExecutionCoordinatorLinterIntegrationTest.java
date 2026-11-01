@@ -75,7 +75,7 @@ class ExecutionCoordinatorLinterIntegrationTest {
         linter.setMaxRetries(2);
         linter.setRegex(regex);
         manifest.setLinter(linter);
-        YamlSkillDefinition definition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, executionConfiguration);
+        YamlSkillDefinition definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, executionConfiguration);
 
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(definition);
         TestCapabilityRegistry registry = new TestCapabilityRegistry();

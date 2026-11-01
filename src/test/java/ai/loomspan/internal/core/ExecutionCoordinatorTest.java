@@ -186,8 +186,8 @@ class ExecutionCoordinatorTest {
         required.setType("string");
         root.setProperties(Map.of("context", context, "requiredInput", required));
         childManifest.setInputSchema(root);
-        var parentDefinition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest("default-parentSkill", List.of("default-compareOptions")), configuration);
-        var childDefinition = new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), childManifest, configuration);
+        var parentDefinition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest("default-parentSkill", List.of("default-compareOptions")), configuration);
+        var childDefinition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), childManifest, configuration);
         var catalog = new StubYamlSkillCatalog(parentDefinition, childDefinition);
         var registry = new TestCapabilityRegistry();
         var resolver = new ai.loomspan.internal.runtime.input.SkillInputContractResolver();
@@ -306,7 +306,7 @@ class ExecutionCoordinatorTest {
                 "openai/gpt-5",
                 "medium");
         YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -375,7 +375,7 @@ class ExecutionCoordinatorTest {
                 "openai/gpt-5",
                 "medium");
         YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -441,7 +441,7 @@ class ExecutionCoordinatorTest {
                 "openai/gpt-5",
                 "medium");
         YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -543,7 +543,7 @@ class ExecutionCoordinatorTest {
                 "medium");
         YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
         manifest.setPlanningMode(false);
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -609,7 +609,7 @@ class ExecutionCoordinatorTest {
                 "medium");
         YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
         manifest.setPlanningMode(true);
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -663,7 +663,7 @@ class ExecutionCoordinatorTest {
                 "openai/gpt-5",
                 "medium");
         YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -717,10 +717,10 @@ class ExecutionCoordinatorTest {
                 "openai/gpt-5",
                 "medium");
         YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
-                executionConfiguration), new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]),
+                executionConfiguration), new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]),
                 manifest("default-top_entry", List.of("default-rootVisibleSkill")), executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root",
@@ -784,7 +784,7 @@ class ExecutionCoordinatorTest {
                 "medium");
         YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
         manifest.setPlanningMode(true);
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -832,7 +832,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest("default-rootVisibleSkill", List.of()),
                 executionConfiguration));
@@ -886,7 +886,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest("default-rootVisibleSkill", List.of()),
                 executionConfiguration));
@@ -930,7 +930,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 attachmentManifest("default-rootVisibleSkill"),
                 executionConfiguration));
@@ -983,7 +983,7 @@ class ExecutionCoordinatorTest {
                 "test-connection", AiDriver.OPENAI,
                 "openai/gpt-5",
                 "medium");
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest("default-rootVisibleSkill", List.of()),
                 executionConfiguration));
@@ -1055,7 +1055,7 @@ class ExecutionCoordinatorTest {
                 "medium");
         YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
         manifest.setPlanningMode(false);
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -1123,7 +1123,7 @@ class ExecutionCoordinatorTest {
                 "openai/gpt-5",
                 "medium");
         YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -1203,9 +1203,9 @@ class ExecutionCoordinatorTest {
         rootManifest.setPrompt("PARENT_PROMPT_SENTINEL");
         childManifest.setPrompt("CHILD_PROMPT_SENTINEL");
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(
-                new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), rootManifest,
+                new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), rootManifest,
                         rootExecutionConfiguration),
-                new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), childManifest,
+                new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), childManifest,
                         childExecutionConfiguration));
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
@@ -1329,7 +1329,7 @@ class ExecutionCoordinatorTest {
                 "openai/gpt-5",
                 "medium");
         YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -1399,9 +1399,9 @@ class ExecutionCoordinatorTest {
         YamlSkillManifest rootManifest = plannedManifest("default-rootVisibleSkill", List.of("default-childLlmSkill"));
         YamlSkillManifest childManifest = plannedManifest("default-childLlmSkill", List.of("default-marsAnalyzer"));
         StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(
-                new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), rootManifest,
+                new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), rootManifest,
                         rootExecutionConfiguration),
-                new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), childManifest,
+                new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), childManifest,
                         childExecutionConfiguration));
 
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
@@ -1513,7 +1513,7 @@ class ExecutionCoordinatorTest {
                 "medium");
         YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
         manifest.setPlanningMode(false);
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));
@@ -1582,7 +1582,7 @@ class ExecutionCoordinatorTest {
                 "medium");
         YamlSkillManifest manifest = manifest("default-rootVisibleSkill", List.of());
         manifest.setPlanningMode(false);
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]), manifest, executionConfiguration));
         CapabilityMetadata rootMetadata = new CapabilityMetadata(
                 "yaml:root", "default-rootVisibleSkill", "root",
@@ -1671,7 +1671,7 @@ class ExecutionCoordinatorTest {
         ai.loomspan.internal.runtime.tool.BoundCapability callback = toolCallbackFactory((value, session) -> value, null, stateService, planningService)
                 .bind(
                         ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-rootVisibleSkill", 2),
-                        new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest("default-rootVisibleSkill", List.of()), executionConfiguration),
+                        new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest("default-rootVisibleSkill", List.of()), executionConfiguration),
                         List.of(childMetadata),
                         null)
                 .getFirst();
@@ -1687,7 +1687,7 @@ class ExecutionCoordinatorTest {
                 "openai/gpt-5",
                 "medium");
         YamlSkillManifest manifest = plannedManifest("default-rootVisibleSkill", List.of("default-allowedVisibleSkill"));
-        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition("default",
+        StubYamlSkillCatalog catalog = new StubYamlSkillCatalog(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),
                 manifest,
                 executionConfiguration));

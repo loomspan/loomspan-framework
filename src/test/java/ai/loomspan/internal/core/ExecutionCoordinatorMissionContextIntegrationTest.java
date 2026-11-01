@@ -175,7 +175,7 @@ class ExecutionCoordinatorMissionContextIntegrationTest
         };
         if (child != null) manifest.setAllowedSkills(List.of(
                 new YamlSkillManifest.AllowedSkillManifest(child, null, null, null)));
-        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest, CONFIG);
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, CONFIG);
     }
 
     private static CapabilityMetadata capability(String name)

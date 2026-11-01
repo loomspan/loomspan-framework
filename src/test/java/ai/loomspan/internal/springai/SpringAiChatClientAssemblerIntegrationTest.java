@@ -151,7 +151,7 @@ class SpringAiChatClientAssemblerIntegrationTest
     {
         YamlSkillManifest manifest = new YamlSkillManifest();
         manifest.setName("test");
-        return new YamlSkillDefinition("default", new ByteArrayResource(new byte[0]), manifest,
+        return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest,
                 new EffectiveSkillExecutionConfiguration("gpt-test", "openai", AiDriver.OPENAI, "gpt-test", null));
     }
 

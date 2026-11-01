@@ -17,7 +17,7 @@ class ExecutionConfigurationParserTest
     @Test
     void nativeCandidateCapturesAccountReferencesAndProtocolOptions() {
         String yaml = CANDIDATE.replace("driver: openai", "driver: typesafe\n      base-url: https://openrouter.ai/api/\n      request-timeout: 240ms");
-        var parsed = ExecutionConfigurationParser.parse(new ExecutionConfiguration(yaml),
+        var parsed = ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(yaml),
                 Map.of("provider.key", "fixture-native-key", "tenant.header", "fixture-header"));
         var connection = parsed.properties().getConnections().get("primary");
         assertThat(connection.getDriver()).isEqualTo(ai.loomspan.autoconfigure.AiDriver.TYPESAFE);
@@ -33,7 +33,7 @@ class ExecutionConfigurationParserTest
     {
         for (String value : java.util.List.of("0ms", "-1ms", "PT0.000999999S", "PT0.0015S",
                 "2147483648ms", "PT9223372036854775807S", "malformed-secret-sentinel"))
-            assertThatThrownBy(() -> ExecutionConfigurationParser.parse(new ExecutionConfiguration(
+            assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
                     CANDIDATE.replace("driver: openai", "driver: openai\n      request-timeout: " + value)),
                     new StandardEnvironment(), false))
                     .hasMessageContaining("loomspan.connections.primary.request-timeout")
@@ -42,7 +42,7 @@ class ExecutionConfigurationParserTest
     @Test
     void acceptsRequestTimeoutOnSupportedConnection()
     {
-        var parsed = ExecutionConfigurationParser.parse(new ExecutionConfiguration(
+        var parsed = ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
                 CANDIDATE.replace("driver: openai", "driver: openai\n      request-timeout: 240s")),
                 new StandardEnvironment(), false);
         assertThat(parsed.properties().getConnections()).containsKey("primary");
@@ -76,18 +76,18 @@ class ExecutionConfigurationParserTest
     void freezesDefaultsAndResolvesReferencesOnlyDuringPreparation()
     {
         StandardEnvironment environment = new StandardEnvironment();
-        var validated = ExecutionConfigurationParser.parse(new ExecutionConfiguration(CANDIDATE), environment, false);
+        var validated = ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(CANDIDATE), environment, false);
         assertThat(validated.tracePersistence()).isEqualTo(TracePersistencePolicy.ALWAYS);
         assertThat(validated.properties().getSession().getMaxDepth()).isEqualTo(3);
         assertThat(validated.properties().getSession().getQuotas().getMaxProviderAttempts()).isEqualTo(4);
         assertThat(validated.properties().getSession().getQuotas().getMaxToolInvocations()).isEqualTo(128);
         assertThat(validated.properties().getConnections().get("primary").getProviderRetry().getMaxAttempts()).isEqualTo(2);
-        assertThatThrownBy(() -> ExecutionConfigurationParser.parse(new ExecutionConfiguration(CANDIDATE), environment, true))
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(CANDIDATE), environment, true))
                 .hasMessageContaining("api-key-ref").hasMessageNotContaining("provider.key");
 
         environment.getPropertySources().addFirst(new MapPropertySource("credentials",
                 Map.of("provider.key", "secret-sentinel", "tenant.header", "header-sentinel")));
-        var prepared = ExecutionConfigurationParser.parse(new ExecutionConfiguration(CANDIDATE), environment, true);
+        var prepared = ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(CANDIDATE), environment, true);
         assertThat(prepared.properties().getConnections().get("primary").getApiKey()).isEqualTo("secret-sentinel");
         assertThat(prepared.properties().getConnections().get("primary").getHeaders()).containsEntry("X-Tenant", "header-sentinel");
         assertThat(new ExecutionConfiguration(CANDIDATE).yaml()).doesNotContain("secret-sentinel", "header-sentinel");
@@ -97,7 +97,7 @@ class ExecutionConfigurationParserTest
     void explicitCandidateUsesTheSameFreshExecutionDefaultsAsFileBinding()
     {
         LoomspanProperties startupDefaults = new LoomspanProperties();
-        var explicit = ExecutionConfigurationParser.parse(new ExecutionConfiguration("loomspan: {}"),
+        var explicit = ExecutionConfigurationParser.parse("default", new ExecutionConfiguration("loomspan: {}"),
                 new StandardEnvironment(), false).properties();
         assertThat(explicit.getSession().getMaxDepth()).isEqualTo(startupDefaults.getSession().getMaxDepth());
         assertThat(explicit.getSession().getMissionTimeout())
@@ -116,12 +116,12 @@ class ExecutionConfigurationParserTest
     void rejectsProcessSettingsDirectSecretsAndDuplicateKeys()
     {
         StandardEnvironment environment = new StandardEnvironment();
-        assertThatThrownBy(() -> ExecutionConfigurationParser.parse(new ExecutionConfiguration("""
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration("""
                 loomspan:
                   shutdown:
                     timeout: 1s
                 """), environment, false)).hasMessageContaining("loomspan.shutdown");
-        assertThatThrownBy(() -> ExecutionConfigurationParser.parse(new ExecutionConfiguration("""
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration("""
                 loomspan:
                   connections:
                     primary:
@@ -129,7 +129,7 @@ class ExecutionConfigurationParserTest
                       api-key: literal-secret-sentinel
                 """), environment, false)).hasMessageContaining("loomspan.connections.primary.api-key")
                 .hasMessageNotContaining("literal-secret-sentinel");
-        assertThatThrownBy(() -> ExecutionConfigurationParser.parse(new ExecutionConfiguration("""
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration("""
                 loomspan:
                   session:
                     max-depth: 2
@@ -146,21 +146,21 @@ class ExecutionConfigurationParserTest
         var configuration = new ExecutionConfiguration(CANDIDATE);
         var supplied = new java.util.LinkedHashMap<>(Map.of(
                 "provider.key", "host-secret", "tenant.header", "host-header"));
-        var parsed = ExecutionConfigurationParser.parse(configuration, supplied);
+        var parsed = ExecutionConfigurationParser.parse("default", configuration, supplied);
         supplied.put("provider.key", "changed-secret");
         assertThat(parsed.properties().getConnections().get("primary").getApiKey()).isEqualTo("host-secret");
         assertThat(parsed.properties().getConnections().get("primary").getHeaders())
                 .containsEntry("X-Tenant", "host-header");
-        assertThatThrownBy(() -> ExecutionConfigurationParser.parse(configuration,
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", configuration,
                 Map.of("tenant.header", "host-header")))
                 .hasMessageContaining("api-key-ref").hasMessageNotContaining("deployment-secret")
                 .hasMessageNotContaining("host-header");
-        assertThatThrownBy(() -> ExecutionConfigurationParser.parse(configuration,
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", configuration,
                 Map.of("provider.key", "host-secret", "tenant.header", "host-header", "unused", "sentinel")))
                 .hasMessageContaining("unused reference").hasMessageNotContaining("sentinel")
                 .hasMessageNotContaining("host-secret");
         supplied.put("provider.key", " ");
-        assertThatThrownBy(() -> ExecutionConfigurationParser.parse(configuration, supplied))
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", configuration, supplied))
                 .hasMessageContaining("api-key-ref").hasMessageNotContaining("host-header");
     }
 
@@ -178,11 +178,11 @@ class ExecutionConfigurationParserTest
                         location: us-central1
                         credentials-json-ref: vertex.json
                 """;
-        var parsed = ExecutionConfigurationParser.parse(new ExecutionConfiguration(yaml),
+        var parsed = ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(yaml),
                 Map.of("vertex.json", "json-secret-sentinel"));
         assertThat(parsed.properties().getConnections().get("vertex").getGemini().getCredentialsJson())
                 .isEqualTo("json-secret-sentinel");
-        assertThatThrownBy(() -> ExecutionConfigurationParser.parse(new ExecutionConfiguration(
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
                 yaml.replace("credentials-json-ref: vertex.json", "credentials-ref: vertex.uri\n        credentials-json-ref: vertex.json")),
                 new StandardEnvironment(), false))
                 .hasMessageContaining("credentials-json-ref");
