@@ -86,7 +86,7 @@ Framework's `consoleCompatibilityVersion`, the release string derived from Maven
 Missing or unequal resolved release markers reject without inference. Matching
 `development` markers permit normal complete validation but do not promise
 compatibility between development builds. No alternate protocol counter, legacy
-reader or trace migration is provided.
+reader is provided.
 
 A successful download is
 `application/x-ndjson; charset=utf-8`, has the exact cataloged

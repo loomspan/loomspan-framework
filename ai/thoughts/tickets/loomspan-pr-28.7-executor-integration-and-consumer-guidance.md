@@ -18,11 +18,11 @@ Finish the PR 28 series with a coherent working Framework and Console, represent
 
 ## Acceptance criteria
 
-- [ ] Representative HTTP invocation proves the feature can call application/microservice code without consumer migration; the second configuration use case proves no Framework domain interpretation or enforced split between operation/infrastructure data.
-- [ ] Integrated tests demonstrate proxy/security, input/reference, root/child, observation/cancellation/limits, and retained-generation boundaries for both Java forms and executor-specific configuration. Tests use the actual startup ingestion and standard tool-manager paths where those boundaries matter.
-- [ ] The three failure routes, failed-result exclusion, budget/deadline continuity, canonical identity/classification, and current Console provenance work together with no recovery extension or automatic retry.
-- [ ] Consumer docs, samples, allowlists, fixtures, and repository guidance describe only the final supported contract; REST skill API/kind/manifest/runtime and old Java error-text behavior are gone. No compatibility shims or temporary duplicate subsystems remain. `CapabilityKind` assessment/removal evidence is present.
-- [ ] All affected builds and required checks pass, or a genuine external verification blocker is explicitly reported without declaring the feature complete. Production contract defects are fixed within the accepted architecture.
+- [x] Representative HTTP invocation proves the feature can call application/microservice code without consumer migration; the second configuration use case proves no Framework domain interpretation or enforced split between operation/infrastructure data.
+- [x] Integrated tests demonstrate proxy/security, input/reference, root/child, observation/cancellation/limits, and retained-generation boundaries for both Java forms and executor-specific configuration. Tests use the actual startup ingestion and standard tool-manager paths where those boundaries matter.
+- [x] The three failure routes, failed-result exclusion, budget/deadline continuity, canonical identity/classification, and current Console provenance work together with no recovery extension or automatic retry.
+- [x] Consumer docs, samples, allowlists, fixtures, and repository guidance describe only the final supported contract; REST skill API/kind/manifest/runtime and old Java error-text behavior are gone. No compatibility shims or temporary duplicate subsystems remain. `CapabilityKind` assessment/removal evidence is present.
+- [x] All affected builds and required checks pass, or a genuine external verification blocker is explicitly reported without declaring the feature complete. Production contract defects are fixed within the accepted architecture.
 
 ## Context and sequencing
 
@@ -54,3 +54,7 @@ Each implementation ticket owns its focused tests and directly affected guidance
 
 - Framework and Sidecar have no customers/deployments. Breaking changes and intermediate broken builds were authorized throughout PR 28; this final ticket must restore coherent working builds and finish the accepted feature. Do not add adapters or retain obsolete APIs to accomplish that.
 - Sidecar's HTTP executor reimplementation and Planner Failure Recovery are separate efforts. Their absence is not a blocker and their implementation is not authorized here. Preserve content fidelity and the existing derived-journal/observer redaction exception without broadening it.
+
+## Execution evidence
+
+Full pipeline approved on 2026-11-01. Step 4 implementation and verification are recorded in [the implementation plan](../plans/2026-11-01-pr-28.7-executor-integration-and-consumer-guidance.md), including architecture/removal audit and acceptance mapping. Required Framework/Console checks and the exact separate consumer quickstart passed; overall pipeline completion awaits fresh Step 5 independent review. No production contract change or compatibility shim was needed.

@@ -153,7 +153,7 @@ mutable Java state and resource consumption need host/application controls.
 There is no prescribed publisher role, namespace membership, reserved shared
 namespace or app/environment mapping. Cloud hosts Framework directly; sidecar
 hosting examples are optional and select neither a dependency nor Cloud auth.
-External migration gates, drainage, version admission and repository integration
+Drainage, version admission and repository integration
 remain host work. Public call visibility grants neither configuration nor
 observation access. See [observation](observation-and-errors.md#captured-namespace-identity)
 for entry-versus-target generation facts.
@@ -170,6 +170,31 @@ a registration prevents future selection without waiting for an already selected
 callback. There is no replay, ordering, retry or durable delivery guarantee;
 notifications during shutdown may be omitted. Never-published candidates get no
 retirement callback. There is no historical invocation API.
+
+### Executor-owned application resources
+
+An executor bean or a collaborating application resource manager MAY inject
+`SkillReloader` and register this existing listener early, before staging the
+initial resources. Match callback IDs against the
+`SkillExecutorInvocation.executorConfigGenerationId()` used to select those
+resources. This is the captured executor namespace generation ID even when the
+annotation has no configuration path; it can differ from the YAML skill's or
+entry generation. Retained invocations keep that executor generation alive
+across replacement and removal.
+
+The ID is a useful application key, not a promise that Loomspan creates,
+refreshes, caches or closes pools, clients or other application resources. The
+application must coordinate resource creation and retirement itself; a listener
+registered after retirement has no replay. Keep the registration handle for the
+application lifetime, use thread-safe bookkeeping, and dispatch slow cleanup
+off the callback thread. Application beans also own shutdown cleanup because
+shutdown notifications may be omitted. Do not rely on callback ordering,
+delivery retries or IDs surviving a process restart.
+
+The executor quickstart (`docs/quickstart-executors.md` in the matching framework checkout) demonstrates
+ordinary Spring-owned HTTP resource cleanup without a generation-specific cache.
+`ExecutorGenerationExecutionIntegrationTest` covers captured executor IDs,
+retained work, retirement notifications and preserved bean ownership.
 
 ## Evidence
 

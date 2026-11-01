@@ -90,6 +90,9 @@ String triage = skills.invoke("default-triageSupportRequest", Map.of("customerMe
 This illustrates the declaration and call; the `assistant` model alias still
 needs configuration. The [complete Java quickstart](docs/quickstart-java.md)
 provides the dependency, configuration, file locations, and runnable application.
+For application-owned HTTP and SQL-shaped execution without a model provider,
+run the [executor quickstart](docs/quickstart-executors.md). Resource creation and
+cleanup remain application-owned; see [executor resource retirement](agent-skills/loomspan-docs/references/java-api/skill-reload.md#executor-owned-application-resources).
 The brief gives an engineer a starting point: reported payment/order mismatches,
 a possible connection to the deployment, and checks needed to establish the cause.
 To investigate beyond the supplied message, expose order lookups or deployment
@@ -298,7 +301,7 @@ cycle validation and recursion limits still apply. There is no atomic multi-name
 bootstrap. Removal or Public-to-Private replacement affects fresh admission while
 already admitted work retains its captured view. Dependent publications are not
 removed automatically, and withdrawal does not drain work. Hosts own management
-authorization, entry routing, readiness, external migration gates, drainage,
+authorization, entry routing, readiness, drainage,
 version admission and repository integration. Loomspan prescribes no publisher
 role, namespace membership, reserved shared name, or app/environment mapping.
 
@@ -327,7 +330,7 @@ for `consoleCompatibilityVersion`, derived from Maven `${project.version}` throu
 filtered `META-INF/loomspan-release.properties`. A different release is rejected.
 Matching `development` markers permit normal validation but promise no compatibility
 between development builds. There are no legacy readers, alternate protocol counters,
-trace migrations or historical readability guarantee.
+or historical readability guarantee.
 
 ## Choose your integration
 
@@ -357,9 +360,9 @@ confidence do not establish judgment correctness or live parity between routes.
 Model-backed skills need a named connection using the OpenAI, Anthropic, Gemini,
 or Ollama driver. Native TypeSafe leaves require the `typesafe` driver. Java leaves can execute without a framework model call.
 
-Loomspan is **in beta**. Supported Java APIs and documented configuration can
-change between betas, including breaking changes. Pin an exact version and review
-[upgrade guidance](docs/upgrades.md). The first production release will be `1.0.0`.
+Loomspan is **in development**, with no deployments. Supported Java APIs and
+documented configuration can change, including breaking changes. Use documentation
+from the same revision as the runtime. The first production release will be `1.0.0`.
 
 ## Explore further
 
@@ -368,6 +371,7 @@ change between betas, including breaking changes. Pin an exact version and revie
 | Understand the architecture and adoption tradeoffs | [Architecture](docs/architecture.md) |
 | Set up a runtime and your assistant | [Setup](docs/setup.md) |
 | Run your first embedded skill | [Java quickstart](docs/quickstart-java.md) |
+| Run application-owned executors without a model provider | [Executor quickstart](docs/quickstart-executors.md) |
 | Connect Console for AI-assisted debugging | [Console setup](docs/console-setup.md) |
 | Design, develop, and troubleshoot application skills | [Skill-authoring knowledge set](agent-skills/loomspan-docs/references/skill-authoring/README.md) |
 | Integrate invocation, validation, and runtime updates | [Java API knowledge set](agent-skills/loomspan-docs/references/java-api/README.md) |

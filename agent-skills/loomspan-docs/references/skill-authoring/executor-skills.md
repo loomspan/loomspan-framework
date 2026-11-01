@@ -70,6 +70,18 @@ Evidence: `DefaultRegisteredSkillCatalogTest`, `ExecutorGenerationExecutionTest`
 
 ## Evidence and next topics
 
+Run the complete HTTP/SQL-shaped executor application (`docs/quickstart-executors.md` in the matching framework checkout)
+without a model provider or database. `ExecutorApplicationIntegrationTest`
+exercises actual startup ingestion, root and standard-tool child HTTP calls,
+default `ref://` resolution to a Resource leaf, and invocation-only SQL-shaped
+domain checks. A Resource handle preserves access to its underlying content;
+it does not copy or freeze those bytes.
+
+For generation-keyed pools or clients, follow the existing public
+[retirement listener guidance](../java-api/skill-reload.md#executor-owned-application-resources).
+The executor generation ID is supplied even with no configuration path; resource
+creation, reuse, retirement and shutdown remain application responsibilities.
+
 - `ExecutorDeclarationTests`, `YamlSkillCatalogTests`, `YamlSkillDefinitionTest` and `TypeSafeDeclarationTests`: explicit forms, presence checks, ordinary input schemas and immutable copies.
 - `ExecutorConfigurationTests`, `ExecutionConfigurationParserTest` and `ExecutorConfigurationStartupTests`: namespace structure, target enforcement, complete replacement, real Config Data loading, exact values and ordinary Spring behavior.
 - `ExecutorDependencyResolutionTest`: local/qualified roles, visibility, exact paths/maps, executor-only startup, retained binding, distinguishable captured executor policies, target-base publication and root-reachable capture.

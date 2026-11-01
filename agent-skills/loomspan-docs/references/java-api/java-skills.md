@@ -92,6 +92,15 @@ Framework supplies validated, reference-resolved input; the executing YAML skill
 
 Its public constructor requires every component to be non-null and both metadata strings to be nonblank; valid strings retain their exact text. All three maps are defensively copied recursively into unmodifiable map/list containers, preserving nulls. Other leaves retain identity, including Spring `Resource` handles, arrays and arbitrary application objects. This does not freeze those objects or copy/freeze resource bytes. There is no builder, authentication field, context bag or internal runtime value in the record.
 
+## Runnable example and resource ownership
+
+For a complete application-owned HTTP executor and SQL-shaped example, run the
+executor quickstart (`docs/quickstart-executors.md` in the matching framework checkout). Both configuration
+maps remain general application data. For generation-keyed application resources,
+see [resource ownership and retirement](skill-reload.md#executor-owned-application-resources).
+`ExecutorApplicationIntegrationTest` verifies HTTP root/standard-child execution,
+real `ref://` Resource resolution and invocation-only domain checks.
+
 ## Designated Java failures
 
 `RecoverableSkillException extends SkillException` has exactly two constructors:

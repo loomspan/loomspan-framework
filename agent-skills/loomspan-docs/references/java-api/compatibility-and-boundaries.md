@@ -44,48 +44,24 @@ Changes to these types are compatibility-sensitive. Application code SHOULD
 still use the narrowest type needed: inject or mock `SkillTemplate`, use the
 annotations on application-owned beans, and consume the public value records.
 
-## Compatibility Changes in This Revision
+## Current contracts
 
-`SkillExecutor`, `SkillExecutorInvocation` and `RecoverableSkillException` are deliberate additive API types. Java successful results now preserve non-null Strings exactly, use empty text for null/void, and JSON-serialize other values. Java method and serialization failures propagate; exception-to-successful-text conversion is removed. Update callers that decoded JSON-quoted Java Strings or relied on successful error text. This intentional pre-1.0 behavior change has no compatibility mode. See [Java declarations](java-skills.md) for the exact contract and executor delivery boundary.
+Loomspan is in development with no deployments. This reference describes the
+supported surface in the bundled revision.
 
-`SkillKind.TYPESAFE` adds native evaluation identity. Applications with exhaustive
-enum switches must handle the new value. The `SkillTemplate` String return type
-and five-component descriptor remain unchanged; no typed evaluation facade
-or additional SPI is introduced. See [TypeSafe authoring](../skill-authoring/typesafe-skills.md).
-
-`NamespaceVisibility` and namespace-first complete `SkillReloader` validation/preparation replace all incomplete/default-only overloads. Configuration is required; omitted scalars use built-in defaults, with no active/startup inheritance. Removal requires namespace and expected active ID. These are intentional pre-1.0 source/binary/behavior changes without shims. See [namespace publication](skill-reload.md).
-
-`SkillValidationResult` now has two record components, `issues` and `skills`.
-Direct constructors and record-pattern users must adopt the two-component shape
-and recompile; the former one-argument constructor is removed. The new
-`ValidatedSkill` record supplies immutable candidate name/kind metadata. See
-[two-stage skill updates](skill-reload.md) for the valid-first contract.
-
-Applications use annotated `@SkillExecutor` methods and executor YAML leaves for application-owned operations. These are intentional pre-1.0 source, binary and behavior changes without compatibility shims. Executor-backed YAML skills classify as `SkillKind.JAVA`; their YAML definitions remain available. See [executor leaves](../skill-authoring/executor-skills.md).
-
-`SkillCatalog.generationId()` identifies its process-local immutable namespace generation. Executor invocations receive the captured executor namespace generation ID separately from the executing YAML skill identity. See [two-stage skill updates](skill-reload.md).
-
-The handoff facade and handle are additive and leave every `SkillTemplate`
-signature unchanged. The three catalog types are additive. The two `SkillTemplate.validate`
-methods are an intentional pre-1.0 source- and binary-sensitive interface
-change: application implementations and hand-written fakes or mocks of
-`SkillTemplate` MUST add both methods and recompile. There is no default-method
-compatibility shim.
-
-`AdmittedSkillInvocation` now requires the abstract `String generationId()` method. Handwritten implementations and fakes must supply the captured process-local ID and recompile; there is no default method or fabricated fallback. Reading the ID does not retain admission ownership or guarantee an application-owned durable snapshot mapping.
-
-Observers passed to `SkillTemplate.invoke` now receive a callback for mappable
-post-session failures as well as successes. Applications upgrading from the
-earlier success-only behavior SHOULD make observer handling idempotent and
-MUST apply the same security and retention policy to both outcomes. There is no
-success-only compatibility mode.
-
-`SkillDescriptor` now has five components: `name`, `description`, `kind`,
-`inputSchema`, and nullable String `outputSchema`. Direct constructors and
-record-pattern users MUST adopt the five-component shape and rebuild. There is
-no four-argument compatibility constructor. Equality, `toString()` and serialized
-record shape include output metadata. This extends the existing supported type;
-no additional application API or SPI is introduced. See [catalog metadata](catalog-and-validation.md).
+- [Java declarations](java-skills.md) define callable methods, reference-only
+  executors, exact String/null/JSON results and designated failures.
+- [TypeSafe authoring](../skill-authoring/typesafe-skills.md) describes native
+  evaluation leaves, classified as `SkillKind.TYPESAFE`.
+- [Namespace publication](skill-reload.md) defines complete candidates, explicit
+  visibility, configuration defaults, captured generation IDs and retirement.
+- [Catalog and validation](catalog-and-validation.md) defines candidate metadata,
+  validation results and skill descriptors.
+- [Invocation and handoff](invocation.md) describes the supported facade and
+  admission ownership.
+- [Observations and failures](observation-and-errors.md) covers completed views
+  for successes and mappable post-session failures. Apply the same access and
+  retention controls to both outcomes.
 
 ## Unsupported Dependencies
 

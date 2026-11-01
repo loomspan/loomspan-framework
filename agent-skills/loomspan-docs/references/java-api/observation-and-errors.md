@@ -63,11 +63,16 @@ trace imports. `consoleCompatibilityVersion` comes from filtered
 `META-INF/loomspan-release.properties` using Maven `${project.version}`. A missing
 or different resolved release rejects. Matching `development` allows ordinary
 complete validation but promises no compatibility between development builds.
-There is no legacy reader, alternate counter, trace migration or historical
+There is no legacy reader, alternate counter or historical
 readability promise. See [HTTP diagnostics](../skill-authoring/observability-http.md)
 and [trace interpretation](../skill-authoring/traces-and-debugging.md).
 
 ## Execution Events
+
+The executor configuration-owner ID is present even without an annotation config
+path. It may key application-owned resources through the existing
+[retirement listener](skill-reload.md#executor-owned-application-resources), but
+neither an observation nor that ID promises resource management by Loomspan.
 
 `SkillExecutionEvent` is a current-version diagnostic value with:
 

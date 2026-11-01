@@ -41,7 +41,7 @@ A complete raw trace may be saved and opened by Console when its framework-owned
 `TRACE_STARTED.metadata.consoleCompatibilityVersion` exactly matches Console.
 The marker is the exact release string from Maven `${project.version}` through
 filtered `META-INF/loomspan-release.properties`, without an independent protocol
-counter. A different resolved release is rejected without fallback or migration.
+counter. A different resolved release is rejected without fallback.
 Matching `development` values permit normal complete validation; they do not
 promise compatibility after canonical trace changes. Imported evidence is a
 transient process-local copy and is not adopted after restart. The marker is a

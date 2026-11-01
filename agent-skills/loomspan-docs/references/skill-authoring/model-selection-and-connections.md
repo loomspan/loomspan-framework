@@ -62,7 +62,7 @@ Static `headers` are accepted by OpenAI, Anthropic, and TypeSafe. TypeSafe rejec
 
 The OpenAI and Anthropic drivers use Spring AI 2's official SDK-backed clients. A configured `base-url` is the SDK service root, not a completion-path override. OpenAI appends `/chat/completions`, so a compatible service that uses the conventional versioned route should provide a root ending in `/v1`. Anthropic appends `/v1/messages` and supplies its required version header through the official client. Put supported Anthropic beta values and other custom headers in the common `headers` map. Compatibility is a service contract, not inferred by Loomspan. The Ollama driver uses the native `/api/chat` protocol.
 
-The removed OpenAI completion-path override and Anthropic completion-path/version/beta fields have no aliases or fallback behavior and fail strict startup binding. Move any supported Anthropic beta/custom values to `headers`; choose a complete compatible `base-url` instead of overriding a completion path.
+Configure supported Anthropic beta/custom values in `headers` and choose a complete compatible `base-url`. Completion-path overrides and separate Anthropic version/beta fields are unsupported and fail strict startup binding.
 
 OpenRouter error-completion handling is enabled only by `openai.compatibility-profile: openrouter`; Loomspan does not infer it from a connection name or URL. This profile rejects `finish_reason: error` responses, including any partial assistant content, and preserves bounded provider diagnostics for tracing. The 1 MiB provider-error diagnostic capture limit bounds retained failure evidence, with explicit `truncated` and `captureLimitBytes` metadata; it does not limit successful response size. The profile inspects the complete response for embedded errors and preserves successful answer content, tool arguments, and response metadata. Parsing, provider/model constraints, and existing timeout/cancellation behavior still apply.
 
@@ -90,7 +90,7 @@ For chat drivers, `loomspan.connections.<name>.request-timeout` MAY bound one ph
 | Ollama | Existing transport unchanged | Rejected as unsupported |
 | TypeSafe (both account routes) | Apache defaults | Response/socket inactivity timeout; no added elapsed whole-call deadline |
 
-An authored value MUST be an exact whole-millisecond duration from `1ms` through `2147483647ms` inclusive (24 days, 20 hours, 31 minutes, 23.647 seconds). Spring duration units and exact ISO-8601 syntax are accepted. Zero, negatives, malformed text, sub-millisecond or fractional-millisecond durations, and larger values fail safely with the full property path; values are never clamped or converted to unlimited. Existing configurations need no migration.
+An authored value MUST be an exact whole-millisecond duration from `1ms` through `2147483647ms` inclusive (24 days, 20 hours, 31 minutes, 23.647 seconds). Spring duration units and exact ISO-8601 syntax are accepted. Zero, negatives, malformed text, sub-millisecond or fractional-millisecond durations, and larger values fail safely with the full property path; values are never clamped or converted to unlimited.
 
 Partial startup fragment; supply model aliases and skills separately:
 
@@ -119,11 +119,11 @@ The following thinking rules apply to chat models.
 
 A model alias MAY declare `thinking-levels`. A skill's `thinking_level` MUST be one of those configured values. If the alias has no configured levels, the skill MUST omit `thinking_level`. Thinking options are adapted to the selected driver at request time; the connection remains reusable across model aliases.
 
-## Migration and diagnosis
+## Configuration and diagnosis
 
 1. Create a named entry under `loomspan.connections` for each endpoint/account.
-2. Move base URLs, credentials, headers, and provider-specific protocol settings from `spring.ai.*` into that connection.
-3. Replace each `loomspan.models.<name>.provider` with `connection` and keep `provider-model`.
+2. Set base URLs, credentials, headers, and provider-specific protocol settings on that connection.
+3. Set each `loomspan.models.<name>.connection` to the named connection and `provider-model` to the provider model ID.
 4. If two aliases use different endpoints or accounts for the same driver, point them at different named connections.
 
 Startup errors include the complete property path for missing, unknown, or driver-inapplicable settings. Runtime resolution errors identify the skill, framework model, connection, driver, and provider model. Start diagnosis at the named connection, then verify its driver-specific requirements and the alias reference.

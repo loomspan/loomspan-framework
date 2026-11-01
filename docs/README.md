@@ -31,8 +31,8 @@ perform. The developer can complete those steps using the same documents.
 | Understand the design, responsibilities, and tradeoffs | [Architecture](architecture.md) |
 | Choose embedded Java or Sidecar and install assistant guidance | [Setup](setup.md) |
 | Run a complete embedded Java example | [Java quickstart](quickstart-java.md) |
+| Run application-owned HTTP and SQL-shaped executors without a provider | [Executor quickstart](quickstart-executors.md) |
 | Enable observability and connect Console MCP | [Console setup](console-setup.md) |
-| Plan a version change | [Upgrades](upgrades.md) |
 
 ## Ongoing application development
 
@@ -55,7 +55,7 @@ current development revision, not every published version.
 ## Documentation placement
 
 Docs explain the system and the choices around it. Skills guide ongoing work and
-carry the task-specific knowledge required to perform it. Installation and upgrade
+carry the task-specific knowledge required to perform it. Installation
 workflows may use skills while their background and decisions live here. Each
 contract should have one authoritative home; link to it rather than copy it.
 
