@@ -3,7 +3,7 @@ import { sessionReducer } from "./sessionReducer";
 
 const bootstrap = {
   processId: "process",
-  consoleVersion: "1.0.0-beta.9",
+  consoleVersion: "1.0.0-beta.10-SNAPSHOT",
   workspacePath: "workspace",
   tabId: "tab",
   csrfToken: "csrf",

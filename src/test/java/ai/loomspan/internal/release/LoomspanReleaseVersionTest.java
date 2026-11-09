@@ -9,6 +9,6 @@ class LoomspanReleaseVersionTest
     @Test
     void loadsCompleteFilteredMavenReleaseIncludingQualifier()
     {
-        assertThat(LoomspanReleaseVersion.load()).isEqualTo("1.0.0-beta.9");
+        assertThat(LoomspanReleaseVersion.load()).isEqualTo("1.0.0-beta.10-SNAPSHOT");
     }
 }

@@ -7,7 +7,7 @@ server, reusable HTTP client, timeouts and cleanup. Loomspan supplies declaratio
 binding, validated input and captured configuration; it supplies no HTTP or SQL
 implementation.
 
-This example matches `1.0.0-beta.9`. First install the matching framework
+This example matches `1.0.0-beta.10-SNAPSHOT`. First install the matching framework
 checkout with `./mvnw -DskipTests install` (`./mvnw.cmd` on Windows). This snapshot
 coordinate does not imply Maven Central availability. For a published version,
 use its exact dependency and matching documentation tag.
@@ -35,7 +35,7 @@ Create a separate application directory and these files.
     <dependency>
       <groupId>ai.loomspan</groupId>
       <artifactId>loomspan-spring-boot-starter</artifactId>
-      <version>1.0.0-beta.9</version>
+      <version>1.0.0-beta.10-SNAPSHOT</version>
     </dependency>
   </dependencies>
   <build><plugins><plugin>

@@ -84,7 +84,7 @@ type fixtureActivePrefix struct {
 	Branches []activeBranch `json:"branches"`
 }
 
-const fixtureCompatibilityVersion = "1.0.0-beta.9"
+const fixtureCompatibilityVersion = "1.0.0-beta.10-SNAPSHOT"
 
 func TestNativeEvaluationFixturePreservesRequestAndChunkedEnvelopeEvidence(t *testing.T) {
 	traceBytes, err := os.ReadFile(filepath.Join(fixtureRoot(t), "traces", "native-evaluation-success.ndjson"))
