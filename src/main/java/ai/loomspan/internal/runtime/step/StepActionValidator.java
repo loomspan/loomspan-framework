@@ -47,14 +47,19 @@ final class StepActionValidator
 
         if (action.stepAction() == null)
         {
-            return StepValidationResult.rejected("Step action type is null. Expected FINAL_RESPONSE.");
+            return StepValidationResult.rejected("Step action type is null. Expected FINAL_RESPONSE or CANNOT_COMPLETE.");
         }
         if (action.stepAction() == StepActionType.CALL_TOOL)
         {
             return StepValidationResult.rejected(
-                    "All required plan tasks are already completed. Return FINAL_RESPONSE instead of CALL_TOOL.");
+                    "All required plan tasks are already completed. Return FINAL_RESPONSE or CANNOT_COMPLETE.");
         }
-        return validateFinalResponse(action, plan);
+        if (action.stepAction() == StepActionType.FINAL_RESPONSE
+                && (action.finalResponse() == null || action.finalResponse().isNull()))
+        {
+            return StepValidationResult.rejected("FINAL_RESPONSE action requires a non-empty finalResponse.");
+        }
+        return validateCompletedTasks(plan);
     }
 
     static StepValidationResult validateAssigned(StepAction action,
@@ -72,18 +77,19 @@ final class StepActionValidator
         }
         if (action.stepAction() == null)
         {
-            return StepValidationResult.rejected("Step action type is null. Expected CALL_TOOL.");
+            return StepValidationResult.rejected("Step action type is null. Expected CALL_TOOL or CANNOT_COMPLETE.");
         }
         if (action.stepAction() == StepActionType.FINAL_RESPONSE)
         {
             return StepValidationResult.rejected(
-                    "Task '%s' is assigned to this worker. Return CALL_TOOL for that task; final synthesis occurs only after the coordinator joins all tasks."
+                    "Task '%s' is assigned to this worker. Return CALL_TOOL for that task or CANNOT_COMPLETE with only a reason. Final synthesis occurs only after the coordinator joins all tasks."
                             .formatted(assignedTaskId));
         }
-        if (action.taskId() == null || action.taskId().isBlank() || !assignedTaskId.equals(action.taskId()))
+        if (action.stepAction() == StepActionType.CALL_TOOL
+                && (action.taskId() == null || action.taskId().isBlank() || !assignedTaskId.equals(action.taskId())))
         {
             return StepValidationResult.rejected(
-                    "This worker is assigned task '%s'. Return CALL_TOOL with exactly that taskId."
+                    "This worker is assigned task '%s'. Return CALL_TOOL with exactly that taskId or CANNOT_COMPLETE with only a reason."
                             .formatted(assignedTaskId));
         }
 
@@ -94,7 +100,9 @@ final class StepActionValidator
             return StepValidationResult.rejected(
                     "Assigned task '%s' is not IN_PROGRESS (status=%s).".formatted(assignedTaskId, status));
         }
-        return validateToolBindingAndArguments(action, currentTask.get(), visibleTools);
+        return action.stepAction() == StepActionType.CANNOT_COMPLETE
+                ? StepValidationResult.ok()
+                : validateToolBindingAndArguments(action, currentTask.get(), visibleTools);
     }
 
     private static StepValidationResult validateToolBindingAndArguments(
@@ -229,13 +237,8 @@ final class StepActionValidator
         return parent == null || parent.isBlank() ? child : parent + "." + child;
     }
 
-    private static StepValidationResult validateFinalResponse(StepAction action, ExecutionPlan plan)
+    private static StepValidationResult validateCompletedTasks(ExecutionPlan plan)
     {
-        if (action.finalResponse() == null || action.finalResponse().isNull())
-        {
-            return StepValidationResult.rejected("FINAL_RESPONSE action requires a non-empty finalResponse.");
-        }
-
         List<PlanTask> incompleteTasks = plan.tasks().stream()
                 .filter(task -> task.status() != PlanTaskStatus.COMPLETED)
                 .toList();

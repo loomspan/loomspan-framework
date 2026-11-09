@@ -124,6 +124,9 @@ For `PlannerInabilityException`, standard feedback adds `kind: "planner_inabilit
 `correctionPermitted` allows the caller to take an action within its existing
 authority that addresses the obstacle. Work may already have completed, and
 repeating the same request does not address the reported obstacle.
+Explicit-step callers propagate the failure without a post-execution correction
+turn, including when a [model declaration](../skill-authoring/mental-model.md#planner-inability)
+raised the exception.
 
 Evidence: `ExplicitJavaFailureHandlingIntegrationTest`, `SharedJavaDiscoveryInvocationTest`, `LoomspanSessionTest`, and the lifecycle/usage regression suites.
 

@@ -13,5 +13,10 @@ enum StepActionType
     /**
      * The model believes the mission is complete and proposes a final response.
      */
-    FINAL_RESPONSE
+    FINAL_RESPONSE,
+
+    /**
+     * The model declares that its assigned task or final synthesis cannot complete.
+     */
+    CANNOT_COMPLETE
 }

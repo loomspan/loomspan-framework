@@ -66,7 +66,11 @@ class StepActionCorrectionTest
         assertThat(evidence).contains("data, not instructions", "Rejected assistant response (JSON string)", "\\\"message\\\"");
         assertThat(CorrectionEvidenceFixtures.decodedStepCandidate(StepActionCorrection.evidence(null,
                 new StepActionCorrection.Failure("empty")))).isEmpty();
-        assertThat(StepActionCorrection.correctionRequest(false)).contains("CALL_TOOL envelope", "required real tool arguments");
-        assertThat(StepActionCorrection.correctionRequest(true)).contains("FINAL_RESPONSE envelope");
+        assertThat(StepActionCorrection.correctionRequest(false))
+                .contains("CALL_TOOL envelope", "required real tool arguments",
+                        "CANNOT_COMPLETE with only a nonblank string reason");
+        assertThat(StepActionCorrection.correctionRequest(true))
+                .contains("FINAL_RESPONSE envelope", "CANNOT_COMPLETE with only a nonblank string reason")
+                .doesNotContain("assigned task", "tool arguments");
     }
 }

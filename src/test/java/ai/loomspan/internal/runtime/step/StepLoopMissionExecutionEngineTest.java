@@ -9,6 +9,8 @@ import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanStackOverflowException;
 import ai.loomspan.internal.core.CapabilityExecutionRouter;
 import ai.loomspan.api.SkillKind;
+import ai.loomspan.api.PlannerInabilityException;
+import ai.loomspan.api.RecoverableSkillException;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.internal.core.CapabilityToolDescriptor;
 import ai.loomspan.internal.core.ExecutionPlan;
@@ -85,7 +87,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -847,6 +851,186 @@ class StepLoopMissionExecutionEngineTest {
     }
 
     @Test
+    void assignedInabilityStopsBeforeInvokingOrAdmittingLaterTasks() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var plan = twoTaskPlan();
+        var session = TestLoomspanSessions.withId("assigned-inability", "default-entry", 3);
+        String response = "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"  Required input is unavailable.  \"}";
+        var model = new SequenceChatClient(response, response);
+        var calls = new AtomicInteger();
+        var capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
+                (arguments, taskId, sources) -> { calls.incrementAndGet(); return "unexpected"; });
+
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor),
+                    session, definition(), model, List.of(capability, tool("default-expenseLookup", "unused"))))
+                    .isInstanceOf(PlannerInabilityException.class)
+                    .hasMessage("  Required input is unavailable.  ");
+        }
+
+        assertThat(calls).hasValue(0);
+        assertThat(model.systemMessagesSeen()).hasSize(1);
+        assertThat(session.getExecutionPlanSnapshot().tasks()).extracting(PlanTask::status)
+                .containsExactly(PlanTaskStatus.FAILED, PlanTaskStatus.PENDING);
+        assertThat(readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.STEP_STARTED))
+                .singleElement().satisfies(record -> assertThat(record.metadata()).containsEntry("assignedTaskId", "t-1"));
+        TraceRecord failure = assertStepInabilityTrace(readRecords(session), response, "  Required input is unavailable.  ", 1);
+        assertThat(failure.data().path("assignedTaskId").asString()).isEqualTo("t-1");
+        assertThat(failure.data().path("capabilityName").asString()).isEqualTo("default-invoiceParser");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void malformedInabilityUsesOnlyExistingActionCorrection(boolean synthesis) {
+        String reason = " \tA missing result.\r\n雪 ";
+        String corrected = " \r\n" + "```" + "json\r\n"
+                + inabilityAction(reason) + "\r\n" + "```" + "\r\n ";
+        for (String rejected : List.of(
+                "{\"stepAction\":\"CANNOT_COMPLETE\"}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":null}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":5}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":{}}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\" \\t\\n\"}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"why\",\"taskId\":null}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"why\",\"toolName\":null}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"why\",\"toolArguments\":null}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"why\",\"finalResponse\":null}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"why\",\"extra\":null}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"first\",\"reason\":\"second\"}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"success\"}",
+                "{\"stepAction\":\" CANNOT_COMPLETE \",\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"success\"}",
+                "{\"stepAction\":2,\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"success\"}",
+                "{\"stepAction\":\"2\",\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"success\"}",
+                "{\"stepAction\":\"cannot_complete\",\"reason\":\"why\"}",
+                "{\"stepAction\":\" CANNOT_COMPLETE \",\"reason\":\"why\"}",
+                "{\"stepAction\":2,\"reason\":\"why\"}",
+                "[{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"why\"}]",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"why\"} {}",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"why\"")) {
+            for (boolean correct : List.of(false, true)) {
+                var state = new DefaultExecutionStateService(FIXED_CLOCK);
+                var plan = synthesis ? singleTaskPlan().updateTask("t-1", task -> task.complete("prior")) : singleTaskPlan();
+                var session = TestLoomspanSessions.create(3, "default-rootVisibleSkill");
+                var model = new SequenceChatClient(rejected, correct ? corrected : rejected);
+                var calls = new AtomicInteger();
+                var capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
+                        (arguments, taskId, sources) -> { calls.incrementAndGet(); return "unexpected"; });
+                try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                    var failure = assertThatThrownBy(() -> executeMission(
+                            engine(state, new InitializingPlanningService(state, plan), executor),
+                            session, definition(), model, List.of(capability)));
+                    if (correct) failure.isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(reason);
+                    else failure.isExactlyInstanceOf(IllegalStateException.class).hasMessageContaining("after 2 attempts");
+                }
+                assertThat(calls).hasValue(0);
+                assertThat(model.systemMessagesSeen()).hasSize(2);
+                assertThat(model.systemMessagesSeen().getLast()).contains("YOUR PREVIOUS ACTION WAS INVALID",
+                        synthesis ? "FINAL_RESPONSE envelope" : "CALL_TOOL envelope", "CANNOT_COMPLETE");
+                assertThat(CorrectionEvidenceFixtures.decodedStepCandidate(model.userMessagesSeen().getLast()))
+                        .isEqualTo(rejected);
+                var records = readRecords(session);
+                assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.STEP_ACTION_REJECTED)
+                        .hasSize(correct ? 1 : 2);
+                assertThat(records).noneMatch(record -> record.recordType() == TraceRecordType.STEP_COMPLETED);
+                if (correct) assertStepInabilityTrace(records, corrected, reason, 1);
+                else assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
+                        .singleElement().satisfies(failure -> {
+                            assertThat(failure.data().path("classification").asString()).isEqualTo("TERMINAL");
+                            assertThat(failure.data().has("kind")).isFalse();
+                            assertThat(failure.data().path("diagnostics")).hasSize(1);
+                        });
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void ordinaryActionsKeepToleratingUnrelatedReasonProperties(boolean bare) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var session = TestLoomspanSessions.create(3, "default-rootVisibleSkill");
+        var model = new SequenceChatClient(
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"reason\":{\"other\":7}}",
+                bare ? "{\"reason\":{\"other\":7}}"
+                        : "{\"stepAction\":\"FINAL_RESPONSE\",\"reason\":{\"other\":7},\"finalResponse\":\"done\"}");
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
+                    session, definition(), model, List.of(tool("default-invoiceParser", "success"))))
+                    .isEqualTo(bare ? "{\"reason\":{\"other\":7}}" : "done");
+        }
+        assertThat(model.systemMessagesSeen()).hasSize(2);
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.ERROR_RECORDED);
+    }
+
+    @Test
+    void synthesisInabilityPreservesCompletedWorkAndBypassesOutputAcceptance() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var manifest = outputBindingDefinition(2, false).manifest();
+        var scalar = new YamlSkillManifest.OutputSchemaManifest(); scalar.setType("string");
+        manifest.getOutputSchema().setProperties(Map.of("report", scalar, "summary", scalar));
+        manifest.getOutputSchema().setRequired(List.of("report", "summary"));
+        var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern(".*GOOD.*");
+        var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(1); linter.setRegex(regex);
+        manifest.setLinter(linter);
+        var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]),
+                manifest, EXECUTION_CONFIGURATION,
+                ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(Map.of("report", "default-invoiceParser")));
+        var session = TestLoomspanSessions.create(3, "default-rootVisibleSkill");
+        var binding = TestExecutionBindings.missionBinding(session);
+        String reason = "The source does not support the requested summary.";
+        String response = inabilityAction(reason);
+        var model = new SequenceChatClient(response);
+        var calls = new AtomicInteger();
+        var producer = new BoundCapability(directTool("default-invoiceParser", "unused").metadata(), List.of(),
+                (arguments, taskId, sources) -> { calls.incrementAndGet(); return "retained"; });
+
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor, definition);
+            assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding,
+                    () -> executeMission(engine, session, definition, model, List.of(producer))))
+                    .isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(reason);
+        }
+
+        assertThat(calls).hasValue(1);
+        assertThat(model.systemMessagesSeen()).singleElement().satisfies(prompt -> assertThat(prompt).contains(
+                "retained", "CANNOT_COMPLETE",
+                "For FINAL_RESPONSE, apply these output binding rules inside finalResponse.\n"
+                        + "Framework supplies these output destinations"));
+        assertThat(binding.requireMission().completedTaskResults()).containsExactly(
+                new MissionContext.CompletedTaskResult("t-1", "default-invoiceParser", "retained"));
+        var records = readRecords(session);
+        assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.STEP_STARTED).hasSize(2);
+        assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.STEP_COMPLETED)
+                .singleElement().satisfies(record -> assertThat(record.metadata()).containsEntry("assignedTaskId", "t-1"));
+        assertThat(records).noneMatch(record -> Set.of(TraceRecordType.RESULT_ASSEMBLED, TraceRecordType.STRUCTURED_OUTPUT_RECORDED,
+                TraceRecordType.LINTER_RECORDED, TraceRecordType.EVIDENCE_VALIDATION_PASSED,
+                TraceRecordType.EVIDENCE_VALIDATION_FAILED, TraceRecordType.STEP_ACTION_REJECTED).contains(record.recordType()));
+        assertThat(assertStepInabilityTrace(records, response, reason, 2).data().has("assignedTaskId")).isFalse();
+    }
+
+    @Test
+    void inabilitySignalCaptureKeepsBoundedUtf8PrefixAndCompleteReason() {
+        String prefix = "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"";
+        String reason = "雪".repeat(400_000);
+        String response = prefix + reason + "\"}";
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var session = TestLoomspanSessions.create(3, "default-rootVisibleSkill");
+        var model = new SequenceChatClient(response);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
+                    session, definition(), model, List.of(tool("default-invoiceParser", "unused"))))
+                    .isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(reason);
+        }
+        var failure = readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
+                .findFirst().orElseThrow();
+        assertThat(failure.data().path("exceptionMessage").asString()).isEqualTo(reason);
+        var signal = failure.data().path("diagnostics").get(1);
+        int limit = 1024 * 1024;
+        assertThat(signal.path("captureLimitBytes").asInt()).isEqualTo(limit);
+        assertThat(signal.path("truncated").asBoolean()).isTrue();
+        assertThat(signal.path("text").asString()).isEqualTo(prefix + "雪".repeat((limit - prefix.length()) / 3));
+    }
+
+    @Test
     void executesNewlyUnblockedTasksAcrossMultipleSteps() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         ExecutionPlan plan = twoTaskPlan();
@@ -1397,10 +1581,10 @@ class StepLoopMissionExecutionEngineTest {
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
         assertThat(chatClient.systemMessagesSeen().get(0) + chatClient.userMessagesSeen().get(0)).contains("All required plan tasks are already COMPLETE");
         assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
-                .contains("All required plan tasks are already completed. Return FINAL_RESPONSE instead of CALL_TOOL.")
-                .contains("You must return a FINAL_RESPONSE action");
+                .contains("All required plan tasks are already completed. Return FINAL_RESPONSE or CANNOT_COMPLETE.")
+                .contains("Return FINAL_RESPONSE if you can fulfill the objective");
         assertThat(readRecords(session)).anyMatch(record -> record.recordType() == TraceRecordType.STEP_ACTION_REJECTED
-                && String.valueOf(record.metadata().get("reason")).contains("Return FINAL_RESPONSE instead of CALL_TOOL"));
+                && String.valueOf(record.metadata().get("reason")).contains("Return FINAL_RESPONSE or CANNOT_COMPLETE"));
     }
 
     @Test
@@ -2641,6 +2825,199 @@ class StepLoopMissionExecutionEngineTest {
     }
 
     @Test
+    void inabilityLetsQueuedAdmittedSiblingRunBeforePropagating() {
+        var queued = new CountDownLatch(1);
+        var firstFailed = new AtomicBoolean();
+        var state = new DefaultExecutionStateService(FIXED_CLOCK) {
+            @Override public void recordStepEvent(LoomspanSession session, ai.loomspan.internal.core.ExecutionFrame frame,
+                    TraceRecordType type, Map<String, Object> metadata, Object payload) {
+                super.recordStepEvent(session, frame, type, metadata, payload);
+                if (type == TraceRecordType.STEP_FAILED && "t-1".equals(metadata.get("assignedTaskId"))) firstFailed.set(true);
+            }
+        };
+        var plan = groupedPlan("queued-after-inability", true);
+        var session = TestLoomspanSessions.create(3, "default-rootVisibleSkill");
+        var binding = TestExecutionBindings.missionBinding(session);
+        String reason = "First task cannot continue";
+        var calls = new AtomicInteger();
+        var model = new TaskAddressedModel(Map.of("t-2", "default-invoiceParser"), new AtomicReference<>());
+        ai.loomspan.internal.model.ModelInteraction interaction = request -> {
+            if (request.systemPrompt().contains("--- ASSIGNED TASK ---\nID: t-1")) {
+                awaitProbe(queued);
+                return new ai.loomspan.internal.model.ModelInteractionResult(inabilityAction(reason), Map.of());
+            }
+            assertThat(firstFailed).isTrue();
+            assertThat(request.systemPrompt()).contains("--- ASSIGNED TASK ---\nID: t-2");
+            return model.call(request);
+        };
+        var capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
+                (arguments, taskId, sources) -> {
+                    assertThat(taskId).isEqualTo("t-2");
+                    assertThat(Thread.currentThread().isInterrupted()).isFalse();
+                    calls.incrementAndGet();
+                    return "queued result";
+                });
+        var definition = definitionWithConcurrency(true);
+        try (var executor = new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>()) {
+            @Override public void execute(Runnable command) {
+                super.execute(command);
+                if (getQueue().contains(command)) queued.countDown();
+            }
+        }) {
+            var engine = engine(state, new InitializingPlanningService(state, plan), executor, definition);
+            assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(binding,
+                    () -> executeMission(engine, session, definition, interaction, List.of(capability))))
+                    .isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(reason);
+        }
+        assertThat(queued.getCount()).isZero();
+        assertThat(calls).hasValue(1);
+        assertThat(binding.requireMission().completedTaskResults()).containsExactly(
+                new MissionContext.CompletedTaskResult("t-2", "default-invoiceParser", "queued result"));
+        assertThat(session.getExecutionPlanSnapshot().tasks()).extracting(PlanTask::status)
+                .containsExactly(PlanTaskStatus.FAILED, PlanTaskStatus.COMPLETED, PlanTaskStatus.PENDING);
+        assertThat(readRecords(session)).filteredOn(record -> record.recordType() == TraceRecordType.STEP_STARTED)
+                .extracting(record -> record.metadata().get("assignedTaskId")).containsExactly("t-1", "t-2");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"inability-then-terminal", "recoverable-then-terminal", "both-inability"})
+    void parallelFailureSelectionUsesClassificationThenAcceptedOrder(String outcome) {
+        var secondReturned = new CountDownLatch(1);
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var plan = groupedPlan("ordered-failure", true);
+        var session = TestLoomspanSessions.create(3, "default-rootVisibleSkill");
+        var definition = definitionWithConcurrency(true);
+        boolean secondDeclares = outcome.equals("both-inability");
+        boolean firstDeclares = !outcome.equals("recoverable-then-terminal");
+        String firstReason = "first task reason";
+        String secondReason = "second task reason";
+        var terminal = new IllegalStateException(secondReason);
+        var model = new TaskAddressedModel(Map.of("t-1", "default-invoiceParser", "t-2", "default-invoiceParser"), new AtomicReference<>());
+        ai.loomspan.internal.model.ModelInteraction interaction = request -> {
+            if (request.systemPrompt().contains("--- ASSIGNED TASK ---\nID: t-1")) {
+                awaitProbe(secondReturned);
+                if (firstDeclares) return new ai.loomspan.internal.model.ModelInteractionResult(inabilityAction(firstReason), Map.of());
+            } else {
+                assertThat(request.systemPrompt()).contains("--- ASSIGNED TASK ---\nID: t-2");
+                if (secondDeclares) return new ai.loomspan.internal.model.ModelInteractionResult(inabilityAction(secondReason), Map.of());
+            }
+            return model.call(request);
+        };
+        var capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
+                (arguments, taskId, sources) -> {
+                    if (taskId.equals("t-1")) throw new RecoverableSkillException(firstReason);
+                    throw terminal;
+                });
+        try (var executor = new ThreadPoolExecutor(3, 3, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>()) {
+            @Override protected void afterExecute(Runnable task, Throwable failure) {
+                // The first member is waiting and the coordinator cannot return until it joins both members.
+                secondReturned.countDown();
+            }
+        }) {
+            var engine = engine(state, new InitializingPlanningService(state, plan), executor, definition);
+            var failure = assertThatThrownBy(() -> executeMission(engine, session, definition, interaction, List.of(capability)));
+            if (secondDeclares) failure.isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(firstReason).hasNoCause();
+            else failure.isSameAs(terminal);
+        }
+        var records = readRecords(session);
+        var failures = records.stream().filter(record -> record.recordType() == TraceRecordType.ERROR_RECORDED).toList();
+        assertThat(failures).extracting(record -> record.data().path("exceptionMessage").asString())
+                .containsExactly(secondReason, firstReason);
+        assertThat(failures).extracting(record -> record.data().path("classification").asString())
+                .containsExactly(secondDeclares ? "RECOVERABLE" : "TERMINAL", "RECOVERABLE");
+        assertThat(failures).extracting(record -> record.metadata().get("failureId")).doesNotHaveDuplicates();
+        assertThat(failures).allSatisfy(record -> assertThat(record.metadata()).doesNotContainKey("causedByFailureId"));
+        assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.STEP_FAILED)
+                .extracting(record -> record.metadata().get("failureId"))
+                .containsExactlyElementsOf(failures.stream().map(record -> record.metadata().get("failureId")).toList());
+        assertThat(session.getExecutionPlanSnapshot().tasks()).extracting(PlanTask::status)
+                .containsExactly(PlanTaskStatus.FAILED, PlanTaskStatus.FAILED, PlanTaskStatus.PENDING);
+    }
+
+    @Test
+    void cancellationAfterValidProposalPreventsInabilityAcceptance() {
+        var cancelled = new IllegalStateException("authoritative cancellation");
+        var state = new DefaultExecutionStateService(FIXED_CLOCK) {
+            @Override public void recordStepEvent(LoomspanSession session, ai.loomspan.internal.core.ExecutionFrame frame,
+                    TraceRecordType type, Map<String, Object> metadata, Object payload) {
+                super.recordStepEvent(session, frame, type, metadata, payload);
+                if (type == TraceRecordType.STEP_ACTION_VALIDATED && "CANNOT_COMPLETE".equals(metadata.get("stepAction"))) {
+                    var binding = ExecutionBindingScope.requireCurrent();
+                    binding.requireMission().lifecycle().beginCancellation(binding, cancelled,
+                            () -> recordFailure(session, cancelled, Map.of("message", cancelled.getMessage())), false);
+                }
+            }
+        };
+        var session = TestLoomspanSessions.create(3, "default-rootVisibleSkill");
+        var model = new SequenceChatClient(inabilityAction("would otherwise be accepted"));
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
+                    session, definition(), model, List.of(tool("default-invoiceParser", "unused")))).isSameAs(cancelled);
+        }
+        assertThat(model.systemMessagesSeen()).hasSize(1);
+        var records = readRecords(session);
+        assertThat(records).anyMatch(record -> record.recordType() == TraceRecordType.STEP_ACTION_PROPOSED
+                && "CANNOT_COMPLETE".equals(record.metadata().get("stepAction")));
+        assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
+                .anySatisfy(record -> assertThat(record.data().path("exceptionMessage").asString()).isEqualTo(cancelled.getMessage()))
+                .allSatisfy(record -> assertThat(record.data().has("kind")).isFalse());
+        assertThat(records).noneMatch(record -> record.recordType() == TraceRecordType.STEP_COMPLETED);
+    }
+
+    @Test
+    void owningDeadlineWinsAfterParallelInabilityWasRecorded() {
+        var failureAndSiblingStarted = new CountDownLatch(2);
+        var state = new DefaultExecutionStateService(FIXED_CLOCK) {
+            @Override public void recordStepEvent(LoomspanSession session, ai.loomspan.internal.core.ExecutionFrame frame,
+                    TraceRecordType type, Map<String, Object> metadata, Object payload) {
+                super.recordStepEvent(session, frame, type, metadata, payload);
+                if (type == TraceRecordType.STEP_FAILED && "t-1".equals(metadata.get("assignedTaskId"))) failureAndSiblingStarted.countDown();
+            }
+        };
+        var session = TestLoomspanSessions.create(3, "default-rootVisibleSkill");
+        var definition = definitionWithConcurrency(true);
+        var plan = groupedPlan("timeout-after-inability", true);
+        var model = new TaskAddressedModel(Map.of("t-2", "default-invoiceParser"), new AtomicReference<>());
+        ai.loomspan.internal.model.ModelInteraction interaction = request -> {
+            if (request.systemPrompt().contains("--- ASSIGNED TASK ---\nID: t-1"))
+                return new ai.loomspan.internal.model.ModelInteractionResult(inabilityAction("Recoverable member"), Map.of());
+            assertThat(request.systemPrompt()).contains("--- ASSIGNED TASK ---\nID: t-2");
+            return model.call(request);
+        };
+        var sibling = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
+                (arguments, taskId, sources) -> {
+                    failureAndSiblingStarted.countDown();
+                    try {
+                        new CountDownLatch(1).await();
+                        throw new AssertionError("Expected deadline interruption");
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Sibling interrupted", ex);
+                    }
+                });
+        try (var executor = new SerializedMemberTimeoutExecutor(failureAndSiblingStarted)) {
+            assertThatThrownBy(() -> executeMission(engine(state, new InitializingPlanningService(state, plan), executor, definition),
+                    session, definition, interaction, List.of(sibling))).isExactlyInstanceOf(LoomspanMissionTimeoutException.class);
+        }
+        assertThat(session.getExecutionPlanSnapshot().tasks()).extracting(PlanTask::status)
+                .containsExactly(PlanTaskStatus.FAILED, PlanTaskStatus.FAILED, PlanTaskStatus.PENDING);
+        var records = readRecords(session);
+        assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
+                .anySatisfy(record -> assertThat(record.data().path("kind").asString()).isEqualTo("planner_inability"))
+                .anySatisfy(record -> assertThat(record.data().path("classification").asString()).isEqualTo("TERMINAL"));
+        assertThat(records).noneMatch(record -> record.recordType() == TraceRecordType.STEP_COMPLETED);
+    }
+
+    private static void awaitProbe(CountDownLatch latch) {
+        try {
+            assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Concurrency probe interrupted", ex);
+        }
+    }
+
+    @Test
     void nestedMissionTimeoutIsAnOrdinaryMemberFailureAndDoesNotCancelSibling()
     {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
@@ -2981,7 +3358,7 @@ class StepLoopMissionExecutionEngineTest {
 
         assertThat(invocationOrder).containsExactly("t-1", "t-2");
         assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
-                .contains("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId.");
+                .contains("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId or CANNOT_COMPLETE with only a reason.");
         List<TraceRecord> records = readRecords(session);
         assertThat(records.stream()
                 .filter(record -> record.recordType() == TraceRecordType.STEP_ACTION_PROPOSED)
@@ -3471,6 +3848,45 @@ class StepLoopMissionExecutionEngineTest {
         List<TraceRecord> records = new ArrayList<>();
         session.readTraceRecords(records::add);
         return records;
+    }
+
+    private static String inabilityAction(String reason) {
+        return LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(
+                Map.of("stepAction", "CANNOT_COMPLETE", "reason", reason));
+    }
+
+    private static TraceRecord assertStepInabilityTrace(List<TraceRecord> records, String response, String reason, int step) {
+        var failure = records.stream().filter(record -> record.recordType() == TraceRecordType.ERROR_RECORDED).toList();
+        assertThat(failure).hasSize(1);
+        var recorded = failure.getFirst();
+        assertThat(recorded.frameType()).isEqualTo(TraceFrameType.STEP_EXECUTION);
+        assertThat(recorded.route()).endsWith("#step-" + step);
+        assertThat(recorded.data().path("planId").asString()).isEqualTo("plan-1");
+        assertThat(recorded.data().path("stepNumber").asInt()).isEqualTo(step);
+        assertThat(recorded.data().path("classification").asString()).isEqualTo("RECOVERABLE");
+        assertThat(recorded.data().path("kind").asString()).isEqualTo("planner_inability");
+        assertThat(recorded.data().path("exceptionMessage").asString()).isEqualTo(reason);
+        assertThat(recorded.metadata()).doesNotContainKeys("causedByFailureId", "attemptId", "retrySequenceId");
+        var diagnostics = recorded.data().path("diagnostics");
+        assertThat(diagnostics).extracting(node -> node.path("kind").asString())
+                .containsExactly("JAVA_STACK_TRACE", "PLANNER_INABILITY_SIGNAL");
+        var signal = diagnostics.get(1);
+        assertThat(signal.path("contentType").asString()).isEqualTo("text/plain; charset=utf-8");
+        assertThat(signal.path("truncated").asBoolean()).isFalse();
+        assertThat(signal.path("text").asString()).isEqualTo(response);
+        assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.STEP_ACTION_PROPOSED)
+                .singleElement().satisfies(proposal -> {
+                    assertThat(proposal.frameId()).isEqualTo(recorded.frameId());
+                    assertThat(proposal.sequence()).isLessThan(recorded.sequence());
+                    assertThat(proposal.metadata()).containsEntry("stepAction", "CANNOT_COMPLETE");
+                });
+        assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.STEP_FAILED)
+                .singleElement().satisfies(failed -> {
+                    assertThat(failed.frameId()).isEqualTo(recorded.frameId());
+                    assertThat(failed.metadata()).containsEntry("stepAction", "CANNOT_COMPLETE")
+                            .containsEntry("failureId", recorded.metadata().get("failureId"));
+                });
+        return recorded;
     }
 
     private static final class InitializingPlanningService implements PlanningService {

@@ -391,12 +391,14 @@ credit and continuation uses existing budgets and the original parent timeout.
 Canonical diagnostics record classification independently from completion linkage.
 
 A standard model-backed invocation can end unsuccessfully by calling the Framework
-control `loomspan_cannot_complete` alone with a nonblank `reason`. Direct and admitted
-Java callers can catch `PlannerInabilityException` to present the exact `getMessage()`
-or choose their own next action. Existing `RecoverableSkillException` catches also
-apply. A standard caller receiving the failure may take a permitted action that
-addresses the obstacle. Work may already have completed, and replay may be unsafe.
-Use `RecoverableSkillException` for ordinary Java operation correction.
+control `loomspan_cannot_complete` alone with a nonblank `reason`. In explicit-step
+planning, the model can declare `CANNOT_COMPLETE` with a reason during assigned-task
+action generation or final synthesis. Explicit-step parents propagate the failure.
+A standard caller receiving it may take a permitted action that addresses the
+obstacle. Work may already have completed, and replay may be unsafe.
+Direct and admitted Java callers can catch `PlannerInabilityException` and read the
+exact reason through `getMessage()`. Existing `RecoverableSkillException` catches
+also apply. Use `RecoverableSkillException` for ordinary Java operation correction.
 
 YAML executor leaves retain their definitions and use captured registrations,
 selected executor configuration and executor generation identity during execution.

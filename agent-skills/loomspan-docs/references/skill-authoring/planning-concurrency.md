@@ -87,14 +87,14 @@ Executable anchors: `CapabilityExecutionRouter#objectiveFor`, `StepPromptBuilder
 | Step cost | Each assigned task costs one `max_steps` slot. Ordinary final synthesis costs one slot; designated-child forwarding costs no additional slot. Corrections for the same assignment remain within that assigned step. |
 | Execution order | Units execute in task-list order. Members of a valid group overlap only when effective concurrency is `true`; ungrouped tasks and disabled groups serialize. |
 | Enabled-group admission | Every member becomes `IN_PROGRESS` in one plan transition before any member is submitted. |
-| Normal join | Loomspan waits for every started member's ordinary success or failure outcome. One member failure does not cancel a started sibling. |
+| Normal join | Loomspan waits for ordinary outcomes from all admitted siblings, including queued work, under the existing deadline. One member's ordinary failure does not cancel a sibling. |
 | State folding | After the full normal join, every outcome is folded in task-list order and one complete joined plan is published. Completion timing does not determine parent state. |
 | Mission-wide termination | Owning timeout, caller interruption, or dispatch failure stops later admission, requests interruption of submitted work, and uses one bounded 250 ms logical-cleanup grace. |
 | Cutoff folding | Outcomes available at the logical cutoff are folded in task-list order. Admitted tasks without an outcome become `FAILED`, never-admitted tasks remain `PENDING`, and an existing plan becomes `STALE`. |
 | `concurrency: false` | Serialization is the final contract. |
 | `concurrency: true` | A valid non-null group is dispatched concurrently. This setting records eligibility; actual trace starts and ends establish observed overlap. |
 
-Workers use isolated branches and cannot mutate parent plan, completed task results, summary, or retained diagnostics before join. Successful siblings still contribute their results when another member fails. If multiple members fail, the earliest failure in task-list order is primary. Later units and final synthesis begin only after a successful full join and observe complete prior-unit results and retained diagnostics.
+Workers use isolated branches and cannot mutate parent plan, completed task results, summary, or retained diagnostics before join. Successful siblings still contribute their results when another member fails. The owning lifecycle's cancellation cause takes precedence. Otherwise, Loomspan propagates the first terminal failure in accepted task order, or the first recoverable failure in that order if every failure is recoverable. Individual failures stay recorded. Later units and final synthesis begin only after a successful full join and observe complete prior-unit results and retained diagnostics.
 
 Every worker branch, nested planner, and later unit also carries the exact immutable skill generation captured by the root. Definitions, visible child capabilities, policies, schemas, and execution settings cannot switch generation mid-plan; a newly active generation applies only to independently captured roots.
 
@@ -107,6 +107,33 @@ own external work after Loomspan has finalized the run. Loomspan does not roll
 back, compensate, or claim to stop those external side effects.
 
 A non-null `parallelGroup` remains a positive author safety assertion, not proof that tasks overlapped. Authors MUST group only work whose capability calls, shared resources, and external side effects are safe to run concurrently.
+
+## Planner inability
+
+A model generating the arguments for an assigned task can return `CALL_TOOL`
+or declare inability. During final synthesis it can return `FINAL_RESPONSE`
+or use the same declaration:
+
+```json
+{"stepAction":"CANNOT_COMPLETE","reason":"Required information is unavailable."}
+```
+
+The declaration has exactly these two fields. The reason is a nonblank string
+and Loomspan preserves it exactly. Framework supplies the assignment or
+synthesis identity. A malformed action can be corrected to a declaration with
+the existing one-retry action allowance.
+
+The declaration fails the task or synthesis and the enclosing invocation.
+An assigned declaration invokes no tool and contributes no successful result.
+Synthesis can declare inability after every task has completed. The normal
+join retains completed sibling results and all failures before propagation.
+Any work that already ran can have effects.
+
+Only the two existing action-generation checkpoints accept the declaration.
+Initial plan generation and automatic Framework dispatch follow their own
+protocols. A tool execution failure propagates without another step-action
+turn. A declaration uses the current step slot and actual model calls count
+toward existing limits. See [caller handling](mental-model.md#planner-inability).
 
 ## Complete task evidence
 
@@ -148,6 +175,10 @@ This contract does not provide per-skill parallelism limits, capability-level co
 - `ConcurrentGroupedExecutionIntegrationTest` protects nested direct and planning missions, inner planner concurrency on the shared executor, authentication and frame propagation, parent/child state and diagnostic isolation, real nested depth and child-timeout failures, parent-timeout suppression of a physically late nested mission, and quota failure without sibling cancellation or usage refund.
 - `SessionUsageServiceTest#simultaneousProviderAttemptReservationsRespectTheLimit` and `#simultaneousUsageUpdatesLoseNoIncrements` protect run-wide quota and usage updates during overlap.
 - `StepPromptBuilder`, `StepActionValidator`, and their tests define the exact-assignment worker protocol and correction messages.
+- `StepLoopMissionExecutionEngineTest#malformedInabilityUsesOnlyExistingActionCorrection`,
+  `#inabilityLetsQueuedAdmittedSiblingRunBeforePropagating`, and
+  `#parallelFailureSelectionUsesClassificationThenAcceptedOrder` cover the
+  declaration, sibling settlement, and primary failure choice.
 - `MissionLifecycleTest`, `PhysicalBranchContext`, `ExecutionBinding`, `DefaultExecutionStateService`, and their tests define ancestor-aware cutoff permission, exact-once branch cleanup, isolated worker diagnostics, and parent-owned mission state.
 
 ## Assembled completion

@@ -297,7 +297,7 @@ class MissionLifecycleTest
         assertThatThrownBy(() -> childLifecycle.requireOpenForNewWork(child))
                 .isInstanceOf(MissionWriteRevokedException.class);
         assertThatThrownBy(() -> child.recordPlannerInability(
-                new ai.loomspan.api.PlannerInabilityException("blocked"), "{}".getBytes(StandardCharsets.UTF_8)))
+                new ai.loomspan.api.PlannerInabilityException("blocked"), "{}".getBytes(StandardCharsets.UTF_8), TraceFrameType.MODEL_CALL, java.util.Map.of()))
                 .isInstanceOf(MissionWriteRevokedException.class);
         var childFacts = new java.util.ArrayList<TraceRecord>();
         child.session().readTraceRecords(childFacts::add);
@@ -315,7 +315,7 @@ class MissionLifecycleTest
         try
         {
             assertThatThrownBy(() -> binding.recordPlannerInability(
-                    new ai.loomspan.api.PlannerInabilityException("blocked"), "{}".getBytes(StandardCharsets.UTF_8)))
+                    new ai.loomspan.api.PlannerInabilityException("blocked"), "{}".getBytes(StandardCharsets.UTF_8), TraceFrameType.MODEL_CALL, java.util.Map.of()))
                     .isInstanceOf(java.util.concurrent.CancellationException.class);
         }
         finally

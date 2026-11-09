@@ -114,6 +114,9 @@ final class StepPromptBuilder
 
                 Rules:
                 - Return CALL_TOOL for exactly the assigned task and tool shown above.
+                - If you cannot complete the assigned task with the available inputs and authority, return
+                  {"stepAction":"CANNOT_COMPLETE","reason":"Explain what prevents completion."} instead.
+                  Include only stepAction and a nonblank string reason.
                 - Do not call the parent mission skill or invent a new tool name.
                 - Return raw JSON only.
                 """.formatted(toolName,
@@ -155,7 +158,7 @@ final class StepPromptBuilder
                 --- YOUR TASK ---
                 All required plan tasks are already COMPLETE.
                 Return ONLY valid JSON - no markdown, no explanation, no code fences.
-                You must return a FINAL_RESPONSE action. CALL_TOOL is not allowed anymore.
+                Return FINAL_RESPONSE if you can fulfill the objective. CALL_TOOL is not allowed anymore.
 
                 {
                   "stepAction": "FINAL_RESPONSE",
@@ -171,7 +174,10 @@ final class StepPromptBuilder
 
                 Rules:
                 - Do NOT call any tool.
-                - finalResponse must be a raw JSON object matching the required schema, not a string containing escaped JSON.
+                - For FINAL_RESPONSE, finalResponse must be a raw JSON object matching the required schema, not a string containing escaped JSON.
+                - If the available results cannot fulfill the objective, return
+                  {"stepAction":"CANNOT_COMPLETE","reason":"Explain what prevents completion."} instead.
+                  Include only stepAction and a nonblank string reason.
                 - Return raw JSON only.
                 """);
 

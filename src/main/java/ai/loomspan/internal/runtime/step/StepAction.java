@@ -1,5 +1,6 @@
 package ai.loomspan.internal.runtime.step;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import tools.jackson.databind.JsonNode;
@@ -16,7 +17,8 @@ record StepAction(
         @JsonProperty("taskId") @Nullable String taskId,
         @JsonProperty("toolName") @Nullable String toolName,
         @JsonProperty("toolArguments") @Nullable Map<String, Object> toolArguments,
-        @JsonProperty("finalResponse") @Nullable JsonNode finalResponse)
+        @JsonProperty("finalResponse") @Nullable JsonNode finalResponse,
+        @JsonIgnore @Nullable String reason)
 {
     StepAction canonicalSelection()
     {
@@ -29,7 +31,7 @@ record StepAction(
      */
     public static StepAction callTool(String taskId, String toolName, Map<String, Object> toolArguments)
     {
-        return new StepAction(StepActionType.CALL_TOOL, taskId, toolName, toolArguments, null);
+        return new StepAction(StepActionType.CALL_TOOL, taskId, toolName, toolArguments, null, null);
     }
 
     /**
@@ -37,6 +39,11 @@ record StepAction(
      */
     public static StepAction finalResponse(JsonNode finalResponse)
     {
-        return new StepAction(StepActionType.FINAL_RESPONSE, null, null, null, finalResponse);
+        return new StepAction(StepActionType.FINAL_RESPONSE, null, null, null, finalResponse, null);
+    }
+
+    static StepAction cannotComplete(String reason)
+    {
+        return new StepAction(StepActionType.CANNOT_COMPLETE, null, null, null, null, reason);
     }
 }

@@ -92,7 +92,7 @@ class StepActionValidatorTest {
 
         @Test
         void nullActionTypeRejected() {
-            StepAction action = new StepAction(null, "t-1", "default-invoiceParser", Map.of(), null);
+            StepAction action = new StepAction(null, "t-1", "default-invoiceParser", Map.of(), null, null);
             StepValidationResult result = validateCurrentMode(action, plan, visibleTools, true);
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason()).contains("Step action type is null");
@@ -120,7 +120,7 @@ class StepActionValidatorTest {
 
         @Test
         void missingTaskIdRejected() {
-            StepAction action = new StepAction(StepActionType.CALL_TOOL, null, "default-invoiceParser", Map.of(), null);
+            StepAction action = new StepAction(StepActionType.CALL_TOOL, null, "default-invoiceParser", Map.of(), null, null);
             StepValidationResult result = validateCurrentMode(action, plan, visibleTools, true);
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason()).contains("taskId");
@@ -128,7 +128,7 @@ class StepActionValidatorTest {
 
         @Test
         void missingToolNameRejected() {
-            StepAction action = new StepAction(StepActionType.CALL_TOOL, "t-1", null, Map.of(), null);
+            StepAction action = new StepAction(StepActionType.CALL_TOOL, "t-1", null, Map.of(), null, null);
             StepValidationResult result = validateCurrentMode(action, plan, visibleTools, true);
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason()).contains("toolName");
@@ -140,7 +140,7 @@ class StepActionValidatorTest {
             StepValidationResult result = validateCurrentMode(action, plan, visibleTools, true);
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason())
-                    .isEqualTo("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId.");
+                    .isEqualTo("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId or CANNOT_COMPLETE with only a reason.");
         }
 
         @Test
@@ -483,6 +483,30 @@ class StepActionValidatorTest {
     class AssignedValidation
     {
         @Test
+        void inabilityRequiresTheFrameworkAssignmentToBeInProgress()
+        {
+            StepAction inability = StepAction.cannotComplete("Missing input");
+            PlanTask assignment = plan.findTask("t-1").orElseThrow();
+            assertThat(StepActionValidator.validateAssigned(inability, plan, assignment, List.of()).rejectionReason())
+                    .contains("not IN_PROGRESS", "PENDING");
+            ExecutionPlan differentPlan = new ExecutionPlan(plan.planId(), plan.capabilityName(), plan.createdAt(), List.of());
+            assertThat(StepActionValidator.validateAssigned(inability, differentPlan, assignment, List.of()).rejectionReason())
+                    .contains("not IN_PROGRESS", "MISSING");
+            ExecutionPlan admitted = plan.updateTask("t-1", task -> task.bindInProgress("starting"));
+            assertThat(StepActionValidator.validateAssigned(inability, admitted, assignment, List.of()).valid()).isTrue();
+        }
+
+        @Test
+        void synthesisInabilityRequiresCompletedTasksAndNoFinalResponse()
+        {
+            StepAction inability = StepAction.cannotComplete("Results are insufficient");
+            assertThat(StepActionValidator.validateFinal(inability, plan).rejectionReason()).contains("remain incomplete");
+            ExecutionPlan completed = plan.updateTask("t-1", task -> task.complete("done"))
+                    .updateTask("t-2", task -> task.complete("done"));
+            assertThat(StepActionValidator.validateFinal(inability, completed).valid()).isTrue();
+        }
+
+        @Test
         void assignedCallMustMatchExactInProgressTask()
         {
             ExecutionPlan admitted = plan.updateTask("t-1", task -> task.bindInProgress("Starting tool invoiceParser"));
@@ -493,15 +517,15 @@ class StepActionValidatorTest {
                     .isTrue();
             assertThat(StepActionValidator.validateAssigned(
                     StepAction.callTool("t-2", "default-expenseLookup", Map.of()), admitted, assignment, visibleTools).rejectionReason())
-                    .isEqualTo("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId.");
+                    .isEqualTo("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId or CANNOT_COMPLETE with only a reason.");
             assertThat(StepActionValidator.validateAssigned(
-                    new StepAction(StepActionType.CALL_TOOL, null, "default-invoiceParser", Map.of(), null),
+                    new StepAction(StepActionType.CALL_TOOL, null, "default-invoiceParser", Map.of(), null, null),
                     admitted, assignment, visibleTools).rejectionReason())
-                    .isEqualTo("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId.");
+                    .isEqualTo("This worker is assigned task 't-1'. Return CALL_TOOL with exactly that taskId or CANNOT_COMPLETE with only a reason.");
             assertThat(StepActionValidator.validateAssigned(
                     StepAction.finalResponse(JSON.createObjectNode().put("message", "early")),
                     admitted, assignment, visibleTools).rejectionReason())
-                    .isEqualTo("Task 't-1' is assigned to this worker. Return CALL_TOOL for that task; final synthesis occurs only after the coordinator joins all tasks.");
+                    .isEqualTo("Task 't-1' is assigned to this worker. Return CALL_TOOL for that task or CANNOT_COMPLETE with only a reason. Final synthesis occurs only after the coordinator joins all tasks.");
         }
 
         @Test

@@ -2,6 +2,7 @@ package ai.loomspan.internal.springai;
 
 import ai.loomspan.api.PlannerInabilityException;
 import ai.loomspan.internal.core.ExecutionBindingScope;
+import ai.loomspan.internal.core.TraceFrameType;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.tool.ToolCallback;
@@ -12,6 +13,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectReader;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** A bound control definition. Dispatch handles it before application callbacks. */
 final class PlannerInabilityTool implements ToolCallback
@@ -51,7 +53,8 @@ final class PlannerInabilityTool implements ToolCallback
         signal.put("name", call.name());
         signal.put("arguments", call.arguments());
         ExecutionBindingScope.requireCurrent().recordPlannerInability(failure,
-                LoomspanJacksonCodecs.defaults().canonicalTrace().writeValueAsBytes(signal));
+                LoomspanJacksonCodecs.defaults().canonicalTrace().writeValueAsBytes(signal),
+                TraceFrameType.MODEL_CALL, Map.of("message", "Model invocation failed"));
         return failure;
     }
 

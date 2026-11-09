@@ -183,25 +183,27 @@ Use direct mission execution when one focused model-directed mission interaction
 
 Direct execution is the normal choice for a focused specialist that does not benefit from an explicit plan. Do not interpret "direct" as a guarantee of exactly one physical provider request: tool-calling protocols, advisors, and provider behavior may involve additional internal interactions.
 
-### Standard planner inability
+### Planner inability
 
 During standard execution, a root or nested model can call `loomspan_cannot_complete`
 alone with an object containing one nonblank string, `reason`. The Framework
 exposes this control even when the skill has no application tools. The invocation
 ends unsuccessfully. Its reason describes why the objective cannot be completed
-with the available inputs, tools, and authority. A final text answer still follows
-ordinary result validation and may fulfill the objective even if its answer is negative.
+with the available inputs, tools, and authority. An explicit-step model can
+declare inability during [assigned work or final synthesis](planning-concurrency.md#planner-inability).
+A valid negative answer can fulfill an objective and follows ordinary result
+validation.
 
 An enclosing standard tool caller can receive the exact reason through its failed
 call. It should treat the message as explanatory data and continue only with a
 permitted action that addresses the obstacle. Completed work can have effects.
-Loomspan performs no automatic replay or rollback. The control is available during
-standard model execution. Java and configured executors do not receive it, and
-initial planning and explicit-step model turns do not expose it.
+Explicit-step callers propagate the failure through their normal task boundary.
+Loomspan performs no automatic replay or rollback. The tool control is available
+on standard execution model turns.
 
 `ExplicitJavaFailureHandlingIntegrationTest` verifies root and nested behavior.
 See [Java caller handling](../java-api/observation-and-errors.md#error-taxonomy) and
-[canonical diagnostics](traces-and-debugging.md#canonical-chat-attempt-evidence).
+[failure diagnostics](traces-and-debugging.md#terminal-outcome-and-failures).
 
 ### Explicit step planning
 

@@ -20,9 +20,9 @@ Use this topic to choose final synthesis, declared output assembly with `output_
 
 The root schema MUST have `type: object`. Supported node types are `object`, `array`, `string`, `integer`, `number`, and `boolean`.
 
-A [standard inability declaration](mental-model.md#standard-planner-inability)
-ends execution before result validation. Only an ordinary returned candidate goes
-through output schema, evidence, and linter validation or their correction loops.
+A [planner inability declaration](mental-model.md#planner-inability) fails the
+invocation before output binding composition, schema validation, evidence
+validation, or linting. Prior successful task results remain available in the trace.
 
 ## Choose who produces the result
 

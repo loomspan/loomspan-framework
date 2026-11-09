@@ -125,7 +125,7 @@ application callback.
 | Spring Security denies access | The original `AccessDeniedException` propagates |
 | Spring authentication failure at a Java proxy | Remains a failure; never successful tool text |
 | Designated Java `RecoverableSkillException` | Propagates as a `SkillException` subtype; exact message and optional diagnostic cause retained |
-| Standard planner declares inability | Direct and admitted callers receive `PlannerInabilityException` with the exact reason |
+| Standard or explicit-step planner declares inability | Direct and admitted callers receive `PlannerInabilityException` with the exact reason |
 | Runtime implementation or Java serialization failure | Safe `SkillException` message with the original cause |
 | Admitted handle already executed, released, or cut off | Safe `SkillException`; no new session or work |
 | Observer throws after success | The observer's runtime exception propagates unchanged |
@@ -160,11 +160,14 @@ correction loop is added. See [Java failures](java-skills.md#designated-java-fai
 `PlannerInabilityException` extends `RecoverableSkillException` and has one public
 constructor, `PlannerInabilityException(String reason)`. The reason must be non-null
 and nonblank. Use the subtype to handle unsuccessful completion explicitly and read
-the exact reason from `getMessage()`. A declaration can propagate from a child.
-Java can construct and throw the same subtype, in which case canonical diagnostics
-record its Java origin. Use `RecoverableSkillException` for ordinary corrective
-Java feedback. If the observer throws after an inability, the inability remains
-primary and the observer exception is suppressed on it.
+the exact reason from `getMessage()`. A model can declare inability in standard
+execution or during explicit-step assigned action generation or final synthesis.
+Explicit-step parents propagate child failure. An enclosing standard tool caller
+can receive the reason as failed-call feedback and continue within its existing
+authority. Java can construct and throw the same subtype, in which case canonical
+diagnostics record its Java origin. Use `RecoverableSkillException` for ordinary
+corrective Java feedback. If the observer throws after an inability, the inability
+remains primary and the observer exception is suppressed on it.
 
 Canonical error facts and their observer projection carry `classification` (`RECOVERABLE` or `TERMINAL`) and exact nullable `exceptionMessage` separately from contextual `message`. `causedByFailureId`, when present, links a distinct application wrapper to an already-recorded cause. Transparent propagation reuses identity; application wrappers retain their own terminal identity. Classification says whether standard feedback is permitted, never whether correction happened. Completion linkage is independent: a recoverable failure can terminate direct or explicit-step execution.
 

@@ -1,16 +1,18 @@
 package ai.loomspan.internal.runtime.step;
 
+import ai.loomspan.api.PlannerInabilityException;
 import ai.loomspan.internal.outputvalidation.OutputValidationPolicy;
 import ai.loomspan.internal.outputvalidation.OutputValidationFeedback;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonToken;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.ObjectReader;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanStackOverflowException;
 import ai.loomspan.internal.core.ExecutionFrame;
 import ai.loomspan.internal.core.ExecutionPlan;
-import ai.loomspan.internal.core.FrameworkShutdownException;
 import ai.loomspan.internal.core.ModelTraceContext;
 import ai.loomspan.internal.core.ModelExecutionIdentity;
 import ai.loomspan.internal.core.PlanTask;
@@ -23,6 +25,7 @@ import ai.loomspan.internal.core.MissionContext.CompletedTaskResult;
 import ai.loomspan.internal.core.MissionLifecycle;
 import ai.loomspan.internal.core.MissionWriteRevokedException;
 import ai.loomspan.internal.core.PlanStatus;
+import ai.loomspan.internal.core.SkillFailurePolicy;
 import ai.loomspan.internal.core.ExecutionTraceRecorder.PlanExecutionTransition;
 import ai.loomspan.internal.core.TraceFrameType;
 import ai.loomspan.internal.core.TraceFailureMetadata;
@@ -60,6 +63,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -105,6 +109,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
     private final ExecutorService missionExecutor;
     private final SessionUsageService sessionUsageService;
     private final ObjectMapper objectMapper;
+    private final ObjectReader stepActionTypeReader;
+    private final ObjectReader inabilityReader;
     private final OutputSchemaValidator outputSchemaValidator;
     private final EvidenceBackedOutputValidator evidenceBackedOutputValidator;
     private final int defaultMaxSteps;
@@ -182,6 +188,10 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         this.missionExecutor = Objects.requireNonNull(missionExecutor, "missionExecutor must not be null");
         this.sessionUsageService = Objects.requireNonNull(sessionUsageService, "sessionUsageService must not be null");
         this.objectMapper = Objects.requireNonNull(schemaMapper, "schemaMapper must not be null");
+        this.stepActionTypeReader = objectMapper.readerFor(StepActionType.class)
+                .without(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+        this.inabilityReader = objectMapper.reader().with(
+                DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY, DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
         this.outputSchemaValidator = new OutputSchemaValidator(schemaMapper);
         this.evidenceBackedOutputValidator = new EvidenceBackedOutputValidator(schemaMapper,
                 new ai.loomspan.internal.runtime.evidence.EvidenceCoverageValidator());
@@ -301,9 +311,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         {
             Throwable cause = ex.getCause();
             var primaryCancellation = lifecycle.primaryCancellation();
-            if (primaryCancellation.isPresent()
-                    && (!(primaryCancellation.orElseThrow().cause() instanceof FrameworkShutdownException)
-                            || cause instanceof MissionWriteRevokedException))
+            if (primaryCancellation.isPresent())
             {
                 MissionLifecycle.PrimaryCancellation primary = primaryCancellation.orElseThrow();
                 cleanupPreservingPrimary(session, missionContext, capturedBinding, lifecycle.awaitCutoff(), primary.cause());
@@ -455,7 +463,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
 
                 List<AssignedOutcome> outcomes = joinAssignedTasks(session, skillName, admission.entries(), lifecycle);
                 foldOutcomes(session, unit, outcomes, mission);
-                propagateFirstFailure(outcomes);
+                propagateUnitFailure(outcomes, lifecycle);
                 nextTaskStep += assignments.size();
             }
             else
@@ -483,7 +491,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                     finally { lifecycle.taskReturned(entry); }
                     List<AssignedOutcome> outcomes = List.of(new AssignedOutcome(assignment, outcome));
                     foldOutcomes(session, unit, outcomes, mission);
-                    propagateFirstFailure(outcomes);
+                    propagateUnitFailure(outcomes, lifecycle);
                     nextTaskStep++;
                 }
             }
@@ -713,20 +721,29 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         }
         catch (ExecutionException ex)
         {
-            lifecycle.beginCancellation(ExecutionBindingScope.requireCurrent(), ex.getCause(), () -> executionStateService.recordFailure(
-                    session, ex.getCause(), Map.of("message", "Concurrent task join failed")), false);
-            throw propagate(ex.getCause());
+            MissionLifecycle.PrimaryCancellation primary = lifecycle.beginCancellation(
+                    ExecutionBindingScope.requireCurrent(), ex.getCause(), () -> executionStateService.recordFailure(
+                            session, ex.getCause(), Map.of("message", "Concurrent task join failed")), false);
+            throw propagate(primary.cause());
         }
     }
 
-    private static void propagateFirstFailure(List<AssignedOutcome> outcomes)
+    private static void propagateUnitFailure(List<AssignedOutcome> outcomes, MissionLifecycle lifecycle)
     {
-        outcomes.stream()
-                .map(AssignedOutcome::outcome)
-                .filter(AssignedTaskOutcome.Failure.class::isInstance)
-                .map(AssignedTaskOutcome.Failure.class::cast)
-                .findFirst()
-                .ifPresent(failure -> { throw propagate(failure.failure()); });
+        var primary = lifecycle.primaryCancellation();
+        if (primary.isPresent()) throw propagate(primary.orElseThrow().cause());
+
+        Throwable firstRecoverable = null;
+        for (AssignedOutcome outcome : outcomes)
+        {
+            if (outcome.outcome() instanceof AssignedTaskOutcome.Failure failed)
+            {
+                Throwable failure = failed.failure();
+                if (SkillFailurePolicy.recoverable(failure) == null) throw propagate(failure);
+                if (firstRecoverable == null) firstRecoverable = failure;
+            }
+        }
+        if (firstRecoverable != null) throw propagate(firstRecoverable);
     }
 
     private static RuntimeException propagate(Throwable failure)
@@ -789,7 +806,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             else if (assignedOutcome.outcome() instanceof AssignedTaskOutcome.Failure failure)
             {
                 folded = plan.updateTask(current.taskId(), task -> task.fail(
-                                "Tool " + task.capabilityName() + " failed: " + failure.failure().getClass().getSimpleName()))
+                                "Assigned task failed: " + failure.failure().getClass().getSimpleName()))
                         .withStatus(ai.loomspan.internal.core.PlanStatus.STALE);
                 if (failure.linterOutcome() != null) mission.recordLinterOutcome(failure.linterOutcome());
                 if (failure.outputSchemaOutcome() != null) mission.recordOutputSchemaOutcome(failure.outputSchemaOutcome());
@@ -916,7 +933,9 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         ? new SkillPromptComposition(stepPrompt, false, null, "step_execution_prompt")
                         : SkillPromptComposer.composeStepExecutionPrompt(skillDefinition, stepPrompt);
                 String stepUserMessage = StepPromptBuilder.buildStepUserMessage(plan, objective, renderedInput.traceSafeInput());
-                String bindingGuidance = composition == null ? "" : composition.guidance();
+                String bindingGuidance = composition == null ? ""
+                        : "\n\nFor FINAL_RESPONSE, apply these output binding rules inside finalResponse.\n"
+                                + composition.guidance();
                 String effectivePrompt = invalidActionFeedback == null
                         ? promptComposition.systemPrompt() + bindingGuidance
                         : promptComposition.systemPrompt() + bindingGuidance + StepActionCorrection.correctionRequest(finalResponseOnly);
@@ -1017,6 +1036,15 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
 
                 return switch (action.stepAction())
                 {
+                    case CANNOT_COMPLETE -> {
+                        var failure = new PlannerInabilityException(action.reason());
+                        String message = finalResponseOnly ? "Final synthesis reported planner inability"
+                                : "Assigned task reported planner inability";
+                        ExecutionBindingScope.requireCurrent().recordPlannerInability(failure,
+                                modelResponse.getBytes(StandardCharsets.UTF_8), TraceFrameType.STEP_EXECUTION,
+                                mergeMetadata(trustedIdentity, Map.of("message", message)));
+                        throw failure;
+                    }
                     case CALL_TOOL -> invokeAssignedAction(session, action, visibleTools, plan, assignment, lifecycle,
                             stepFrame, stepNumber, trustedIdentity, completedTaskResults);
                     case FINAL_RESPONSE -> {
@@ -1181,11 +1209,23 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         String unwrapped = unwrapFencedBlock(modelResponse);
         try
         {
+            if (hasInabilityDeclaration(unwrapped))
+            {
+                JsonNode declaration = inabilityReader.readTree(unwrapped);
+                JsonNode action = declaration.path("stepAction");
+                JsonNode reason = declaration.path("reason");
+                if (declaration.size() != 2 || !action.isString()
+                        || !StepActionType.CANNOT_COMPLETE.name().equals(action.asString())
+                        || !reason.isString() || reason.asString().isBlank())
+                    return invalidInability();
+                return new ParsedStepAction(StepAction.cannotComplete(reason.asString()), null);
+            }
             StepAction parsed = objectMapper.readValue(unwrapped, StepAction.class);
             if (parsed == null)
             {
                 return new ParsedStepAction(null, new StepActionCorrection.Failure("Step-action parsing failed: JSON null is not an action"));
             }
+            if (parsed.stepAction() == StepActionType.CANNOT_COMPLETE) return invalidInability();
             if (finalResponseOnly && (parsed.stepAction() == null || parsed.stepAction() != StepActionType.FINAL_RESPONSE))
             {
                 JsonNode node = objectMapper.readTree(unwrapped);
@@ -1206,6 +1246,37 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             log.debug("Failed to parse step action JSON: {}", ex.getMessage());
             return new ParsedStepAction(null, StepActionCorrection.parsingFailure(ex, unwrapped));
         }
+    }
+
+    private boolean hasInabilityDeclaration(String candidate)
+    {
+        // Detect every value the ordinary binder could read as inability before a duplicate can overwrite it.
+        // Only the strict reader and raw field checks above can accept it.
+        try (var parser = objectMapper.createParser(candidate))
+        {
+            if (parser.nextToken() != JsonToken.START_OBJECT) return false;
+            while (parser.nextToken() == JsonToken.PROPERTY_NAME)
+            {
+                String name = parser.currentName();
+                parser.nextToken();
+                if ("stepAction".equals(name))
+                {
+                    StepActionType action = stepActionTypeReader.readValue(parser);
+                    if (action == StepActionType.CANNOT_COMPLETE) return true;
+                }
+                else
+                {
+                    parser.skipChildren();
+                }
+            }
+            return false;
+        }
+    }
+
+    private static ParsedStepAction invalidInability()
+    {
+        return new ParsedStepAction(null, new StepActionCorrection.Failure(
+                "CANNOT_COMPLETE requires exactly the uppercase stepAction and one nonblank string reason."));
     }
 
     private boolean looksLikeBareFinalResponsePayload(@Nullable JsonNode node)
@@ -1484,8 +1555,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                     {
                         failedJoin = true;
                         plan = plan.updateTask(existing.taskId(), candidate -> candidate.fail(
-                                "Tool " + candidate.capabilityName() + " failed: "
-                                        + failure.failure().getClass().getSimpleName()));
+                                "Assigned task failed: " + failure.failure().getClass().getSimpleName()));
                         if (linterOutcome == null) linterOutcome = failure.linterOutcome();
                         if (outputSchemaOutcome == null) outputSchemaOutcome = failure.outputSchemaOutcome();
                     }

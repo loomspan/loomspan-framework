@@ -655,6 +655,7 @@ class StepPromptBuilderTest {
                 .contains("ASSIGNED TASK", "ID: t-1", "Exact capability/tool: default-invoiceParser")
                 .contains("prior-result", "prior-summary")
                 .contains("\"taskId\": \"t-1\"", "\"toolName\": \"default-invoiceParser\"")
+                .contains("{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"Explain what prevents completion.\"}")
                 .doesNotContain("Exact capability/tool: default-expenseLookup")
                 .doesNotContain("FINAL_RESPONSE")
                 .doesNotContain("parallelGroup", "dependsOn", "Starting tool default-invoiceParser");
@@ -670,14 +671,15 @@ class StepPromptBuilderTest {
     }
 
     @Test
-    void buildStepPromptForCompletedPlanRequiresFinalResponseOnly() {
+    void completedPlanPromptOffersFinalResponseOrInability() {
         ExecutionPlan plan = createTwoTaskPlan()
                 .updateTask("t-1", task -> task.complete("parsed"))
                 .updateTask("t-2", task -> task.complete("matched"));
         String prompt = buildPromptForCurrentMode(
                 plan, "objective", 3, null, "Step 2 complete", List.of(mockTool("default-invoiceParser")), true, null);
         assertThat(prompt).contains("All required plan tasks are already COMPLETE");
-        assertThat(prompt).contains("You must return a FINAL_RESPONSE action");
+        assertThat(prompt).contains("Return FINAL_RESPONSE if you can fulfill the objective",
+                "{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"Explain what prevents completion.\"}");
         assertThat(prompt).doesNotContain("Option 1 - Call a tool for a ready task");
         assertThat(prompt).doesNotContain("\"stepAction\": \"CALL_TOOL\"");
     }

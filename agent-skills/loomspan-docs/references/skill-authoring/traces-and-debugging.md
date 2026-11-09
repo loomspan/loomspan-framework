@@ -467,7 +467,7 @@ cost, excess, correctness, importance, cause, or action recommendations.
 
 For an invalid planning step action, the existing correction attempt preserves the original task instructions and user input and adds the rejected assistant response and concrete failure diagnostic as quoted data. The complete latest original response is JSON-quoted in user evidence without a candidate-size cutoff, including Unicode, whitespace, fences, and the malformed tail. Earlier rejected candidates are replaced rather than accumulated; original task constraints and available completed-task results remain in the request. Parser failures include the bounded original parser reason, available coordinates in the parsed candidate, and a nearby fragment when its character offset is usable. Action-validation failures retain their own reason and are not labeled syntax errors.
 
-The correction requests one complete valid JSON action for the same assignment. A rejected action does not execute a tool; an accepted correction passes through normal action and argument validation before execution. The invalid-action allowance remains one retry. Final output-schema, evidence, and linter correction retain their separate existing allowances. Complete replay does not guarantee live-model recovery, argument or citation fidelity, or sufficient provider context capacity. Existing provider-attempt quotas and provider/resource failures remain explicit; Loomspan does not retry with a shortened or summarized candidate when complete evidence cannot be sent. Read the model request/response evidence when diagnosing correction, rather than assuming the bounded rejection-record preview contains the complete rejected action.
+The correction requests one complete valid JSON action in the same step context. A corrected tool call must pass normal assignment and argument validation before execution. A valid corrected [inability declaration](planning-concurrency.md#planner-inability) fails the step without invoking a tool. The invalid-action allowance is one retry. Final output-schema, evidence, and linter correction retain their separate allowances. Complete replay does not guarantee live-model recovery, argument or citation fidelity, or sufficient provider context capacity. Existing provider-attempt quotas and provider/resource failures remain explicit; Loomspan does not retry with a shortened or summarized candidate when complete evidence cannot be sent. Read the model request/response evidence when diagnosing correction, rather than assuming the bounded rejection-record preview contains the complete rejected action.
 
 Source and regression anchors: `StepLoopMissionExecutionEngine.parseStepAction` and its step loop, `StepActionCorrection`, `StepPromptBuilder`, `StepActionCorrectionTest`, `StepLoopMissionExecutionEngineTest`, and `StepPromptBuilderTest`. `OutputSchemaCallAdvisorTest` protects ordinary output-schema correction separately. `StepLoopMissionExecutionEngineTest#largeFinalSchemaRetriesReplaceCandidateAndRetainCompletedEvidence` protects replacement and completed evidence across final-schema retries. `StepLoopMissionExecutionEngineTest#completeStepCorrectionPropagatesContextLimitWithoutToolExecutionOrFallback` and `ModelAttemptCallAdvisorIntegrationTest#outputSchemaCorrectionPreservesFullCandidateWhenProviderRejectsContextLimit` protect explicit terminal context failures without lossy fallback, including exact provider wire text in the latter.
 
@@ -553,14 +553,23 @@ reports truncation separately. Provider response bodies are not available when
 the current client integration loses them before Loomspan observes a response.
 
 A canonical failure with `kind: "planner_inability"` has `RECOVERABLE`
-classification. For an accepted standard model declaration, the failure first
-records on the declaring model frame. The stack comes first, followed by a
-bounded `PLANNER_INABILITY_SIGNAL` text diagnostic with the exact adapter call
-`id`, `name`, and raw `arguments` as JSON. An absent ID is null. A truncated
-diagnostic can end inside the JSON text. The exact reason remains in `exceptionMessage`.
+classification. An accepted declaration records on the declaring model frame
+in standard execution, or on the assigned-task or synthesis step frame in
+explicit-step execution. The stack comes first, followed by
+`PLANNER_INABILITY_SIGNAL` as `text/plain; charset=utf-8`.
+
+- Standard signals contain the adapter call `id`, `name`, and raw `arguments`
+  as JSON. An absent ID is null.
+- Step signals contain the original response text, including whitespace, line
+  endings, and any fences. The step and plan identify the declaration's context,
+  including the Framework assignment when one exists.
+
+The signal captures up to 1 MiB of valid UTF-8 and reports its capture limit
+and truncation separately. The exact reason remains in `exceptionMessage`.
 Java-thrown instances carry the same failure kind and only the stack diagnostic.
 Use the failure kind for interpretation and `terminalFailureId` for the overall
-outcome. `ExplicitJavaFailureHandlingIntegrationTest` verifies those distinct facts.
+outcome. `ExplicitJavaFailureHandlingIntegrationTest` and
+`StepLoopMissionExecutionEngineTest` verify these facts.
 
 ### Sensitivity and limitations
 

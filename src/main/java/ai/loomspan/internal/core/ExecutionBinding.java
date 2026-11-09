@@ -89,15 +89,16 @@ public record ExecutionBinding(
         return MissionLifecycle.requireWritable(this, action);
     }
 
-    public void recordPlannerInability(PlannerInabilityException failure, byte[] signal)
+    public void recordPlannerInability(PlannerInabilityException failure, byte[] signal,
+            TraceFrameType expectedFrameType, Map<String, Object> context)
     {
         TraceDiagnostic diagnostic = TraceDiagnostic.plannerInabilitySignal(signal);
         requireMission().lifecycle().recordWhileOpen(this, () -> {
             if (Thread.currentThread().isInterrupted()) throw new CancellationException("Planner declaration interrupted");
-            ExecutionFrame modelFrame = branch.requireLeaf();
-            if (modelFrame.traceFrameType() != TraceFrameType.MODEL_CALL)
-                throw new IllegalStateException("Planner declaration requires an active model frame");
-            session.recordFailure(failure, Map.of("message", "Model invocation failed"), modelFrame, diagnostic);
+            ExecutionFrame frame = branch.requireLeaf();
+            if (frame.traceFrameType() != expectedFrameType)
+                throw new IllegalStateException("Planner declaration requires an active " + expectedFrameType + " frame");
+            session.recordFailure(failure, context, frame, diagnostic);
         });
     }
 }
