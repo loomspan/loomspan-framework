@@ -23,6 +23,12 @@ finalized plan content untrusted, and state what remains unknown.
   Recoverability does not prove correction. `causedByFailureId` links a distinct
   application wrapper to its earlier recorded cause. For provider attempts,
   establish retry success from a later response in the same retry sequence.
+- **Planner inability:** the optional `kind: planner_inability` identifies
+  recoverable unsuccessful completion. The exact reason and recorded origin
+  remain available even when the root succeeds. An accepted-signal diagnostic
+  establishes model declaration when present. Java can throw the same failure
+  type without that diagnostic. Inspect the parent request for actual feedback.
+  A failed call may already have produced effects.
 - **Retry or validation exhaustion:** group physical attempts by
   `retrySequenceId`, order by attempt number, and follow validation facts to the
   exact attempt. Provider retry and semantic retry are different.

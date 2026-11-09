@@ -128,6 +128,7 @@ function TraceExplorerEvidence({ traceId, source = "TARGET", onArtifactUnavailab
 		if (response.source !== "IMPORTED" || response.targetScopeId) {
 			setScopeMismatch(true);
 			select({ frameId: undefined, recordSequence: undefined, failureId: undefined, planId: undefined, transitionSequence: undefined });
+			throw new Error("The trace evidence response did not match the selected source.");
 		}
 		return response;
 	}, [select]);
@@ -137,6 +138,7 @@ function TraceExplorerEvidence({ traceId, source = "TARGET", onArtifactUnavailab
       select({ frameId: undefined, recordSequence: undefined, failureId: undefined, planId: undefined, transitionSequence: undefined });
     }
 		await requireCurrentTargetScope(response.targetScopeId ?? "", currentScopeID, refresh);
+		if (response.source !== "TARGET") throw new Error("The trace evidence response did not match the selected source.");
     return response;
 	}, [currentScopeID, refresh, select]);
 	const verifyScope = source === "TARGET" ? verifyTargetResponse : verifyImportedResponse;
@@ -541,7 +543,7 @@ function TraceExplorerEvidence({ traceId, source = "TARGET", onArtifactUnavailab
     {!summary ? <p role="status">Loading trace evidence&hellip;</p> : <>
       <p className="trace-explorer-summary">{summary.outcome} &middot; {summary.frameCount} frames &middot; {summary.recordCount} records{!summary.usageComplete && " · usage incomplete"}</p>
       {hasFailurePanel && <section id="trace-failure-panel" className="trace-failure-panel" aria-label="Trace failure details" tabIndex={-1}>
-        <TraceFailureFocus summary={summary} failure={selectedFailure} frame={selectedFrame} onView={showFailureView}
+        <TraceFailureFocus summary={summary} failure={selectedFailure} frame={selectedFrame?.frameId === selectedFailure?.frameId ? selectedFrame : undefined} onView={showFailureView}
           traceId={traceId} source={source} scopeGeneration={source === "TARGET" ? scopeGeneration : 0}
           verifyScope={verifyScope} onArtifactUnavailable={(value) => reportError(value, true)} />
         <TraceFailureDiagnostic onSelectFailure={viewFailure} traceId={traceId} source={source} failure={selectedFailure} scopeGeneration={source === "TARGET" ? scopeGeneration : 0} verifyScope={verifyScope} />

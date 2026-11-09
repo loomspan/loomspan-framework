@@ -57,7 +57,7 @@ func responseRecord(seq int, frameID, retryID, attemptID string, attemptNum int,
 		`","attemptNumber":` + itoa(attemptNum) +
 		`,"attemptReason":"` + attemptReason(attemptNum) + `","providerAttemptNumber":1` +
 		`,"usage":{"promptUnits":` + itoa(prompt) + `,"completionUnits":` + itoa(completion) +
-		`,"totalUnits":` + itoa(total) + `,"precision":"` + precision + `"}},"data":{"content":"r"}}`
+		`,"totalUnits":` + itoa(total) + `,"precision":"` + precision + `"}},"data":{"generations":[{"messageType":"ASSISTANT","text":"r","toolCalls":[]}]}}`
 }
 
 // requestRecord builds the sent boundary. Legacy two-boundary test layouts use
@@ -73,7 +73,7 @@ func requestRecord(seq int, retryID, attemptID string, attemptNum int, formerFir
 		`,"recordType":"` + rt + `","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th",` +
 		`"metadata":{"retrySequenceId":"` + retryID + `","attemptId":"` + attemptID +
 		`","attemptNumber":` + itoa(attemptNum) + `,"attemptReason":"` + attemptReason(attemptNum) +
-		`","providerAttemptNumber":1},"data":{"messages":["u"]}}`
+		`","providerAttemptNumber":1},"data":{"messages":[{"messageType":"USER","text":"u"}]}}`
 }
 
 func attemptReason(number int) string {
@@ -426,7 +426,7 @@ func TestAttemptsRejectInconsistentAttemptNumber(t *testing.T) {
 		// Same attemptId but different attemptNumber in the SENT record
 		`{"traceId":"t","sessionId":"s","sequence":3,"timestamp":` + timestampForSeq(3) +
 		`,"recordType":"MODEL_REQUEST_SENT","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th",` +
-		`"metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":2},"data":{"messages":["u"]}}` + "\n" +
+		`"metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":2},"data":{"messages":[{"messageType":"USER","text":"u"}]}}` + "\n" +
 		completionRecord(4, "SUCCEEDED", 0, 0, 0, "") + "\n"
 	_, cat, ok := processTrace(t, raw)
 	if ok {
@@ -747,7 +747,7 @@ func TestAttemptsRejectInconsistentIdentityNumberAndLifecycleOrder(t *testing.T)
 			requestRecord(2, "retry-1", "attempt-1", 1, false) + "\n" +
 			`{"traceId":"t","sessionId":"s","sequence":3,"timestamp":` + timestampForSeq(3) +
 			`,"recordType":"MODEL_REQUEST_SENT","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th",` +
-			`"metadata":{"retrySequenceId":"retry-2","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1},"data":{"messages":["u"]}}` + "\n" +
+			`"metadata":{"retrySequenceId":"retry-2","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1},"data":{"messages":[{"messageType":"USER","text":"u"}]}}` + "\n" +
 			completionRecord(4, "SUCCEEDED", 0, 0, 0, "") + "\n"
 		_, cat, ok := processTrace(t, raw)
 		if ok {

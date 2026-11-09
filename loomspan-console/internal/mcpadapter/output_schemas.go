@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/diagnostics"
@@ -16,26 +17,52 @@ const maxToolsListResponseBytes = 25 << 10
 func compactFalseSchema() *jsonschema.Schema { return &jsonschema.Schema{Not: &jsonschema.Schema{}} }
 
 func addValidatedTool[In, Out any](server *mcp.Server, tool *mcp.Tool, compact *jsonschema.Schema, handler mcp.ToolHandlerFor[In, Out]) {
-	validate := newCompleteOutputValidator[Out](tool.Name)
 	tool.OutputSchema = compact
+	checked := checkedToolHandler(tool.Name, handler, newValidatedOutputEncoder[Out](tool.Name, nil))
 	mcp.AddTool(server, tool, func(ctx context.Context, request *mcp.CallToolRequest, input In) (*mcp.CallToolResult, Out, error) {
-		ctx = diagnostics.Operation(ctx, "mcp."+tool.Name)
-		result, output, callErr := handler(ctx, request, input)
-		if callErr != nil {
-			diagnostics.Report(ctx, callErr)
-			return result, output, callErr
-		}
-		if err := validate(output); err != nil {
-			diagnostics.Report(ctx, diagnostics.Annotate(err, diagnostics.Facts{Classification: "internal", Cause: "response_encode", Stage: "response"}))
-			var zero Out
-			return nil, zero, err
-		}
-		return result, output, nil
+		result, output, _, err := checked(ctx, request, input)
+		return result, output, err
 	})
 }
 
-func newCompleteOutputValidator[Out any](toolName string) func(Out) error {
-	full, err := jsonschema.For[Out](nil)
+// The SDK validates input as usual. Publish our validated bytes for this tool
+// because the SDK's structured-output remarshal can replace escaped code units.
+func addValidatedToolWithExactOutput[In, Out any](server *mcp.Server, tool *mcp.Tool, compact *jsonschema.Schema, handler mcp.ToolHandlerFor[In, Out]) {
+	tool.OutputSchema = compact
+	checked := checkedToolHandler(tool.Name, handler, newValidatedOutputEncoder[Out](tool.Name, compact))
+	mcp.AddTool(server, tool, func(ctx context.Context, request *mcp.CallToolRequest, input In) (*mcp.CallToolResult, any, error) {
+		result, _, encoded, err := checked(ctx, request, input)
+		if err != nil {
+			return result, nil, err
+		}
+		result.StructuredContent = encoded
+		return result, nil, nil
+	})
+}
+
+func checkedToolHandler[In, Out any](name string, handler mcp.ToolHandlerFor[In, Out], encode func(Out) (json.RawMessage, error)) func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, Out, json.RawMessage, error) {
+	return func(ctx context.Context, request *mcp.CallToolRequest, input In) (*mcp.CallToolResult, Out, json.RawMessage, error) {
+		ctx = diagnostics.Operation(ctx, "mcp."+name)
+		result, output, callErr := handler(ctx, request, input)
+		if callErr != nil {
+			diagnostics.Report(ctx, callErr)
+			return result, output, nil, callErr
+		}
+		encoded, err := encode(output)
+		if err != nil {
+			diagnostics.Report(ctx, diagnostics.Annotate(err, diagnostics.Facts{Classification: "internal", Cause: "response_encode", Stage: "response"}))
+			var zero Out
+			return nil, zero, nil, err
+		}
+		return result, output, encoded, nil
+	}
+}
+
+func newValidatedOutputEncoder[Out any](toolName string, compact *jsonschema.Schema) func(Out) (json.RawMessage, error) {
+	// Raw exception messages are validated nullable JSON strings.
+	full, err := jsonschema.For[Out](&jsonschema.ForOptions{TypeSchemas: map[reflect.Type]*jsonschema.Schema{
+		reflect.TypeFor[json.RawMessage](): {Types: []string{"null", "string"}},
+	}})
 	if err != nil {
 		panic(fmt.Sprintf("derive complete output schema for %s: %v", toolName, err))
 	}
@@ -43,24 +70,36 @@ func newCompleteOutputValidator[Out any](toolName string) func(Out) error {
 	if err != nil {
 		panic(fmt.Sprintf("resolve complete output schema for %s: %v", toolName, err))
 	}
-	return func(output Out) error {
+	var advertised *jsonschema.Resolved
+	if compact != nil {
+		advertised, err = compact.Resolve(nil)
+		if err != nil {
+			panic(fmt.Sprintf("resolve advertised output schema for %s: %v", toolName, err))
+		}
+	}
+	return func(output Out) (json.RawMessage, error) {
 		encoded, err := json.Marshal(output)
 		if err != nil {
-			return fmt.Errorf("INTERNAL: %s result could not be encoded: %w", toolName, err)
+			return nil, fmt.Errorf("INTERNAL: %s result could not be encoded: %w", toolName, err)
 		}
 		var instance any
 		if err := json.Unmarshal(encoded, &instance); err != nil {
-			return fmt.Errorf("INTERNAL: %s result could not be validated: %w", toolName, err)
+			return nil, fmt.Errorf("INTERNAL: %s result could not be validated: %w", toolName, err)
 		}
 		if toolName == GetTraceToolName {
 			if err := validateCompleteRecordCounts(instance); err != nil {
-				return fmt.Errorf("INTERNAL: %s result violates its complete contract: %w", toolName, err)
+				return nil, fmt.Errorf("INTERNAL: %s result violates its complete contract: %w", toolName, err)
 			}
 		}
 		if err := resolved.Validate(instance); err != nil {
-			return fmt.Errorf("INTERNAL: %s result violates its complete contract: %w", toolName, err)
+			return nil, fmt.Errorf("INTERNAL: %s result violates its complete contract: %w", toolName, err)
 		}
-		return nil
+		if advertised != nil {
+			if err := advertised.Validate(instance); err != nil {
+				return nil, fmt.Errorf("INTERNAL: %s result violates its advertised contract: %w", toolName, err)
+			}
+		}
+		return encoded, nil
 	}
 }
 
@@ -253,8 +292,14 @@ func recordQueryOutputSchema() *jsonschema.Schema {
 		"role": compactString(), "available": compactBoolean(), "complete": compactBoolean(),
 		"contentRef": compactString(), "inlineContent": compactString(), "inlineOmission": compactString(),
 	}, true)
+	failure := compactObject(nil, map[string]*jsonschema.Schema{"kind": {Enum: []any{"planner_inability"}}}, true)
+	failure.DependentSchemas = map[string]*jsonschema.Schema{
+		"kind": {Required: []string{"classification"}, Properties: map[string]*jsonschema.Schema{
+			"classification": {Enum: []any{"RECOVERABLE"}},
+		}},
+	}
 	record := compactObject([]string{"sequence", "type", "timestampMillis", "representation", "attempts", "retries", "validations", "failures"}, map[string]*jsonschema.Schema{
-		"sequence": compactInteger(), "type": compactString(), "failureId": compactString(), "validationStatus": compactString(), "timestampMillis": compactInteger(), "representation": compactString(), "plan": compactOpenObject(), "resultForwarding": compactOpenObject(), "resultAssembly": compactOpenObject(), "attempts": compactArray(compactOpenObject()), "retries": compactArray(compactOpenObject()), "validations": compactArray(compactOpenObject()), "failures": compactArray(compactOpenObject()), "content": content,
+		"sequence": compactInteger(), "type": compactString(), "failureId": compactString(), "validationStatus": compactString(), "timestampMillis": compactInteger(), "representation": compactString(), "plan": compactOpenObject(), "resultForwarding": compactOpenObject(), "resultAssembly": compactOpenObject(), "attempts": compactArray(compactOpenObject()), "retries": compactArray(compactOpenObject()), "validations": compactArray(compactOpenObject()), "failures": compactArray(failure), "content": content,
 	}, true)
 	match := compactObject([]string{"sequence", "recordType", "matchOffset", "matchLength", "searchedField"}, map[string]*jsonschema.Schema{
 		"sequence": compactInteger(), "recordType": compactString(), "matchOffset": compactInteger(), "matchLength": compactInteger(), "searchedField": compactString(), "contentId": compactString(),

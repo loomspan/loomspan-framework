@@ -441,6 +441,25 @@ test("failure selection follows its linked frame", async () => {
   await vi.waitFor(() => expect(screen.getByLabelText("location")).toHaveTextContent("frameId=f-1"));
 });
 
+test("distinguishes a selected child inability from the failed root's completion link", async () => {
+  api.getTraceAnalysisSummary.mockResolvedValueOnce({
+    source: "TARGET", targetScopeId: "scope-1", traceId: "trace-1", outcome: "FAILED",
+    terminalFailureId: "root-failure", recordCount: 5, frameCount: 1, gapCount: 0, uncertaintyCount: 0,
+  });
+  api.getTraceFailures.mockResolvedValueOnce({
+    source: "TARGET", targetScopeId: "scope-1", hasMore: false, nextCursor: null,
+    items: [{ classification: "RECOVERABLE", kind: "planner_inability", failureId: "child-failure",
+      terminal: false, exceptionMessage: "No approved source", frameId: "f-1",
+      sequence: 3, recordType: "ERROR_RECORDED", contextSummary: "Final synthesis reported planner inability" }],
+  });
+  render(<MemoryRouter initialEntries={["/?failureId=child-failure"]}><TraceExplorer traceId="trace-1" /></MemoryRouter>);
+  const panel = await screen.findByRole("region", { name: "Planner inability evidence" });
+  expect(within(panel).getByText("Selected failure ID").parentElement).toHaveTextContent("child-failure");
+  expect(within(panel).getByText("Terminal failure ID").parentElement).toHaveTextContent("root-failure");
+  expect(within(panel).getByText("Final synthesis reported planner inability")).toBeVisible();
+  expect(screen.queryByText("Selected as the completion failure.")).toBeNull();
+});
+
 test("frame selection follows its first linked failure", async () => {
   api.getTraceFrames.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ frameId: "f-1", parentFrameId: null, childFrameIds: [], frameType: "SKILL", route: "hello", inclusiveDurationMillis: null, selfDurationMillis: null, failureIds: ["failure-1"] }], hasMore: false, nextCursor: null });
   api.getTraceFailures.mockResolvedValueOnce({ source: "TARGET", targetScopeId: "scope-1", items: [{ classification: "TERMINAL" as const, exceptionMessage: "failure", failureId: "failure-1", terminal: false, sequence: 2, frameId: "f-1" }], hasMore: false, nextCursor: null });
@@ -615,6 +634,22 @@ test.each(["TARGET", "IMPORTED"] as const)("clears expanded comparison on mismat
   fireEvent.click(screen.getByRole("button", { name: "Load more records" }));
   await vi.waitFor(() => expect(screen.queryByRole("region", { name: "Plan diff for record 7" })).toBeNull());
   expect(screen.queryByRole("button", { name: "View diff" })).toBeNull();
+});
+
+test.each(["TARGET", "IMPORTED"] as const)("does not display model evidence from a different source for %s", async (source) => {
+  const envelope = { source, targetScopeId: source === "TARGET" ? "scope-1" : undefined, hasMore: false, nextCursor: null };
+  const record = { sequence: 7, type: "MODEL_RESPONSE_RECEIVED", frameId: "", content: { contentRef: "model-content" } };
+  const payload = JSON.stringify({ generations: [{ messageType: "ASSISTANT", text: "wrong source evidence", toolCalls: [] }] });
+  api.getTraceAnalysisSummary.mockResolvedValueOnce({ ...envelope, outcome: "SUCCEEDED", frameCount: 0, recordCount: 1 });
+  api.getTraceFrames.mockResolvedValueOnce({ ...envelope, items: [] });
+  api.getTraceFailures.mockResolvedValueOnce({ ...envelope, items: [] });
+  api.getTraceRecords.mockResolvedValueOnce({ ...envelope, items: [record] });
+  api.getContentRange.mockResolvedValueOnce({ ...envelope, source: source === "TARGET" ? "IMPORTED" : "TARGET",
+    actualStart: 0, actualEnd: payload.length, totalLength: payload.length, contentType: "application/json", encoding: "TEXT", content: payload });
+  render(<MemoryRouter initialEntries={["/?view=records"]}><TraceExplorer traceId="trace-1" source={source} /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "Response" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("did not match the selected source");
+  expect(screen.queryByText("wrong source evidence")).toBeNull();
 });
 
 test.each(["TARGET", "IMPORTED"].flatMap((source) => ["ARTIFACT_EXPIRED", "NOT_FOUND"].flatMap((code) => ["raw", "model", "diagnostics"].map((reader) => ({ source, code, reader })))))("invalidates diff on $source $reader evidence $code", async ({ source, code, reader }) => {

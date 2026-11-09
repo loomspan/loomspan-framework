@@ -1223,20 +1223,24 @@ func TestCurrentCorpusExplicitFailureMeaning(t *testing.T) {
 				t.Fatalf("facts=%+v domain=%v", page, domain)
 			}
 			first := page.Items[0]
+			if first.Kind != "" {
+				t.Fatalf("ordinary failure unexpectedly classified as inability: %+v", first)
+			}
 			if name == "terminal-unlinked-success" {
 				if first.Classification != "TERMINAL" || first.Terminal {
 					t.Fatalf("facts=%+v", first)
 				}
 				return
 			}
-			if first.Classification != "RECOVERABLE" || first.ExceptionMessage == nil || *first.ExceptionMessage != "  correct this\n雪\t" {
+			var reason *string
+			if err := json.Unmarshal(first.ExceptionMessage, &reason); err != nil || reason == nil || *reason != "  correct this\n雪\t" || first.Classification != "RECOVERABLE" {
 				t.Fatalf("exact facts=%+v", first)
 			}
 			if first.Terminal != (name == "recoverable-failed-completion") {
 				t.Fatalf("completion conflated: %+v", first)
 			}
 			if name == "terminal-wrapper-recorded-cause" {
-				if len(page.Items) != 2 || page.Items[1].Classification != "TERMINAL" || page.Items[1].CausedByFailureID != first.FailureID || !page.Items[1].Terminal {
+				if len(page.Items) != 2 || page.Items[1].Classification != "TERMINAL" || page.Items[1].Kind != "" || page.Items[1].CausedByFailureID != first.FailureID || !page.Items[1].Terminal {
 					t.Fatalf("wrapper facts=%+v", page.Items)
 				}
 			}

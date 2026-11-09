@@ -13,16 +13,25 @@ export function TraceFailureFocus({ summary, failure, frame, onView, traceId, so
   verifyScope?: (response: TraceRange) => Promise<TraceRange>;
   onArtifactUnavailable?: (error: unknown) => void;
 }) {
-  if ((summary.outcome !== "FAILED" && summary.outcome !== "ABORTED") || !summary.terminalFailureId) return null;
+  const completionFailureId = summary.terminalFailureId;
+  const inability = failure?.kind === "planner_inability";
+  if (!inability && !completionFailureId) return null;
+  const completionSelected = !failure || failure.failureId === completionFailureId;
   return <section className="failure-focus" aria-labelledby="failure-focus-title">
-    <h4 id="failure-focus-title">Terminal failure evidence</h4>
+    <h4 id="failure-focus-title">{inability ? "Planner inability evidence" : completionSelected ? "Terminal failure evidence" : "Selected failure evidence"}</h4>
     <dl className="status-grid">
       <div><dt>Outcome</dt><dd>{summary.outcome}</dd></div>
-      <div><dt>Terminal failure ID</dt><dd><code>{summary.terminalFailureId ?? "unavailable"}</code></dd></div>
+      {failure && !completionSelected && <div><dt>Selected failure ID</dt><dd><code>{failure.failureId}</code></dd></div>}
+      {completionFailureId && <div><dt>Terminal failure ID</dt><dd><code>{completionFailureId}</code></dd></div>}
       <div><dt>Record</dt><dd>{failure ? `${failure.recordType} sequence ${failure.sequence}` : "Loading or unavailable"}</dd></div>
       <div><dt>Frame</dt><dd><code>{failure?.frameId || "unattributed"}</code></dd></div>
       <div><dt>Route</dt><dd>{failure?.route || frame?.route || "unavailable"}</dd></div>
       <div><dt>Recorded skill names</dt><dd>{frame?.skillNames?.join(", ") || "unavailable"}</dd></div>
+      {inability && failure.contextSummary && <div><dt>Recorded context</dt><dd>{failure.contextSummary}</dd></div>}
+      {inability && frame?.taskId && <div><dt>Assignment context</dt><dd>
+        Task <code>{frame.taskId}</code>{frame.planId && <> · Plan <code>{frame.planId}</code></>}
+        {frame.stepNumber != null && <> · Assignment step {frame.stepNumber}</>}
+      </dd></div>}
       <div><dt>Attempt</dt><dd><code>{failure?.attemptId || frame?.attemptIds?.join(", ") || "unavailable"}</code></dd></div>
       <div><dt>Retry sequence</dt><dd><code>{failure?.retrySequenceId || frame?.retrySequenceIds?.join(", ") || "unavailable"}</code></dd></div>
       <div><dt>Validation</dt><dd>{failure?.validationStatus || frame?.validationStatuses?.join(", ") || "unavailable"}</dd></div>

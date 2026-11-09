@@ -399,6 +399,10 @@ obstacle. Work may already have completed, and replay may be unsafe.
 Direct and admitted Java callers can catch `PlannerInabilityException` and read the
 exact reason through `getMessage()`. Existing `RecoverableSkillException` catches
 also apply. Use `RecoverableSkillException` for ordinary Java operation correction.
+Console shows the selected failure's origin, the accepted signal when captured,
+and the parent request's recorded tool feedback. Java-thrown inability has the
+same failure kind. Use recorded evidence to identify its source.
+See [trace failure inspection](agent-skills/loomspan-docs/references/skill-authoring/traces-and-debugging.md#terminal-outcome-and-failures).
 
 YAML executor leaves retain their definitions and use captured registrations,
 selected executor configuration and executor generation identity during execution.

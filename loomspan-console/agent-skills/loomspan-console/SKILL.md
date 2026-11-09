@@ -60,7 +60,8 @@ references required by the interpretation:
 | Question | Primary evidence path |
 | --- | --- |
 | What is running now? | `LOOMSPAN_list_executions`, then selected `LOOMSPAN_get_execution` and bounded activity. |
-| Why did this trace fail? | `LOOMSPAN_get_trace` for the outcome and exact `terminalFailureId`, then frames and records filtered by that identity. Keep recovered failures separate. |
+| Why did this trace fail? | Use `LOOMSPAN_get_trace` for the outcome and `terminalFailureId`. Query records by that `failureId` and inspect the recorded `frameId`. Keep earlier failures separate. |
+| Where did planner inability occur, and what feedback reached the parent? | Query the selected failure and detailed origin frame, then read its accepted-signal diagnostic and the parent request's tool response when present. A successful root can contain a child inability. |
 | Did planned tasks run concurrently? | `LOOMSPAN_query_trace_plans` for `parallelGroup`, `effectiveConcurrency`, transitions, and nullable `observedOverlap`; use `DETAILED` frames for exact open/close intervals. |
 | Where was time or usage spent? | `DETAILED` frames, using duration or usage order when useful; preserve direct, descendant, inclusive, and unknown values. |
 | What model, tool, or structured content was recorded? | Descriptor-first `LOOMSPAN_query_trace_records` narrowed to the relevant types, then read only selected `contentRef` values. Captured thought is not automatically the final output. |

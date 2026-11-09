@@ -164,9 +164,12 @@ the exact reason from `getMessage()`. A model can declare inability in standard
 execution or during explicit-step assigned action generation or final synthesis.
 Explicit-step parents propagate child failure. An enclosing standard tool caller
 can receive the reason as failed-call feedback and continue within its existing
-authority. Java can construct and throw the same subtype, in which case canonical
-diagnostics record its Java origin. Use `RecoverableSkillException` for ordinary
-corrective Java feedback. If the observer throws after an inability, the inability
+authority. Prior work may have completed, so continuation alone does not make
+replay safe. Java can construct and throw the same subtype. Canonical diagnostics
+record its Java origin and stack without an accepted model signal. Use
+`RecoverableSkillException` for ordinary corrective Java feedback. See
+[trace failure inspection](../skill-authoring/traces-and-debugging.md#terminal-outcome-and-failures)
+for recorded origin, signal, and parent feedback. If the observer throws after an inability, the inability
 remains primary and the observer exception is suppressed on it.
 
 Canonical error facts and their observer projection carry `classification` (`RECOVERABLE` or `TERMINAL`) and exact nullable `exceptionMessage` separately from contextual `message`. `causedByFailureId`, when present, links a distinct application wrapper to an already-recorded cause. Transparent propagation reuses identity; application wrappers retain their own terminal identity. Classification says whether standard feedback is permitted, never whether correction happened. Completion linkage is independent: a recoverable failure can terminate direct or explicit-step execution.

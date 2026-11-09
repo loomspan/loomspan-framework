@@ -33,7 +33,7 @@ func validateTypedOutput[T any](t *testing.T, name string, schema *jsonschema.Sc
 	if err := validateCompactInstance(t, schema, instance); err != nil {
 		t.Fatalf("compact contract rejected %s output: %v\n%s", name, err, encoded)
 	}
-	if err := newCompleteOutputValidator[T](name)(output); err != nil {
+	if _, err := newValidatedOutputEncoder[T](name, nil)(output); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -84,8 +84,8 @@ func TestCompleteOutputValidationRejectsFieldsHiddenByCompactDiscovery(t *testin
 	if err := validateCompactInstance(t, compact, compactInstance); err != nil {
 		t.Fatalf("compact control rejected: %v", err)
 	}
-	validate := newCompleteOutputValidator[malformedCompleteOutput]("test-tool")
-	err := validate(malformedCompleteOutput{Required: "present before custom serialization"})
+	encode := newValidatedOutputEncoder[malformedCompleteOutput]("test-tool", nil)
+	_, err := encode(malformedCompleteOutput{Required: "present before custom serialization"})
 	if err == nil || !strings.Contains(err.Error(), "complete contract") {
 		t.Fatalf("complete validation error = %v", err)
 	}
@@ -147,6 +147,32 @@ func TestEveryInstalledToolRepresentativeOutputsValidateAgainstBothSchemas(t *te
 	}
 	for _, test := range tests {
 		t.Run(test.name, test.validate)
+	}
+}
+
+func TestRecordFailureSchemaValidatesPlannerInabilityKind(t *testing.T) {
+	failure := recordQueryOutputSchema().Properties["result"].Properties["items"].Items.Properties["failures"].Items
+	for _, test := range []struct {
+		fact  string
+		valid bool
+	}{
+		{"{\"classification\":\"RECOVERABLE\"}", true},
+		{"{\"classification\":\"TERMINAL\"}", true},
+		{"{\"classification\":\"RECOVERABLE\",\"kind\":\"planner_inability\",\"terminal\":true}", true},
+		{"{\"classification\":\"TERMINAL\",\"kind\":\"planner_inability\"}", false},
+		{"{\"kind\":\"planner_inability\"}", false},
+		{"{\"classification\":\"RECOVERABLE\",\"kind\":null}", false},
+		{"{\"classification\":\"RECOVERABLE\",\"kind\":\"\"}", false},
+		{"{\"classification\":\"RECOVERABLE\",\"kind\":false}", false},
+		{"{\"classification\":\"RECOVERABLE\",\"kind\":\"unknown\"}", false},
+	} {
+		var fact map[string]any
+		if err := json.Unmarshal([]byte(test.fact), &fact); err != nil {
+			t.Fatal(err)
+		}
+		if err := validateCompactInstance(t, failure, fact); (err == nil) != test.valid {
+			t.Fatalf("fact=%s valid=%v err=%v", test.fact, test.valid, err)
+		}
 	}
 }
 

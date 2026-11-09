@@ -2,9 +2,10 @@ package traceanalysis
 
 import (
 	"encoding/json"
-	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
 )
 
 // failureGraph tracks ERROR_RECORDED failure facts and validates terminal
@@ -64,11 +65,9 @@ type diagnosticValue struct {
 	CaptureLimitBytes int     `json:"captureLimitBytes"`
 }
 type failureData struct {
-	Classification   string            `json:"classification"`
-	ExceptionMessage *string           `json:"exceptionMessage"`
-	ExceptionType    string            `json:"exceptionType"`
-	Message          string            `json:"message"`
-	Diagnostics      []diagnosticValue `json:"diagnostics"`
+	ExceptionType string            `json:"exceptionType"`
+	Message       string            `json:"message"`
+	Diagnostics   []diagnosticValue `json:"diagnostics"`
 }
 
 func (g *failureGraph) validateDiagnostics(assembler *payloadAssembler, traceID string) *consolecore.Error {
@@ -78,27 +77,31 @@ func (g *failureGraph) validateDiagnostics(assembler *payloadAssembler, traceID 
 		if fact.PayloadID != "" {
 			raw = assembler.logicalPayload(fact.PayloadID)
 		}
-		if len(raw) == 0 || string(raw) == "null" {
+		fields, ok := decodeUniqueObject(raw)
+		if !ok {
 			return invalidityError(CategoryUnsupportedValue, traceID)
+		}
+		if err := json.Unmarshal(fields["classification"], &fact.Classification); err != nil ||
+			(fact.Classification != "RECOVERABLE" && fact.Classification != "TERMINAL") {
+			return invalidityError(CategoryUnsupportedValue, traceID)
+		}
+		// Decode for validation only. Keeping the original JSON value preserves
+		// escaped Java UTF-16 code units that Go strings cannot round-trip.
+		fact.ExceptionMessage = fields["exceptionMessage"]
+		var message *string
+		if err := json.Unmarshal(fact.ExceptionMessage, &message); err != nil ||
+			(fact.Classification == "RECOVERABLE" && (message == nil || javaBlankMessage(*message))) {
+			return invalidityError(CategoryUnsupportedValue, traceID)
+		}
+		if rawKind, present := fields["kind"]; present {
+			if err := json.Unmarshal(rawKind, &fact.Kind); err != nil || fact.Kind != "planner_inability" || fact.Classification != "RECOVERABLE" {
+				return invalidityError(CategoryUnsupportedValue, traceID)
+			}
 		}
 		var data failureData
 		if err := json.Unmarshal(raw, &data); err != nil {
 			return invalidityError(CategoryUnsupportedValue, traceID)
 		}
-		if data.Classification != "RECOVERABLE" && data.Classification != "TERMINAL" {
-			return invalidityError(CategoryUnsupportedValue, traceID)
-		}
-		var fields map[string]json.RawMessage
-		if err := json.Unmarshal(raw, &fields); err != nil {
-			return invalidityError(CategoryUnsupportedValue, traceID)
-		}
-		if _, exists := fields["exceptionMessage"]; !exists {
-			return invalidityError(CategoryUnsupportedValue, traceID)
-		}
-		if data.Classification == "RECOVERABLE" && (data.ExceptionMessage == nil || javaBlankMessage(*data.ExceptionMessage)) {
-			return invalidityError(CategoryUnsupportedValue, traceID)
-		}
-		fact.Classification, fact.ExceptionMessage = data.Classification, data.ExceptionMessage
 		fact.ExceptionType, fact.ContextSummary = data.ExceptionType, data.Message
 		if len(data.Diagnostics) == 0 {
 			return invalidityError(CategoryUnsupportedValue, traceID)

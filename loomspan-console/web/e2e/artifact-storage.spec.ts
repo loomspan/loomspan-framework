@@ -70,12 +70,12 @@ function makeLargeChunkedPayloadArtifact(): Buffer {
     { ...common, sequence: 3, recordType: "MODEL_REQUEST_SENT", metadata: { retrySequenceId: "retry-1", attemptId: "attempt-1", attemptNumber: 1, attemptReason: "INITIAL", providerAttemptNumber: 1, payloadId: "payload-large", chunkCount, payloadChunked: true, contentType: "application/json" }, data: null },
   ];
   for (let index = 0; index < chunkCount; index++) {
-    const prefix = index === 0 ? '{"content":"' : "";
-    const suffix = index === chunkCount - 1 ? '"}' : "";
+    const prefix = index === 0 ? '{"messages":[{"messageType":"USER","text":"' : "";
+    const suffix = index === chunkCount - 1 ? '"}]}' : "";
     records.push({ ...common, sequence: 4 + index, recordType: "PAYLOAD_CHUNK_APPENDED", metadata: { payloadId: "payload-large", chunkIndex: index, chunkCount, contentType: "application/json" }, data: prefix + "x".repeat(chunkBytes) + suffix });
   }
   records.push(
-    { ...common, sequence: 4 + chunkCount, recordType: "MODEL_RESPONSE_RECEIVED", metadata: { retrySequenceId: "retry-1", attemptId: "attempt-1", attemptNumber: 1, attemptReason: "INITIAL", providerAttemptNumber: 1, usage: { promptUnits: 2, completionUnits: 1, totalUnits: 3, precision: "EXACT" } }, data: { content: "done" } },
+    { ...common, sequence: 4 + chunkCount, recordType: "MODEL_RESPONSE_RECEIVED", metadata: { retrySequenceId: "retry-1", attemptId: "attempt-1", attemptNumber: 1, attemptReason: "INITIAL", providerAttemptNumber: 1, usage: { promptUnits: 2, completionUnits: 1, totalUnits: 3, precision: "EXACT" } }, data: { generations: [{ messageType: "ASSISTANT", text: "done", toolCalls: [] }] } },
     { ...common, sequence: 5 + chunkCount, recordType: "TRACE_COMPLETED", metadata: { outcome: "SUCCEEDED", sessionUsageSnapshot: { promptUnits: 2, completionUnits: 1, totalUnits: 3 }, errored: false, persistencePolicy: "ALWAYS" }, data: null },
   );
   return Buffer.from(records.map((record) => JSON.stringify(record)).join("\n") + "\n");
@@ -500,7 +500,9 @@ test("chunked payload inspection is deliberate and incomplete timing stays expli
   await acquireAndOpenExplorer(page, consoleProcess, "trace-chunked-json-payload");
   await page.getByRole("tab", { name: "Records" }).click();
   await page.getByRole("button", { name: "Request", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Request could not be displayed");
+  const request = page.getByRole("region", { name: /Model request for record/ });
+  await expect(request.getByRole("heading", { name: "user" })).toBeVisible();
+  expect(await request.locator("pre").textContent()).toBe("x".repeat(5000));
   await navigateToTraceDetail(page, consoleProcess, "trace-incomplete-frame-duration");
   await page.getByRole("button", { name: "Acquire for analysis" }).click();
   await page.getByRole("tab", { name: "Timeline" }).click();
@@ -513,7 +515,9 @@ test("multi-megabyte payload remains bounded and continuable", async ({ page, co
   await acquireAndOpenExplorer(page, consoleProcess, "trace-large-chunked-payload");
   await page.getByRole("tab", { name: "Records" }).click();
   await page.getByRole("button", { name: "Request", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Request could not be displayed");
+  const request = page.getByRole("region", { name: /Model request for record/ });
+  await expect(request.getByRole("heading", { name: "user" })).toBeVisible();
+  expect(await request.locator("pre").evaluate(element => element.textContent?.length)).toBe(36 * 64 * 1024);
 });
 
 test("nested retry attempts remain separate returned facts", async ({ page, consoleProcess, targetApp }) => {
@@ -523,7 +527,9 @@ test("nested retry attempts remain separate returned facts", async ({ page, cons
   const requests = page.getByRole("button", { name: "Request", exact: true });
   await expect(requests).toHaveCount(3);
   await requests.nth(1).click();
-  await expect(page.getByRole("alert")).toContainText("not a JSON object");
+  const request = page.getByRole("region", { name: /Model request for record/ });
+  await expect(request.getByRole("heading", { name: "user" })).toBeVisible();
+  expect(await request.locator("pre").textContent()).toBe("user");
 });
 
 // WF-AS-02: A failed (FAILED outcome) trace can also be acquired for analysis

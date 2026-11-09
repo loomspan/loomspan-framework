@@ -125,10 +125,10 @@ test("renders validation warning status without reading raw record content", () 
 });
 
 test("switches from the response view to the raw envelope on the same row", async () => {
-  const rawRecord = JSON.stringify({ traceId: "trace-1", sequence: 7, recordType: "MODEL_RESPONSE_RECEIVED", data: { content: "model output" } });
+  const rawRecord = JSON.stringify({ traceId: "trace-1", sequence: 7, recordType: "MODEL_RESPONSE_RECEIVED", data: { generations: [{ messageType: "ASSISTANT", text: "model output", toolCalls: [] }] } });
   getRawRecordRangeMock.mockResolvedValue(range(rawRecord));
   const value = record("MODEL_RESPONSE_RECEIVED");
-  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify({ content: "model output" }) };
+  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify({ generations: [{ messageType: "ASSISTANT", text: "model output", toolCalls: [] }] }) };
   renderRecord(value);
 
   fireEvent.click(screen.getByRole("button", { name: "Response" }));

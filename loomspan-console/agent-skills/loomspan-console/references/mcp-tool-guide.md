@@ -120,14 +120,23 @@ Unknown properties are rejected rather than silently interpreted.
   `TRACE_COMPLETED.terminalFailureId`.
 - Error facts expose `classification` (`RECOVERABLE` or `TERMINAL`), exact nullable
   `exceptionMessage`, contextual `contextSummary`, and optional `causedByFailureId`.
-  Read these recorded facts directly. The separate `terminal` field means selected
-  by completion; neither recoverability nor an unlinked error proves correction.
+  The optional `kind: planner_inability` applies to recoverable inability.
+  Read these recorded facts directly. The separate `terminal` field records
+  completion selection. Recoverability alone does not establish correction.
+  Follow the failure's `frameId` for origin and diagnostic `contentRef` for any
+  accepted signal. The signal is opaque text and may be truncated. The kind
+  also applies to Java-thrown inability without a model signal.
 - Join selected plans and detailed frames through recorded frame and plan IDs.
   Canonical sequence orders recorded events but does not prove cause or
   simultaneity between concurrent branches.
 - Treat one `MODEL_REQUEST_SENT` as the start of one physical provider attempt.
   Its terminal is either `MODEL_RESPONSE_RECEIVED` or `MODEL_ATTEMPT_FAILED`;
-  there is no separate prepared-request phase. Read typed failure
+  there is no separate prepared-request phase. Chat requests carry ordered
+  `messages`, and responses carry ordered `generations`. Read the model record's
+  ordinary `contentRef` for nullable text, supplied IDs and names, and exact
+  `toolCalls` or `toolResponses` strings. Inspect the parent request's recorded
+  tool response for actual feedback. Array position only groups evidence.
+  TypeSafe evaluation payloads use their separate format. Read typed failure
   classification, category, retry decision, and delay before opening diagnostic
   content. A wrapped provider read deadline is `TIMEOUT`; caller cancellation is
   not. A failure record's ordinary `contentRef` selects an ordered diagnostics

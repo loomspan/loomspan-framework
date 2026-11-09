@@ -1,0 +1,328 @@
+{
+  "case" : "nested-synthesis-planner-inability",
+  "valid" : true,
+  "traceId" : "trace-nested-synthesis-planner-inability",
+  "sessionId" : "session-nested-synthesis-planner-inability",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-nested-synthesis-planner-inability",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-nested-synthesis-planner-inability"
+  },
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 6,
+    "completionUnits" : 3,
+    "totalUnits" : 9
+  },
+  "terminalUsage" : {
+    "promptUnits" : 6,
+    "completionUnits" : 3,
+    "totalUnits" : 9
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ {
+    "retrySequenceId" : "retry-parent-first",
+    "attemptId" : "attempt-parent-first-model",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "usageComplete" : true
+  }, {
+    "retrySequenceId" : "retry-synthesis",
+    "attemptId" : "attempt-synthesis-model",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "usageComplete" : true
+  }, {
+    "retrySequenceId" : "retry-parent-final",
+    "attemptId" : "attempt-parent-final-model",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "usageComplete" : true
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "retry-parent-first",
+    "usage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "usageComplete" : true
+  }, {
+    "retrySequenceId" : "retry-synthesis",
+    "usage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "usageComplete" : true
+  }, {
+    "retrySequenceId" : "retry-parent-final",
+    "usage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "usageComplete" : true
+  } ],
+  "validationLinks" : [ ],
+  "frames" : [ {
+    "frameId" : "inability-root",
+    "parentFrameId" : null,
+    "frameType" : "ROOT_MISSION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 6,
+      "completionUnits" : 3,
+      "totalUnits" : 9
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 6,
+      "completionUnits" : 3,
+      "totalUnits" : 9
+    },
+    "route" : "default-test_entry"
+  }, {
+    "frameId" : "parent-first-model",
+    "parentFrameId" : "inability-root",
+    "frameType" : "MODEL_CALL",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-test_entry-model"
+  }, {
+    "frameId" : "parent-tool",
+    "parentFrameId" : "inability-root",
+    "frameType" : "TOOL_INVOCATION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-coordinate"
+  }, {
+    "frameId" : "coordinator",
+    "parentFrameId" : "parent-tool",
+    "frameType" : "SKILL_EXECUTION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-coordinate"
+  }, {
+    "frameId" : "inability-planning",
+    "parentFrameId" : "coordinator",
+    "frameType" : "PLANNING",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "default-coordinate#planning"
+  }, {
+    "frameId" : "surrounding-step",
+    "parentFrameId" : "coordinator",
+    "frameType" : "STEP_EXECUTION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-coordinate#step-1"
+  }, {
+    "frameId" : "synthesis-child",
+    "parentFrameId" : "surrounding-step",
+    "frameType" : "SKILL_EXECUTION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-summarize"
+  }, {
+    "frameId" : "synthesis-step",
+    "parentFrameId" : "synthesis-child",
+    "frameType" : "STEP_EXECUTION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-summarize#step-2"
+  }, {
+    "frameId" : "synthesis-model",
+    "parentFrameId" : "synthesis-step",
+    "frameType" : "MODEL_CALL",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-summarize#step-2-model"
+  }, {
+    "frameId" : "parent-final-model",
+    "parentFrameId" : "inability-root",
+    "frameType" : "MODEL_CALL",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-test_entry-model"
+  } ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

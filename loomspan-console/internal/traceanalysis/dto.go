@@ -1,6 +1,8 @@
 package traceanalysis
 
 import (
+	"encoding/json"
+
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/artifact"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/evidence"
 )
@@ -320,8 +322,9 @@ type ValidationSummary struct {
 
 // FailureSummary is one ERROR_RECORDED failure fact.
 type FailureSummary struct {
+	Kind                      string
 	Classification            string
-	ExceptionMessage          *string
+	ExceptionMessage          json.RawMessage
 	CausedByFailureID         string
 	Context                   TraceContext
 	FailureID                 string

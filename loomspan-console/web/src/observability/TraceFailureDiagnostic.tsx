@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { getTraceFailureDiagnostic } from "../api/client";
 import type { TraceFailure, TraceFailureDiagnostic as Diagnostic, TraceSource } from "../api/contracts";
 
+function diagnosticLabel(kind: string) {
+  if (kind === "JAVA_STACK_TRACE") return "Java stack trace";
+  if (kind === "PLANNER_INABILITY_SIGNAL") return "Accepted planner inability signal";
+  return `Text diagnostic (${kind})`;
+}
+
 export function TraceFailureDiagnostic({ traceId, source = "TARGET", failure, scopeGeneration = 0, verifyScope, onSelectFailure }: {
 	traceId: string;
 	source?: TraceSource;
@@ -89,9 +95,9 @@ export function TraceFailureDiagnostic({ traceId, source = "TARGET", failure, sc
     {failure.terminal && <p>Selected as the completion failure.</p>}
     {failure.exceptionMessage !== null && <pre>{failure.exceptionMessage}</pre>}
     {failure.causedByFailureId && <p>Recorded cause: <button type="button" onClick={() => onSelectFailure?.(failure.causedByFailureId!)}>{failure.causedByFailureId}</button></p>}
-    {failure.exceptionType && <p><code>{failure.exceptionType}</code>{failure.contextSummary && ` - ${failure.contextSummary}`}</p>}
+    {failure.exceptionType && <p><code>{failure.exceptionType}</code>{failure.kind !== "planner_inability" && failure.contextSummary && ` - ${failure.contextSummary}`}</p>}
     {diagnostics.length === 0 ? <p>No diagnostic text was recorded.</p> : <ul className="failure-diagnostic-list">{diagnostics.map((descriptor) => <li key={descriptor.ordinal}>
-      <span>{descriptor.kind === "JAVA_STACK_TRACE" ? "Java stack trace" : `Text diagnostic (${descriptor.kind})`} / {descriptor.contentType} / {descriptor.decodedBytes} bytes</span>
+      <span>{diagnosticLabel(descriptor.kind)} / {descriptor.contentType} / {descriptor.decodedBytes} bytes</span>
       {descriptor.truncated && <strong> / truncated</strong>}
       {" "}<button className="failure-diagnostic-action" type="button" disabled={loading} onClick={() => void load(descriptor.ordinal)}>{loading && selected === descriptor.ordinal ? "Loading diagnostic..." : `Load diagnostic ${descriptor.ordinal + 1}`}</button>
     </li>)}</ul>}

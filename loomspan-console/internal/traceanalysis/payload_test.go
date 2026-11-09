@@ -36,7 +36,7 @@ func chunkEnvelopeRecordFor(seq int, retryID, attemptID string, attemptNum int, 
 	return `{"traceId":"t","sessionId":"s","sequence":` + itoa(seq) +
 		`,"timestamp":` + timestampForSeq(seq) +
 		`,"recordType":"MODEL_REQUEST_SENT","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"th",` +
-		`"metadata":` + string(metaJSON) + `,"data":{"messages":["u"]}}`
+		`"metadata":` + string(metaJSON) + `,"data":null}`
 }
 
 // chunkRecord builds a PAYLOAD_CHUNK_APPENDED record with the given chunk

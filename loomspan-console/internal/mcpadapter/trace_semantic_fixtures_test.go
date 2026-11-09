@@ -35,8 +35,8 @@ import (
 )
 
 const semanticTrace = `{"traceId":"trace-t","sessionId":"session-t","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/t.ndjson","consoleCompatibilityVersion":"development","generationId":"generation-fixture","entrySkill":"default-test","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-fixture"}},"data":{"sessionId":"session-t"}}
-{"traceId":"trace-t","sessionId":"session-t","sequence":2,"timestamp":1784894400.000000000,"recordType":"MODEL_REQUEST_SENT","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1},"data":{"messages":["user"]}}
-{"traceId":"trace-t","sessionId":"session-t","sequence":3,"timestamp":1784894400.000000000,"recordType":"MODEL_RESPONSE_RECEIVED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1,"usage":{"promptUnits":10,"completionUnits":4,"totalUnits":14,"precision":"EXACT"}},"data":{"content":"fixture response"}}
+{"traceId":"trace-t","sessionId":"session-t","sequence":2,"timestamp":1784894400.000000000,"recordType":"MODEL_REQUEST_SENT","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1},"data":{"messages":[{"messageType":"USER","text":"user"}]}}
+{"traceId":"trace-t","sessionId":"session-t","sequence":3,"timestamp":1784894400.000000000,"recordType":"MODEL_RESPONSE_RECEIVED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1,"usage":{"promptUnits":10,"completionUnits":4,"totalUnits":14,"precision":"EXACT"}},"data":{"generations":[{"messageType":"ASSISTANT","text":"fixture response","toolCalls":[]}]}}
 {"traceId":"trace-t","sessionId":"session-t","sequence":4,"timestamp":1784894400.000000000,"recordType":"TRACE_COMPLETED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"outcome":"SUCCEEDED","sessionUsageSnapshot":{"promptUnits":10,"completionUnits":4,"totalUnits":14},"errored":false,"persistencePolicy":"ALWAYS"},"data":null}
 `
 
@@ -561,6 +561,225 @@ func TestRecoveredProviderAttemptDiagnosticUsesExistingRecordAndContentTools(t *
 		h.acquired.Metadata.TraceID, record.Content.ContentRef))
 	if browserRange["content"] != content.String() || browserRange["contentType"] != "application/json" || browserRange["hasMore"] != false {
 		t.Fatalf("browser range did not preserve recovered diagnostic content: %#v", browserRange)
+	}
+}
+
+func TestPlannerInabilityPreservesEscapedReasonOnBothWirePaths(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "loomspan-console-fixtures", "traces", "nonterminal-error-then-success.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = bytes.Replace(raw, []byte(`"consoleCompatibilityVersion":"1.0.0-beta.9-SNAPSHOT"`), []byte(`"consoleCompatibilityVersion":"development"`), 1)
+	const expected = `"exceptionMessage":"exact \ud800"`
+	raw = bytes.Replace(raw, []byte(`"exceptionMessage":"  correct this\n雪\t"`), []byte(`"kind":"planner_inability",`+expected), 1)
+	raw = bytes.Replace(raw, []byte(`ai.loomspan.api.RecoverableSkillException`), []byte(`ai.loomspan.api.PlannerInabilityException`), 1)
+	h := newRealSemanticHarnessFromRaw(t, raw)
+	traceID := h.acquired.Metadata.TraceID
+	router, sessionID := newSemanticBrowserTransport(t, h)
+	browser := semanticBrowserResponse(router, sessionID, "/api/console/v1/traces/analysis/failures", fmt.Sprintf(`{"source":"IMPORTED","traceId":%q}`, traceID))
+	if browser.Code != http.StatusOK || !strings.Contains(browser.Body.String(), expected) {
+		t.Errorf("browser reason = %s", browser.Body.String())
+	}
+
+	options := newMCPTestOptions(t, nil)
+	options.TraceAnalysis = h.analysis
+	options.TraceResolver = &fakeTraceArtifacts{result: h.acquired, ref: evidence.ForImported()}
+	body := fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":%q,"arguments":{"traceId":%q,"filter":{"failureId":"failure-recovered"}}}}`, QueryTraceRecordsToolName, traceID)
+	request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	request.Host = "127.0.0.1:7345"
+	request.Header.Set("Authorization", "Bearer mcp-secret")
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "application/json, text/event-stream")
+	request.Header.Set("MCP-Protocol-Version", "2025-11-25")
+	response := httptest.NewRecorder()
+	NewServer(options).Handler().ServeHTTP(response, request)
+	var wire struct {
+		Result struct {
+			Content           []struct{ Text string }
+			StructuredContent json.RawMessage
+		}
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &wire); response.Code != http.StatusOK || err != nil ||
+		len(wire.Result.Content) != 1 || !strings.Contains(wire.Result.Content[0].Text, expected) ||
+		!bytes.Contains(wire.Result.StructuredContent, []byte(expected)) {
+		t.Errorf("MCP reason = %s (%v)", response.Body.String(), err)
+	}
+}
+
+func TestPlannerInabilityUsesExistingFailureFrameAndContentTools(t *testing.T) {
+	for _, test := range []struct {
+		name, origin, parent, route, task, context, reason string
+		terminal                                           bool
+	}{
+		{"assigned-planner-inability", "assigned-step", "inability-root", "default-test_entry#step-1",
+			"verify-source", "Assigned task reported planner inability", "  Need an approved source.\r\n雪\t", true},
+		{"nested-synthesis-planner-inability", "synthesis-step", "synthesis-child", "default-summarize#step-2",
+			"gather-records", "Final synthesis reported planner inability", "  Records disagree.\r\n雪\t", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join("..", "..", "..", "loomspan-console-fixtures", "traces", test.name+".ndjson"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw = bytes.ReplaceAll(raw, []byte("\"consoleCompatibilityVersion\":\"1.0.0-beta.9-SNAPSHOT\""), []byte("\"consoleCompatibilityVersion\":\"development\""))
+			h := newRealSemanticHarnessFromRaw(t, raw)
+			options := newMCPTestOptions(t, nil)
+			options.TraceAnalysis = h.analysis
+			options.TraceResolver = &fakeTraceArtifacts{result: h.acquired, ref: evidence.ForImported()}
+			ctx := context.Background()
+			traceID := h.acquired.Metadata.TraceID
+			call, records, err := handleQueryTraceRecords(ctx, options, queryTraceRecordsInput{
+				TraceID: traceID, Representation: traceanalysis.RecordRepresentationLogical,
+				Filter: traceanalysis.RecordFilter{FailureID: "failure-inability", Types: []string{"ERROR_RECORDED"}},
+			})
+			if err != nil || call.IsError || records.Result == nil || len(records.Result.Items) != 1 ||
+				len(records.Result.Items[0].Failures) != 1 {
+				t.Fatalf("failure query=%#v err=%v", records, err)
+			}
+			failure := records.Result.Items[0].Failures[0]
+			var reason *string
+			if err := json.Unmarshal(failure.ExceptionMessage, &reason); err != nil || reason == nil || *reason != test.reason ||
+				failure.FailureID != "failure-inability" || failure.Kind != "planner_inability" ||
+				failure.Classification != "RECOVERABLE" || failure.Terminal != test.terminal ||
+				failure.FrameID != test.origin || failure.Route != test.route || failure.ContextSummary != test.context {
+				t.Fatalf("failure=%+v", failure)
+			}
+			if !strings.Contains(call.Content[0].(*mcp.TextContent).Text, "\"kind\":\"planner_inability\"") {
+				t.Fatal("text fallback omitted failure kind")
+			}
+
+			_, frames, err := handleQueryTraceFrames(ctx, options, queryTraceFramesInput{
+				TraceID: traceID, Projection: traceanalysis.FrameProjectionDetailed,
+				Filter: traceanalysis.FrameFilter{FrameIDs: []string{failure.FrameID}},
+			})
+			if err != nil || frames.Result == nil || len(frames.Result.Items) != 1 {
+				t.Fatalf("frame query=%#v err=%v", frames, err)
+			}
+			frame := frames.Result.Items[0]
+			if frame.FrameType != "STEP_EXECUTION" || frame.Route != test.route ||
+				frame.ParentFrameID == nil || *frame.ParentFrameID != test.parent ||
+				frame.PlanID == nil || *frame.PlanID != "inability-plan" ||
+				frame.TaskID == nil || *frame.TaskID != test.task || !slicesContain(frame.FailureIDs, failure.FailureID) {
+				t.Fatalf("origin frame=%+v", frame)
+			}
+
+			if len(failure.Diagnostics) != 2 || failure.Diagnostics[0].Kind != "JAVA_STACK_TRACE" {
+				t.Fatalf("diagnostics=%+v", failure.Diagnostics)
+			}
+			signal := failure.Diagnostics[1]
+			if signal.Ordinal != 1 || signal.Kind != "PLANNER_INABILITY_SIGNAL" || signal.ContentType != "text/plain; charset=utf-8" ||
+				signal.Truncated != test.terminal || signal.CaptureLimitBytes != 1<<20 || signal.ContentRef == "" {
+				t.Fatalf("signal=%+v", signal)
+			}
+
+			browser := newSemanticBrowserPost(t, h)
+			prefix := "/api/console/v1/traces/analysis/"
+			body := fmt.Sprintf("{\"source\":\"IMPORTED\",\"traceId\":%q}", traceID)
+			browserFailure := semanticItems(t, browser(prefix+"failures", body)["items"])[0]
+			for key, want := range map[string]any{
+				"kind": failure.Kind, "classification": failure.Classification, "terminal": failure.Terminal,
+				"frameId": failure.FrameID, "failureId": failure.FailureID, "exceptionMessage": test.reason,
+			} {
+				if browserFailure[key] != want {
+					t.Fatalf("Browser failure %s = %v, want %v", key, browserFailure[key], want)
+				}
+			}
+			summary := browser(prefix+"summary", body)
+			if terminalID, _ := summary["terminalFailureId"].(string); (terminalID == failure.FailureID) != test.terminal {
+				t.Fatalf("Browser completion linkage=%#v", summary["terminalFailureId"])
+			}
+
+			retained := readFixtureContent(t, options, traceID, signal.ContentRef, signal.ContentType, 32768)
+			if len(retained) != signal.DecodedBytes || json.Valid([]byte(retained)) == signal.Truncated {
+				t.Fatalf("signal length=%d valid JSON=%v", len(retained), json.Valid([]byte(retained)))
+			}
+			signalPrefix := "{\r\n  \"stepAction\":\"CANNOT_COMPLETE\",\r\n  \"reason\":"
+			if test.terminal {
+				const partialReason = "\"  Need an approved source.\\r\\n"
+				expected := signalPrefix + strings.Repeat(" ", (1<<20)-1-len(signalPrefix)-len(partialReason)) + partialReason
+				if retained != expected {
+					t.Fatal("truncated UTF-8 signal did not retain the exact prefix")
+				}
+				_, models, err := handleQueryTraceRecords(ctx, options, queryTraceRecordsInput{
+					TraceID: traceID, Filter: traceanalysis.RecordFilter{FrameID: "assigned-model", Types: []string{"MODEL_RESPONSE_RECEIVED"}},
+				})
+				if err != nil || models.Result == nil || len(models.Result.Items) != 1 || models.Result.Items[0].Content == nil {
+					t.Fatalf("model response query=%#v err=%v", models, err)
+				}
+				payload := readFixtureContent(t, options, traceID, models.Result.Items[0].Content.ContentRef, "application/json", 32768)
+				var response struct {
+					Generations []struct{ Text string }
+				}
+				if err := json.Unmarshal([]byte(payload), &response); err != nil || len(response.Generations) != 1 ||
+					response.Generations[0].Text != retained+"雪\\t\"\r\n}" {
+					t.Fatalf("full response did not match retained signal and continuation: %v", err)
+				}
+			} else {
+				if want := signalPrefix + "\"  Records disagree.\\r\\n雪\\t\"\r\n}"; retained != want {
+					t.Fatalf("synthesis signal=%q want=%q", retained, want)
+				}
+				assertPlannerFeedbackContent(t, options, traceID)
+			}
+
+			diagnostic := browser(prefix+"failure-diagnostic", fmt.Sprintf(
+				"{\"source\":\"IMPORTED\",\"traceId\":%q,\"failureId\":%q,\"ordinal\":1}", traceID, failure.FailureID))
+			if diagnostic["text"] != retained || diagnostic["descriptor"].(map[string]any)["truncated"] != test.terminal {
+				t.Fatal("Browser did not return the same retained diagnostic and truncation state")
+			}
+		})
+	}
+}
+
+func readFixtureContent(t *testing.T, options ServerOptions, traceID, contentRef, contentType string, maxBytes int) string {
+	t.Helper()
+	var content strings.Builder
+	input := traceRangeInput{TraceID: traceID, ContentRef: contentRef, MaxBytes: maxBytes}
+	for {
+		call, envelope, err := handleTraceRange(context.Background(), options, input, false)
+		if err != nil || call.IsError || envelope.Result == nil {
+			t.Fatalf("content read=%#v err=%v", envelope, err)
+		}
+		page := envelope.Result
+		if page.ContentType != contentType || page.Encoding != string(traceanalysis.RangeEncodingText) || page.ActualStart != int64(content.Len()) {
+			t.Fatalf("unexpected range at %d with type %q and encoding %q", page.ActualStart, page.ContentType, page.Encoding)
+		}
+		content.WriteString(page.Content)
+		if !page.HasMore {
+			if page.ActualEnd != page.TotalLength || int64(content.Len()) != page.TotalLength {
+				t.Fatalf("incomplete content at %d of %d", page.ActualEnd, page.TotalLength)
+			}
+			return content.String()
+		}
+		if page.Continuation == "" || page.Continuation == input.Continuation {
+			t.Fatal("invalid content continuation")
+		}
+		input.Continuation = page.Continuation
+	}
+}
+
+func assertPlannerFeedbackContent(t *testing.T, options ServerOptions, traceID string) {
+	t.Helper()
+	_, records, err := handleQueryTraceRecords(context.Background(), options, queryTraceRecordsInput{
+		TraceID: traceID, Filter: traceanalysis.RecordFilter{FrameID: "parent-final-model", Types: []string{"MODEL_REQUEST_SENT"}},
+	})
+	if err != nil || records.Result == nil || len(records.Result.Items) != 1 || records.Result.Items[0].Content == nil {
+		t.Fatalf("parent request query=%#v err=%v", records, err)
+	}
+	payload := readFixtureContent(t, options, traceID, records.Result.Items[0].Content.ContentRef, "application/json", 127)
+	var request struct {
+		Messages []struct {
+			MessageType   string
+			ToolResponses []struct{ ID, Name, Content string }
+		}
+	}
+	if err := json.Unmarshal([]byte(payload), &request); err != nil || len(request.Messages) != 3 ||
+		request.Messages[2].MessageType != "TOOL" || len(request.Messages[2].ToolResponses) != 1 {
+		t.Fatalf("invalid parent request: %v %s", err, payload)
+	}
+	feedback := request.Messages[2].ToolResponses[0]
+	if feedback.ID != "call-coordinate" || feedback.Name != "default-coordinate" ||
+		feedback.Content != "{\"status\":\"failed\",\"kind\":\"planner_inability\",\"correctionPermitted\":true,\"message\":\"  Records disagree.\\r\\n雪\\t\"}" {
+		t.Fatalf("tool feedback=%+v", feedback)
 	}
 }
 

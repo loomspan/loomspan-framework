@@ -10,10 +10,20 @@ import { recordContext } from "./recordContext";
 
 type Props = { traceId?: string; source?: TraceSource; scopeGeneration?: number; verifyScope?: (response: TraceRange) => Promise<TraceRange>; records: TraceRecord[]; frames?: TraceFrame[]; failures: TraceFailure[]; selectedRecordSequence?: number; selectedFailureId?: string; activeContentRecordSequence?: number; contentRange?: TraceRange; contentPending?: boolean; contentError?: string; onSelectRecord: (record: TraceRecord) => void; onSelectFailure: (failureId: string) => void; onSelectPlan?: (planId: string, transitionSequence?: number) => void; onContent: (contentRef: string, recordSequence: number) => void; onNextContent?: () => void; onClearContent?: () => void; onArtifactUnavailable?: (error: unknown) => void };
 
+type ModelCall = { id: string | null; name: string | null; arguments: string | null };
+type ModelToolResponse = { id: string | null; name: string | null; content: string | null };
+type ModelMessage = {
+  text: string | null;
+} & (
+  | { role: "SYSTEM" | "USER" }
+  | { role: "ASSISTANT"; toolCalls: ModelCall[] }
+  | { role: "TOOL"; toolResponses: ModelToolResponse[] }
+);
+
 type ModelDetail =
   | { kind: "evaluation"; content: string }
-  | { kind: "request"; messages: { role: string; text: string }[] }
-  | { kind: "response"; content: string };
+  | { kind: "request"; messages: ModelMessage[] }
+  | { kind: "response"; generations: (ModelMessage | null)[] };
 
 type ModelCacheEntry = { loading: boolean; error?: string; detail?: ModelDetail };
 type RawCacheEntry = { loading: boolean; error?: string; json?: string };
@@ -199,11 +209,12 @@ async function readCompleteRecord(traceId: string, sequence: number, source: Tra
   return new TextDecoder("utf-8", { fatal: true }).decode(joinBytes(parts)).trim();
 }
 
-async function readCompleteContent(traceId: string, contentRef: string, source: TraceSource): Promise<string> {
+async function readCompleteContent(traceId: string, contentRef: string, source: TraceSource, verifyScope?: Props["verifyScope"]): Promise<string> {
   const parts: Uint8Array[] = [];
   let cursor: string | undefined;
   do {
-    const range = await getContentRange(traceId, contentRef, cursor, source);
+    const response = await getContentRange(traceId, contentRef, cursor, source);
+    const range = verifyScope ? await verifyScope(response) : response;
     parts.push(decodeBytes(range));
     if (!range.hasMore) break;
     if (!range.nextCursor || range.nextCursor === cursor) throw new Error("Content continuation was invalid.");
@@ -226,40 +237,75 @@ function recordData(rawRecord: string): unknown {
   return envelope.data;
 }
 
-function parseModelDetail(kind: "request" | "response", value: unknown): ModelDetail {
+function modelObject(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`Model ${kind} data was not a JSON object.`);
+    throw new Error(`${label} was not a JSON object.`);
   }
-  const fields = value as Record<string, unknown>;
+  return value as Record<string, unknown>;
+}
+
+function modelText(value: unknown, label: string): string | null {
+  if (value === null || typeof value === "string") return value;
+  throw new Error(`${label} was not a string or null.`);
+}
+
+function parseModelMessage(value: unknown, label: string): ModelMessage {
+  const fields = modelObject(value, label);
+  const text = modelText(fields.text, `${label} text`);
+  const role = fields.messageType;
+  if ((role !== "ASSISTANT" && "toolCalls" in fields) || (role !== "TOOL" && "toolResponses" in fields)) {
+    throw new Error(`${label} contained tool evidence for a different message type.`);
+  }
+  switch (role) {
+    case "SYSTEM":
+    case "USER":
+      return { role, text };
+    case "ASSISTANT": {
+      if (!Array.isArray(fields.toolCalls)) throw new Error(`${label} did not contain tool calls.`);
+      const toolCalls = fields.toolCalls.map((entry, index) => {
+        const callLabel = `${label} tool call ${index + 1}`;
+        const call = modelObject(entry, callLabel);
+        return {
+          id: modelText(call.id, `${callLabel} ID`),
+          name: modelText(call.name, `${callLabel} name`),
+          arguments: modelText(call.arguments, `${callLabel} arguments`),
+        };
+      });
+      return { role, text, toolCalls };
+    }
+    case "TOOL": {
+      if (!Array.isArray(fields.toolResponses)) throw new Error(`${label} did not contain tool responses.`);
+      const toolResponses = fields.toolResponses.map((entry, index) => {
+        const responseLabel = `${label} tool response ${index + 1}`;
+        const response = modelObject(entry, responseLabel);
+        return {
+          id: modelText(response.id, `${responseLabel} ID`),
+          name: modelText(response.name, `${responseLabel} name`),
+          content: modelText(response.content, `${responseLabel} content`),
+        };
+      });
+      return { role, text, toolResponses };
+    }
+    default:
+      throw new Error(`${label} had an invalid message type.`);
+  }
+}
+
+function parseModelDetail(kind: "request" | "response", value: unknown): ModelDetail {
+  const fields = modelObject(value, `Model ${kind} data`);
   if (fields.payloadType === "evaluation") {
     return { kind: "evaluation", content: JSON.stringify(fields, null, 2) };
   }
   if (kind === "request") {
-    if (!Array.isArray(fields.messages)) {
-      throw new Error("Model request data did not contain messages.");
-    }
-    const messages = fields.messages.map((message, index) => {
-      if (!message || typeof message !== "object" || Array.isArray(message)) {
-        throw new Error(`Model request message ${index + 1} was not a JSON object.`);
-      }
-      const messageFields = message as Record<string, unknown>;
-      if (typeof messageFields.messageType !== "string" || typeof messageFields.text !== "string") {
-        throw new Error(`Model request message ${index + 1} did not contain messageType and text.`);
-      }
-      return { role: messageFields.messageType, text: messageFields.text };
-    });
-    return { kind, messages };
+    if (!Array.isArray(fields.messages)) throw new Error("Model request data did not contain messages.");
+    return { kind, messages: fields.messages.map((message, index) => parseModelMessage(message, `Model request message ${index + 1}`)) };
   }
 
-  if (typeof fields.content !== "string") {
-    throw new Error("Model response data did not contain text content.");
-  }
-  const trimmed = fields.content.trim();
-  try {
-    return { kind, content: JSON.stringify(JSON.parse(trimmed), null, 2) };
-  } catch {
-    return { kind, content: fields.content };
-  }
+  if (!Array.isArray(fields.generations)) throw new Error("Model response data did not contain generations.");
+  return {
+    kind,
+    generations: fields.generations.map((output, index) => output === null ? null : parseModelMessage(output, `Model response generation ${index + 1}`)),
+  };
 }
 
 function parseStepStartedDetail(rawRecord: string, route: string): StepDetail {
@@ -400,14 +446,45 @@ function parseStepActionDetail(rawRecord: string, route: string, kind: StepActio
   };
 }
 
-function ModelDetailView({ detail }: { detail: ModelDetail }) {
-  if (detail.kind === "response" || detail.kind === "evaluation") return <pre>{detail.content}</pre>;
-  return <div className="trace-model-messages">
-    {detail.messages.map((message, index) => <section className="trace-model-message" key={`${message.role}-${index}`}>
-      <h5>{message.role.toLowerCase().replaceAll("_", " ")}</h5>
-      <pre>{message.text}</pre>
+function ModelText({ value }: { value: string | null }) {
+  if (value === null) return <span className="trace-step-note">Absent (null)</span>;
+  if (value.length === 0) return <span className="trace-step-note">Empty string</span>;
+  return <pre>{value}</pre>;
+}
+
+function ModelMessageView({ message }: { message: ModelMessage }) {
+  return <section className="trace-model-message">
+    <h5>{message.role.toLowerCase()}</h5>
+    <ModelText value={message.text} />
+    {message.role === "ASSISTANT" && message.toolCalls.map((call, index) => <section key={index} aria-label={`Tool call ${index + 1}`}>
+      <h6>Tool call {index + 1}</h6>
+      <dl>
+        <div><dt>ID</dt><dd><ModelText value={call.id} /></dd></div>
+        <div><dt>Name</dt><dd><ModelText value={call.name} /></dd></div>
+        <div><dt>Arguments</dt><dd><ModelText value={call.arguments} /></dd></div>
+      </dl>
     </section>)}
-  </div>;
+    {message.role === "TOOL" && message.toolResponses.map((response, index) => <section key={index} aria-label={`Tool response ${index + 1}`}>
+      <h6>Tool response {index + 1}</h6>
+      <dl>
+        <div><dt>ID</dt><dd><ModelText value={response.id} /></dd></div>
+        <div><dt>Name</dt><dd><ModelText value={response.name} /></dd></div>
+        <div><dt>Content</dt><dd><ModelText value={response.content} /></dd></div>
+      </dl>
+    </section>)}
+  </section>;
+}
+
+function ModelDetailView({ detail }: { detail: ModelDetail }) {
+  if (detail.kind === "evaluation") return <pre>{detail.content}</pre>;
+  if (detail.kind === "request") {
+    return <div className="trace-model-messages">{detail.messages.map((message, index) => <ModelMessageView key={index} message={message} />)}</div>;
+  }
+  if (detail.generations.length === 0) return <p>No generations were returned.</p>;
+  return <div className="trace-model-messages">{detail.generations.map((message, index) => <section key={index} aria-label={`Generation ${index + 1}`}>
+    <h5>Generation {index + 1}</h5>
+    {message === null ? <p>No output was recorded for this generation.</p> : <ModelMessageView message={message} />}
+  </section>)}</div>;
 }
 
 async function findProposedAction(traceId: string, record: TraceRecord, source: TraceSource): Promise<{ sequence: number; detail: StepActionDetail } | undefined> {
@@ -882,7 +959,7 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
 	const detailSource = record.content?.inlineContent
       ? Promise.resolve().then(() => JSON.parse(record.content!.inlineContent!) as unknown)
       : record.content?.contentRef
-        ? readCompleteContent(traceId, record.content.contentRef, source).then((raw) => JSON.parse(raw) as unknown)
+        ? readCompleteContent(traceId, record.content.contentRef, source, verifyScope).then((raw) => JSON.parse(raw) as unknown)
         : Promise.reject(new Error("Model content is unavailable."));
 	void detailSource
       .then((value) => {

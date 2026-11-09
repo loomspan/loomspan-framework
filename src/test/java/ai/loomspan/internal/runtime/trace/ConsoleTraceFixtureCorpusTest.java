@@ -3,6 +3,7 @@ package ai.loomspan.internal.runtime.trace;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
+import ai.loomspan.api.PlannerInabilityException;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.core.ExecutionFrame;
 import ai.loomspan.internal.core.ExecutionBinding;
@@ -73,6 +74,11 @@ class ConsoleTraceFixtureCorpusTest
 {
     private static final ObjectMapper JSON = JsonMapper.builder().findAndAddModules().build();
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-24T12:00:00Z"), ZoneOffset.UTC);
+    private static final String ASSIGNED_REASON = "  Need an approved source.\r\n雪\t";
+    private static final String SYNTHESIS_REASON = "  Records disagree.\r\n雪\t";
+    private static final String ASSIGNMENT_PLAN = "inability-plan";
+    private static final String ASSIGNED_TASK = "verify-source";
+    private static final String SYNTHESIS_TASK = "gather-records";
     private static final Set<String> VALID = Set.of(
             "native-evaluation-success",
             "native-evaluation-malformed-response",
@@ -94,6 +100,8 @@ class ConsoleTraceFixtureCorpusTest
             "unattributed-usage",
             "nonterminal-error-then-success",
             "recoverable-failed-completion",
+            "assigned-planner-inability",
+            "nested-synthesis-planner-inability",
             "terminal-wrapper-recorded-cause",
             "terminal-unlinked-success",
             "chunked-payload",
@@ -1108,6 +1116,15 @@ class ConsoleTraceFixtureCorpusTest
                 terminalFailureId = session.recordFailure(designatedFixtureFailure(), Map.of("message", "Direct invocation failed"), null);
                 outcome = "FAILED";
             }
+            case "assigned-planner-inability" -> {
+                terminalFailureId = executeAssignedInabilityFixture(session, handle);
+                outcome = "FAILED";
+                attributed = terminal = new Usage(2, 1);
+            }
+            case "nested-synthesis-planner-inability" -> {
+                executeSynthesisInabilityFixture(session, handle);
+                attributed = terminal = new Usage(6, 3);
+            }
             case "terminal-wrapper-recorded-cause" -> {
                 var cause = designatedFixtureFailure();
                 session.recordFailure(cause, Map.of("message", "Application call failed"), null);
@@ -1121,17 +1138,15 @@ class ConsoleTraceFixtureCorpusTest
             }
             case "chunked-payload" ->
             {
-                handle.append(TraceRecordType.MODEL_REQUEST_SENT,
-                        attempt("retry-1", "attempt-1", 1, Map.of()),
-                        "x".repeat(5000));
-                appendResponse(handle, "retry-1", "attempt-1", 1, 2, 1, "EXACT");
+                handle.append(TraceRecordType.EVIDENCE_RECORDED, Map.of(), "x".repeat(5000));
+                appendAttempt(handle, "retry-1", "attempt-1", 1, 2, 1, "EXACT");
                 attributed = terminal = new Usage(2, 1);
             }
             case "chunked-json-payload" ->
             {
                 handle.append(TraceRecordType.MODEL_REQUEST_SENT,
                         attempt("retry-1", "attempt-1", 1, Map.of()),
-                        Map.of("content", "x".repeat(5000)));
+                        requestText("x".repeat(5000)));
                 appendResponse(handle, "retry-1", "attempt-1", 1, 2, 1, "EXACT");
                 attributed = terminal = new Usage(2, 1);
             }
@@ -1210,14 +1225,18 @@ class ConsoleTraceFixtureCorpusTest
             default -> throw new IllegalArgumentException(name);
         }
 
-        int toolInvocations = (name.equals("forwarded-child-result") || name.equals("assembled-child-result")) ? 2 : name.equals("nested-forwarded-child-result") ? 4
+        int toolInvocations = name.equals("nested-synthesis-planner-inability") ? 1
+                : (name.equals("forwarded-child-result") || name.equals("assembled-child-result")) ? 2 : name.equals("nested-forwarded-child-result") ? 4
                 : name.equals("planned-tool-success") || name.equals("unplanned-tool-failure") ? 1 : 0;
-        int modelCalls = name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
+        int modelCalls = name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
+                : name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
                 : name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
-        int providerAttempts = name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
+        int providerAttempts = name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
+                : name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
                 : name.equals("recovered-provider-attempt-diagnostic") ? 2
                 : name.equals("terminal-provider-failure-actionable") ? 1 : 0;
-        int exactModelResponses = name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
+        int exactModelResponses = name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
+                : name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
                 : name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
         SessionUsageSnapshot usageSnapshot = new SessionUsageSnapshot(
                 0, toolInvocations, 0, modelCalls, providerAttempts,
@@ -1226,7 +1245,7 @@ class ConsoleTraceFixtureCorpusTest
         Map<String, Object> completionDetails = new LinkedHashMap<>();
         completionDetails.put("outcome", outcome);
         completionDetails.put("sessionUsageSnapshot",
-                toolInvocations > 0 || name.equals("recovered-provider-attempt-diagnostic")
+                toolInvocations > 0 || name.equals("recovered-provider-attempt-diagnostic") || name.equals("assigned-planner-inability")
                         ? usageSnapshot.toTraceMap()
                         : terminal.asMap());
         session.finalizeTrace(new TraceCompletion(
@@ -1282,6 +1301,140 @@ class ConsoleTraceFixtureCorpusTest
             Files.writeString(trace, String.join("\n", stable) + "\n", StandardCharsets.UTF_8);
         }
         writeExpected(root, name, validExpected(root, name, outcome, terminalFailureId, attributed, terminal));
+    }
+
+    private static String executeAssignedInabilityFixture(LoomspanSession session, DefaultExecutionTraceHandle handle) throws Exception
+    {
+        ExecutionFrame root = frame("inability-root", null, TraceFrameType.ROOT_MISSION, "default-test_entry");
+        appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant());
+        ExecutionFrame step = openInabilityAssignment(handle, root, ASSIGNED_TASK, "assigned-step");
+        PhysicalBranchContext branch = new PhysicalBranchContext(session);
+        branch.push(root);
+        branch.push(step);
+        ExecutionBinding binding = fixtureBinding(session, branch, root.route(), root.frameId());
+        String prefix = "{\r\n  \"stepAction\":\"CANNOT_COMPLETE\",\r\n  \"reason\":";
+        String reason = JSON.writeValueAsString(ASSIGNED_REASON);
+        int beforeUnicode = reason.indexOf("雪");
+        // Place the capture limit inside a multi-byte character of an otherwise valid signal.
+        int padding = (1 << 20) - prefix.length() - beforeUnicode - 1;
+        String signal = prefix + " ".repeat(padding) + reason + "\r\n}";
+        recordFixtureModelExchange(handle, step, "assigned-model", "retry-assigned", requestText("Use the assigned source"), responseText(signal));
+        PlannerInabilityException failure = fixtureInability(ASSIGNED_REASON);
+        String failureId = recordFixtureInability(session, binding, step, failure, signal,
+                "Assigned task reported planner inability", ASSIGNED_TASK);
+        closeInabilityAssignment(handle, root, step, ASSIGNED_TASK, failureId);
+        appendFrame(handle, TraceRecordType.FRAME_CLOSED, root, CLOCK.instant());
+        return session.recordFailure(failure, Map.of("message", "Root execution failed"), root);
+    }
+
+    private static void executeSynthesisInabilityFixture(LoomspanSession session, DefaultExecutionTraceHandle handle) throws Exception
+    {
+        ExecutionFrame root = frame("inability-root", null, TraceFrameType.ROOT_MISSION, "default-test_entry");
+        appendFrame(handle, TraceRecordType.FRAME_OPENED, root, CLOCK.instant());
+        String request = "Use the verified records.";
+        var assistant = ordered("messageType", "ASSISTANT", "text", "Checking the records.",
+                "toolCalls", List.of(ordered("id", "call-coordinate", "name", "default-coordinate",
+                        "arguments", "{ \"scope\": \"current\" }")));
+        recordFixtureModelExchange(handle, root, "parent-first-model", "retry-parent-first",
+                requestText(request), Map.of("generations", List.of(assistant)));
+
+        ExecutionFrame tool = frame("parent-tool", root.frameId(), TraceFrameType.TOOL_INVOCATION, "default-coordinate");
+        ExecutionFrame coordinator = frame("coordinator", tool.frameId(), TraceFrameType.SKILL_EXECUTION, "default-coordinate");
+        appendFrame(handle, TraceRecordType.FRAME_OPENED, tool, CLOCK.instant());
+        appendFrame(handle, TraceRecordType.FRAME_OPENED, coordinator, CLOCK.instant());
+        ExecutionFrame assignment = openInabilityAssignment(handle, coordinator, SYNTHESIS_TASK, "surrounding-step");
+        ExecutionFrame child = frame("synthesis-child", assignment.frameId(), TraceFrameType.SKILL_EXECUTION, "default-summarize");
+        ExecutionFrame synthesis = frame("synthesis-step", child.frameId(), TraceFrameType.STEP_EXECUTION, "default-summarize#step-2");
+        appendFrame(handle, TraceRecordType.FRAME_OPENED, child, CLOCK.instant());
+        appendFrame(handle, TraceRecordType.FRAME_OPENED, synthesis, CLOCK.instant());
+
+        String signal = "{\r\n  \"stepAction\":\"CANNOT_COMPLETE\",\r\n  \"reason\":" + JSON.writeValueAsString(SYNTHESIS_REASON) + "\r\n}";
+        recordFixtureModelExchange(handle, synthesis, "synthesis-model", "retry-synthesis", requestText("Synthesize the records"), responseText(signal));
+        PhysicalBranchContext branch = new PhysicalBranchContext(session);
+        for (ExecutionFrame frame : List.of(root, tool, coordinator, assignment, child, synthesis)) branch.push(frame);
+        ExecutionBinding binding = fixtureBinding(session, branch, child.route(), child.frameId());
+        PlannerInabilityException failure = fixtureInability(SYNTHESIS_REASON);
+        String failureId = recordFixtureInability(session, binding, synthesis, failure, signal,
+                "Final synthesis reported planner inability", null);
+        handle.append(TraceRecordType.STEP_FAILED, synthesis, TraceFrameType.STEP_EXECUTION,
+                ordered("stepNumber", 2, "failureId", failureId), Map.of("failureId", failureId));
+        appendAssignedFrame(handle, TraceRecordType.FRAME_CLOSED, synthesis, CLOCK.instant(), null, 0, null, false, "FAILED");
+        assertThat(session.recordFailure(failure, Map.of("message", "Child execution failed"), child)).isEqualTo(failureId);
+        appendAssignedFrame(handle, TraceRecordType.FRAME_CLOSED, child, CLOCK.instant(), null, 0, null, false, "FAILED");
+        closeInabilityAssignment(handle, coordinator, assignment, SYNTHESIS_TASK, failureId);
+        assertThat(session.recordFailure(failure, Map.of("message", "Enclosing execution failed"), coordinator)).isEqualTo(failureId);
+        appendAssignedFrame(handle, TraceRecordType.FRAME_CLOSED, coordinator, CLOCK.instant(), null, 0, null, false, "FAILED");
+        handle.append(TraceRecordType.TOOL_CALL_FAILED, tool, TraceFrameType.TOOL_INVOCATION,
+                ordered("capabilityName", "default-coordinate", "failureId", failureId), Map.of("failureId", failureId));
+        appendAssignedFrame(handle, TraceRecordType.FRAME_CLOSED, tool, CLOCK.instant(), null, 0, null, false, "FAILED");
+
+        String feedback = JSON.writeValueAsString(ordered("status", "failed", "kind", "planner_inability",
+                "correctionPermitted", true, "message", SYNTHESIS_REASON));
+        var response = ordered("messageType", "TOOL", "text", "",
+                "toolResponses", List.of(ordered("id", "call-coordinate", "name", "default-coordinate", "content", feedback)));
+        recordFixtureModelExchange(handle, root, "parent-final-model", "retry-parent-final",
+                Map.of("messages", List.of(ordered("messageType", "USER", "text", request), assistant, response)),
+                responseText("The records could not be verified."));
+        appendFrame(handle, TraceRecordType.FRAME_CLOSED, root, CLOCK.instant());
+    }
+
+    private static ExecutionFrame openInabilityAssignment(DefaultExecutionTraceHandle handle, ExecutionFrame owner,
+            String taskId, String stepId) throws IOException
+    {
+        ExecutionFrame planning = frame("inability-planning", owner.frameId(), TraceFrameType.PLANNING, owner.route() + "#planning");
+        appendFrame(handle, TraceRecordType.FRAME_OPENED, planning, CLOCK.instant());
+        handle.append(TraceRecordType.PLAN_CREATED, planning, TraceFrameType.PLANNING, Map.of("planId", ASSIGNMENT_PLAN),
+                shadowPlan(ASSIGNMENT_PLAN, owner.route(), taskId, "PENDING", "VALID"));
+        appendFrame(handle, TraceRecordType.FRAME_CLOSED, planning, CLOCK.instant());
+        handle.append(TraceRecordType.PLAN_UPDATED, owner, owner.traceFrameType(),
+                transitionMetadata(ASSIGNMENT_PLAN, "ADMISSION", List.of(taskId), null, false, null),
+                shadowPlan(ASSIGNMENT_PLAN, owner.route(), taskId, "IN_PROGRESS", "VALID"));
+        ExecutionFrame step = frame(stepId, owner.frameId(), TraceFrameType.STEP_EXECUTION, owner.route() + "#step-1");
+        appendAssignedFrame(handle, TraceRecordType.FRAME_OPENED, step, CLOCK.instant(),
+                ASSIGNMENT_PLAN, taskId, 1, null, false, null);
+        return step;
+    }
+
+    private static void closeInabilityAssignment(DefaultExecutionTraceHandle handle, ExecutionFrame owner, ExecutionFrame step,
+            String taskId, String failureId) throws IOException
+    {
+        handle.append(TraceRecordType.STEP_FAILED, step, TraceFrameType.STEP_EXECUTION,
+                ordered("stepNumber", 1, "assignedTaskId", taskId, "failureId", failureId), Map.of("failureId", failureId));
+        appendAssignedFrame(handle, TraceRecordType.FRAME_CLOSED, step, CLOCK.instant(), null, 0, null, false, "FAILED");
+        handle.append(TraceRecordType.PLAN_UPDATED, owner, owner.traceFrameType(),
+                transitionMetadata(ASSIGNMENT_PLAN, "JOIN", List.of(taskId), null, null, "FAILED"),
+                shadowPlan(ASSIGNMENT_PLAN, owner.route(), taskId, "FAILED", "STALE"));
+    }
+
+    private static void recordFixtureModelExchange(DefaultExecutionTraceHandle handle, ExecutionFrame parent,
+            String frameId, String retryId, Map<String, Object> request, Map<String, Object> response) throws IOException
+    {
+        ExecutionFrame model = frame(frameId, parent.frameId(), TraceFrameType.MODEL_CALL, parent.route() + "-model");
+        appendFrame(handle, TraceRecordType.FRAME_OPENED, model, CLOCK.instant());
+        String attemptId = "attempt-" + frameId;
+        handle.append(TraceRecordType.MODEL_REQUEST_SENT, model, TraceFrameType.MODEL_CALL, attempt(retryId, attemptId, 1, Map.of()), request);
+        handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED, model, TraceFrameType.MODEL_CALL,
+                attempt(retryId, attemptId, 1, Map.of("usage", usage(new Usage(2, 1), "EXACT"))), response);
+        appendFrame(handle, TraceRecordType.FRAME_CLOSED, model, CLOCK.instant());
+    }
+
+    private static PlannerInabilityException fixtureInability(String reason)
+    {
+        var failure = new PlannerInabilityException(reason);
+        failure.setStackTrace(new StackTraceElement[0]);
+        return failure;
+    }
+
+    private static String recordFixtureInability(LoomspanSession session, ExecutionBinding binding, ExecutionFrame origin,
+            PlannerInabilityException failure, String signal, String contextSummary, String taskId) throws Exception
+    {
+        Map<String, Object> context = ordered("message", contextSummary, "stepNumber", taskId == null ? 2 : 1);
+        if (taskId != null) context.putAll(ordered("planId", ASSIGNMENT_PLAN, "assignedTaskId", taskId));
+        ExecutionBindingScope.callWith(binding, () -> {
+            binding.recordPlannerInability(failure, signal.getBytes(StandardCharsets.UTF_8), TraceFrameType.STEP_EXECUTION, context);
+            return null;
+        });
+        return session.recordFailure(failure, context, origin);
     }
 
     private static void executeCurrentPlanSemanticFixture(DefaultExecutionTraceHandle handle) throws IOException
@@ -1526,7 +1679,7 @@ class ConsoleTraceFixtureCorpusTest
                 "attemptReason", "INITIAL",
                 "providerAttemptNumber", 1);
         handle.append(TraceRecordType.MODEL_REQUEST_SENT, model, TraceFrameType.MODEL_CALL,
-                firstAttempt, Map.of("messages", List.of("inspect provider retry")));
+                firstAttempt, requestText("inspect provider retry"));
         String stack = "java.lang.RuntimeException: fixture provider read timeout\n"
                 + "\tat fixture.ProviderBoundary.invoke(ProviderBoundary.java:39)\n"
                 + "\tSuppressed: java.lang.IllegalStateException: fixture suppressed context\n"
@@ -1567,12 +1720,12 @@ class ConsoleTraceFixtureCorpusTest
                 "attemptReason", "PROVIDER_RETRY",
                 "providerAttemptNumber", 2);
         handle.append(TraceRecordType.MODEL_REQUEST_SENT, model, TraceFrameType.MODEL_CALL,
-                secondAttempt, Map.of("messages", List.of("inspect provider retry")));
+                secondAttempt, requestText("inspect provider retry"));
         Map<String, Object> secondResponse = new LinkedHashMap<>(secondAttempt);
         secondResponse.put("usage", usage(new Usage(4, 2), "EXACT"));
         handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED, model, TraceFrameType.MODEL_CALL,
                 secondResponse,
-                Map.of("content", "provider retry recovered"));
+                responseText("provider retry recovered"));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, model, CLOCK.instant().plusSeconds(4));
         appendFrame(handle, TraceRecordType.FRAME_CLOSED, root, CLOCK.instant().plusSeconds(5));
     }
@@ -1593,7 +1746,7 @@ class ConsoleTraceFixtureCorpusTest
             Map<String, Object> attempt = attempt("retry-terminal-provider", "attempt-terminal-provider", 1,
                     Map.of("providerAttemptNumber", 1));
             handle.append(TraceRecordType.MODEL_REQUEST_SENT, model, TraceFrameType.MODEL_CALL,
-                    attempt, Map.of("messages", List.of("diagnose provider")));
+                    attempt, requestText("diagnose provider"));
             handle.append(TraceRecordType.MODEL_ATTEMPT_FAILED, model, TraceFrameType.MODEL_CALL,
                     attempt("retry-terminal-provider", "attempt-terminal-provider", 1, ordered(
                             "providerAttemptNumber", 1,
@@ -1646,7 +1799,7 @@ class ConsoleTraceFixtureCorpusTest
         branch.push(model);
         handle.append(TraceRecordType.MODEL_REQUEST_SENT, model, TraceFrameType.MODEL_CALL,
                 attempt("retry-timeout", "attempt-timeout", 1, Map.of()),
-                Map.of("content", "inspect timeout"));
+                requestText("inspect timeout"));
         handle.append(TraceRecordType.MODEL_ATTEMPT_FAILED, model, TraceFrameType.MODEL_CALL,
                 attempt("retry-timeout", "attempt-timeout", 1, ordered(
                         "failureClassification", "TRANSIENT",
@@ -1717,9 +1870,9 @@ class ConsoleTraceFixtureCorpusTest
                 ExecutionFrame contribution = frame("assembly-model", root.frameId(), TraceFrameType.MODEL_CALL, "default-prepareReport#model");
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, contribution, CLOCK.instant());
                 handle.append(TraceRecordType.MODEL_REQUEST_SENT, contribution, TraceFrameType.MODEL_CALL,
-                        attempt("retry-assembly", "attempt-assembly", 1, Map.of()), Map.of("messages", List.of("Generate summary only; report is framework-owned")));
+                        attempt("retry-assembly", "attempt-assembly", 1, Map.of()), requestText("Generate summary only; report is framework-owned"));
                 handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED, contribution, TraceFrameType.MODEL_CALL,
-                        attempt("retry-assembly", "attempt-assembly", 1, Map.of("usage", usage(Usage.ZERO, "EXACT"))), Map.of("content", "{\"summary\":\"Original model wording\"}"));
+                        attempt("retry-assembly", "attempt-assembly", 1, Map.of("usage", usage(Usage.ZERO, "EXACT"))), responseText("{\"summary\":\"Original model wording\"}"));
                 appendFrame(handle, TraceRecordType.FRAME_CLOSED, contribution, CLOCK.instant());
             }
             if (assembly) recorder.recordResultAssembled(session, "default-prepareReport", "report-plan", true,
@@ -1875,7 +2028,7 @@ class ConsoleTraceFixtureCorpusTest
             String precision) throws IOException
     {
         Map<String, Object> metadata = attempt(retryId, attemptId, number, Map.of());
-        handle.append(TraceRecordType.MODEL_REQUEST_SENT, metadata, Map.of("messages", List.of("user")));
+        handle.append(TraceRecordType.MODEL_REQUEST_SENT, metadata, requestText("user"));
         appendResponse(handle, retryId, attemptId, number, usage, precision);
     }
 
@@ -1908,7 +2061,7 @@ class ConsoleTraceFixtureCorpusTest
                         try
                         {
                             handle.append(TraceRecordType.MODEL_REQUEST_SENT, modelFrame,
-                                    TraceFrameType.MODEL_CALL, metadata, Map.of("messages", List.of("user")));
+                                    TraceFrameType.MODEL_CALL, metadata, requestText("user"));
                         }
                         catch (IOException ex)
                         {
@@ -1970,6 +2123,16 @@ class ConsoleTraceFixtureCorpusTest
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, configuration);
     }
 
+    private static Map<String, Object> requestText(String text)
+    {
+        return Map.of("messages", List.of(ordered("messageType", "USER", "text", text)));
+    }
+
+    private static Map<String, Object> responseText(String text)
+    {
+        return Map.of("generations", List.of(ordered("messageType", "ASSISTANT", "text", text, "toolCalls", List.of())));
+    }
+
     private static void appendAttemptWithoutUsage(
             DefaultExecutionTraceHandle handle,
             String retryId,
@@ -1977,8 +2140,8 @@ class ConsoleTraceFixtureCorpusTest
             int number) throws IOException
     {
         Map<String, Object> metadata = attempt(retryId, attemptId, number, Map.of());
-        handle.append(TraceRecordType.MODEL_REQUEST_SENT, metadata, Map.of("messages", List.of("user")));
-        handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED, metadata, Map.of("content", "fixture response"));
+        handle.append(TraceRecordType.MODEL_REQUEST_SENT, metadata, requestText("user"));
+        handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED, metadata, responseText("fixture response"));
     }
 
     private static void appendAttempt(
@@ -1992,7 +2155,7 @@ class ConsoleTraceFixtureCorpusTest
             String precision) throws IOException
     {
         Map<String, Object> metadata = attempt(retryId, attemptId, number, Map.of());
-        handle.append(TraceRecordType.MODEL_REQUEST_SENT, frame, frame.traceFrameType(), metadata, Map.of("messages", List.of("user")));
+        handle.append(TraceRecordType.MODEL_REQUEST_SENT, frame, frame.traceFrameType(), metadata, requestText("user"));
         appendResponse(handle, frame, retryId, attemptId, number, prompt, completion, precision);
     }
 
@@ -2018,7 +2181,7 @@ class ConsoleTraceFixtureCorpusTest
     {
         handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED,
                 attempt(retryId, attemptId, number, Map.of("usage", usage(usage, precision))),
-                Map.of("content", "fixture response"));
+                responseText("fixture response"));
     }
 
     private static void appendResponse(
@@ -2034,7 +2197,7 @@ class ConsoleTraceFixtureCorpusTest
         Map<String, Object> usage = usage(new Usage(prompt, completion), precision);
         handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED, frame, frame.traceFrameType(),
                 attempt(retryId, attemptId, number, Map.of("usage", usage)),
-                Map.of("content", "fixture response"));
+                responseText("fixture response"));
     }
 
     private static ExecutionFrame frame(
@@ -2145,6 +2308,7 @@ class ConsoleTraceFixtureCorpusTest
             case "terminal-provider-failure-actionable" -> "failure-terminal-provider";
             case "native-evaluation-malformed-response", "native-evaluation-provider-failure" -> "failure-native";
             case "recoverable-failed-completion", "terminal-unlinked-success" -> "failure-explicit";
+            case "assigned-planner-inability", "nested-synthesis-planner-inability" -> "failure-inability";
             default -> throw new IllegalStateException("Unexpected fixture failure for " + name);
         };
     }
@@ -2527,6 +2691,11 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "assigned-planner-inability" -> List.of(expectedAttempt(name, "retry-assigned", "attempt-assigned-model", 1));
+            case "nested-synthesis-planner-inability" -> List.of(
+                    expectedAttempt(name, "retry-parent-first", "attempt-parent-first-model", 1),
+                    expectedAttempt(name, "retry-synthesis", "attempt-synthesis-model", 1),
+                    expectedAttempt(name, "retry-parent-final", "attempt-parent-final-model", 1));
             case "native-evaluation-success", "native-evaluation-malformed-response" -> List.of(expectedAttempt(name, "native-retry", "native-attempt", 1));
             case "native-evaluation-provider-failure" -> List.of(ordered(
                     "retrySequenceId", "native-retry", "attemptId", "native-attempt", "attemptNumber", 1,
@@ -2651,7 +2820,7 @@ class ConsoleTraceFixtureCorpusTest
             case "chunked-payload", "chunked-json-payload" -> new Usage(2, 1);
             case "nested-frame-usage" -> attemptId.equals("attempt-framed") ? new Usage(4, 2) : new Usage(1, 1);
             case "repeated-skill-invocations" -> attemptId.equals("attempt-1") ? new Usage(2, 1) : new Usage(3, 2);
-            case "current-plan-semantic-evidence" -> new Usage(2, 1);
+            case "current-plan-semantic-evidence", "assigned-planner-inability", "nested-synthesis-planner-inability" -> new Usage(2, 1);
             default -> new Usage(10, 4);
         };
     }
@@ -2700,6 +2869,22 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "assigned-planner-inability" -> List.of(
+                    inabilityFrame("inability-root", null, "ROOT_MISSION", "default-test_entry", 0, 1),
+                    inabilityFrame("inability-planning", "inability-root", "PLANNING", "default-test_entry#planning", 0, 0),
+                    inabilityFrame("assigned-step", "inability-root", "STEP_EXECUTION", "default-test_entry#step-1", 0, 1),
+                    inabilityFrame("assigned-model", "assigned-step", "MODEL_CALL", "default-test_entry#step-1-model", 1, 0));
+            case "nested-synthesis-planner-inability" -> List.of(
+                    inabilityFrame("inability-root", null, "ROOT_MISSION", "default-test_entry", 0, 3),
+                    inabilityFrame("parent-first-model", "inability-root", "MODEL_CALL", "default-test_entry-model", 1, 0),
+                    inabilityFrame("parent-tool", "inability-root", "TOOL_INVOCATION", "default-coordinate", 0, 1),
+                    inabilityFrame("coordinator", "parent-tool", "SKILL_EXECUTION", "default-coordinate", 0, 1),
+                    inabilityFrame("inability-planning", "coordinator", "PLANNING", "default-coordinate#planning", 0, 0),
+                    inabilityFrame("surrounding-step", "coordinator", "STEP_EXECUTION", "default-coordinate#step-1", 0, 1),
+                    inabilityFrame("synthesis-child", "surrounding-step", "SKILL_EXECUTION", "default-summarize", 0, 1),
+                    inabilityFrame("synthesis-step", "synthesis-child", "STEP_EXECUTION", "default-summarize#step-2", 0, 1),
+                    inabilityFrame("synthesis-model", "synthesis-step", "MODEL_CALL", "default-summarize#step-2-model", 1, 0),
+                    inabilityFrame("parent-final-model", "inability-root", "MODEL_CALL", "default-test_entry-model", 1, 0));
             case "assembled-child-result" -> List.of(
                     expectedFrame("forward-root", null, "ROOT_MISSION", "default-prepareReport", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
                     expectedFrame("planning-report-plan", "forward-root", "PLANNING", "default-prepareReport#planning", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
@@ -2791,6 +2976,13 @@ class ConsoleTraceFixtureCorpusTest
         };
     }
 
+    private static Map<String, Object> inabilityFrame(String id, String parent, String type, String route,
+            int directCalls, int descendantCalls)
+    {
+        return expectedFrame(id, parent, type, route, 0, 0, new Usage(directCalls * 2, directCalls),
+                new Usage(descendantCalls * 2, descendantCalls), new Usage((directCalls + descendantCalls) * 2, directCalls + descendantCalls));
+    }
+
     private static Map<String, Object> expectedFrame(
             String frameId,
             String parentFrameId,
@@ -2840,6 +3032,9 @@ class ConsoleTraceFixtureCorpusTest
         return switch (name)
         {
             case "native-evaluation-success" -> List.of(expectedPayload(4, "payload-1", "application/json", 2));
+            case "assigned-planner-inability" -> List.of(
+                    expectedPayload(11, "payload-1", "application/json", 257),
+                    expectedPayload(270, "payload-2", "application/json", 257));
             case "chunked-payload" -> List.of(expectedPayload(3, "payload-1", "text/plain", 2));
             case "chunked-json-payload" -> List.of(expectedPayload(3, "payload-1", "application/json", 2));
             case "recovered-provider-attempt-diagnostic" ->

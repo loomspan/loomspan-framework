@@ -265,7 +265,15 @@ export function getRawRecordRange(traceId: string, recordSequence: number, curso
 function traceFactPage<T>(operation: string, traceId: string, cursor?: string, source: TraceSource = "TARGET"): Promise<TraceAnalysisPage<T>> { return post(`/api/console/v1/traces/analysis/${operation}`, { traceId, source, pageSize: 100, cursor: cursor ?? "" }); }
 export const getTraceAttempts = (traceId: string, cursor?: string, source: TraceSource = "TARGET") => traceFactPage<TraceAttempt>("attempts", traceId, cursor, source);
 export const getTraceRetries = (traceId: string, cursor?: string) => traceFactPage<TraceRetry>("retries", traceId, cursor);
-export const getTraceFailures = (traceId: string, cursor?: string, source: TraceSource = "TARGET") => traceFactPage<TraceFailure>("failures", traceId, cursor, source);
+export async function getTraceFailures(traceId: string, cursor?: string, source: TraceSource = "TARGET"): Promise<TraceAnalysisPage<TraceFailure>> {
+  const page = await traceFactPage<TraceFailure>("failures", traceId, cursor, source);
+  for (const failure of page.items) {
+    if ("kind" in failure && (failure.kind !== "planner_inability" || failure.classification !== "RECOVERABLE")) {
+      throw new Error("Trace failure contained an invalid kind.");
+    }
+  }
+  return page;
+}
 export const getTraceFailureDiagnostic = (traceId: string, failureId: string, ordinal: number, source: TraceSource = "TARGET") => post<TraceFailureDiagnostic>("/api/console/v1/traces/analysis/failure-diagnostic", { traceId, source, failureId, ordinal });
 export const getTraceValidationLinks = (traceId: string, cursor?: string) => traceFactPage<TraceValidation>("validation-links", traceId, cursor);
 export const getTraceGaps = (traceId: string, cursor?: string) => traceFactPage<TraceGap>("gaps", traceId, cursor);

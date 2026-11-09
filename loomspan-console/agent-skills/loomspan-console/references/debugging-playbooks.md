@@ -38,6 +38,26 @@ succeeds.
 Stop when the recorded mechanism and limits are clear, or state that the
 available evidence cannot establish cause.
 
+## WF-PLANNER-INABILITY
+
+Start with the selected `failureId`. If investigating a failed root, get the
+completion-linked ID. If investigating a child in a successful root, narrow
+`ERROR_RECORDED` records by the selected frame. Read the canonical
+`kind: planner_inability`, `classification`, exact `exceptionMessage`, and
+`contextSummary`. Query its `frameId` in `DETAILED` projection to establish
+origin. A synthesis step can have an enclosing assignment. Use the recorded
+failure context for the declaring step.
+
+Read the selected `PLANNER_INABILITY_SIGNAL` diagnostic `contentRef` as opaque
+text. Preserve truncation. A Java-thrown inability has no accepted signal.
+If the question is what the standard parent received, read its subsequent
+model request and inspect the tool response with the supplied call fields.
+A rejected protocol response can be inspected in its model response before
+dispatch, including calls in later generations without assistant text.
+
+Stop after explaining the recorded declaration and feedback. Partial work
+may already have completed and the evidence does not establish safe replay.
+
 ## WF-SLOW-EXECUTION
 
 Use the active snapshot and recent activity to establish elapsed time, current

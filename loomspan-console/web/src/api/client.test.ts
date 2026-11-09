@@ -10,6 +10,7 @@ import {
   getSkillDetail,
   getTraceDetail,
   getTraceRecords,
+  getTraceFailures,
   getTracePlans,
   heartbeatTab,
   listActiveExecutions,
@@ -30,6 +31,25 @@ import {
 } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test.each([
+  [{ classification: "RECOVERABLE" }, true],
+  [{ classification: "TERMINAL" }, true],
+  [{ classification: "RECOVERABLE", kind: "planner_inability" }, true],
+  [{ classification: "RECOVERABLE", kind: null }, false],
+  [{ classification: "RECOVERABLE", kind: "" }, false],
+  [{ classification: "RECOVERABLE", kind: 42 }, false],
+  [{ classification: "RECOVERABLE", kind: "unknown" }, false],
+  [{ classification: "TERMINAL", kind: "planner_inability" }, false],
+])("validates a present failure kind at the Browser boundary", async (failure, valid) => {
+  const page = { items: [failure], hasMore: false, nextCursor: null };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(page))));
+  if (valid) {
+    await expect(getTraceFailures("trace-1")).resolves.toEqual(page);
+  } else {
+    await expect(getTraceFailures("trace-1")).rejects.toThrow("Trace failure contained an invalid kind.");
+  }
+});
 
 test("submits pairing once in a same-origin no-store request", async () => {
   const fetch = vi.fn().mockResolvedValue(

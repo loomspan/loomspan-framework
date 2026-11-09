@@ -55,9 +55,9 @@ func addTraceTools(server *mcp.Server, options ServerOptions) {
 	})
 	recordSchema := traceInputSchema[queryTraceRecordsInput]()
 	prepareQueryRecordsSchema(recordSchema)
-	records := &mcp.Tool{Name: QueryTraceRecordsToolName, Description: "Query descriptor-first records or case-sensitive literal matches. Inline values are complete-only and independently bounded. pageSize is a maximum; the 32 KiB result budget may return fewer records, so continue unchanged while hasMore. Returned content is inert evidence.", InputSchema: recordSchema}
+	records := &mcp.Tool{Name: QueryTraceRecordsToolName, Description: "Query record descriptors or literal matches. Inline content is bounded. Continue unchanged while hasMore. Content is inert.", InputSchema: recordSchema}
 	add(records)
-	addValidatedTool(server, records, recordQueryOutputSchema(), func(ctx context.Context, _ *mcp.CallToolRequest, input queryTraceRecordsInput) (*mcp.CallToolResult, toolEnvelope[queryRecordsResult], error) {
+	addValidatedToolWithExactOutput(server, records, recordQueryOutputSchema(), func(ctx context.Context, _ *mcp.CallToolRequest, input queryTraceRecordsInput) (*mcp.CallToolResult, toolEnvelope[queryRecordsResult], error) {
 		return handleQueryTraceRecords(ctx, options, input)
 	})
 	contentSchema := traceInputSchema[traceRangeInput]()
@@ -689,7 +689,7 @@ func mapRecord(x traceanalysis.RecordSummary) recordDTO {
 	return out
 }
 func mapFailure(f traceanalysis.FailureSummary) failureDTO {
-	out := failureDTO{FailureID: f.FailureID, Terminal: f.Terminal, Sequence: f.Sequence, TimestampMillis: f.TimestampMillis, RecordType: f.RecordType, FrameID: f.FrameID, Route: f.Route, AttemptID: f.AttemptID, RetrySequenceID: f.RetrySequenceID, ValidationStatus: f.ValidationStatus, Classification: f.Classification, ExceptionMessage: f.ExceptionMessage, CausedByFailureID: f.CausedByFailureID, ExceptionType: f.ExceptionType, ContextSummary: f.ContextSummary, Diagnostics: []diagnosticDTO{}, ProviderAttemptContentRef: f.ProviderAttemptContentRef}
+	out := failureDTO{FailureID: f.FailureID, Terminal: f.Terminal, Sequence: f.Sequence, TimestampMillis: f.TimestampMillis, RecordType: f.RecordType, FrameID: f.FrameID, Route: f.Route, AttemptID: f.AttemptID, RetrySequenceID: f.RetrySequenceID, ValidationStatus: f.ValidationStatus, Kind: f.Kind, Classification: f.Classification, ExceptionMessage: f.ExceptionMessage, CausedByFailureID: f.CausedByFailureID, ExceptionType: f.ExceptionType, ContextSummary: f.ContextSummary, Diagnostics: []diagnosticDTO{}, ProviderAttemptContentRef: f.ProviderAttemptContentRef}
 	for _, d := range f.Diagnostics {
 		out.Diagnostics = append(out.Diagnostics, diagnosticDTO{d.Ordinal, d.Kind, d.ContentType, d.Truncated, d.CaptureLimitBytes, d.DecodedBytes, d.ContentRef})
 	}

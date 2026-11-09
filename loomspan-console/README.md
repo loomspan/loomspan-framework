@@ -275,6 +275,24 @@ The read-only tool surface is:
 - `LOOMSPAN_read_trace_artifact` for optional exact raw NDJSON forensics.
 
 Ordinary MCP `tools/list` is the inventory for these thirteen tools.
+
+To inspect planner inability, select the error in **Records** or its originating
+frame in **Timeline**. The failure remains inspectable even after a successful
+root execution. `kind: planner_inability` identifies a recoverable failure.
+The completion link separately identifies the failure that ended the root.
+Use the recorded origin and context to distinguish invocation, assigned action,
+and synthesis. An accepted signal can be loaded, copied, or downloaded with
+its truncation status. A Java-thrown inability carries the same kind and its
+Java origin without an accepted signal.
+
+The model **Request** and **Response** views show ordered chat messages and
+generations, including exact tool arguments and responses as supplied by Spring
+AI. Inspect the parent request's recorded tool response for the feedback it
+received. In MCP, query records by `failureId`, use the originating `frameId` in
+a detailed frame query, and read diagnostic or model `contentRef` values through
+`LOOMSPAN_read_trace_content`. Recorded feedback describes the obstacle. Work
+may already have completed, and replay may be unsafe.
+
 TypeSafe leaves use the existing catalog and skill-detail views: their source is
 `TYPESAFE`, with original YAML, source location and generated descriptive schemas.
 Use `LOOMSPAN_list_skills` and `LOOMSPAN_get_skill` for the same metadata. Supplied

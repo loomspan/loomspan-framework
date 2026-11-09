@@ -512,9 +512,15 @@ missing response has an empty array, and a generation with missing output has a
 null entry. Each message stores `messageType` and exact nullable `text`.
 Assistant messages add ordered `toolCalls` with `id`, `name`, and `arguments`.
 Tool messages add ordered `toolResponses` with `id`, `name`, and `content`.
-The call arguments and response content are the exact strings supplied by the
-Spring AI adapter. The canonical response is captured before dispatch validation,
-so a rejected call remains inspectable without a follow-up request.
+Console's **Request** and **Response** views preserve message and generation
+order, accompanying text, and the supplied call and response IDs, names, and
+strings. Raw arguments are the string supplied by Spring AI before Loomspan
+parses it. Preserve null, empty, and repeated IDs as recorded. Position groups
+entries within a message and does not establish cross-record identity. The
+response is captured before dispatch validation, so a rejected call is
+inspectable in its returned generation even without text or a follow-up request.
+When provider decoding fails before Spring AI produces a response, inspect the
+provider-attempt failure.
 
 These are Framework trace payloads. See [TypeSafe leaves](typesafe-skills.md) for
 the separate evaluation protocol. The Java observer receives a derived journal.
@@ -564,12 +570,31 @@ explicit-step execution. The stack comes first, followed by
   endings, and any fences. The step and plan identify the declaration's context,
   including the Framework assignment when one exists.
 
-The signal captures up to 1 MiB of valid UTF-8 and reports its capture limit
-and truncation separately. The exact reason remains in `exceptionMessage`.
-Java-thrown instances carry the same failure kind and only the stack diagnostic.
-Use the failure kind for interpretation and `terminalFailureId` for the overall
-outcome. `ExplicitJavaFailureHandlingIntegrationTest` and
-`StepLoopMissionExecutionEngineTest` verify these facts.
+Select the failure in Console from **Records** or its frame in **Timeline**.
+The selected failure shows its originating frame, route, and recorded context.
+A synthesis step can have an enclosing assignment. Use the failure's own
+context to distinguish synthesis from that assignment. Load **Accepted planner
+inability signal** to inspect, copy, or download the recorded text. The signal
+captures up to 1 MiB of valid UTF-8 and reports its limit and truncation. A
+truncated signal can be incomplete JSON. The exact reason remains in
+`exceptionMessage`.
+
+Use `kind` for failure meaning and `terminalFailureId` for completion linkage.
+Java-thrown instances carry the same kind, retain their Java origin, and have a
+stack diagnostic without an accepted signal. A child inability remains
+inspectable after a successful root execution. For actual standard caller
+feedback, open the caller's next model **Request** and inspect the recorded
+tool-response entry. A malformed or mixed response that dispatch rejects is
+available as model-response evidence and has no accepted signal diagnostic.
+
+With MCP, filter `LOOMSPAN_query_trace_records` by `failureId`, follow the
+failure's `frameId` in a detailed `LOOMSPAN_query_trace_frames` query, and read
+the selected diagnostic or model `contentRef` using `LOOMSPAN_read_trace_content`.
+These are diagnostic paths for the operator. Work may already have completed
+before an inability, and the reason and feedback alone do not establish safe
+replay or show that the parent has another authorized action.
+`ExplicitJavaFailureHandlingIntegrationTest`, `StepLoopMissionExecutionEngineTest`,
+and the shared Console fixtures cover the recorded behavior.
 
 ### Sensitivity and limitations
 

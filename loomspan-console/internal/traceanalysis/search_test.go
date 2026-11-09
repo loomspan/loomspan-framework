@@ -103,11 +103,11 @@ func TestServiceSearchAppliesRecordFiltersToOrdinaryAndEnvelopeContent(t *testin
 		requestRecord(2, "retry-1", "attempt-1", 1, true),
 		chunkEnvelopeRecordFor(3, "retry-1", "attempt-1", 1, "payload-1", "text/plain", 1),
 		chunkRecord(4, "payload-1", "text/plain", 0, 1, "shared-hit"),
-		strings.Replace(responseRecord(5, "", "retry-1", "attempt-1", 1, 1, 0, 1, "EXACT"), `"content":"r"`, `"content":"shared-hit"`, 1),
+		strings.Replace(responseRecord(5, "", "retry-1", "attempt-1", 1, 1, 0, 1, "EXACT"), `"text":"r"`, `"text":"shared-hit"`, 1),
 		requestRecord(6, "retry-2", "attempt-2", 1, true),
 		chunkEnvelopeRecordFor(7, "retry-2", "attempt-2", 1, "payload-2", "text/plain", 1),
 		chunkRecord(8, "payload-2", "text/plain", 0, 1, "shared-hit"),
-		strings.Replace(responseRecord(9, "", "retry-2", "attempt-2", 1, 1, 0, 1, "EXACT"), `"content":"r"`, `"content":"shared-hit"`, 1),
+		strings.Replace(responseRecord(9, "", "retry-2", "attempt-2", 1, 1, 0, 1, "EXACT"), `"text":"r"`, `"text":"shared-hit"`, 1),
 		completionRecord(10, "SUCCEEDED", 2, 0, 2, ""),
 	}, "\n") + "\n"
 	h := newServiceTestHarness(t, "t", trace)

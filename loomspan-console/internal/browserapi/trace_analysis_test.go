@@ -2,6 +2,7 @@ package browserapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -447,7 +448,7 @@ func TestTraceAnalysisMapsCompactFailureDescriptorsAndSelectedDiagnostic(t *test
 	router, _, cookie, fake := traceAnalysisRouter(t)
 	descriptor := traceanalysis.DiagnosticDescriptor{Ordinal: 0, Kind: "JAVA_STACK_TRACE", ContentType: "text/plain; charset=utf-8", Truncated: true, CaptureLimitBytes: 1048576, DecodedBytes: 10}
 	fake.failurePage = traceanalysis.Page[traceanalysis.FailureSummary]{Items: []traceanalysis.FailureSummary{{
-		Classification: "RECOVERABLE", ExceptionMessage: func() *string { v := "  exact\n雪\t"; return &v }(), CausedByFailureID: "prior", FailureID: "failure-1", Terminal: true, ExceptionType: "java.lang.IllegalStateException", ContextSummary: "provider failed", Diagnostics: []traceanalysis.DiagnosticDescriptor{descriptor},
+		Classification: "RECOVERABLE", ExceptionMessage: json.RawMessage(`"  exact\n雪\t"`), CausedByFailureID: "prior", FailureID: "failure-1", Terminal: true, ExceptionType: "java.lang.IllegalStateException", ContextSummary: "provider failed", Diagnostics: []traceanalysis.DiagnosticDescriptor{descriptor},
 	}}}
 	failures := traceAnalysisRequest(router, "/api/console/v1/traces/analysis/failures", `{"source":"TARGET","traceId":"trace-1"}`, cookie)
 	if failures.Code != http.StatusOK {

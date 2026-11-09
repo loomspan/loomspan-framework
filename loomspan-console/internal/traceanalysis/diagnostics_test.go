@@ -38,11 +38,11 @@ func diagnosticData(values ...map[string]any) map[string]any {
 	}
 }
 
-func chunkedDiagnosticTrace(t *testing.T, data map[string]any) string {
+func chunkedDiagnosticTrace(t *testing.T, data any) string {
 	return chunkedDiagnosticTraceWithFailureID(t, "failure-1", data)
 }
 
-func chunkedDiagnosticTraceWithFailureID(t *testing.T, failureID string, data map[string]any) string {
+func chunkedDiagnosticTraceWithFailureID(t *testing.T, failureID string, data any) string {
 	t.Helper()
 	logical, err := json.Marshal(data)
 	if err != nil {
@@ -194,6 +194,74 @@ func TestFailuresRejectDuplicateIDsAndDeriveTerminalityOnlyFromCompletion(t *tes
 	}
 }
 
+func TestProcessorValidatesPlannerInabilityKind(t *testing.T) {
+	for _, test := range []struct {
+		name, classification string
+		kind                 any
+		present, valid       bool
+	}{
+		{"ordinary recoverable", "RECOVERABLE", nil, false, true},
+		{"ordinary terminal", "TERMINAL", nil, false, true},
+		{"inability", "RECOVERABLE", "planner_inability", true, true},
+		{"null", "RECOVERABLE", nil, true, false},
+		{"empty", "RECOVERABLE", "", true, false},
+		{"unknown", "RECOVERABLE", "unknown", true, false},
+		{"number", "RECOVERABLE", 1, true, false},
+		{"object", "RECOVERABLE", map[string]any{}, true, false},
+		{"contradiction", "TERMINAL", "planner_inability", true, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data := diagnosticData(diagnostic("JAVA_STACK_TRACE", "stack", false, 64))
+			data["classification"] = test.classification
+			if test.present {
+				data["kind"] = test.kind
+			}
+			inline := startedRecord(1) + "\n" + diagnosticRecord(2, "f", data, nil) + "\n" + completionRecord(3, "SUCCEEDED", 0, 0, 0, "") + "\n"
+			for _, raw := range []string{inline, chunkedDiagnosticTrace(t, data)} {
+				if _, category, valid := processTrace(t, raw); valid != test.valid || !valid && category != CategoryUnsupportedValue {
+					t.Fatalf("valid=%v category=%s", valid, category)
+				}
+			}
+		})
+	}
+}
+
+func TestProcessorRejectsAmbiguousPlannerInabilityKind(t *testing.T) {
+	data := diagnosticData(diagnostic("JAVA_STACK_TRACE", "stack", false, 64))
+	data["classification"] = "TERMINAL"
+	data["kind"] = "planner_inability"
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, input := range []string{
+		strings.Replace(string(encoded), `"classification":"TERMINAL"`, `"classification":"RECOVERABLE","kind":null`, 1),
+		strings.Replace(string(encoded), `"classification":"TERMINAL"`, `"classification":"TERMINAL","Classification":"RECOVERABLE"`, 1),
+	} {
+		payload := json.RawMessage(input)
+		inline := startedRecord(1) + "\n" + diagnosticRecord(2, "f", payload, nil) + "\n" + completionRecord(3, "SUCCEEDED", 0, 0, 0, "") + "\n"
+		for _, raw := range []string{inline, chunkedDiagnosticTrace(t, payload)} {
+			if _, category, valid := processTrace(t, raw); valid || category != CategoryUnsupportedValue {
+				t.Fatalf("valid=%v category=%s for %s", valid, category, input)
+			}
+		}
+	}
+}
+
+func TestApplicationPlannerInabilityDoesNotRequireAcceptedModelEvidence(t *testing.T) {
+	data := diagnosticData(diagnostic("JAVA_STACK_TRACE", "application stack", false, 64))
+	data["kind"] = "planner_inability"
+	data["classification"] = "RECOVERABLE"
+	data["exceptionType"] = "ai.loomspan.api.PlannerInabilityException"
+	data["message"] = "Java invocation failed"
+	raw := startedRecord(1) + "\n" + diagnosticRecord(2, "f", data, nil) + "\n" + completionRecord(3, "FAILED", 0, 0, 0, "f") + "\n"
+	failure := explicitFailureFacts(t, raw)[0]
+	if failure.Kind != "planner_inability" || !failure.Terminal || failure.ContextSummary != "Java invocation failed" ||
+		len(failure.Diagnostics) != 1 || failure.Diagnostics[0].Kind != "JAVA_STACK_TRACE" {
+		t.Fatalf("application failure=%+v", failure)
+	}
+}
+
 func TestExplicitFailureClassificationAndRecordedCauseAreIndependentOfCompletion(t *testing.T) {
 	exact := "  correct this\n雪\t"
 	for _, completion := range []string{"SUCCEEDED", "FAILED"} {
@@ -208,7 +276,9 @@ func TestExplicitFailureClassificationAndRecordedCauseAreIndependentOfCompletion
 		if !ok {
 			t.Fatalf("%s category=%s", completion, category)
 		}
-		if got := explicitFailureFacts(t, raw)[0]; got.Classification != "RECOVERABLE" || got.ExceptionMessage == nil || *got.ExceptionMessage != exact || got.Terminal != (completion == "FAILED") {
+		got := explicitFailureFacts(t, raw)[0]
+		var reason *string
+		if err := json.Unmarshal(got.ExceptionMessage, &reason); err != nil || reason == nil || *reason != exact || got.Classification != "RECOVERABLE" || got.Terminal != (completion == "FAILED") {
 			t.Fatalf("facts=%+v", got)
 		}
 	}

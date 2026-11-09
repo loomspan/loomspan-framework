@@ -1,0 +1,162 @@
+{
+  "case" : "assigned-planner-inability",
+  "valid" : true,
+  "traceId" : "trace-assigned-planner-inability",
+  "sessionId" : "session-assigned-planner-inability",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-assigned-planner-inability",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-assigned-planner-inability"
+  },
+  "outcome" : "FAILED",
+  "terminalFailureId" : "failure-inability",
+  "attributedUsage" : {
+    "promptUnits" : 2,
+    "completionUnits" : 1,
+    "totalUnits" : 3
+  },
+  "terminalUsage" : {
+    "promptUnits" : 2,
+    "completionUnits" : 1,
+    "totalUnits" : 3
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ {
+    "retrySequenceId" : "retry-assigned",
+    "attemptId" : "attempt-assigned-model",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "usageComplete" : true
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "retry-assigned",
+    "usage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "usageComplete" : true
+  } ],
+  "validationLinks" : [ ],
+  "frames" : [ {
+    "frameId" : "inability-root",
+    "parentFrameId" : null,
+    "frameType" : "ROOT_MISSION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-test_entry"
+  }, {
+    "frameId" : "inability-planning",
+    "parentFrameId" : "inability-root",
+    "frameType" : "PLANNING",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "default-test_entry#planning"
+  }, {
+    "frameId" : "assigned-step",
+    "parentFrameId" : "inability-root",
+    "frameType" : "STEP_EXECUTION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-test_entry#step-1"
+  }, {
+    "frameId" : "assigned-model",
+    "parentFrameId" : "assigned-step",
+    "frameType" : "MODEL_CALL",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 2,
+      "completionUnits" : 1,
+      "totalUnits" : 3
+    },
+    "route" : "default-test_entry#step-1-model"
+  } ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ {
+    "logicalRecordSequence" : 11,
+    "payloadId" : "payload-1",
+    "contentType" : "application/json",
+    "chunkCount" : 257
+  }, {
+    "logicalRecordSequence" : 270,
+    "payloadId" : "payload-2",
+    "contentType" : "application/json",
+    "chunkCount" : 257
+  } ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

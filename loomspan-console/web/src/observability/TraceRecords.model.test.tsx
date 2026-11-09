@@ -46,8 +46,8 @@ function range(content: string, overrides: Partial<TraceRange> = {}): TraceRange
   };
 }
 
-function renderRecords(records: TraceRecord[]) {
-  render(<TraceRecords traceId="trace-1" records={records} failures={[]} onSelectRecord={vi.fn()} onSelectFailure={vi.fn()} onContent={vi.fn()} />);
+function renderRecords(records: TraceRecord[], verifyScope?: (response: TraceRange) => Promise<TraceRange>) {
+  render(<TraceRecords traceId="trace-1" records={records} failures={[]} verifyScope={verifyScope} onSelectRecord={vi.fn()} onSelectFailure={vi.fn()} onContent={vi.fn()} />);
 }
 
 beforeEach(() => {
@@ -81,28 +81,87 @@ test("reconstructs a chunked model request and presents messages by role", async
   expect(getRawRecordRangeMock).not.toHaveBeenCalled();
 });
 
-test("extracts and pretty prints JSON content from an inline model response", async () => {
-  const content = { stepAction: "CALL_TOOL", toolName: "understandIntent", toolArguments: { customerId: "CUST-1001" } };
+test("shows a rejected call from a later generation without assistant text or another request", async () => {
+  const args = ' { "reason":\r\n ';
+  const generations = [
+    { messageType: "ASSISTANT", text: null, toolCalls: [] },
+    { messageType: "ASSISTANT", text: null, toolCalls: [{ id: null, name: "loomspan_cannot_complete", arguments: args }] },
+  ];
   const value = record(12, "MODEL_RESPONSE_RECEIVED");
-  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify({ content: `\n${JSON.stringify(content)}` }) };
+  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify({ generations }) };
   renderRecords([value]);
 
   fireEvent.click(screen.getByRole("button", { name: "Response" }));
 
   const detail = await screen.findByRole("region", { name: "Model response for record 12" });
-  const output = within(detail).getByText((_, element) => element?.tagName === "PRE");
-  expect(output).toHaveTextContent(JSON.stringify(content, null, 2), { normalizeWhitespace: false });
-  expect(detail).not.toHaveTextContent("traceId");
+  const first = within(detail).getByRole("region", { name: "Generation 1" });
+  const second = within(detail).getByRole("region", { name: "Generation 2" });
+  expect(first).not.toHaveTextContent("loomspan_cannot_complete");
+  expect(second).toHaveTextContent("loomspan_cannot_complete");
+  expect(Array.from(second.querySelectorAll("pre"), element => element.textContent)).toContain(args);
+  expect(detail).not.toHaveTextContent("Planner inability");
+  expect(getContentRangeMock).not.toHaveBeenCalled();
 });
 
 test("preserves a plain-text model response", async () => {
   const value = record(13, "MODEL_RESPONSE_RECEIVED");
-  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify({ content: "Plain model response" }) };
+  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify({ generations: [{ messageType: "ASSISTANT", text: "Plain model response", toolCalls: [] }] }) };
   renderRecords([value]);
 
   fireEvent.click(screen.getByRole("button", { name: "Response" }));
 
   expect(await screen.findByText("Plain model response")).toBeVisible();
+});
+
+test("preserves ordered calls and tool responses with exact text and nullable identities", async () => {
+  const args = ' {  "token": "value" }\r\n';
+  const feedback = '{ "status":"failed", "kind":"planner_inability", "correctionPermitted":true, "message":"  Need access.\\r\\n" } ';
+  const message = "  Trying authorized action\r\n ";
+  const request = JSON.stringify({ messages: [
+    { messageType: "SYSTEM", text: "" },
+    { messageType: "ASSISTANT", text: message, toolCalls: [
+      { id: "same", name: "run", arguments: args },
+      { id: "same", name: "", arguments: "" },
+      { id: null, name: null, arguments: null },
+    ] },
+    { messageType: "TOOL", text: null, toolResponses: [
+      { id: "same", name: "run", content: feedback },
+      { id: "", name: null, content: "" },
+      { id: null, name: "", content: null },
+    ] },
+  ] });
+  const split = request.indexOf("planner_inability") + 6;
+  getContentRangeMock
+    .mockResolvedValueOnce(range(request.slice(0, split), { hasMore: true, nextCursor: "continued" }))
+    .mockResolvedValueOnce(range(request.slice(split)));
+  renderRecords([record(15, "MODEL_REQUEST_SENT", "feedback-payload")]);
+  fireEvent.click(screen.getByRole("button", { name: "Request" }));
+
+  const detail = await screen.findByRole("region", { name: "Model request for record 15" });
+  await within(detail).findByRole("region", { name: "Tool response 3" });
+  const texts = (container: Element) => Array.from(container.querySelectorAll("pre"), element => element.textContent);
+  expect(within(detail).getAllByRole("heading", { level: 5 }).slice(1).map(element => element.textContent)).toEqual(["system", "assistant", "tool"]);
+  const calls = within(detail).getAllByRole("region", { name: /Tool call/ });
+  expect(calls.map(texts)).toEqual([["same", "run", args], ["same"], []]);
+  expect(calls[1]).toHaveTextContent("Empty string");
+  expect(calls[2]).toHaveTextContent("Absent (null)");
+  const responses = within(detail).getAllByRole("region", { name: /Tool response/ });
+  expect(responses.map(texts)).toEqual([["same", "run", feedback], [], []]);
+  expect(responses[1]).toHaveTextContent("IDEmpty string");
+  expect(responses[2]).toHaveTextContent("IDAbsent (null)");
+  expect(texts(detail)).toContain(message);
+  expect(getContentRangeMock).toHaveBeenNthCalledWith(2, "trace-1", "feedback-payload", "continued", "TARGET");
+});
+
+test.each([
+  [[], "No generations were returned."],
+  [[null, { messageType: "ASSISTANT", text: "", toolCalls: [] }], "No output was recorded for this generation."],
+])("shows a response with absent output", async (generations, expected) => {
+  const value = record(16, "MODEL_RESPONSE_RECEIVED");
+  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify({ generations }) };
+  renderRecords([value]);
+  fireEvent.click(screen.getByRole("button", { name: "Response" }));
+  expect(await screen.findByText(expected)).toBeVisible();
 });
 
 test.each([
@@ -161,7 +220,7 @@ test("does not display partial native response evidence when continuation fails"
 test("shows context in rows and expanded content while retaining UUIDs only in raw records", async () => {
   const value = record(56, "MODEL_RESPONSE_RECEIVED");
   value.route = "hotelSelection#step-3-model";
-  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify({ content: "Selected hotels" }) };
+  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify({ generations: [{ messageType: "ASSISTANT", text: "Selected hotels", toolCalls: [] }] }) };
   getRawRecordRangeMock.mockResolvedValue(range(JSON.stringify({ frameId: value.frameId })));
   renderRecords([value]);
 
@@ -175,6 +234,23 @@ test("shows context in rows and expanded content while retaining UUIDs only in r
   expect(await within(detail).findByText("Selected hotels")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Read raw record" }));
   expect(await within(screen.getByRole("region", { name: "Raw record 56" })).findByText(/model-frame/)).toBeVisible();
+});
+
+test("rejects a model continuation from another scope before displaying content", async () => {
+  const value = JSON.stringify({ generations: [{ messageType: "ASSISTANT", text: "stale evidence", toolCalls: [] }] });
+  getContentRangeMock
+    .mockResolvedValueOnce(range(value.slice(0, 18), { hasMore: true, nextCursor: "next" }))
+    .mockResolvedValueOnce(range(value.slice(18), { targetScopeId: "scope-other", hasMore: true, nextCursor: "rejected" }));
+  const verifyScope = vi.fn(async (response: TraceRange) => {
+    if (response.targetScopeId !== "scope-1") throw new Error("Evidence scope changed.");
+    return response;
+  });
+  renderRecords([record(17, "MODEL_RESPONSE_RECEIVED", "payload")], verifyScope);
+  fireEvent.click(screen.getByRole("button", { name: "Response" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Evidence scope changed.");
+  expect(verifyScope).toHaveBeenCalledTimes(2);
+  expect(getContentRangeMock).toHaveBeenCalledTimes(2);
+  expect(screen.queryByText("stale evidence")).toBeNull();
 });
 
 test("reports malformed model content without displaying a partial fallback", async () => {
