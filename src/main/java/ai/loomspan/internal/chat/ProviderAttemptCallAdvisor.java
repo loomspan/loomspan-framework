@@ -18,12 +18,16 @@ import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.core.Ordered;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,7 +107,7 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
             ModelUsageRecord usage = modelUsageExtractor.extract(linkedResponse.chatResponse(),
                     request.prompt().getInstructions(), responseText);
             executionStateService.recordModelResponseReceived(session, frame, context, attempt, usage,
-                    Map.of("content", responseText));
+                    responsePayload(linkedResponse.chatResponse()));
             sessionUsageService.recordModelResponse(session, context.skillName(), context.identity(), usage);
             return linkedResponse;
         }
@@ -155,10 +159,37 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
 
     private Map<String, Object> messagePayload(Message message)
     {
+        if (message == null) return null;
         LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("messageType", message.getMessageType().name());
-        payload.put("text", message.getText() == null ? "" : message.getText());
-        return Map.copyOf(payload);
+        payload.put("text", message.getText());
+        if (message instanceof AssistantMessage assistant)
+        {
+            payload.put("toolCalls", assistant.getToolCalls().stream().map(call -> {
+                var entry = new LinkedHashMap<String, Object>();
+                entry.put("id", call.id());
+                entry.put("name", call.name());
+                entry.put("arguments", call.arguments());
+                return Collections.unmodifiableMap(entry);
+            }).toList());
+        }
+        else if (message instanceof ToolResponseMessage tool)
+        {
+            payload.put("toolResponses", tool.getResponses().stream().map(response -> {
+                var entry = new LinkedHashMap<String, Object>();
+                entry.put("id", response.id());
+                entry.put("name", response.name());
+                entry.put("content", response.responseData());
+                return Collections.unmodifiableMap(entry);
+            }).toList());
+        }
+        return Collections.unmodifiableMap(payload);
+    }
+
+    private Map<String, Object> responsePayload(ChatResponse response)
+    {
+        return Map.of("generations", response == null ? List.of() : response.getResults().stream()
+                .map(generation -> messagePayload(generation == null ? null : generation.getOutput())).toList());
     }
 
     private String responseText(ChatClientResponse response)

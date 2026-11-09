@@ -283,7 +283,7 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
         public ai.loomspan.internal.model.ModelInteraction create(
                 YamlSkillDefinition definition,
                 ai.loomspan.internal.model.ModelInteractionMode mode) {
-            return new ai.loomspan.internal.springai.SpringAiModelInteraction(delegate);
+            return new ai.loomspan.internal.springai.SpringAiModelInteraction(delegate, mode);
         }
     }
 }

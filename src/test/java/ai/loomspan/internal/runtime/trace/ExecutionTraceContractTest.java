@@ -7,6 +7,7 @@ import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.ExecutionFrame;
 import ai.loomspan.internal.core.ExecutionPlan;
 import ai.loomspan.internal.core.ModelTraceContext;
+import ai.loomspan.internal.core.ModelExecutionIdentity;
 import ai.loomspan.internal.core.PlanStatus;
 import ai.loomspan.internal.core.TestExecutionBindings;
 import ai.loomspan.internal.core.ExecutionBinding;
@@ -35,12 +36,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClientRequest;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayDeque;
 import java.time.Clock;
@@ -64,6 +73,91 @@ class ExecutionTraceContractTest {
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-03-15T12:00:00Z"), ZoneOffset.UTC);
     private static final EffectiveSkillExecutionConfiguration EXECUTION_CONFIGURATION =
             new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
+
+    @Test
+    void structuredChatCapturePreservesOrderNullsEmptyValuesAndExactContent() {
+        String system = "  system \r\n\u96ea  ";
+        String user = "  user\t\n ";
+        String rawArguments = "{ invalid JSON \r\n" + "\u96ea\ud83d\ude00".repeat(5000) + " } " + (char) 0xDC00;
+        String feedback = "  {\"message\":\"verbatim\"}\r\n ";
+        var nullFields = new AssistantMessage.ToolCall(null, "function", null, null);
+        var emptyFields = new AssistantMessage.ToolCall("", "function", "", "");
+        var repeatedId = new AssistantMessage.ToolCall("same", "function", "one-tool", rawArguments);
+        var sameIdDifferentCall = new AssistantMessage.ToolCall("same", "function", "two-tool", "  {}\n");
+        var assistant = AssistantMessage.builder().toolCalls(List.of(nullFields, emptyFields, repeatedId, sameIdDifferentCall)).build();
+        var emptyAssistant = AssistantMessage.builder().content("").build();
+        var tool = ToolResponseMessage.builder().responses(List.of(
+                new ToolResponseMessage.ToolResponse("same", "one-tool", feedback),
+                new ToolResponseMessage.ToolResponse("same", "two-tool", ""),
+                new ToolResponseMessage.ToolResponse(null, null, null))).build();
+        var missingOutput = mock(Generation.class);
+        var response = new ChatResponse(List.of(new Generation(assistant), missingOutput, new Generation(emptyAssistant)),
+                ChatResponseMetadata.builder().usage(new DefaultUsage(1, 2, 3)).build());
+        var session = captureChatExchange(new Prompt(List.of(new SystemMessage(system), new UserMessage(user), assistant,
+                tool, emptyAssistant, ToolResponseMessage.builder().build())), response);
+
+        var records = modelRecords(session);
+        assertThat(records).hasSize(2).allSatisfy(record -> assertThat(record.metadata()).containsEntry("payloadChunked", true));
+        var mapper = new ObjectMapper();
+        var messages = records.getFirst().data().path("messages");
+        assertThat(records.getFirst().data().size()).isOne();
+        assertThat(messages.size()).isEqualTo(6);
+        assertThat(messages.get(0)).isEqualTo(mapper.valueToTree(Map.of("messageType", "SYSTEM", "text", system)));
+        assertThat(messages.get(1)).isEqualTo(mapper.valueToTree(Map.of("messageType", "USER", "text", user)));
+        var expectedAssistant = mapper.createObjectNode().put("messageType", "ASSISTANT").putNull("text");
+        var calls = expectedAssistant.putArray("toolCalls");
+        calls.addObject().putNull("id").putNull("name").putNull("arguments");
+        calls.addObject().put("id", "").put("name", "").put("arguments", "");
+        calls.addObject().put("id", "same").put("name", "one-tool").put("arguments", rawArguments);
+        calls.addObject().put("id", "same").put("name", "two-tool").put("arguments", "  {}\n");
+        assertThat(messages.get(2)).isEqualTo(expectedAssistant);
+        var expectedTool = mapper.createObjectNode().put("messageType", "TOOL").put("text", "");
+        var responses = expectedTool.putArray("toolResponses");
+        responses.addObject().put("id", "same").put("name", "one-tool").put("content", feedback);
+        responses.addObject().put("id", "same").put("name", "two-tool").put("content", "");
+        responses.addObject().putNull("id").putNull("name").putNull("content");
+        assertThat(messages.get(3)).isEqualTo(expectedTool);
+        var expectedEmptyAssistant = mapper.valueToTree(Map.of("messageType", "ASSISTANT", "text", "", "toolCalls", List.of()));
+        assertThat(messages.get(4)).isEqualTo(expectedEmptyAssistant);
+        assertThat(messages.get(5)).isEqualTo(mapper.valueToTree(Map.of("messageType", "TOOL", "text", "", "toolResponses", List.of())));
+        var payload = records.getLast().data();
+        assertThat(payload.size()).isOne();
+        var generations = payload.path("generations");
+        assertThat(generations.size()).isEqualTo(3);
+        assertThat(generations.get(0)).isEqualTo(expectedAssistant);
+        assertThat(generations.get(1).isNull()).isTrue();
+        assertThat(generations.get(2)).isEqualTo(expectedEmptyAssistant);
+        assertThat(session.getSessionUsage().orElseThrow().usageUnits()).isEqualTo(3);
+    }
+
+    @Test
+    void missingOrEmptyChatResponseHasAnEmptyGenerationsArray() {
+        for (ChatResponse response : java.util.Arrays.asList(null, new ChatResponse(List.of()))) {
+            var payload = modelRecords(captureChatExchange(new Prompt("user"), response)).getLast().data();
+            assertThat(payload).isEqualTo(new ObjectMapper().valueToTree(Map.of("generations", List.of())));
+        }
+    }
+
+    private static LoomspanSession captureChatExchange(Prompt prompt, ChatResponse response) {
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("structured-chat", "default-test_entry", 3);
+        var usage = new DefaultSessionUsageService(new LoomspanProperties().getSession().getQuotas(), new NoOpUsageMetricsRecorder());
+        var state = new DefaultExecutionStateService(FIXED_CLOCK, usage);
+        var retry = new LoomspanProperties.ProviderRetryProperties();
+        retry.setEnabled(false);
+        var runtime = ProviderConnectionRuntime.chat(mock(ChatModel.class), AiDriver.OPENAI,
+                AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP, ProviderRetryPolicy.from(retry), ignored -> ProviderFailureDetails.unknown());
+        var advisor = new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), usage);
+        var chain = mock(CallAdvisorChain.class);
+        var request = new ChatClientRequest(prompt, Map.of(ModelTraceContext.REQUEST_CONTEXT_KEY,
+                new ModelTraceContext(ModelExecutionIdentity.from(EXECUTION_CONFIGURATION), "default-test_entry", "mission")));
+        when(chain.copy(advisor)).thenReturn(chain);
+        when(chain.nextCall(request)).thenReturn(response == null ? null : ChatClientResponse.builder().chatResponse(response).build());
+        TestExecutionBindings.callWithSession(session, () -> {
+            state.openFrame(session, TraceFrameType.MODEL_CALL, "default-test_entry#model", Map.of());
+            return advisor.adviseCall(request, chain);
+        });
+        return session;
+    }
 
     @Test
     void engineCallSitesDoNotEmitDuplicateOuterModelEvents() {
@@ -329,7 +423,8 @@ class ExecutionTraceContractTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(rejectedResponse.metadata()).doesNotContainKey("planId");
-        assertThat(rejectedResponse.data().path("content").asText()).contains("\"planId\": \"plan-weak\"");
+        assertThat(rejectedResponse.data().path("generations").get(0).path("text").asText())
+                .contains("\"planId\": \"plan-weak\"");
         assertThat(planChain(records, "rejected-candidate-plan")).isEmpty();
         assertThat(acceptingResponse.metadata().get("retrySequenceId"))
                 .isEqualTo(primaryCreation.metadata().get("retrySequenceId"));
@@ -384,7 +479,7 @@ class ExecutionTraceContractTest {
                 .defaultAdvisors(new ProviderAttemptCallAdvisor(
                         runtime, stateService, new ModelUsageExtractor(), usageService))
                 .build();
-        return new SpringAiModelInteraction(client);
+        return new SpringAiModelInteraction(client, ai.loomspan.internal.model.ModelInteractionMode.STANDARD);
     }
 
     private static final class QueueChatModel implements ChatModel {

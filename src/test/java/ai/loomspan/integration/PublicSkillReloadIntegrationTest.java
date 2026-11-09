@@ -14,8 +14,10 @@ import ai.loomspan.api.SkillValidationResult;
 import ai.loomspan.api.ValidatedSkill;
 import ai.loomspan.api.SkillTemplate;
 import ai.loomspan.autoconfigure.LoomspanAutoConfiguration;
+import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -48,7 +50,13 @@ class PublicSkillReloadIntegrationTest
                     if (chunks) response.setChunkedBody(" ".repeat(1000) + response.getBody().readUtf8(), 50)
                             .throttleBody(50, 75, java.util.concurrent.TimeUnit.MILLISECONDS);
                     else response.setHeadersDelay(expires ? 1800 : 150, java.util.concurrent.TimeUnit.MILLISECONDS);
-                    server.enqueue(response);
+                    // Apply the throttle after request receipt so only the response body is paced.
+                    server.setDispatcher(new Dispatcher() {
+                        @Override
+                        public MockResponse dispatch(RecordedRequest request) {
+                            return response;
+                        }
+                    });
                     timeoutContext(directory).withPropertyValues(
                             "loomspan.connections.candidate.driver=openai",
                             "loomspan.connections.candidate.base-url=" + server.url("/v1"),

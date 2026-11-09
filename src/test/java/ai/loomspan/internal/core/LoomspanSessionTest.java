@@ -123,6 +123,28 @@ class LoomspanSessionTest {
     }
 
     @Test
+    void inabilityKindFollowsTheEffectiveExceptionAndCannotBeSuppliedByContext() {
+        var session = TestLoomspanSessions.create(8, "default-test_skill");
+        var cause = new ai.loomspan.api.PlannerInabilityException("  exact\r\n reason  ");
+        var infrastructure = new java.util.concurrent.ExecutionException(cause);
+        String original = recordFailure(session, cause, Map.of("kind", "unknown", "message", "first"));
+        assertThat(recordFailure(session, infrastructure, Map.of("message", "later"))).isEqualTo(original);
+        var wrapper = new IllegalStateException("terminal wrapper", cause);
+        assertThat(recordFailure(session, wrapper, Map.of("kind", "planner_inability"))).isNotEqualTo(original);
+
+        var errors = new java.util.ArrayList<TraceRecord>();
+        session.readTraceRecords(record -> { if (record.recordType() == TraceRecordType.ERROR_RECORDED) errors.add(record); });
+        assertThat(errors).hasSize(2);
+        assertThat(errors.getFirst().data().path("kind").asString()).isEqualTo("planner_inability");
+        assertThat(errors.getFirst().data().path("classification").asString()).isEqualTo("RECOVERABLE");
+        assertThat(errors.getFirst().data().path("exceptionMessage").asString()).isEqualTo(cause.getMessage());
+        assertThat(errors.getFirst().data().path("message").asString()).isEqualTo("first");
+        assertThat(errors.getLast().metadata()).containsEntry("causedByFailureId", original);
+        assertThat(errors.getLast().data().has("kind")).isFalse();
+        assertThat(errors.getLast().data().path("classification").asString()).isEqualTo("TERMINAL");
+    }
+
+    @Test
     void transparentIdentityAndApplicationCauseLinkPreserveAuthoritativeFacts() {
         for (boolean wrapperFirst : java.util.List.of(false, true)) {
             var session = TestLoomspanSessions.create(8, "default-test_skill");

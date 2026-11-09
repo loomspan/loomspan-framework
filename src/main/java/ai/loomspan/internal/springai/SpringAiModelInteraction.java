@@ -2,6 +2,7 @@ package ai.loomspan.internal.springai;
 
 import ai.loomspan.internal.core.ModelTraceContext;
 import ai.loomspan.internal.model.ModelInteraction;
+import ai.loomspan.internal.model.ModelInteractionMode;
 import ai.loomspan.internal.model.ModelInteractionRequest;
 import ai.loomspan.internal.model.ModelInteractionResult;
 import org.springframework.ai.chat.client.ChatClient;
@@ -9,15 +10,18 @@ import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.util.MimeTypeUtils;
 
 import java.util.Map;
+import java.util.ArrayList;
 import java.util.Objects;
 
 public final class SpringAiModelInteraction implements ModelInteraction
 {
     private final ChatClient chatClient;
+    private final ModelInteractionMode mode;
 
-    public SpringAiModelInteraction(ChatClient chatClient)
+    public SpringAiModelInteraction(ChatClient chatClient, ModelInteractionMode mode)
     {
         this.chatClient = Objects.requireNonNull(chatClient, "chatClient must not be null");
+        this.mode = Objects.requireNonNull(mode, "mode must not be null");
     }
 
     @Override
@@ -36,7 +40,10 @@ public final class SpringAiModelInteraction implements ModelInteraction
 
     private ModelInteractionResult doCall(ModelInteractionRequest interactionRequest)
     {
-        ChatClient.ChatClientRequestSpec request = chatClient.prompt().system(interactionRequest.systemPrompt());
+        boolean exposeControl = mode == ModelInteractionMode.STANDARD && !interactionRequest.planning();
+        String system = interactionRequest.systemPrompt();
+        ChatClient.ChatClientRequestSpec request = chatClient.prompt()
+                .system(exposeControl ? system + PlannerInabilityTool.CALLER_GUIDANCE : system);
         if (interactionRequest.input().attachments().isEmpty())
         {
             request = request.user(interactionRequest.input().userText());
@@ -50,9 +57,11 @@ public final class SpringAiModelInteraction implements ModelInteraction
                         MimeTypeUtils.parseMimeType(attachment.contentType()), attachment.resource()));
             });
         }
-        if (!interactionRequest.capabilities().isEmpty())
+        if (exposeControl || !interactionRequest.capabilities().isEmpty())
         {
-            request = request.tools(SpringAiToolCallbackAdapter.adapt(interactionRequest.capabilities()));
+            var callbacks = new ArrayList<>(SpringAiToolCallbackAdapter.adapt(interactionRequest.capabilities()));
+            if (exposeControl) callbacks.add(new PlannerInabilityTool());
+            request = request.tools(callbacks);
         }
         ChatClientResponse response = request
                 .advisors(spec ->

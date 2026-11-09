@@ -120,6 +120,11 @@ Messages MUST be non-null and nonblank. Valid messages, including surrounding wh
 
 Standard feedback uses the original tool-call ID/name and a JSON body with `status: "failed"`, `correctionPermitted: true`, and the exact application `message`. It is never a successful skill result, success credit, or a value for successful-result bindings. The model may choose normal continuation, but the exception does not replay work automatically. Failed calls and subsequent model/tool work consume the existing budgets with no reset or refund; the parent timeout continues. Authorization, quotas, timeout, cancellation and shutdown remain terminal controls. See [facade errors](observation-and-errors.md) for supported caller handling.
 
+For `PlannerInabilityException`, standard feedback adds `kind: "planner_inability"`.
+`correctionPermitted` allows the caller to take an action within its existing
+authority that addresses the obstacle. Work may already have completed, and
+repeating the same request does not address the reported obstacle.
+
 Evidence: `ExplicitJavaFailureHandlingIntegrationTest`, `SharedJavaDiscoveryInvocationTest`, `LoomspanSessionTest`, and the lifecycle/usage regression suites.
 
 

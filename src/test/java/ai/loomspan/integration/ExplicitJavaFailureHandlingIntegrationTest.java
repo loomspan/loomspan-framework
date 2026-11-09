@@ -6,6 +6,7 @@ import ai.loomspan.internal.core.*;
 import ai.loomspan.internal.runtime.input.*;
 import okhttp3.mockwebserver.*;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.aop.framework.ProxyFactory;
@@ -23,6 +24,236 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     static final ObjectMapper JSON = new ObjectMapper();
     static final String EXACT = "  correct this\n\u96ea\t";
     @TempDir Path directory;
+
+    @Test
+    void declaringChildStopsAndOnlyItsStandardCallerReceivesAssociatedFeedback() throws Exception {
+        Files.writeString(directory.resolve("child.yaml"), parent("child", "default-callable", false));
+        Files.writeString(directory.resolve("standard.yaml"), parent("standard", "default-child", false));
+        for (boolean parentDeclaresInability : List.of(false, true)) {
+            var behavior = new Behavior();
+            behavior.kind = "success";
+            try (var server = new MockWebServer()) {
+                server.enqueue(tool("default-child"));
+                server.enqueue(tool("default-callable"));
+                String rawArguments = "{ \r\n \"reason\" : " + JSON.writeValueAsString(EXACT) + " \n }";
+                server.enqueue(tool("loomspan_cannot_complete", "child-declaration", rawArguments, "Ignored candidate"));
+                String parentReason = "Parent independently stops";
+                server.enqueue(parentDeclaresInability ? inability(parentReason) : text("DONE"));
+                server.start();
+                runner(server, behavior).run(context -> {
+                    assertThat(context).hasNotFailed();
+                    var template = context.getBean(SkillTemplate.class);
+                    if (parentDeclaresInability) {
+                        assertThatThrownBy(() -> template.invoke("default-standard", Map.of()))
+                                .isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(parentReason);
+                    } else {
+                        assertThat(template.invoke("default-standard", Map.of())).isEqualTo("DONE");
+                    }
+                    assertThat(behavior.calls).hasValue(1);
+                    assertThat(behavior.parent.get().successfulDirectSkills()).containsExactly("default-callable");
+                    var session = behavior.session.get();
+                    var usage = session.getSessionUsage().orElseThrow();
+                    assertThat(usage.providerAttempts()).isEqualTo(4);
+                    assertThat(usage.modelCalls()).isEqualTo(4);
+                    assertThat(usage.usageUnits()).isEqualTo(8);
+                    assertThat(usage.toolInvocations()).isEqualTo(2);
+                    assertThat(usage.skillInvocations()).isEqualTo(3);
+
+                    var records = new ArrayList<TraceRecord>();
+                    session.readTraceRecords(records::add);
+                    var failures = records.stream().filter(record -> record.recordType() == TraceRecordType.ERROR_RECORDED).toList();
+                    assertThat(failures).hasSize(parentDeclaresInability ? 2 : 1);
+                    var childFailure = failures.getFirst();
+                    assertThat(childFailure.frameType()).isEqualTo(TraceFrameType.MODEL_CALL);
+                    assertThat(childFailure.route()).isEqualTo("default-child#mission-model");
+                    assertThat(childFailure.data().path("kind").asString()).isEqualTo("planner_inability");
+                    assertThat(childFailure.data().path("classification").asString()).isEqualTo("RECOVERABLE");
+                    assertThat(childFailure.data().path("exceptionMessage").asString()).isEqualTo(EXACT);
+                    assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.TOOL_CALL_COMPLETED)
+                            .singleElement().satisfies(record -> assertThat(record.route()).isEqualTo("default-callable"));
+                    assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.TOOL_CALL_FAILED)
+                            .singleElement().satisfies(record -> {
+                                assertThat(record.route()).isEqualTo("default-child");
+                                assertThat(record.data().path("failure").path("classification").asString()).isEqualTo("RECOVERABLE");
+                                assertThat(records).anySatisfy(mission -> {
+                                    assertThat(mission.recordType()).isEqualTo(TraceRecordType.FRAME_OPENED);
+                                    assertThat(mission.frameId()).isEqualTo(childFailure.parentFrameId());
+                                    assertThat(mission.parentFrameId()).isEqualTo(record.frameId());
+                                });
+                            });
+                    assertThat(records).noneMatch(record -> record.recordType() == TraceRecordType.MODEL_ATTEMPT_FAILED);
+
+                    var completion = records.getLast();
+                    assertThat(completion.recordType()).isEqualTo(TraceRecordType.TRACE_COMPLETED);
+                    if (parentDeclaresInability) {
+                        var parentFailure = failures.getLast();
+                        assertThat(parentFailure.metadata()).doesNotContainKey("causedByFailureId");
+                        assertThat(parentFailure.metadata().get("failureId")).isNotEqualTo(childFailure.metadata().get("failureId"));
+                        assertThat(completion.metadata().get("terminalFailureId")).isEqualTo(parentFailure.metadata().get("failureId"));
+                    } else {
+                        assertThat(completion.metadata()).containsEntry("outcome", "SUCCEEDED").doesNotContainKey("terminalFailureId");
+                    }
+                    var traceRequest = records.stream().filter(record -> record.recordType() == TraceRecordType.MODEL_REQUEST_SENT)
+                            .toList().getLast();
+                    var traceFeedback = traceRequest.data().path("messages").get(traceRequest.data().path("messages").size() - 1)
+                            .path("toolResponses").get(0);
+                    assertThat(traceFeedback.path("id").asString()).isEqualTo("failed-call");
+                    assertThat(traceFeedback.path("name").asString()).isEqualTo("default-child");
+                    for (int turn = 0; turn < 3; turn++) server.takeRequest();
+                    var wire = JSON.readTree(server.takeRequest().getBody().readUtf8());
+                    var messages = wire.path("messages");
+                    assertThat(messages.get(0).path("content").asString()).contains("ended unsuccessfully", "explanation and data",
+                            "replay may be unsafe", "Repeating the same request does not address", "existing authority");
+                    var feedback = messages.get(messages.size() - 1);
+                    assertThat(feedback.path("tool_call_id").asString()).isEqualTo("failed-call");
+                    assertThat(feedback.path("content").asString()).isEqualTo(traceFeedback.path("content").asString());
+                    assertThat(JSON.readTree(feedback.path("content").asString())).isEqualTo(JSON.valueToTree(Map.of(
+                            "status", "failed", "kind", "planner_inability", "correctionPermitted", true, "message", EXACT)));
+                });
+                assertThat(server.getRequestCount()).isEqualTo(4);
+            }
+        }
+    }
+
+    @Test
+    void standardChildInabilityPropagatesThroughAnExplicitStepAncestor() throws Exception {
+        Files.writeString(directory.resolve("child.yaml"), parent("child", "default-callable", false));
+        Files.writeString(directory.resolve("step.yaml"), parent("step", "default-child", true));
+        Files.writeString(directory.resolve("standard.yaml"), parent("standard", "default-step", false));
+        var behavior = new Behavior();
+        behavior.kind = "success";
+        try (var server = new MockWebServer()) {
+            server.enqueue(tool("default-step"));
+            server.enqueue(text(JSON.writeValueAsString(Map.of("capabilityName", "default-step",
+                    "createdAt", "2026-11-01T00:00:00Z", "status", "VALID", "tasks", List.of(task("default-child"))))));
+            server.enqueue(text(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", "child",
+                    "toolName", "default-child", "toolArguments", Map.of()))));
+            server.enqueue(tool("default-callable"));
+            server.enqueue(inability(EXACT));
+            server.enqueue(text("DONE"));
+            server.start();
+            runner(server, behavior).run(context -> {
+                assertThat(context).hasNotFailed();
+                assertThat(context.getBean(SkillTemplate.class).invoke("default-standard", Map.of())).isEqualTo("DONE");
+                var records = new ArrayList<TraceRecord>();
+                behavior.session.get().readTraceRecords(records::add);
+                assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
+                        .singleElement().satisfies(failure -> {
+                            assertThat(failure.route()).isEqualTo("default-child#mission-model");
+                            assertThat(failure.data().path("exceptionMessage").asString()).isEqualTo(EXACT);
+                        });
+                assertThat(records.getLast().metadata()).containsEntry("outcome", "SUCCEEDED").doesNotContainKey("terminalFailureId");
+            });
+            assertThat(server.getRequestCount()).isEqualTo(6);
+            for (int turn = 0; turn < 5; turn++) server.takeRequest();
+            var messages = JSON.readTree(server.takeRequest().getBody().readUtf8()).path("messages");
+            var feedback = messages.get(messages.size() - 1);
+            assertThat(feedback.path("tool_call_id").asString()).isEqualTo("failed-call");
+            assertThat(JSON.readTree(feedback.path("content").asString()).path("message").asString()).isEqualTo(EXACT);
+        }
+    }
+
+    @Test
+    void directAndAdmittedPlannerFailureBypassResultValidatorsAndKeepTheObserverSecondary() throws Exception {
+        Files.writeString(directory.resolve("checked.yaml"), """
+                name: checked
+                description: Validate the accepted result
+                model: local
+                allowed_skills: [{name: default-callable}]
+                output_schema_max_retries: 1
+                output_schema:
+                  type: object
+                  properties:
+                    answer: {type: string, evidence: default-callable}
+                  required: [answer]
+                  additionalProperties: false
+                linter:
+                  type: REGEX
+                  max_retries: 1
+                  regex:
+                    pattern: '^\\{.*\\}$'
+                    message: Return an object
+                input_schema:
+                  type: object
+                  required: [image]
+                  properties:
+                    image: {type: attachment, media_type: image, allowed_content_types: [image/jpeg]}
+                """);
+        var image = new org.springframework.core.io.ByteArrayResource(new byte[] {(byte) 0xff, (byte) 0xd8,
+                (byte) 0xff, 0x00, (byte) 0xd9}) {
+            @Override public String getFilename() { return "fixture.jpg"; }
+        };
+        var input = Map.<String, Object>of("image", image);
+        var behavior = new Behavior();
+        behavior.kind = "success";
+        String candidate = "{\"answer\":\"The requested item is unavailable.\"}";
+        try (var server = new MockWebServer()) {
+            String arguments = JSON.writeValueAsString(Map.of("reason", EXACT));
+            server.enqueue(tool("loomspan_cannot_complete", "signal", arguments, candidate));
+            server.enqueue(tool("loomspan_cannot_complete", "signal", arguments, candidate));
+            server.enqueue(tool("default-callable"));
+            server.enqueue(text(candidate));
+            server.start();
+            runner(server, behavior).run(context -> {
+                assertThat(context).hasNotFailed();
+                var template = context.getBean(SkillTemplate.class);
+                var direct = new ArrayList<SkillExecutionView>();
+                assertThatThrownBy(() -> template.invoke("default-checked", input, direct::add))
+                        .isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(EXACT);
+                var observerFailure = new IllegalStateException("Observer failed");
+                var admitted = context.getBean(SkillInvocationHandoff.class).handoff("default-checked", input);
+                var observed = new ArrayList<SkillExecutionView>();
+                try {
+                    admitted.invoke(view -> { observed.add(view); throw observerFailure; });
+                    fail("Expected the declaring invocation to fail");
+                } catch (RecoverableSkillException failure) {
+                    assertThat(failure).isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(EXACT);
+                    assertThat(failure.getSuppressed()).containsExactly(observerFailure);
+                }
+                for (var views : List.of(direct, observed)) {
+                    assertThat(views).singleElement().satisfies(view -> assertThat(view.events())
+                            .filteredOn(event -> event.type().equals("ERROR")).singleElement().satisfies(event ->
+                                    assertThat(event.details()).containsEntry("classification", "RECOVERABLE")
+                                            .containsEntry("exceptionMessage", EXACT)));
+                }
+                assertThat(behavior.calls).hasValue(0);
+                assertThat(template.invoke("default-checked", input)).isEqualTo(candidate);
+                assertThat(behavior.calls).hasValue(1);
+            });
+            assertThat(server.getRequestCount()).isEqualTo(4);
+            for (int turn = 0; turn < 4; turn++) {
+                var wire = JSON.readTree(server.takeRequest().getBody().readUtf8());
+                assertThat(wire.path("tools")).extracting(tool -> tool.path("function").path("name").asString())
+                        .containsExactlyInAnyOrder("default-callable", "loomspan_cannot_complete");
+                assertThat(wire.path("messages").toString()).contains("image_url");
+            }
+        }
+    }
+
+    @Test
+    void applicationThrownInabilityRetainsJavaOriginWithoutModelSignal() throws Exception {
+        var behavior = new Behavior();
+        behavior.kind = "inability";
+        try (var server = new MockWebServer()) {
+            server.start();
+            runner(server, behavior).run(context -> {
+                assertThat(context).hasNotFailed();
+                assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default-callable", Map.of()))
+                        .isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(EXACT);
+                var records = new ArrayList<TraceRecord>();
+                behavior.session.get().readTraceRecords(records::add);
+                assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
+                        .singleElement().satisfies(failure -> {
+                            assertThat(failure.frameType()).isNotEqualTo(TraceFrameType.MODEL_CALL);
+                            assertThat(failure.data().path("kind").asString()).isEqualTo("planner_inability");
+                            assertThat(failure.data().path("diagnostics").size()).isOne();
+                            assertThat(records.getLast().metadata().get("terminalFailureId"))
+                                    .isEqualTo(failure.metadata().get("failureId"));
+                        });
+            });
+            assertThat(server.getRequestCount()).isZero();
+        }
+    }
 
     @ParameterizedTest @ValueSource(booleans={false,true})
     void bothJavaFormsFailTruthfullyAcrossDirectStandardAndStep(boolean executor) throws Exception {
@@ -55,6 +286,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                                 assertThat(data.path("status").asText()).isEqualTo("failed");
                                 assertThat(data.path("correctionPermitted").asBoolean()).isTrue();
                                 assertThat(data.path("message").asText()).isEqualTo(EXACT);
+                                assertThat(data.has("kind")).isFalse();
                                 // This is checked on the next provider request, before any enclosing success.
                                 assertFailedAttempt(behavior.session.get(), child);
                                 assertNoAcceptedResult(behavior.parent.get(), child);
@@ -287,6 +519,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
         String fail() {
             calls.incrementAndGet(); session.set(ExecutionBindingScope.requireCurrent().session());
             var mission = ExecutionBindingScope.requireCurrent().requireMission(); parent.set(mission.parent().orElse(mission));
+            if (kind.equals("success")) return "EARLIER WORK";
             if (kind.equals("once") && calls.get() > 1) return "REAL RESULT";
             if (delayMillis > 0) { try { Thread.sleep(delayMillis); } catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException("Interrupted", ex); } }
             var recoverable = new RecoverableSkillException(EXACT, new Exception("diagnostic cause"));
@@ -294,6 +527,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                 case "recoverable", "once" -> recoverable;
                 case "transparent" -> new java.lang.reflect.UndeclaredThrowableException(new java.lang.reflect.InvocationTargetException(recoverable));
                 case "application" -> new IllegalStateException("terminal outer", recoverable);
+                case "inability" -> new PlannerInabilityException(EXACT);
                 case "cancellation" -> new java.util.concurrent.CancellationException("Application cancellation");
                 case "shutdown" -> new FrameworkShutdownException();
                 default -> new IllegalStateException("terminal outer", new Exception("diagnostic cause"));
@@ -311,8 +545,14 @@ class ExplicitJavaFailureHandlingIntegrationTest {
         value.put("intent", "Run child"); value.put("dependsOn", List.of()); value.put("expectedOutputs", List.of("result"));
         value.put("parallelGroup", null); value.put("note", ""); return value;
     }
-    static MockResponse tool(String name) { return response(Map.of("role", "assistant", "content", "", "tool_calls", List.of(
-            Map.of("id", "failed-call", "type", "function", "function", Map.of("name", name, "arguments", "{}")))), "tool_calls"); }
+    static MockResponse tool(String name) { return tool(name, "failed-call", "{}", ""); }
+    static MockResponse tool(String name, String id, String arguments, String content) {
+        return response(Map.of("role", "assistant", "content", content, "tool_calls", List.of(
+                Map.of("id", id, "type", "function", "function", Map.of("name", name, "arguments", arguments)))), "tool_calls");
+    }
+    static MockResponse inability(String reason) {
+        return tool("loomspan_cannot_complete", "signal", JSON.writeValueAsString(Map.of("reason", reason)), "Invalid candidate");
+    }
     static MockResponse text(String value) { return response(Map.of("role", "assistant", "content", value), "stop"); }
     static MockResponse response(Map<String,Object> message, String reason) {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody(JSON.writeValueAsString(Map.of(

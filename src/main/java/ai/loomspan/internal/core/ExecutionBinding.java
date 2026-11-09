@@ -1,11 +1,14 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.PlannerInabilityException;
 import org.springframework.lang.Nullable;
 import ai.loomspan.internal.skill.SkillGeneration;
 import ai.loomspan.internal.skill.SkillAdmissionSnapshot;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.function.Supplier;
 
 /** Immutable identity binding installed only for the duration of runtime work. */
@@ -84,5 +87,17 @@ public record ExecutionBinding(
     public <T> T requireWritable(Supplier<T> action)
     {
         return MissionLifecycle.requireWritable(this, action);
+    }
+
+    public void recordPlannerInability(PlannerInabilityException failure, byte[] signal)
+    {
+        TraceDiagnostic diagnostic = TraceDiagnostic.plannerInabilitySignal(signal);
+        requireMission().lifecycle().recordWhileOpen(this, () -> {
+            if (Thread.currentThread().isInterrupted()) throw new CancellationException("Planner declaration interrupted");
+            ExecutionFrame modelFrame = branch.requireLeaf();
+            if (modelFrame.traceFrameType() != TraceFrameType.MODEL_CALL)
+                throw new IllegalStateException("Planner declaration requires an active model frame");
+            session.recordFailure(failure, Map.of("message", "Model invocation failed"), modelFrame, diagnostic);
+        });
     }
 }

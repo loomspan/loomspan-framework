@@ -379,8 +379,8 @@ from the same revision as the runtime. The first production release will be `1.0
 
 The supported Java API is the closed allowlist in `ai.loomspan.api`, summarized
 in the [public API reference](agent-skills/loomspan-docs/references/java-api/compatibility-and-boundaries.md).
-It contains 25 public top-level types, including `SkillExecutor`, the five-component
-`SkillExecutorInvocation` record, and `RecoverableSkillException`. Java callable
+It contains 26 public top-level types, including `SkillExecutor`, the five-component
+`SkillExecutorInvocation` record, `RecoverableSkillException`, and `PlannerInabilityException`. Java callable
 methods and reference-only executors share discovery and proxy invocation. Successful
 null/void results become empty text, Strings remain exact, and other results become
 JSON; failures propagate. Only designated `RecoverableSkillException` failures become
@@ -389,6 +389,15 @@ exact application message. Direct invocation and explicit steps still throw;
 ordinary application wrappers remain terminal. Feedback earns no successful-result
 credit and continuation uses existing budgets and the original parent timeout.
 Canonical diagnostics record classification independently from completion linkage.
+
+A standard model-backed invocation can end unsuccessfully by calling the Framework
+control `loomspan_cannot_complete` alone with a nonblank `reason`. Direct and admitted
+Java callers can catch `PlannerInabilityException` to present the exact `getMessage()`
+or choose their own next action. Existing `RecoverableSkillException` catches also
+apply. A standard caller receiving the failure may take a permitted action that
+addresses the obstacle. Work may already have completed, and replay may be unsafe.
+Use `RecoverableSkillException` for ordinary Java operation correction.
+
 YAML executor leaves retain their definitions and use captured registrations,
 selected executor configuration and executor generation identity during execution.
 Validation and discovery evaluate declarative metadata without running argument-dependent

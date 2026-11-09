@@ -504,6 +504,23 @@ Console skill detail exposes the generation's effective `outputSchema` metadata 
 
 `StepLoopMissionExecutionEngineTest`, `ExecutionJournalProjectorTest`, `LiveActivityProjectorTest`, and the Java-written `ConsoleTraceFixtureCorpusTest`, `ConsoleRestFixtureCorpusTest` and `ConsoleSseFixtureCorpusTest` with Console readers protect the decision, identity and current-version boundary. Same-version portability and ordinary access restrictions continue to apply.
 
+## Canonical chat attempt evidence
+
+`MODEL_REQUEST_SENT` stores ordered `messages`. `MODEL_RESPONSE_RECEIVED` stores
+ordered `generations`, with one assistant message per returned generation. A
+missing response has an empty array, and a generation with missing output has a
+null entry. Each message stores `messageType` and exact nullable `text`.
+Assistant messages add ordered `toolCalls` with `id`, `name`, and `arguments`.
+Tool messages add ordered `toolResponses` with `id`, `name`, and `content`.
+The call arguments and response content are the exact strings supplied by the
+Spring AI adapter. The canonical response is captured before dispatch validation,
+so a rejected call remains inspectable without a follow-up request.
+
+These are Framework trace payloads. See [TypeSafe leaves](typesafe-skills.md) for
+the separate evaluation protocol. The Java observer receives a derived journal.
+`ExecutionTraceContractTest` and `SpringAiChatClientAssemblerIntegrationTest`
+verify the chat payload and rejection evidence.
+
 ## Terminal outcome and failures
 
 The final trace record carries one outcome: `SUCCEEDED`, `FAILED`, or `ABORTED`, plus the authoritative terminal session-usage snapshot. A failed or aborted completion has a `terminalFailureId` that links to the corresponding `ERROR_RECORDED` fact. Success has no terminal failure ID. Earlier nonterminal errors can coexist with a successful outcome.
@@ -534,6 +551,16 @@ Stack capture is limited to 1 MiB of valid UTF-8. When necessary Loomspan keeps
 a larger head and a root-cause-oriented tail, inserts an omission marker, and
 reports truncation separately. Provider response bodies are not available when
 the current client integration loses them before Loomspan observes a response.
+
+A canonical failure with `kind: "planner_inability"` has `RECOVERABLE`
+classification. For an accepted standard model declaration, the failure first
+records on the declaring model frame. The stack comes first, followed by a
+bounded `PLANNER_INABILITY_SIGNAL` text diagnostic with the exact adapter call
+`id`, `name`, and raw `arguments` as JSON. An absent ID is null. A truncated
+diagnostic can end inside the JSON text. The exact reason remains in `exceptionMessage`.
+Java-thrown instances carry the same failure kind and only the stack diagnostic.
+Use the failure kind for interpretation and `terminalFailureId` for the overall
+outcome. `ExplicitJavaFailureHandlingIntegrationTest` verifies those distinct facts.
 
 ### Sensitivity and limitations
 

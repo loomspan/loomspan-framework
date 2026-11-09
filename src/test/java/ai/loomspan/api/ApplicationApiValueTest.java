@@ -15,6 +15,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ApplicationApiValueTest
 {
     @Test
+    void plannerInabilityUsesTheSupportedRecoverableContract() throws Exception
+    {
+        String reason = "  no evidence\r\n\u96ea\t";
+        RecoverableSkillException failure = new PlannerInabilityException(reason);
+        assertThat(failure).hasMessage(reason);
+        assertThat(PlannerInabilityException.class.getConstructors())
+                .containsExactly(PlannerInabilityException.class.getConstructor(String.class));
+        assertThat(PlannerInabilityException.class.getDeclaredMethods()).isEmpty();
+        assertThatThrownBy(() -> new PlannerInabilityException(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new PlannerInabilityException("")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PlannerInabilityException(" \r\n\t")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void publicCatalogAndValidationExposeOnlyTheTicketedShape() throws Exception
     {
         assertThat(SkillKind.values()).containsExactly(SkillKind.YAML, SkillKind.JAVA, SkillKind.TYPESAFE);

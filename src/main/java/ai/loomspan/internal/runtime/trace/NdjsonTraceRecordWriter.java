@@ -3,9 +3,9 @@ package ai.loomspan.internal.runtime.trace;
 import tools.jackson.databind.ObjectMapper;
 import ai.loomspan.internal.core.TraceRecord;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -32,15 +32,15 @@ final class NdjsonTraceRecordWriter implements TraceRecordWriter
     {
         Files.createDirectories(tracePath.getParent());
 
-        try (Writer writer = Files.newBufferedWriter(
+        try (OutputStream output = new BufferedOutputStream(Files.newOutputStream(
                 tracePath,
-                StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE,
                 StandardOpenOption.WRITE,
-                StandardOpenOption.APPEND))
+                StandardOpenOption.APPEND)))
         {
-            writer.write(objectMapper.writeValueAsString(record));
-            writer.write('\n');
+            // The UTF-8 JSON generator escapes isolated surrogate code units losslessly.
+            output.write(objectMapper.writeValueAsBytes(record));
+            output.write('\n');
         }
     }
 }

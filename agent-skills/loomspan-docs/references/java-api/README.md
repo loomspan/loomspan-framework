@@ -46,13 +46,14 @@ The allowlist currently contains only:
 - `SkillExecutor`
 - `SkillExecutorInvocation`
 - `RecoverableSkillException`
+- `PlannerInabilityException`
 - `SkillParam`
 - `SkillException`
 - `SkillReloadException`
 - `SkillInputValidationException`
 - `SkillInputValidationIssue`
 
-All twenty-five are public top-level types in `ai.loomspan.api`. A Java
+All twenty-six are public top-level types in `ai.loomspan.api`. A Java
 `public` modifier does not make any other Loomspan type supported API. Read
 [compatibility-and-boundaries.md](compatibility-and-boundaries.md) before
 advising an application to depend on another Loomspan type.
@@ -94,7 +95,7 @@ Run the complete executor quickstart (`docs/quickstart-executors.md` in the matc
 
 | Topic | Coverage | Notes |
 | --- | --- | --- |
-| Supported public types | Source-verified | Exact twenty-five-type allowlist and package boundaries |
+| Supported public types | Source-verified | Exact twenty-six-type allowlist and package boundaries |
 | Catalog and pre-checks | Source-verified | Explicit namespace acquisition, immutable qualified metadata, strict catalog lookup versus local-to-default invoke/validate/handoff resolution (SkillReachableAdmissionTest), malformed/foreign lookup, candidate IDs, active namespace registry and removal; fresh reachable admission and temporary validation are covered by SkillReachableAdmissionTest; shared composed executor entry/filter/dispatch checks are covered by `SharedDeclarativeAuthorizationIntegrationTest` |
 | Two-stage skill updates | Source-verified | Complete skill and execution candidate, environment or host-map credential references, frozen generation, process-local ID, one-shot publication, candidate disposal, safe retirement callback, and application-owned readiness and cleanup. Executor namespace IDs can key application-owned resources through existing retirement listeners; shutdown remains application-owned. |
 | Skill invocation | Source-verified | Local-to-default or explicit-qualified invocation and atomic single-use handoff (SkillReachableAdmissionTest) with captured generation ID, input normalization and validation, result, session, security context, and observer timing |

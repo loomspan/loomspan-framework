@@ -193,7 +193,8 @@ class ExecutionCoordinatorLinterIntegrationTest {
         @Override
         public ai.loomspan.internal.model.ModelInteractionResult call(
                 ai.loomspan.internal.model.ModelInteractionRequest request) {
-            return new ai.loomspan.internal.springai.SpringAiModelInteraction(delegate).call(request);
+            return new ai.loomspan.internal.springai.SpringAiModelInteraction(
+                    delegate, ai.loomspan.internal.model.ModelInteractionMode.STANDARD).call(request);
         }
     }
 }

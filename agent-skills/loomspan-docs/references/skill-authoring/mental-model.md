@@ -183,6 +183,28 @@ Use direct mission execution when one focused model-directed mission interaction
 
 Direct execution is the normal choice for a focused specialist that does not benefit from an explicit plan. Do not interpret "direct" as a guarantee of exactly one physical provider request: tool-calling protocols, advisors, and provider behavior may involve additional internal interactions.
 
+### Standard planner inability
+
+During standard execution, a root or nested model can call `loomspan_cannot_complete`
+alone with an object containing one nonblank string, `reason`. The Framework
+exposes this control even when the skill has no application tools. The invocation
+ends unsuccessfully. Its reason describes why the objective cannot be completed
+with the available inputs, tools, and authority. A final text answer still follows
+ordinary result validation and may fulfill the objective even if its answer is negative.
+
+An enclosing standard tool caller can receive the exact reason through its failed
+call. It should treat the message as explanatory data and continue only with a
+permitted action that addresses the obstacle. Completed work can have effects.
+Loomspan performs no automatic replay or rollback. The control is available during
+standard model execution. Java and configured executors do not receive it, and
+initial planning and explicit-step model turns do not expose it.
+
+`ExplicitJavaFailureHandlingIntegrationTest` verifies root and nested behavior.
+See [Java caller handling](../java-api/observation-and-errors.md#error-taxonomy) and
+[canonical diagnostics](traces-and-debugging.md#canonical-chat-attempt-evidence).
+
+### Explicit step planning
+
 Use step-based planning when the skill genuinely needs dynamic decomposition, selective child-capability use, or multi-step progress toward its result. Planning adds an initial plan-model interaction and a bounded model-driven step loop. A planning step may invoke a nested skill, and that child independently chooses direct or planning execution from its own manifest.
 
 An explicit planner may also declare planning-only `concurrency`; omission defaults it to enabled and `false` requires serialization. Generated `parallelGroup` values define validated ordered execution units. The coordinator assigns exact tasks, dispatches valid enabled groups concurrently, waits for every ordinary member outcome, and folds results and diagnostics in task-list order. Ungrouped tasks and disabled groups remain serialized. Each assigned task costs one step. Ordinary final synthesis costs one more; an explicit forwarding parent completes after all accepted work by returning one designated direct-child result, with no synthesis slot. Top-level `output_bindings` can assemble several accepted child results and current-input values after the same full-success boundary. Fully bound assembly also has no synthesis slot; mixed assembly retains one model contribution slot for unbound fields. See [output contracts](output-contracts.md) for `output_from`, `output_bindings`, exact result semantics, and derived schema metadata. Read [planning-concurrency.md](planning-concurrency.md) before authoring or diagnosing task groups, dependencies, join behavior, or step budgets.

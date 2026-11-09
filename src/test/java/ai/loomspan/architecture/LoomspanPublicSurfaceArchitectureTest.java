@@ -35,6 +35,7 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.api.SkillMethod",
             "ai.loomspan.api.SkillExecutor",
             "ai.loomspan.api.SkillExecutorInvocation",
+            "ai.loomspan.api.PlannerInabilityException",
             "ai.loomspan.api.RecoverableSkillException",
             "ai.loomspan.api.SkillParam",
             "ai.loomspan.api.SkillException",

@@ -1,5 +1,6 @@
 package ai.loomspan.internal.runtime;
 
+import ai.loomspan.api.RecoverableSkillException;
 import ai.loomspan.internal.outputvalidation.OutputValidationPolicy;
 
 import ai.loomspan.internal.core.LoomspanSession;
@@ -17,6 +18,9 @@ import ai.loomspan.internal.core.PlanTaskStatus;
 import ai.loomspan.internal.core.ExecutionBinding;
 import ai.loomspan.internal.core.ExecutionBindingScope;
 import ai.loomspan.internal.core.MissionLifecycle;
+import ai.loomspan.internal.core.FrameworkShutdownException;
+import ai.loomspan.internal.core.MissionWriteRevokedException;
+import ai.loomspan.internal.core.SkillFailurePolicy;
 import ai.loomspan.internal.core.TraceFrameType;
 import ai.loomspan.internal.core.TraceFailureMetadata;
 import ai.loomspan.internal.runtime.planning.PlanningService;
@@ -29,12 +33,15 @@ import ai.loomspan.internal.vfs.DefaultRefResolver;
 import ai.loomspan.internal.vfs.SessionLocalVirtualFileSystem;
 import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 
 public class DefaultMissionExecutionEngine implements MissionExecutionEngine
 {
@@ -141,7 +148,8 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
                 {
                     executionStateService.recordFailure(session, ex, Map.of("message", "Model invocation failed"));
                 }
-                if (ex instanceof RuntimeException runtimeException && !renderedInput.attachments().isEmpty())
+                if (ex instanceof RuntimeException runtimeException && !renderedInput.attachments().isEmpty()
+                        && !cancelling && !Thread.currentThread().isInterrupted() && shouldExplainAttachmentFailure(ex))
                 {
                     String mediaDetails = renderedInput.attachments().stream()
                             .map(attachment -> attachment.mediaType() + "/" + attachment.contentType())
@@ -160,6 +168,16 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
                 executionStateService.closeFrame(session, modelFrame, closeMetadata(modelFrameStatus, modelFailure));
             }
         });
+    }
+
+    private static boolean shouldExplainAttachmentFailure(Throwable failure)
+    {
+        Throwable effective = SkillFailurePolicy.unwrapInvocationFailure(failure);
+        return !(effective instanceof RecoverableSkillException)
+                && !(effective instanceof CancellationException || effective instanceof MissionWriteRevokedException
+                        || effective instanceof FrameworkShutdownException || effective instanceof LoomspanMissionTimeoutException
+                        || effective instanceof LoomspanQuotaExceededException || effective instanceof AccessDeniedException
+                        || effective instanceof AuthenticationException);
     }
 
     private void validateBoundPolicies(LoomspanSession session, YamlSkillDefinition definition, String content) {

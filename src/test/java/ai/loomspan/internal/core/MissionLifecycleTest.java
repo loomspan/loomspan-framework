@@ -8,6 +8,7 @@ import ai.loomspan.internal.runtime.step.AssignedTaskExecution;
 import ai.loomspan.internal.runtime.step.AssignedTaskOutcome;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -295,9 +296,35 @@ class MissionLifecycleTest
         assertThat(childLifecycle.taskStarted(admitted, child)).isFalse();
         assertThatThrownBy(() -> childLifecycle.requireOpenForNewWork(child))
                 .isInstanceOf(MissionWriteRevokedException.class);
+        assertThatThrownBy(() -> child.recordPlannerInability(
+                new ai.loomspan.api.PlannerInabilityException("blocked"), "{}".getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOf(MissionWriteRevokedException.class);
+        var childFacts = new java.util.ArrayList<TraceRecord>();
+        child.session().readTraceRecords(childFacts::add);
+        assertThat(childFacts).noneMatch(record -> record.recordType() == TraceRecordType.ERROR_RECORDED);
         assertThatThrownBy(() -> childLifecycle.admitUnit(
                 child, List.of(assignment("new", 2)), () -> {}))
                 .isInstanceOf(MissionWriteRevokedException.class);
+    }
+
+    @Test
+    void interruptedModelThreadCannotRecordAnAcceptedDeclaration()
+    {
+        ExecutionBinding binding = binding("interrupted-declaration", null);
+        Thread.currentThread().interrupt();
+        try
+        {
+            assertThatThrownBy(() -> binding.recordPlannerInability(
+                    new ai.loomspan.api.PlannerInabilityException("blocked"), "{}".getBytes(StandardCharsets.UTF_8)))
+                    .isInstanceOf(java.util.concurrent.CancellationException.class);
+        }
+        finally
+        {
+            Thread.interrupted();
+        }
+        var records = new java.util.ArrayList<TraceRecord>();
+        binding.session().readTraceRecords(records::add);
+        assertThat(records).noneMatch(record -> record.recordType() == TraceRecordType.ERROR_RECORDED);
     }
 
     @Test

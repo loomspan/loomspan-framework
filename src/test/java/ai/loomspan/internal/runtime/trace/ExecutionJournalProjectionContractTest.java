@@ -166,7 +166,7 @@ class ExecutionJournalProjectionContractTest {
                         Map.of("diagnostics", List.of(Map.of("text", "do not project me")))),
                 record(2, TraceRecordType.MODEL_RESPONSE_RECEIVED, "model-frame", "rootVisibleSkill#model",
                         Map.of("attemptId", "attempt-2", "retrySequenceId", "retry-1"),
-                        Map.of("content", "recovered"))))
+                        assistantResponse("recovered"))))
                 .getEntriesSnapshot();
 
         assertThat(entries).singleElement().satisfies(entry ->
@@ -182,13 +182,20 @@ class ExecutionJournalProjectionContractTest {
         List<JournalEntry> entries = projector.project(List.of(
                 record(1, TraceRecordType.TRACE_STARTED, null, null, Map.of(), Map.of("sessionId", "session-1")),
                 record(2, TraceRecordType.FRAME_OPENED, "frame-1", "default-rootVisibleSkill", Map.of(), Map.of("openedAt", "2026-03-24T12:00:00Z")),
-                record(4, TraceRecordType.MODEL_REQUEST_SENT, "frame-1", "default-rootVisibleSkill", Map.of("segment", "mission"), Map.of("objective", "hello")),
-                record(5, TraceRecordType.MODEL_RESPONSE_RECEIVED, "frame-1", "default-rootVisibleSkill", Map.of("segment", "mission"), Map.of("content", "done")),
+                record(4, TraceRecordType.MODEL_REQUEST_SENT, "frame-1", "default-rootVisibleSkill", Map.of("segment", "mission"),
+                        Map.of("messages", List.of(Map.of("messageType", "TOOL", "text", "", "toolResponses",
+                                List.of(Map.of("id", "call", "name", "default-child", "content", "child feedback")))))),
+                record(5, TraceRecordType.MODEL_RESPONSE_RECEIVED, "frame-1", "default-rootVisibleSkill", Map.of("segment", "mission"),
+                        assistantResponse("done")),
                 record(6, TraceRecordType.FRAME_CLOSED, "frame-1", "default-rootVisibleSkill", Map.of("status", "completed"), Map.of("closedAt", "2026-03-24T12:00:01Z")),
                 record(7, TraceRecordType.TRACE_COMPLETED, null, null, Map.of("errored", false), null)
         )).getEntriesSnapshot();
 
         assertThat(entries).isEmpty();
+    }
+
+    private static Map<String, Object> assistantResponse(String text) {
+        return Map.of("generations", List.of(Map.of("messageType", "ASSISTANT", "text", text, "toolCalls", List.of())));
     }
 
     private static TraceRecord record(long sequence,

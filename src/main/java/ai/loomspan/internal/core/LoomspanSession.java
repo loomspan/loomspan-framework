@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import ai.loomspan.api.PlannerInabilityException;
 import ai.loomspan.internal.linter.LinterOutcome;
 import ai.loomspan.internal.outputschema.OutputSchemaOutcome;
 import ai.loomspan.internal.runtime.trace.ExecutionJournalProjector;
@@ -146,6 +147,12 @@ public final class LoomspanSession
     /** Records a throwable once for this session and returns its stable failure identity. */
     public String recordFailure(Throwable failure, Map<String, Object> context, @Nullable ExecutionFrame origin)
     {
+        return recordFailure(failure, context, origin, null);
+    }
+
+    String recordFailure(Throwable failure, Map<String, Object> context, @Nullable ExecutionFrame origin,
+            @Nullable TraceDiagnostic additionalDiagnostic)
+    {
         Objects.requireNonNull(failure, "failure must not be null");
         lock.lock();
         try
@@ -182,8 +189,14 @@ public final class LoomspanSession
             Object message = payload.get("message");
             TraceFailureMetadata.addTo(payload, failure,
                     message instanceof String text && !text.isBlank() ? text : "Execution failed");
+            payload.remove("kind");
+            if (effective instanceof PlannerInabilityException)
+            {
+                payload.put("kind", TraceFailureMetadata.PLANNER_INABILITY_KIND);
+            }
             payload.put("exceptionMessage", effective.getMessage());
-            payload.put("diagnostics", List.of(BoundedStackTraceCapture.capture(failure)));
+            TraceDiagnostic stack = BoundedStackTraceCapture.capture(failure);
+            payload.put("diagnostics", additionalDiagnostic == null ? List.of(stack) : List.of(stack, additionalDiagnostic));
             RecordedFailure recorded = new RecordedFailure(failureId, origin == null ? null : origin.frameId(), attemptLink);
             failuresByThrowable.put(effective, recorded);
             failuresByThrowable.put(failure, recorded);

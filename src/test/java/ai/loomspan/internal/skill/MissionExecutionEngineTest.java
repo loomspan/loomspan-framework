@@ -417,6 +417,21 @@ class MissionExecutionEngineTest {
     }
 
     @Test
+    void attachmentContextDoesNotReplaceACancellationFailure() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = new DefaultMissionExecutionEngine(mock(PlanningService.class), state,
+                    new ai.loomspan.internal.runtime.MissionWorkExecutor(state, Duration.ofSeconds(5), executor,
+                            new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService()));
+            var failure = new java.util.concurrent.CancellationException("authoritative cancellation");
+            assertThatThrownBy(() -> executeMission(engine,
+                    ai.loomspan.internal.core.TestLoomspanSessions.withId("attachment-cancellation", "default-test_entry", 2),
+                    attachmentDefinition(), "Extract ticket", Map.of("image", imageResource("ticket.jpg", "image bytes")),
+                    request -> { throw failure; }, List.of(), false, null)).isSameAs(failure);
+        }
+    }
+
+    @Test
     void timesOutBlockingMissionExecutionAndRestoresReusedWorker() throws Exception {
         PlanningService planningService = mock(PlanningService.class);
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);

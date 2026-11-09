@@ -8,6 +8,8 @@ import java.util.Objects;
  */
 public final class TraceFailureMetadata
 {
+    public static final String PLANNER_INABILITY_KIND = "planner_inability";
+
     private TraceFailureMetadata()
     {
     }

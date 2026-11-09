@@ -18,6 +18,7 @@ import ai.loomspan.internal.runtime.observation.ExecutionObservationHandle;
 import org.springframework.lang.Nullable;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -358,11 +359,13 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
 
         if (jsonData != null)
         {
-            String serialized = jsonData.isTextual() ? jsonData.asText() : objectMapper.writeValueAsString(jsonData);
+            String serialized = jsonData.isTextual() ? jsonData.asText()
+                    : new String(objectMapper.writeValueAsBytes(jsonData), StandardCharsets.UTF_8);
             if (serialized.length() > DEFAULT_CHUNK_SIZE)
             {
                 String payloadId = requireNonBlank(idSupplier.get(), "payloadId");
-                int chunkCount = (int) Math.ceil((double) serialized.length() / DEFAULT_CHUNK_SIZE);
+                int chunkCount = 0;
+                for (int start = 0; start < serialized.length(); start = chunkEnd(serialized, start)) chunkCount++;
                 safeMetadata.put("payloadId", payloadId);
                 safeMetadata.put("chunkCount", chunkCount);
                 safeMetadata.put("payloadChunked", true);
@@ -426,10 +429,10 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
             @Nullable String route,
             Map<String, Object> baseMetadata) throws IOException
     {
+        int start = 0;
         for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
         {
-            int start = chunkIndex * DEFAULT_CHUNK_SIZE;
-            int end = Math.min(serialized.length(), start + DEFAULT_CHUNK_SIZE);
+            int end = chunkEnd(serialized, start);
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put("payloadId", payloadId);
             metadata.put("chunkIndex", chunkIndex);
@@ -452,7 +455,20 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
                     StringNode.valueOf(serialized.substring(start, end)));
 
             writer.append(chunk);
+            start = end;
         }
+    }
+
+    private static int chunkEnd(String content, int start)
+    {
+        int end = start + Math.min(DEFAULT_CHUNK_SIZE, content.length() - start);
+        // Each chunk is written as independent UTF-8 JSON and must keep surrogate pairs intact.
+        if (end < content.length() && Character.isHighSurrogate(content.charAt(end - 1))
+                && Character.isLowSurrogate(content.charAt(end)))
+        {
+            return end - 1;
+        }
+        return end;
     }
 
     private TraceRecord buildRecord(

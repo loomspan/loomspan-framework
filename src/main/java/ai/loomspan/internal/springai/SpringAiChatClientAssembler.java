@@ -1,9 +1,12 @@
 package ai.loomspan.internal.springai;
 
+import ai.loomspan.api.PlannerInabilityException;
 import ai.loomspan.internal.chat.SkillAdvisorResolver;
 import ai.loomspan.internal.chat.ProviderAttemptCallAdvisor;
 import ai.loomspan.internal.chat.SkillChatModelResolver;
 import ai.loomspan.internal.core.ExecutionBindingScope;
+import ai.loomspan.internal.core.SkillFailurePolicy;
+import ai.loomspan.internal.core.TraceFailureMetadata;
 import ai.loomspan.internal.linter.LinterCallAdvisor;
 import ai.loomspan.internal.outputschema.OutputSchemaCallAdvisor;
 import ai.loomspan.internal.runtime.evidence.EvidenceContractCallAdvisor;
@@ -11,6 +14,7 @@ import ai.loomspan.internal.runtime.state.ExecutionStateService;
 import ai.loomspan.internal.runtime.usage.ModelUsageExtractor;
 import ai.loomspan.internal.runtime.usage.SessionUsageService;
 import ai.loomspan.internal.provider.ProviderConnectionRuntime;
+import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration;
 import ai.loomspan.internal.skill.YamlSkillDefinition;
 import org.slf4j.Logger;
@@ -18,9 +22,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.execution.ToolExecutionException;
 import io.micrometer.observation.ObservationRegistry;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 
@@ -50,14 +57,23 @@ final class SpringAiChatClientAssembler
                         org.springframework.ai.chat.client.advisor.ToolCallingAdvisor.builder()
                                 .toolCallingManager(new CanonicalToolCallingManager(
                                         org.springframework.ai.model.tool.ToolCallingManager.builder()
-                                                .toolExecutionExceptionProcessor(failure -> {
-                                                    var recoverable = ai.loomspan.internal.core.SkillFailurePolicy.recoverable(failure);
-                                                    if (recoverable == null) throw ai.loomspan.internal.core.SkillFailurePolicy.propagate(failure);
-                                                    return ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace().writeValueAsString(
-                                                            java.util.Map.of("status", "failed", "correctionPermitted", true,
-                                                                    "message", recoverable.getMessage()));
-                                                })
+                                                .toolExecutionExceptionProcessor(SpringAiChatClientAssembler::recoverableFeedback)
                                                 .observationRegistry(observationRegistry).build()))));
+    }
+
+    private static String recoverableFeedback(ToolExecutionException failure)
+    {
+        var recoverable = SkillFailurePolicy.recoverable(failure);
+        if (recoverable == null) throw SkillFailurePolicy.propagate(failure);
+        var feedback = new LinkedHashMap<String, Object>();
+        feedback.put("status", "failed");
+        if (recoverable instanceof PlannerInabilityException)
+        {
+            feedback.put("kind", TraceFailureMetadata.PLANNER_INABILITY_KIND);
+        }
+        feedback.put("correctionPermitted", true);
+        feedback.put("message", recoverable.getMessage());
+        return new String(LoomspanJacksonCodecs.defaults().canonicalTrace().writeValueAsBytes(feedback), StandardCharsets.UTF_8);
     }
 
     SpringAiChatClientAssembler(SkillChatModelResolver chatModelResolver,

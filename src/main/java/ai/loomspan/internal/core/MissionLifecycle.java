@@ -197,6 +197,15 @@ public final class MissionLifecycle
         runWhileOpen(binding, true, () -> true).orElseThrow();
     }
 
+    void recordWhileOpen(ExecutionBinding binding, Runnable action)
+    {
+        requireCurrentMission(binding);
+        runWhileOpen(binding, true, () -> {
+            action.run();
+            return true;
+        });
+    }
+
     public void registerFuture(AdmittedTask task, Future<AssignedTaskOutcome> future)
     {
         Objects.requireNonNull(future, "future must not be null");

@@ -35,6 +35,6 @@ public final class SpringAiModelInteractionFactory implements ModelInteractionFa
     {
         return new SpringAiModelInteraction(mode == ModelInteractionMode.STEP_EXECUTION
                 ? assembler.createForStepExecution(definition)
-                : assembler.create(definition));
+                : assembler.create(definition), mode);
     }
 }
