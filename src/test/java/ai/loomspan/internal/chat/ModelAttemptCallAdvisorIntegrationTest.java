@@ -987,9 +987,11 @@ class ModelAttemptCallAdvisorIntegrationTest
             assertThat(records(session).stream().filter(record -> record.recordType() == TraceRecordType.MODEL_ATTEMPT_FAILED))
                     .singleElement().satisfies(record -> assertThat(record.data().toString()).contains("unsafe partial"));
             assertThat(records(session).stream().filter(record -> record.recordType() == TraceRecordType.MODEL_RESPONSE_RECEIVED))
-                    .singleElement().satisfies(record -> assertThat(record.metadata())
+                    .hasSize(2).last().satisfies(record -> assertThat(record.metadata())
                             .containsEntry("attemptReason", "PROVIDER_RETRY")
                             .containsEntry("providerAttemptNumber", 2));
+            assertThat(session.getSessionUsage().orElseThrow().modelCalls()).isEqualTo(2);
+            assertThat(session.getSessionUsage().orElseThrow().usageUnits()).isEqualTo(5);
             assertThat(records(session)).noneMatch(record -> record.recordType() == TraceRecordType.ERROR_RECORDED);
         }
     }

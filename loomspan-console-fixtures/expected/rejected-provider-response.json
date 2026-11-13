@@ -1,0 +1,68 @@
+{
+  "case" : "rejected-provider-response",
+  "valid" : true,
+  "traceId" : "trace-rejected-provider-response",
+  "sessionId" : "session-rejected-provider-response",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-rejected-provider-response",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-rejected-provider-response"
+  },
+  "outcome" : "FAILED",
+  "terminalFailureId" : "failure-rejected-provider",
+  "attributedUsage" : {
+    "promptUnits" : 10,
+    "completionUnits" : 4,
+    "totalUnits" : 14
+  },
+  "terminalUsage" : {
+    "promptUnits" : 10,
+    "completionUnits" : 4,
+    "totalUnits" : 14
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ {
+    "retrySequenceId" : "retry-rejected",
+    "attemptId" : "attempt-rejected",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "FAILED",
+    "failureClassification" : "PERMANENT",
+    "failureCategory" : "PROVIDER_RESPONSE_REJECTED",
+    "retryDecision" : "DO_NOT_RETRY",
+    "retryDelayMillis" : 0,
+    "retryDelaySource" : "NONE",
+    "usage" : {
+      "promptUnits" : 10,
+      "completionUnits" : 4,
+      "totalUnits" : 14
+    },
+    "usageComplete" : true
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "retry-rejected",
+    "usage" : {
+      "promptUnits" : 10,
+      "completionUnits" : 4,
+      "totalUnits" : 14
+    },
+    "usageComplete" : true
+  } ],
+  "validationLinks" : [ ],
+  "frames" : [ ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 10,
+    "completionUnits" : 4,
+    "totalUnits" : 14
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}

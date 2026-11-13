@@ -95,7 +95,7 @@ func (g *attemptGraph) onModelRecord(rec *Record) *consolecore.Error {
 					return invalidityError(CategoryInvalidAttempt, rec.TraceID)
 				}
 			case "SEMANTIC_RETRY":
-				if !previous.hasResponse || providerNumber != 1 {
+				if !previous.hasResponse || previous.hasFailure || providerNumber != 1 {
 					return invalidityError(CategoryInvalidAttempt, rec.TraceID)
 				}
 			default:
@@ -114,11 +114,11 @@ func (g *attemptGraph) onModelRecord(rec *Record) *consolecore.Error {
 		g.lastByRetry[retryID] = a
 	} else {
 		// Identity consistency: retrySequenceId and attemptNumber must not change.
-		if a.retrySequenceID != retryID || a.attemptNumber != numberStr || a.attemptReason != reason || a.providerAttemptNumber != providerNumber {
+		if a.retrySequenceID != retryID || a.attemptNumber != numberStr || a.attemptReason != reason || a.providerAttemptNumber != providerNumber || g.lastByRetry[retryID] != a {
 			return invalidityError(CategoryInvalidAttempt, rec.TraceID)
 		}
 	}
-	// Lifecycle ordering: SENT -> RESPONSE_RECEIVED|ATTEMPT_FAILED, no repeats.
+	// Receipt is not acceptance: a received response may subsequently fail.
 	if !lifecycleAccepts(a.lifecycle, rec.Type) {
 		return invalidityError(CategoryInvalidAttempt, rec.TraceID)
 	}
@@ -164,8 +164,11 @@ func lifecycleAccepts(lifecycle []TraceRecordType, recType TraceRecordType) bool
 	switch recType {
 	case RecordModelRequestSent:
 		return len(lifecycle) == 0
-	case RecordModelResponseReceived, RecordModelAttemptFailed:
+	case RecordModelResponseReceived:
 		return len(lifecycle) == 1 && lifecycle[0] == RecordModelRequestSent
+	case RecordModelAttemptFailed:
+		return (len(lifecycle) == 1 && lifecycle[0] == RecordModelRequestSent) ||
+			(len(lifecycle) == 2 && lifecycle[0] == RecordModelRequestSent && lifecycle[1] == RecordModelResponseReceived)
 	}
 	return false
 }

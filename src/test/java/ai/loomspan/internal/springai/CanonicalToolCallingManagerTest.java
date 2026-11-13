@@ -16,6 +16,38 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class CanonicalToolCallingManagerTest {
+    @Test void nativeDriverOptionsUseTheSharedDecisionBeforeAnyDelegation() {
+        var delegate = mock(ToolCallingManager.class);
+        var manager = new CanonicalToolCallingManager(delegate);
+        var calls = new AtomicInteger();
+        var callback = callback("tax-calculateTax", calls);
+        List<org.springframework.ai.chat.prompt.ChatOptions> options = List.of(
+                org.springframework.ai.openai.responses.OpenAiResponsesChatOptions.builder().toolCallbacks(callback).build(),
+                org.springframework.ai.anthropic.AnthropicChatOptions.builder().toolCallbacks(callback).build(),
+                org.springframework.ai.google.genai.GoogleGenAiChatOptions.builder().toolCallbacks(callback).build());
+        for (int index = 0; index < options.size(); index++) {
+            String finish = List.of("LENGTH", "refusal", "SAFETY").get(index);
+            var response = new ChatResponse(List.of(new Generation(response("tax-calculateTax").getResult().getOutput(),
+                    org.springframework.ai.chat.metadata.ChatGenerationMetadata.builder().finishReason(finish).build())));
+            var prompt = new Prompt("user", options.get(index));
+            assertThatThrownBy(() -> manager.executeToolCalls(prompt, response))
+                    .isInstanceOf(ai.loomspan.internal.provider.ProviderResponseRejectedException.class);
+        }
+        verifyNoInteractions(delegate);
+        assertThat(calls).hasValue(0);
+    }
+    @Test void incompleteContainingResponseRejectsEveryGenerationBeforeDelegation() {
+        var delegate = mock(ToolCallingManager.class);
+        var manager = new CanonicalToolCallingManager(delegate);
+        var options = ToolCallingChatOptions.builder().toolCallbacks(callback("tax-calculateTax", new AtomicInteger())).build();
+        var complete = generation(call("tax-calculateTax", "{}"));
+        var incomplete = new Generation(complete.getOutput(), org.springframework.ai.chat.metadata.ChatGenerationMetadata
+                .builder().finishReason("LENGTH").build());
+        assertThatThrownBy(() -> manager.executeToolCalls(new Prompt("user", options),
+                new ChatResponse(List.of(complete, incomplete))))
+                .isInstanceOf(ai.loomspan.internal.provider.ProviderResponseRejectedException.class);
+        verifyNoInteractions(delegate);
+    }
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", "{", "null", "[]", "1", "{}", "{\"reason\":null}", "{\"reason\":true}",

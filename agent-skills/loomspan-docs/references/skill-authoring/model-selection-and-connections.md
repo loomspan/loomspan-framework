@@ -73,6 +73,28 @@ One Loomspan model interaction is one semantic request from mission, planning, o
 
 Credentials SHOULD come from environment placeholders or an external secret source and MUST NOT be committed. Connection diagnostics, traces, and metrics identify framework model, connection, and driver; connection-construction diagnostics do not expose API keys, header values, base URLs, or credential contents. Native TypeSafe request evidence records its actual endpoint under existing capture controls. Authored YAML retains reference names, not resolved values. Environment-variable changes require restart. For rotation, publish a replacement, allow old work to finish, then revoke the old key; external revocation can break a captured execution.
 
+## Explicit response status
+
+An explicit provider refusal or incomplete generation is terminal before output
+correction, planning parsing or tool dispatch. Complete tool-call turns continue
+normally; refusal-like prose and missing final text alone do not imply rejection.
+Loomspan does not retry an unchanged refused/incomplete generation, increase its
+cap or recover a complete-looking subset of tool calls. Existing transport retry
+classification remains separate; `failed` is not automatically transient.
+
+The pinned metadata mappings are Responses `incomplete` status, native `refusal`,
+`LENGTH`/`CONTENT_FILTER`/`INCOMPLETE` finish reasons and incomplete output items;
+Anthropic `max_tokens`, `model_context_window_exceeded`, `pause_turn` and `refusal`;
+Gemini `MAX_TOKENS`, `SAFETY`, `RECITATION`, `LANGUAGE`, `BLOCKLIST`,
+`PROHIBITED_CONTENT` and `SPII`. Unknown values get no additional policy.
+
+Known Gemini limitation: Spring AI 2.1.0-RC2 discards prompt feedback and native
+candidate finish/safety details. A blocked prompt with no candidates therefore
+cannot be rejected from its lost block reason. Available candidate finish reasons
+remain enforced. Neither empty-output inference nor text scanning repairs this
+limitation. `ProviderResponseStatusIntegrationTest` retains complete opt-in
+metadata-loss assertions with `loomspan.pr30.blockers=true`.
+
 ## Provider call budgets
 
 The whole-call behavior below applies to chat drivers. TypeSafe uses Apache

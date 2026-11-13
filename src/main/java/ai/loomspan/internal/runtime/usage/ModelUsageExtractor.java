@@ -71,7 +71,8 @@ public class ModelUsageExtractor
             return false;
         }
 
-        return positive(usage.getTotalTokens())
+        return (!(usage instanceof org.springframework.ai.chat.metadata.EmptyUsage) && usage.getNativeUsage() != null)
+                || positive(usage.getTotalTokens())
                 || positive(usage.getPromptTokens())
                 || positive(usage.getCompletionTokens());
     }

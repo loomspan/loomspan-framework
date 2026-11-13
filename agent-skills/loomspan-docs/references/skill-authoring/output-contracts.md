@@ -18,6 +18,12 @@ can bind from or forward a TypeSafe child's result under the existing rules.
 
 Use this topic to choose final synthesis, declared output assembly with `output_bindings`, or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract gives the model provider-neutral instructions, validates the returned JSON exactly, and can drive semantic retries. Java skills have no YAML `output_schema`; their null/void results become empty text, Strings remain exact, and other results become JSON. See [Java results](../java-api/java-skills.md#inputs-results-and-lifecycle).
 
+Explicit provider refusal/incompleteness terminates before schema, linter or
+evidence correction, even when the returned JSON matches the contract. No
+correction allowance can accept that partial result or replay the generation.
+Normal complete output still uses the configured correction budgets. See
+[explicit status and adapter limits](model-selection-and-connections.md#explicit-response-status).
+
 The root schema MUST have `type: object`. Supported node types are `object`, `array`, `string`, `integer`, `number`, and `boolean`.
 
 A [planner inability declaration](mental-model.md#planner-inability) fails the

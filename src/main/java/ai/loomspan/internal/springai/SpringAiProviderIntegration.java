@@ -216,9 +216,43 @@ public final class SpringAiProviderIntegration
         ProviderFailureCategory category = category(type);
         ProviderFailureClassification classification = retryableResponses(type)
                 ? ProviderFailureClassification.TRANSIENT : ProviderFailureClassification.PERMANENT;
+        var usage = failedResponseUsage(root.path("usage"));
         throw new ProviderCallException("Provider returned a failed Responses envelope",
                 new ProviderFailureDetails(classification, category, 200, null, type, code, summary,
-                        List.of(diagnostic(bytes, bytes.length > DIAGNOSTIC_LIMIT_BYTES))));
+                        List.of(diagnostic(bytes, bytes.length > DIAGNOSTIC_LIMIT_BYTES))),
+                java.util.Collections.unmodifiableMap(objectMapper.convertValue(root, java.util.LinkedHashMap.class)), usage);
+    }
+
+    private ai.loomspan.internal.runtime.usage.ModelUsageRecord failedResponseUsage(JsonNode usage)
+    {
+        if (!usage.isObject() || !(usage.path("input_tokens").isIntegralNumber()
+                || usage.path("output_tokens").isIntegralNumber() || usage.path("total_tokens").isIntegralNumber()))
+            return null;
+        try
+        {
+            int input = responseTokenCount(usage.path("input_tokens"));
+            int output = responseTokenCount(usage.path("output_tokens"));
+            var totalNode = usage.path("total_tokens");
+            int total = totalNode.isMissingNode() || totalNode.isNull()
+                    ? Math.addExact(input, output) : responseTokenCount(totalNode);
+            return new ai.loomspan.internal.runtime.usage.ModelUsageRecord(input, output, total,
+                    ai.loomspan.internal.runtime.usage.UsagePrecision.EXACT,
+                    objectMapper.convertValue(usage, Map.class));
+        }
+        catch (IllegalArgumentException | ArithmeticException invalidUsage)
+        {
+            // Keep the original envelope and provider failure authoritative when its
+            // counts cannot be represented. Never replace native values with narrowed ones.
+            return null;
+        }
+    }
+
+    private static int responseTokenCount(JsonNode count)
+    {
+        if (count.isMissingNode() || count.isNull()) return 0;
+        if (!count.isIntegralNumber() || !count.canConvertToInt() || count.intValue() < 0)
+            throw new IllegalArgumentException("Response token count must be a nonnegative int");
+        return count.intValue();
     }
 
     private ProviderFailureDetails translate(Throwable failure)

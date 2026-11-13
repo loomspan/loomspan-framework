@@ -19,6 +19,23 @@ class ModelUsageExtractorTest {
 
     private final ModelUsageExtractor extractor = new ModelUsageExtractor();
 
+    @Test void explicitNativeZeroDoesNotBecomeEstimatedUsage() {
+        var nativeZero = new org.springframework.ai.chat.metadata.DefaultUsage(0, 0, 0, java.util.Map.of("input_tokens", 0));
+        var response = new ChatResponse(List.of(new Generation(new AssistantMessage("nonempty output"))),
+                ChatResponseMetadata.builder().usage(nativeZero).build());
+        var result = extractor.extract(response, List.of(new UserMessage("nonempty prompt")), null);
+        assertThat(result.precision()).isEqualTo(UsagePrecision.EXACT);
+        assertThat(result.totalUnits()).isZero();
+        assertThat(result.nativeUsage()).isEqualTo(java.util.Map.of("input_tokens", 0));
+        for (Usage missing : List.of(new org.springframework.ai.chat.metadata.EmptyUsage(),
+                new org.springframework.ai.chat.metadata.DefaultUsage(0, 0, 0))) {
+            response = new ChatResponse(List.of(new Generation(new AssistantMessage("nonempty output"))),
+                    ChatResponseMetadata.builder().usage(missing).build());
+            assertThat(extractor.extract(response, List.of(new UserMessage("prompt")), null).precision())
+                    .isEqualTo(UsagePrecision.HEURISTIC);
+        }
+    }
+
     @Test
     void extractsExactUsageFromChatResponseMetadata() {
         Usage usage = mock(Usage.class);

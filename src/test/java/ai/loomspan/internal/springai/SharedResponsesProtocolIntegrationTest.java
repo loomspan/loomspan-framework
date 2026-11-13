@@ -314,6 +314,9 @@ class SharedResponsesProtocolIntegrationTest {
                     "{\"id\":\"incomplete\",\"object\":\"response\",\"created_at\":1,\"model\":\"fixture\",\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"},\"output\":[],\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"total_tokens\":15,\"output_tokens_details\":{\"reasoning_tokens\":3}}}"));
             var response=model(server).call(new Prompt("fixture",requestOptions("fixture",1024).build()));
             assertThat((String)response.getMetadata().get("openai.responses.status")).isEqualTo("incomplete");
+            assertThatThrownBy(() -> ai.loomspan.internal.provider.ProviderResponseStatusClassifier
+                    .requireAccepted(AiDriver.OPENAI, response))
+                    .isInstanceOf(ai.loomspan.internal.provider.ProviderResponseRejectedException.class);
             var usage=new ai.loomspan.internal.runtime.usage.ModelUsageExtractor().extract(response,List.of(new UserMessage("fixture")),"");
             assertThat(usage.totalUnits()).isEqualTo(15);
             assertThat(usage.completionUnits()).isEqualTo(5);

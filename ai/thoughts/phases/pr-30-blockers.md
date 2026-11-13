@@ -214,3 +214,69 @@ with zero failures/errors and 14 skips (four B04, eight prior B01–B03 and two
 existing diagnostics). Positive options and preservation controls remain active.
 Current iteration may proceed to independent review; these results do not close
 B04 or establish raw-schema fidelity. Exact logs are in the results artifact.
+
+## PR30-B05 — Gemini response status evidence discarded by the adapter
+
+**Status:** Open; default-skip deferral explicitly approved by the developer on
+November 13, 2026: "Apply the same default-skip deferral to B05 as B01–B04, keep
+the full assertions available with loomspan.pr30.blockers=true, document my
+approval in pr-30-blockers.md, and finish the pipeline including independent
+review."
+
+This approval covers only required Gemini status evidence discarded by the pinned
+`org.springframework.ai:spring-ai-google-genai:2.1.0-RC2` adapter: native
+`promptFeedback` and candidate finish/safety details. A blocked prompt can have
+no candidates, so its explicit block reason cannot be recovered from candidate
+finishReason. Do not infer rejection from empty output or prose.
+
+Keep complete correctness assertions available with `loomspan.pr30.blockers=true`
+and skip only these blocked cases by default. Verify all available Framework
+status handling, evidence, accounting and preservation controls. Default green
+checks do not establish the missing evidence or close B05. Preserve official
+adapter/tool-loop ownership; no copied adapter, second transport, body rewrite,
+fallback or weaker evidence requirement is authorized.
+
+**Ownership:** PR 30.1.5 retains this unresolved adapter requirement; PR 30.4.3
+must reconcile it and rerun integrated acceptance. Current iteration completion
+requires sufficient default verification and fresh independent review.
+
+**Closure:** Consume an identifiable acceptable upstream correction retaining
+original prompt feedback and candidate finish/safety details. Record artifact
+identity, remove the skip guards and pass complete real-pipeline evidence
+assertions, including blocked prompts without candidates, plus status, usage,
+normal tool continuation and preservation controls. A source-only correction or
+merged upstream PR does not establish shipped adapter fidelity.
+
+Research and the bounded correction are recorded in
+`ai/thoughts/research/2026-11-13-pr-30.1.5-explicit-status-and-accounting.md` and
+`ai/thoughts/plans/2026-11-13-pr-30.1.5-explicit-status.md`.
+
+**Retained complete correctness cases:**
+`ProviderResponseStatusIntegrationTest#geminiBlockedPromptRetainsFeedbackAndRejectsWithoutCandidates`
+and `#geminiCandidateRetainsNativeFinishAndSafetyDetails`. Only these methods use
+the B05 assumption; available candidate-status rejection, zero tool dispatch,
+schema/linter/evidence/planning bypass, usage/outcome and cancellation controls
+run by default across the three adapters.
+
+```powershell
+mvn -B '-Dtest=ProviderResponseStatusIntegrationTest#geminiBlockedPromptRetainsFeedbackAndRejectsWithoutCandidates+geminiCandidateRetainsNativeFinishAndSafetyDetails' '-Dloomspan.pr30.blockers=true' test
+```
+
+### PR30-B05 focused verification under explicit default deferral
+
+Default `mvn -B '-Dtest=ProviderResponseStatusIntegrationTest' test` ran 33 cases
+with zero failures/errors and exactly two B05 skips on November 13, 2026. The
+opt-in two-method command above ran two cases with two expected assertion
+failures, zero errors and zero skips. The empty-candidate prompt loses feedback
+and is accepted; candidate SAFETY rejection works but original finishMessage and
+safetyRatings are lost. Exact supplied usage is counted once for both fixtures.
+These runs preserve the full requirements and do not close B05. Exact logs are
+`target/pr30-status-tests-final.log` and `target/pr30-status-b05-optin.log`;
+verification history is in
+`ai/thoughts/plans/2026-11-13-pr-30.1.5-explicit-status-results.md`.
+
+Final PR30.1.5 default verification passed 1,930 Java tests with zero failures/errors
+and 16 skips (14 prior authorized/existing skips plus two B05), including the
+public-surface check and corrected shared corpus. Final full Console Go tests
+passed. These are Step 4 results; fresh independent review remains the iteration
+completion gate. B05 remains open.

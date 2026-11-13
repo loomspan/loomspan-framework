@@ -353,7 +353,7 @@ Every thrown physical provider attempt records its own bounded Java stack at
 the attempt boundary, even when a later attempt succeeds. A
 `MODEL_ATTEMPT_FAILED` record is therefore a warning about that attempt, not a
 canonical execution error. Call an attempt recovered only when a later
-`MODEL_RESPONSE_RECEIVED` in the same retry sequence succeeds. The failure
+`MODEL_RESPONSE_RECEIVED` in the same retry sequence has no corresponding failure. The failure
 record's diagnostic content uses the same ordinary trace-content access rules
 as other recorded content; progressive loading is a readability and
 response-budget mechanism, not a separate authorization boundary. Framework
@@ -383,7 +383,16 @@ owns deterministic planning retry and trace behavior. `PlanningServiceTest`,
 `PlanTaskConstraintValidatorTest`, and `ExecutionTraceContractTest` protect
 constraint/evidence retries, terminal rejection, and attempt linkage.
 
-For an attempt that reaches the provider and returns, the trace records exactly one sent request followed by one received response with the same attempt identity. A known provider failure instead ends with `MODEL_ATTEMPT_FAILED`, including neutral classification, category, retry decision, delay, and bounded diagnostics; it is not reported as a missing-response gap. A wrapped provider read deadline remains a transient `TIMEOUT` fact, while caller cancellation remains cancellation rather than timeout. Validator mutation facts identify the exact attempt whose output caused a pass, retry, or exhaustion.
+For an attempt that reaches the provider and returns, the trace records exactly one sent request followed by one received response with the same attempt identity. A known provider failure ends with `MODEL_ATTEMPT_FAILED`, including neutral classification, category, retry decision, delay, and bounded diagnostics; it is not reported as a missing-response gap. A wrapped provider read deadline remains a transient `TIMEOUT` fact, while caller cancellation remains cancellation rather than timeout. Validator mutation facts identify the exact attempt whose output caused a pass, retry, or exhaustion.
+
+`MODEL_RESPONSE_RECEIVED` records receipt, not successful acceptance. A rejected
+returned response records receipt followed by `MODEL_ATTEMPT_FAILED` with the
+same attempt identity. Failure is authoritative; this pair is one attempt, and
+usage comes from receipt once. Available SDK-thrown failed-envelope evidence
+also retains receipt and actual usage before the existing retry decision.
+Explicit native zero usage is exact; missing returned usage retains its existing
+estimated/unavailable precision. Quota failures after usage mutation do not
+repeat accounting. Cancellation fences continue to suppress late writes.
 
 `STEP_COMPLETED` is successful step evidence. `STEP_FAILED` is the failed terminal, carries a stable `failureId`, and projects as error activity; use that identity to join the detailed failure and provider-attempt facts. Caller-owned aborts emit neither step terminal.
 

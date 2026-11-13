@@ -37,6 +37,11 @@ final class CanonicalToolCallingManager implements ToolCallingManager {
     }
 
     @Override public ToolExecutionResult executeToolCalls(Prompt prompt, ChatResponse response) {
+        var driver = prompt.getOptions() instanceof org.springframework.ai.anthropic.AnthropicChatOptions
+                ? ai.loomspan.autoconfigure.AiDriver.ANTHROPIC
+                : prompt.getOptions() instanceof org.springframework.ai.google.genai.GoogleGenAiChatOptions
+                ? ai.loomspan.autoconfigure.AiDriver.GEMINI : ai.loomspan.autoconfigure.AiDriver.OPENAI;
+        ai.loomspan.internal.provider.ProviderResponseStatusClassifier.requireAccepted(driver, response);
         if (!(prompt.getOptions() instanceof ToolCallingChatOptions options))
             throw new IllegalArgumentException("Tool calls require a bound callback surface");
         List<ToolCallback> callbacks = boundCallbacks(options);

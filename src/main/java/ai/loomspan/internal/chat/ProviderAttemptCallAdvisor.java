@@ -10,6 +10,9 @@ import ai.loomspan.internal.provider.ProviderFailureDetails;
 import ai.loomspan.internal.provider.ProviderFailureGuidance;
 import ai.loomspan.internal.provider.ProviderRetryDecider;
 import ai.loomspan.internal.provider.ProviderRetryOutcome;
+import ai.loomspan.internal.provider.ProviderResponseEvidence;
+import ai.loomspan.internal.provider.ProviderResponseStatusClassifier;
+import ai.loomspan.internal.provider.ProviderResponseRejectedException;
 import ai.loomspan.internal.runtime.state.ExecutionStateService;
 import ai.loomspan.internal.runtime.usage.ModelUsageExtractor;
 import ai.loomspan.internal.runtime.usage.ModelUsageRecord;
@@ -82,6 +85,24 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
             }
             catch (RuntimeException failure)
             {
+                ProviderResponseEvidence evidence = ProviderResponseEvidence.find(failure);
+                if (evidence != null && !evidence.responseEvidence().isEmpty())
+                {
+                    ModelUsageRecord usage = evidence.responseUsage() == null
+                            ? new ModelUsageRecord(0, 0, 0, ai.loomspan.internal.runtime.usage.UsagePrecision.UNAVAILABLE, null)
+                            : evidence.responseUsage();
+                    executionStateService.recordModelResponseReceived(session, frame, context, attempt, usage,
+                            evidence.responseEvidence());
+                    try
+                    {
+                        sessionUsageService.recordModelResponse(session, context.skillName(), context.identity(), usage);
+                    }
+                    catch (RuntimeException accountingFailure)
+                    {
+                        recordTerminalFailure(session, frame, context, attempt, accountingFailure);
+                        throw accountingFailure;
+                    }
+                }
                 ProviderFailureDetails details = runtime.failureTranslator().translate(failure);
                 ProviderRetryOutcome outcome = retryDecider.decide(runtime.retryPolicy(), details, providerAttempt);
                 ProviderFailureGuidance.Guidance guidance = ProviderFailureGuidance.explain(context.identity(), details);
@@ -104,16 +125,45 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
 
             ChatClientResponse linkedResponse = (response == null ? ChatClientResponse.builder() : response.mutate())
                     .context(ModelTraceContext.RESPONSE_ATTEMPT_CONTEXT_KEY, attempt).build();
-            sessionUsageService.recordProviderAttemptOutcome(session, context.skillName(), context.identity(), "succeeded", null, null);
+            String rejection = ProviderResponseStatusClassifier.rejection(runtime.driver(), linkedResponse.chatResponse());
             String responseText = responseText(linkedResponse);
             ModelUsageRecord usage = modelUsageExtractor.extract(linkedResponse.chatResponse(),
                     request.prompt().getInstructions(), responseText);
             executionStateService.recordModelResponseReceived(session, frame, context, attempt, usage,
                     responsePayload(linkedResponse.chatResponse()));
-            sessionUsageService.recordModelResponse(session, context.skillName(), context.identity(), usage);
+            try
+            {
+                sessionUsageService.recordModelResponse(session, context.skillName(), context.identity(), usage);
+            }
+            catch (RuntimeException accountingFailure)
+            {
+                recordTerminalFailure(session, frame, context, attempt, accountingFailure);
+                throw accountingFailure;
+            }
+            if (rejection != null)
+            {
+                var failure = new ProviderResponseRejectedException(rejection);
+                recordTerminalFailure(session, frame, context, attempt, failure);
+                throw failure;
+            }
+            sessionUsageService.recordProviderAttemptOutcome(session, context.skillName(), context.identity(), "succeeded", null, null);
             return linkedResponse;
         }
         throw new IllegalStateException("provider retry loop exhausted without a terminal result");
+    }
+
+    private void recordTerminalFailure(LoomspanSession session, ExecutionFrame frame, ModelTraceContext context,
+            Map<String, Object> attempt, RuntimeException failure)
+    {
+        var details = new ProviderFailureDetails(ai.loomspan.internal.provider.ProviderFailureClassification.PERMANENT,
+                ai.loomspan.internal.provider.ProviderFailureCategory.UNKNOWN,
+                null, null, null, null, failure.getMessage(), List.of());
+        var outcome = ProviderRetryOutcome.doNotRetry();
+        sessionUsageService.recordProviderAttemptOutcome(session, context.skillName(), context.identity(), "failed",
+                details.category(), outcome.decision());
+        executionStateService.recordModelAttemptFailed(session, frame, context, attempt,
+                failureMetadata(details, outcome), failure, List.of());
+        executionStateService.registerProviderFailure(session, failure, attempt);
     }
 
     private static Map<String, Object> failureMetadata(ProviderFailureDetails details, ProviderRetryOutcome outcome)

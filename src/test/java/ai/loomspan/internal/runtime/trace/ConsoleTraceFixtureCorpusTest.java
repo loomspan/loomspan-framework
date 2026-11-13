@@ -93,6 +93,7 @@ class ConsoleTraceFixtureCorpusTest
             "runtime-terminal-abort",
             "advisor-retry",
             "recovered-provider-attempt-diagnostic",
+            "rejected-provider-response",
             "nested-retry-sequences",
             "validation-exhaustion",
             "unavailable-usage",
@@ -496,8 +497,9 @@ class ConsoleTraceFixtureCorpusTest
                         .add(node.path("recordType").asText());
                 if ("MODEL_ATTEMPT_FAILED".equals(node.path("recordType").asText()))
                 {
-                    sequenceAttempts.computeIfAbsent(retrySequenceId, ignored -> new ArrayList<>())
-                            .add(attemptNumber);
+                    if (!attemptLifecycle.get(attemptId).contains("MODEL_RESPONSE_RECEIVED"))
+                        sequenceAttempts.computeIfAbsent(retrySequenceId, ignored -> new ArrayList<>()).add(attemptNumber);
+                    Map<String, Object> receivedAttempt = actualAttemptsById.get(attemptId);
                     Map<String, Object> failedAttempt = ordered(
                             "retrySequenceId", retrySequenceId,
                             "attemptId", attemptId,
@@ -510,8 +512,8 @@ class ConsoleTraceFixtureCorpusTest
                             "retryDecision", node.at("/metadata/retryDecision").asText(),
                             "retryDelayMillis", node.at("/metadata/retryDelayMillis").asInt(),
                             "retryDelaySource", node.at("/metadata/retryDelaySource").asText(),
-                            "usage", Usage.ZERO.asMap(),
-                            "usageComplete", false);
+                            "usage", receivedAttempt.get("usage"),
+                            "usageComplete", receivedAttempt.get("usageComplete"));
                     if (node.at("/metadata/httpStatus").isInt())
                     {
                         failedAttempt.put("httpStatus", node.at("/metadata/httpStatus").asInt());
@@ -1008,6 +1010,26 @@ class ConsoleTraceFixtureCorpusTest
                 executeRecoveredProviderAttemptDiagnosticFixture(handle);
                 attributed = terminal = new Usage(4, 2);
             }
+            case "rejected-provider-response" ->
+            {
+                Map<String, Object> identity = attempt("retry-rejected", "attempt-rejected", 1, Map.of());
+                handle.append(TraceRecordType.MODEL_REQUEST_SENT, identity, requestText("Return a complete object."));
+                handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED,
+                        attempt("retry-rejected", "attempt-rejected", 1, Map.of("usage", usage(new Usage(10, 4), "EXACT"))),
+                        ordered("status", "incomplete", "incompleteReason", "max_output_tokens",
+                                "generations", List.of(ordered("messageType", "ASSISTANT", "text", "{\"ok\":true}",
+                                        "finishReason", "LENGTH", "toolCalls", List.of()))));
+                handle.append(TraceRecordType.MODEL_ATTEMPT_FAILED,
+                        attempt("retry-rejected", "attempt-rejected", 1, ordered(
+                                "failureClassification", "PERMANENT", "failureCategory", "PROVIDER_RESPONSE_REJECTED",
+                                "retryDecision", "DO_NOT_RETRY", "retryDelayMillis", 0, "retryDelaySource", "NONE")),
+                        ordered("status", "incomplete", "incompleteReason", "max_output_tokens"));
+                IllegalStateException rejected = fixtureFailure("Provider returned an explicitly incomplete response");
+                session.registerProviderFailure(rejected, identity);
+                terminalFailureId = session.recordFailure(rejected, Map.of("message", rejected.getMessage()), null);
+                attributed = terminal = new Usage(10, 4);
+                outcome = "FAILED";
+            }
             case "nested-retry-sequences" ->
             {
                 appendAttempt(handle, "retry-outer", "attempt-outer-1", 1, 4, 2, "HEURISTIC");
@@ -1230,14 +1252,14 @@ class ConsoleTraceFixtureCorpusTest
                 : name.equals("planned-tool-success") || name.equals("unplanned-tool-failure") ? 1 : 0;
         int modelCalls = name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
                 : name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
-                : name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
+                : name.equals("recovered-provider-attempt-diagnostic") || name.equals("rejected-provider-response") ? 1 : 0;
         int providerAttempts = name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
                 : name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
                 : name.equals("recovered-provider-attempt-diagnostic") ? 2
-                : name.equals("terminal-provider-failure-actionable") ? 1 : 0;
+                : name.equals("terminal-provider-failure-actionable") || name.equals("rejected-provider-response") ? 1 : 0;
         int exactModelResponses = name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
                 : name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
-                : name.equals("recovered-provider-attempt-diagnostic") ? 1 : 0;
+                : name.equals("recovered-provider-attempt-diagnostic") || name.equals("rejected-provider-response") ? 1 : 0;
         SessionUsageSnapshot usageSnapshot = new SessionUsageSnapshot(
                 0, toolInvocations, 0, modelCalls, providerAttempts,
                 terminal.promptUnits(), terminal.completionUnits(), terminal.totalUnits(),
@@ -1245,7 +1267,7 @@ class ConsoleTraceFixtureCorpusTest
         Map<String, Object> completionDetails = new LinkedHashMap<>();
         completionDetails.put("outcome", outcome);
         completionDetails.put("sessionUsageSnapshot",
-                toolInvocations > 0 || name.equals("recovered-provider-attempt-diagnostic") || name.equals("assigned-planner-inability")
+                toolInvocations > 0 || name.equals("recovered-provider-attempt-diagnostic") || name.equals("rejected-provider-response") || name.equals("assigned-planner-inability")
                         ? usageSnapshot.toTraceMap()
                         : terminal.asMap());
         session.finalizeTrace(new TraceCompletion(
@@ -2306,6 +2328,7 @@ class ConsoleTraceFixtureCorpusTest
             case "unplanned-tool-failure" -> "failure-tool";
             case "timeout-step-failure" -> "failure-timeout-step";
             case "terminal-provider-failure-actionable" -> "failure-terminal-provider";
+            case "rejected-provider-response" -> "failure-rejected-provider";
             case "native-evaluation-malformed-response", "native-evaluation-provider-failure" -> "failure-native";
             case "recoverable-failed-completion", "terminal-unlinked-success" -> "failure-explicit";
             case "assigned-planner-inability", "nested-synthesis-planner-inability" -> "failure-inability";
@@ -2691,6 +2714,12 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "rejected-provider-response" -> List.of(ordered(
+                    "retrySequenceId", "retry-rejected", "attemptId", "attempt-rejected", "attemptNumber", 1,
+                    "attemptReason", "INITIAL", "providerAttemptNumber", 1, "outcome", "FAILED",
+                    "failureClassification", "PERMANENT", "failureCategory", "PROVIDER_RESPONSE_REJECTED",
+                    "retryDecision", "DO_NOT_RETRY", "retryDelayMillis", 0, "retryDelaySource", "NONE",
+                    "usage", new Usage(10, 4).asMap(), "usageComplete", true));
             case "assigned-planner-inability" -> List.of(expectedAttempt(name, "retry-assigned", "attempt-assigned-model", 1));
             case "nested-synthesis-planner-inability" -> List.of(
                     expectedAttempt(name, "retry-parent-first", "attempt-parent-first-model", 1),
@@ -3015,7 +3044,7 @@ class ConsoleTraceFixtureCorpusTest
         return switch (name)
         {
             case "native-evaluation-success" -> new Usage(2, 1);
-            case "single-attempt-success" -> new Usage(10, 4);
+            case "single-attempt-success", "rejected-provider-response" -> new Usage(10, 4);
             case "advisor-retry" -> new Usage(18, 7);
             case "nested-retry-sequences" -> new Usage(12, 4);
             case "validation-exhaustion" -> new Usage(11, 4);

@@ -653,11 +653,11 @@ func buildAttemptResults(g *attemptGraph, completion *Record) ([]attemptResult, 
 			AttemptReason:         a.attemptReason,
 			ProviderAttemptNumber: a.providerAttemptNumber,
 			Outcome: func() string {
-				if a.hasResponse {
-					return "SUCCEEDED"
-				}
 				if a.hasFailure {
 					return "FAILED"
+				}
+				if a.hasResponse {
+					return "SUCCEEDED"
 				}
 				return "INCOMPLETE"
 			}(),

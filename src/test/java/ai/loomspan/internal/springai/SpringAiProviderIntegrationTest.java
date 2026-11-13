@@ -390,6 +390,51 @@ class SpringAiProviderIntegrationTest
         assertThat(stream.closed).isTrue();
     }
 
+    @Test
+    void invalidFailedEnvelopeUsageRetainsOriginalEvidenceAndFailureClassification()
+    {
+        for (String usage : java.util.List.of(
+                "{\"input_tokens\":4294967296,\"output_tokens\":0,\"total_tokens\":4294967296}",
+                "{\"input_tokens\":1,\"output_tokens\":2,\"total_tokens\":0}",
+                "{\"input_tokens\":-1,\"output_tokens\":2,\"total_tokens\":1}",
+                "{\"input_tokens\":1.5,\"output_tokens\":2,\"total_tokens\":4}",
+                "{\"input_tokens\":2147483647,\"output_tokens\":1}"))
+        {
+            String json = "{\"status\":\"failed\",\"output\":[],\"error\":{\"type\":\"provider_overloaded\","
+                    + "\"code\":\"ORIGINAL_CODE\",\"message\":\"ORIGINAL_DETAIL\"},\"usage\":" + usage + "}";
+            var stream = new TrackingInputStream(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            Throwable thrown = catchThrowable(() -> integration.inspectResponses(streamingResponse(stream)));
+            assertThat(thrown).isInstanceOf(ProviderCallException.class);
+            var failure = (ProviderCallException) thrown;
+            assertThat(failure.details().classification()).isEqualTo(ProviderFailureClassification.TRANSIENT);
+            assertThat(failure.details().providerErrorCode()).isEqualTo("ORIGINAL_CODE");
+            assertThat(failure.responseEvidence().get("usage"))
+                    .isEqualTo(new tools.jackson.databind.ObjectMapper().readValue(usage, java.util.Map.class));
+            assertThat(failure.responseUsage()).as("invalid counts must never become exact narrowed usage").isNull();
+            assertThat(failure.details().diagnostics()).singleElement().satisfies(diagnostic ->
+                    assertThat(diagnostic.get("text")).isEqualTo(json));
+            assertThat(stream.closed).isTrue();
+        }
+    }
+
+    @Test
+    void failedEnvelopeUsageRetainsExactZeroAndCheckedMissingTotal()
+    {
+        for (int input : new int[] {0, 7})
+        {
+            String usage = "{\"input_tokens\":" + input + ",\"output_tokens\":0}";
+            String json = "{\"status\":\"failed\",\"error\":{\"type\":\"fixture_permanent\"},\"usage\":" + usage + "}";
+            var stream = new TrackingInputStream(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            var failure = (ProviderCallException) catchThrowable(() -> integration.inspectResponses(streamingResponse(stream)));
+            assertThat(failure.responseUsage().promptUnits()).isEqualTo(input);
+            assertThat(failure.responseUsage().completionUnits()).isZero();
+            assertThat(failure.responseUsage().totalUnits()).isEqualTo(input);
+            assertThat(failure.responseUsage().precision()).isEqualTo(ai.loomspan.internal.runtime.usage.UsagePrecision.EXACT);
+            assertThat(failure.responseUsage().nativeUsage()).isEqualTo(failure.responseEvidence().get("usage"));
+            assertThat(stream.closed).isTrue();
+        }
+    }
+
     private static Response streamingResponse(InputStream stream)
     {
         ResponseBody body = new ResponseBody()
