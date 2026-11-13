@@ -71,7 +71,7 @@ public final class ProviderFailureGuidance
         return driver == AiDriver.GEMINI
                 ? connection + ".api-key or the Vertex AI settings " + connection + ".gemini.project-id, "
                         + connection + ".gemini.location, and " + connection + ".gemini.credentials-uri"
-                : driver == AiDriver.OLLAMA ? connection + ".base-url" : connection + ".api-key";
+                : connection + ".api-key";
     }
 
     private static String endpointProperty(AiDriver driver, String connection)

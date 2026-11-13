@@ -6,8 +6,7 @@ import ai.loomspan.internal.springai.SpringAiProviderIntegration;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatModel;
-import org.springframework.ai.ollama.OllamaChatModel;
-import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatModel;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ResourceLoader;
 
@@ -25,13 +24,14 @@ class AiConnectionChatModelFactoryTests {
         openAi.setDriver(AiDriver.OPENAI);
         openAi.setApiKey("test-key");
         SpringAiProviderIntegration integration = integration();
-        assertThat(integration.create("one", openAi).chatModel()).isInstanceOf(OpenAiChatModel.class)
+        assertThat(integration.create("one", openAi).chatModel()).isInstanceOf(OpenAiResponsesChatModel.class)
                 .isNotSameAs(integration.create("two", openAi).chatModel());
 
         LoomspanProperties.ConnectionProperties ollama = new LoomspanProperties.ConnectionProperties();
-        ollama.setDriver(AiDriver.OLLAMA);
-        ollama.setBaseUrl("http://localhost:11434");
-        assertThat(integration.create("one", ollama).chatModel()).isInstanceOf(OllamaChatModel.class)
+        ollama.setDriver(AiDriver.OPENAI);
+        ollama.setApiKey("ollama");
+        ollama.setBaseUrl("http://localhost:11434/v1");
+        assertThat(integration.create("one", ollama).chatModel()).isInstanceOf(OpenAiResponsesChatModel.class)
                 .isNotSameAs(integration.create("two", ollama).chatModel());
     }
 

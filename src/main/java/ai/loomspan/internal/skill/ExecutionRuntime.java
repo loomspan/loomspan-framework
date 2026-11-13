@@ -64,7 +64,6 @@ public final class ExecutionRuntime implements AutoCloseable
             if (original.getOpenai() != null)
             {
                 LoomspanProperties.OpenAiOptions options = new LoomspanProperties.OpenAiOptions();
-                options.setCompatibilityProfile(original.getOpenai().getCompatibilityProfile());
                 options.setOrganizationId(original.getOpenai().getOrganizationId());
                 options.setProjectId(original.getOpenai().getProjectId());
                 connection.setOpenai(options);

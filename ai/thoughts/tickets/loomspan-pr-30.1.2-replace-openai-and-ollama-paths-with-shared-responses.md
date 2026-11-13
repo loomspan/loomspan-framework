@@ -592,8 +592,27 @@ equality can conceal rounding. Preserve numeric value, not lexical spelling/scal
 
 ## Reference navigation
 
+- [Open PR 30 dependency blockers and retained skipped tests](../phases/pr-30-blockers.md)
+
 - [Agreed overview](../phases/migration-ticket-overview.md)
 - [Coverage ledger](../phases/migration-ticket-coverage.md)
 - [Migration roadmap](../phases/spring-ai-responses-migration.md)
 - [Historical schema research](../phases/standard-json-schema-research.md)
 - [TBD-06 reproduction and retained evidence](../../../docs/maintainers/probes/tbd-06/README.md)
+
+## Execution notes — developer decision, November 13, 2026
+
+After the initial Step 4 blocker report, the developer explicitly authorized moving
+the known unresolved adapter issues into `../phases/pr-30-blockers.md` and marking
+their retained tests skipped so later PR 30 tickets can proceed. This supersedes
+the requirement above to keep those seven failing cases enabled by default; their
+assertions remain available with `-Dloomspan.pr30.blockers=true`. Exact schema
+precision and required reasoning fidelity remain open overall migration acceptance
+requirements. Active preservation controls and independent-review obligations are
+unchanged. This decision does not retroactively change the original test results.
+
+The developer subsequently requested resuming the Full pipeline at independent
+Step 5 for PR 30.1.2 with this blocker deferral in effect. Review the complete
+current migration and the containment of these seven default skips; the tracked
+upstream requirements remain open for overall PR 30 acceptance. This authorizes
+proceeding to review despite the original Step 4 dependency-failure disposition.

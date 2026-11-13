@@ -19,8 +19,11 @@ owner's published sources.
 
 Model-backed YAML skills select a named model alias. The alias selects a named
 connection and a provider model ID. Supported chat drivers are `openai`, `anthropic`,
-`gemini`, and `ollama`. Supply credentials and endpoint configuration for the
-chosen service; Loomspan does not inherit `spring.ai.*` settings.
+and `gemini`. The `openai` driver uses stateless Responses for OpenAI, Meta,
+OpenRouter and Ollama. For local Ollama, use `http://127.0.0.1:11434/v1` with
+`api-key: ollama`; authenticated deployments require their actual credentials.
+Services must accept Responses; Chat Completions-only endpoints are unsupported.
+Loomspan does not inherit `spring.ai.*` settings.
 
 Native TypeSafe Choice, Noul, and Score leaves use the separate `typesafe` driver
 with direct TypeSafe or OpenRouter System One access. Use the

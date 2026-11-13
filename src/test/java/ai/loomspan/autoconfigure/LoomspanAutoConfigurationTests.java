@@ -29,8 +29,7 @@ import ai.loomspan.internal.vfs.RefResolver;
 import ai.loomspan.internal.vfs.VirtualFileSystem;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.springframework.ai.ollama.OllamaChatModel;
-import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatModel;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -282,9 +281,9 @@ class LoomspanAutoConfigurationTests {
 
     @Test
     void autoConfiguresDefaultSkillAdvisorResolver() {
-        OpenAiChatModel openAiChatModel = Mockito.mock(OpenAiChatModel.class);
+        OpenAiResponsesChatModel openAiChatModel = Mockito.mock(OpenAiResponsesChatModel.class);
         contextRunner
-                .withBean(OpenAiChatModel.class, () -> openAiChatModel)
+                .withBean(OpenAiResponsesChatModel.class, () -> openAiChatModel)
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/default-thinking-skill.yaml")
                 .run(context -> {
                     assertThat(context).hasSingleBean(SkillAdvisorResolver.class);
@@ -319,7 +318,7 @@ class LoomspanAutoConfigurationTests {
                     assertThat(properties.getConnections().get(properties.getModels().get("gpt-5").getConnection()).getDriver()).isEqualTo(AiDriver.OPENAI);
                     assertThat(properties.getConnections().get(properties.getModels().get("claude-sonnet").getConnection()).getDriver()).isEqualTo(AiDriver.ANTHROPIC);
                     assertThat(properties.getConnections().get(properties.getModels().get("gemini-pro").getConnection()).getDriver()).isEqualTo(AiDriver.GEMINI);
-                    assertThat(properties.getConnections().get(properties.getModels().get("ollama-llama3").getConnection()).getDriver()).isEqualTo(AiDriver.OLLAMA);
+                    assertThat(properties.getConnections().get(properties.getModels().get("ollama-llama3").getConnection()).getDriver()).isEqualTo(AiDriver.OPENAI);
                     assertThat(properties.getModels().get("gpt-5").getProviderModel()).isEqualTo("openai/gpt-5");
                     assertThat(properties.getModels().get("claude-sonnet").getThinkingLevels()).containsExactlyInAnyOrder("low", "medium", "high");
                     assertThat(properties.getModels().get("ollama-llama3").getThinkingLevels()).isEmpty();
@@ -328,12 +327,12 @@ class LoomspanAutoConfigurationTests {
 
     @Test
     void supportsMultiProviderResolverRegistrationWithoutTypeCollapse() {
-        OpenAiChatModel openAiChatModel = Mockito.mock(OpenAiChatModel.class);
-        OllamaChatModel ollamaChatModel = Mockito.mock(OllamaChatModel.class);
+        OpenAiResponsesChatModel openAiChatModel = Mockito.mock(OpenAiResponsesChatModel.class);
+        OpenAiResponsesChatModel ollamaChatModel = Mockito.mock(OpenAiResponsesChatModel.class);
 
         contextRunner
-                .withBean(OpenAiChatModel.class, () -> openAiChatModel)
-                .withBean(OllamaChatModel.class, () -> ollamaChatModel)
+                .withBean(OpenAiResponsesChatModel.class, () -> openAiChatModel)
+                .withBean("ollamaHostModel", OpenAiResponsesChatModel.class, () -> ollamaChatModel)
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/default-thinking-skill.yaml")
                 .run(context -> {
                     SkillChatModelResolver resolver = context.getBean(SkillChatModelResolver.class);
@@ -341,20 +340,20 @@ class LoomspanAutoConfigurationTests {
                     assertThat(resolver.resolve("openaiSkill", new EffectiveSkillExecutionConfiguration(
                             "gpt-5", "openai-main", AiDriver.OPENAI, "openai/gpt-5", "medium")))
                             .extracting(ai.loomspan.internal.provider.ProviderConnectionRuntime::chatModel)
-                            .isInstanceOf(OpenAiChatModel.class);
+                            .isInstanceOf(OpenAiResponsesChatModel.class);
                     assertThat(resolver.resolve("ollamaSkill", new EffectiveSkillExecutionConfiguration(
-                            "ollama-llama3", "ollama-main", AiDriver.OLLAMA, "llama3.2", null)))
+                            "ollama-llama3", "ollama-main", AiDriver.OPENAI, "llama3.2", null)))
                             .extracting(ai.loomspan.internal.provider.ProviderConnectionRuntime::chatModel)
-                            .isInstanceOf(OllamaChatModel.class);
+                            .isInstanceOf(OpenAiResponsesChatModel.class);
                 });
     }
 
     @Test
     void exposesModelInteractionFactoryBackedByResolver() {
-        OpenAiChatModel openAiChatModel = Mockito.mock(OpenAiChatModel.class);
+        OpenAiResponsesChatModel openAiChatModel = Mockito.mock(OpenAiResponsesChatModel.class);
 
         contextRunner
-                .withBean(OpenAiChatModel.class, () -> openAiChatModel)
+                .withBean(OpenAiResponsesChatModel.class, () -> openAiChatModel)
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/default-thinking-skill.yaml")
                 .run(context -> {
                     assertThat(context).hasSingleBean(SkillChatModelResolver.class);

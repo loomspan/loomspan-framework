@@ -28,7 +28,7 @@ class ExecutorDependencyResolutionTest {
         var discovery = mock(SkillMethodBeanPostProcessor.class);
         when(discovery.capabilities()).thenReturn(List.of());
         when(discovery.executors()).thenReturn(registrations);
-        var manager = new SkillGenerationManager(discovery, () -> new YamlSkillCatalog(properties), inputs, properties, null, null);
+        var manager = new SkillGenerationManager(discovery, () -> new YamlSkillCatalog(properties), inputs, properties, new org.springframework.mock.env.MockEnvironment().withProperty("fixture.key", "ollama"), null);
         manager.initializeStartup();
         return manager;
     }

@@ -68,14 +68,14 @@ class DefaultSkillChatModelResolverTests {
         DefaultSkillChatModelResolver resolver = new DefaultSkillChatModelResolver(Map.of(
                 "openai-main", runtime(mock(ChatModel.class))));
         EffectiveSkillExecutionConfiguration configuration = new EffectiveSkillExecutionConfiguration(
-                "local", "ollama-east", AiDriver.OLLAMA, "qwen3", null);
+                "local", "ollama-east", AiDriver.OPENAI, "qwen3", null);
 
         assertThatThrownBy(() -> resolver.resolve("default-invoiceParser", configuration))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("default-invoiceParser")
                 .hasMessageContaining("local")
                 .hasMessageContaining("ollama-east")
-                .hasMessageContaining("OLLAMA");
+                .hasMessageContaining("OPENAI");
     }
 
     private static ProviderConnectionRuntime runtime(ChatModel model) {

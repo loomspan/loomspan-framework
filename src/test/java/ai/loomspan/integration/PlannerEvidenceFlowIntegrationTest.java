@@ -90,19 +90,17 @@ class PlannerEvidenceFlowIntegrationTest {
         String objective = "Fulfill the mission for skill 'default-root' using the provided mission input object.";
         for (String request : List.of(capture.requestContaining("Exact capability/tool: default-assess"),
                 capture.requestContaining("All required plan tasks are already COMPLETE"))) {
-            JsonNode messages = JSON.readTree(request).path("messages");
+            JsonNode messages = ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(request));
             String system = messages.get(0).path("content").asText();
             String user = messages.get(1).path("content").asText();
             assertThat(system).contains(objective).doesNotContain("Canonical mission input:", "Execute skill the mission");
             assertThat(user).contains(objective, "\"caseId\" : \"local-case\"");
             assertThat(user.split("Canonical mission input:", -1)).hasSize(2);
         }
-        assertThat(JSON.readTree(capture.requestContaining("Exact capability/tool: default-assess"))
-                .path("messages").get(0).path("content").asText())
+        assertThat(ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(capture.requestContaining("Exact capability/tool: default-assess"))).get(0).path("content").asText())
                 .contains("Overall mission context (non-actionable; execute only the assigned task below)",
                         "Do not call the parent mission skill");
-        assertThat(JSON.readTree(capture.requestContaining("All required plan tasks are already COMPLETE"))
-                .path("messages").get(0).path("content").asText()).contains("Do NOT call any tool");
+        assertThat(ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(capture.requestContaining("All required plan tasks are already COMPLETE"))).get(0).path("content").asText()).contains("Do NOT call any tool");
     }
 
     private Capture run(boolean concurrent, boolean longResults) throws Exception {
@@ -127,7 +125,7 @@ class PlannerEvidenceFlowIntegrationTest {
             assertThat(capture.requestContaining("ASSESS_ONLY_RECEIVED_INPUT")).contains("FACT_" + source + "_TAIL");
         }
         for (String request : capture.requests) {
-            String system = JSON.readTree(request).path("messages").get(0).path("content").asText();
+            String system = ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(request)).get(0).path("content").asText();
             if (system.contains("coordinator-assigned task") && !system.contains("Exact capability/tool: default-assess")
                     && !system.contains("Exact capability/tool: default-nested") && !system.contains("Exact capability/tool: default-nestedSource"))
                 assertThat(system).doesNotContain("COMPLETED TASK EVIDENCE", "FACT_A_TAIL", "FACT_B0_TAIL", "FACT_C_TAIL");
@@ -151,7 +149,7 @@ class PlannerEvidenceFlowIntegrationTest {
     }
 
     private static JsonNode evidenceRecords(String request) {
-        String system = JSON.readTree(request).path("messages").get(0).path("content").asText();
+        String system = ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(request)).get(0).path("content").asText();
         String block = system.substring(system.indexOf("--- COMPLETED TASK EVIDENCE ---"));
         return JSON.readTree(block.substring(block.indexOf("\n[") + 1).split("\n\n", 2)[0]);
     }
@@ -234,9 +232,9 @@ class PlannerEvidenceFlowIntegrationTest {
                     try {
                         String body = request.getBody().readUtf8();
                         capture.requests.add(body);
-                        assertThat(request.getPath()).isEqualTo("/v1/chat/completions");
+                        assertThat(request.getPath()).isEqualTo("/v1/responses");
                         JsonNode wire = JSON.readTree(body);
-                        String text = wire.path("messages").toString();
+                        String text = ai.loomspan.testkit.ResponsesFixtures.transcript(wire).toString();
                         Object content;
                         if (text.contains("Create an ordered flight plan")) {
                             List<Object> tasks = new ArrayList<>();
@@ -255,7 +253,7 @@ class PlannerEvidenceFlowIntegrationTest {
                             }
                             content = Map.of("capabilityName", nestedPlan ? "default-nested" : "default-root", "createdAt", "2026-10-01T00:00:00Z", "status", "VALID", "tasks", tasks);
                         } else if (text.contains("coordinator-assigned task")) {
-                            String system = wire.path("messages").get(0).path("content").asText();
+                            String system = ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(0).path("content").asText();
                             var matcher = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
                             assertThat(matcher.find()).isTrue();
                             String tool = matcher.group(1);
@@ -276,15 +274,14 @@ class PlannerEvidenceFlowIntegrationTest {
                             content = Map.of("facts", facts(text));
                         } else if (text.contains("NESTED_COPY_SOURCE")) {
                             JsonNode toolResult = null;
-                            for (JsonNode message : wire.path("messages"))
+                            for (JsonNode message : ai.loomspan.testkit.ResponsesFixtures.transcript(wire))
                                 if (message.path("role").asText().equals("tool")) toolResult = message.path("content");
-                            if (toolResult == null) return response(Map.of("role", "assistant", "content", "", "tool_calls",
-                                    List.of(Map.of("id", "call-nested", "type", "function", "function",
-                                            Map.of("name", "default-nestedSource", "arguments", "{}")))), "tool_calls");
+                            if (toolResult == null) return ai.loomspan.testkit.ResponsesFixtures.response("local", "deterministic",
+                                    List.of(ai.loomspan.testkit.ResponsesFixtures.functionCall("default-nestedSource", "nested-call", "{}")));
                             capture.nestedCompletion = toolResult.asText();
-                            return response(Map.of("role", "assistant", "content", capture.nestedCompletion), "stop");
+                            return ai.loomspan.testkit.ResponsesFixtures.text(capture.nestedCompletion);
                         } else throw new AssertionError("Unexpected request: " + body);
-                        return response(Map.of("role", "assistant", "content", JSON.writeValueAsString(content)), "stop");
+                        return ai.loomspan.testkit.ResponsesFixtures.text(JSON.writeValueAsString(content));
                     } catch (Throwable failure) {
                         capture.failure.compareAndSet(null, failure);
                         return new MockResponse().setResponseCode(500).setBody("Unexpected test request");
@@ -383,13 +380,6 @@ class PlannerEvidenceFlowIntegrationTest {
         return task;
     }
 
-    private static MockResponse response(Object message, String reason) {
-        return new MockResponse().setHeader("Content-Type", "application/json").setBody(JSON.writeValueAsString(Map.of(
-                "id", "local-completion", "object", "chat.completion", "created", 1, "model", "deterministic",
-                "choices", List.of(Map.of("index", 0, "message", message, "finish_reason", reason)),
-                "usage", Map.of("prompt_tokens", 1, "completion_tokens", 1, "total_tokens", 2))));
-    }
-
     private static class Capture {
         final List<String> leafReturns = Collections.synchronizedList(new ArrayList<>());
         final List<String> requests = Collections.synchronizedList(new ArrayList<>());
@@ -401,7 +391,7 @@ class PlannerEvidenceFlowIntegrationTest {
             return requests.stream().filter(request -> request.contains(value)).findFirst().orElseThrow();
         }
         String requestWithToolResult() {
-            return requests.stream().filter(request -> JSON.readTree(request).path("messages").toString()
+            return requests.stream().filter(request -> ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(request)).toString()
                     .contains("\"role\":\"tool\"")).findFirst().orElseThrow();
         }
     }

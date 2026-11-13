@@ -19,7 +19,7 @@ class SkillReloaderTest {
     static final ExecutionConfiguration EMPTY = new ExecutionConfiguration("loomspan: {}");
     static final ExecutionConfiguration MODEL = new ExecutionConfiguration("""
             loomspan:
-              connections: {local: {driver: ollama, base-url: 'http://localhost:11434'}}
+              connections: {local: {driver: openai, api-key-ref: fixture.key, base-url: 'http://localhost:11434/v1'}}
               models: {model: {connection: local, provider-model: fixture}}
             """);
 
@@ -290,7 +290,7 @@ class SkillReloaderTest {
         Fixture(BiFunction<LoomspanProperties,TracePersistencePolicy,ExecutionRuntime> factory){
             startup.getSkills().setLocations(List.of("classpath:/publication-no-files/*.yaml"));startup.getSession().setMaxDepth(91);
             var javaSkills=mock(SkillMethodBeanPostProcessor.class);when(javaSkills.capabilities()).thenReturn(List.of());
-            manager=new SkillGenerationManager(javaSkills,()->new YamlSkillCatalog(startup),new SkillInputContractResolver(),startup,null,factory==null?SkillReloaderTest::runtime:factory);
+            manager=new SkillGenerationManager(javaSkills,()->new YamlSkillCatalog(startup),new SkillInputContractResolver(),startup,new org.springframework.mock.env.MockEnvironment().withProperty("fixture.key", "ollama"),factory==null?SkillReloaderTest::runtime:factory);
             manager.initializeStartup();lifecycle=new FrameworkExecutionLifecycle(mock(ApplicationContext.class),Duration.ofMillis(100),Executors.newSingleThreadExecutor());
             reloader=new DefaultSkillReloader(manager,lifecycle);
         }

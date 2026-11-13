@@ -112,39 +112,23 @@ class SupportedSurfaceIntegrationTest
             server.enqueue(new MockResponse()
                     .setHeader("Content-Type", "application/json")
                     .setBody("""
-                            {"id":"chatcmpl-supported-surface","object":"chat.completion","created":1,
-                             "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"capabilityName\\\":\\\"default-supportedSurfaceSkill\\\",\\\"createdAt\\\":\\\"2026-09-12T12:00:00Z\\\",\\\"status\\\":\\\"VALID\\\",\\\"tasks\\\":[{\\\"taskId\\\":\\\"java-task\\\",\\\"title\\\":\\\"Call Java leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"default-supportedJavaLeaf\\\",\\\"intent\\\":\\\"Echo through Java\\\",\\\"dependsOn\\\":[],\\\"expectedOutputs\\\":[\\\"Java echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"},{\\\"taskId\\\":\\\"executor-task\\\",\\\"title\\\":\\\"Call EXECUTOR leaf\\\",\\\"status\\\":\\\"PENDING\\\",\\\"capabilityName\\\":\\\"default-supportedExecutorLeaf\\\",\\\"intent\\\":\\\"Echo through EXECUTOR\\\",\\\"dependsOn\\\":[\\\"java-task\\\"],\\\"expectedOutputs\\\":[\\\"EXECUTOR echo\\\"],\\\"parallelGroup\\\":null,\\\"note\\\":\\\"\\\"}]}"},
-                                         "finish_reason":"stop"}],
-                             "usage":{"prompt_tokens":3,"completion_tokens":3,"total_tokens":6}}
-                            """));
+                {"id":"chatcmpl-supported-surface","object":"response","created_at":1,"model":"integration-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"{\\"capabilityName\\":\\"default-supportedSurfaceSkill\\",\\"createdAt\\":\\"2026-09-12T12:00:00Z\\",\\"status\\":\\"VALID\\",\\"tasks\\":[{\\"taskId\\":\\"java-task\\",\\"title\\":\\"Call Java leaf\\",\\"status\\":\\"PENDING\\",\\"capabilityName\\":\\"default-supportedJavaLeaf\\",\\"intent\\":\\"Echo through Java\\",\\"dependsOn\\":[],\\"expectedOutputs\\":[\\"Java echo\\"],\\"parallelGroup\\":null,\\"note\\":\\"\\"},{\\"taskId\\":\\"executor-task\\",\\"title\\":\\"Call EXECUTOR leaf\\",\\"status\\":\\"PENDING\\",\\"capabilityName\\":\\"default-supportedExecutorLeaf\\",\\"intent\\":\\"Echo through EXECUTOR\\",\\"dependsOn\\":[\\"java-task\\"],\\"expectedOutputs\\":[\\"EXECUTOR echo\\"],\\"parallelGroup\\":null,\\"note\\":\\"\\"}]}","annotations":[]}]}],"usage":{"input_tokens":3,"output_tokens":3,"total_tokens":6}}
+                """));
             server.enqueue(new MockResponse()
                     .setHeader("Content-Type", "application/json")
                     .setBody("""
-                            {"id":"chatcmpl-supported-surface-java","object":"chat.completion","created":1,
-                             "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"CALL_TOOL\\\",\\\"taskId\\\":\\\"java-task\\\",\\\"toolName\\\":\\\"default-supportedJavaLeaf\\\",\\\"toolArguments\\\":{\\\"message\\\":\\\"hello through the public API\\\"}}"},
-                                         "finish_reason":"stop"}],
-                             "usage":{"prompt_tokens":4,"completion_tokens":3,"total_tokens":7}}
-                            """));
+                {"id":"chatcmpl-supported-surface-java","object":"response","created_at":1,"model":"integration-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"{\\"stepAction\\":\\"CALL_TOOL\\",\\"taskId\\":\\"java-task\\",\\"toolName\\":\\"default-supportedJavaLeaf\\",\\"toolArguments\\":{\\"message\\":\\"hello through the public API\\"}}","annotations":[]}]}],"usage":{"input_tokens":4,"output_tokens":3,"total_tokens":7}}
+                """));
             server.enqueue(new MockResponse()
                     .setHeader("Content-Type", "application/json")
                     .setBody("""
-                            {"id":"chatcmpl-supported-surface-executor","object":"chat.completion","created":1,
-                             "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"CALL_TOOL\\\",\\\"taskId\\\":\\\"executor-task\\\",\\\"toolName\\\":\\\"default-supportedExecutorLeaf\\\",\\\"toolArguments\\\":{\\\"message\\\":\\\"hello through the public API\\\"}}"},
-                                         "finish_reason":"stop"}],
-                             "usage":{"prompt_tokens":4,"completion_tokens":3,"total_tokens":7}}
-                            """));
+                {"id":"chatcmpl-supported-surface-executor","object":"response","created_at":1,"model":"integration-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"{\\"stepAction\\":\\"CALL_TOOL\\",\\"taskId\\":\\"executor-task\\",\\"toolName\\":\\"default-supportedExecutorLeaf\\",\\"toolArguments\\":{\\"message\\":\\"hello through the public API\\"}}","annotations":[]}]}],"usage":{"input_tokens":4,"output_tokens":3,"total_tokens":7}}
+                """));
             server.enqueue(new MockResponse()
                     .setHeader("Content-Type", "application/json")
                     .setBody("""
-                            {"id":"chatcmpl-supported-surface-final","object":"chat.completion","created":1,
-                             "model":"integration-model",
-                             "choices":[{"index":0,"message":{"role":"assistant","content":"{\\\"stepAction\\\":\\\"FINAL_RESPONSE\\\",\\\"finalResponse\\\":\\\"supported surface response\\\"}"},
-                                         "finish_reason":"stop"}],
-                             "usage":{"prompt_tokens":4,"completion_tokens":3,"total_tokens":7}}
-                            """));
+                {"id":"chatcmpl-supported-surface-final","object":"response","created_at":1,"model":"integration-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"{\\"stepAction\\":\\"FINAL_RESPONSE\\",\\"finalResponse\\":\\"supported surface response\\"}","annotations":[]}]}],"usage":{"input_tokens":4,"output_tokens":3,"total_tokens":7}}
+                """));
 
             new ApplicationContextRunner()
                     .withConfiguration(AutoConfigurations.of(
@@ -271,7 +255,7 @@ class SupportedSurfaceIntegrationTest
 
             RecordedRequest planningRequest = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(planningRequest).isNotNull();
-            assertThat(planningRequest.getPath()).isEqualTo("/v1/chat/completions");
+            assertThat(planningRequest.getPath()).isEqualTo("/v1/responses");
             assertThat(planningRequest.getHeader("Authorization")).isEqualTo("Bearer integration-key");
             assertThat(planningRequest.getBody().readUtf8())
                     .contains("\"model\":\"integration-model\"")
@@ -312,7 +296,7 @@ class SupportedSurfaceIntegrationTest
     private static String requestMessages(JsonNode payload)
     {
         StringBuilder messages = new StringBuilder();
-        payload.path("messages").forEach(message -> messages.append(message.path("content").asText()).append('\n'));
+        ai.loomspan.testkit.ResponsesFixtures.transcript(payload).forEach(message -> messages.append(message.path("content").asText()).append('\n'));
         return messages.toString();
     }
 

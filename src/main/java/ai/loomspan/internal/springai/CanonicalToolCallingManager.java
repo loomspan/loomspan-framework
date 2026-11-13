@@ -2,6 +2,9 @@ package ai.loomspan.internal.springai;
 
 import ai.loomspan.internal.core.SkillIdentity;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.part.MessagePart;
+import org.springframework.ai.chat.messages.part.ToolCallPart;
+import org.springframework.ai.chat.messages.part.StreamingParts;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -43,13 +46,20 @@ final class CanonicalToolCallingManager implements ToolCallingManager {
                 .peek(CanonicalToolCallingManager::requireCanonical).collect(Collectors.toUnmodifiableSet());
         // Complete validation before delegating any side effect, including multi-call responses.
         List<Generation> generations = new ArrayList<>(response.getResults().size());
+        boolean changedResponse = false;
         AssistantMessage.ToolCall control = null;
         int selectionCount = 0;
         for (Generation generation : response.getResults()) {
             var original = generation == null ? null : generation.getOutput();
             if (original == null) throw new IllegalArgumentException("Missing assistant output in tool selection response");
-            List<AssistantMessage.ToolCall> calls = new ArrayList<>(original.getToolCalls().size());
-            for (var call : original.getToolCalls()) {
+            List<MessagePart> parts = new ArrayList<>(original.getParts().size());
+            boolean changed = false;
+            for (var part : original.getParts()) {
+                if (!(part instanceof ToolCallPart tool) || StreamingParts.isPartial(part)) {
+                    parts.add(part);
+                    continue;
+                }
+                var call = tool.toolCall();
                 selectionCount++;
                 if (PlannerInabilityTool.NAME.equals(call.name())) {
                     if (!controlBound) throw new IllegalArgumentException("Unbound tool selection '" + call.name() + "'");
@@ -58,16 +68,22 @@ final class CanonicalToolCallingManager implements ToolCallingManager {
                 }
                 String canonical = SkillIdentity.parse(call.name()).toString();
                 if (!bound.contains(canonical)) throw new IllegalArgumentException("Unbound tool selection '" + call.name() + "'");
-                calls.add(new AssistantMessage.ToolCall(call.id(), call.type(), canonical, call.arguments()));
+                if (canonical.equals(call.name())) parts.add(part);
+                else {
+                    parts.add(new ToolCallPart(new AssistantMessage.ToolCall(call.id(), call.type(), canonical,
+                            call.arguments()), tool.payload(), tool.attributes()));
+                    changed = true;
+                }
             }
-            generations.add(new Generation(AssistantMessage.builder().content(original.getText()).properties(original.getMetadata())
-                    .media(original.getMedia()).toolCalls(calls).build(), generation.getMetadata()));
+            generations.add(changed ? new Generation(AssistantMessage.builder().parts(parts)
+                    .properties(original.getMetadata()).build(), generation.getMetadata()) : generation);
+            changedResponse |= changed;
         }
         if (control != null) {
             if (selectionCount != 1) throw new IllegalArgumentException("Planner inability must be the only tool selection");
             throw PlannerInabilityTool.accept(control);
         }
-        return delegate.executeToolCalls(prompt, new ChatResponse(generations, response.getMetadata()));
+        return delegate.executeToolCalls(prompt, changedResponse ? new ChatResponse(generations, response.getMetadata()) : response);
     }
 
     private static List<ToolCallback> boundCallbacks(ToolCallingChatOptions options) {

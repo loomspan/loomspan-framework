@@ -32,7 +32,6 @@ class ConfigurationMetadataTest {
                     "loomspan.connections.*.base-url",
                     "loomspan.connections.*.driver",
                     "loomspan.connections.*.headers",
-                    "loomspan.connections.*.openai.compatibility-profile",
                     "loomspan.connections.*.openai.organization-id",
                     "loomspan.connections.*.openai.project-id",
                     "loomspan.connections.*.gemini.vertex-ai",
@@ -55,10 +54,7 @@ class ConfigurationMetadataTest {
                             property -> property.path("name").asText(),
                             property -> property.path("description").asText()));
             assertThat(descriptions.get("loomspan.connections.*.base-url")).isEqualTo(
-                    "Optional driver service-root override; required for Ollama. OpenAI appends "
-                            + "/chat/completions to the configured root, so include /v1 in the root when required "
-                            + "by the service. Anthropic appends /v1/messages. Values are not emitted in "
-                            + "Loomspan diagnostics.");
+                    "Optional driver service-root override. OpenAI Responses appends /responses to the configured root, so include /v1 in the root when required by the service, including Ollama. Anthropic appends /v1/messages. Values are not emitted in Loomspan diagnostics.");
             assertThat(descriptions.get("loomspan.connections.*.headers")).isEqualTo(
                     "Sensitive static headers supported only for the OpenAI and Anthropic drivers; use them "
                             + "for supported provider-specific headers such as anthropic-beta.");
@@ -73,6 +69,8 @@ class ConfigurationMetadataTest {
                     .contains("loomspan.observability.trace-catalog-metadata-ttl")
                     .contains("loomspan.shutdown.timeout")
                     .contains("\"value\": \"openai\"")
+                    .doesNotContain("loomspan.connections.*.openai.compatibility-profile")
+                    .doesNotContain("\"value\": \"ollama\"")
                     .doesNotContain("unversioned URLs use /v1/chat/completions")
                     .doesNotContain("headers supported only for the OpenAI driver")
                     .doesNotContain("loomspan.connections.*.openai.chat-" + "completions-path")

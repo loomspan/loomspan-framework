@@ -139,9 +139,9 @@ class DesignatedChildResultIntegrationTest {
                             if (kind.equals("native-failure")) return new MockResponse().setResponseCode(401).setBody("account rejected");
                             return new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"answers\":" + expected(kind) + "}");
                         }
-                        assertThat(request.getPath()).isEqualTo("/v1/chat/completions");
+                        assertThat(request.getPath()).isEqualTo("/v1/responses");
                         JsonNode wire = JSON.readTree(body);
-                        String system = wire.path("messages").get(0).path("content").asText();
+                        String system = ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan")) {
                             boolean middle = system.contains("MIDDLE_ORCHESTRATION");
                             String parent = middle ? "middle" : "root";
@@ -243,9 +243,9 @@ class DesignatedChildResultIntegrationTest {
                 @Override public MockResponse dispatch(RecordedRequest request) {
                     try {
                         JsonNode wire = JSON.readTree(request.getBody().readUtf8());
-                        String system = wire.path("messages").get(0).path("content").asText();
+                        String system = ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(0).path("content").asText();
                         String messages = "";
-                        for (JsonNode message : wire.path("messages")) messages += message.path("content").asText();
+                        for (JsonNode message : ai.loomspan.testkit.ResponsesFixtures.transcript(wire)) messages += message.path("content").asText();
                         var markerMatch = Pattern.compile("\"marker\"\\s*:\\s*\"([^\"]+)\"").matcher(messages);
                         assertThat(markerMatch.find()).isTrue();
                         String marker = markerMatch.group(1);
@@ -369,10 +369,7 @@ class DesignatedChildResultIntegrationTest {
     }
 
     private static MockResponse response(String content) {
-        return new MockResponse().setHeader("Content-Type", "application/json").setBody(JSON.writeValueAsString(Map.of(
-                "id", "local-completion", "object", "chat.completion", "created", 1, "model", "deterministic",
-                "choices", List.of(Map.of("index", 0, "message", Map.of("role", "assistant", "content", content), "finish_reason", "stop")),
-                "usage", Map.of("prompt_tokens", 1, "completion_tokens", 1, "total_tokens", 2))));
+        return ai.loomspan.testkit.ResponsesFixtures.text(content);
     }
 
     private static class Capture {

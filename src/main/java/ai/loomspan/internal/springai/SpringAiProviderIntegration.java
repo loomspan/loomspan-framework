@@ -23,23 +23,12 @@ import com.google.genai.types.HttpRetryOptions;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.google.genai.GoogleGenAiChatModel;
-import org.springframework.ai.ollama.OllamaChatModel;
-import org.springframework.ai.ollama.api.OllamaApi;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatModel;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.web.client.RestClient;
 import org.springframework.core.io.ResourceLoader;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.client.ClientHttpRequestInterceptor;
-import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.DefaultResponseErrorHandler;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 
 import javax.net.ssl.SSLException;
@@ -51,7 +40,6 @@ import java.io.InterruptedIOException;
 import java.net.ConnectException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -120,15 +108,14 @@ public final class SpringAiProviderIntegration
             case OPENAI -> openAi(properties);
             case ANTHROPIC -> anthropic(properties);
             case GEMINI -> gemini(connectionName, properties);
-            case OLLAMA -> ollama(properties);
             case TYPESAFE -> throw new IllegalArgumentException("Native evaluations do not construct a ChatModel");
         }, properties.getDriver(), AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP, retry, this::translate);
     }
 
-    private OpenAiChatModel openAi(LoomspanProperties.ConnectionProperties properties)
+    private OpenAiResponsesChatModel openAi(LoomspanProperties.ConnectionProperties properties)
     {
         Map<String, String> headers = new java.util.LinkedHashMap<>(properties.getHeaders());
-        OpenAiChatOptions.Builder optionsBuilder = OpenAiChatOptions.builder()
+        OpenAiResponsesChatOptions.Builder optionsBuilder = OpenAiResponsesChatOptions.builder()
                 .apiKey(properties.getApiKey())
                 .maxRetries(0);
         if (properties.getRequestTimeout() != null) optionsBuilder.timeout(properties.getRequestTimeout());
@@ -140,12 +127,11 @@ public final class SpringAiProviderIntegration
             if (StringUtils.hasText(options.getProjectId())) headers.put("OpenAI-Project", options.getProjectId());
         }
         if (!headers.isEmpty()) optionsBuilder.customHeaders(headers);
-        OpenAiChatModel.Builder builder = OpenAiChatModel.builder().options(optionsBuilder.build())
+        OpenAiResponsesChatModel.Builder builder = OpenAiResponsesChatModel.builder().options(optionsBuilder.build())
                 .observationRegistry(observationRegistry);
-        if (options != null && options.getCompatibilityProfile() == LoomspanProperties.OpenAiCompatibilityProfile.OPENROUTER)
-        {
-            builder.httpClientBuilderCustomizer(http -> http.interceptor(chain -> inspectOpenRouter(chain.proceed(chain.request()))));
-        }
+        // Responses exceptions retain only a code/message for failed HTTP-200 envelopes.
+        // Capture their original evidence at the existing HTTP boundary.
+        builder.httpClientBuilderCustomizer(http -> http.interceptor(chain -> inspectResponses(chain.proceed(chain.request()))));
         return builder.build();
     }
 
@@ -181,17 +167,6 @@ public final class SpringAiProviderIntegration
                 .observationRegistry(observationRegistry).build();
     }
 
-    private OllamaChatModel ollama(LoomspanProperties.ConnectionProperties properties)
-    {
-        RestClient.Builder oneSendRestClient = RestClient.builder()
-                .requestFactory(new SimpleClientHttpRequestFactory());
-        OllamaApi api = OllamaApi.builder().baseUrl(properties.getBaseUrl())
-                .restClientBuilder(oneSendRestClient)
-                .responseErrorHandler(new CapturingResponseErrorHandler()).build();
-        return OllamaChatModel.builder().ollamaApi(api).retryTemplate(oneAttemptTemplate())
-                .observationRegistry(observationRegistry).build();
-    }
-
     static HttpOptions oneAttemptGoogleHttpOptions(Duration timeout)
     {
         var builder = HttpOptions.builder().retryOptions(HttpRetryOptions.builder().attempts(1).build());
@@ -204,7 +179,7 @@ public final class SpringAiProviderIntegration
         return new RetryTemplate(RetryPolicy.withMaxRetries(0));
     }
 
-    okhttp3.Response inspectOpenRouter(okhttp3.Response response) throws IOException
+    okhttp3.Response inspectResponses(okhttp3.Response response) throws IOException
     {
         okhttp3.ResponseBody body = response.body();
         if (!response.isSuccessful() || body == null) return response;
@@ -214,29 +189,36 @@ public final class SpringAiProviderIntegration
         {
             bytes = stream.readAllBytes();
         }
-        inspectOpenRouterBody(bytes);
+        inspectResponsesBody(bytes);
         return response.newBuilder().body(okhttp3.ResponseBody.create(contentType, bytes)).build();
     }
 
-    private void inspectOpenRouterBody(byte[] bytes)
+    private void inspectResponsesBody(byte[] bytes)
     {
-        JsonNode root = objectMapper.readTree(bytes);
-        for (JsonNode choice : root.path("choices"))
-        {
-            if (!"error".equals(choice.path("finish_reason").asText())) continue;
-            JsonNode error = choice.path("error");
-            if (!error.isObject()) throw decodingFailure("Malformed OpenRouter error completion", bytes);
-            String type = text(error.path("metadata").path("error_type"));
-            String code = text(error.path("code"));
-            if (code == null) code = text(error.path("provider_code"));
-            String summary = text(error.path("message"));
-            ProviderFailureCategory category = category(type);
-            ProviderFailureClassification classification = retryableOpenRouter(type)
-                    ? ProviderFailureClassification.TRANSIENT : ProviderFailureClassification.PERMANENT;
-            throw new ProviderCallException("OpenRouter returned an error completion",
-                    new ProviderFailureDetails(classification, category, 200, null, type, code, summary,
-                            List.of(diagnostic(bytes, bytes.length > DIAGNOSTIC_LIMIT_BYTES))));
+        JsonNode root;
+        try { root = objectMapper.readTree(bytes); }
+        catch (tools.jackson.core.JacksonException failure) {
+            var captured = decodingFailure("Malformed Responses JSON", bytes);
+            captured.initCause(failure);
+            throw captured;
         }
+        if (root == null || !root.isObject()) throw decodingFailure("Malformed Responses envelope", bytes);
+        JsonNode error = root.path("error");
+        if (!"failed".equals(root.path("status").asText()) && !error.isObject()) return;
+        if (!error.isObject()) throw decodingFailure("Malformed failed Responses envelope", bytes);
+        String type = text(error.path("metadata").path("error_type"));
+        if (type == null) type = text(error.path("error_type"));
+        if (type == null) type = text(root.path("error_type"));
+        if (type == null) type = text(error.path("type"));
+        String code = text(error.path("code"));
+        if (code == null) code = text(error.path("provider_code"));
+        String summary = text(error.path("message"));
+        ProviderFailureCategory category = category(type);
+        ProviderFailureClassification classification = retryableResponses(type)
+                ? ProviderFailureClassification.TRANSIENT : ProviderFailureClassification.PERMANENT;
+        throw new ProviderCallException("Provider returned a failed Responses envelope",
+                new ProviderFailureDetails(classification, category, 200, null, type, code, summary,
+                        List.of(diagnostic(bytes, bytes.length > DIAGNOSTIC_LIMIT_BYTES))));
     }
 
     private ProviderFailureDetails translate(Throwable failure)
@@ -420,7 +402,7 @@ public final class SpringAiProviderIntegration
                 "captureLimitBytes", DIAGNOSTIC_LIMIT_BYTES);
     }
 
-    private static boolean retryableOpenRouter(String type)
+    private static boolean retryableResponses(String type)
     {
         return type != null && java.util.Set.of("rate_limit_exceeded", "provider_overloaded",
                 "provider_unavailable", "timeout", "server", "unmapped").contains(type);
@@ -465,27 +447,6 @@ public final class SpringAiProviderIntegration
         {
             throw new SafeAiConnectionConfigurationException("loomspan.connections." + connectionName
                     + ".gemini.credentials-json-ref is invalid");
-        }
-    }
-
-    private static boolean baseUrlAlreadyEndsWithV1(String baseUrl)
-    {
-        if (!StringUtils.hasText(baseUrl)) return false;
-        String path = URI.create(baseUrl).getPath();
-        return path != null && path.replaceFirst("/+$", "").endsWith("/v1");
-    }
-
-    private final class CapturingResponseErrorHandler extends DefaultResponseErrorHandler
-    {
-        @Override
-        public void handleError(URI url, HttpMethod method, ClientHttpResponse response) throws IOException
-        {
-            byte[] bytes = response.getBody().readNBytes(DIAGNOSTIC_LIMIT_BYTES + 1);
-            boolean truncated = bytes.length > DIAGNOSTIC_LIMIT_BYTES;
-            if (truncated) bytes = java.util.Arrays.copyOf(bytes, DIAGNOSTIC_LIMIT_BYTES);
-            int status = response.getStatusCode().value();
-            throw new ProviderCallException("Provider returned HTTP " + status,
-                    httpFailure(status, response.getHeaders().getFirst("Retry-After"), bytes, truncated));
         }
     }
 

@@ -70,7 +70,7 @@ public final class ExecutionConfigurationParser
                             for (var header : object(field.getValue(), fieldPath).entrySet())
                                 flat.put(path + ".headers[" + header.getKey() + "]", reference(header.getValue(), fieldPath + "." + header.getKey(), environment, supplied, used, resolveReferences));
                         }
-                        case "openai" -> flattenObject(object(field.getValue(), fieldPath), Set.of("compatibility-profile", "organization-id", "project-id"), fieldPath, flat);
+                        case "openai" -> flattenObject(object(field.getValue(), fieldPath), Set.of("organization-id", "project-id"), fieldPath, flat);
                         case "gemini" -> {
                             Map<String, Object> gemini = object(field.getValue(), fieldPath);
                             keys(gemini, Set.of("vertex-ai", "project-id", "location", "credentials-ref", "credentials-json-ref"), fieldPath);

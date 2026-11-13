@@ -160,7 +160,7 @@ class SkillAdmissionSnapshotTest {
         var properties = new LoomspanProperties();
         properties.getSkills().setLocations(List.of("classpath:/publication-no-files/*.yaml"));
         var javaSkills = mock(SkillMethodBeanPostProcessor.class); when(javaSkills.capabilities()).thenReturn(List.of());
-        var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties), inputs, properties, null, SkillReloaderTest::runtime);
+        var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties), inputs, properties, new org.springframework.mock.env.MockEnvironment().withProperty("fixture.key", "ollama"), SkillReloaderTest::runtime);
         manager.initializeStartup();
         var lifecycle = new FrameworkExecutionLifecycle(mock(ApplicationContext.class), Duration.ofMillis(100), Executors.newSingleThreadExecutor());
         var reloader = new DefaultSkillReloader(manager, lifecycle);

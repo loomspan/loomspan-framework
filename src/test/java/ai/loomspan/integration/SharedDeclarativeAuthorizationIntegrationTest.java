@@ -42,9 +42,9 @@ class SharedDeclarativeAuthorizationIntegrationTest {
     static void publish(SkillReloader reloader, List<SkillDocument> documents) {
         reloader.publish(reloader.prepare("default",documents,new ExecutionConfiguration("""
                 loomspan:
-                  connections: {local: {driver: ollama, base-url: 'http://localhost:11434'}}
+                  connections: {local: {driver: openai, api-key-ref: fixture.key, base-url: 'http://localhost:11434/v1'}}
                   models: {model: {connection: local, provider-model: fixture}}
-                """)));
+                """), Map.of("fixture.key", "ollama")));
     }
     static void restored(ExecutorService worker, SecurityContext sentinel, SecurityContext caller) throws Exception {
         assertThat(worker.submit(SecurityContextHolder::getContext).get(5,TimeUnit.SECONDS)).isSameAs(sentinel);

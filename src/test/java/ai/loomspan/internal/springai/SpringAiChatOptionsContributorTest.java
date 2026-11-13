@@ -7,8 +7,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
-import org.springframework.ai.ollama.api.OllamaChatOptions;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,9 +18,9 @@ class SpringAiChatOptionsContributorTest
     @Test
     void providerOptionContributorsApplyImmutableTargetOptions()
     {
-        OpenAiChatOptions firstOpenAi = (OpenAiChatOptions) contributor.createOptions(configuration(
+        OpenAiResponsesChatOptions firstOpenAi = (OpenAiResponsesChatOptions) contributor.createOptions(configuration(
                 AiDriver.OPENAI, "openai/gpt-5", "high")).build();
-        OpenAiChatOptions secondOpenAi = (OpenAiChatOptions) contributor.createOptions(configuration(
+        OpenAiResponsesChatOptions secondOpenAi = (OpenAiResponsesChatOptions) contributor.createOptions(configuration(
                 AiDriver.OPENAI, "openai/gpt-4.1", null)).build();
 
         assertThat(firstOpenAi.getModel()).isEqualTo("openai/gpt-5");
@@ -42,8 +41,8 @@ class SpringAiChatOptionsContributorTest
         assertThat(gemini.getIncludeThoughts()).isTrue();
         assertThat(gemini.getThinkingBudget()).isEqualTo(1024);
 
-        OllamaChatOptions ollama = (OllamaChatOptions) contributor.createOptions(configuration(
-                AiDriver.OLLAMA, "qwen3:8b", null)).build();
+        OpenAiResponsesChatOptions ollama = (OpenAiResponsesChatOptions) contributor.createOptions(configuration(
+                AiDriver.OPENAI, "qwen3:8b", null)).build();
         assertThat(ollama.getModel()).isEqualTo("qwen3:8b");
     }
 

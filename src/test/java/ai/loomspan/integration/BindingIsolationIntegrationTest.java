@@ -61,7 +61,7 @@ class BindingIsolationIntegrationTest {
                 @Override public MockResponse dispatch(RecordedRequest request) {
                     try {
                         JsonNode wire = JSON.readTree(request.getBody().readUtf8());
-                        String system = wire.path("messages").get(0).path("content").asText();
+                        String system = ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan")) {
                             var first = task("producer", List.of()); first.put("parallelGroup", "sources");
                             var second = task("secondProducer", List.of()); second.put("parallelGroup", "sources");
@@ -133,7 +133,7 @@ class BindingIsolationIntegrationTest {
                 @Override public MockResponse dispatch(RecordedRequest request) {
                     try {
                         JsonNode wire = JSON.readTree(request.getBody().readUtf8());
-                        String system = wire.path("messages").get(0).path("content").asText();
+                        String system = ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan"))
                             return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-04T00:00:00Z",
                                     "status", "VALID", "tasks", List.of(task("producer", List.of()), task("consumer", List.of("producer"))))));
@@ -183,7 +183,7 @@ class BindingIsolationIntegrationTest {
                 @Override public MockResponse dispatch(RecordedRequest request) {
                     try {
                         JsonNode wire = JSON.readTree(request.getBody().readUtf8());
-                        String system = wire.path("messages").get(0).path("content").asText();
+                        String system = ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan")) {
                             boolean isOuter = system.contains("OUTER_ONLY");
                             String owner = isOuter || !nested ? "root" : "middle";
@@ -338,9 +338,6 @@ class BindingIsolationIntegrationTest {
         catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new AssertionError(ex); }
     }
     private static MockResponse response(String content) {
-        return new MockResponse().setHeader("Content-Type", "application/json").setBody(JSON.writeValueAsString(Map.of("id", "local",
-                "object", "chat.completion", "created", 1, "model", "deterministic", "choices", List.of(Map.of("index", 0,
-                "message", Map.of("role", "assistant", "content", content), "finish_reason", "stop")),
-                "usage", Map.of("prompt_tokens", 1, "completion_tokens", 1, "total_tokens", 2))));
+        return ai.loomspan.testkit.ResponsesFixtures.text(content);
     }
 }

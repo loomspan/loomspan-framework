@@ -68,7 +68,7 @@ class SpringAiChatClientAssemblerIntegrationTest
             assertThat(harness.toolExecutions).hasValue(2);
             assertThat(harness.session.getSessionUsage().orElseThrow().providerAttempts()).isEqualTo(4);
             var tools = JSON.readTree(server.takeRequest().getBody().readUtf8()).path("tools");
-            assertThat(tools).extracting(tool -> tool.path("function").path("name").asString())
+            assertThat(tools).extracting(tool -> tool.path("name").asString())
                     .containsExactlyInAnyOrder("tax-lookup", PlannerInabilityTool.NAME);
         }
     }
@@ -104,7 +104,7 @@ class SpringAiChatClientAssemblerIntegrationTest
             var request = JSON.readTree(server.takeRequest().getBody().readUtf8());
             var tools = request.path("tools");
             assertThat(tools.size()).isOne();
-            var function = tools.get(0).path("function");
+            var function = tools.get(0);
             assertThat(function.path("name").asText()).isEqualTo("loomspan_cannot_complete");
             var parameters = function.path("parameters");
             assertThat(parameters.path("properties").path("reason").path("type").asText()).isEqualTo("string");
@@ -117,7 +117,7 @@ class SpringAiChatClientAssemblerIntegrationTest
     }
 
     @ParameterizedTest
-    @EnumSource(value = AiDriver.class, names = {"OPENAI", "ANTHROPIC", "GEMINI", "OLLAMA"})
+    @EnumSource(value = AiDriver.class, names = {"OPENAI", "ANTHROPIC", "GEMINI"})
     void standardControlWorksWithEachRealAdapter(AiDriver driver) throws Exception
     {
         try (MockWebServer server = new MockWebServer())
@@ -156,7 +156,6 @@ class SpringAiChatClientAssemblerIntegrationTest
                     }
                     case ANTHROPIC -> assertThat(call.path("id").asString()).isEqualTo("signal");
                     case GEMINI -> assertThat(call.path("id").asString()).isEmpty();
-                    case OLLAMA -> assertThat(call.path("id").isNull()).isTrue();
                     default -> throw new AssertionError(driver);
                 }
                 assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
@@ -197,7 +196,7 @@ class SpringAiChatClientAssemblerIntegrationTest
             {
                 var wire = JSON.readTree(server.takeRequest().getBody().readUtf8());
                 assertThat(wire.path("tools").size()).isZero();
-                assertThat(wire.path("messages").get(0).path("content").asString()).isEqualTo("system");
+                assertThat(wire.path("instructions").asString()).isEqualTo("system");
             }
             assertThat(server.getRequestCount()).isEqualTo(2);
         }
@@ -210,12 +209,12 @@ class SpringAiChatClientAssemblerIntegrationTest
         try (MockWebServer server = new MockWebServer())
         {
             String arguments = mixed ? "{\"reason\":\"blocked\"}" : "{ invalid JSON \r\n  ";
-            var choices = new ArrayList<Map<String, Object>>();
-            if (mixed) choices.add(openAiChoice(0, "tax-lookup", "same-id", "  {}\r\n"));
-            choices.add(openAiChoice(choices.size(), PlannerInabilityTool.NAME, "same-id", arguments));
+            var outputItems = new ArrayList<Map<String, Object>>();
+            if (mixed) outputItems.add(openAiToolItem(0, "tax-lookup", "same-id", "  {}\r\n"));
+            outputItems.add(openAiToolItem(outputItems.size(), PlannerInabilityTool.NAME, "same-id", arguments));
             server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody(JSON.writeValueAsString(Map.of(
-                    "id", "tool", "object", "chat.completion", "created", 1, "model", "gpt-test", "choices", choices,
-                    "usage", Map.of("prompt_tokens", 1, "completion_tokens", 1, "total_tokens", 2)))));
+                    "id", "tool", "object", "response", "created_at", 1, "model", "gpt-test", "output", outputItems,
+                    "status", "completed", "usage", Map.of("input_tokens", 1, "output_tokens", 1, "total_tokens", 2)))));
             Harness harness = harness(server, true);
 
             assertThatThrownBy(() -> harness.call(ModelInteractionMode.STANDARD)).isInstanceOf(IllegalArgumentException.class)
@@ -234,14 +233,15 @@ class SpringAiChatClientAssemblerIntegrationTest
             assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.MODEL_RESPONSE_RECEIVED)
                     .singleElement().satisfies(response -> {
                         var generations = response.data().path("generations");
-                        assertThat(generations.size()).isEqualTo(choices.size());
+                        assertThat(generations.size()).isOne();
+                        assertThat(generations.get(0).path("toolCalls").size()).isEqualTo(outputItems.size());
                         assertThat(generations).allSatisfy(generation -> {
                             assertThat(generation.path("text").asString()).isEmpty();
                             assertThat(generation.path("toolCalls").get(0).path("id").asString()).isEqualTo("same-id");
                         });
                         if (mixed) assertThat(generations.get(0).path("toolCalls").get(0).path("arguments").asString())
                                 .isEqualTo("  {}\r\n");
-                        assertThat(generations.get(choices.size() - 1).path("toolCalls").get(0).path("arguments").asString())
+                        assertThat(generations.get(0).path("toolCalls").get(outputItems.size() - 1).path("arguments").asString())
                                 .isEqualTo(arguments);
                     });
         }
@@ -332,11 +332,9 @@ class SpringAiChatClientAssemblerIntegrationTest
         }
     }
 
-    private static Map<String, Object> openAiChoice(int index, String name, String id, String arguments)
+    private static Map<String, Object> openAiToolItem(int index, String name, String id, String arguments)
     {
-        return Map.of("index", index, "message", Map.of("role", "assistant", "content", "", "tool_calls", List.of(
-                Map.of("id", id, "type", "function", "function", Map.of("name", name, "arguments", arguments)))),
-                "finish_reason", "tool_calls");
+        return ai.loomspan.testkit.ResponsesFixtures.functionCall(name, id, arguments);
     }
 
     private static void assertNativeControl(AiDriver driver, JsonNode wire)
@@ -345,7 +343,7 @@ class SpringAiChatClientAssemblerIntegrationTest
         assertThat(tools.size()).isOne();
         var definition = switch (driver)
         {
-            case OPENAI, OLLAMA -> tools.get(0).path("function");
+            case OPENAI -> tools.get(0);
             case ANTHROPIC -> tools.get(0);
             case GEMINI -> tools.get(0).path("functionDeclarations").get(0);
             default -> throw new AssertionError(driver);
@@ -355,7 +353,7 @@ class SpringAiChatClientAssemblerIntegrationTest
         var schema = definition.path(driver == AiDriver.ANTHROPIC ? "input_schema" : "parameters");
         assertThat(schema.path("properties").path("reason").path("type").asString()).isEqualToIgnoringCase("string");
         assertThat(schema.path("required")).extracting(JsonNode::asString).containsExactly("reason");
-        if (driver == AiDriver.OPENAI || driver == AiDriver.OLLAMA)
+        if (driver == AiDriver.OPENAI)
         {
             assertThat(schema.path("additionalProperties").isBoolean()).isTrue();
             assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
@@ -368,12 +366,9 @@ class SpringAiChatClientAssemblerIntegrationTest
         String quoted = JSON.writeValueAsString(value);
         String body = switch (driver)
         {
-            case OPENAI -> signal ? """
-                    {"id":"tool","object":"chat.completion","created":1,"model":"gpt-test",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"OK: accompanying text",
-                      "tool_calls":[{"id":"signal","type":"function","function":{"name":"%s","arguments":%s}}]},"finish_reason":"tool_calls"}],
-                     "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-                    """.formatted(name, quoted) : null;
+            case OPENAI -> signal ? ai.loomspan.testkit.ResponsesFixtures.body("tool", "gpt-test", List.of(
+                    ai.loomspan.testkit.ResponsesFixtures.textItem("OK: accompanying text"),
+                    ai.loomspan.testkit.ResponsesFixtures.functionCall(name, "signal", value))) : null;
             case ANTHROPIC -> """
                     {"id":"msg_1","type":"message","role":"assistant","model":"gpt-test","content":[%s],
                      "stop_reason":"%s","stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":1}}
@@ -384,11 +379,6 @@ class SpringAiChatClientAssemblerIntegrationTest
                      "usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":1,"totalTokenCount":2}}
                     """.formatted(signal ? "{\"functionCall\":{\"name\":\"%s\",\"args\":%s}}".formatted(name, value)
                             : "{\"text\":%s}".formatted(quoted));
-            case OLLAMA -> """
-                    {"model":"gpt-test","created_at":"2026-07-14T00:00:00Z","message":{"role":"assistant",%s},
-                     "done":true,"done_reason":"stop","prompt_eval_count":1,"eval_count":1}
-                    """.formatted(signal ? "\"content\":\"\",\"tool_calls\":[{\"function\":{\"name\":\"%s\",\"arguments\":%s}}]".formatted(name, value)
-                            : "\"content\":%s".formatted(quoted));
             default -> throw new AssertionError(driver);
         };
         return body == null ? text(value) : new MockResponse().setHeader("Content-Type", "application/json").setBody(body);
@@ -500,19 +490,14 @@ class SpringAiChatClientAssemblerIntegrationTest
     private static MockResponse toolCallArguments(String id, String arguments)
     {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"tool","object":"chat.completion","created":1,"model":"gpt-test",
-                 "choices":[{"index":0,"message":{"role":"assistant","content":null,
-                  "tool_calls":[{"id":"%s","type":"function","function":{"name":"Tax-lookup","arguments":"%s"}}]},"finish_reason":"tool_calls"}],
-                 "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                {"id":"tool","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"%s","name":"Tax-lookup","arguments":"%s","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(id, arguments));
     }
 
     private static MockResponse text(String value)
     {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"text","object":"chat.completion","created":1,"model":"gpt-test",
-                 "choices":[{"index":0,"message":{"role":"assistant","content":"%s"},"finish_reason":"stop"}],
-                 "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                {"id":"text","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"%s","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(value));
     }
 }

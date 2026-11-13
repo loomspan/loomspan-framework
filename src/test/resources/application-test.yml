@@ -10,8 +10,9 @@ loomspan:
       driver: gemini
       api-key: test-gemini-key
     ollama-main:
-      driver: ollama
-      base-url: http://localhost:11434
+      driver: openai
+      base-url: http://localhost:11434/v1
+      api-key: ollama
   models:
     gpt-5:
       connection: openai-main

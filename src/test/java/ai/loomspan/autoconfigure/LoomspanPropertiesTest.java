@@ -50,11 +50,9 @@ class LoomspanPropertiesTest {
                             .hasStackTraceContaining("loomspan.connections.named.request-timeout")
                             .hasMessageNotContaining("credential-secret-sentinel"));
         bindingRunner.withPropertyValues("loomspan.connections.named.driver=ollama",
-                "loomspan.connections.named.base-url=http://localhost:11434",
-                "loomspan.connections.named.request-timeout=1s").run(context ->
-                assertThat(context.getStartupFailure()).rootCause()
-                        .hasMessageContaining("loomspan.connections.named.request-timeout")
-                        .hasMessageContaining("not supported for driver OLLAMA"));
+                "loomspan.connections.named.base-url=http://localhost:11434/v1")
+                .run(context -> assertThat(context.getStartupFailure()).isNotNull()
+                        .hasStackTraceContaining("loomspan.connections.named.driver"));
     }
 
     @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
@@ -79,15 +77,6 @@ class LoomspanPropertiesTest {
                     .hasMessageContaining("loomspan.connections.named.request-timeout")
                     .hasMessageContaining("whole-millisecond").hasMessageNotContaining("secret-sentinel");
         }
-        connection.setDriver(AiDriver.OLLAMA);
-        connection.setApiKey(null);
-        connection.setBaseUrl("http://localhost:11434");
-        connection.setRequestTimeout(java.time.Duration.ofSeconds(1));
-        assertThatThrownBy(properties::afterPropertiesSet)
-                .hasMessageContaining("loomspan.connections.named.request-timeout")
-                .hasMessageContaining("not supported for driver OLLAMA");
-        connection.setRequestTimeout(null);
-        assertThatCode(properties::afterPropertiesSet).doesNotThrowAnyException();
     }
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
@@ -175,19 +164,16 @@ class LoomspanPropertiesTest {
     }
 
     @Test
-    void bindsExplicitOpenRouterProfileAndProviderRetryDefaults()
+    void bindsSharedOpenAiConnectionAndProviderRetryDefaults()
     {
         contextRunner.withPropertyValues(
                 "loomspan.connections.openrouter.driver=openai",
-                "loomspan.connections.openrouter.api-key=test-key",
-                "loomspan.connections.openrouter.openai.compatibility-profile=openrouter")
+                "loomspan.connections.openrouter.api-key=test-key")
                 .run(context ->
                 {
                     assertThat(context).hasNotFailed();
                     LoomspanProperties properties = context.getBean(LoomspanProperties.class);
                     LoomspanProperties.ConnectionProperties connection = properties.getConnections().get("openrouter");
-                    assertThat(connection.getOpenai().getCompatibilityProfile())
-                            .isEqualTo(LoomspanProperties.OpenAiCompatibilityProfile.OPENROUTER);
                     assertThat(connection.getProviderRetry().isEnabled()).isTrue();
                     assertThat(connection.getProviderRetry().getMaxAttempts()).isEqualTo(3);
                     assertThat(connection.getProviderRetry().getInitialBackoff()).isEqualTo(java.time.Duration.ofMillis(500));
@@ -202,6 +188,7 @@ class LoomspanPropertiesTest {
     void rejectsRemovedProviderFieldsWithTheirFullPaths()
     {
         for (String removed : java.util.List.of(
+                "openai.compatibility-profile=openrouter",
                 "openai.chat-" + "completions-path=/custom/chat/completions",
                 "anthropic." + "completions-path=/custom/messages",
                 "anthropic." + "version=2026-01-01",
@@ -243,19 +230,19 @@ class LoomspanPropertiesTest {
     void validatesDriverSpecificFieldsAndRedactsSensitiveConnectionValues() {
         LoomspanProperties properties = new LoomspanProperties();
         LoomspanProperties.ConnectionProperties connection = new LoomspanProperties.ConnectionProperties();
-        connection.setDriver(AiDriver.OLLAMA);
+        connection.setDriver(AiDriver.GEMINI);
         connection.setBaseUrl("https://secret-endpoint.example");
         connection.setApiKey("secret-api-key");
         connection.setHeaders(java.util.Map.of("X-Secret", "secret-header-value"));
         properties.setConnections(java.util.Map.of("local", connection));
 
         assertThatThrownBy(properties::afterPropertiesSet)
-                .hasMessageContaining("loomspan.connections.local.api-key")
+                .hasMessageContaining("loomspan.connections.local.base-url")
                 .hasMessageNotContaining("secret-api-key")
                 .hasMessageNotContaining("secret-header-value")
                 .hasMessageNotContaining("secret-endpoint.example");
 
-        connection.setApiKey(null);
+        connection.setBaseUrl(null);
         assertThatThrownBy(properties::afterPropertiesSet)
                 .hasMessageContaining("loomspan.connections.local.headers")
                 .hasMessageNotContaining("secret-header-value")
@@ -277,18 +264,6 @@ class LoomspanPropertiesTest {
                 .hasMessageContaining("loomspan.connections.internal.base-url")
                 .hasMessageContaining("not supported for driver GEMINI")
                 .hasMessageNotContaining("internal-gemini.example");
-
-        LoomspanProperties.ConnectionProperties ollama = new LoomspanProperties.ConnectionProperties();
-        ollama.setDriver(AiDriver.OLLAMA);
-        ollama.setBaseUrl("http://localhost:11434");
-        ollama.setApiKey("ignored-secret");
-
-        LoomspanProperties ollamaProperties = new LoomspanProperties();
-        ollamaProperties.setConnections(java.util.Map.of("local", ollama));
-        assertThatThrownBy(ollamaProperties::afterPropertiesSet)
-                .hasMessageContaining("loomspan.connections.local.api-key")
-                .hasMessageContaining("not supported for driver OLLAMA")
-                .hasMessageNotContaining("ignored-secret");
     }
 
     @Test
@@ -306,19 +281,12 @@ class LoomspanPropertiesTest {
             assertThatCode(properties::afterPropertiesSet).doesNotThrowAnyException();
         }
 
-        for (AiDriver driver : java.util.List.of(AiDriver.GEMINI, AiDriver.OLLAMA))
+        for (AiDriver driver : java.util.List.of(AiDriver.GEMINI))
         {
             LoomspanProperties.ConnectionProperties connection = new LoomspanProperties.ConnectionProperties();
             connection.setDriver(driver);
             connection.setHeaders(java.util.Map.of("X-Provider-Feature", "enabled"));
-            if (driver == AiDriver.GEMINI)
-            {
-                connection.setApiKey("test-key");
-            }
-            else
-            {
-                connection.setBaseUrl("http://localhost:11434");
-            }
+            connection.setApiKey("test-key");
 
             LoomspanProperties properties = new LoomspanProperties();
             properties.setConnections(java.util.Map.of(driver.name().toLowerCase(), connection));

@@ -191,7 +191,6 @@ public class LoomspanProperties implements InitializingBean
         Duration timeout = connection.getRequestTimeout();
         if (timeout == null) return;
         String path = connectionPath + ".request-timeout";
-        if (driver == AiDriver.OLLAMA) throw invalid(path, "is not supported for driver OLLAMA");
         if (timeout.compareTo(Duration.ofMillis(1)) < 0
                 || timeout.compareTo(Duration.ofMillis(Integer.MAX_VALUE)) > 0
                 || timeout.getNano() % 1_000_000 != 0)
@@ -203,10 +202,6 @@ public class LoomspanProperties implements InitializingBean
         if (StringUtils.hasText(connection.getBaseUrl()) && driver == AiDriver.GEMINI)
         {
             throw invalid(path + ".base-url", "is not supported for driver GEMINI");
-        }
-        if (StringUtils.hasText(connection.getApiKey()) && driver == AiDriver.OLLAMA)
-        {
-            throw invalid(path + ".api-key", "is not supported for driver OLLAMA");
         }
         if (connection.getOpenai() != null && driver != AiDriver.OPENAI)
         {
@@ -237,7 +232,6 @@ public class LoomspanProperties implements InitializingBean
                     }
                 }
             }
-            case OLLAMA -> requireText(connection.getBaseUrl(), path + ".base-url", driver);
             case GEMINI -> validateGeminiMode(path, connection);
         }
     }
@@ -518,24 +512,12 @@ public class LoomspanProperties implements InitializingBean
 
     public static class OpenAiOptions
     {
-        @NotNull private OpenAiCompatibilityProfile compatibilityProfile = OpenAiCompatibilityProfile.STANDARD;
         private String organizationId;
         private String projectId;
         public String getOrganizationId() { return organizationId; }
         public void setOrganizationId(String organizationId) { this.organizationId = organizationId; }
         public String getProjectId() { return projectId; }
         public void setProjectId(String projectId) { this.projectId = projectId; }
-        public OpenAiCompatibilityProfile getCompatibilityProfile() { return compatibilityProfile; }
-        public void setCompatibilityProfile(OpenAiCompatibilityProfile value)
-        {
-            compatibilityProfile = value == null ? OpenAiCompatibilityProfile.STANDARD : value;
-        }
-    }
-
-    public enum OpenAiCompatibilityProfile
-    {
-        STANDARD,
-        OPENROUTER
     }
 
     public static class ProviderRetryProperties

@@ -153,7 +153,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
         try (MockWebServer server = new MockWebServer()) {
             server.setDispatcher(new Dispatcher() { @Override public MockResponse dispatch(RecordedRequest request) {
                 try {
-                    String system = JSON.readTree(request.getBody().readUtf8()).path("messages").get(0).path("content").asText();
+                    String system = ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(request.getBody().readUtf8())).get(0).path("content").asText();
                     if(system.contains("EXACT_PRODUCER")) return response(EXACT);
                     if (system.contains("Create an ordered flight plan")) {
                         int attempt = plans.incrementAndGet();
@@ -203,9 +203,6 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
         return Map.of("taskId",name,"title",name,"status","PENDING","capabilityName","default-" + name,"intent","work","dependsOn",List.of(),"expectedOutputs",List.of("result"));
     }
     private static MockResponse response(String content) {
-        return new MockResponse().setHeader("Content-Type","application/json").setBody(JSON.writeValueAsString(Map.of(
-                "id","test","object","chat.completion","created",1,"model","deterministic",
-                "choices",List.of(Map.of("index",0,"message",Map.of("role","assistant","content",content),"finish_reason","stop")),
-                "usage",Map.of("prompt_tokens",1,"completion_tokens",1,"total_tokens",2))));
+        return ai.loomspan.testkit.ResponsesFixtures.text(content);
     }
 }

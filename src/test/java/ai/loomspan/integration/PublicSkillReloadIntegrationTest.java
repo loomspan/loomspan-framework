@@ -62,7 +62,6 @@ class PublicSkillReloadIntegrationTest
                             "loomspan.connections.candidate.base-url=" + server.url("/v1"),
                             "loomspan.connections.candidate.api-key=local-fake-key",
                             "loomspan.connections.candidate.request-timeout=" + (expires ? "1s" : "4s"),
-                            "loomspan.connections.candidate.openai.compatibility-profile=openrouter",
                             "loomspan.connections.candidate.provider-retry.max-attempts=1",
                             "loomspan.models.selected.connection=candidate",
                             "loomspan.models.selected.provider-model=compact",
@@ -90,11 +89,8 @@ class PublicSkillReloadIntegrationTest
         try (MockWebServer first = new MockWebServer(); MockWebServer second = new MockWebServer())
         {
             first.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                    {"id":"tool","object":"chat.completion","created":1,"model":"compact",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":null,
-                       "tool_calls":[{"id":"child-call","type":"function","function":{"name":"default-child","arguments":"{}"}}]},
-                       "finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-                    """));
+                {"id":"tool","object":"response","created_at":1,"model":"compact","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"child-call","name":"default-child","arguments":"{}","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                """));
             first.enqueue(modelResponse("too-late").setHeadersDelay(3000, java.util.concurrent.TimeUnit.MILLISECONDS));
             first.enqueue(modelResponse("child-return").setHeadersDelay(1500, java.util.concurrent.TimeUnit.MILLISECONDS));
             first.enqueue(modelResponse("old-tree-finished"));
@@ -298,8 +294,7 @@ class PublicSkillReloadIntegrationTest
     private static ExecutionConfiguration timeoutConfiguration(MockWebServer server, String timeout, int attempts)
     {
         return new ExecutionConfiguration(candidateConfiguration(server, "candidate.key", attempts).yaml()
-                .replace("driver: openai", "driver: openai\n      request-timeout: " + timeout
-                        + "\n      openai:\n        compatibility-profile: openrouter"));
+                .replace("driver: openai", "driver: openai\n      request-timeout: " + timeout));
     }
     @Test
     void publicHostMapPublishesReplacementKeysWithoutDeploymentProperties(@TempDir Path directory) throws Exception
@@ -427,9 +422,7 @@ class PublicSkillReloadIntegrationTest
     private static MockResponse modelResponse(String content)
     {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"candidate","object":"chat.completion","created":1,"model":"compact",
-                 "choices":[{"index":0,"message":{"role":"assistant","content":"%s"},"finish_reason":"stop"}],
-                 "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                {"id":"candidate","object":"response","created_at":1,"model":"compact","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"%s","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(content));
     }
 
@@ -466,10 +459,8 @@ class PublicSkillReloadIntegrationTest
         try (MockWebServer server = new MockWebServer())
         {
             server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                    {"id":"candidate","object":"chat.completion","created":1,"model":"candidate-model",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"candidate"},"finish_reason":"stop"}],
-                     "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-                    """));
+                {"id":"candidate","object":"response","created_at":1,"model":"candidate-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"candidate","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                """));
             String document = "name: candidateSkill\ndescription: candidate skill\nmodel: candidate-model\nplanning_mode: false\n";
             ExecutionConfiguration configuration = new ExecutionConfiguration("""
                     loomspan:
@@ -635,10 +626,8 @@ class PublicSkillReloadIntegrationTest
         try (MockWebServer server = new MockWebServer())
         {
             server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                    {"id":"done","object":"chat.completion","created":1,"model":"integration-model",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"done"},"finish_reason":"stop"}],
-                     "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-                    """));
+                {"id":"done","object":"response","created_at":1,"model":"integration-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"done","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                """));
             new ApplicationContextRunner()
                     .withConfiguration(AutoConfigurations.of(
                             ConfigurationPropertiesAutoConfiguration.class,

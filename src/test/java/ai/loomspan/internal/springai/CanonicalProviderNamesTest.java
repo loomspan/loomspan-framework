@@ -15,14 +15,13 @@ import static org.assertj.core.api.Assertions.*;
 
 class CanonicalProviderNamesTest {
     @ParameterizedTest
-    @EnumSource(value=AiDriver.class,names={"OPENAI","ANTHROPIC","GEMINI","OLLAMA"})
+    @EnumSource(value=AiDriver.class,names={"OPENAI","ANTHROPIC","GEMINI"})
     void sendsCanonicalIdentityUnchangedIncludingUnderscoresAndMaximumLength(AiDriver driver) throws Exception {
         try (var server = new MockWebServer()) {
             String response = switch(driver) {
-                case OPENAI -> "{\"id\":\"test\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"test\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}";
+                case OPENAI -> "{\"id\":\"test\",\"object\":\"response\",\"created_at\":1,\"model\":\"test\",\"status\":\"completed\",\"output\":[{\"id\":\"msg_0\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"ok\",\"annotations\":[]}]}],\"usage\":{\"input_tokens\":1,\"output_tokens\":1,\"total_tokens\":2}}";
                 case ANTHROPIC -> "{\"id\":\"test\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"test\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}";
                 case GEMINI -> "{\"modelVersion\":\"test\",\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ok\"}],\"role\":\"model\"},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":1,\"candidatesTokenCount\":1,\"totalTokenCount\":2}}";
-                case OLLAMA -> "{\"model\":\"test\",\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"done\":true,\"done_reason\":\"stop\",\"prompt_eval_count\":1,\"eval_count\":1}";
                 default -> throw new IllegalArgumentException();
             };
             server.enqueue(new MockResponse().setHeader("Content-Type","application/json").setBody(response));
@@ -33,7 +32,7 @@ class CanonicalProviderNamesTest {
                 model = org.springframework.ai.google.genai.GoogleGenAiChatModel.builder().genAiClient(client).build();
             } else {
                 var properties = new LoomspanProperties.ConnectionProperties(); properties.setDriver(driver);
-                properties.setApiKey(driver == AiDriver.OLLAMA ? null : "test-key"); properties.setBaseUrl(server.url("/").toString());
+                properties.setApiKey("test-key"); properties.setBaseUrl(server.url("/").toString());
                 model = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("test",properties).requireChatModel();
             }
             var names = List.of("a_b-c_d","n".repeat(32)+"-"+"x".repeat(31));

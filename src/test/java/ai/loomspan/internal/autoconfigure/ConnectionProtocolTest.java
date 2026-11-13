@@ -16,8 +16,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.ollama.api.OllamaChatOptions;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -28,25 +27,21 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 class ConnectionProtocolTest {
 
     @Test
-    void explicitOpenRouterProfileRejectsPartialErrorCompletionsBeforeDecoding() throws Exception {
+    void responsesFailureRetainsPartialEvidenceBeforeDecoding() throws Exception {
         try (MockWebServer server = new MockWebServer()) {
             server.enqueue(json("""
-                    {"id":"chatcmpl-error","object":"chat.completion","created":1,"model":"routed-model",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"unsafe partial content"},
-                       "finish_reason":"error","error":{"message":"upstream overloaded","code":"E_OVERLOAD",
-                       "metadata":{"error_type":"provider_overloaded"}}}]}
-                    """));
+                {"id":"chatcmpl-error","object":"response","created_at":1,"model":"routed-model","status":"failed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"unsafe partial content","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2},"error":{"message":"upstream overloaded","code":"E_OVERLOAD","metadata":{"error_type":"provider_overloaded"},"type":"provider_overloaded"}}
+                """));
             LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
             properties.setDriver(AiDriver.OPENAI);
             properties.setApiKey("gateway-key");
             properties.setBaseUrl(server.url("/api/v1").toString());
             LoomspanProperties.OpenAiOptions openAi = new LoomspanProperties.OpenAiOptions();
-            openAi.setCompatibilityProfile(LoomspanProperties.OpenAiCompatibilityProfile.OPENROUTER);
             properties.setOpenai(openAi);
             var runtime = integration().create("openrouter", properties);
 
             Throwable failure = catchThrowable(() -> runtime.chatModel().call(
-                    new Prompt("hello", OpenAiChatOptions.builder().model("routed-model").build())));
+                    new Prompt("hello", OpenAiResponsesChatOptions.builder().model("routed-model").build())));
             var details = runtime.failureTranslator().translate(failure);
 
             assertThat(server.getRequestCount()).isEqualTo(1);
@@ -63,22 +58,20 @@ class ConnectionProtocolTest {
     void openAiCompatibleBaseUrlEndingInV1DoesNotDuplicateTheVersionPath() throws Exception {
         try (MockWebServer server = new MockWebServer()) {
             server.enqueue(json("""
-                    {"id":"chatcmpl-1","object":"chat.completion","created":1,"model":"routed-model",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],
-                     "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-                    """));
+                {"id":"chatcmpl-1","object":"response","created_at":1,"model":"routed-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"ok","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                """));
             LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
             properties.setDriver(AiDriver.OPENAI);
             properties.setApiKey("gateway-key");
             properties.setBaseUrl(server.url("/api/v1").toString());
 
             var model = integration().create("gateway", properties).chatModel();
-            model.call(new Prompt("hello", OpenAiChatOptions.builder().model("routed-model").build()));
+            model.call(new Prompt("hello", OpenAiResponsesChatOptions.builder().model("routed-model").build()));
 
             RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(request).isNotNull();
             assertThat(server.getRequestCount()).isEqualTo(1);
-            assertThat(request.getPath()).isEqualTo("/api/v1/chat/completions");
+            assertThat(request.getPath()).isEqualTo("/api/v1/responses");
         }
     }
 
@@ -178,10 +171,8 @@ class ConnectionProtocolTest {
     void openAiConnectionUsesConfiguredPathCredentialsAndHeaders() throws Exception {
         try (MockWebServer server = new MockWebServer()) {
             server.enqueue(json("""
-                    {"id":"chatcmpl-1","object":"chat.completion","created":1,"model":"gpt-test",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],
-                     "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-                    """));
+                {"id":"chatcmpl-1","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"ok","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                """));
             LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
             properties.setDriver(AiDriver.OPENAI);
             properties.setApiKey("secret-key");
@@ -193,12 +184,12 @@ class ConnectionProtocolTest {
             properties.setOpenai(openAi);
 
             var model = integration().create("openai-main", properties).chatModel();
-            model.call(new Prompt("hello", OpenAiChatOptions.builder().model("gpt-test").build()));
+            model.call(new Prompt("hello", OpenAiResponsesChatOptions.builder().model("gpt-test").build()));
 
             RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(request).isNotNull();
             assertThat(server.getRequestCount()).isEqualTo(1);
-            assertThat(request.getPath()).isEqualTo("/chat/completions");
+            assertThat(request.getPath()).isEqualTo("/responses");
             assertThat(request.getHeader("Authorization")).isEqualTo("Bearer secret-key");
             assertThat(request.getHeader("X-Tenant")).isEqualTo("tenant-a");
             assertThat(request.getHeader("OpenAI-Organization")).isEqualTo("org-a");
@@ -208,24 +199,23 @@ class ConnectionProtocolTest {
     }
 
     @Test
-    void ollamaConnectionUsesNativeChatEndpoint() throws Exception {
+    void ollamaConnectionUsesSharedResponsesEndpoint() throws Exception {
         try (MockWebServer server = new MockWebServer()) {
             server.enqueue(json("""
-                    {"model":"qwen","created_at":"2026-07-14T00:00:00Z",
-                     "message":{"role":"assistant","content":"ok"},"done":true,"done_reason":"stop",
-                     "prompt_eval_count":1,"eval_count":1}
-                    """));
+                {"id":"resp_local","object":"response","created_at":1,"model":"qwen","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"ok","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                """));
             LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
-            properties.setDriver(AiDriver.OLLAMA);
-            properties.setBaseUrl(server.url("/").toString());
+            properties.setDriver(AiDriver.OPENAI);
+            properties.setApiKey("ollama");
+            properties.setBaseUrl(server.url("/v1").toString());
 
             var model = integration().create("ollama-local", properties).chatModel();
-            model.call(new Prompt("hello", OllamaChatOptions.builder().model("qwen").build()));
+            model.call(new Prompt("hello", OpenAiResponsesChatOptions.builder().model("qwen").build()));
 
             RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(request).isNotNull();
             assertThat(server.getRequestCount()).isEqualTo(1);
-            assertThat(request.getPath()).isEqualTo("/api/chat");
+            assertThat(request.getPath()).isEqualTo("/v1/responses");
             assertThat(request.getBody().readUtf8()).contains("\"model\":\"qwen\"");
         }
     }
@@ -237,12 +227,13 @@ class ConnectionProtocolTest {
                     .setHeader("Content-Type", "application/json")
                     .setBody("{\"error\":\"busy\"}"));
             LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
-            properties.setDriver(AiDriver.OLLAMA);
-            properties.setBaseUrl(server.url("/").toString());
+            properties.setDriver(AiDriver.OPENAI);
+            properties.setApiKey("ollama");
+            properties.setBaseUrl(server.url("/v1").toString());
             var runtime = integration().create("ollama-local", properties);
 
             Throwable failure = catchThrowable(() -> runtime.chatModel().call(
-                    new Prompt("hello", OllamaChatOptions.builder().model("qwen").build())));
+                    new Prompt("hello", OpenAiResponsesChatOptions.builder().model("qwen").build())));
             var details = runtime.failureTranslator().translate(failure);
 
             assertThat(server.getRequestCount()).isEqualTo(1);

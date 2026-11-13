@@ -12,7 +12,7 @@ public final class PublicationFixtures {
         return new ExecutionConfiguration("""
                 loomspan:
                   connections:
-                    connection: {driver: ollama, base-url: 'http://localhost:11434'}
+                    connection: {driver: openai, api-key-ref: fixture.key, base-url: 'http://localhost:11434/v1'}
                     native: {driver: typesafe, api-key-ref: fixture.key}
                   models:
                     model: {connection: connection, provider-model: provider-model, thinking-levels: [medium]}

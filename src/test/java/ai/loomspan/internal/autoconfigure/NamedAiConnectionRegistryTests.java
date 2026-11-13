@@ -68,7 +68,7 @@ class NamedAiConnectionRegistryTests {
         ChatModel model = mock(ChatModel.class, withSettings().extraInterfaces(DisposableBean.class));
         SpringAiProviderIntegration integration = mock(SpringAiProviderIntegration.class);
         LoomspanProperties.ConnectionProperties properties = connection("http://opaque.example");
-        ProviderConnectionRuntime opaque = ProviderConnectionRuntime.chat(model, AiDriver.OLLAMA,
+        ProviderConnectionRuntime opaque = ProviderConnectionRuntime.chat(model, AiDriver.OPENAI,
                 AttemptOwnership.OPAQUE_CLIENT_RETRIES,
                 ProviderRetryPolicy.from(properties.getProviderRetry()), ignored -> ProviderFailureDetails.unknown());
         when(integration.create("opaque", properties)).thenReturn(opaque);
@@ -81,7 +81,7 @@ class NamedAiConnectionRegistryTests {
         catch (Exception ex) { throw new AssertionError(ex); }
 
         properties.getProviderRetry().setEnabled(false);
-        ProviderConnectionRuntime disabled = ProviderConnectionRuntime.chat(model, AiDriver.OLLAMA,
+        ProviderConnectionRuntime disabled = ProviderConnectionRuntime.chat(model, AiDriver.OPENAI,
                 AttemptOwnership.OPAQUE_CLIENT_RETRIES,
                 ProviderRetryPolicy.from(properties.getProviderRetry()), ignored -> ProviderFailureDetails.unknown());
         when(integration.create("opaque", properties)).thenReturn(disabled);
@@ -216,14 +216,15 @@ class NamedAiConnectionRegistryTests {
     }
 
     private static ProviderConnectionRuntime runtime(ChatModel model) {
-        return ProviderConnectionRuntime.chat(model, AiDriver.OLLAMA, AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
+        return ProviderConnectionRuntime.chat(model, AiDriver.OPENAI, AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
                 ProviderRetryPolicy.from(new LoomspanProperties.ProviderRetryProperties()), ignored -> ProviderFailureDetails.unknown());
     }
 
     private static LoomspanProperties.ConnectionProperties connection(String baseUrl) {
         LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
-        properties.setDriver(AiDriver.OLLAMA);
+        properties.setDriver(AiDriver.OPENAI);
         properties.setBaseUrl(baseUrl);
+        properties.setApiKey("ollama");
         return properties;
     }
 

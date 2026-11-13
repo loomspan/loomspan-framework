@@ -168,8 +168,7 @@ class ExecutorApplicationIntegrationTest {
     }
 
     private static MockResponse tool(String name, String arguments, String id) {
-        return ExplicitJavaFailureHandlingIntegrationTest.response(Map.of("role", "assistant", "content", "", "tool_calls", List.of(
-                Map.of("id", id, "type", "function", "function", Map.of("name", name, "arguments", arguments)))), "tool_calls");
+        return ExplicitJavaFailureHandlingIntegrationTest.tool(name, id, arguments, "");
     }
 
     public static class ApplicationExecutors {

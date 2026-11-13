@@ -47,7 +47,7 @@
     {
       "name": "loomspan.connections.*.base-url",
       "type": "java.lang.String",
-      "description": "Optional driver service-root override; required for Ollama. OpenAI appends /chat/completions to the configured root, so include /v1 in the root when required by the service. Anthropic appends /v1/messages. Values are not emitted in Loomspan diagnostics."
+      "description": "Optional driver service-root override. OpenAI Responses appends /responses to the configured root, so include /v1 in the root when required by the service, including Ollama. Anthropic appends /v1/messages. Values are not emitted in Loomspan diagnostics."
     },
     {
       "name": "loomspan.connections.*.headers",
@@ -63,12 +63,6 @@
       "name": "loomspan.connections.*.openai.project-id",
       "type": "java.lang.String",
       "description": "OpenAI-only project header value."
-    },
-    {
-      "name": "loomspan.connections.*.openai.compatibility-profile",
-      "type": "ai.loomspan.autoconfigure.LoomspanProperties$OpenAiCompatibilityProfile",
-      "defaultValue": "standard",
-      "description": "Explicit OpenAI compatibility profile. OpenRouter error-completion decoding is enabled only by openrouter."
     },
     {
       "name": "loomspan.connections.*.provider-retry.enabled",
@@ -157,17 +151,15 @@
     {
       "name": "loomspan.connections.*.driver",
       "values": [
-        { "value": "openai" },
-        { "value": "anthropic" },
-        { "value": "gemini" },
-        { "value": "ollama" }
-      ]
-    },
-    {
-      "name": "loomspan.connections.*.openai.compatibility-profile",
-      "values": [
-        { "value": "standard" },
-        { "value": "openrouter" }
+        {
+          "value": "openai"
+        },
+        {
+          "value": "anthropic"
+        },
+        {
+          "value": "gemini"
+        }
       ]
     }
   ]

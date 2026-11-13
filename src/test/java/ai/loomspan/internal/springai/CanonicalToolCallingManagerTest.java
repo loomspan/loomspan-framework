@@ -113,6 +113,56 @@ class CanonicalToolCallingManagerTest {
         }
     }
 
+    @Test void unchangedCanonicalResponseRetainsMessageAndPartIdentity() {
+        var delegate = mock(ToolCallingManager.class);
+        var message = richMessage("tax-calculateTax");
+        var original = new ChatResponse(List.of(new Generation(message)));
+        var prompt = new Prompt("user", ToolCallingChatOptions.builder()
+                .toolCallbacks(callback("tax-calculateTax", new AtomicInteger())).build());
+        new CanonicalToolCallingManager(delegate).executeToolCalls(prompt, original);
+        var capture = org.mockito.ArgumentCaptor.forClass(ChatResponse.class);
+        verify(delegate).executeToolCalls(eq(prompt), capture.capture());
+        assertThat(capture.getValue()).isSameAs(original);
+        assertThat(capture.getValue().getResult().getOutput()).isSameAs(message);
+    }
+
+    @Test void canonicalRenameReplacesOnlyTheAttributedToolPart() {
+        var delegate = mock(ToolCallingManager.class);
+        var message = richMessage("Tax-calculateTax");
+        var original = new ChatResponse(List.of(new Generation(message)));
+        var prompt = new Prompt("user", ToolCallingChatOptions.builder()
+                .toolCallbacks(callback("tax-calculateTax", new AtomicInteger())).build());
+        new CanonicalToolCallingManager(delegate).executeToolCalls(prompt, original);
+        var capture = org.mockito.ArgumentCaptor.forClass(ChatResponse.class);
+        verify(delegate).executeToolCalls(eq(prompt), capture.capture());
+        var parts = capture.getValue().getResult().getOutput().getParts();
+        assertThat(parts).hasSize(message.getParts().size());
+        for (int i : List.of(0, 1, 3, 4)) assertThat(parts.get(i)).isSameAs(message.getParts().get(i));
+        var changed = (org.springframework.ai.chat.messages.part.ToolCallPart) parts.get(2);
+        var before = (org.springframework.ai.chat.messages.part.ToolCallPart) message.getParts().get(2);
+        assertThat(changed.toolCall().name()).isEqualTo("tax-calculateTax");
+        assertThat(changed.toolCall().id()).isEqualTo(before.toolCall().id());
+        assertThat(changed.toolCall().arguments()).isEqualTo(before.toolCall().arguments());
+        assertThat(changed.payload()).isSameAs(before.payload());
+        assertThat(changed.attributes()).isEqualTo(before.attributes());
+        assertThat(before.toolCall().name()).isEqualTo("Tax-calculateTax");
+    }
+
+    private static AssistantMessage richMessage(String name) {
+        var opaque = new org.springframework.ai.chat.messages.part.OpaquePayload(
+                "openai.responses", "encrypted_content", "opaque exact payload");
+        return AssistantMessage.builder().parts(List.of(
+                new org.springframework.ai.chat.messages.part.ReasoningPart(null, "summary", opaque,
+                        Map.of("id", "rs_1", "status", "completed")),
+                new org.springframework.ai.chat.messages.part.TextPart("commentary", null, Map.of("phase", "commentary")),
+                new org.springframework.ai.chat.messages.part.ToolCallPart(call(name, "{\"value\":null}"), opaque,
+                        Map.of("id", "fc_1", "status", "completed")),
+                new org.springframework.ai.chat.messages.part.UnknownPart("test", "future", "{\"exact\":1}", null,
+                        Map.of("future", "attribute")),
+                org.springframework.ai.chat.messages.part.MediaPart.of(org.springframework.ai.content.Media.builder()
+                        .mimeType(org.springframework.util.MimeType.valueOf("image/png")).data(new byte[]{1,2,3}).build()))).properties(Map.of("raw", name)).build();
+    }
+
     private static Generation generation(AssistantMessage.ToolCall... calls) {
         return new Generation(AssistantMessage.builder().content("accompanying text").toolCalls(List.of(calls)).build());
     }

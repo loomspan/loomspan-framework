@@ -238,11 +238,8 @@ class JavaSkillIntegrationTest
         try (var server = new MockWebServer())
         {
             server.enqueue(jsonResponse("""
-                    {"id":"child-call","object":"chat.completion","created":1,"model":"integration-model",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[
-                       {"id":"call1","type":"function","function":{"name":"default-securedEcho","arguments":"{\\"message\\":\\"child hello\\"}"}}
-                     ]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-                    """));
+                {"id":"child-call","object":"response","created_at":1,"model":"integration-model","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"call1","name":"default-securedEcho","arguments":"{\\"message\\":\\"child hello\\"}","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                """));
             server.enqueue(finalResponse());
             server.enqueue(finalResponse());
             AtomicInteger calls = new AtomicInteger();
@@ -298,9 +295,7 @@ class JavaSkillIntegrationTest
     private static MockResponse finalResponse()
     {
         return jsonResponse("""
-                {"id":"done","object":"chat.completion","created":1,"model":"integration-model",
-                 "choices":[{"index":0,"message":{"role":"assistant","content":"done"},"finish_reason":"stop"}],
-                 "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                {"id":"done","object":"response","created_at":1,"model":"integration-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"done","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """);
     }
 

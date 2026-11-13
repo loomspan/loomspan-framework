@@ -150,7 +150,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             server.setDispatcher(new Dispatcher() {
                 @Override public MockResponse dispatch(RecordedRequest request) {
                     sends.incrementAndGet();
-                    String system = JSON.readTree(request.getBody().readUtf8()).path("messages").get(0).path("content").asText();
+                    String system = ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(request.getBody().readUtf8())).get(0).path("content").asText();
                     assertThat(system).contains("Create an ordered flight plan");
                     if (scenario.equals("revoked")) revoked.set(true);
                     return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-04T00:00:00Z",
@@ -262,7 +262,7 @@ class DeclaredChildInputBindingsIntegrationTest {
                     try {
                         String body=request.getBody().readUtf8(); requests.add(body);
                         JsonNode wire=JSON.readTree(body);
-                        String system=wire.path("messages").get(0).path("content").asText();
+                        String system=ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan")) {
                             plannerCalls.incrementAndGet();
                             assertThat(system).contains("Declared child input dependencies", "exactly one", "Generate only inputs");
@@ -285,7 +285,7 @@ class DeclaredChildInputBindingsIntegrationTest {
                         }
                         assertThat(system).contains("CONSUMER");
                         consumerReasoningCalls.incrementAndGet();
-                        String user=wire.path("messages").get(wire.path("messages").size()-1).path("content").asText();
+                        String user=ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(ai.loomspan.testkit.ResponsesFixtures.transcript(wire).size()-1).path("content").asText();
                         int start=user.indexOf("{"); int end=user.lastIndexOf("}");
                         received.set(JSON.readValue(user.substring(start,end+1),Map.class));
                         return response("COMPLETE");
@@ -396,8 +396,6 @@ class DeclaredChildInputBindingsIntegrationTest {
         task.put("expectedOutputs",List.of("complete result"));task.put("parallelGroup",null);task.put("note","");return task;
     }
     private static MockResponse response(String content) {
-        return new MockResponse().setHeader("Content-Type","application/json").setBody(JSON.writeValueAsString(Map.of("id","local",
-                "object","chat.completion","created",1,"model","deterministic","choices",List.of(Map.of("index",0,
-                "message",Map.of("role","assistant","content",content),"finish_reason","stop")),"usage",Map.of("prompt_tokens",1,"completion_tokens",1,"total_tokens",2))));
+        return ai.loomspan.testkit.ResponsesFixtures.text(content);
     }
 }

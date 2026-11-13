@@ -273,7 +273,7 @@ ExecutionConfiguration execution = new ExecutionConfiguration("""
           connections:
             chat:
               driver: openai
-              base-url: https://api.openai.com
+              base-url: https://api.openai.com/v1
               api-key-ref: provider-key
           models:
             assistant: {connection: chat, provider-model: gpt-4.1-mini}
@@ -357,8 +357,11 @@ confidence do not establish judgment correctness or live parity between routes.
   Cloud hosts Framework directly; sidecar examples do not make sidecar a runtime
   dependency or select a Cloud authentication scheme.
 
-Model-backed skills need a named connection using the OpenAI, Anthropic, Gemini,
-or Ollama driver. Native TypeSafe leaves require the `typesafe` driver. Java leaves can execute without a framework model call.
+Model-backed skills need a named connection using the `openai`, `anthropic`, or `gemini` driver.
+The `openai` driver uses stateless Responses for OpenAI, Meta, OpenRouter and Ollama.
+Services must support `/responses`. For local Ollama, use an explicit root such as
+`http://127.0.0.1:11434/v1` and `api-key: ollama`; authenticated deployments use
+their actual credentials. Native TypeSafe leaves require the `typesafe` driver. Java leaves can execute without a framework model call.
 
 Loomspan is **in development**, with no deployments. Supported Java APIs and
 documented configuration can change, including breaking changes. Use documentation

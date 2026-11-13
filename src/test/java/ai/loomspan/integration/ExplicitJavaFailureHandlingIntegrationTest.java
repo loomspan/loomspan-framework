@@ -101,11 +101,11 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                     assertThat(traceFeedback.path("name").asString()).isEqualTo("default-child");
                     for (int turn = 0; turn < 3; turn++) server.takeRequest();
                     var wire = JSON.readTree(server.takeRequest().getBody().readUtf8());
-                    var messages = wire.path("messages");
+                    var messages = ai.loomspan.testkit.ResponsesFixtures.transcript(wire);
                     assertThat(messages.get(0).path("content").asString()).contains("ended unsuccessfully", "explanation and data",
                             "replay may be unsafe", "Repeating the same request does not address", "existing authority");
                     var feedback = messages.get(messages.size() - 1);
-                    assertThat(feedback.path("tool_call_id").asString()).isEqualTo("failed-call");
+                    assertThat(feedback.path("call_id").asString()).isEqualTo("failed-call");
                     assertThat(feedback.path("content").asString()).isEqualTo(traceFeedback.path("content").asString());
                     assertThat(JSON.readTree(feedback.path("content").asString())).isEqualTo(JSON.valueToTree(Map.of(
                             "status", "failed", "kind", "planner_inability", "correctionPermitted", true, "message", EXACT)));
@@ -146,9 +146,9 @@ class ExplicitJavaFailureHandlingIntegrationTest {
             });
             assertThat(server.getRequestCount()).isEqualTo(6);
             for (int turn = 0; turn < 5; turn++) server.takeRequest();
-            var messages = JSON.readTree(server.takeRequest().getBody().readUtf8()).path("messages");
+            var messages = ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(server.takeRequest().getBody().readUtf8()));
             var feedback = messages.get(messages.size() - 1);
-            assertThat(feedback.path("tool_call_id").asString()).isEqualTo("failed-call");
+            assertThat(feedback.path("call_id").asString()).isEqualTo("failed-call");
             assertThat(JSON.readTree(feedback.path("content").asString()).path("message").asString()).isEqualTo(EXACT);
         }
     }
@@ -223,9 +223,9 @@ class ExplicitJavaFailureHandlingIntegrationTest {
             assertThat(server.getRequestCount()).isEqualTo(4);
             for (int turn = 0; turn < 4; turn++) {
                 var wire = JSON.readTree(server.takeRequest().getBody().readUtf8());
-                assertThat(wire.path("tools")).extracting(tool -> tool.path("function").path("name").asString())
+                assertThat(wire.path("tools")).extracting(tool -> tool.path("name").asString())
                         .containsExactlyInAnyOrder("default-callable", "loomspan_cannot_complete");
-                assertThat(wire.path("messages").toString()).contains("image_url");
+                assertThat(wire.path("input").toString()).contains("image_url");
             }
         }
     }
@@ -390,9 +390,9 @@ class ExplicitJavaFailureHandlingIntegrationTest {
             assertThat(server.getRequestCount()).isEqualTo(requests);
             server.takeRequest();
             for (int turn = 1; turn < requests - 1; turn++) assertNoWireTools(server.takeRequest());
-            var messages = JSON.readTree(server.takeRequest().getBody().readUtf8()).path("messages");
+            var messages = ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(server.takeRequest().getBody().readUtf8()));
             var feedback = messages.get(messages.size() - 1);
-            assertThat(feedback.path("tool_call_id").asString()).isEqualTo("failed-call");
+            assertThat(feedback.path("call_id").asString()).isEqualTo("failed-call");
             assertThat(JSON.readTree(feedback.path("content").asString())).isEqualTo(JSON.valueToTree(Map.of(
                     "status", "failed", "kind", "planner_inability", "correctionPermitted", true, "message", EXACT)));
         }
@@ -444,16 +444,16 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                     requests.incrementAndGet();
                     try {
                         var wire = JSON.readTree(request.getBody().readUtf8());
-                        String system = wire.path("messages").get(0).path("content").asText();
+                        String system = ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan")) {
                             return text(JSON.writeValueAsString(Map.of("capabilityName", "default-step", "createdAt", "2026-11-01T00:00:00Z",
                                     "status", "VALID", "tasks", List.of(task(child)))));
                         }
                         if (system.contains("Exact capability/tool:")) return text(JSON.writeValueAsString(Map.of(
                                 "stepAction", "CALL_TOOL", "taskId", "child", "toolName", child, "toolArguments", Map.of())));
-                        for (var message : wire.path("messages")) {
+                        for (var message : ai.loomspan.testkit.ResponsesFixtures.transcript(wire)) {
                             if (message.path("role").asText().equals("tool")) {
-                                assertThat(message.path("tool_call_id").asText()).isEqualTo("failed-call");
+                                assertThat(message.path("call_id").asText()).isEqualTo("failed-call");
                                 feedback.set(message.path("content").asText());
                                 var data = JSON.readTree(feedback.get());
                                 assertThat(data.path("status").asText()).isEqualTo("failed");
@@ -746,17 +746,14 @@ class ExplicitJavaFailureHandlingIntegrationTest {
         assertThat(failure.metadata()).doesNotContainKey("causedByFailureId");
     }
     static MockResponse tool(String name, String id, String arguments, String content) {
-        return response(Map.of("role", "assistant", "content", content, "tool_calls", List.of(
-                Map.of("id", id, "type", "function", "function", Map.of("name", name, "arguments", arguments)))), "tool_calls");
+        var output = new java.util.ArrayList<Map<String,Object>>();
+        if (!content.isEmpty()) output.add(ai.loomspan.testkit.ResponsesFixtures.textItem(content));
+        output.add(ai.loomspan.testkit.ResponsesFixtures.functionCall(name, id, arguments));
+        return ai.loomspan.testkit.ResponsesFixtures.response("fixture", "fixture", output);
     }
     static MockResponse inability(String reason) {
         return tool("loomspan_cannot_complete", "signal", JSON.writeValueAsString(Map.of("reason", reason)), "Invalid candidate");
     }
-    static MockResponse text(String value) { return response(Map.of("role", "assistant", "content", value), "stop"); }
-    static MockResponse response(Map<String,Object> message, String reason) {
-        return new MockResponse().setHeader("Content-Type", "application/json").setBody(JSON.writeValueAsString(Map.of(
-                "id", "fixture", "object", "chat.completion", "created", 1, "model", "fixture", "choices", List.of(
-                        Map.of("index", 0, "message", message, "finish_reason", reason)),
-                "usage", Map.of("prompt_tokens", 1, "completion_tokens", 1, "total_tokens", 2))));
-    }
+    static MockResponse text(String value) { return ai.loomspan.testkit.ResponsesFixtures.text(value); }
+
 }

@@ -10,7 +10,7 @@ import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -45,10 +45,8 @@ class SpringAiObservationIntegrationTest
         try (MockWebServer server = new MockWebServer())
         {
             server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                    {"id":"chatcmpl-1","object":"chat.completion","created":1,"model":"gpt-test",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"%s"},"finish_reason":"stop"}],
-                     "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-                    """.formatted(completionCanary)));
+                {"id":"chatcmpl-1","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"%s","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                """.formatted(completionCanary)));
             LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
             properties.setDriver(AiDriver.OPENAI);
             properties.setApiKey(keyCanary);
@@ -57,7 +55,7 @@ class SpringAiObservationIntegrationTest
 
             var model = new SpringAiProviderIntegration(new DefaultResourceLoader(), registry)
                     .create("openai-main", properties).chatModel();
-            model.call(new Prompt(promptCanary, OpenAiChatOptions.builder().model("gpt-test").build()));
+            model.call(new Prompt(promptCanary, OpenAiResponsesChatOptions.builder().model("gpt-test").build()));
         }
 
         assertThat(stopped).isNotEmpty();
@@ -120,7 +118,7 @@ class SpringAiObservationIntegrationTest
                     .build();
 
             String result = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt().user("safe-user")
-                    .options(OpenAiChatOptions.builder().model("gpt-test"))
+                    .options(OpenAiResponsesChatOptions.builder().model("gpt-test"))
                     .tools(tool)
                     .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY,
                             new ModelTraceContext(new ModelExecutionIdentity("gpt-test", "openai", AiDriver.OPENAI,
@@ -174,7 +172,7 @@ class SpringAiObservationIntegrationTest
 
             assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
                     .user("safe-user")
-                    .options(OpenAiChatOptions.builder().model("gpt-test"))
+                    .options(OpenAiResponsesChatOptions.builder().model("gpt-test"))
                     .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY,
                             new ModelTraceContext(new ModelExecutionIdentity("gpt-test", "openai", AiDriver.OPENAI,
                                     "gpt-test"), "default-test_skill", "mission")))
@@ -213,19 +211,14 @@ class SpringAiObservationIntegrationTest
     private static MockResponse toolCall(String value)
     {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"tool","object":"chat.completion","created":1,"model":"gpt-test",
-                 "choices":[{"index":0,"message":{"role":"assistant","content":null,
-                  "tool_calls":[{"id":"call-1","type":"function","function":{"name":"lookup","arguments":"{\\\"value\\\":\\\"%s\\\"}"}}]},"finish_reason":"tool_calls"}],
-                 "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                {"id":"tool","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"call-1","name":"lookup","arguments":"{\\"value\\":\\"%s\\"}","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(value));
     }
 
     private static MockResponse text(String value)
     {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"text","object":"chat.completion","created":1,"model":"gpt-test",
-                 "choices":[{"index":0,"message":{"role":"assistant","content":"%s"},"finish_reason":"stop"}],
-                 "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                {"id":"text","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"%s","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(value));
     }
 }

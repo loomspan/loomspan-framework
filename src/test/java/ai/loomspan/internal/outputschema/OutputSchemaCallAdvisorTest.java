@@ -24,7 +24,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
@@ -95,7 +95,7 @@ class OutputSchemaCallAdvisorTest {
         RecordingChain chain = new RecordingChain(List.of(
                 first, second,
                 "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
-        OpenAiChatOptions options = OpenAiChatOptions.builder().model("retry-model").temperature(0.2).build();
+        OpenAiResponsesChatOptions options = OpenAiResponsesChatOptions.builder().model("retry-model").temperature(0.2).build();
         Object traceMarker = new Object();
         ChatClientRequest baseline = new ChatClientRequest(new Prompt(List.of(
                 new SystemMessage("BASELINE_SYSTEM"),

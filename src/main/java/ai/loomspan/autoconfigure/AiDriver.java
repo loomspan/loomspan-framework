@@ -5,6 +5,5 @@ public enum AiDriver
     OPENAI,
     ANTHROPIC,
     GEMINI,
-    OLLAMA,
     TYPESAFE
 }

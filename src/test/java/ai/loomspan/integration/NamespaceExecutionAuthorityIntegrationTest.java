@@ -241,14 +241,10 @@ class NamespaceExecutionAuthorityIntegrationTest {
                 """.formatted(server.url("/v1"), provider, calls == 20 ? 12 : 1, calls, persistence));
     }
     private static MockResponse tool(String name) {
-        return response("{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call\",\"type\":\"function\",\"function\":{\"name\":\"" + name + "\",\"arguments\":\"{}\"}}]}", "tool_calls");
+        return ai.loomspan.testkit.ResponsesFixtures.response("test", "test", List.of(
+                ai.loomspan.testkit.ResponsesFixtures.functionCall(name, "call", "{}")));
     }
-    private static MockResponse text(String value) { return response("{\"role\":\"assistant\",\"content\":"
-            + ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion().writeValueAsString(value) + "}", "stop"); }
-    private static MockResponse response(String message, String finish) {
-        return new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"id\":\"test\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"test\",\"choices\":[{\"index\":0,\"message\":" + message
-                + ",\"finish_reason\":\"" + finish + "\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1,\"total_tokens\":2}}");
-    }
+    private static MockResponse text(String value) { return ai.loomspan.testkit.ResponsesFixtures.text(value); }
     record Capture(SkillExecutorInvocation invocation, ExecutionBinding binding, org.springframework.security.core.Authentication caller,
                    org.springframework.security.core.context.SecurityContext security, TracePersistencePolicy persistence,
                    int maxDepth, Map<String,Object> configuredLimits) {}

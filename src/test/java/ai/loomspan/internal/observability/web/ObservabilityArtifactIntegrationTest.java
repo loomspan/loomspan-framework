@@ -34,8 +34,9 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "loomspan.observability.enabled=true",
                 "loomspan.observability.auth.api-key=0123456789abcdef0123456789abcdef",
                 "loomspan.skills.locations=classpath:/observability-test/*.yaml",
-                "loomspan.connections.local.driver=ollama",
-                "loomspan.connections.local.base-url=http://localhost:11434",
+                "loomspan.connections.local.driver=openai",
+                "loomspan.connections.local.api-key=ollama",
+                "loomspan.connections.local.base-url=http://localhost:11434/v1",
                 "loomspan.models.test.connection=local",
                 "loomspan.models.test.provider-model=test-model"
         })
@@ -152,6 +153,7 @@ class ObservabilityArtifactIntegrationTest
 
     @SpringBootConfiguration
     @EnableAutoConfiguration(exclude = { SecurityAutoConfiguration.class,
+            org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration.class,
             ServletWebSecurityAutoConfiguration.class }, excludeName =
             "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration")
     static class TestApplication

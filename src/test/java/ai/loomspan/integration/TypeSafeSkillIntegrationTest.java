@@ -767,8 +767,8 @@ class TypeSafeSkillIntegrationTest {
                                                             documentedInput.get("levels")));
                                     return success("{\"answers\":" + retained + "}");
                                 }
-                                assertThat(request.getPath()).isEqualTo("/v1/chat/completions");
-                                assertThat(body.at("/messages/0/content").asText())
+                                assertThat(request.getPath()).isEqualTo("/v1/responses");
+                                assertThat(body.path("instructions").asText())
                                         .contains("Create an ordered flight plan");
                                 boolean assembly = body.toString().contains("assessFixedContact");
                                 String child = assembly ? "assessFixedContact" : "assessContact";
@@ -793,38 +793,7 @@ class TypeSafeSkillIntegrationTest {
                                                         "VALID",
                                                         "tasks",
                                                         List.of(task)));
-                                return success(
-                                        JSON.writeValueAsString(
-                                                Map.of(
-                                                        "id",
-                                                        "fixture",
-                                                        "object",
-                                                        "chat.completion",
-                                                        "created",
-                                                        1,
-                                                        "model",
-                                                        "gpt-4.1",
-                                                        "choices",
-                                                        List.of(
-                                                                Map.of(
-                                                                        "index",
-                                                                        0,
-                                                                        "message",
-                                                                        Map.of(
-                                                                                "role",
-                                                                                "assistant",
-                                                                                "content",
-                                                                                plan),
-                                                                        "finish_reason",
-                                                                        "stop")),
-                                                        "usage",
-                                                        Map.of(
-                                                                "prompt_tokens",
-                                                                1,
-                                                                "completion_tokens",
-                                                                1,
-                                                                "total_tokens",
-                                                                2))));
+                                return success(ai.loomspan.testkit.ResponsesFixtures.body("fixture", "gpt-4.1", List.of(ai.loomspan.testkit.ResponsesFixtures.textItem(plan))));
                             } catch (Throwable error) {
                                 failure.compareAndSet(null, error);
                                 return new MockResponse().setResponseCode(500);
@@ -1109,7 +1078,7 @@ output_from: {skill: default-judgment}
                                     nativeRequests.add(JSON.readTree(request.getBody().readUtf8()));
                                     return success("{\"answers\":{}}");
                                 }
-                                assertThat(request.getPath()).isEqualTo("/v1/chat/completions");
+                                assertThat(request.getPath()).isEqualTo("/v1/responses");
                                 Map<String, Object> task = new LinkedHashMap<>();
                                 task.put("taskId", "judge");
                                 task.put("title", "Judge value");
@@ -1131,38 +1100,7 @@ output_from: {skill: default-judgment}
                                                         "VALID",
                                                         "tasks",
                                                         List.of(task)));
-                                return success(
-                                        JSON.writeValueAsString(
-                                                Map.of(
-                                                        "id",
-                                                        "fixture",
-                                                        "object",
-                                                        "chat.completion",
-                                                        "created",
-                                                        1,
-                                                        "model",
-                                                        "gpt-4.1",
-                                                        "choices",
-                                                        List.of(
-                                                                Map.of(
-                                                                        "index",
-                                                                        0,
-                                                                        "message",
-                                                                        Map.of(
-                                                                                "role",
-                                                                                "assistant",
-                                                                                "content",
-                                                                                plan),
-                                                                        "finish_reason",
-                                                                        "stop")),
-                                                        "usage",
-                                                        Map.of(
-                                                                "prompt_tokens",
-                                                                1,
-                                                                "completion_tokens",
-                                                                1,
-                                                                "total_tokens",
-                                                                2))));
+                                return success(ai.loomspan.testkit.ResponsesFixtures.body("fixture", "gpt-4.1", List.of(ai.loomspan.testkit.ResponsesFixtures.textItem(plan))));
                             } catch (Throwable error) {
                                 failure.compareAndSet(null, error);
                                 return new MockResponse().setResponseCode(500);
@@ -1262,8 +1200,7 @@ output_from: {skill: default-judgment}
         try (var server = new MockWebServer()) {
             var task = Map.of("taskId", "judge", "title", "Judge", "capabilityName", "default-judgment", "intent", "Judge", "status", "PENDING", "dependsOn", List.of(), "expectedOutputs", List.of("result"));
             String plan = JSON.writeValueAsString(Map.of("capabilityName", "default-parent", "createdAt", "2026-10-11T00:00:00Z", "status", "VALID", "tasks", List.of(task)));
-            server.enqueue(success(JSON.writeValueAsString(Map.of("id", "fixture", "object", "chat.completion", "created", 1, "model", "planner", "choices", List.of(
-                    Map.of("index", 0, "message", Map.of("role", "assistant", "content", plan), "finish_reason", "stop")), "usage", Map.of("prompt_tokens", 1, "completion_tokens", 1, "total_tokens", 2)))));
+            server.enqueue(ai.loomspan.testkit.ResponsesFixtures.text(plan));
             runner(server, "/", document).withPropertyValues(
                     "loomspan.connections.chat.driver=openai", "loomspan.connections.chat.api-key=fixture",
                     "loomspan.connections.chat.base-url=" + server.url("/v1"), "loomspan.connections.chat.provider-retry.enabled=false",
@@ -1283,7 +1220,7 @@ output_from: {skill: default-judgment}
                         assertThat(usage(trace).path("modelCalls").intValue()).isEqualTo(scenario.equals("budget") ? 1 : 0);
                     });
             assertThat(server.getRequestCount()).isEqualTo(scenario.equals("budget") ? 1 : 0);
-            if (server.getRequestCount() > 0) assertThat(server.takeRequest().getPath()).isEqualTo("/v1/chat/completions");
+            if (server.getRequestCount() > 0) assertThat(server.takeRequest().getPath()).isEqualTo("/v1/responses");
         }
     }
 

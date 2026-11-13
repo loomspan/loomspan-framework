@@ -73,6 +73,7 @@ class ObservabilityActuatorCoexistenceIntegrationTest
 
     @SpringBootConfiguration
     @EnableAutoConfiguration(exclude = { SecurityAutoConfiguration.class,
+            org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration.class,
             ServletWebSecurityAutoConfiguration.class }, excludeName =
             "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration")
     static class TestApplication

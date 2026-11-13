@@ -46,7 +46,7 @@ import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ai.tool.ToolCallback;
@@ -112,7 +112,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                         new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), usage)).build();
                 java.util.function.Supplier<String> call = () -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
                         binding, () -> client.prompt().user("unchanged")
-                                .options(OpenAiChatOptions.builder().model("test-model"))
+                                .options(OpenAiResponsesChatOptions.builder().model("test-model"))
                                 .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
                                 .call().content());
                 if (scenario.equals("recovered")) assertThat(call.get()).isEqualTo("recovered");
@@ -175,7 +175,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                     new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), usage)).build();
             assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding,
                     () -> client.prompt().system("ORIGINAL_SYSTEM").user("Compare NB-P240-017 event E17")
-                            .options(OpenAiChatOptions.builder().model("test-model"))
+                            .options(OpenAiResponsesChatOptions.builder().model("test-model"))
                             .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
                             .call().content()))
                     .isInstanceOf(RuntimeException.class)
@@ -189,7 +189,7 @@ class ModelAttemptCallAdvisorIntegrationTest
             assertThat(server.getRequestCount()).isEqualTo(2);
             server.takeRequest(2, TimeUnit.SECONDS);
             var wire = json.readTree(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8());
-            var messages = wire.path("messages");
+            var messages = ai.loomspan.testkit.ResponsesFixtures.transcript(wire);
             assertThat(messages).hasSize(4);
             assertThat(messages.get(0).path("content").asText()).contains("ORIGINAL_SYSTEM", "Return JSON only");
             assertThat(messages.get(1).path("content").asText()).isEqualTo("Compare NB-P240-017 event E17");
@@ -331,7 +331,7 @@ class ModelAttemptCallAdvisorIntegrationTest
 
             String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
                     .user("user")
-                    .options(OpenAiChatOptions.builder().model("gpt-test"))
+                    .options(OpenAiResponsesChatOptions.builder().model("gpt-test"))
                     .toolCallbacks(tool)
                     .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
                     .call()
@@ -342,9 +342,9 @@ class ModelAttemptCallAdvisorIntegrationTest
             assertThat(toolExecutions).hasValue(2);
             assertThat(toolValues).containsExactly("first", "second");
             assertThat(server.takeRequest().getBody().readUtf8()).contains("\"name\":\"lookup\"");
-            assertThat(server.takeRequest().getBody().readUtf8()).contains("\"tool_call_id\":\"call-1\"");
+            assertThat(server.takeRequest().getBody().readUtf8()).contains("\"call_id\":\"call-1\"");
             assertThat(server.takeRequest().getBody().readUtf8()).contains("\"name\":\"lookup\"");
-            assertThat(server.takeRequest().getBody().readUtf8()).contains("\"tool_call_id\":\"call-2\"");
+            assertThat(server.takeRequest().getBody().readUtf8()).contains("\"call_id\":\"call-2\"");
 
             // Semantic validation wraps the AI 2 tool advisor; every inner model turn crosses the
             // physical-attempt advisor exactly once.
@@ -408,7 +408,7 @@ class ModelAttemptCallAdvisorIntegrationTest
 
             String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
                     .user("user")
-                    .options(OpenAiChatOptions.builder().model("gpt-test"))
+                    .options(OpenAiResponsesChatOptions.builder().model("gpt-test"))
                     .toolCallbacks(tool)
                     .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
                     .call()
@@ -948,22 +948,16 @@ class ModelAttemptCallAdvisorIntegrationTest
         try (MockWebServer server = new MockWebServer())
         {
             server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                    {"id":"error-1","object":"chat.completion","created":1,"model":"routed-model",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"unsafe partial%s"},
-                       "finish_reason":"error","error":{"message":"overloaded","code":"E_OVERLOAD",
-                       "metadata":{"error_type":"provider_overloaded"}}}]}
-                    """.formatted("x".repeat(1024 * 1024 + 1))));
+                {"id":"error-1","object":"response","created_at":1,"model":"routed-model","status":"failed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"unsafe partial%s","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2},"error":{"message":"overloaded","code":"E_OVERLOAD","metadata":{"error_type":"provider_overloaded"},"type":"provider_overloaded"}}
+                """.formatted("x".repeat(1024 * 1024 + 1))));
             server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                    {"id":"success-2","object":"chat.completion","created":2,"model":"routed-model",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"recovered"},"finish_reason":"stop"}],
-                     "usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}
-                    """));
+                {"id":"success-2","object":"response","created_at":2,"model":"routed-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"recovered","annotations":[]}]}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}
+                """));
             LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
             properties.setDriver(AiDriver.OPENAI);
             properties.setApiKey("gateway-key");
             properties.setBaseUrl(server.url("/v1").toString());
             LoomspanProperties.OpenAiOptions openAi = new LoomspanProperties.OpenAiOptions();
-            openAi.setCompatibilityProfile(LoomspanProperties.OpenAiCompatibilityProfile.OPENROUTER);
             properties.setOpenai(openAi);
             properties.getProviderRetry().setInitialBackoff(java.time.Duration.ZERO);
             properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
@@ -983,7 +977,7 @@ class ModelAttemptCallAdvisorIntegrationTest
 
             String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
                     .user("hello")
-                    .options(OpenAiChatOptions.builder().model("routed-model"))
+                    .options(OpenAiResponsesChatOptions.builder().model("routed-model"))
                     .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext))
                     .call().content());
 
@@ -1059,20 +1053,14 @@ class ModelAttemptCallAdvisorIntegrationTest
     private static MockResponse openAiToolCall(String callId, String value)
     {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"chatcmpl-tool","object":"chat.completion","created":1,"model":"gpt-test",
-                 "choices":[{"index":0,"message":{"role":"assistant","content":null,
-                   "tool_calls":[{"id":"%s","type":"function","function":{"name":"lookup","arguments":"{\\\"value\\\":\\\"%s\\\"}"}}]},
-                   "finish_reason":"tool_calls"}],
-                 "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                {"id":"chatcmpl-tool","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"%s","name":"lookup","arguments":"{\\"value\\":\\"%s\\"}","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(callId, value));
     }
 
     private static MockResponse openAiText(String text)
     {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"chatcmpl-text","object":"chat.completion","created":1,"model":"gpt-test",
-                 "choices":[{"index":0,"message":{"role":"assistant","content":"%s"},"finish_reason":"stop"}],
-                 "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                {"id":"chatcmpl-text","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"%s","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(text));
     }
 

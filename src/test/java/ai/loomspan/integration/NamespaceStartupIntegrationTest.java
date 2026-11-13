@@ -150,17 +150,12 @@ class NamespaceStartupIntegrationTest {
     static MockResponse tool(String name, String arguments) {
         String escaped = arguments.replace("\\", "\\\\").replace("\"", "\\\"");
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"fixture","object":"chat.completion","created":1,"model":"fixture",
-                 "choices":[{"index":0,"message":{"role":"assistant","content":null,
-                 "tool_calls":[{"id":"call","type":"function","function":{"name":"%s","arguments":"%s"}}]},
-                 "finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                {"id":"fixture","object":"response","created_at":1,"model":"fixture","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"call","name":"%s","arguments":"%s","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(name, escaped));
     }
     static MockResponse text(String value) {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"fixture","object":"chat.completion","created":1,"model":"fixture",
-                 "choices":[{"index":0,"message":{"role":"assistant","content":"%s"},
-                 "finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                {"id":"fixture","object":"response","created_at":1,"model":"fixture","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"%s","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(value));
     }
     @Configuration(proxyBeanMethods=false)static class App{

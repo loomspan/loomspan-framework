@@ -19,6 +19,8 @@ import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.AbstractMessage;
+import org.springframework.ai.chat.messages.part.*;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -163,6 +165,9 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
         LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("messageType", message.getMessageType().name());
         payload.put("text", message.getText());
+        payload.put("metadata", message.getMetadata());
+        payload.put("parts", message instanceof AbstractMessage rich
+                ? rich.getParts().stream().map(this::partPayload).toList() : List.of());
         if (message instanceof AssistantMessage assistant)
         {
             payload.put("toolCalls", assistant.getToolCalls().stream().map(call -> {
@@ -186,10 +191,61 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
         return Collections.unmodifiableMap(payload);
     }
 
+    private Map<String, Object> partPayload(MessagePart part)
+    {
+        var payload = new LinkedHashMap<String, Object>();
+        payload.put("attributes", part.attributes());
+        payload.put("payload", part.payload());
+        switch (part)
+        {
+            case TextPart text -> { payload.put("type", "text"); payload.put("text", text.text()); }
+            case ReasoningPart reasoning -> {
+                payload.put("type", "reasoning"); payload.put("text", reasoning.text());
+                payload.put("summary", reasoning.summary());
+            }
+            case ToolCallPart call -> {
+                payload.put("type", "tool_call"); payload.put("toolCall", call.toolCall());
+            }
+            case ToolResultPart result -> {
+                payload.put("type", "tool_result"); payload.put("id", result.id());
+                payload.put("name", result.name()); payload.put("isError", result.isError());
+                payload.put("content", result.content().stream().map(this::partPayload).toList());
+            }
+            case MediaPart media -> {
+                payload.put("type", "media");
+                payload.put("media", new MediaPart.ToDto().convert(media.media()));
+            }
+            case UnknownPart unknown -> {
+                payload.put("type", "unknown"); payload.put("provider", unknown.provider());
+                payload.put("kind", unknown.kind()); payload.put("rawJson", unknown.rawJson());
+            }
+        }
+        return Collections.unmodifiableMap(payload);
+    }
+
     private Map<String, Object> responsePayload(ChatResponse response)
     {
-        return Map.of("generations", response == null ? List.of() : response.getResults().stream()
+        var payload = new LinkedHashMap<String, Object>();
+        payload.put("generations", response == null ? List.of() : response.getResults().stream()
                 .map(generation -> messagePayload(generation == null ? null : generation.getOutput())).toList());
+        payload.put("generationMetadata", response == null ? List.of() : response.getResults().stream().map(generation -> {
+            if (generation == null || generation.getMetadata() == null) return null;
+            var metadata = new LinkedHashMap<String, Object>();
+            generation.getMetadata().entrySet().forEach(entry -> metadata.put(entry.getKey(), entry.getValue()));
+            metadata.put("finishReason", generation.getMetadata().getFinishReason());
+            metadata.put("contentFilters", generation.getMetadata().getContentFilters());
+            return Collections.unmodifiableMap(metadata);
+        }).toList());
+        var metadata = new LinkedHashMap<String, Object>();
+        if (response != null && response.getMetadata() != null)
+        {
+            var source = response.getMetadata();
+            source.entrySet().forEach(entry -> metadata.put(entry.getKey(), entry.getValue()));
+            metadata.put("id", source.getId());
+            metadata.put("model", source.getModel());
+        }
+        payload.put("metadata", Collections.unmodifiableMap(metadata));
+        return Collections.unmodifiableMap(payload);
     }
 
     private String responseText(ChatClientResponse response)

@@ -102,31 +102,31 @@ class ExecutionTraceContractTest {
         var messages = records.getFirst().data().path("messages");
         assertThat(records.getFirst().data().size()).isOne();
         assertThat(messages.size()).isEqualTo(6);
-        assertThat(messages.get(0)).isEqualTo(mapper.valueToTree(Map.of("messageType", "SYSTEM", "text", system)));
-        assertThat(messages.get(1)).isEqualTo(mapper.valueToTree(Map.of("messageType", "USER", "text", user)));
-        var expectedAssistant = mapper.createObjectNode().put("messageType", "ASSISTANT").putNull("text");
+        assertThat(messageView(messages.get(0))).isEqualTo(mapper.valueToTree(Map.of("messageType", "SYSTEM", "text", system)));
+        assertThat(messageView(messages.get(1))).isEqualTo(mapper.valueToTree(Map.of("messageType", "USER", "text", user)));
+        var expectedAssistant = mapper.createObjectNode().put("messageType", "ASSISTANT").put("text", "");
         var calls = expectedAssistant.putArray("toolCalls");
         calls.addObject().putNull("id").putNull("name").putNull("arguments");
         calls.addObject().put("id", "").put("name", "").put("arguments", "");
         calls.addObject().put("id", "same").put("name", "one-tool").put("arguments", rawArguments);
         calls.addObject().put("id", "same").put("name", "two-tool").put("arguments", "  {}\n");
-        assertThat(messages.get(2)).isEqualTo(expectedAssistant);
+        assertThat(messageView(messages.get(2))).isEqualTo(expectedAssistant);
         var expectedTool = mapper.createObjectNode().put("messageType", "TOOL").put("text", "");
         var responses = expectedTool.putArray("toolResponses");
         responses.addObject().put("id", "same").put("name", "one-tool").put("content", feedback);
         responses.addObject().put("id", "same").put("name", "two-tool").put("content", "");
         responses.addObject().putNull("id").putNull("name").putNull("content");
-        assertThat(messages.get(3)).isEqualTo(expectedTool);
+        assertThat(messageView(messages.get(3))).isEqualTo(expectedTool);
         var expectedEmptyAssistant = mapper.valueToTree(Map.of("messageType", "ASSISTANT", "text", "", "toolCalls", List.of()));
-        assertThat(messages.get(4)).isEqualTo(expectedEmptyAssistant);
-        assertThat(messages.get(5)).isEqualTo(mapper.valueToTree(Map.of("messageType", "TOOL", "text", "", "toolResponses", List.of())));
+        assertThat(messageView(messages.get(4))).isEqualTo(expectedEmptyAssistant);
+        assertThat(messageView(messages.get(5))).isEqualTo(mapper.valueToTree(Map.of("messageType", "TOOL", "text", "", "toolResponses", List.of())));
         var payload = records.getLast().data();
-        assertThat(payload.size()).isOne();
+        assertThat(payload.size()).isEqualTo(3);
         var generations = payload.path("generations");
         assertThat(generations.size()).isEqualTo(3);
-        assertThat(generations.get(0)).isEqualTo(expectedAssistant);
+        assertThat(messageView(generations.get(0))).isEqualTo(expectedAssistant);
         assertThat(generations.get(1).isNull()).isTrue();
-        assertThat(generations.get(2)).isEqualTo(expectedEmptyAssistant);
+        assertThat(messageView(generations.get(2))).isEqualTo(expectedEmptyAssistant);
         assertThat(session.getSessionUsage().orElseThrow().usageUnits()).isEqualTo(3);
     }
 
@@ -134,8 +134,42 @@ class ExecutionTraceContractTest {
     void missingOrEmptyChatResponseHasAnEmptyGenerationsArray() {
         for (ChatResponse response : java.util.Arrays.asList(null, new ChatResponse(List.of()))) {
             var payload = modelRecords(captureChatExchange(new Prompt("user"), response)).getLast().data();
-            assertThat(payload).isEqualTo(new ObjectMapper().valueToTree(Map.of("generations", List.of())));
+            assertThat(payload.path("generations")).isEqualTo(new ObjectMapper().valueToTree(List.of()));
+            assertThat(payload.path("generationMetadata")).isEqualTo(new ObjectMapper().valueToTree(List.of()));
+            assertThat(payload.path("metadata").size()).isEqualTo(response == null ? 0 : 2);
         }
+    }
+
+    private static tools.jackson.databind.JsonNode messageView(tools.jackson.databind.JsonNode node) {
+        var copy = (tools.jackson.databind.node.ObjectNode) node.deepCopy();
+        copy.remove("parts"); copy.remove("metadata");
+        return copy;
+    }
+
+    @Test void orderedPartsAndStatusMetadataRetainExactProviderEvidence() {
+        var opaque = new org.springframework.ai.chat.messages.part.OpaquePayload("openai.responses", "encrypted_content", "  opaque\r\n\u96ea");
+        var message = AssistantMessage.builder().parts(List.of(
+                new org.springframework.ai.chat.messages.part.ReasoningPart("thought", "summary", opaque, Map.of("id", "rs_1")),
+                new org.springframework.ai.chat.messages.part.TextPart("commentary", null, Map.of("phase", "commentary")),
+                new org.springframework.ai.chat.messages.part.ToolCallPart(new AssistantMessage.ToolCall("call_1", "function", "test-lookup", "  {}\n"), null, Map.of("id", "fc_1")),
+                new org.springframework.ai.chat.messages.part.UnknownPart("fixture", "future", "{\"number\":1.0000000000000001}", null, Map.of("exact", "yes")))).build();
+        var generation = new Generation(message, org.springframework.ai.chat.metadata.ChatGenerationMetadata.builder()
+                .finishReason("completed").metadata("providerStatus", "completed").build());
+        var response = new ChatResponse(List.of(generation), ChatResponseMetadata.builder().id("resp_1")
+                .model("fixture").keyValue("openai.responses.status", "completed").build());
+        var data = modelRecords(captureChatExchange(new Prompt("test"), response)).getLast().data();
+        var parts = data.at("/generations/0/parts");
+        assertThat(parts.size()).isEqualTo(4);
+        assertThat(parts.get(0).path("type").asText()).isEqualTo("reasoning");
+        assertThat(parts.get(0).at("/payload/data").asText()).isEqualTo("  opaque\r\n\u96ea");
+        assertThat(parts.get(0).at("/attributes/id").asText()).isEqualTo("rs_1");
+        assertThat(parts.get(1).at("/attributes/phase").asText()).isEqualTo("commentary");
+        assertThat(parts.get(2).at("/toolCall/id").asText()).isEqualTo("call_1");
+        assertThat(parts.get(2).at("/toolCall/arguments").asText()).isEqualTo("  {}\n");
+        assertThat(parts.get(3).path("rawJson").asText()).isEqualTo("{\"number\":1.0000000000000001}");
+        assertThat(data.at("/metadata/id").asText()).isEqualTo("resp_1");
+        assertThat(data.at("/metadata/openai.responses.status").asText()).isEqualTo("completed");
+        assertThat(data.at("/generationMetadata/0/providerStatus").asText()).isEqualTo("completed");
     }
 
     private static LoomspanSession captureChatExchange(Prompt prompt, ChatResponse response) {
@@ -205,7 +239,7 @@ class ExecutionTraceContractTest {
     void providerFailureMessagesRemainOutOfFrameMetadataAndAppearInDeliberateErrorDiagnostics() {
         String endpointSentinel = "http://127.0.0.1:1/SENTINEL-BASE";
         RuntimeException providerFailure = new IllegalStateException(
-                "I/O error on POST request for \"" + endpointSentinel + "/v1/chat/completions\"");
+                "I/O error on POST request for \"" + endpointSentinel + "/v1/responses\"");
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
 
         LoomspanSession planningSession = ai.loomspan.internal.core.TestLoomspanSessions.withId(

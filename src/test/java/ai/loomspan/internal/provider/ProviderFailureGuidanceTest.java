@@ -89,8 +89,8 @@ class ProviderFailureGuidanceTest
                         "loomspan.connections.gemini.gemini.location",
                         "loomspan.connections.gemini.gemini.credentials-uri")
                 .doesNotContain("gemini.gemini Vertex");
-        assertThat(authenticationGuidance(AiDriver.OLLAMA, "ollama"))
-                .contains("driver OLLAMA", "loomspan.connections.ollama.base-url");
+        assertThat(authenticationGuidance(AiDriver.OPENAI, "ollama"))
+                .contains("driver OPENAI", "loomspan.connections.ollama.api-key");
 
         String geminiConnectivity = ProviderFailureGuidance.explain(
                 new ModelExecutionIdentity("support-model", "gemini", AiDriver.GEMINI, "provider-model"),

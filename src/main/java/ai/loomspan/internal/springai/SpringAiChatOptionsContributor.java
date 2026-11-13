@@ -4,8 +4,7 @@ import ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
-import org.springframework.ai.ollama.api.OllamaChatOptions;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 
 public final class SpringAiChatOptionsContributor
 {
@@ -20,14 +19,13 @@ public final class SpringAiChatOptionsContributor
             case OPENAI -> openAi(configuration);
             case ANTHROPIC -> anthropic(configuration);
             case GEMINI -> gemini(configuration);
-            case OLLAMA -> OllamaChatOptions.builder().model(configuration.providerModel());
             case TYPESAFE -> throw new IllegalArgumentException("Native evaluations do not accept chat options");
         };
     }
 
     private ChatOptions.Builder<?> openAi(EffectiveSkillExecutionConfiguration configuration)
     {
-        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder().model(configuration.providerModel());
+        OpenAiResponsesChatOptions.Builder builder = OpenAiResponsesChatOptions.builder().model(configuration.providerModel());
         String model = configuration.providerModel();
         int separator = model.lastIndexOf('/');
         if ((separator >= 0 ? model.substring(separator + 1) : model).startsWith("gpt-5")) builder.temperature(1.0);

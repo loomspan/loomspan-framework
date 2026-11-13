@@ -50,6 +50,18 @@ class ExecutionConfigurationParserTest
                 .isEqualTo(java.time.Duration.ofSeconds(240));
     }
 
+    @Test
+    void rejectsRemovedNativeDriverAndCompatibilityProfile()
+    {
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
+                CANDIDATE.replace("driver: openai", "driver: ollama")), new StandardEnvironment(), false))
+                .hasMessageContaining("loomspan.connections.primary.driver");
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
+                CANDIDATE.replace("driver: openai", "driver: openai\n      openai:\n        compatibility-profile: openrouter")),
+                new StandardEnvironment(), false))
+                .hasMessageContaining("loomspan.connections.primary.openai.compatibility-profile");
+    }
+
     private static final String CANDIDATE = """
             loomspan:
               connections:

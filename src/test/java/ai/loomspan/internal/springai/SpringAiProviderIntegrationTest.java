@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.MediaType;
@@ -274,12 +274,11 @@ class SpringAiProviderIntegrationTest
                 properties.setApiKey("gateway-key");
                 properties.setBaseUrl(server.url("/v1").toString());
                 LoomspanProperties.OpenAiOptions openAi = new LoomspanProperties.OpenAiOptions();
-                openAi.setCompatibilityProfile(LoomspanProperties.OpenAiCompatibilityProfile.OPENROUTER);
                 properties.setOpenai(openAi);
                 var runtime = integration.create("openrouter", properties);
 
                 Throwable failure = catchThrowable(() -> runtime.chatModel().call(new Prompt("hello",
-                        OpenAiChatOptions.builder().model("routed-model").build())));
+                        OpenAiResponsesChatOptions.builder().model("routed-model").build())));
                 var details = runtime.failureTranslator().translate(failure);
 
                 assertThat(failure).isNotNull();
@@ -300,23 +299,21 @@ class SpringAiProviderIntegrationTest
     }
 
     @Test
-    void validResponsesPreserveContentToolsAndMetadataAcrossProfilesAndDiagnosticBoundary() throws Exception
+    void validResponsesPreserveContentToolsAndMetadataAcrossConnectionsAndDiagnosticBoundary() throws Exception
     {
         int limit = SpringAiProviderIntegration.DIAGNOSTIC_LIMIT_BYTES;
-        for (boolean openRouter : new boolean[] {false, true})
+        for (String connectionName : new String[] {"direct", "openrouter"})
         {
             for (int size : new int[] {limit - 1, limit, limit + 1, limit * 2})
             {
                 String content = "answer-" + "x".repeat(size / 2 - 500) + "-answer-end";
                 String arguments = "{\"value\":\"" + "y".repeat(size / 2 - 500) + "-argument-end\"}";
                 String json = new tools.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of(
-                        "id", "complete-response", "object", "chat.completion", "created", 1,
-                        "model", "routed-model", "choices", java.util.List.of(java.util.Map.of(
-                                "index", 0, "finish_reason", "tool_calls", "message", java.util.Map.of(
-                                        "role", "assistant", "content", content, "tool_calls", java.util.List.of(
-                                                java.util.Map.of("id", "call-1", "type", "function", "function",
-                                                        java.util.Map.of("name", "lookup", "arguments", arguments)))))),
-                        "usage", java.util.Map.of("prompt_tokens", 2, "completion_tokens", 3, "total_tokens", 5)));
+                        "id", "complete-response", "object", "response", "created_at", 1, "status", "completed",
+                        "model", "routed-model", "output", java.util.List.of(
+                                ai.loomspan.testkit.ResponsesFixtures.textItem(content),
+                                ai.loomspan.testkit.ResponsesFixtures.functionCall("lookup", "call-1", arguments)),
+                        "usage", java.util.Map.of("input_tokens", 2, "output_tokens", 3, "total_tokens", 5)));
                 // Pad outside the object so each fixture has an exact UTF-8 byte size.
                 json += " ".repeat(size - json.length());
                 try (MockWebServer server = new MockWebServer())
@@ -324,14 +321,8 @@ class SpringAiProviderIntegrationTest
                     server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody(json));
                     var properties = openAi();
                     properties.setBaseUrl(server.url("/v1").toString());
-                    if (openRouter)
-                    {
-                        var options = new LoomspanProperties.OpenAiOptions();
-                        options.setCompatibilityProfile(LoomspanProperties.OpenAiCompatibilityProfile.OPENROUTER);
-                        properties.setOpenai(options);
-                    }
-                    var response = integration.create("test", properties).chatModel().call(new Prompt("hello",
-                            OpenAiChatOptions.builder().model("routed-model").build()));
+                    var response = integration.create(connectionName, properties).chatModel().call(new Prompt("hello",
+                            OpenAiResponsesChatOptions.builder().model("routed-model").build()));
                     assertThat(response.getResult().getOutput().getText()).isEqualTo(content);
                     assertThat(response.getResult().getOutput().getToolCalls()).singleElement().satisfies(tool ->
                     {
@@ -353,25 +344,25 @@ class SpringAiProviderIntegrationTest
     void inspectedResponsesReleaseOriginalStreamOnSuccessAndFailure() throws Exception
     {
         int limit = SpringAiProviderIntegration.DIAGNOSTIC_LIMIT_BYTES;
-        String success = "{\"choices\":[{\"finish_reason\":\"stop\"}],\"padding\":\"" + "x".repeat(limit + 1) + "\"}";
+        String success = "{\"status\":\"completed\",\"output\":[],\"padding\":\"" + "x".repeat(limit + 1) + "\"}";
         for (String json : new String[] {success, openRouterErrorBody(limit * 2), "not-json",
-                "{\"choices\":[{\"finish_reason\":\"error\"}]}",
-                "{\"padding\":\"" + "x".repeat(limit + 1) + "\",\"choices\":[{\"finish_reason\":\"error\"}]}"})
+                "{\"status\":\"failed\"}",
+                "{\"padding\":\"" + "x".repeat(limit + 1) + "\",\"status\":\"failed\"}"})
         {
             TrackingInputStream stream = new TrackingInputStream(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             Response response = streamingResponse(stream);
             if (json.equals(success))
             {
-                try (Response inspected = integration.inspectOpenRouter(response))
+                try (Response inspected = integration.inspectResponses(response))
                 {
                     assertThat(inspected.body().string()).isEqualTo(json);
                 }
             }
             else
             {
-                Throwable failure = catchThrowable(() -> integration.inspectOpenRouter(response));
+                Throwable failure = catchThrowable(() -> integration.inspectResponses(response));
                 assertThat(failure).isNotNull();
-                if (json.contains("finish_reason"))
+                if (json.contains("failed"))
                 {
                     var details = ((ProviderCallException) failure).details();
                     assertThat(details.category()).isEqualTo(json.contains("provider_overloaded")
@@ -395,7 +386,7 @@ class SpringAiProviderIntegrationTest
                 throw new java.io.UncheckedIOException(new IOException("failed read"));
             }
         };
-        assertThat(catchThrowable(() -> integration.inspectOpenRouter(streamingResponse(stream)))).isNotNull();
+        assertThat(catchThrowable(() -> integration.inspectResponses(streamingResponse(stream)))).isNotNull();
         assertThat(stream.closed).isTrue();
     }
 
@@ -408,7 +399,7 @@ class SpringAiProviderIntegrationTest
             @Override public long contentLength() { return -1; }
             @Override public BufferedSource source() { return source; }
         };
-        return new Response.Builder().request(new Request.Builder().url("https://openrouter.example/v1/chat/completions").build())
+        return new Response.Builder().request(new Request.Builder().url("https://openrouter.example/v1/responses").build())
                 .protocol(Protocol.HTTP_1_1).code(200).message("OK").body(body).build();
     }
 
@@ -430,10 +421,10 @@ class SpringAiProviderIntegrationTest
 
     private static String openRouterErrorBody(int targetBytes)
     {
-        String prefix = "{\"id\":\"chatcmpl-error\",\"object\":\"chat.completion\",\"created\":1,"
-                + "\"model\":\"routed-model\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"";
-        String suffix = "\"},\"finish_reason\":\"error\",\"error\":{\"message\":\"overloaded\","
-                + "\"code\":\"E_OVERLOAD\",\"metadata\":{\"error_type\":\"provider_overloaded\"}}}]}";
+        String prefix = "{\"id\":\"response-error\",\"object\":\"response\",\"created_at\":1,"
+                + "\"model\":\"routed-model\",\"status\":\"failed\",\"padding\":\"";
+        String suffix = "\",\"output\":[],\"error\":{\"message\":\"overloaded\","
+                + "\"code\":\"E_OVERLOAD\",\"type\":\"provider_overloaded\"}}";
         int padding = targetBytes - prefix.length() - suffix.length();
         if (padding < 0)
         {

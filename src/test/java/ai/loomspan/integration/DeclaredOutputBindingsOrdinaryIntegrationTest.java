@@ -217,7 +217,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                 int attempt=calls.getAndIncrement();
                 assertThat(attempt).isLessThan(candidates.size());
                 String content=candidates.get(attempt);
-                return new MockResponse().setHeader("Content-Type","application/json").setBody(JsonMapper.builder().build().writeValueAsString(Map.of("id","local","object","chat.completion","created",1,"model","deterministic","choices",List.of(Map.of("index",0,"message",Map.of("role","assistant","content",content),"finish_reason","stop")),"usage",Map.of("prompt_tokens",1,"completion_tokens",1,"total_tokens",2))));
+                return ai.loomspan.testkit.ResponsesFixtures.text(content);
             }});server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class).withPropertyValues("spring.main.web-application-type=none","loomspan.skills.locations="+directory.toUri()+"*.yaml","loomspan.connections.local.driver=openai","loomspan.connections.local.base-url="+server.url("/"),"loomspan.connections.local.api-key=local-test","loomspan.models.local.connection=local","loomspan.models.local.provider-model=deterministic").run(context->{ assertThat(context).hasNotFailed();check.accept(context.getBean(SkillTemplate.class),calls); });
         }
@@ -256,7 +256,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                 int attempt=calls.incrementAndGet();
                 if (attempt==2 && reload!=null) reload.get().run();
                 String content=attempt==1?"{\"assessment\":{\"exact\":\"original\"},\"summary\":\"reasoned\"}":"{\"summary\":\"reasoned\"}";
-                return new MockResponse().setHeader("Content-Type","application/json").setBody(JsonMapper.builder().build().writeValueAsString(Map.of("id","local","object","chat.completion","created",1,"model","deterministic","choices",List.of(Map.of("index",0,"message",Map.of("role","assistant","content",content),"finish_reason","stop")),"usage",Map.of("prompt_tokens",1,"completion_tokens",1,"total_tokens",2))));
+                return ai.loomspan.testkit.ResponsesFixtures.text(content);
             }});server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class).withPropertyValues("spring.main.web-application-type=none","loomspan.skills.locations="+directory.toUri()+"*.yaml","loomspan.connections.local.driver=openai","loomspan.connections.local.base-url="+server.url("/"),"loomspan.connections.local.api-key=local-test","loomspan.models.local.connection=local","loomspan.models.local.provider-model=deterministic").run(context->{ assertThat(context).hasNotFailed();
                 if(reload!=null) reload.set(()-> {

@@ -11,7 +11,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.core.io.DefaultResourceLoader;
 
@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
-/** Real synchronous adapters, including original OpenRouter body consumption. No external auth. */
+/** Real synchronous adapters, including shared Responses body consumption. No external auth. */
 class ProviderRequestTimeoutIntegrationTest
 {
     enum Provider { OPENAI, OPENROUTER, ANTHROPIC, GEMINI, VERTEX }
@@ -44,12 +44,6 @@ class ProviderRequestTimeoutIntegrationTest
             options.setLocation("us-central1");
             options.setCredentialsJson(serviceAccount("http://127.0.0.1:1/token"));
             properties.setGemini(options);
-        }
-        if (provider == Provider.OPENROUTER)
-        {
-            var options = new LoomspanProperties.OpenAiOptions();
-            options.setCompatibilityProfile(LoomspanProperties.OpenAiCompatibilityProfile.OPENROUTER);
-            properties.setOpenai(options);
         }
         boolean google = properties.getDriver() == AiDriver.GEMINI;
         for (Duration timeout : new Duration[] {null, Duration.ofSeconds(240)})
@@ -128,18 +122,12 @@ class ProviderRequestTimeoutIntegrationTest
             }
             else properties.setApiKey("local-fake-key");
             if (properties.getDriver() != AiDriver.GEMINI) properties.setBaseUrl(server.url("/v1").toString());
-            if (provider == Provider.OPENROUTER)
-            {
-                var options = new LoomspanProperties.OpenAiOptions();
-                options.setCompatibilityProfile(LoomspanProperties.OpenAiCompatibilityProfile.OPENROUTER);
-                properties.setOpenai(options);
-            }
             Client.setDefaultBaseUrls(Optional.of(server.url("/").toString()), Optional.of(server.url("/").toString()));
             try
             {
                 var runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("local", properties);
                 var options = switch (properties.getDriver()) {
-                    case OPENAI -> OpenAiChatOptions.builder().model("test-model").build();
+                    case OPENAI -> OpenAiResponsesChatOptions.builder().model("test-model").build();
                     case ANTHROPIC -> AnthropicChatOptions.builder().model("test-model").maxTokens(128).build();
                     case GEMINI -> GoogleGenAiChatOptions.builder().model("test-model").build();
                     default -> throw new AssertionError();
@@ -175,10 +163,8 @@ class ProviderRequestTimeoutIntegrationTest
     {
         return switch (provider) {
             case OPENAI, OPENROUTER -> """
-                    {"id":"local","object":"chat.completion","created":1,"model":"test-model",
-                     "choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],
-                     "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-                    """;
+                {"id":"local","object":"response","created_at":1,"model":"test-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"ok","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                """;
             case ANTHROPIC -> """
                     {"id":"local","type":"message","role":"assistant","model":"test-model",
                      "content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","stop_sequence":null,
