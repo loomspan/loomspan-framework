@@ -349,7 +349,7 @@ uses the existing JSON/text trace views. Capture availability and distribution
 confidence do not establish judgment correctness or live parity between routes.
 
 - **Embedded Java:** add the Spring Boot starter and invoke skills in your
-  application. This revision targets Java 21+, Spring Boot 4.1, and Spring AI 2;
+  application. This revision targets Java 21+, Spring Boot 4.2.0-RC2, and Spring AI 2.1.0-RC2;
   building with Maven requires 3.9+.
 - **[Sidecar](https://github.com/loomspan/loomspan-sidecar):** use the separate
   Loomspan HTTP service from applications in other languages or when you want a

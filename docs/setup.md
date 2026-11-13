@@ -3,8 +3,8 @@
 ## Choose the runtime boundary
 
 For **embedded Java**, use a Java 21+ application with the Loomspan Spring Boot
-starter. This checkout targets Spring Boot 4.1 and Spring AI 2. Maven builds need
-3.9+; the framework checkout includes a wrapper. Follow the
+starter. This checkout targets Spring Boot 4.2.0-RC2 and Spring AI 2.1.0-RC2.
+Maven builds need 3.9+; the framework checkout includes a wrapper. Follow the
 [Java quickstart](quickstart-java.md).
 
 For **Sidecar**, use the separate

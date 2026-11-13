@@ -151,10 +151,15 @@ public final class SpringAiProviderIntegration
 
     private AnthropicChatModel anthropic(LoomspanProperties.ConnectionProperties properties)
     {
+        Map<String, String> headers = new java.util.LinkedHashMap<>(properties.getHeaders());
+        // Preserve API-key authentication when the SDK's static credential default changes.
+        if (headers.keySet().stream().noneMatch(name -> name.equalsIgnoreCase("x-api-key")
+                || name.equalsIgnoreCase("Authorization")))
+            headers.put("x-api-key", properties.getApiKey());
         AnthropicChatOptions.Builder optionsBuilder = AnthropicChatOptions.builder()
                 .apiKey(properties.getApiKey())
                 .maxRetries(0)
-                .customHeaders(properties.getHeaders());
+                .customHeaders(headers);
         if (properties.getRequestTimeout() != null) optionsBuilder.timeout(properties.getRequestTimeout());
         if (StringUtils.hasText(properties.getBaseUrl())) optionsBuilder.baseUrl(properties.getBaseUrl());
         return AnthropicChatModel.builder().options(optionsBuilder.build())

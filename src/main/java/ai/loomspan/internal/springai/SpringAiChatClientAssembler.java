@@ -57,6 +57,8 @@ final class SpringAiChatClientAssembler
                         org.springframework.ai.chat.client.advisor.ToolCallingAdvisor.builder()
                                 .toolCallingManager(new CanonicalToolCallingManager(
                                         org.springframework.ai.model.tool.ToolCallingManager.builder()
+                                                // Keep tool-call limits owned by Loomspan rather than SDK defaults.
+                                                .unlimitedCallsPerTool().unlimitedTotalToolCalls()
                                                 .toolExecutionExceptionProcessor(SpringAiChatClientAssembler::recoverableFeedback)
                                                 .observationRegistry(observationRegistry).build()))));
     }

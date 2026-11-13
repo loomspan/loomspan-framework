@@ -63,10 +63,10 @@ missing live evidence is not permission to weaken Framework requirements.
 
 ## Acceptance criteria
 
-- [ ] The selected reproducible platform resolves with recorded effective Boot, Framework, Micrometer, AI, SDK and Jackson versions; no unsupported assumption that changing only the AI property is sufficient.
-- [ ] Compilation/startup/regressions distinguish actual platform acceptance from isolated historical probes; each adapter fix has an exact artifact identity or an explicit remaining blocker.
-- [ ] Every applicable mandatory case in the detailed contract below has executable evidence, or an explicitly identified downstream integration owner and blocked-check record consistent with this ticket's build allowance; no in-scope required behavior is silently deferred.
-- [ ] Owned fixtures and callers migrate with the behavior; preservation controls and the public-surface check are run when buildable, and all failures/blocked checks are reported accurately.
+- [x] The selected reproducible platform resolves with recorded effective Boot, Framework, Micrometer, AI, SDK and Jackson versions; no unsupported assumption that changing only the AI property is sufficient.
+- [x] Compilation/startup/regressions distinguish actual platform acceptance from isolated historical probes; each adapter fix has an exact artifact identity or an explicit remaining blocker.
+- [x] Every applicable mandatory case in the detailed contract below has executable evidence, or an explicitly identified downstream integration owner and blocked-check record consistent with this ticket's build allowance; no in-scope required behavior is silently deferred.
+- [x] Owned fixtures and callers migrate with the behavior; preservation controls and the public-surface check are run when buildable, and all failures/blocked checks are reported accurately.
 
 **Verification emphasis:** Effective dependency tree, compilation, startup, existing regressions and public-surface architecture test. Distinguish platform failures from known pending migration behavior.
 
@@ -103,17 +103,17 @@ accepted decisions or the explicit exclusions above.
 
 - **Historical completed evidence:** Inspect published Spring AI 2.1.0-RC2 source artifacts and POMs from Maven
   Central. The adapter exists in `spring-ai-openai`; no new starter is needed.
-- [ ] Resolve platform alignment before selecting the exact pin: RC2's upstream
+- [x] Resolve platform alignment before selecting the exact pin: RC2's upstream
   build uses Boot 4.2.0-RC2, Spring Framework 7.1.0-RC2, and Micrometer 1.18.0-RC2,
   while Loomspan pins Boot 4.1.0. Java 21 exceeds the upstream Java 17 baseline.
   Decide a coherent Boot/AI version pair and verify the effective dependency tree,
   compilation, startup, and tests. Do not assume changing only the AI property works.
-- [ ] Prefer a reproducible milestone or release candidate over a moving snapshot.
+- [x] Prefer a reproducible milestone or release candidate over a moving snapshot.
   Use a snapshot only if a required fix warrants it and record the exact resolved build.
-- [ ] Review migration changes to ordered message parts, options, metadata, usage,
+- [x] Review migration changes to ordered message parts, options, metadata, usage,
   error types, tool execution, and the OpenAI SDK. Run the existing regression suite
   as an upgrade check without expanding the provider design scope.
-- [ ] Establish the current test baseline and update the dependency in an isolated
+- [x] Establish the current test baseline and update the dependency in an isolated
   implementation change. Do not combine unrelated framework redesigns with this upgrade.
 
 Completion: a reproducible dependency selection and passing existing checks, with
@@ -234,3 +234,10 @@ These probe results do not replace the complete Framework effective tree/startup
 - [Migration roadmap](../phases/spring-ai-responses-migration.md)
 - [Historical schema research](../phases/standard-json-schema-research.md)
 - [TBD-06 reproduction and retained evidence](../../../docs/maintainers/probes/tbd-06/README.md)
+
+
+## Execution notes
+
+Step 4 selected Boot 4.2.0-RC2 / AI 2.1.0-RC2 / NetworkNT 3.0.9. Root effective versions, exact dependency paths, adapter-fix ledger, commands and per-check evidence are in `../plans/2026-11-13-pr-30.1.1-dependency-baseline.md` (Execution Record). Mechanical preservation explicitly disables RC2's new per-tool/total caps to retain Loomspan limit ownership and retains x-api-key through existing Anthropic custom headers after SDK 3.4.0 changed static auth to Bearer. No API, configuration or provider-design expansion.
+
+Acceptance uses the authorized intermediate-build allowance: full suite ran 1,837 tests with two failures and two existing skips; final preservation checks passed 125/125 after the owned auth correction, architecture 8/8, unchanged independent NetworkNT probe 26/26. `ExecutionTraceContractTest.structuredChatCapturePreservesOrderNullsEmptyValuesAndExactContent` remains an executed failure from selected ordered-message text empty versus prior null; restoration owner **30.1.2**, integrated rerun owner **30.4.3**. Exact command/cause/rerun gates are in the plan. Checkmarks record platform-owned completion plus explicit downstream ownership, not integrated green or provider/schema migration acceptance. All other named future adapter cases retain the plan's pending acceptance ledger. Fresh Step 5 review remains required.
