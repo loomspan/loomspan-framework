@@ -146,3 +146,71 @@ cases). The independent nested/canonical tool control stays active. These result
 permit iteration completion under the explicit developer decision and do not
 establish root-schema fidelity or close this blocker. Exact commands and logs are
 recorded in the PR 30.1.3 results artifact linked above.
+
+## PR30-B04 — Gemini raw output and tool schema narrowing (SAI-04/05)
+
+**Status:** Open; four full correctness cases are skipped by default under the
+explicit developer approval of November 13, 2026: "Apply the same default-skip
+deferral to B04 as B01–B03, keep the full assertions available with
+loomspan.pr30.blockers=true, document my approval, and finish the pipeline
+including independent review." This authorizes current iteration completion
+after sufficient default verification and fresh independent review, not blocker
+closure or a claim of raw-schema fidelity. Positive native/default/cap controls
+remain active.
+
+Tested artifact: `org.springframework.ai:spring-ai-google-genai:2.1.0-RC2`, JAR
+SHA-256 `c4217785fb658c76d20a85ca7e322338485ee437b7c9195585b277de01ded307`.
+SDK: `com.google.genai:google-genai:1.73.0`, JAR SHA-256
+`9709e5fd1277e758c8f4b0165473e752d0071ea22ef821556a8f18b3e435d9f0`.
+
+- **Boundaries:** `GoogleGenAiToolCallingManager.resolveToolDefinitions` converts
+  canonical tools into OpenAPI and uppercases types. `GoogleGenAiChatModel`
+  subsequently calls `parameters(jsonToSchema(...))`; output calls
+  `responseJsonSchema(jsonToSchema(...))`. Both tool conversion stages must be
+  bypassed by a suitable correction. SDK raw setters alone do not integrate them.
+- **Actual Framework evidence:** `GeminiProtocolIntegrationTest` keeps complete
+  assertions for nullable output, typed-map/unconstrained input, nullable input
+  and generated reserved-false property. RC2 nullable output fails before HTTP
+  because the SDK Type cannot deserialize an array. The three tool requests use
+  narrowed `parameters`, with no raw `parametersJsonSchema`; map value constraints
+  and root openness disappear. Canonical callback schemas stay unchanged and no
+  tool callbacks execute for the deterministic plain-text responses.
+- **Reproduction:** `mvn -B '-Dtest=GeminiProtocolIntegrationTest' '-Dloomspan.pr30.blockers=true' test`.
+  Full assertions remain intact behind the approved assumption. Exact runs and results are in
+  `ai/thoughts/plans/2026-11-13-pr-30.1.4-gemini-results.md`.
+- **Options:** The independent exact `gemini-3.8-flash` mapping uses native
+  LOW/MEDIUM/HIGH without numeric budget or cap inflation. Request-local schemas
+  must copy effective target defaults: a fresh typed schema-only builder replaces
+  them in RC2. Positive controls retain MEDIUM, 1024/4096/2048 caps, temperature,
+  stops and no schema leakage. This does not close schema fidelity.
+- **Strategy:** Research established no acceptable fixed shipped artifact. Keep
+  official Spring AI model/tool-loop ownership; no copied research model,
+  singleton mutation, body rewrite, fixed extraBody substitute or fallback.
+- **Owner:** PR 30.1.4 retains the unresolved adapter requirement. 30.2.2/30.2.3
+  own schema generation/validation/binding; 30.3.1/30.3.2 own ordinary/planner
+  consumer schema/default copying; 30.4.3 reconciles integrated checks.
+- **Closure:** Verify an acceptable upstream artifact/commit, record its identity,
+  pass complete raw output/tool assertions and native/options/preservation checks.
+  A merged change or SDK-only success does not prove the adapter ships the fix.
+  Remove the guards after correction. Iteration completion under the explicit
+  deferral is separate from closure of these owned requirements.
+
+Verification before the B04 deferral on November 13, 2026: 101 focused native-option/architecture/provider
+controls passed with zero failures/errors/skips. Full `mvn -B test` ran 1,892
+cases with 3 failures, 1 error and 10 prior skips. All failures/errors are the
+four active B04 correctness methods; no unrelated failure was observed. The
+retained Gemini probe command passed four historical defect/direct-SDK methods,
+which does not establish Framework raw-schema fidelity. Exact commands and logs
+are in the linked results document.
+
+### PR30-B04 verification under explicit default deferral
+
+After the quoted approval, focused contributor/protocol/architecture verification
+passed 31 cases with zero failures/errors and exactly four B04 skips. Opt-in
+`mvn -B '-Dtest=GeminiProtocolIntegrationTest' '-Dloomspan.pr30.blockers=true' test`
+ran eight cases with three failures, one error and zero skips, preserving the
+original defect assertions. The default full `mvn -B test` passed 1,892 cases
+with zero failures/errors and 14 skips (four B04, eight prior B01–B03 and two
+existing diagnostics). Positive options and preservation controls remain active.
+Current iteration may proceed to independent review; these results do not close
+B04 or establish raw-schema fidelity. Exact logs are in the results artifact.

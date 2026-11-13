@@ -7,6 +7,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
+import org.springframework.ai.google.genai.common.GoogleGenAiThinkingLevel;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import com.anthropic.models.messages.OutputConfig;
 
@@ -86,6 +87,50 @@ class SpringAiChatOptionsContributorTest
         assertThat(options.getOutputConfig()).isNull();
         assertThatThrownBy(() -> contributor.createOptions(configuration(
                 AiDriver.ANTHROPIC, "claude-sonnet-5-5", "unsupported")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Unsupported thinking level 'unsupported'");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"low, LOW", "medium, MEDIUM", "high, HIGH"})
+    void selectedGeminiUsesNativeLevelWithoutBudgetOrCapInflation(String level, GoogleGenAiThinkingLevel expected)
+    {
+        GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) contributor.createOptions(configuration(
+                AiDriver.GEMINI, "gemini-3.8-flash", level)).build();
+        assertThat(options.getThinkingLevel()).isEqualTo(expected);
+        assertThat(options.getThinkingBudget()).isNull();
+        assertThat(options.getIncludeThoughts()).isTrue();
+        assertThat(options.getMaxOutputTokens()).isEqualTo(GoogleGenAiChatOptions.builder().build().getMaxOutputTokens());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"low, 1024", "medium, 4096", "high, 8192"})
+    void legacyGeminiRetainsBudgetIndependentlyOfSelectedOptions(String level, int budget)
+    {
+        for (boolean selectedFirst : new boolean[] {true, false})
+        {
+            GoogleGenAiChatOptions first = (GoogleGenAiChatOptions) contributor.createOptions(configuration(
+                    AiDriver.GEMINI, selectedFirst ? "gemini-3.8-flash" : "gemini-2.5-pro", level)).build();
+            GoogleGenAiChatOptions second = (GoogleGenAiChatOptions) contributor.createOptions(configuration(
+                    AiDriver.GEMINI, selectedFirst ? "gemini-2.5-pro" : "gemini-3.8-flash", level)).build();
+            GoogleGenAiChatOptions legacy = selectedFirst ? second : first;
+            GoogleGenAiChatOptions selected = selectedFirst ? first : second;
+            assertThat(legacy.getThinkingBudget()).isEqualTo(budget);
+            assertThat(legacy.getThinkingLevel()).isNull();
+            assertThat(selected.getThinkingBudget()).isNull();
+            assertThat(selected.getThinkingLevel()).isNotNull();
+        }
+    }
+
+    @Test
+    void selectedGeminiThinkingIsOptionalAndUnsupportedLevelsFailLocally()
+    {
+        GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) contributor.createOptions(configuration(
+                AiDriver.GEMINI, "gemini-3.8-flash", null)).build();
+        assertThat(options.getThinkingLevel()).isNull();
+        assertThat(options.getThinkingBudget()).isNull();
+        assertThat(options.getIncludeThoughts()).isNull();
+        assertThatThrownBy(() -> contributor.createOptions(configuration(
+                AiDriver.GEMINI, "gemini-3.8-flash", "unsupported")))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("Unsupported thinking level 'unsupported'");
     }
 

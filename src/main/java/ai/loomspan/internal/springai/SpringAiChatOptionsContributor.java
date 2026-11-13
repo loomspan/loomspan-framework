@@ -5,6 +5,7 @@ import com.anthropic.models.messages.OutputConfig;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
+import org.springframework.ai.google.genai.common.GoogleGenAiThinkingLevel;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 
 public final class SpringAiChatOptionsContributor
@@ -63,6 +64,18 @@ public final class SpringAiChatOptionsContributor
         GoogleGenAiChatOptions.Builder builder = GoogleGenAiChatOptions.builder().model(configuration.providerModel());
         if (configuration.thinkingLevel() != null)
         {
+            if ("gemini-3.8-flash".equals(configuration.providerModel()))
+            {
+                GoogleGenAiThinkingLevel level = switch (configuration.thinkingLevel())
+                {
+                    case "low" -> GoogleGenAiThinkingLevel.LOW;
+                    case "medium" -> GoogleGenAiThinkingLevel.MEDIUM;
+                    case "high" -> GoogleGenAiThinkingLevel.HIGH;
+                    default -> throw new IllegalArgumentException("Unsupported thinking level '"
+                            + configuration.thinkingLevel() + "'");
+                };
+                return builder.includeThoughts(true).thinkingLevel(level);
+            }
             builder.includeThoughts(true).thinkingBudget(budget(configuration.thinkingLevel()));
         }
         return builder;

@@ -132,6 +132,26 @@ unresolved. Native raw output configuration can preserve format schemas and
 existing effort when copied; this adapter evidence does not establish ordinary
 mission or planner native-output orchestration.
 
+For the exact Gemini provider model `gemini-3.8-flash`, `low`, `medium` and
+`high` select native `LOW`, `MEDIUM` and `HIGH`. No numeric thinking budget is
+sent and the generation cap is unchanged. Omitted thinking remains omitted;
+unsupported levels fail locally. Other Gemini model IDs retain numeric budgets
+1024, 4096 and 8192 for low, medium and high. This exact-model mapping does not
+infer hosted availability or support for other model IDs.
+
+Known Gemini adapter limitation in Spring AI `2.1.0-RC2`: output schemas are
+converted to the SDK's finite schema type, while tool schemas first pass through
+OpenAPI conversion and then that SDK type. Nullable output type arrays fail
+before HTTP; ordinary-input typed maps, unconstrained leaves and reserved false
+properties cannot be assumed to survive. Complete raw-schema fidelity remains
+unresolved. Changing serializable per-request schemas preserves native thinking
+and generation caps, but does not establish full raw-schema support or migrated
+ordinary/planner output orchestration. At this adapter boundary, request-local
+typed options must copy the effective target defaults before replacing the schema;
+a fresh schema-only builder replaces those defaults, losing native thinking and
+the configured cap. Fresh effective-target defaults also prevent carrying an old
+model's numeric budget into a native-level target.
+
 ## Configuration and diagnosis
 
 1. Create a named entry under `loomspan.connections` for each endpoint/account.
@@ -159,6 +179,10 @@ For chat drivers, the identical bounded guidance is recorded on every failed phy
 - Wire behavior: `ConnectionProtocolTest` and `AnthropicProtocolIntegrationTest`
   (native effort, unchanged caps, changing raw output schemas, legacy controls and
   active nested/canonical controls and the opt-in blocked full tool-root fidelity assertion).
+- Gemini native/legacy options and cap/default isolation: `SpringAiChatOptionsContributorTest`
+  and `GeminiProtocolIntegrationTest`; complete raw output/tool assertions remain
+  opt-in dependency-failure evidence (`loomspan.pr30.blockers=true`) rather than
+  proof of schema support. Positive option and cap controls remain active.
 - Call budgets/default transport phases: `LoomspanProperties#validateRequestTimeout`,
   `ProviderRequestTimeoutIntegrationTest` (shared Responses, Anthropic and both Gemini modes,
   delayed headers, active body deadline, configured success, actual client defaults).
