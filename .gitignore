@@ -52,6 +52,9 @@ logs/
 *.bak
 *~
 
+# Local migration research probes
+/docs/maintainers/probes/
+
 # Python test caches
 __pycache__/
 *.py[cod]

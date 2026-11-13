@@ -683,9 +683,9 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
         }
         if (rawValue instanceof Resource resource)
         {
-            try
+            try (InputStream stream = resource.getInputStream())
             {
-                return StreamUtils.copyToByteArray(resource.getInputStream());
+                return StreamUtils.copyToByteArray(stream);
             }
             catch (IOException ex)
             {
@@ -717,9 +717,9 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
 
     private String convertResourceToString(Parameter parameter, Resource resource)
     {
-        try
+        try (InputStream stream = resource.getInputStream())
         {
-            return StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+            return StreamUtils.copyToString(stream, StandardCharsets.UTF_8);
         }
         catch (IOException ex)
         {

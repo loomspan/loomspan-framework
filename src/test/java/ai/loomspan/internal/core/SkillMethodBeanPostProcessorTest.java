@@ -219,11 +219,13 @@ class SkillMethodBeanPostProcessorTest {
 
         CapabilityMetadata metadata = registry.getCapability("default-readRefAsString");
         Method method = getDeclaredMethod(RefStringInvocationBean.class, "readRefAsString", String.class);
+        TrackingResource resource = new TrackingResource("hello text".getBytes(StandardCharsets.UTF_8), false);
         Object rawResult = metadata.invoker().invoke(Map.of(
                 method.getParameters()[0].getName(),
-                new ByteArrayResource("hello text".getBytes(StandardCharsets.UTF_8))));
+                resource));
 
         assertThat(rawResult).isEqualTo("hello text");
+        assertThat(resource.closeCount).isEqualTo(1);
     }
 
     @Test
@@ -235,11 +237,69 @@ class SkillMethodBeanPostProcessorTest {
 
         CapabilityMetadata metadata = registry.getCapability("default-readRefAsBytes");
         Method method = getDeclaredMethod(RefBytesInvocationBean.class, "readRefAsBytes", byte[].class);
+        TrackingResource resource = new TrackingResource(new byte[]{0x01, 0x02, 0x03}, false);
         Object rawResult = metadata.invoker().invoke(Map.of(
                 method.getParameters()[0].getName(),
-                new ByteArrayResource(new byte[]{0x01, 0x02, 0x03})));
+                resource));
 
         assertThat(rawResult).isEqualTo("010203");
+        assertThat(resource.closeCount).isEqualTo(1);
+    }
+
+    @Test
+    void closesEagerConversionStreamsWhenReadingFails() {
+        var registry = new TestCapabilityRegistry();
+        var processor = processor(registry);
+        process(processor, new RefStringInvocationBean(), "textBean");
+        process(processor, new RefBytesInvocationBean(), "bytesBean");
+        process(processor, new NestedRecordInvocationBean(), "nestedBean");
+
+        for (String capability : List.of("default-readRefAsString", "default-readRefAsBytes",
+                "default-readNestedRecord")) {
+            var resource = new TrackingResource(new byte[]{1}, true);
+            Object payload = capability.equals("default-readNestedRecord")
+                    ? Map.of("document", Map.of("title", "title", "attachments", List.of(resource)))
+                    : resource;
+            org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                    registry.getCapability(capability).invoker().invoke(Map.of("payload", payload)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasCause(resource.readFailure);
+            assertThat(resource.closeCount).as(capability).isEqualTo(1);
+        }
+    }
+
+    private static final class TrackingResource extends ByteArrayResource {
+        private final boolean failRead;
+        private final IOException readFailure = new IOException("fixture read failure");
+        private int closeCount;
+
+        private TrackingResource(byte[] bytes, boolean failRead) {
+            super(bytes);
+            this.failRead = failRead;
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            return new java.io.FilterInputStream(super.getInputStream()) {
+                @Override
+                public int read() throws IOException {
+                    if (failRead) throw readFailure;
+                    return super.read();
+                }
+
+                @Override
+                public int read(byte[] bytes, int offset, int length) throws IOException {
+                    if (failRead) throw readFailure;
+                    return super.read(bytes, offset, length);
+                }
+
+                @Override
+                public void close() throws IOException {
+                    closeCount++;
+                    super.close();
+                }
+            };
+        }
     }
 
     @Test
@@ -295,16 +355,18 @@ class SkillMethodBeanPostProcessorTest {
 
         CapabilityMetadata metadata = registry.getCapability("default-readNestedRecord");
         Method method = getDeclaredMethod(NestedRecordInvocationBean.class, "readNestedRecord", NestedPayload.class);
+        var title = new TrackingResource("hello title".getBytes(StandardCharsets.UTF_8), false);
+        var first = new TrackingResource(new byte[]{0x01, 0x02}, false);
+        var second = new TrackingResource(new byte[]{0x0A, 0x0B}, false);
         Object rawResult = metadata.invoker().invoke(Map.of(
                 method.getParameters()[0].getName(),
                 Map.of(
                         "document", Map.of(
-                                "title", new ByteArrayResource("hello title".getBytes(StandardCharsets.UTF_8)),
-                                "attachments", List.of(
-                                        new ByteArrayResource(new byte[]{0x01, 0x02}),
-                                        new ByteArrayResource(new byte[]{0x0A, 0x0B}))))));
+                                "title", title,
+                                "attachments", List.of(first, second)))));
 
         assertThat(rawResult).isEqualTo("hello title|0102,0a0b");
+        assertThat(List.of(title.closeCount, first.closeCount, second.closeCount)).containsExactly(1, 1, 1);
     }
 
     @Test

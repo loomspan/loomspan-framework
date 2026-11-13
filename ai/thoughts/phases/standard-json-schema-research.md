@@ -1,8 +1,36 @@
 # TBD-06 research: a standard JSON Schema foundation
 
-Continuation: read the roadmap's [November 11 handoff](spring-ai-responses-migration.md#continuation-handoff--november-11-2026)
-for current decisions, rationale, evidence boundaries and remaining TBD-13/14 work.
+Continuation: read the roadmap's [November 12 handoff](spring-ai-responses-migration.md#continuation-handoff--november-12-2026)
+for current Framework decisions, rationale, evidence boundaries and audit discipline.
 Accepted roadmap decisions supersede historical research proposals below.
+The next fresh-context session follows the roadmap's [bounded readiness review](spring-ai-responses-migration.md#next-session--bounded-migration-readiness-review).
+That review is pending; focus on known migration blockers and handoff sufficiency, not
+further Java declaration edge-case discovery.
+The roadmap's [deferred Java declaration overview](spring-ai-responses-migration.md#deferred-java-declaration-edge-cases--scope-reset-november-12-2026)
+supersedes the earlier edge-case registration restrictions. Keep those items outside
+migration implementation, acceptance and routine audit scope; their detailed sections
+and probes have been deliberately removed.
+TBD-13 records the agreed map-key registration restriction with
+[preserved probes](../../../docs/maintainers/probes/tbd-13-map-key-types/README.md); implementation remains pending.
+TBD-13 records the agreed open-property JSON-compatibility acceptance detail with
+[preserved probes](../../../docs/maintainers/probes/tbd-13-open-properties/README.md); implementation remains pending.
+TBD-13 records the agreed enabled-JsonUnwrapped registration rejection with
+[preserved probes](../../../docs/maintainers/probes/tbd-13-unwrapped/README.md); implementation remains pending.
+TBD-13 also records the agreed UUID string-contract correction with
+[preserved baseline/candidate probes](../../../docs/maintainers/probes/tbd-13-uuid/README.md);
+implementation and full acceptance remain pending.
+The roadmap's TBD-13 recursive-type section also records the agreed runtime-resource
+sequencing requirement and its [preserved probes](../../../docs/maintainers/probes/tbd-13-runtime-recursion/README.md).
+The [TBD-11 completed-history follow-up](spring-ai-responses-migration.md#completed-tool-history-integration--agreed-november-12-2026)
+records the agreed call-local integration approach and links its durable current/RC2
+probes. Those results do not complete production implementation or live acceptance.
+The [TBD-12 status/usage follow-up](spring-ai-responses-migration.md#statususage-integration-and-adapter-prerequisites--agreed-november-12-2026)
+owns the agreed classifier/accounting approach and adapter evidence-retention prerequisites,
+with durable current/RC2 probes. Adapter repairs and full acceptance remain pending.
+Test-suite implementation and deployed/live acceptance requirements live in the
+[test-suite roadmap](../../../../loomspan-sidecar-test-suite/MIGRATION-ACCEPTANCE-ROADMAP.md);
+that work follows Framework implementation, and overall migration acceptance remains
+pending until its gates pass.
 
 Resource-limit follow-up: [Validation resource-limit evidence and v1 decision](#validation-resource-limit-evidence-and-v1-decision).
 
@@ -303,12 +331,6 @@ See TBD-13's accepted developer model and mandatory tests for implementation sco
 Flag existing generated unconstrained schemas or internal projection needs outside
 this baseline; they do not automatically expand authoring scope.
 
-**Root shapes — agreed for v1:** input, output, tool-argument, and planning
-contracts require `type: object` at the root. Arrays and scalars remain supported
-as nested properties under the approved v1 profile. Apply this rule consistently to
-authored and generated contracts; reject unsupported root shapes at schema loading
-or declaration registration. Do not automatically wrap or convert root values.
-Broader root shapes are deferred until a concrete use case justifies them.
 
 The earlier proposal to accept arbitrary JSON roots is superseded.
 
@@ -566,7 +588,7 @@ Offline fixtures should come first; cloud probes require separate authorization.
 | Real framework lifecycle | Initial planning, skill output, one tool continuation, one correction; distinct schemas for concurrent skills. Verify authored canonical schema persists and request schema belongs to the correct call. History policy is still TBD-11. |
 | Bindings/runtime values | Parent input to child; accepted child output to another input; bound output composition; reserved null/equal-value override; open object; nested optional ancestor; ambiguous union path rejected clearly. Attachment ref versus direct Resource and Java runtime ref resolve in existing boundaries. |
 | Metadata/Console/TypeSafe | Standard derived TypeSafe choice/score maps; input substitutions; original YAML plus effective schema display; output diagnostics and MCP/REST fixture parity. Confirm no independent chat adapter is introduced. |
-| Later live smoke | Per explicitly selected model/route: one closed simple schema; one schema with tools and final output; one planning schema; one documented ignored or weakened constraint paired with deliberately invalid local fixture. Historical initial proposal, superseded by the accepted TBD-14 bounded matrix below; its request/token/cost caps govern. Wall-clock settings are agreed below. |
+| Later live smoke | Per explicitly selected model/route: one closed simple schema; one schema with tools and final output; one planning schema; one documented ignored or weakened constraint paired with deliberately invalid local fixture. Historical initial proposal, superseded by the accepted TBD-14 matrix in the linked test-suite roadmap; its request/token/cost caps and wall-clock settings govern. |
 
 For live results record endpoint protocol, model snapshot, OpenRouter upstream route,
 Ollama server/model digest, Spring AI/SDK versions, exact sent schema, status/refusal,
@@ -576,18 +598,6 @@ invalid-result fixture proves local rejection; a bounded live call establishes o
 observed compatibility. Do not run or install a different Ollama model to fill a matrix
 cell silently. A missing credential or rejected schema remains a gap, not a skipped
 test reported as success.
-
-## Decision status and continuation
-
-TBD-01 through TBD-13 are resolved as policy; implementation and acceptance are not
-complete. The roadmap's numbered decisions and ticket requirements are authoritative.
-Attachment input design under TBD-13 is also settled, including annotation placement,
-direct Resource validation and null semantics. Native generated attachments are deferred.
-TBD-14 is resolved as policy below, including testing ownership, protected suite,
-host coverage, bounded cases, models/routes/effort, USD 5 ceiling and timeouts.
-Implementation and acceptance gates remain open; no further policy choice is identified.
-See the roadmap's [continuation handoff](spring-ai-responses-migration.md#continuation-handoff--november-11-2026).
-No implementation tickets have been created in this conversation.
 
 Downloaded public sources/POMs are inspection-only under `target/research/tbd-06`
 (existing OpenAI RC2 sources remain under `target/research/spring-ai-2.1.0-RC2`).
@@ -631,7 +641,7 @@ the probe thresholds are fixtures, not proposed product restrictions.
 
 | Actual serialization boundary | Verified outcome |
 | --- | --- |
-| OpenAI Responses | Complete authored schema survives `text.format.schema` and function parameters. ChatClient retains effort/token defaults; a direct call with fresh typed options loses them. |
+| OpenAI Responses | The tested schema fixture survives `text.format.schema` and function parameters. This did not establish numeric precision: the November 12 follow-up below reproduces rounded decimal bounds/enums in both paths. ChatClient retains effort/token defaults; a direct call with fresh typed options loses them. |
 | Anthropic native outputConfig | Intact raw schema survives. Copy existing OutputConfig and replace format to preserve effort; a fresh per-call OutputConfig replaces default effort even through ChatClient. |
 | Anthropic tools | Root additionalProperties and other root constraints disappear; nested property content survives. Direct SDK raw input schema preserves all tested fields. |
 | Gemini output | Type arrays fail before HTTP; typed additionalProperties silently disappear. minLength/pattern/minimum/minProperties survive; multipleOf disappears. |
@@ -681,6 +691,7 @@ When fixing upstream, replace the defect expectation with schema-fidelity assert
 | SAI-03 Anthropic tool root-schema loss | `AdapterTest.anthropicConvenienceAndNativeAndOptions`; `anthropic-native.json`, direct control `anthropic-sdk.json`. Root openness and other constraints disappear. | No exact matching issue found; the ordinary root-constraint loss is independently demonstrated. Candidate fix: populate SDK InputSchema with all authored root entries rather than only properties/required. No options-only bypass established. | Actual tool request preserves the canonical schema. Native strict tools are deferred beyond v1 under TBD-08; schema fidelity and local validation remain required. |
 | SAI-04 Gemini tool schema conversion | `AdapterTest.geminiAdapterMatrix`, `AdditionalAdapterTest.geminiNonNullableUnion`; `gemini-tool-mixed-union-exception.txt`, `gemini-tool-map.json`, `gemini-tool-constraints.json`. Mixed unions fail before HTTP; other constraints disappear. | No exact matching upstream fix established for these remaining inline-schema failures. Candidate action: use raw parametersJsonSchema for ordinary schemas rather than narrow conversion. | Fidelity for approved v1 fixtures, including nullable types and retained constraints. Typed-map input fidelity is now a v1 implementation gate; general mixed unions remain historical defect evidence outside v1. |
 | SAI-05 Gemini output schema conversion | `AdapterTest.geminiAdapterMatrix` and `geminiDirectSdkRawSchemas`; `gemini-output-union-exception.txt`, `gemini-output-map.json`, `gemini-output-constraints.json`, `gemini-sdk-*.json`. Type arrays fail; maps/multipleOf are dropped. | No exact matching issue found for this complete output path. Candidate fix: send raw maps through GenerateContentConfig.responseJsonSchema instead of narrowing to SDK Schema. | Different per-call v1 skill/planning schemas survive intact with option defaults preserved, subject only to approved TBD-07 mappings. Nullable type arrays remain relevant; typed maps/multipleOf are outside v1 and not standalone gates. Fixed client extraBody is not a per-request solution. |
+| SAI-06 Responses schema decimal decoding | [November 12 baseline/candidate probe](../../../docs/maintainers/probes/responses-schema-precision/README.md): actual output/tool schema captures round precise decimal bounds/enums. Six baseline and six candidate cases per Boot platform; candidate also passes three existing schema/options/replay regressions per platform. | A private rebuilt SDK mapper with Jackson 2 USE_BIG_DECIMAL_FOR_FLOATS preserves both paths in the isolated adapter. Prefer a focused upstream fix or verified release; no released fix/submission verified. Do not deploy the copied research class as a Loomspan override or mutate the shared SDK mapper. | Exact numeric values in both wire schemas through the migrated Framework pipeline, retaining canonical contracts, options, strictness and replay. Isolated candidate proof is not completed Framework or live acceptance. Authoritative requirements are under TBD-07. |
 
 The raw SDK controls preserve the tested fields, locating these losses in Spring AI
 rather than proving provider acceptance. Provider subset restrictions remain separate.
@@ -1000,82 +1011,6 @@ above. These gaps are documented limitations, not newly authorized implementatio
 
 
 
-## Accepted TBD-07 implementation policy
-
-The user accepted narrow driver mappings, as specified in the roadmap's
-[TBD-07 requirements and mandatory ticket handoff](spring-ai-responses-migration.md#tbd-07-selecting-provider-differences-without-a-capability-registry).
-Those requirements supersede broader mapping proposals in this research. Preserve
-canonical schemas; send supported/ignored keywords unchanged; omit only evidenced
-rejected simple-bound assertions or exact standard formats from request copies.
-No structural transformations, route/model detection, registry, automatic fallback,
-or error-driven keyword stripping are authorized. Adapter losses remain defects,
-not provider rejection evidence. Future tickets must include exact mapping entries,
-evidence, implementation boundaries, and acceptance cases; the implementing LLM
-must not invent policy. Strict tools and failure timing are separately resolved under TBD-08/09.
-
-## Accepted TBD-08 implementation policy
-
-Native strict tool enforcement is deferred beyond v1. The roadmap's
-[TBD-08 requirements and mandatory ticket handoff](spring-ai-responses-migration.md#tbd-08-native-strict-tool-argument-enforcement)
-are authoritative: send tool schemas, keep strictness disabled, validate canonical
-arguments before tool execution, retain authorization and existing binding/resource
-semantics, and preserve the existing Spring AI tool loop. Add no strict-mode option,
-automatic enablement, new loop, or retry mechanism. Future tickets must include the
-exact driver settings and acceptance tests, especially proof that invalid arguments
-cannot execute side effects. Native final-output/planning formatting remains in scope.
-Earlier proposals to investigate or enable strict tools during v1 are superseded.
-
-## Accepted TBD-09 failure policy
-
-The roadmap's [TBD-09 failure policy and mandatory ticket handoff](spring-ai-responses-migration.md#tbd-09-unsupported-schemasmodels-and-failure-timing)
-are authoritative. Reject invalid declarations locally at loading/registration;
-reject known driver incompatibility before the affected request; surface explicit
-provider schema/support rejection without unchanged-request retries or fallback.
-Canonical-invalid output uses bounded correction; transient transport failures retain
-the existing retry policy; incomplete validation is an operational failure. No live
-registration probes, capability registry, rollback promise, or new public error API
-is authorized. Tickets must carry the complete failure table, diagnostic requirements,
-retry ownership and acceptance cases. Untested routes may be attempted without a
-native-support guarantee. TBD-11/12 retain their separate history/refusal decisions.
-
-## Accepted TBD-10 binding migration policy
-
-Preserve existing binding/projection/composition behavior while migrating to standard
-JSON Schema and shared validation. The roadmap's [TBD-10 implementation requirements
-and mandatory ticket handoff](spring-ai-responses-migration.md#tbd-10-output-binding-projection-and-fully-bound-outputs)
-are authoritative. Exact property-name matching intentionally replaces legacy
-case-insensitive behavior. Retain object-only paths, whole-value transfers, ownership
-rejection, source snapshots, required-work checks, full-result validation, and skipping
-final synthesis when no model contribution remains. Do not add a new binding system,
-array-element/wildcard paths, coercion, or a general schema-transformation engine.
-Tickets must carry the concrete preserved behaviors and acceptance cases rather than
-leaving policy to the implementing LLM. Earlier binding proposals are superseded by
-this preservation decision; correction history follows the separately resolved TBD-11 requirements.
-
-## Accepted TBD-11 targeted correction changes
-
-The roadmap's [TBD-11 requirements and mandatory integration tests](spring-ai-responses-migration.md#tbd-11-correction-history-tool-availability-and-side-effects)
-authorize only two ordinary-advisor changes: enforce no tool execution during final-
-output correction, and retain completed tool exchanges/results in correction requests.
-Preserve schema correction's latest-candidate policy and existing linter/evidence
-feedback behavior. Preserve planning, step-loop final correction, budgets, retry
-ownership, binding snapshots and all unrelated behavior. The findings are from source
-and test inspection; tickets must include end-to-end reproductions with captured
-requests and side-effect counts, not assume mocked advisor tests prove integration.
-No second loop, new retry policy, public knobs, or speculative history redesign.
-
-## Accepted TBD-12 targeted response-status changes
-
-The roadmap's [TBD-12 requirements and mandatory ticket tests](spring-ai-responses-migration.md#tbd-12-refusals-incomplete-responses-and-partial-tool-calls)
-authorize three targeted changes: explicit refusal/incomplete checks before downstream
-acceptance/correction; zero tool dispatch from incomplete responses; and preserved
-status/content diagnostics with usage counted once on rejection. Use provider metadata,
-not prose heuristics. Preserve cancellation, transport retry policy, normal tool turns,
-authorization and existing OpenRouter error-completion handling. Tickets must carry
-exact adapter mappings/evidence and integration tests. Source inspection alone is not
-an end-to-end proof for every SDK; missing status metadata is an integration blocker,
-not permission to guess or add a competing transport or recovery system.
-
 ## TBD-13 attachment investigation — November 11, 2026
 
 Historical investigation evidence; subsequent accepted decisions settle attachment
@@ -1190,9 +1125,6 @@ and standard assertions. The earlier `input_attachments` proposal is superseded.
 Exact [ticket requirements](spring-ai-responses-migration.md#attachment-input-declaration--agreed-november-11-2026)
 are in TBD-13. Direct Java Resource validation is now settled through the attachment-only adapter
 below; do not stringify resources, fabricate placeholders, or remove existing support.
-Non-attachment runtime-reference marker retention is also agreed below; evidence
-evidence annotation placement and behavior are settled below; effective-schema display is settled below; TypeSafe migration boundaries are settled below; declaration authority is preserved below. Direct Java-value validation
-uses the separately agreed adapter below.
 
 ## Accepted non-attachment runtime-reference metadata
 
@@ -1260,8 +1192,7 @@ ordinary sibling errors, closed-object extras and array bounds; no invocation af
 validation failure; canonical immutability and no private placeholders/weakened schemas
 in provider requests or diagnostic evidence. The authoritative detailed requirements
 are in [TBD-13](spring-ai-responses-migration.md#direct-java-runtime-value-validation--agreed-november-11-2026).
-No implementation or new test-run acceptance is claimed. Existing declaration authority
-is preserved below; recursive types are settled below and unconstrained Object input support is agreed below.
+No implementation or new test-run acceptance is claimed.
 
 ## Accepted direct Resource attachment boundary
 
@@ -1644,388 +1575,3 @@ Mandatory ticket acceptance tests:
   schema consistently, with original source text preserved and no provider-copy mutation.
 
 No production implementation, new test-run acceptance or ticket creation is claimed.
-
-
-## Acceptance ownership, suite gaps and mandatory gates — agreed November 11, 2026
-
-Use loomspan-framework for deterministic implementation coverage and the neighboring
-loomspan-sidecar-test-suite for deployed migration acceptance. The latter already hosts
-both an embedded Java Framework application and a Python/SDK/Sidecar application, plus
-separate Java/Python SDK consumers. It is not merely an HTTP-only Sidecar test harness.
-Reuse its capability-oriented suites, runtime orchestration, artifact recording and
-provider-disabled restoration; do not create a second live acceptance harness here.
-Fix tracking stays in the owning product repository, not PR-specific suite partitions.
-
-| Acceptance area | Framework repository | Sidecar test suite |
-| --- | --- | --- |
-| Schema semantics and Java declarations | Exhaustive compiler/validator, generation, binding, recursion errors and resource checks | Representative deployed input/output and real Java declarations with equivalent Sidecar callbacks |
-| Provider contracts | Actual request captures for all three integrations, schema/options fidelity, ordered replay and tool identities | Selected live endpoint/model/route compatibility through deployed integrations |
-| Repairs/status/side effects | Deterministic refusal/incomplete, repair history, authorization and duplicate-side-effect prevention | Small controlled scenarios verifying deployed wiring and observable behavior |
-| Planning/bindings/evidence | Detailed semantic, projection and isolation regressions | Existing composed workflows plus targeted missing integration cases |
-| Attachments | Validation, direct Java resource handling, materialization and serialized requests | Real supported files on selected live routes through supported host entry points |
-| TypeSafe | Declaration/metadata and native executor unit tests | Existing native protocol, passthrough, forwarding, bindings and policy regressions |
-| Catalog/Console | Metadata and Console contract/rendering tests in framework/loomspan-console | Relevant external integration assertions only |
-
-Inspected suite gaps to close:
-
-1. fixtures/server.py serves /v1/chat/completions and proxies live chat to OpenRouter's
-   Chat endpoint. fixtures/replay.py matches messages/reasoning_effort. Migrate request
-   matching, response envelopes, controlled responses, usage reporting and live proxy
-   handling to Responses for the migrated openai driver. Preserve maintained reference
-   packs; derive new protocol fixtures separately. Reusing accepted business answers
-   proves business regression, not ordered reasoning/tool replay fidelity.
-2. Existing chat live orchestration is OpenRouter-specific. Add bounded selections for
-   OpenAI, Meta, OpenRouter, Ollama, Anthropic and Gemini through existing orchestration.
-   Host coverage is agreed below; run budgets are agreed below; model/route selections and timeouts are finalized below.
-   Do not multiply the entire equipment workflow across every provider to prove protocol
-   compatibility; use small capability-oriented cases.
-3. Migrate maintained YAML and its authoring generators/contracts together, including
-   explicit intended openness and accepted metadata vocabulary. Preserve business
-   behavior and Java/Sidecar equivalence. Regeneration must not restore the old dialect.
-4. Add focused scenarios for typed-map/unconstrained inputs, native schema-plus-tools,
-   response refusal/incompleteness, and attachments where existing business scenarios
-   do not establish these contracts. Keep exhaustive variants in framework tests.
-5. Stage coherent migrated Framework artifacts in both Java and Sidecar hosts. Reuse
-   build recording to identify actual artifacts/configuration and relevant source/suite
-   revisions. A shared mutable snapshot coordinate alone is not migration acceptance.
-
-The TypeSafe suite already covers fixed/dynamic questions, substitution, forwarding,
-bindings, malformed envelopes, extra answers and native passthrough. Migrate its schemas
-and chat-parent fixtures and rerun that coverage rather than invent a new native test
-suite. New paid TypeSafe evaluation is not inherently required for this migration.
-SDK TLS/mTLS and service-commitment checks are affected-path regressions, not tests to
-repeat for every model. The suite's --suite all covers its business suites, not every
-SDK/transport/commitment check; reports must name actual selections.
-
-Mandatory acceptance gates for later tickets:
-
-- Passing applicable deterministic framework tests, including the previously agreed
-  numbered TBD cases, real factory/advisor/tool pipeline captures and public-surface
-  architecture checks after production type changes. Isolated SDK proof is insufficient.
-- Coherent migrated dependencies/artifacts in both deployed hosts, migrated authoring
-  sources and provider-free business/TypeSafe integration regression with maintained
-  fixtures preserved. Report selected checks and uncovered paths explicitly.
-- Responses fixture and live-path readiness before claiming migrated integration
-  coverage; no Chat fallback, old runtime implementation or successful legacy replay
-  counted as proof of the new path. Native Anthropic/Gemini paths remain native.
-- Selected live route cases for the required provider endpoints, with exact model/route,
-  versions, schemas/requests, outcomes, local validation, usage, retries and limits
-  recorded. Host coverage is agreed below; cases and budgets are agreed below; model/route and effort selections are finalized below; wall-clock settings are agreed below.
-- Resolve relevant replay/schema mapper defects, including Anthropic root constraints
-  and Gemini raw tool-schema fidelity. A successful final answer cannot substitute for
-  preserved protocol state and schema evidence. Do not silently drop required features.
-- Missing credentials, unavailable endpoints, unresolved dependencies/mapper defects,
-  and failing required features remain explicit open completion gates. Independent work
-  may continue; skipped/untested cases are not passes and trigger no automatic fallback.
-- Keep deterministic correctness, deployed integration, live compatibility and observed
-  quality/performance evidence distinct. Prior suite reports apply only to their recorded
-  builds. Publish evidence references from this roadmap even when tests run elsewhere.
-
-Inspection sources: ../loomspan-sidecar-test-suite/AGENTS.md, docs/project-agreement.md,
-docs/coverage.md, docs/runtime.md, docs/typesafe-ai.md, fixtures/server.py,
-fixtures/replay.py, scripts/run_suite.py and scripts/suites/registry.py. Inspection was
-read-only: no tests, builds, runtime changes or paid calls were performed. Future paid
-scope is not authorized by this documentation update; no tickets are created here.
-
-
-## Live host coverage — agreed November 11, 2026
-
-Use reduced live duplication within loomspan-sidecar-test-suite. Both hosts below are
-owned by that suite: its embedded Java Framework app and its Python/SDK/Sidecar app.
-Do not interpret Java-host acceptance as a new live harness in loomspan-framework.
-
-| Coverage | Required host selection |
-| --- | --- |
-| Provider-free business/schema/callback and TypeSafe regression | Both suite hosts |
-| Full bounded provider-compatibility cases for OpenAI, Meta, OpenRouter, Ollama, Anthropic and Gemini | Embedded Java host |
-| Representative live tools-plus-structured-output case for each of the three integrations (OpenAI Responses, Anthropic, Gemini) | Python/Sidecar host |
-| Host-specific or unexplained discrepancy | Reproduce on both hosts as needed to resolve it |
-
-Meta, OpenRouter and Ollama receive full selected live-case coverage on the Java host;
-their Sidecar configuration is checked deterministically. Use the OpenAI endpoint for
-the representative Sidecar Responses case. Cases and run budgets are agreed below; timeout
-settings are agreed below. The full matrix means the agreed bounded cases,
-not every model, every schema keyword or the entire equipment workflow per endpoint.
-
-Rationale: verify all required endpoints through deployed Framework and all three
-integration paths through Sidecar without repeating the whole live matrix twice.
-This does not establish live acceptance of every provider/host combination. Reports
-must explicitly distinguish live verification from deterministic configuration checks.
-
-Mandatory acceptance requirements: both-host provider-free results; Java-host live
-results for all six selected endpoint routes; Sidecar live tools-plus-structured-output
-results for the three selected integration representatives; deterministic Sidecar
-configuration checks for remaining Responses routes; and resolved or explicitly open
-host-specific discrepancies. Record host, artifact/configuration identity and route
-for every result. Missing required cells remain open gates under the preceding rules;
-do not infer live Sidecar route acceptance from the Java host's success.
-
-No paid run or implementation is authorized or performed by this decision.
-
-
-## Protected framework acceptance suite and Meta Contributor — agreed November 11, 2026
-
-Maintain a durable framework-acceptance suite inside loomspan-sidecar-test-suite,
-separate from business examples and SDK/transport suites. Own its scenarios, skills,
-fixtures, provider/host matrix and expected results in dedicated suite locations using
-the existing suite layout and explicit runner selection. This is framework contract
-coverage, not a disposable migration-specific folder or PR partition.
-
-Protect coverage through a checked-in manifest identifying required contracts and
-host/provider cells. Verification must fail when a required case disappears or is
-silently skipped. Business generators and fixture-refresh commands must not modify
-framework-acceptance assets. Keep maintained accepted fixtures separate from fresh
-run output; changing expectations requires a deliberate update with recorded rationale.
-Shared runtime/reporting infrastructure remains reusable; changes to it require the
-framework suite's applicable provider-free regressions. Protection means stable contract
-coverage and reviewed updates, not permanently frozen provider IDs or protocol files.
-
-Mandatory acceptance tests: explicit suite selection/discovery; required-case manifest
-completeness; missing/skipped-cell failure; isolation from business authoring/refresh
-commands; refusal to overwrite maintained fixtures with run output; independent fresh
-result directories; framework regression selection for shared harness changes; and
-reports distinguishing current tested artifacts, live/provider-free cells and gaps.
-Keep existing business assignments and accepted reference packs unchanged.
-
-Select muse-spark-1.3-contributor for direct Meta Responses acceptance, replacing the
-previous standard-mode proposal. Meta documents the same model at discounted prices
-in exchange for permission to use submitted content and responses for training.
-Use deliberately authored synthetic acceptance data; this is not a content-masking
-mechanism. Contributor does not offer max reasoning effort; use a supported setting
-for continuation tests. Account access and actual route acceptance remain unverified.
-
-Published prices checked November 11, 2026: Contributor input $0.10 and output $0.20
-per million tokens, versus Standard $1.25/$4.25; cached Contributor input $0.002.
-Source: https://dev.meta.ai/docs/pricing-rate-limits and
-https://dev.meta.ai/docs/choose-a-model. Recheck pricing before an authorized run.
-The earlier exclusion of Contributor was not a necessary compatibility boundary.
-
-The final endpoint model selections below supersede earlier proposals. Bounded
-cases, request/token caps and USD 5 ceiling are agreed below; timeout
-settings are agreed below. Run deterministic checks first; use compact synthetic skills and tool
-results, small real media files, and physical-provider-request accounting. No new paid
-TypeSafe evaluation is required. No paid calls, production edits or tickets are
-performed or authorized by this document update.
-
-
-## Bounded live cases, token budgets and acceptance rules — agreed November 11, 2026
-
-These are initial acceptance-run ceilings in the protected framework-acceptance suite,
-not production defaults or targets. Execute only after deterministic readiness checks
-and separate explicit paid-run authorization. Use tiny purpose-built skills, synthetic
-identifiers, short tool-result objects and small real files. Do not substitute a full
-business workflow or repeatedly sample until a desired outcome appears.
-
-| Case | Required evidence | Maximum physical requests per route | Maximum generated tokens per request |
-| --- | --- | --- | --- |
-| Small structured result | Native output configuration, required/nullable fields, local acceptance | 1 | 1,024 |
-| Two-tool chain to structured result | Typed-map and unconstrained arguments, tool-result use, ordered continuation, no duplicate execution | 3 | 4,096 |
-| Small planned task | Actual planner contract, deterministic child execution, bindings/evidence handling, final result | 4 | 4,096 |
-| Two small images plus tool | File association/order, media-bearing execution, tool continuation, structured result | 2 | 2,048 |
-| One-page PDF plus tool | Real PDF acceptance, attachment continuation, structured result | 2 | 2,048 |
-| Full route total | All cases above, through real framework execution | 12 | 37,888 aggregate generated tokens |
-
-Run all five cases on six Java-host endpoints: at most 72 requests including 12 local
-Ollama requests. Run only the two-tool-chain case on the Sidecar OpenAI, Anthropic and
-Gemini representatives: at most nine additional requests. Overall ceiling is 81 requests,
-of which 69 are cloud requests. These count physical sends, including planner and
-continuation calls, not logical tests or skills. A request that fails or times out still
-consumes its send allowance; do not assume it was unbilled.
-
-Limit every request to 8,192 total input tokens, counting framework instructions,
-schemas, retained history and media accounting. Across cloud requests the mathematical
-maximum is 565,248 input tokens and 226,304 generated tokens (approximately 566,000 and
-227,000 respectively). Generation allowances include reasoning and visible output;
-verify each provider/adapter's budget semantics before running. Final visible responses
-should ordinarily be under 200 tokens, but this is a fixture design target, not a new
-production response restriction. Do not truncate protocol history or schema content to
-force a request below the cap; simplify fixtures or record a blocked case.
-
-The total cloud spending ceiling is USD 5 for this initial matrix, not USD 5 per route
-or rerun. Recheck selected-route pricing at preflight and calculate a conservative
-estimate from actual fixtures. Before sending, reserve the maximum estimated request
-cost including input, media, replay and maximum billed generation/reasoning; reconcile
-with usage without counting reasoning twice. Keep reservations for uncertain billed
-outcomes. Stop before a send if remaining allowance is insufficient. If pricing/media
-accounting cannot be bounded reliably, leave the case pending. This ceiling does not
-guarantee matrix completion. Do not rely only on after-the-fact usage totals, assume
-cache discounts, silently reset the ledger, or add paid provider tools. These are suite
-run controls, not new Framework public configuration requirements.
-
-Disable automatic transport retries and automatic schema-repair attempts for this
-initial compatibility batch. Existing production retry/repair ownership remains intact
-and is tested deterministically. Stop a failing case and diagnose offline; no automatic
-increase of caps, effort, retries, model changes, fallback or weakened assertions.
-Any subsequent rerun must retain previous spend accounting and have an explicit scope;
-this agreement itself authorizes no paid sends.
-
-Acceptance rules and mandatory ticket tests:
-
-- Test request/token/cost reservations and stop behavior without paid calls: exact caps,
-  one-over rejection, concurrent reservation safety if parallel sends are used, failed
-  sends, uncertain billing, no implicit retries/repairs and no ledger resets on rerun.
-- Demonstrate actual tool/planner/native-output paths and retained request evidence.
-  Short successful text alone is not schema or reasoning-continuation proof. If no
-  replayable reasoning is emitted, that assertion remains unverified, not passed.
-- Unsupported PDF/media or combinations remain explicit gaps. Do not convert files,
-  change protocols/models or silently skip cells into success. Missing access, adapter
-  defects and exhausted budgets likewise leave required cells open.
-- Pair live compatibility with deterministic invalid-result/argument rejection and
-  side-effect checks. Refusal/incomplete responses, malformed arguments, repair history,
-  and attachment preservation during corrections use controlled fixtures first.
-- Preserve original requests, schema and diagnostics; compare accepted constraints and
-  required item/order fidelity. Record host/route/model, actual usage/cost, attempts,
-  local validation, artifacts and unverified assertions separately from task quality.
-- A capped/incomplete generation is not successful validation. Initial batch failures
-  cannot establish that the provider fundamentally lacks a capability without diagnosis.
-
-Model/route, effort and wall-clock timeout settings are finalized below. Provider availability, credentials,
-final dependency pins, adapter repairs and actual passing evidence are implementation/
-execution gates, not facts established by this agreement. No paid calls have been made.
-
-
-## Terra acceptance selection — agreed November 11, 2026
-
-Use gpt-6.1-terra for direct OpenAI Responses acceptance and openai/gpt-6.1-terra
-through OpenRouter's OpenAI standard endpoint (tag openai), replacing the prior Sol
-proposal. Use the same direct Terra model for the Sidecar representative. Retain
-explicit route restriction, disabled fallback and resolved-endpoint verification.
-Business Sol/Luna assignments remain unchanged.
-
-Official OpenAI documentation lists reasoning, function calling, image input and
-structured outputs; tool calling requires Responses. The public OpenRouter endpoint
-listing inspected November 11 advertises reasoning, tools and structured outputs for
-its openai route, with text/image/file inputs. Both list standard short-context prices
-of USD 1 per million input and USD 5 per million output tokens. This is half the
-previous Sol proposal's USD 2/10 rates. Recheck prices/access before authorized runs.
-Sources: https://developers.openai.com/api/docs/models/gpt-6.1-terra and
-https://openrouter.ai/api/v1/models/openai/gpt-6.1-terra/endpoints.
-
-Rationale: compact protocol/schema acceptance does not require Sol's model selection.
-Retain all assertions, request/token limits and the total USD 5 ceiling; no automatic
-fallback to Sol or budget increase if a case fails. Published capabilities are not
-passing integration evidence; account access, PDF handling and exact combination
-acceptance remain gates. No inference calls or runtime configuration changes occurred.
-
-
-## Final model, route and effort manifest — agreed November 11, 2026
-
-| Endpoint | Acceptance model | Protocol / route | Reasoning |
-| --- | --- | --- | --- |
-| OpenAI | `gpt-6.1-terra` | Direct Responses | Explicit medium |
-| OpenRouter | `openai/gpt-6.1-terra` | Responses; OpenAI standard endpoint tag `openai` only; fallback disabled | Explicit medium |
-| Meta | `muse-spark-1.3-contributor` | Direct Responses | Explicit medium |
-| Ollama | `qwen3.5:4b-q4_K_M` | Local Responses | Thinking enabled; boolean-only model, not medium |
-| Anthropic | `claude-sonnet-5-5` | Native Messages | Native output effort medium |
-| Gemini | `gemini-3.8-flash` | Native Gemini Developer API | Native thinking level MEDIUM |
-
-All six receive the bounded Java matrix; the three agreed Sidecar representatives
-use the same direct OpenAI, Anthropic and Gemini selections. Business model assignments
-remain unchanged. These selections supersede earlier proposals, not recorded historical
-probe results. Medium is a provider-specific effort setting, not equal compute across
-providers. Do not silently use defaults, lower effort, change models or expand budgets.
-
-The inspected local baseline is Ollama 0.40.16, model digest
-`2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd`.
-Record/recheck the actual server version and digest before execution. The model reports
-boolean thinking support; do not manufacture a numeric medium mapping. Verify the shared
-Responses route can express enabled thinking; inability to do so remains a blocker.
-OpenRouter must restrict routing to the standard OpenAI endpoint, disable fallback,
-require support for requested parameters and record the resolved endpoint; a different
-provider, Flex or priority route is not equivalent acceptance evidence.
-
-Concrete code gap: SpringAiChatOptionsContributor currently maps medium to a 4096-token
-thinking budget for Anthropic/Gemini. Anthropic additionally sets maxTokens to at least
-8192. That is not native medium effort and exceeds these cases' generation caps.
-Sonnet 5.5 rejects explicit thinking budgets. During implementation, use supported native
-options for the selected models, retain the agreed total generation caps (including
-reasoning), and capture the serialized request. Do not globally change legacy-model
-behavior merely to configure this suite. If pinned adapters cannot express these options,
-resolve that integration gap before paid acceptance; do not silently raise token limits.
-
-Mandatory ticket acceptance tests:
-
-- Offline manifest checks pin all six model/route/effort combinations, the three Sidecar
-  representatives and Ollama digest; preserve business suites and their assignments.
-- Capture actual adapter requests proving native medium on the five cloud endpoints,
-  enabled thinking on Ollama, and unchanged per-case generation caps. Cover initial,
-  tool-continuation and planner calls, including option combination/model overrides.
-- Prove Anthropic sends no rejected thinking budget and does not inflate max_tokens;
-  Gemini sends native MEDIUM rather than the legacy numeric budget. Unsupported option
-  combinations fail preflight without paid sends or implicit fallback.
-- Prove OpenRouter routing restrictions and resolved-endpoint evidence; reject missing
-  parameter support or route drift. Published capability flags alone do not pass a case.
-- Record requested and effective settings, actual usage and incomplete statuses in live
-  evidence. Missing reasoning material leaves continuity unverified; timeout or capped
-  output is not a pass. Retain the USD 5 ledger and zero automatic retries/repairs.
-
-Provider references inspected November 11, 2026:
-[OpenAI Terra](https://developers.openai.com/api/docs/models/gpt-6.1-terra),
-[OpenRouter endpoint inventory](https://openrouter.ai/api/v1/models/openai/gpt-6.1-terra/endpoints),
-[Meta reasoning](https://dev.meta.ai/docs/reasoning),
-[Sonnet migration guide](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide),
-[Gemini 3.8 Flash](https://aistudio.google.com/docs/models/gemini-3.8-flash).
-These are configuration evidence, not executed acceptance. Wall-clock settings are
-agreed below. No production changes, tickets or paid calls are authorized here.
-
-## Acceptance timeout profile — agreed November 11, 2026
-
-Use one acceptance-only profile for every selected provider and both suite hosts:
-
-| Boundary | Limit |
-| --- | --- |
-| Each physical provider request | 180 seconds |
-| Fixture proxy upstream request | 210 seconds |
-| Each case's mission | 900 seconds |
-| Runner deadline including evidence collection grace | 960 seconds |
-
-Rationale: the largest bounded case permits four physical requests, leaving 180 seconds
-for orchestration after four 180-second requests. The same profile gives local Ollama
-headroom without separate provider tuning. The proxy has 30 seconds of margin beyond
-the framework request boundary; the runner has 60 seconds beyond the mission boundary
-for terminal-state observation and evidence collection. These are maximum waits, not
-performance targets or authorization to send additional requests.
-
-Implement as a protected framework-acceptance suite overlay using existing timeout and
-runner mechanisms. The inspected compose.runtime.yaml business profile remains
-480/510/2400 seconds for provider/proxy/mission. Do not change production defaults,
-business suites, TypeSafe timeouts or callback limits solely to configure this matrix.
-Record effective values in run evidence. Verify actual adapter timeout semantics;
-a socket inactivity timeout alone must not be reported as a total elapsed deadline.
-The runner's polling deadline must account for in-flight polling/collection work, not
-merely check elapsed time before starting another blocking poll. Reuse existing
-cancellation paths; do not introduce a new public Framework timeout API for this suite.
-
-Mandatory ticket acceptance tests (provider-free, using controlled delays/clock control
-or scaled test durations rather than waiting for the full live limits):
-
-- Effective configuration proves 180/210/900/960 seconds for the selected suite on both
-  hosts and all selected routes, including option combination, model overrides,
-  planner and tool-continuation requests. Business profiles remain unchanged.
-- A stalled provider request terminates at its configured boundary without automatic
-  retry, schema repair, model fallback or a subsequent tool dispatch from a late reply.
-  A timely response still follows the normal tool/result pipeline.
-- Mission expiry prevents further provider sends/tool dispatch for that case and uses
-  existing cancellation/terminal-state behavior. Preserve already completed tool effects;
-  do not claim cancellation can undo a tool or guarantee the provider stopped billing.
-- Runner timeout and evidence-collection work are bounded by the outer deadline;
-  pending HTTP polls cannot silently extend it. Timeout/collection failure remains a
-  failed or incomplete case, never a successful validation or silently skipped cell.
-- Preserve available request, status, timing and diagnostic evidence on every timeout.
-  Count the physical send, retain uncertain-cost reservations and previous spend, and
-  prove no automatic rerun, token-cap increase or budget reset follows timeout.
-- Check the proxy/framework boundary ordering and provider-disabled restoration after
-  failure. A missing terminal result or incomplete artifact is reported explicitly.
-
-The request/token/USD 5 ceilings still govern independently. No paid sends, production
-changes or tickets were performed or authorized by this documentation decision.
-
-TBD-14 review outcome: testing ownership, protected-suite isolation, host coverage,
-bounded cases, models/routes/effort, budgets, timeout settings and completion rules are
-resolved as policy. Implementation and acceptance remain pending. Remaining gates are
-actual dependency/adapter readiness (including native effort and cap fidelity), suite
-fixture/proxy migration, coherent deployed artifacts, deterministic regression results,
-account/route availability, conservative pricing preflight, separately authorized live
-execution and complete evidence for every required cell. A failed or unavailable cell
-is an open gate; changing scope, limits or expectations requires a deliberate decision.
-There is no additional unresolved TBD-14 policy choice identified by this review.

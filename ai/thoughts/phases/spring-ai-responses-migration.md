@@ -89,8 +89,6 @@ This document records the agreed implementation direction; drafting it has not
 performed the dependency or runtime migration. A subsequent implementation task
 should follow these decisions without reopening settled scope merely because it
 starts in a new context. Change direction only for concrete contrary evidence.
-The broader conversation-history audit remains a linked investigation; its decisions
-needed for migrated correction paths must be resolved before accepting those paths.
 The subsequent Ollama investigation explicitly expands this scope to Ollama, using
 the same `openai` driver. Remove all Ollama-specific implementation code with the
 migration, including the separate `ollama` driver and native adapter. Ollama must
@@ -138,8 +136,10 @@ reasoning through `reasoning_content`; its Responses contract provides a replay
 mechanism. That motivated the migration. Do not generalize this to every
 OpenAI-compatible service: Spring AI's existing Chat adapter can replay nonempty
 `reasoning_content`, and OpenRouter supports structured reasoning through Chat too.
-See the [initial Meta investigation](../../../docs/maintainers/meta-compatibility-spike.md)
-for its sources and the limits of its evidence.
+The earlier initial Meta investigation was referenced at
+`docs/maintainers/meta-compatibility-spike.md`, which is absent from this worktree.
+Treat it as unavailable historical material, not accessible verification evidence; use
+the retained source references and evidence below for the readiness review.
 
 ### Why these choices were made
 
@@ -167,20 +167,15 @@ as a quality measure, and opaque state cannot be evaluated by reading it. We hav
 not measured a quality benefit. Assess outcomes, repeated tool work, latency, usage,
 and context growth separately from proving correct serialization.
 
-### Settled scope versus history decisions still to make
+### Tool-continuation, retry and isolation verification
 
 Required state replay across ordinary tool continuations is agreed. Full history
 means the history belonging to that interaction under its intended semantics, not
-all prior work by the invocation or every abandoned attempt. The linked
-[history audit](model-provider-enhancements.md#audit-conversation-history-across-calls-and-retries)
-requests review and agreement, not a finding that existing behavior is wrong.
+all prior work by the invocation or every abandoned attempt.
 
 | Boundary | Starting observation or decision | Verification needed |
 | --- | --- | --- |
 | Ordinary/parallel tools and recoverable tool errors | Continue the active conversation, preserving required ordered assistant items and tool results. | Actual outbound second/third requests; canonical names, authorization, IDs, order, opaque fields, and no duplicate tool execution. |
-| Output-schema corrections | Current inspection suggests baseline plus candidate text and feedback. | Agree whether this is a fresh attempt or continuation; preserve exactly the history that decision requires. |
-| Lint corrections | Current inspection suggests amended instructions. | Agree which previous messages/reasoning belong in the corrected request and test the outbound request. |
-| Evidence-contract and other retries | Ordinary advisor gaps reviewed under TBD-11. | Implement only its two targeted changes; preserve planning, step-loop and existing retry ownership. Verify actual requests. |
 | Transport/rate-limit retries | Retry the current provider request under Loomspan's existing retry ownership. | No accumulated duplicate history, nested SDK retries, or re-execution of completed tools. |
 | Planning, step execution, child skills, separate interactions | No blanket decision to carry reasoning between these boundaries. | Verify intended isolation and connection/model binding; never share mutable continuation state accidentally. |
 
@@ -398,6 +393,13 @@ parametersJsonSchema preserves them in offline captures. Fix schema transport in
 of deleting existing input functionality. These captures do not prove live acceptance.
 See TBD-13's accepted developer model and mandatory tests for implementation scope.
 
+Retain internally generated `false` property schemas for framework-bound child-input
+destinations. Preserve existing override checks and assembled-input validation, and
+include this generated shape in adapter schema-fidelity tests. This does not expand
+authored-schema scope.
+
+Preservation evidence: `src/main/java/ai/loomspan/internal/runtime/input/ChildInputBindingProjection.java:56` (`properties.put(tokens.get(i), false)`) emits the false property schema; `src/test/java/ai/loomspan/internal/runtime/input/ChildInputBindingProjectionTest.java:59` (`void allBoundAncestorMayBeOmittedAndGenericFieldsAreStructurallyForbidden`) and `src/test/java/ai/loomspan/internal/runtime/input/ChildInputBindingProjectionTest.java:72` (`void preservesTypedExtensionsArrayItemsAndFormattingWhileExcludingReservedNames`) assert its serialization and ownership protection. These local assertions are not provider acceptance evidence.
+
 Flag existing generated unconstrained schemas or internal projection needs outside
 this baseline; they do not automatically expand authoring scope.
 
@@ -532,8 +534,7 @@ schema support across every model and route.
   ordered encrypted reasoning replay, assistant phase, opaque items, and call/result IDs.
 - [ ] Verify canonical tool authorization, recoverable tool failures, and independent
   concurrent invocation state. Provider retries must not repeat completed tool side effects.
-- [ ] Cover schema/lint correction boundaries according to the history audit's agreed
-  semantics, plus terminal/incomplete responses, malformed responses, 429/5xx errors,
+- [ ] Cover terminal/incomplete responses, malformed responses, 429/5xx errors,
   timeout/cancellation, and per-attempt usage accounting.
 - [ ] Migrate existing regression coverage to Responses, remove obsolete Chat
   fixtures, and run normal project checks and `LoomspanPublicSurfaceArchitectureTest`.
@@ -552,36 +553,13 @@ text. They verify Responses replay and the standard schema contract across input
 planning, and output paths, including documented provider differences and local
 validation. Replay and schema correctness do not by themselves prove a quality gain.
 
-## Phase 4 Live Responses and native structured-output validation
+## Phase 4 Deployed and live acceptance — separate follow-up
 
-- [ ] Run opt-in bounded live probes with explicit model IDs and account credentials.
-  Cover text, supported reasoning settings, tool round trips, multiple tool rounds,
-  parallel calls where supported, and output validation.
-- [ ] Verify that reasoning items are returned and correctly replayed for each
-  provider. Record unsupported options and real protocol differences; add narrow
-  compatibility handling only when needed.
-- [ ] Evaluate representative tasks for correctness, repeated tool work, latency,
-  usage, and context growth. Use recorded pre-migration results or the old revision
-  for comparison; do not retain a second runtime path just for benchmarking.
-  Keep model quality findings distinct from protocol correctness.
-- [ ] Validate OpenRouter with explicit model and upstream route identities, including
-  a route whose upstream lacks native Responses. Compare the same Meta model direct
-  and through OpenRouter where available. Record actual replay fields and limitations;
-  acceptance does not require identical answers or promise equivalent model quality.
-- [ ] Publish supported configuration examples, limitations, and reproducible results.
-  The earlier Meta Chat Completions smoke test is not evidence of Responses compatibility.
-
-Responses acceptance: OpenAI, Meta, OpenRouter, and Ollama pass the agreed live
-cases through the same Spring AI adapter with stateless replay.
-
-Structured-output acceptance additionally requires bounded live schema-constrained
-skill-output and planning cases for OpenAI, Meta, OpenRouter, Ollama, Anthropic,
-and Gemini, with explicit model/route identities and documented schema limitations.
-Verify native formatting alongside tools where the framework combines them.
-The existing Ollama reasoning/tool probe did not test native structured output.
-
-Completion requires both Responses acceptance and native structured-output
-acceptance; success in one workstream does not complete this phase.
+After Framework implementation, create and execute tickets in the test-suite project
+using its [migration acceptance roadmap](../../../../loomspan-sidecar-test-suite/MIGRATION-ACCEPTANCE-ROADMAP.md). That document owns the complete
+agreed suite implementation scope and acceptance gates for both migration workstreams.
+Framework implementation completion does not establish deployed or live acceptance.
+Overall roadmap acceptance remains pending until those required gates pass.
 
 ## Phase 5 Stabilize before production
 
@@ -759,8 +737,9 @@ carry reasoning continuity; endpoint choice alone does not prove a quality gain.
   each required field: ciphertext-only replay must not silently discard a required
   signed/plaintext reasoning item. Prefer an upstream fix over a second adapter;
   document a concrete blocker if the selected mapper cannot preserve the contract.
-- [ ] Verify a non-native-Responses upstream works through the same adapter. Use
-  fixtures for its documented wire shape and a bounded live route where available.
+- [ ] Verify documented non-native-Responses upstream wire shapes with deterministic
+  fixtures. Live coverage and the earlier extra-comparison scope question are owned
+  by the [test-suite roadmap](../../../../loomspan-sidecar-test-suite/MIGRATION-ACCEPTANCE-ROADMAP.md#earlier-openrouter-checklist-scope-remains-an-audit-question).
 - [ ] Exercise unsupported options with default routing and with
   `provider.require_parameters: true`, including no eligible route. If routing
   controls are needed, use existing Spring AI extension facilities rather than
@@ -970,6 +949,39 @@ proposed portable-output restrictions were not adopted. Propose any further limi
 only with a concrete compatibility, simplicity, developer, or model benefit and
 discuss its tradeoffs; never impose it solely on general principle.
 
+**Output prompt openness — agreed audit correction:** migrate the existing output
+contract renderer to standard object openness: omitted additionalProperties means
+open, as does explicit true, at root and nested objects. Remove the blanket instruction
+that unknown fields require explicit permission. Keep prompt guidance consistent with
+the canonical or binding-projected contract supplied to the renderer; do not change
+ownership projection, provider adaptation or correction-history policy.
+
+Add omitted/true/false root and nested-object renderer cases, plus focused ordinary
+advisor and step-final prompt assertions. Explicit false must still describe a closed
+object; omission must never be presented as false. Preserve existing descriptions,
+requiredness and final-phase-only step guidance. A local renderer probe printed false
+for omission and false, and true for explicit true at both object depths. This is a
+pending migration compatibility correction, not a defect under legacy closed-by-default
+output semantics. Implementation and focused acceptance remain pending; no live model
+behavior was tested.
+
+Evidence anchors:
+
+- `src/main/java/ai/loomspan/internal/outputschema/OutputSchemaPromptAugmentor.java:62`
+  (`renderNode`) interprets only explicit true as open; line 21 contains the blanket
+  explicit-permission instruction.
+- `src/main/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisor.java:97`
+  (`adviseCall`) injects this guidance into ordinary requests, including projected
+  output contracts. `src/main/java/ai/loomspan/internal/runtime/step/StepPromptBuilder.java:218`
+  (`appendOutputSchemaGuidance`) uses the same renderer for final synthesis.
+- `src/test/java/ai/loomspan/internal/outputschema/OutputSchemaPromptAugmentorTest.java:16`
+  (`augmentsPromptWithCompleteRecursiveEffectiveContractInDeclaredOrder`) covers
+  explicit true/false. `src/test/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisorTest.java:422`
+  (`firstRequestIncludesRecursiveTravelContractBeforeValidation`) checks ordinary
+  prompt delivery; `src/test/java/ai/loomspan/internal/runtime/step/StepPromptBuilderTest.java:688`
+  (`buildStepPromptShowsOutputSchemaInFinalResponseMode`) checks step-final guidance.
+  These inspected assertions do not establish standard omission behavior.
+
 ### TBD-06: Initial JSON Schema profile and validation behavior
 
 **Status: Resolved — v1 policy decisions agreed.** Adopt JSON
@@ -1022,6 +1034,114 @@ as nested properties under the approved v1 profile. Apply this rule consistently
 authored and generated contracts; reject unsupported root shapes at schema loading
 or declaration registration. Do not automatically wrap or convert root values.
 Broader root shapes are deferred until a concrete use case justifies them.
+
+**Step-action decimal precision — agreed audit correction:** decode model-supplied
+step-action decimals losslessly before validation, tool execution or final-response
+serialization. Cover both toolArguments values and finalResponse trees. Keep the
+correction local to this decoding boundary, using the existing arbitrary-precision
+approach rather than changing unrelated shared mapper behavior. Preserve action
+validation, authorization, correction budgets and the agreed parser migration.
+
+Add focused step-engine tests with long fractional/exponent-form values, including
+nested tool arguments and final-response fields. Assert exact values delivered to
+callbacks and returned after final serialization, using precision-preserving assertions.
+Include migrated numeric-boundary checks that reject the original out-of-range value
+before callbacks or final acceptance; rounding must not make it valid. Retain bound
+child-result precision and existing correction regressions. A local probe invoking
+the actual action parser and final serializer changed 0.12345678901234567890123456789
+to 0.12345678901234568 in both action kinds. This reproduces local precision loss;
+full-engine acceptance and live behavior remain unverified. Implementation and focused
+tests remain pending.
+
+Evidence anchors:
+
+- `src/main/java/ai/loomspan/internal/runtime/step/StepLoopMissionExecutionEngine.java:1223`
+  (`parseStepAction`) reads StepAction using the schema mapper; the tree-reading branch
+  at line 1231 uses that mapper too. Production wiring supplies codecs.schemaTree()
+  at `src/main/java/ai/loomspan/autoconfigure/LoomspanAutoConfiguration.java:442`;
+  `src/main/java/ai/loomspan/internal/serialization/LoomspanJacksonCodecs.java:39`
+  builds it without lossless decimal decoding.
+- `src/main/java/ai/loomspan/internal/runtime/step/StepActionValidator.java:171`
+  validates already-decoded arguments. The engine passes those arguments onward at
+  line 1179 and serializes final-response trees for validation/return at lines 991
+  and 1051 (`serializeFinalResponse` at line 1474).
+- `src/test/java/ai/loomspan/internal/runtime/step/StepLoopMissionExecutionEngineTest.java:480`
+  (`assembledOutputPoliciesValidateExactBoundDecimals`) covers decimals originating
+  in bound child results, not model action JSON. Its model-owned contribution is a
+  string. The test at line 1359 (`retriesFinalResponseUntilOutputSchemaPasses`) covers
+  correction with string-valued results, not numeric fidelity. These are inspected
+  tests, not newly run acceptance results.
+
+**Ordinary tool-callback decimal precision — agreed audit correction:** decode raw
+tool-argument JSON losslessly in the existing internal callback adapter before invoking
+BoundCapability. Preserve tool definitions, result conversion, authorization, shared
+input validation and Spring AI tool-loop ownership. Do not globally reconfigure Spring
+AI's mapper or introduce a public callback API. Fixing step-action parsing does not
+fix this separate ordinary-tool ingress.
+
+Add focused callback invocation tests with long fractional/exponent-form decimals in
+nested objects and arrays. Assert exact values delivered to BoundCapability and, through
+the actual tool pipeline, Java execution. Add migrated numeric-boundary cases proving
+an originally out-of-range value cannot become valid through rounding and invokes no
+Java side effect. Retain schema/name fidelity, result conversion, authorization and
+invalid-input regressions. A local probe through the actual Loomspan adapter delivered
+0.12345678901234568 as Double for JSON 0.12345678901234567890123456789. This reproduces
+callback-level loss, not full migrated-pipeline or live-provider behavior. Implementation
+and focused acceptance remain pending.
+
+Evidence anchors:
+
+- `src/main/java/ai/loomspan/internal/springai/SpringAiToolCallbackAdapter.java:22`
+  (`adapt`) builds FunctionToolCallback with Map<String,Object> input at line 26;
+  its lambda forwards already-decoded arguments to BoundCapability.
+- `src/main/java/ai/loomspan/internal/runtime/tool/DefaultCapabilityInvoker.java:172`
+  routes the decoded arguments to execution;
+  `src/main/java/ai/loomspan/internal/core/CapabilityExecutionRouter.java:62`
+  (`executeInput`) validates them afterward, too late to recover lost digits.
+- `src/test/java/ai/loomspan/internal/springai/SpringAiToolCallbackAdapterTest.java:18`
+  (`adaptsUnconstrainedSchemaVerbatimToSpringAiToolCallback`) checks schema metadata
+  without invoking the callback. `src/test/java/ai/loomspan/internal/core/CapabilityExecutionRouterTest.java:30`
+  (`assembledBoundValuesFailBeforeDispatchWithoutCoercionAndStillRequireAuthorization`)
+  supplies validation/authorization controls, not raw callback decimal coverage.
+- Inspected Spring AI sources for both 2.0.0 and 2.1.0-RC2:
+  spring-ai-model's `org/springframework/ai/tool/function/FunctionToolCallback.java:53`
+  creates the default JsonHelper and line 108 decodes toolInput. spring-ai-commons'
+  `org/springframework/ai/util/JsonHelper.java:47` selects JacksonUtils' default mapper;
+  `org/springframework/ai/util/JacksonUtils.java:41` builds it without lossless decimal
+  handling in RC2. Sources are in the corresponding local Maven source artifacts.
+  This is source-inspected target behavior, not a new RC2 pipeline test result.
+
+**Ordinary output-validation decimal precision — agreed audit correction:** parse
+model output decimals losslessly at the ordinary output-validation boundary when
+introducing the shared validator. Keep the original response text unchanged; validation
+must evaluate its numeric value rather than a rounded replacement. Use a local reader
+with arbitrary-precision decimal handling, without changing unrelated shared codecs.
+The step-action, callback, TypeSafe and YAML corrections concern separate ingress paths.
+
+Add precise minimum/maximum boundary tests, including long fractional/exponent-form
+values and nested fields, with valid boundary controls. Add an ordinary-advisor test
+proving an originally out-of-range candidate enters existing bounded correction and
+is not returned as valid because parsing rounded it. Preserve original candidate text,
+correction budgets and final acceptance behavior. An offline probe combined the current
+output parsing operation with NetworkNT 3.0.9: {"value":1.0000000000000001} against
+maximum:1 became {"value":1.0} and passed; lossless parsing retained the value and failed.
+This demonstrates a migration integration risk, not a currently implemented maximum
+check failing in production. Implementation, migrated-advisor tests and live acceptance
+remain pending.
+
+Evidence anchors:
+
+- `src/main/java/ai/loomspan/internal/outputschema/OutputSchemaValidator.java:58`
+  (`validate`) parses raw output with the supplied mapper; its default constructor
+  uses schemaTree(), built without lossless decimal handling at
+  `src/main/java/ai/loomspan/internal/serialization/LoomspanJacksonCodecs.java:39`.
+- `src/main/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisor.java:112`
+  (`adviseCall`) validates the ordinary candidate through this boundary.
+- `src/test/java/ai/loomspan/internal/outputschema/OutputSchemaValidatorTest.java:140`
+  (`distinguishesArraysScalarsNumbersAndJsonNull`) checks numeric type distinctions,
+  not exact bound comparisons. `src/test/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisorTest.java:148`
+  (`retriesWithCanonicalIssuesAfterSchemaMismatch`) covers correction, not precision
+  at migrated numeric boundaries. These are inspected tests, not new acceptance runs.
 
 Provider mapping, strict tools, binding projection, and runtime metadata remain
 owned by TBD-07/08/10/13. Full framework dependency validation, applicable adapter
@@ -1086,9 +1206,11 @@ or a general schema-conversion system.
    Each entry must name the keyword/value or format, context (output/planning or
    tool arguments), provider requirement, source/test evidence, and omission action.
    Tool entries do not authorize enabling strict tools; TBD-08 owns that decision.
-   Traverse only actual schema nodes in the approved v1 tree (`properties` values
-   and `items`), including the root. Never recursively delete matching keys from
-   arbitrary JSON: a property named `minimum` or `format` is application data.
+   Traverse only actual schema nodes in the approved v1 tree: the root, `properties`
+   values, `items`, and schema-valued `additionalProperties` for ordinary inputs/tool
+   arguments. Native output/planning typed maps remain deferred. Never recursively
+   delete matching keys from arbitrary JSON: a property named `minimum` or `format`
+   is application data.
 5. Never strengthen or reshape the canonical contract to satisfy a provider. In
    particular, do not make optional fields required, insert nullability, substitute
    null for absence, close an open object, change types/enums, wrap values, or convert
@@ -1138,6 +1260,47 @@ The bounded v1 mapping work is approved; exact evidence-backed rule entries must
 prepared in the later ticket-writing context. TBD-08 through TBD-11 are separately resolved below; this decision alone does not
 assert native support for untested models/routes.
 
+**Responses schema decimal fidelity — agreed audit correction, November 12, 2026:**
+preserve numeric values when the Responses adapter decodes output and tool schema
+JSON for SDK serialization. The pinned RC2 adapter rounds decimal bounds and enum
+members before sending either schema. This violates the unchanged-contract requirement
+above; it is not an approved provider omission. Existing YAML, callback, step-action,
+output-validation and TypeSafe precision corrections do not repair this outbound boundary.
+
+The [isolated probe](../../../docs/maintainers/probes/responses-schema-precision/README.md)
+captures maximum 1.0000000000000001 as 1.0 and a long fractional minimum/enum member
+as a rounded value. A candidate private SDK-compatible schema mapper with Jackson 2
+USE_BIG_DECIMAL_FOR_FLOATS preserves both wire schemas without changing the SDK singleton.
+Prefer a focused upstream correction or verified fixed release; do not ship the probe's
+copied upstream class as a Loomspan override, add another adapter, mutate shared mappers,
+stringify numbers or weaken constraints. Preserve numeric value, not lexical spelling.
+
+On each Boot 4.1.0 and 4.2.0-RC2 platform, six baseline defect/control cases and six
+candidate numeric cases passed; three existing schema/options and multi-round replay
+regressions also passed with the candidate. Cases cover nested bounds/enums, fractional
+and exponent values, changed per-call schemas and large-integer/exact-decimal controls.
+Passing baseline tests reproduce the loss. Candidate success is isolated adapter proof,
+not Framework implementation, full numeric conformance or live acceptance. No released
+fix or upstream submission was verified. Production migration remains pending.
+
+Tickets must retain the versioned reproduction, exact two decoding sites, candidate
+mechanism and preservation controls. Add precise actual-request assertions for output
+and tool schemas through the migrated Framework path; default floating-point comparisons
+can conceal the defect. Retain strictness, options, canonical schemas, isolation and
+tool/reasoning replay. No integer decoding change is justified by the tested controls.
+
+Evidence anchors:
+
+- Retained upstream ResponsesRequestBuilder.java:80, :228 and :262 under
+  docs/maintainers/probes/responses-schema-precision/upstream/ show the shared mapper
+  and the output/tool decoding branches respectively.
+- The historical docs/maintainers/probes/tbd-06/src/test/java/AdapterTest.java:22,
+  :44 and :51 use default-mapper equality and a fixture without precise decimal
+  constraints. They prove their tested shapes, not numeric schema fidelity.
+- The new baseline SchemaWirePrecisionTest.java:15 captures the original failure and
+  SDK controls; candidate SchemaWireFixTest.java exercises both real wire schemas.
+  Source hashes, exact commands, retained requests and reports are in the probe README.
+
 ### TBD-08: Native strict tool-argument enforcement
 
 **Status: Resolved — native strict tools deferred beyond v1.** Native final-output
@@ -1186,6 +1349,101 @@ tool loop handles validation feedback without introducing another loop or retrie
 Cover affected binding/resource-input paths with their existing semantics; any gap
 requiring a new policy must be flagged under the owning TBD. Retain local validation
 even if a provider happens to constrain arguments without an explicit strict flag.
+
+**Ordinary tool-callback trailing content — agreed audit correction:** require the
+entire argument string to contain one JSON object, permitting trailing whitespace but
+rejecting additional JSON values or garbage before BoundCapability invocation. Enable
+FAIL_ON_TRAILING_TOKENS in the local callback reader already required for decimal
+preservation. Keep existing error handling, authorization, input validation and loop
+ownership; do not introduce a new retry or batch-rollback policy.
+
+Add focused callback and actual tool-manager tests for a valid object followed by an
+object, scalar or malformed suffix, asserting zero target-handler calls. Retain valid
+object and trailing-whitespace controls and existing planner-control rejection tests.
+A local probe through CanonicalToolCallingManager, the actual adapter and the existing
+input validator invoked its handler for both {"value":1} {"value":2} and
+{"value":1} trailing garbage. Only the parsed prefix reached validation. This reproduces
+local callback execution from invalid complete argument text; migrated full-pipeline
+and live-provider acceptance remain pending. Implementation and focused tests are pending.
+
+Evidence anchors:
+
+- `src/main/java/ai/loomspan/internal/springai/SpringAiToolCallbackAdapter.java:22`
+  delegates argument decoding to FunctionToolCallback; the lambda invokes BoundCapability
+  with the decoded map. `src/main/java/ai/loomspan/internal/springai/CanonicalToolCallingManager.java:60`
+  retains raw call.arguments() in its execution copy, without a whole-document parse.
+- Inspected Spring AI 2.0.0/2.1.0-RC2 sources: FunctionToolCallback.java:108 calls
+  JsonHelper.fromJson; spring-ai-commons' `org/springframework/ai/util/JacksonUtils.java:42`
+  explicitly disables FAIL_ON_TRAILING_TOKENS. The corresponding local Maven source
+  artifacts retain this evidence; RC2 behavior was inspected, not newly run end to end.
+- `src/test/java/ai/loomspan/internal/springai/CanonicalToolCallingManagerTest.java:24`
+  (`rejectsMalformedBoundControlArguments`) covers trailing JSON for planner inability,
+  whose strict reader is at `src/main/java/ai/loomspan/internal/springai/PlannerInabilityTool.java:38`.
+  It does not exercise ordinary callback decoding.
+- `src/test/java/ai/loomspan/internal/springai/SpringAiToolCallbackAdapterTest.java:18`
+  (`adaptsUnconstrainedSchemaVerbatimToSpringAiToolCallback`) checks metadata without
+  calling the callback. Extend the ordinary invocation coverage rather than assuming
+  the planner-control tests establish this boundary.
+
+**Ordinary tool-callback root shape — agreed audit correction:** require an actual
+JSON object at the ordinary callback decoding boundary, before conversion to a map or
+BoundCapability invocation. JSON null and scalar values must not become empty argument
+objects. Preserve {} for contracts permitting empty arguments and permitted null values
+inside objects. Keep this check local to model callback ingress; do not change public
+invocation overloads or unrelated internal null-map handling.
+
+Add callback and actual tool-manager tests rejecting null, strings (including the empty
+string), arrays, numbers and booleans with zero target-handler calls. Retain valid {},
+ordinary object and permitted nested-null controls, with normal contract validation.
+A local probe through the real manager/adapter and input validator delivered {} to its
+handler for {}, null and "", invoking once for each; [] and 1 were rejected without
+invocation. This reproduces callback-level conversion inconsistent with the agreed
+object-root requirement. Implementation, full migrated-pipeline verification and live
+acceptance remain pending.
+
+Evidence anchors:
+
+- `src/main/java/ai/loomspan/internal/springai/SpringAiToolCallbackAdapter.java:22`
+  (`adapt`) delegates to Spring AI's Map decoder, then invokes BoundCapability.
+  Inspected spring-ai-commons 2.0.0/2.1.0-RC2 JacksonUtils enables
+  ACCEPT_EMPTY_STRING_AS_NULL_OBJECT; JSON null also decodes to null.
+- `src/main/java/ai/loomspan/internal/runtime/tool/BoundCapability.java:56`
+  (`invokeAssigned`) replaces null arguments with Map.of() before calling its handler;
+  subsequent map validation cannot recover the original JSON root kind.
+- `src/test/java/ai/loomspan/internal/springai/SpringAiToolCallbackAdapterTest.java:18`
+  checks schema metadata without invoking the callback.
+  `src/test/java/ai/loomspan/internal/springai/CanonicalToolCallingManagerTest.java:24`
+  (`rejectsMalformedBoundControlArguments`) rejects non-object roots for the special
+  planner control, not ordinary callback ingress. Extend ordinary invocation coverage;
+  these inspected tests do not establish its root-shape enforcement.
+
+**Step-action null toolArguments — agreed audit correction:** reject explicitly null
+toolArguments in a CALL_TOOL action before it becomes an empty map. Preserve valid {},
+permitted null fields inside argument objects, existing omission behavior and bounded
+step-action correction. Detect explicit null at decoding while its distinction from
+omission is still available; do not globally reject internal null maps or change public
+invocation behavior. Ordinary callback ingress fixes do not cover this separate path.
+
+Add a focused step-engine test proving a CALL_TOOL with toolArguments:null invokes no
+tool, enters existing bounded correction, and executes once after a valid {} correction
+for a tool accepting empty arguments. Cover correction exhaustion with no side effects;
+retain nested-null and omitted-argument behavior controls. A local decoding/validation
+probe accepted both explicit null and {} against a closed empty-object contract.
+Dispatch normalization was source-inspected, not exercised in a full engine reproduction.
+Implementation, focused engine verification and live acceptance remain pending.
+
+Evidence anchors:
+
+- `src/main/java/ai/loomspan/internal/runtime/step/StepLoopMissionExecutionEngine.java:1223`
+  (`parseStepAction`) binds JSON to StepAction, collapsing explicit null and omission;
+  `src/main/java/ai/loomspan/internal/runtime/step/StepActionValidator.java:161`
+  (`validateRequiredToolArguments`) substitutes Map.of() before ownership checks and
+  does so again at line 170 for schema validation. The engine substitutes Map.of()
+  at line 1179 before invocation.
+- `src/test/java/ai/loomspan/internal/runtime/step/StepLoopMissionExecutionEngineTest.java:3382`
+  (`preservesExplicitNullArgumentsInTheStepLoopToolPath`) supplies {"rawText":null},
+  a valid object, rather than a null argument root. Preserve this nested-null behavior;
+  it does not establish enforcement of the object-root requirement.
 
 ### TBD-09: Unsupported schemas/models and failure timing
 
@@ -1310,6 +1568,98 @@ completion before skipping synthesis. Assert actual provider requests contain th
 projected contract subject only to approved mappings, original schemas remain
 unchanged, and existing bounds/formats are enforced at the appropriate boundaries.
 
+**Omitted additionalProperties and synthesis — agreed audit correction:** migrate
+OutputBindingProjection's model-contribution decision to standard object openness:
+omitted additionalProperties leaves an object open, just as explicit true does.
+Apply this at nested object ancestors as well as the root; preserve whole-subtree
+ownership when the entire object is bound. Add omitted/true/false projection tests
+and focused standard/step-engine tests proving final generation remains enabled when
+model-owned space remains, while closed fully bound outputs still skip synthesis.
+Retain required-work and source-availability checks. A local projection probe returned
+modelContributionRequired=false for omission and false, but true for explicit true;
+existing tests distinguish explicit true/false without establishing standard omission
+behavior. This is pending migration work against the agreed openness policy, not an
+existing defect under legacy closed-by-default output semantics. Implementation and
+focused verification remain pending.
+
+Implementation evidence for this correction (repository-relative paths; line numbers
+are audit-time anchors, with symbols retained for navigation after edits):
+- `src/main/java/ai/loomspan/internal/outputschema/OutputBindingProjection.java:43`,
+  `hasSpace`: line 44 recognizes only explicit true as open; line 49 recurses into
+  partially bound objects.
+- `src/main/java/ai/loomspan/internal/runtime/DefaultMissionExecutionEngine.java:99`
+  skips final generation when `composition.modelContributionRequired()` is false;
+  `src/main/java/ai/loomspan/internal/runtime/step/StepLoopMissionExecutionEngine.java:379`
+  derives the corresponding decision from the same projection.
+- `src/test/java/ai/loomspan/internal/outputschema/OutputBindingCompositionTest.java:33`,
+  `fullBindingAndOpenOrOptionalResidualSpace`, covers explicit closed/open objects;
+  its `schema` helper at line 19 defaults to false, so omission is not exercised.
+
+**Binding-validation openness — agreed audit correction:** remove the legacy
+insertion of additionalProperties: false into output-schema copies used for binding
+declaration validation. Omission must remain open for both producer and destination
+schemas, including nested objects. Preserve existing explicit-false path rejection,
+structural compatibility checks and runtime obligations for unknown/open branches;
+do not infer future producer fields or expand binding path syntax.
+
+Add focused publication-validation cases comparing omitted/true/false openness on
+producer and destination objects, including nested paths and whole-object compatibility.
+Omitted and true must have equivalent openness behavior; false must still reject
+statically impossible paths/transfers. Retain runtime missing-source and invalid-bound-
+value rejection, with no model fallback. A local helper probe of default insertion
+followed by source-path selection rejected omission and false but accepted true at
+root and nested objects. This is pending migration work under standard openness, not
+a defect under legacy closed-by-default semantics. Full publication verification and
+implementation remain pending; no provider capability is inferred.
+
+Evidence anchors:
+
+- `src/main/java/ai/loomspan/internal/skill/SkillDependencyValidator.java:233`
+  (`applyOutputDefaultOpenness`) recursively inserts false. Calls at lines 215 and
+  229 apply it to producer schemas and destination metadata respectively;
+  `selectBindingSchema` at line 243 then rejects undeclared closed-object paths.
+  `checkBindingCompatibility` at line 265 also uses openness for object transfers.
+- `src/test/java/ai/loomspan/internal/skill/SkillGenerationManagerTest.java:90`
+  (`validatesOutputBindingPathsTypesAndProducerCountsAgainstCompleteGeneration`)
+  covers closed source/destination rejection and an explicitly open producer at
+  line 138, but not standard omitted-openness equivalence.
+- `src/test/java/ai/loomspan/internal/outputschema/OutputBindingCompositionTest.java:49`
+  (`missingAndInvalidSourcesFailBeforeModelButNullableNullSucceeds`) and
+  `src/test/java/ai/loomspan/integration/DeclaredOutputBindingsOrdinaryIntegrationTest.java:111`
+  (`dynamicBoundTypeMismatchFailsBeforeProviderAndWithoutAssembly`) supply runtime
+  rejection controls to preserve. These are inspected tests, not new acceptance runs.
+
+**Numeric enum equality — agreed audit correction:** use exact numeric-value
+equality when comparing numeric enum members in binding compatibility checks, retaining
+ordinary type-sensitive equality for other scalar values. Do not use floating-point
+rounding, epsilon comparisons or string coercion. Preserve the existing overlap check
+and runtime bound-value validation; do not introduce a schema implication solver.
+
+Add focused publication-validation tests for equivalent spellings (1, 1.0, 1e0 and
+1.00), genuinely different high-precision numbers, disjoint enums, and numeric versus
+string values. Retain existing string-enum intersection and runtime rejection controls.
+A local helper probe using lossless decimal parsing rejected 1 -> 1.0, 1 -> 1e0 and
+1.0 -> 1.00 as statically incompatible. These are pending migration cases: legacy
+catalog schemas restrict enums to strings, so the probe does not establish a currently
+reachable numeric-enum publication defect. Implementation, migrated publication tests
+and live provider acceptance remain pending.
+
+Evidence anchors:
+
+- `src/main/java/ai/loomspan/internal/skill/SkillDependencyValidator.java:280`
+  (`checkBindingCompatibility`) compares enum members with JsonNode.equals; the
+  declaration-validation caller at line 218 can reject before runtime validation.
+- `src/main/java/ai/loomspan/internal/skill/YamlSkillCatalog.java:938` and line 996
+  restrict legacy output/input enums to string schemas. The v1 scalar-enum scope
+  removes that restriction; replacing the value validator alone does not fix the
+  separate binding compatibility comparison.
+- `src/test/java/ai/loomspan/internal/skill/SkillGenerationManagerTest.java:36`
+  (`nativeSchemasEnterExistingBindingCompatibilityAndCapturedCatalogs`) exercises
+  overlapping/disjoint string enums and dynamic producer metadata, not numeric
+  equivalence. `src/test/java/ai/loomspan/internal/outputschema/OutputBindingCompositionTest.java:49`
+  (`missingAndInvalidSourcesFailBeforeModelButNullableNullSucceeds`) supplies runtime
+  rejection controls. These are inspected tests, not newly run acceptance results.
+
 If migration exposes an existing behavior outside the approved v1 feature scope or
 requires a new binding policy, flag the concrete case for discussion. Do not let the
 implementing LLM invent path semantics, value coercion, compatibility shims, or a
@@ -1396,6 +1746,67 @@ Capture actual outgoing requests and callback execution counts for each affected
   continuation, budgets/exhaustion, and transport retry tests continue to pass.
   No new behavior in those paths is authorized by this decision.
 
+Evidence anchors (source/test inspection, not tests rerun during this backfill):
+
+- `src/main/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisor.java:243` (`private Prompt buildRetryPrompt`) rebuilds baseline plus candidate/feedback and keeps baseline options; `src/main/java/ai/loomspan/internal/linter/LinterCallAdvisor.java:173` (`private Prompt appendHint`) and `src/main/java/ai/loomspan/internal/runtime/evidence/EvidenceContractCallAdvisor.java:115` (`private Prompt appendHint`) append hints before re-entering the chain.
+- `src/main/java/ai/loomspan/internal/springai/CanonicalToolCallingManager.java:36` (`@Override public ToolExecutionResult executeToolCalls`) checks bound selections without a correction-phase prohibition; `src/main/java/ai/loomspan/internal/runtime/step/StepActionValidator.java:38` (`static StepValidationResult validateFinal`) already rejects final-phase CALL_TOOL.
+- `src/test/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisorTest.java:91` (`void rebuildsThirdAttemptFromBaselineWithOnlyLatestCandidateAndCorrection`) covers latest-candidate behavior; `src/test/java/ai/loomspan/internal/runtime/evidence/EvidenceContractAdvisorAdditionalTest.java:31` (`void unsupportedRequiredClaimFailsAfterToolFreeRetriesAndPreservesExpressionDiagnostics`) uses a recording chain and asserts instructions, not dispatch prohibition.
+- `src/test/java/ai/loomspan/internal/chat/ModelAttemptCallAdvisorIntegrationTest.java:288` (`void semanticRetriesWrapOneObservableAi2ToolLoop`) explicitly expects two callbacks across linter correction. Update that legacy expectation under the agreed no-tools correction policy while retaining physical-attempt accounting. `src/test/java/ai/loomspan/internal/chat/ModelAttemptCallAdvisorIntegrationTest.java:361` (`void outputSchemaRetryReusesCompletedToolResultWhenCorrectionReturnsJsonDirectly`) scripts a direct final answer and asserts one callback plus candidate/feedback in the retry request; despite its name, it does not assert completed tool-result content in that request.
+
+#### Completed-tool-history integration — agreed November 12, 2026
+
+The [preserved investigation/probes](../../../docs/maintainers/probes/tbd-11-history/README.md)
+refine the implementation approach without changing either TBD-11 policy. Allocate one
+private holder per ordinary SpringAiModelInteraction.call and pass the same reference
+through existing advisor context and tool context. Do not store history on cached
+clients/managers or share it across interactions. Preserve planning and step behavior.
+
+After successful CanonicalToolCallingManager delegate execution, retain the appended
+Message objects from ToolExecutionResult.conversationHistory, including assistant parts
+and associated tool results. Keep completed exchanges separate from baseline instructions,
+rejected candidates and feedback. Reuse the already agreed canonical-message parts repair;
+the current text/tools/media reconstruction is not faithful RC2 replay.
+
+Retain the latest raw provider AssistantMessage at ProviderAttemptCallAdvisor's returned-
+response boundary before output composition, without adding retries or usage accounting.
+Do not reconstruct provider history from the application-facing composed result.
+The three existing correction advisors use one private request helper. Preserve their
+baseline instructions/media, existing feedback behavior, budgets and exhaustion policy.
+Explicitly track the inserted replay segment in request context so nested/repeated
+corrections replace it with completed exchanges and the latest raw candidate instead of
+duplicating history or retaining stale candidates. Do not infer segments from text.
+
+Entering final repair sets a call-local terminal flag. Clear callbacks on copied typed
+request options and enforce the flag in CanonicalToolCallingManager before delegation.
+Keep normal canonical authorization intact. Actual serialized requests must have no
+executable tool availability, including defaults; prompt guidance alone is insufficient.
+No additional tool loop, public API, global mapper/context or persistence is authorized.
+
+Evidence: an augmented current factory/advisor/default-tool-loop harness reproduces
+missing tool context in schema and evidence corrections, and two tool executions across
+linter correction. Its physical-attempt assertions pass. This is not the complete
+assembler/canonical-manager pipeline. Five RC2/Boot 4.2.0-RC2 mock-HTTP mechanism tests
+passed: ordered two-round replay through repeated corrections, a correction tool-call
+guard with model-default callbacks, separate sequential-call isolation, nested synthetic
+validators without duplicate replay, and raw-reply preservation through synthetic
+composition. These use synthetic correction components, not migrated Framework advisors.
+
+Implementation and full acceptance remain pending. Retain the mandatory tests above,
+including real three-advisor/combined paths, all three adapters, concurrent/nested-call
+isolation, attachments, bindings/snapshots, canonical names/parts, cancellation,
+exhaustion and physical-attempt/usage controls. No live capability is established.
+Tickets must carry the exact integration seams, replay-segment ownership and raw-versus-
+composed distinction, plus these evidence limitations and reproduction commands.
+
+Evidence anchors: SpringAiModelInteraction.java:41/:64/:67 creates each interaction and
+binds tools/advisor context; CanonicalToolCallingManager.java:70 returns the delegate's
+history; ProviderAttemptCallAdvisor.java:103–112 owns returned response/usage;
+OutputSchemaCallAdvisor.java:125 composes application-facing text and :243 rebuilds
+schema corrections; LinterCallAdvisor.java:116 and EvidenceContractCallAdvisor.java:94
+retain their own feedback policies. All are under src/main/java/ai/loomspan/internal/
+in their existing springai, chat, outputschema, linter or runtime/evidence packages.
+The durable probe README identifies copied harnesses, exact commands and retained captures.
+
 ### TBD-12: Refusals, incomplete responses, and partial tool calls
 
 **Status: Resolved — three targeted changes agreed November 11, 2026.** Preserve
@@ -1474,13 +1885,80 @@ Required tests:
 - Existing cancellation, backoff, transient retries, OpenRouter error-completion,
   authorization, and ordinary tool-loop tests remain valid without policy changes.
 
+Evidence anchors (source/test inspection, not tests rerun during this backfill):
+
+- `src/main/java/ai/loomspan/internal/chat/ProviderAttemptCallAdvisor.java:103` (`ChatClientResponse linkedResponse =`) records a returned response as successful and returns it without explicit completeness classification; `src/main/java/ai/loomspan/internal/chat/ProviderAttemptCallAdvisor.java:189` (`private Map<String, Object> responsePayload`) records message payloads without generation completion metadata.
+- `src/main/java/ai/loomspan/internal/springai/CanonicalToolCallingManager.java:36` (`@Override public ToolExecutionResult executeToolCalls`) validates selections before delegating but has no explicit containing-response status check.
+- `src/test/java/ai/loomspan/internal/springai/CanonicalToolCallingManagerTest.java:88` (`void rejectsEveryInvalidOrUnboundSelectionBeforeAnyCallbackExecutes`) proves selection rejection, not incomplete-response rejection. `src/test/java/ai/loomspan/internal/chat/ModelAttemptCallAdvisorIntegrationTest.java:207` (`void recordsEachAdvisorRetryAsOnePhysicalAttemptInTheSameRetrySequence`) covers attempt accounting; `src/test/java/ai/loomspan/internal/chat/ModelAttemptCallAdvisorIntegrationTest.java:946` (`void openRouterRetryableErrorCompletionRecoversWithTwoVisibleEndpointCalls`) is the existing provider error-completion regression to preserve. These do not prove all three adapters expose/refuse incomplete responses as required.
+
+#### Status/usage integration and adapter prerequisites — agreed November 12, 2026
+
+The [preserved probes](../../../docs/maintainers/probes/tbd-12-status/README.md) refine
+the three agreed changes above; they do not introduce new status policy. A Framework-
+only classifier cannot recover evidence discarded by the selected adapter. Prefer
+narrow upstream corrections or a verified fixed release within the existing dependency
+work: retain Gemini promptFeedback and candidate finish details in response/generation
+metadata, and retain the original Responses failed-lifecycle response as accessible
+exception evidence. Do not ship copied research classes, add a second transport, infer
+status from empty output/prose, or weaken the evidence requirement.
+
+Use one internal driver-specific explicit-status classifier at ProviderAttemptCallAdvisor,
+before downstream correction, planning parsing or tool dispatch. Read the actual pinned
+metadata: Responses generation status/refusal/incomplete reason; Anthropic finishReason
+and native anthropic-response; Gemini candidate finishReason plus preserved prompt feedback.
+Normal complete tool turns remain valid. Mapping a status does not authorize a new policy
+for undocumented values or vendor-recommended continuation/fallback. The already documented
+Responses failed-lifecycle error path retains evidenced error-code retry classification;
+failed is not synonymous with refusal/incomplete or automatically transient.
+
+For normally returned responses, retain relevant status/details/content/tool evidence and
+use existing ModelUsageExtractor and session accounting once, outside the transport retry
+catch. Record a failed provider outcome for terminal rejection instead of unconditional
+success; link failure to the same physical attempt and throw without correction or transport
+retry. MODEL_RESPONSE_RECEIVED records receipt, not successful acceptance. Reuse the same
+decision in CanonicalToolCallingManager before any delegation; neither that guard nor outer
+validators own usage. Preserve authorization and the separately agreed parts-preservation fix.
+For SDK-thrown responses, account once for actual usage made accessible by the adapter repair,
+without fabricating usage for transport failures or changing existing error retry policy.
+Preserve quota/cancellation semantics, including failures raised by usage accounting itself.
+
+Evidence: three RC2/Boot 4.2.0-RC2 tests passed with 15 mock HTTP fixtures. Responses
+incomplete text/two-tool replies and explicit refusal retain metadata and usage; a failed
+lifecycle fixture loses its supplied body/usage in the code/message-only exception.
+Anthropic's six tested stop reasons retain finishReason, native response and usage. Gemini
+MAX_TOKENS/SAFETY/STOP retain finishReason; a blocked-prompt fixture returns empty generations
+and usage while losing its explicit promptFeedback.blockReason. Fixture token counts do
+not establish live billing. Current Framework harnesses separately reproduce incomplete
+output entering linter correction and two authorized callbacks executing on LENGTH. Existing
+exact-usage assertions, invalid-selection rejection and OpenRouter error-completion retry
+regression pass. These are not one complete migrated production pipeline.
+
+Implementation remains pending, including verification of the candidate adapter repairs.
+Retain all acceptance cases above across three real migrated pipelines: schema-valid
+incomplete output, explicit refusal/prose controls, multi-call zero dispatch, normal tool
+continuation, planning rejection before parsing, exactly-once usage/outcomes, missing/zero
+usage, quota/cancellation collisions and existing transport/backoff behavior. No streaming,
+comprehensive SDK-error matrix or live capability is established. Tickets must carry exact
+metadata mappings, adapter prerequisites, accounting ownership and these limitations.
+
+Evidence anchors: ProviderAttemptCallAdvisor.java:103/:189 records success and message-only
+payloads; DefaultSessionUsageService.java:59 owns response usage and quota enforcement;
+CanonicalToolCallingManager.java:36 is the dispatch boundary (all under
+src/main/java/ai/loomspan/internal/ in chat, runtime/usage and springai respectively).
+Preserved upstream files under docs/maintainers/probes/tbd-12-status/upstream/:
+ResponsesItemMapper.java:525/:776/:815 maps status, usage and failed exceptions;
+OpenAiResponsesChatModel.java:137 throws before response mapping;
+AnthropicChatModel.java:1183/:1413 retains stop reason/native response;
+GoogleGenAiChatModel.java:618/:743/:871 maps candidates/finish reason but omits feedback.
+The probe README and investigation.json retain commands, fixtures and test limitations.
+
 ### TBD-13: Framework input features and generated schemas
 
 **Status: Resolved as policy; implementation and acceptance remain pending.**
 Attachment inputs, runtime references, Java declaration authority, typed-map and
 unconstrained inputs, recursive-type rejection, output evidence metadata, effective
 schema display and TypeSafe boundaries are agreed below. Preserve existing behavior
-except the explicit changes recorded here. Resume policy discussion with TBD-14.
+except the explicit changes recorded here. TBD-14 records the agreed implementation split.
 
 #### Accepted SkillMethod/SkillExecutor developer model and typed-map inputs — November 11, 2026
 
@@ -1559,6 +2037,210 @@ Mandatory ticket acceptance tests:
 Existing AdapterTest sources/captures and RC2 source inspection support these findings;
 no new live calls, production implementation or ticket creation accompany this agreement.
 
+#### Deferred Java declaration edge cases — scope reset November 12, 2026
+
+Keep only this overview for possible follow-up:
+
+- Optional input wrappers.
+- Jackson polymorphic inputs (`@JsonTypeInfo`).
+- Array-shaped DTO inputs (`@JsonFormat(shape=ARRAY)`).
+- Delegating creator inputs (`@JsonCreator`).
+
+These are outside the migration implementation and acceptance scope. This scope reset
+supersedes the earlier registration-restriction agreements for the first three items;
+the creator investigation is also deferred. It does not assert that these declarations
+are supported. Detailed findings, implementation proposals, acceptance requirements and
+probe artifacts have been removed deliberately. Do not reconstruct or expand them in
+routine migration audits. Revisit only when a concrete application requirement or a
+migration-critical acceptance case establishes a need, with explicit scope agreement.
+The map-key, open-property and JsonUnwrapped corrections remain in scope.
+
+#### Retained generated-input corrections
+
+**Declared map key types — registration restriction agreed November 12, 2026:**
+Reject generated Java map declarations whose resolved key type requires conversion of
+JSON property names. Preserve String-keyed maps and raw/Object-keyed maps accepting
+string keys; do not convert property names or introduce property-name schema features.
+Use the agreed effective Java-type traversal, including nested DTOs, collection items,
+map values and inherited generic bindings. Report the method, parameter/property path
+and unsupported key type at registration, before publishing a misleading contract.
+Runtime non-string-key rejection still applies separately to incoming values.
+
+The [preserved probe](../../../docs/maintainers/probes/tbd-13-map-key-types/README.md)
+registers Map<Integer,String>, validates two distinct string keys "1" and "01", and
+invokes the method with only one integer-keyed entry: the second value wins after
+binding. A nonnumeric string key also validates but fails during Java binding. The
+isolated registration-check candidate rejects direct and nested integer-key declarations;
+String-keyed, raw and Object-keyed controls preserve both string keys. Four existing
+generator and two binder test methods pass against it. This is actual local registration,
+validation and invoker evidence, not public SkillTemplate, NetworkNT or live capability.
+
+Implementation and full acceptance remain pending. Add registration tests for other
+numeric, enum and custom key types, inherited resolved generics and full diagnostics;
+retain valid nested maps and marked resource-map values. Inspect effective application
+mapper behavior where custom key deserializers are configured; the probe does not
+establish fidelity for arbitrary custom mapper configuration. Reuse existing registration
+and binding machinery rather than designing a general serializer-to-schema system.
+
+Evidence anchors (audit-time lines and symbols):
+
+- `src/main/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGenerator.java:64`
+  (`schemaFor`) emits map value schemas without checking key types.
+- `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:596`
+  (`materializeValue`) preserves keys; `:567` (`convertArgument`) converts to the
+  declared JavaType, including key conversion.
+- `src/test/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGeneratorTest.java:70`
+  (`typedMapSchemasRemainConstrainedAfterObjectBroadening`) tests typed values with
+  String keys. Binder controls at `SkillMethodBeanPostProcessorTest.java:118` and
+  `:154` do not cover declared numeric-key collisions. The runtime-map-key and
+  open-property corrections do not cover this all-string-key counterexample.
+
+**JsonUnwrapped declarations — agreed November 12, 2026:** reject enabled
+@JsonUnwrapped in generated Java input contracts at registration, using effective
+binding-mapper introspection and diagnostics identifying the method, parameter and
+property path. Preserve disabled annotations and ordinary nested DTOs. This is an
+explicit bounded declaration restriction: these annotated DTOs cannot be used directly
+as generated SkillMethod inputs. Do not ignore the annotation, rewrite values or add
+a general flattening/serializer system. Supporting prefixes/suffixes, collisions,
+requiredness and runtime-reference mapping would require a separate design decision.
+
+The [preserved probe](../../../docs/maintainers/probes/tbd-13-unwrapped/README.md)
+reproduces a published nested contract versus flattened Jackson binding: flattened
+input is rejected, while schema-valid nested input executes with its supplied leaf
+lost. A temporary rejection candidate preserves disabled-annotation/ordinary DTO
+controls; four existing generator and two binding test methods pass. Existing naming,
+enum, UUID, generic and resource corrections do not handle structural unwrapping.
+This is local registration/validation/invoker evidence, not full public invocation,
+migrated NetworkNT/provider or live acceptance. Implementation remains pending.
+
+Add registration rejection cases for fields, getters, effective application mixins,
+prefix/suffix settings and nested/items/map locations, with method/path diagnostics
+and no publication/invocation. Preserve disabled annotations and existing DTO/binding
+coverage. Evidence anchors: LoomspanMethodInputSchemaGenerator.java:114/:120/:121
+introspects then emits/requires a nested named property; SkillMethodBeanPostProcessor.java:567
+binds through the application mapper, with bean-map materialization at :623. Files are
+under src/main/java/ai/loomspan/internal/serialization and core. Existing generator and
+postprocessor tests do not cover unwrapping. The separate read-only-property probe found
+correct exclusion by creation introspection; no read-only-property correction is selected.
+
+**UUID input contracts — agreed November 12, 2026:** map java.util.UUID to the
+existing generated string scalar shape, including nested properties, collection items
+and map values. Preserve descriptions, requiredness, surrounding contracts, method
+signatures and existing Java conversion failures. Do not add format assertions or a
+general serializer-to-schema system incidentally. Existing naming/enum/generic/resource
+corrections do not repair this scalar classification.
+
+The [preserved probe](../../../docs/maintainers/probes/tbd-13-uuid/README.md) uses actual
+registration, validation and registered invokers: UUID strings fail the current published
+object contract but bind successfully; advertised leastSignificantBits/mostSignificantBits
+objects validate but fail binding before the method body. Nested record/list/map cases
+show the same mismatch. An isolated string-mapping candidate fixes the tested shapes;
+four existing generator and two binding tests pass. This is an existing local mismatch,
+not a new validator defect. Full public-invocation, migrated-validator, adapter and live
+acceptance remain pending, as does production implementation.
+
+Add focused registration/validation/invocation tests for those shapes, unchanged
+requiredness/descriptions/sibling validation and malformed binding controls. Evidence:
+LoomspanMethodInputSchemaGenerator.java:93/:114 omits UUID from scalar classification
+and introspects its bean properties; SkillMethodBeanPostProcessor.java:337/:567 generates
+then binds through the application mapper. These are under src/main/java/ai/loomspan/internal/
+serialization and core. Existing LoomspanMethodInputSchemaGeneratorTest.java:26/:50/:70
+and SkillMethodBeanPostProcessorTest.java:118/:154 do not cover UUID. The probe README
+retains commands, candidate scope and evidence limitations.
+
+**Enum names and Java binding — agreed audit correction:** generated string-enum
+choices must agree with Java binding for enum constants with JsonProperty names.
+The current generator uses String.valueOf while Jackson binding honors the annotated
+name: an isolated probe with JsonProperty("wire-ready") on READY showed that READY
+passed schema validation but failed binding, while wire-ready bound successfully but
+failed validation. Replacing the legacy validator alone does not fix this mismatch.
+Align generation and binding for this bounded case without introducing a general
+custom-serializer schema system or changing method signatures. Add a registration/
+invocation regression proving the advertised value validates and reaches the intended
+enum constant; retain ordinary enum coverage. The probe establishes the narrow mismatch,
+not full invocation or live-provider acceptance. Implementation remains pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGenerator.java:90` (`values.add(String.valueOf(value))`) advertises Java string values; `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:567` (`return objectMapper.convertValue(materializedValue, parameterJavaType)`) binds using Jackson.
+- `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:118` (`invokesCapabilityUsingEnvelopeMap`) is the existing registration/binding harness, but does not exercise an enum with JsonProperty. Add the annotated-enum case there; the isolated probe described above is not a committed regression test.
+
+**Interface parameter-name remapping — agreed audit correction:** preserve the
+existing support for SkillMethod declarations on interfaces implemented by Spring
+beans. When interface contract names differ from implementation parameter names,
+build the final properties and required list from the original generated parameter
+schemas by position, rather than removing and reinserting names in the same mutable
+map/list. Overlapping names must not overwrite a later parameter's schema or alter
+its requiredness. Preserve the existing contract-selection rules, implementation
+types, SkillParam descriptions/requiredness, runtime-reference handling and binding
+by contract name; no signature restriction or new public API is needed.
+
+Add a registration/validation/invocation regression with swapped interface and
+implementation parameter names and different types, plus mixed required/optional
+parameters. Assert both properties retain the correct types and descriptions, the
+required list matches the selected contract metadata, and valid contract-name input
+reaches the intended argument positions. Retain ordinary matching-name and existing
+interface/proxy invocation coverage. A local registration probe published only
+right:string for interface (String left, int right) implemented as (String right,
+int left): intended input failed schema validation although direct binding returned
+the expected result. The existing secured generic JDK-proxy integration test passed
+through SkillTemplate.invoke(), establishing interface support but not collision
+coverage. The remapping fix and its focused tests remain pending; no provider
+capability is inferred from this local evidence.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:333` (`private String buildInputSchema`) mutates properties in place; `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:393` (`required.remove(index)`) mutates required names while remapping.
+- `src/test/java/ai/loomspan/integration/JavaSkillIntegrationTest.java:109` (`void securedGenericJdkProxyRetainsCanonicalInputContractAndActualMethodAdvice`) proves interface/proxy invocation; `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:137` (`handlesMissingOptionalParameterWithoutCrashing`) covers ordinary optional arguments. Neither exercises swapped names. The earlier passing proxy test is historical local evidence, not a rerun during this backfill.
+
+**Java property naming and binding — agreed audit correction:** generate Java input
+property names using the application binding mapper's property introspection, while
+retaining the dedicated schema mapper for schema JSON handling. Production currently
+generates properties with the schema mapper but binds with the application mapper;
+an application naming strategy can therefore make the published contract disagree
+with binding. Preserve default naming, explicit property-name annotations, required
+lists and nested runtime-reference traversal under the same property names. This is
+a naming-alignment correction, not a general custom-serializer schema system or a
+change to framework-owned trace/observability serialization.
+
+Add a registration/validation/invocation regression using a configured SNAKE_CASE
+application mapper and a nested Java property. Assert the published schema and
+resolved contract use first_name for Java firstName, valid input reaches the method
+unchanged, and the unadvertised spelling is rejected under the closed contract.
+Retain default-name coverage and exercise production's separate mapper wiring.
+The local registration/binding probe found firstName passed validation but bound
+to null, while first_name failed validation but bound to Ada when invoked directly.
+Existing generator tests use the same mapper for generation and conversion; the
+snake-case observability integration fixture does not establish skill-input binding
+coverage. Implementation and focused verification remain pending; no provider
+capability is inferred from this local evidence.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:129` (`private SkillMethodBeanPostProcessor(ObjectMapper objectMapper, ObjectMapper schemaMapper`) wires separate mappers; `src/main/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGenerator.java:114` (`.introspectBeanDescriptionForCreation(type)`) chooses schema property names; `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:638` (`private Map<String, JavaType> propertyTypes`) uses binding-side introspection for runtime leaves.
+- `src/test/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGeneratorTest.java:20` (`private final ObjectMapper objectMapper`) shares one mapper between generation and contract conversion; `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:154` (`publishesDescriptionsAndBindsUnconstrainedReflectedInputs`) exercises ordinary input binding. Neither proves production wiring with a custom naming strategy.
+
+**Inherited generic parameters — agreed audit correction:** resolve method parameter
+types against the concrete bean class and reuse those resolved types for generated
+schemas, runtime-reference marking and Java binding. Current context-free resolution
+of an inherited T can collapse it to Object even when the bean extends Base<Integer>.
+Preserve existing declaration selection and proxy invocation; no new signature or
+public API is needed. Add a registration/validation/invocation regression for an
+inherited T resolved to Integer: publish an integer contract, accept integer input,
+and reject strings before entering the method. Include a resolved runtime-reference
+parameter to verify marking and binding use the same type information. Retain existing
+concrete-override generic-interface coverage and resolved generic recursion checks.
+A local registration/invocation probe published value:{} for Base<T>.increment(T)
+inherited by Base<Integer>'s concrete subclass: 4 validated and returned 5, while a
+non-integer string validated then failed with ClassCastException. This establishes
+the local mismatch, not provider behavior. Implementation and focused tests remain
+pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGenerator.java:41` (`mapper.constructType(parameter.getParameterizedType())`), `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:354` (`applyRuntimeInputSemantics(parameterSchema, objectMapper.constructType(parameter.getParameterizedType()))`) and `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:538` (`JavaType parameterJavaType = objectMapper.constructType`) independently resolve without the concrete owning class.
+- `src/test/java/ai/loomspan/integration/JavaSkillIntegrationTest.java:109` (`void securedGenericJdkProxyRetainsCanonicalInputContractAndActualMethodAdvice`) covers a concrete override; `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:72` (`inheritedSkillUsesSpringDeclaringClassPolicySemantics`) checks inherited security policy, not inherited generic parameter resolution.
+
 #### Recursive Java input types — agreed November 11, 2026
 
 Reject recursive types exposed through generated skill-input contracts at registration,
@@ -1597,6 +2279,40 @@ Source evidence: LoomspanMethodInputSchemaGenerator.schemaFor currently uses a s
 raw classes and emits only type: object when a class repeats; the existing generator
 unit test explicitly asserts that fallback. This agreement is not a production change
 or new passing-test claim.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGenerator.java:104` (`else if (!visiting.add(raw))`) emits the open fallback; `src/test/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGeneratorTest.java:90` (`recursiveDtoFallbackRemainsBoundedAndObjectShaped`) explicitly asserts that legacy fallback. Replace that expectation as agreed; `src/test/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGeneratorTest.java:70` (`typedMapSchemasRemainConstrainedAfterObjectBroadening`) supplies nonrecursive map controls.
+
+**Runtime-resource sequencing — agreed November 12, 2026:** recognize existing
+Resource, InputStream and byte[] leaves before ordinary bean-property expansion and
+recursive-contract rejection. Reuse the existing supported-type predicate/semantics,
+including nested properties, collection items and map values, rather than maintaining
+divergent type lists. These leaves expose marked string contracts, not their Java
+implementation internals. Preserve strict rejection for genuinely recursive exposed
+DTOs, resolved-type cycle tracking, finite generic nesting and the separately agreed
+description, naming and container-binding corrections. No public API change is needed.
+
+The [preserved probe](../../../docs/maintainers/probes/tbd-13-runtime-recursion/README.md)
+uses actual registration: the current code registers direct/nested Resource inputs;
+replacing the generator's fallback with rejection first fails on java.io.File before
+runtime rewriting. An isolated candidate recognizing runtime leaves first preserves
+identical published resource schemas and direct validation/invocation, while rejecting
+real DTO cycles, including beside a Resource. Seven existing binding/cleanup test
+methods passed with the candidate. This is a reproduced migration-order hazard, not
+a current Resource-registration defect. The candidate retains raw-class cycle tracking;
+it is not the complete agreed resolved-generic implementation or full/live acceptance.
+
+Tickets must preserve this ordering and add combined registration cases for direct,
+nested/items/map resource leaves, genuine DTO cycles alongside them, finite generic
+nesting, metadata fidelity and existing binding/cleanup behavior. Evidence anchors:
+SkillMethodBeanPostProcessor.java:337 generates before :354 applies runtime semantics;
+:410/:457 rewrites resource leaves and :662 defines their type predicate.
+LoomspanMethodInputSchemaGenerator.java:104/:114 handles cycles/bean traversal.
+Both are under src/main/java/ai/loomspan/internal/ in core and serialization.
+Existing SkillMethodBeanPostProcessorTest.java:330 verifies reference-friendly schemas;
+LoomspanMethodInputSchemaGeneratorTest.java:90 still expects recursive fallback. Neither
+combines strict recursion rejection with resource registration. Implementation is pending.
 
 #### Unconstrained Object input values — agreed November 11, 2026
 
@@ -1648,6 +2364,43 @@ Mandatory ticket acceptance tests:
 Existing generator and postprocessor tests demonstrate intended JSON-value acceptance
 and binding. No production changes, new test-run acceptance or tickets accompany this
 agreement.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGenerator.java:99` (`else if (raw == Object.class)`) already emits an empty schema; `src/test/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGeneratorTest.java:50` (`javaObjectGeneratesUnconstrainedProviderSchema`) tests non-null JSON values, while `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:154` (`publishesDescriptionsAndBindsUnconstrainedReflectedInputs`) exercises descriptions and binding. These do not establish the new required-present-null behavior or live route acceptance.
+
+**Open-property JSON compatibility — acceptance detail agreed November 12, 2026:**
+Apply the existing ordinary-input JSON-compatibility requirement to undeclared properties
+under explicit non-generic contracts with additionalProperties: true or omitted, as well
+as schema-valued additionalProperties: {}. Recursively reject arbitrary POJOs, Resources,
+InputStreams, byte arrays and non-finite numbers before conversion/invocation; do not
+read streams or serialize Java internals to make these values acceptable. Preserve JSON
+null, exact numeric values, literal ref:// strings, separate generic-contract behavior
+and explicitly marked runtime-resource leaves. This refines existing policy rather
+than introducing a new restriction or retaining the custom validator in migration.
+
+The [preserved probe](../../../docs/maintainers/probes/tbd-13-open-properties/README.md)
+reproduces twelve direct/nested invalid-value cases: true and omitted openness accept
+them, while an explicit empty value schema rejects them. An isolated candidate applies
+the existing recursive JSON check at open branches for non-generic contracts; all 17
+existing validator test methods pass. Resource/stream sentinels are not consumed.
+Add equivalent generated/authored acceptance cases and assert rejection before Java
+invocation with useful input paths and unchanged input. Public invocation, migrated
+NetworkNT integration and live-provider capability were not established by this local
+validator probe; production implementation and full acceptance remain pending.
+
+Evidence anchors (audit-time lines and symbols):
+
+- `src/main/java/ai/loomspan/internal/runtime/input/SkillInputValidator.java:165`
+  (`validateObject`) validates schema-valued extras; `:185` (`validateOpenBranch`)
+  otherwise copies arbitrary values, unlike `:75` (`validateUnconstrained`).
+- `src/main/java/ai/loomspan/internal/skillapi/DefaultSkillTemplate.java:165`
+  (`prepareMap`) and `src/main/java/ai/loomspan/internal/core/CapabilityExecutionRouter.java:62`
+  call input validation before execution; the probe does not exercise these callers.
+- `src/test/java/ai/loomspan/internal/runtime/input/SkillInputValidatorTest.java:472`
+  (`rejectsNonJsonValuesAndUnknownSchemaKindsExplicitly`) covers explicit unconstrained
+  values, not undeclared open properties. The runtime-map-key correction addresses
+  key identity rather than this value-validation branch.
 
 #### Output evidence metadata — agreed November 11, 2026
 
@@ -1707,6 +2460,11 @@ Mandatory ticket acceptance tests:
 
 No production implementation, new test-run acceptance or ticket creation is claimed.
 
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/skill/YamlSkillCatalog.java:857` (`String evidence = entry.getValue().getEvidence()`) extracts root-property evidence; the parser/compiled-contract path immediately below it remains the authority. The existing lowercase claim index at `src/main/java/ai/loomspan/internal/skill/YamlSkillCatalog.java:899` (`compiled.keySet().forEach`) must follow the agreed exact-name migration.
+- `src/test/java/ai/loomspan/internal/skill/YamlSkillEvidencePropertyCatalogTest.java:41` (`void loadsEvidenceAnnotationFromImmediateRootOutputProperty`) and `src/test/java/ai/loomspan/internal/skill/YamlSkillEvidencePropertyCatalogTest.java:98` (`void rejectsEvidenceOutsideImmediateRootPropertiesWithFullPath`) establish legacy extraction/placement. Migrate their vocabulary and retain those semantics; these are not tests of the new annotation.
+
 #### Effective-schema display and catalog metadata — agreed November 11, 2026
 
 Preserve effective output schemas as structural result metadata, distinct from canonical
@@ -1751,6 +2509,11 @@ Mandatory ticket acceptance tests:
   public descriptor signatures or adding an independent client-side schema validator.
 
 No production implementation, new test-run acceptance or ticket creation is claimed.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/skill/SkillDependencyValidator.java:359` (`private static Map<String, Object> outputSchemaMetadata`) reconstructs selected legacy fields and omits child evidence; resolveOutputSchema immediately above follows forwarding chains.
+- `src/test/java/ai/loomspan/internal/skill/SkillDependencyValidatorTest.java:21` (`void transitiveReturnUsesCandidateDeclarationsContractsAndVisibility`) covers transitive contracts; `loomspan-console/web/src/observability/SkillDetail.test.tsx:49` (`TypeSafe detail retains source label, original declaration and descriptive schema`) covers inert display of existing schema text, not preservation of newly supported standard keywords.
 
 #### TypeSafe migration boundary — agreed November 11, 2026
 
@@ -1809,6 +2572,128 @@ Mandatory ticket acceptance tests:
 
 No production implementation, new test-run acceptance or ticket creation is claimed.
 
+**TypeSafe response decimal precision — agreed audit correction:** parse native
+response envelopes with lossless decimal handling before recording response evidence
+and extracting answers. Keep this correction local to TypeSafe response parsing;
+do not change shared mapper behavior or introduce result-schema validation. Reuse
+the arbitrary-precision decoding approach already present in AcceptedResultDecoder.
+Add focused mock-response integration tests with long fractional and exponent-form
+decimal values, including nested answers, asserting exact numeric values in returned
+answers and trace evidence using precision-preserving assertions. Retain object-answer
+acceptance, usage accounted once and existing malformed-response handling.
+The exact current codec/extraction operations rounded 0.12345678901234567890123456789
+to 0.12345678901234568 in a local probe. Source inspection shows successful parsing
+records the parsed envelope rather than the raw body; the full executor path was not
+run with that fixture. Existing large/extended-answer tests use integer fixtures and
+default-mapper tree comparisons, which do not establish decimal precision.
+Implementation and focused tests remain pending; no live provider claim is made.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/typesafe/TypeSafeExecutor.java:89` (`envelope = codec.readTree(raw)`) parses with the default schema mapper; `src/main/java/ai/loomspan/internal/typesafe/TypeSafeExecutor.java:97` (`responseEvidence.put("envelope", envelope)`) records the parsed value; `src/main/java/ai/loomspan/internal/typesafe/TypeSafeExecutor.java:121` (`return codec.writeValueAsString(answers)`) returns extracted answers.
+- `src/test/java/ai/loomspan/integration/TypeSafeSkillIntegrationTest.java:298` (`void completeExtendedAndLargeAnswersPassThroughBothRoutePrefixes`) uses integer/large-string fixtures and default-mapper equality. Reuse this mock HTTP harness with exact decimal assertions; `src/main/java/ai/loomspan/internal/runtime/input/AcceptedResultDecoder.java:12` (`USE_BIG_DECIMAL_FOR_FLOATS`) is the existing lossless-decoding implementation to reuse.
+
+**TypeSafe request decimal precision — agreed audit correction:** make
+ResolvedRequest.json() reparse captured request decimals losslessly while retaining
+its detached-copy behavior. Template resolution can preserve a BigDecimal in jsonText
+only for the subsequent default-mapper reparse to round it before the executor adds
+the model and serializes the request body. Keep this correction local; preserve
+embedded-string substitution and immutable request reuse across retries.
+Add focused tests for long fractional/exponent-form numeric substitutions, including
+nested values, repeated json() reads and mutation isolation, and captured HTTP request
+bodies across retries using precision-preserving assertions. Existing scalar-fidelity
+coverage uses 1.25 embedded into a string and does not establish this numeric path.
+A local request-construction probe retained 0.12345678901234567890123456789 in the
+resolved JSON text but emitted 0.12345678901234568 after json() and executor-style
+serialization. No HTTP/provider call was made. This is separate from response parsing;
+implementation and focused tests remain pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/typesafe/TypeSafeDeclaration.java:74` (`public record ResolvedRequest`) reparses with JSON.readTree; `src/main/java/ai/loomspan/internal/typesafe/TypeSafeExecutor.java:36` (`ObjectNode request =`) consumes that tree before adding model and serializing the body.
+- `src/test/java/ai/loomspan/internal/skill/TypeSafeDeclarationTests.java:93` (`void parsedYamlScalarFidelityAndResolvedCopiesRemainExact`) checks detached copies and embedded BigDecimal(1.25) text, not long decimal numeric substitutions. Extend it and the captured-request integration harness named in the response finding.
+
+**Skill YAML decimal precision — agreed audit correction:** preserve finite decimal
+literals losslessly at skill-document YAML ingestion, before converting decoded values
+to Jackson trees. Default CoreSchema numeric construction in YamlValues currently
+rounds these literals to Double; later request/response parsing fixes cannot recover
+the lost digits. Add focused fractional/exponent-literal tests, literal TypeSafe data
+tests, and migrated minimum/maximum boundary-validation tests using exact numeric
+assertions. Preserve duplicate-key, alias and non-JSON-value checks. Account for the
+helper's shared executor-configuration use without changing unrelated Boot property
+decoding. Existing scalar-fidelity coverage supplies BigDecimal(1.25) programmatically
+and does not establish literal YAML precision. A local ingestion probe converted
+9007199254740993.0 to 9007199254740992 and rounded a long fractional literal. The
+ingestion loss is reproduced; incorrect enforcement of migrated bounds is a pending
+migration risk, not a claim about currently supported bound validation. Implementation
+and focused tests remain pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/serialization/YamlValues.java:14` (`setSchema(new CoreSchema())`) constructs YAML numbers before `src/main/java/ai/loomspan/internal/skill/YamlSkillCatalog.java:412` (`yamlObjectMapper.valueToTree(decoded)`); `src/main/java/ai/loomspan/internal/autoconfigure/ExecutorYamlPropertySourceLoader.java:9` (`YamlValues`) is the shared configuration consumer to preserve.
+- `src/test/java/ai/loomspan/internal/skill/TypeSafeDeclarationTests.java:93` (`void parsedYamlScalarFidelityAndResolvedCopiesRemainExact`) creates its BigDecimal programmatically; it does not test decimal YAML literals or migrated numeric bounds.
+
+**Non-string YAML keys — agreed audit correction:** reject non-string mapping keys
+in JSON-bound skill-document content before valueToTree conversion, with source/path
+diagnostics. Preserve quoted numeric strings as valid property names and keep executor
+configuration's separate handling intact. Add focused catalog tests for numeric and
+boolean keys, nested occurrences, numeric 1 alongside quoted "1", and valid quoted-key
+controls. YAML distinguishes those two keys, but a local loadSupplied probe accepted
+both and retained only the integer schema associated with "1" after JSON conversion.
+Existing duplicate-key tests cover identical YAML keys, not conversion collisions.
+This corrects the migration's non-JSON-YAML rejection boundary before the standard
+validator sees the schema. Implementation and focused tests remain pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/serialization/YamlValues.java:36` (`private static long check`) checks expansion, including keys, without enforcing string keys; `src/main/java/ai/loomspan/internal/skill/YamlSkillCatalog.java:412` (`yamlObjectMapper.valueToTree(decoded)`) is the conversion boundary where numeric/string key collisions occur.
+- `src/test/java/ai/loomspan/internal/skill/TypeSafeDeclarationTests.java:45` (`void strictNativeManifestParsingRejectsDuplicateAndUnknownFields`) rejects duplicate YAML keys; `src/test/java/ai/loomspan/internal/skill/TypeSafeDeclarationTests.java:693` (`void nonJsonInputsAreRejectedBeforeSerialization`) checks runtime input keys. Neither covers distinct YAML keys colliding during tree conversion.
+
+**Runtime map keys — agreed audit correction:** reject non-string keys in runtime
+object/map inputs before normalization or JSON-tree conversion. Reuse the existing
+string-key check rather than stringifying keys; do not allow numeric 1 and string "1"
+to collapse into one property. This is separate from skill-document YAML ingestion.
+Preserve valid string-keyed maps and existing runtime-leaf adapters; do not redesign
+the public object/DTO invocation overload as part of this correction.
+
+Add focused typed-map and public map-invocation tests for numeric/boolean keys, nested
+occurrences (including maps in arrays), and numeric 1 alongside string "1". Assert
+rejection before execution, useful input-path diagnostics and unchanged original input.
+Retain valid string-key controls and existing unconstrained-value rejection. A local
+validator probe accepted a typed string-valued map with both keys and returned only
+the string-key entry; the same data under an unconstrained leaf was rejected. This
+reproduces validator-level loss, not a full public-invocation test. Implementation and
+focused invocation verification remain pending; no live capability is inferred.
+
+Evidence anchors:
+
+- `src/main/java/ai/loomspan/internal/runtime/input/SkillInputValidator.java:157`
+  (`validateObject`) applies String.valueOf to keys before inserting normalized values;
+  its `validateUnconstrained` branch at line 110 already checks for string keys.
+- `src/main/java/ai/loomspan/internal/skillapi/DefaultSkillTemplate.java:165`
+  (`prepareMap`) validates public map inputs through this path before admission.
+- `src/test/java/ai/loomspan/internal/runtime/input/SkillInputValidatorTest.java:316`
+  (`validatesMapLikeAdditionalPropertiesAgainstNestedSchema`) checks invalid values
+  using string keys; it does not cover key conversion or collisions. Extend this
+  coverage and public map-invocation tests rather than treating YAML-key tests as
+  proof of runtime behavior.
+
+**Non-finite YAML numbers — agreed audit correction:** reject non-finite numeric
+values in JSON-bound skill-document content before conversion. Add catalog tests
+for .nan, .inf and -.inf, including nested schema values, while preserving explicitly
+quoted "NaN" and "Infinity" as ordinary strings. Keep executor configuration's separate
+handling intact. A local catalog-loading probe accepted enum: [.nan, .inf, -.inf]
+and published the string enum ["NaN", "Infinity", "-Infinity"] through the legacy
+List<String> conversion. Existing TypeSafe non-JSON tests reject non-finite runtime
+inputs but do not establish schema YAML rejection. This implements the migration's
+non-JSON-YAML boundary without changing authored values into replacements.
+Implementation and focused tests remain pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/skill/YamlSkillCatalog.java:404` (`Object decoded = ai.loomspan.internal.serialization.YamlValues.read`) precedes valueToTree and treeToValue; `src/main/java/ai/loomspan/internal/skill/YamlSkillManifest.java:514` (`private List<String> enumValues`) is the legacy enum coercion destination.
+- `src/test/java/ai/loomspan/internal/skill/TypeSafeDeclarationTests.java:693` (`void nonJsonInputsAreRejectedBeforeSerialization`) rejects runtime non-finite values, not catalog schema literals; `src/test/java/ai/loomspan/internal/skill/YamlSkillCatalogTests.java:922` (`void loadsYamlSkillInputSchemaWhenPresent`) is the catalog input-schema fixture to extend with nested non-finite values and quoted-string controls.
+
 #### Non-attachment runtime-reference metadata — agreed November 11, 2026
 
 Retain the existing boolean `x-loomspan-runtime-ref-capable` marker as internal
@@ -1847,6 +2732,49 @@ cleanup; authorization and generic-resolution regressions; canonical marker rete
 provider-copy annotation removal with standard assertions, descriptions and similarly
 named data properties intact. Preserve original values and canonical schemas. Existing
 source/test inspection is evidence of behavior, not a new test-run acceptance claim.
+
+**Authored parameter descriptions — agreed audit correction:**
+`SkillMethodBeanPostProcessor` currently applies `SkillParam.description` before
+`rewriteAsRefFriendlyString` clears the node and installs generic reference guidance.
+Retain a nonblank authored description when rewriting Resource, InputStream and byte[]
+parameter schemas; use the existing generic guidance only when no nonblank description
+is supplied. Preserve the authored text exactly, string schemas, runtime-reference
+markers, requiredness, conversion and stream cleanup. This corrects an existing
+metadata loss; it does not redesign Java declarations or resource binding.
+
+Add focused registration tests for each of Resource, InputStream and byte[] with
+an authored SkillParam description. Assert exact description retention in the published
+tool schema and resolved input contract, alongside string type, runtime marker and
+requiredness. Cover absent/blank descriptions retaining existing generic guidance.
+Reuse existing conversion/cleanup regressions. Existing tests cover ordinary Object
+descriptions and unannotated runtime-reference schemas separately; they do not prove
+this combination. Source inspection establishes the loss; implementation and new
+passing-test evidence remain pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:382` (`objectSchema.put("description", skillParam.description())`) writes the authored description before `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:457` (`private void rewriteAsRefFriendlyString`) clears the node and installs a generic description.
+- `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:154` (`publishesDescriptionsAndBindsUnconstrainedReflectedInputs`) covers ordinary descriptions; `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:330` (`publishesRefFriendlyInputSchemasForRefCapableParameters`) covers runtime markers/types. Neither combines an authored description with a rewritten runtime-reference parameter.
+
+**Resource container binding — agreed audit correction:** preserve already assignable
+Resource leaves through container binding without serializing their internals. Current
+recursive materialization retains the Resource, but the subsequent whole-container
+ObjectMapper.convertValue attempts to serialize it. A local registration/validation/
+invocation probe accepted a Resource directly and preserved its identity, while the
+same object in List<Resource> passed validation but failed binding when Jackson tried
+to access its URI. This is not an incompatible target-type conversion.
+Add focused validation/invocation tests for direct and reference-resolved List<Resource>
+inputs, asserting original object identity and no content reads during binding. Retain
+existing Resource-to-string/byte conversion and stream-cleanup tests. Existing typed
+collection tests convert Resources to strings and do not prove Resource pass-through.
+The list failure is reproduced; verify other affected container shapes before extending
+the correction beyond demonstrated cases. Implementation and focused tests remain
+pending; no new public API or general serializer system is selected.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:570` (`private Object materializeValue`) preserves Resource leaves, but `src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:567` (`return objectMapper.convertValue(materializedValue, parameterJavaType)`) then converts the entire container.
+- `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:306` (`passesResourceBackedRefsThroughResourceAndInputStreamParameters`) covers direct leaves; `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:373` (`materializesResourceLeavesInsideTypedCollectionParameters`) converts to strings, and `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:350` (`materializesNestedResourceLeavesInsideTypedRecordParameters`) converts to String/byte[] leaves. These do not prove a Resource-valued container remains intact.
 
 #### Direct Java runtime-value validation — agreed November 11, 2026
 
@@ -1961,6 +2889,72 @@ standard keywords and similarly named data properties intact; existing reference
 Resource materialization regressions. Tickets must not prescribe fake reference values,
 Resource serialization or an alternative validation strategy beyond the agreed adapter.
 
+**Attachment MIME declarations — agreed audit correction:** validate every declared
+allowed_content_types entry during loading with the same MIME parser used by media
+construction. Report the skill, schema location and invalid entry for malformed MIME
+syntax. Preserve existing nonblank/nonempty checks; do not introduce a new MIME
+allowlist or infer provider support from syntactic validity. Add focused rejection
+tests for malformed nonblank entries, including one malformed entry among valid
+entries, and valid-MIME controls. A local probe loaded allowed_content_types:
+[not-a-mime] and materialized that content type before the media MIME parser rejected
+it for lacking a slash. Existing catalog tests cover missing content types and
+misplaced metadata, not this late failure. This implements the agreed malformed-
+metadata/load-time rejection boundary; implementation and focused tests remain
+pending, and no provider call was made by the probe.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/skill/YamlSkillCatalog.java:1009` (`private void validateAttachmentInputSchema`) validates declarations but checks allowed entries only for nonblank text; `src/main/java/ai/loomspan/internal/springai/SpringAiModelInteraction.java:57` (`MimeTypeUtils.parseMimeType(attachment.contentType())`) parses MIME values for media construction.
+- `src/test/java/ai/loomspan/internal/skill/YamlSkillCatalogTests.java:962` (`requiresAllowedContentTypesForAttachmentInputAndRejectsMediaFieldsElsewhere`) covers missing lists/placement, not malformed MIME syntax in an otherwise nonempty list.
+
+**Attachment MIME capitalization — agreed audit correction:** use parsed MIME values
+consistently for allowed-type comparison and normalized type/subtype selection for
+image-signature checks. Preserve the authored declaration; do not lowercase arbitrary
+parameter values or add wildcard/provider-support rules. Add focused lowercase,
+uppercase and mixed-case tests with identical valid JPEG bytes, plus controls for
+genuinely different MIME types and invalid signatures. Cover filename detection and
+the single-allowed-type fallback. A local materializer probe accepted image/jpeg but
+rejected IMAGE/JPEG for the same JPEG, although Spring's MIME parser considers them
+equal. The declaration parser correction alone does not fix this runtime mismatch.
+Implementation and focused tests remain pending; no provider capability is inferred.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializer.java:174` (`if (!schema.allowedContentTypes().contains(contentType))`) compares raw strings; `src/main/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializer.java:248` (`boolean valid = switch (contentType)`) matches lowercase image types only.
+- `src/test/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializerTest.java:54` (`rejectsAttachmentWhenContentTypePolicyDoesNotMatch`) and `src/test/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializerTest.java:76` (`rejectsImageAttachmentWhenFilenameAndBytesDoNotMatch`) cover real mismatches, not equivalent MIME type/subtype capitalization.
+
+**Attachment map-value traversal — agreed audit correction:** materialization and
+ExecutionCoordinator's mission-input trace traversal must
+select a named property schema when present, otherwise schema-valued
+additionalProperties, and recurse through that selected schema. The current
+DefaultMissionInputMaterializer copies unnamed properties unchanged, so migrating
+attachment-valued maps requires this traversal change. ExecutionCoordinator likewise
+selects only named properties and passes unnamed values through unchanged before
+opening the mission frame. Apply the same schema selection there so attachment map
+values receive descriptors in FRAME_OPENED; later materialization or descriptor
+records do not repair that earlier input record. Reuse existing reference
+resolution, descriptor construction, resource checks and media collection; do not
+interpret boolean openness or unmarked values as attachment declarations.
+
+Add focused map-value materialization tests for reference strings and direct repeatable
+Resources, permitted/prohibited nulls, and invalid resources. Assert original map keys,
+descriptor placement and collected media associations, including nested map values.
+Verify named properties take precedence over additionalProperties, ordinary siblings
+remain validated, and existing MIME/signature/repeatability/size checks still apply.
+Permitted nulls produce no media and survive immutable container copying. Preserve
+canonical inputs/schemas and descriptor-only planning versus media-bearing execution.
+Add focused coordinator tests for reference and direct repeatable Resource map values,
+including nested values and named-property precedence. Assert original keys and
+descriptor placement in FRAME_OPENED without Resource serialization; preserve explicit
+nulls under the coordinator null-recording requirement below. Existing named-field
+materialization and coordinator tests do not establish map-value coverage; this
+is pending work for the agreed typed-map scope, not a claim of current YAML support.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializer.java:108` (`SkillInputSchemaNode childSchema = schema.properties().get(childName)`) selects only named children; `src/main/java/ai/loomspan/internal/core/ExecutionCoordinator.java:431` (`private Object traceSafeNode`) likewise traverses only named properties before frame recording.
+- `src/test/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializerTest.java:32` (`materializesRefAttachmentToDescriptorAndResource`) and `src/test/java/ai/loomspan/internal/core/ExecutionCoordinatorTest.java:928` (`redactsDeclaredAttachmentInputBeforeOpeningMissionFrame`) cover named image fields, not map-value declarations or named-property precedence.
+
 #### Direct Resource inputs and attachment validation — agreed
 
 Retain direct repeatable Spring Resource inputs for v1 alongside existing ref://
@@ -1992,6 +2986,81 @@ contain internal descriptor contracts. Retain current execution routing: plannin
 currently receives attachment descriptors, while execution receives media; changing
 planner access to file bytes requires a separate decision, not an incidental migration.
 
+**Unreadable attachments — agreed audit correction:** an IOException during the
+existing bounded digest read must fail materialization with the attachment field path
+and original cause, rather than returning a null hash and accepting the Resource.
+Unknown content length remains acceptable when the subsequent bounded read succeeds;
+reuse that read without adding a separate readability pass or changing MIME/size policy.
+Add focused tests for stream-opening and mid-read failures, a readable unknown-length
+control, and failure preventing model invocation. The local materializer probe accepted
+an unreadable named PDF Resource while the readable control produced a hash; this
+reproduces the materializer defect, not provider behavior. Implementation and full
+pipeline/live acceptance remain pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializer.java:311` (`private String digest`) catches IOException and returns null after the bounded read; `src/main/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializer.java:188` (`String digest = digest(resource, path)`) accepts that result into a descriptor.
+- `src/test/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializerTest.java:119` (`rejectsMissingRefWithFieldSpecificMessage`) checks resolution failure; `src/test/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializerTest.java:76` (`rejectsImageAttachmentWhenFilenameAndBytesDoNotMatch`) checks signatures. Neither tests an unreadable resolved non-image Resource; use a document fixture to reach the digest failure itself.
+
+**Bounded attachment size reads — agreed audit correction:** avoid the unconditional
+Resource.contentLength() pre-read, which can consume the entire stream before applying
+the size limit. Use the existing bounded digest pass to calculate both actual byte
+count and hash, retaining them in the descriptor. Preserve the configured per-attachment
+limit and stop oversized reads after bounded excess detection; do not add another limit
+or a separate counting pass. Add counting-stream tests for oversized repeatable
+Resources with inherited stream-reading contentLength(), including unknown-length
+resources, and accepted inputs at/below the limit with accurate size/hash metadata.
+Assert bounded bytes consumed before rejection and no model invocation on failure.
+The local helper probe consumed all 65,536 bytes before rejecting under a 16-byte
+limit; it demonstrated excessive reading, not acceptance of oversized input. Existing
+ByteArrayResource size tests prove rejection but not bounded reading. Implementation
+and full pipeline/live acceptance remain pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializer.java:181` (`Long size = contentLength(resource)`) invokes the unbounded pre-read before `src/main/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializer.java:311` (`private String digest`) performs bounded reading.
+- `src/test/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializerTest.java:132` (`rejectsAttachmentAboveConfiguredSizeLimit`) uses ByteArrayResource with a cheap known length and asserts rejection only, not bytes read. Extend with the counting repeatable Resource described above.
+
+**Attachment failure diagnostics — agreed audit correction:** remove the unconditional
+"Use a model/driver that supports the declared attachment media" advice from
+DefaultMissionExecutionEngine's generic attachment-failure wrapper. Retain factual
+skill/model/attachment context and the original exception as cause; unknown failures
+do not establish media incompatibility. Evidenced incompatibility handling remains
+governed by TBD-09, without adding a new classifier or changing retry behavior.
+Update the focused wrapper test to assert preserved context/cause and absence of
+unsupported-media advice for a generic failure; retain the cancellation-preservation
+regression. The existing wrapsProviderFailureWithAttachmentContext test expects that
+advice for a fixture throwing only IllegalStateException("boom"). This finding is
+established by source/test inspection, not live provider evidence. Implementation and
+focused verification remain pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/runtime/DefaultMissionExecutionEngine.java:162` (`Use a model/driver that supports`) appends unsupported-media advice to the generic wrapper.
+- `src/test/java/ai/loomspan/internal/skill/MissionExecutionEngineTest.java:393` (`wrapsProviderFailureWithAttachmentContext`) asserts that advice for boom; `src/test/java/ai/loomspan/internal/skill/MissionExecutionEngineTest.java:420` (`attachmentContextDoesNotReplaceACancellationFailure`) is the cancellation control to retain.
+
+**Missing attachment filenames — agreed audit correction:** repeatable direct
+Resources need not supply a filename. Preserve a missing name through both
+ExecutionCoordinator's mission-input descriptor and LoomspanAttachment.descriptor
+without inventing a filename or relaxing resource checks. Both currently insert a
+nullable name and call Map.copyOf, which rejects null entries. Use immutable
+null-preserving descriptor copies. Existing single-allowed-MIME detection remains
+applicable when filename detection cannot supply a type.
+
+Add focused materializer and coordinator regressions using a repeatable Resource
+with no filename, valid signature bytes and one allowed MIME type. Assert successful
+descriptor creation, retained missing name, collected resource/media and normal
+coordinator progression; retain named-resource and MIME/signature/repeatability/size
+failure regressions. The local materializer probe reproduced a NullPointerException
+for a missing name while the named control passed; the coordinator path was inspected,
+not reproduced. This is an existing defect distinct from permitted-null input values.
+Implementation and full pipeline/live acceptance remain pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/runtime/attachment/LoomspanAttachment.java:29` (`public Map<String, Object> descriptor()`) inserts name before Map.copyOf; `src/main/java/ai/loomspan/internal/core/ExecutionCoordinator.java:466` (`private Map<String, Object> attachmentPlaceholder`) does the same for direct Resource names.
+- `src/test/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializerTest.java:32` (`materializesRefAttachmentToDescriptorAndResource`) uses a named file; `src/test/java/ai/loomspan/internal/core/ExecutionCoordinatorTest.java:928` (`redactsDeclaredAttachmentInputBeforeOpeningMissionFrame`) uses the named-field reference path. Neither proves unnamed direct Resources survive descriptor copying.
+
 **Nullable attachment handling — agreed:** absent optional attachment fields produce
 no media. Explicit null produces no media only where permitted by the standard schema;
 otherwise it fails validation. Required nullable fields must still be present. Preserve
@@ -2001,6 +3070,86 @@ must test absent optional, absent required, permitted null, prohibited null, and
 array-item null cases. This is a targeted migration adjustment, not permission to
 ignore nulls or relax requiredness globally. Preserve descriptor-only planning and
 media-bearing execution; remaining attachment work is verification as listed below.
+
+**Coordinator null recording — agreed audit correction:** preserve explicit null
+as null in ExecutionCoordinator's recorded mission input. Its current attachment
+placeholder branch manufactures an attachment descriptor for null before materialization;
+fixing materialization alone does not correct the recorded input. Validation continues
+to decide whether null is permitted; recording must not invent a descriptor or substitute
+a replacement value. Add focused coordinator tests asserting that permitted null stays
+null in recorded input and produces no descriptor/media, while prohibited null still
+fails validation. The helper-level probe reproduced the incorrect descriptor; full
+coordinator verification and implementation remain pending.
+
+Implementation note: skipping a permitted null attachment at its leaf is not sufficient.
+`DefaultMissionInputMaterializer.materializeNode` currently uses `Map.copyOf` and
+`List.copyOf` for surrounding containers, and `RenderedMissionInput` uses `Map.copyOf`
+for its input map; these copies reject null entries. Preserve permitted nulls through
+these copies while retaining immutable containers, missing-field semantics, property
+names and array positions. Reuse existing null-preserving container-copy machinery
+where appropriate. The already required null cases must exercise materialization and
+`RenderedMissionInput`, not only schema validation, while retaining ordinary sibling
+validation and existing resource checks. This names implementation work for the agreed
+null policy; it does not broaden that policy or authorize production changes here.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/core/ExecutionCoordinator.java:431` (`private Object traceSafeNode`) enters the attachment branch before checking the value; `src/main/java/ai/loomspan/internal/core/ExecutionCoordinator.java:466` (`private Map<String, Object> attachmentPlaceholder`) manufactures the placeholder. `src/main/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializer.java:118` (`return Map.copyOf(traceSafe)`), `src/main/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializer.java:127` (`return List.copyOf(traceSafe)`) and `src/main/java/ai/loomspan/internal/runtime/attachment/RenderedMissionInput.java:14` (`traceSafeInput =`) are the null-rejecting copies.
+- `src/test/java/ai/loomspan/internal/core/ExecutionCoordinatorTest.java:60` (`nestedChildPreservesNullContextThroughValidationExecutionAndCanonicalTrace`) covers ordinary null context; `src/test/java/ai/loomspan/internal/core/ExecutionCoordinatorTest.java:928` (`redactsDeclaredAttachmentInputBeforeOpeningMissionFrame`) covers a non-null attachment. Neither tests a null attachment through recording and materialization.
+
+**Unambiguous attachment paths — agreed audit correction:** use JSON Pointer for
+attachment descriptor fieldPath in both coordinator recording and materialization.
+Escape object-name tokens (~ as ~0 and / as ~1) and represent array positions as
+index tokens. Preserve original input keys; no new path-resolution engine or input
+name restriction is needed. The current dot/bracket concatenation gives a literal
+a.b property and nested a/b properties the same fieldPath. A local materializer probe
+reproduced two different attachments both labeled a.b; the original nested input tree
+remained distinct, so this is ambiguous descriptor location metadata, not evidence of
+swapped media. Add coordinator/materializer tests distinguishing literal dotted and
+bracketed names from nested properties and array items, including / and ~ escaping.
+Assert the same unambiguous locations survive descriptor recording and the planned
+journal/observer and Console views. Existing single-field tests do not cover path
+collisions. Implementation and focused verification remain pending.
+
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializer.java:341` (`private String join`) and `src/main/java/ai/loomspan/internal/core/ExecutionCoordinator.java:431` (`private Object traceSafeNode`) build dotted properties/bracketed indexes; both must use the agreed pointer spelling.
+- `src/test/java/ai/loomspan/internal/runtime/attachment/DefaultMissionInputMaterializerTest.java:32` (`materializesRefAttachmentToDescriptorAndResource`) and `src/test/java/ai/loomspan/internal/core/ExecutionCoordinatorTest.java:928` (`redactsDeclaredAttachmentInputBeforeOpeningMissionFrame`) use a simple image key and cannot expose literal dotted/bracketed-key collisions.
+
+**Attachment descriptor propagation — agreed audit correction:** after successful
+materialization, record the existing attachment descriptors once per owning mission
+frame in both standard and step engines, before planning or a possible no-model
+completion. Reuse FRAME_METADATA_RECORDED with an attachments collection in its data
+payload and existing internal trace recording. Record descriptors only, never Resource
+objects or file contents. Preserve original references, field paths, available names,
+MIME/media types, sizes, hashes and metadata; direct Resources remain resources, with
+no invented reference or filename. A later mission failure retains this evidence;
+failed materialization must not manufacture successful descriptors.
+
+Console consumes canonical trace artifacts, not the execution journal. Add an
+Attachments detail view for these records using its existing record/content endpoints
+and logical payload reconstruction, including chunked payloads. Display the recorded
+descriptor fields without parsing model prompts or dereferencing files. Existing raw
+record inspection remains available. No new public API or endpoint is required.
+Project the same per-frame descriptors into the existing SKILL_FINISHED journal entry,
+including failed missions after successful materialization, so the existing observer
+mapping carries them too. Retain the journal's existing field-name redaction exception
+without broadening it or applying it to canonical traces or Console. Live attachment
+display is deferred: the bounded scalar live-activity projection does not carry this
+collection automatically.
+
+Add focused tests for both engines recording descriptors once on the correct mission
+frame, including no-model completion and failure after materialization; failed
+materialization must not emit successful descriptors. Cover reference and direct
+Resource inputs, multiple/nested attachment association, absent names/optional fields,
+and absence of file bytes/Resource serialization. Verify journal and observer details
+retain the collection with existing journal redaction behavior. Console tests must
+render descriptor fields from completed traces, including chunked payloads and missing
+optional fields, using existing endpoints without resolving references or loading file
+contents. Existing raw-record/chunked-content tests establish reusable transport and
+rendering behavior, not attachment-view coverage. Source inspection and the isolated
+journal projection probe establish the propagation gap; implementation, these focused
+tests and live acceptance remain pending.
 
 Remaining verification is implementation acceptance, not authority to invent policies:
 verify real supported files on selected provider/model routes, multiple attachment
@@ -2019,6 +3168,13 @@ media. Subsequent decisions below/above settle attachment-input design and defer
 generated attachments. This evidence does not authorize new provider tools, media
 generation, file storage or public API.
 
+Evidence anchors (source/test inspection; new acceptance remains pending):
+
+- `src/main/java/ai/loomspan/internal/runtime/DefaultMissionExecutionEngine.java:88` (`RenderedMissionInput renderedInput =`) and `src/main/java/ai/loomspan/internal/runtime/step/StepLoopMissionExecutionEngine.java:236` (`RenderedMissionInput renderedInput =`) are the successful-materialization insertion points; retain their existing descriptor helpers. `src/main/java/ai/loomspan/internal/runtime/trace/ExecutionJournalProjector.java:103` (`details.put("skillName", record.route())`) builds lifecycle details without attachments.
+- `src/main/java/ai/loomspan/internal/skillapi/DefaultSkillTemplate.java:252` (`observer.accept(executionViewMapper.map(session))`) and `src/main/java/ai/loomspan/internal/skillapi/SkillExecutionViewMapper.java:42` (`List<SkillExecutionEvent> events =`) show the existing journal-to-observer route.
+- `src/test/java/ai/loomspan/internal/skill/MissionExecutionEngineTest.java:342` (`planningReceivesDescriptorsAndMissionTraceRedactsAttachmentBytes`) and `src/test/java/ai/loomspan/internal/runtime/step/StepLoopMissionExecutionEngineTest.java:1894` (`stepLoopSendsAttachmentMediaOnExecutionSteps`) prove existing planning/media behavior, not frame-metadata recording; `src/test/java/ai/loomspan/internal/runtime/trace/ExecutionJournalProjectorTest.java:24` (`projectsMissionLifecycleWithoutExposingInputOrAuthentication`) covers lifecycle projection without this collection.
+- `loomspan-console/web/src/observability/TraceRecords.tsx:212` (`async function readCompleteContent`) reconstructs content ranges, while its generic raw-record action is the existing fallback. `loomspan-console/web/src/observability/TraceRecords.raw.test.tsx:101` (`loads all ranges and pretty prints the complete raw record envelope`) proves chunked raw transport, not an Attachments view.
+
 ### TBD-14: Live acceptance matrix and implementation gates
 
 **Status: Resolved as policy — testing ownership, suite gaps, protected suite, host
@@ -2027,288 +3183,30 @@ agreed. Implementation and acceptance remain pending.**
 Keep fixture proof, isolated adapter proof, deployed framework proof and observed
 quality/performance distinct. No implementation or live acceptance is claimed.
 
-#### Acceptance ownership, suite gaps and mandatory gates — agreed November 11, 2026
+#### Implementation split — agreed November 11, 2026
 
-Use loomspan-framework for deterministic implementation coverage and the neighboring
-loomspan-sidecar-test-suite for deployed migration acceptance. The latter already hosts
-both an embedded Java Framework application and a Python/SDK/Sidecar application, plus
-separate Java/Python SDK consumers. It is not merely an HTTP-only Sidecar test harness.
-Reuse its capability-oriented suites, runtime orchestration, artifact recording and
-provider-disabled restoration; do not create a second live acceptance harness here.
-Fix tracking stays in the owning product repository, not PR-specific suite partitions.
+Framework implementation and test-suite implementation are separate workstreams.
+Complete production migration, deterministic Framework tests, real adapter/pipeline
+request captures, public-surface checks and applicable Console changes/tests here.
+Create test-suite tickets and implement them afterward in the neighboring project.
 
-| Acceptance area | Framework repository | Sidecar test suite |
-| --- | --- | --- |
-| Schema semantics and Java declarations | Exhaustive compiler/validator, generation, binding, recursion errors and resource checks | Representative deployed input/output and real Java declarations with equivalent Sidecar callbacks |
-| Provider contracts | Actual request captures for all three integrations, schema/options fidelity, ordered replay and tool identities | Selected live endpoint/model/route compatibility through deployed integrations |
-| Repairs/status/side effects | Deterministic refusal/incomplete, repair history, authorization and duplicate-side-effect prevention | Small controlled scenarios verifying deployed wiring and observable behavior |
-| Planning/bindings/evidence | Detailed semantic, projection and isolation regressions | Existing composed workflows plus targeted missing integration cases |
-| Attachments | Validation, direct Java resource handling, materialization and serialized requests | Real supported files on selected live routes through supported host entry points |
-| TypeSafe | Declaration/metadata and native executor unit tests | Existing native protocol, passthrough, forwarding, bindings and policy regressions |
-| Catalog/Console | Metadata and Console contract/rendering tests in framework/loomspan-console | Relevant external integration assertions only |
+The [test-suite roadmap](../../../../loomspan-sidecar-test-suite/MIGRATION-ACCEPTANCE-ROADMAP.md) is the sole implementation plan for that project's
+fixture/proxy and authoring migration, protected suite, deployed scenarios, host coverage,
+model/route/effort manifest, request/token/cost controls, timeouts and evidence gates.
+Those agreed requirements have moved there; they are not removed or completed.
 
-Inspected suite gaps to close:
+Framework implementation can finish before deployed/live acceptance. Overall migration
+acceptance still requires the suite roadmap's gates. Keep deterministic correctness,
+historical evidence, pending implementation and unverified live capability distinct.
+The suite's earlier OpenRouter checklist-scope question is retained there for resolution;
+this split does not expand the agreed initial live matrix or authorize paid calls.
 
-1. fixtures/server.py serves /v1/chat/completions and proxies live chat to OpenRouter's
-   Chat endpoint. fixtures/replay.py matches messages/reasoning_effort. Migrate request
-   matching, response envelopes, controlled responses, usage reporting and live proxy
-   handling to Responses for the migrated openai driver. Preserve maintained reference
-   packs; derive new protocol fixtures separately. Reusing accepted business answers
-   proves business regression, not ordered reasoning/tool replay fidelity.
-2. Existing chat live orchestration is OpenRouter-specific. Add bounded selections for
-   OpenAI, Meta, OpenRouter, Ollama, Anthropic and Gemini through existing orchestration.
-   Host coverage is agreed below; run budgets are agreed below; model/route selections and timeouts are finalized below.
-   Do not multiply the entire equipment workflow across every provider to prove protocol
-   compatibility; use small capability-oriented cases.
-3. Migrate maintained YAML and its authoring generators/contracts together, including
-   explicit intended openness and accepted metadata vocabulary. Preserve business
-   behavior and Java/Sidecar equivalence. Regeneration must not restore the old dialect.
-4. Add focused scenarios for typed-map/unconstrained inputs, native schema-plus-tools,
-   response refusal/incompleteness, and attachments where existing business scenarios
-   do not establish these contracts. Keep exhaustive variants in framework tests.
-5. Stage coherent migrated Framework artifacts in both Java and Sidecar hosts. Reuse
-   build recording to identify actual artifacts/configuration and relevant source/suite
-   revisions. A shared mutable snapshot coordinate alone is not migration acceptance.
+#### Framework prerequisites for later acceptance
 
-The TypeSafe suite already covers fixed/dynamic questions, substitution, forwarding,
-bindings, malformed envelopes, extra answers and native passthrough. Migrate its schemas
-and chat-parent fixtures and rerun that coverage rather than invent a new native test
-suite. New paid TypeSafe evaluation is not inherently required for this migration.
-SDK TLS/mTLS and service-commitment checks are affected-path regressions, not tests to
-repeat for every model. The suite's --suite all covers its business suites, not every
-SDK/transport/commitment check; reports must name actual selections.
-
-Mandatory acceptance gates for later tickets:
-
-- Passing applicable deterministic framework tests, including the previously agreed
-  numbered TBD cases, real factory/advisor/tool pipeline captures and public-surface
-  architecture checks after production type changes. Isolated SDK proof is insufficient.
-- Coherent migrated dependencies/artifacts in both deployed hosts, migrated authoring
-  sources and provider-free business/TypeSafe integration regression with maintained
-  fixtures preserved. Report selected checks and uncovered paths explicitly.
-- Responses fixture and live-path readiness before claiming migrated integration
-  coverage; no Chat fallback, old runtime implementation or successful legacy replay
-  counted as proof of the new path. Native Anthropic/Gemini paths remain native.
-- Selected live route cases for the required provider endpoints, with exact model/route,
-  versions, schemas/requests, outcomes, local validation, usage, retries and limits
-  recorded. Host coverage is agreed below; cases and budgets are agreed below; model/route and effort selections are finalized below; wall-clock settings are agreed below.
-- Resolve relevant replay/schema mapper defects, including Anthropic root constraints
-  and Gemini raw tool-schema fidelity. A successful final answer cannot substitute for
-  preserved protocol state and schema evidence. Do not silently drop required features.
-- Missing credentials, unavailable endpoints, unresolved dependencies/mapper defects,
-  and failing required features remain explicit open completion gates. Independent work
-  may continue; skipped/untested cases are not passes and trigger no automatic fallback.
-- Keep deterministic correctness, deployed integration, live compatibility and observed
-  quality/performance evidence distinct. Prior suite reports apply only to their recorded
-  builds. Publish evidence references from this roadmap even when tests run elsewhere.
-
-Inspection sources: ../loomspan-sidecar-test-suite/AGENTS.md, docs/project-agreement.md,
-docs/coverage.md, docs/runtime.md, docs/typesafe-ai.md, fixtures/server.py,
-fixtures/replay.py, scripts/run_suite.py and scripts/suites/registry.py. Inspection was
-read-only: no tests, builds, runtime changes or paid calls were performed. Future paid
-scope is not authorized by this documentation update; no tickets are created here.
-
-#### Live host coverage — agreed November 11, 2026
-
-Use reduced live duplication within loomspan-sidecar-test-suite. Both hosts below are
-owned by that suite: its embedded Java Framework app and its Python/SDK/Sidecar app.
-Do not interpret Java-host acceptance as a new live harness in loomspan-framework.
-
-| Coverage | Required host selection |
-| --- | --- |
-| Provider-free business/schema/callback and TypeSafe regression | Both suite hosts |
-| Full bounded provider-compatibility cases for OpenAI, Meta, OpenRouter, Ollama, Anthropic and Gemini | Embedded Java host |
-| Representative live tools-plus-structured-output case for each of the three integrations (OpenAI Responses, Anthropic, Gemini) | Python/Sidecar host |
-| Host-specific or unexplained discrepancy | Reproduce on both hosts as needed to resolve it |
-
-Meta, OpenRouter and Ollama receive full selected live-case coverage on the Java host;
-their Sidecar configuration is checked deterministically. Use the OpenAI endpoint for
-the representative Sidecar Responses case. Cases and run budgets are agreed below; timeout
-settings are agreed below. The full matrix means the agreed bounded cases,
-not every model, every schema keyword or the entire equipment workflow per endpoint.
-
-Rationale: verify all required endpoints through deployed Framework and all three
-integration paths through Sidecar without repeating the whole live matrix twice.
-This does not establish live acceptance of every provider/host combination. Reports
-must explicitly distinguish live verification from deterministic configuration checks.
-
-Mandatory acceptance requirements: both-host provider-free results; Java-host live
-results for all six selected endpoint routes; Sidecar live tools-plus-structured-output
-results for the three selected integration representatives; deterministic Sidecar
-configuration checks for remaining Responses routes; and resolved or explicitly open
-host-specific discrepancies. Record host, artifact/configuration identity and route
-for every result. Missing required cells remain open gates under the preceding rules;
-do not infer live Sidecar route acceptance from the Java host's success.
-
-No paid run or implementation is authorized or performed by this decision.
-
-#### Protected framework acceptance suite and Meta Contributor — agreed November 11, 2026
-
-Maintain a durable framework-acceptance suite inside loomspan-sidecar-test-suite,
-separate from business examples and SDK/transport suites. Own its scenarios, skills,
-fixtures, provider/host matrix and expected results in dedicated suite locations using
-the existing suite layout and explicit runner selection. This is framework contract
-coverage, not a disposable migration-specific folder or PR partition.
-
-Protect coverage through a checked-in manifest identifying required contracts and
-host/provider cells. Verification must fail when a required case disappears or is
-silently skipped. Business generators and fixture-refresh commands must not modify
-framework-acceptance assets. Keep maintained accepted fixtures separate from fresh
-run output; changing expectations requires a deliberate update with recorded rationale.
-Shared runtime/reporting infrastructure remains reusable; changes to it require the
-framework suite's applicable provider-free regressions. Protection means stable contract
-coverage and reviewed updates, not permanently frozen provider IDs or protocol files.
-
-Mandatory acceptance tests: explicit suite selection/discovery; required-case manifest
-completeness; missing/skipped-cell failure; isolation from business authoring/refresh
-commands; refusal to overwrite maintained fixtures with run output; independent fresh
-result directories; framework regression selection for shared harness changes; and
-reports distinguishing current tested artifacts, live/provider-free cells and gaps.
-Keep existing business assignments and accepted reference packs unchanged.
-
-Select muse-spark-1.3-contributor for direct Meta Responses acceptance, replacing the
-previous standard-mode proposal. Meta documents the same model at discounted prices
-in exchange for permission to use submitted content and responses for training.
-Use deliberately authored synthetic acceptance data; this is not a content-masking
-mechanism. Contributor does not offer max reasoning effort; use a supported setting
-for continuation tests. Account access and actual route acceptance remain unverified.
-
-Published prices checked November 11, 2026: Contributor input $0.10 and output $0.20
-per million tokens, versus Standard $1.25/$4.25; cached Contributor input $0.002.
-Source: https://dev.meta.ai/docs/pricing-rate-limits and
-https://dev.meta.ai/docs/choose-a-model. Recheck pricing before an authorized run.
-The earlier exclusion of Contributor was not a necessary compatibility boundary.
-
-The final endpoint model selections below supersede earlier proposals. Bounded
-cases, request/token caps and USD 5 ceiling are agreed below; timeout
-settings are agreed below. Run deterministic checks first; use compact synthetic skills and tool
-results, small real media files, and physical-provider-request accounting. No new paid
-TypeSafe evaluation is required. No paid calls, production edits or tickets are
-performed or authorized by this document update.
-
-#### Bounded live cases, token budgets and acceptance rules — agreed November 11, 2026
-
-These are initial acceptance-run ceilings in the protected framework-acceptance suite,
-not production defaults or targets. Execute only after deterministic readiness checks
-and separate explicit paid-run authorization. Use tiny purpose-built skills, synthetic
-identifiers, short tool-result objects and small real files. Do not substitute a full
-business workflow or repeatedly sample until a desired outcome appears.
-
-| Case | Required evidence | Maximum physical requests per route | Maximum generated tokens per request |
-| --- | --- | --- | --- |
-| Small structured result | Native output configuration, required/nullable fields, local acceptance | 1 | 1,024 |
-| Two-tool chain to structured result | Typed-map and unconstrained arguments, tool-result use, ordered continuation, no duplicate execution | 3 | 4,096 |
-| Small planned task | Actual planner contract, deterministic child execution, bindings/evidence handling, final result | 4 | 4,096 |
-| Two small images plus tool | File association/order, media-bearing execution, tool continuation, structured result | 2 | 2,048 |
-| One-page PDF plus tool | Real PDF acceptance, attachment continuation, structured result | 2 | 2,048 |
-| Full route total | All cases above, through real framework execution | 12 | 37,888 aggregate generated tokens |
-
-Run all five cases on six Java-host endpoints: at most 72 requests including 12 local
-Ollama requests. Run only the two-tool-chain case on the Sidecar OpenAI, Anthropic and
-Gemini representatives: at most nine additional requests. Overall ceiling is 81 requests,
-of which 69 are cloud requests. These count physical sends, including planner and
-continuation calls, not logical tests or skills. A request that fails or times out still
-consumes its send allowance; do not assume it was unbilled.
-
-Limit every request to 8,192 total input tokens, counting framework instructions,
-schemas, retained history and media accounting. Across cloud requests the mathematical
-maximum is 565,248 input tokens and 226,304 generated tokens (approximately 566,000 and
-227,000 respectively). Generation allowances include reasoning and visible output;
-verify each provider/adapter's budget semantics before running. Final visible responses
-should ordinarily be under 200 tokens, but this is a fixture design target, not a new
-production response restriction. Do not truncate protocol history or schema content to
-force a request below the cap; simplify fixtures or record a blocked case.
-
-The total cloud spending ceiling is USD 5 for this initial matrix, not USD 5 per route
-or rerun. Recheck selected-route pricing at preflight and calculate a conservative
-estimate from actual fixtures. Before sending, reserve the maximum estimated request
-cost including input, media, replay and maximum billed generation/reasoning; reconcile
-with usage without counting reasoning twice. Keep reservations for uncertain billed
-outcomes. Stop before a send if remaining allowance is insufficient. If pricing/media
-accounting cannot be bounded reliably, leave the case pending. This ceiling does not
-guarantee matrix completion. Do not rely only on after-the-fact usage totals, assume
-cache discounts, silently reset the ledger, or add paid provider tools. These are suite
-run controls, not new Framework public configuration requirements.
-
-Disable automatic transport retries and automatic schema-repair attempts for this
-initial compatibility batch. Existing production retry/repair ownership remains intact
-and is tested deterministically. Stop a failing case and diagnose offline; no automatic
-increase of caps, effort, retries, model changes, fallback or weakened assertions.
-Any subsequent rerun must retain previous spend accounting and have an explicit scope;
-this agreement itself authorizes no paid sends.
-
-Acceptance rules and mandatory ticket tests:
-
-- Test request/token/cost reservations and stop behavior without paid calls: exact caps,
-  one-over rejection, concurrent reservation safety if parallel sends are used, failed
-  sends, uncertain billing, no implicit retries/repairs and no ledger resets on rerun.
-- Demonstrate actual tool/planner/native-output paths and retained request evidence.
-  Short successful text alone is not schema or reasoning-continuation proof. If no
-  replayable reasoning is emitted, that assertion remains unverified, not passed.
-- Unsupported PDF/media or combinations remain explicit gaps. Do not convert files,
-  change protocols/models or silently skip cells into success. Missing access, adapter
-  defects and exhausted budgets likewise leave required cells open.
-- Pair live compatibility with deterministic invalid-result/argument rejection and
-  side-effect checks. Refusal/incomplete responses, malformed arguments, repair history,
-  and attachment preservation during corrections use controlled fixtures first.
-- Preserve original requests, schema and diagnostics; compare accepted constraints and
-  required item/order fidelity. Record host/route/model, actual usage/cost, attempts,
-  local validation, artifacts and unverified assertions separately from task quality.
-- A capped/incomplete generation is not successful validation. Initial batch failures
-  cannot establish that the provider fundamentally lacks a capability without diagnosis.
-
-Model/route, effort and wall-clock timeout settings are finalized below. Provider availability, credentials,
-final dependency pins, adapter repairs and actual passing evidence are implementation/
-execution gates, not facts established by this agreement. No paid calls have been made.
-
-#### Terra acceptance selection — agreed November 11, 2026
-
-Use gpt-6.1-terra for direct OpenAI Responses acceptance and openai/gpt-6.1-terra
-through OpenRouter's OpenAI standard endpoint (tag openai), replacing the prior Sol
-proposal. Use the same direct Terra model for the Sidecar representative. Retain
-explicit route restriction, disabled fallback and resolved-endpoint verification.
-Business Sol/Luna assignments remain unchanged.
-
-Official OpenAI documentation lists reasoning, function calling, image input and
-structured outputs; tool calling requires Responses. The public OpenRouter endpoint
-listing inspected November 11 advertises reasoning, tools and structured outputs for
-its openai route, with text/image/file inputs. Both list standard short-context prices
-of USD 1 per million input and USD 5 per million output tokens. This is half the
-previous Sol proposal's USD 2/10 rates. Recheck prices/access before authorized runs.
-Sources: https://developers.openai.com/api/docs/models/gpt-6.1-terra and
-https://openrouter.ai/api/v1/models/openai/gpt-6.1-terra/endpoints.
-
-Rationale: compact protocol/schema acceptance does not require Sol's model selection.
-Retain all assertions, request/token limits and the total USD 5 ceiling; no automatic
-fallback to Sol or budget increase if a case fails. Published capabilities are not
-passing integration evidence; account access, PDF handling and exact combination
-acceptance remain gates. No inference calls or runtime configuration changes occurred.
-
-#### Final model, route and effort manifest — agreed November 11, 2026
-
-| Endpoint | Acceptance model | Protocol / route | Reasoning |
-| --- | --- | --- | --- |
-| OpenAI | `gpt-6.1-terra` | Direct Responses | Explicit medium |
-| OpenRouter | `openai/gpt-6.1-terra` | Responses; OpenAI standard endpoint tag `openai` only; fallback disabled | Explicit medium |
-| Meta | `muse-spark-1.3-contributor` | Direct Responses | Explicit medium |
-| Ollama | `qwen3.5:4b-q4_K_M` | Local Responses | Thinking enabled; boolean-only model, not medium |
-| Anthropic | `claude-sonnet-5-5` | Native Messages | Native output effort medium |
-| Gemini | `gemini-3.8-flash` | Native Gemini Developer API | Native thinking level MEDIUM |
-
-All six receive the bounded Java matrix; the three agreed Sidecar representatives
-use the same direct OpenAI, Anthropic and Gemini selections. Business model assignments
-remain unchanged. These selections supersede earlier proposals, not recorded historical
-probe results. Medium is a provider-specific effort setting, not equal compute across
-providers. Do not silently use defaults, lower effort, change models or expand budgets.
-
-The inspected local baseline is Ollama 0.40.16, model digest
-`2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd`.
-Record/recheck the actual server version and digest before execution. The model reports
-boolean thinking support; do not manufacture a numeric medium mapping. Verify the shared
-Responses route can express enabled thinking; inability to do so remains a blocker.
-OpenRouter must restrict routing to the standard OpenAI endpoint, disable fallback,
-require support for requested parameters and record the resolved endpoint; a different
-provider, Flex or priority route is not equivalent acceptance evidence.
+Retain all numbered TBD deterministic acceptance requirements, including real
+factory/advisor/tool-path captures, schema/options fidelity, ordered replay, status
+handling and side-effect prevention. Resolve applicable Anthropic root-constraint and
+Gemini raw-schema defects; isolated SDK proof does not establish Framework integration.
 
 Concrete code gap: SpringAiChatOptionsContributor currently maps medium to a 4096-token
 thinking budget for Anthropic/Gemini. Anthropic additionally sets maxTokens to at least
@@ -2319,92 +3217,11 @@ reasoning), and capture the serialized request. Do not globally change legacy-mo
 behavior merely to configure this suite. If pinned adapters cannot express these options,
 resolve that integration gap before paid acceptance; do not silently raise token limits.
 
-Mandatory ticket acceptance tests:
-
-- Offline manifest checks pin all six model/route/effort combinations, the three Sidecar
-  representatives and Ollama digest; preserve business suites and their assignments.
-- Capture actual adapter requests proving native medium on the five cloud endpoints,
-  enabled thinking on Ollama, and unchanged per-case generation caps. Cover initial,
-  tool-continuation and planner calls, including option combination/model overrides.
-- Prove Anthropic sends no rejected thinking budget and does not inflate max_tokens;
-  Gemini sends native MEDIUM rather than the legacy numeric budget. Unsupported option
-  combinations fail preflight without paid sends or implicit fallback.
-- Prove OpenRouter routing restrictions and resolved-endpoint evidence; reject missing
-  parameter support or route drift. Published capability flags alone do not pass a case.
-- Record requested and effective settings, actual usage and incomplete statuses in live
-  evidence. Missing reasoning material leaves continuity unverified; timeout or capped
-  output is not a pass. Retain the USD 5 ledger and zero automatic retries/repairs.
-
-Provider references inspected November 11, 2026:
-[OpenAI Terra](https://developers.openai.com/api/docs/models/gpt-6.1-terra),
-[OpenRouter endpoint inventory](https://openrouter.ai/api/v1/models/openai/gpt-6.1-terra/endpoints),
-[Meta reasoning](https://dev.meta.ai/docs/reasoning),
-[Sonnet migration guide](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide),
-[Gemini 3.8 Flash](https://aistudio.google.com/docs/models/gemini-3.8-flash).
-These are configuration evidence, not executed acceptance. Wall-clock settings are
-agreed below. No production changes, tickets or paid calls are authorized here.
-
-#### Acceptance timeout profile — agreed November 11, 2026
-
-Use one acceptance-only profile for every selected provider and both suite hosts:
-
-| Boundary | Limit |
-| --- | --- |
-| Each physical provider request | 180 seconds |
-| Fixture proxy upstream request | 210 seconds |
-| Each case's mission | 900 seconds |
-| Runner deadline including evidence collection grace | 960 seconds |
-
-Rationale: the largest bounded case permits four physical requests, leaving 180 seconds
-for orchestration after four 180-second requests. The same profile gives local Ollama
-headroom without separate provider tuning. The proxy has 30 seconds of margin beyond
-the framework request boundary; the runner has 60 seconds beyond the mission boundary
-for terminal-state observation and evidence collection. These are maximum waits, not
-performance targets or authorization to send additional requests.
-
-Implement as a protected framework-acceptance suite overlay using existing timeout and
-runner mechanisms. The inspected compose.runtime.yaml business profile remains
-480/510/2400 seconds for provider/proxy/mission. Do not change production defaults,
-business suites, TypeSafe timeouts or callback limits solely to configure this matrix.
-Record effective values in run evidence. Verify actual adapter timeout semantics;
-a socket inactivity timeout alone must not be reported as a total elapsed deadline.
-The runner's polling deadline must account for in-flight polling/collection work, not
-merely check elapsed time before starting another blocking poll. Reuse existing
-cancellation paths; do not introduce a new public Framework timeout API for this suite.
-
-Mandatory ticket acceptance tests (provider-free, using controlled delays/clock control
-or scaled test durations rather than waiting for the full live limits):
-
-- Effective configuration proves 180/210/900/960 seconds for the selected suite on both
-  hosts and all selected routes, including option combination, model overrides,
-  planner and tool-continuation requests. Business profiles remain unchanged.
-- A stalled provider request terminates at its configured boundary without automatic
-  retry, schema repair, model fallback or a subsequent tool dispatch from a late reply.
-  A timely response still follows the normal tool/result pipeline.
-- Mission expiry prevents further provider sends/tool dispatch for that case and uses
-  existing cancellation/terminal-state behavior. Preserve already completed tool effects;
-  do not claim cancellation can undo a tool or guarantee the provider stopped billing.
-- Runner timeout and evidence-collection work are bounded by the outer deadline;
-  pending HTTP polls cannot silently extend it. Timeout/collection failure remains a
-  failed or incomplete case, never a successful validation or silently skipped cell.
-- Preserve available request, status, timing and diagnostic evidence on every timeout.
-  Count the physical send, retain uncertain-cost reservations and previous spend, and
-  prove no automatic rerun, token-cap increase or budget reset follows timeout.
-- Check the proxy/framework boundary ordering and provider-disabled restoration after
-  failure. A missing terminal result or incomplete artifact is reported explicitly.
-
-The request/token/USD 5 ceilings still govern independently. No paid sends, production
-changes or tickets were performed or authorized by this documentation decision.
-
-TBD-14 review outcome: testing ownership, protected-suite isolation, host coverage,
-bounded cases, models/routes/effort, budgets, timeout settings and completion rules are
-resolved as policy. Implementation and acceptance remain pending. Remaining gates are
-actual dependency/adapter readiness (including native effort and cap fidelity), suite
-fixture/proxy migration, coherent deployed artifacts, deterministic regression results,
-account/route availability, conservative pricing preflight, separately authorized live
-execution and complete evidence for every required cell. A failed or unavailable cell
-is an open gate; changing scope, limits or expectations requires a deliberate decision.
-There is no additional unresolved TBD-14 policy choice identified by this review.
+Capture native effort and unchanged generation caps on initial, tool-continuation,
+planner and model-override requests. Preserve option defaults where applicable and
+legacy-model behavior. Test unsupported combinations without paid calls or fallback.
+Use the suite roadmap's exact selected models/settings as fixtures, rather than copying
+its manifest here. Missing adapter support blocks the affected later acceptance cell.
 
 ## Document audit history
 
@@ -2425,28 +3242,193 @@ and captured retry-boundary questions and superseded alternatives. No production
 changes or live tests were performed in this document audit. The checklist remains
 the implementation record; checked source research is not runtime acceptance.
 
-## Continuation handoff — November 11, 2026
+## Continuation handoff — November 12, 2026
 
 ### Read first and resume point
 
-This roadmap is the authoritative decision/ticket handoff; the companion
+This roadmap is the authoritative Framework decision/ticket handoff; the companion
 [research report](standard-json-schema-research.md) retains code inventory, provider
 sources, offline evidence and superseded proposals. Accepted decisions override older
-proposals and historical probe coverage. Production implementation and ticket creation
-have not been performed here. Existing worktree changes outside these research/docs
-must not be discarded. Follow repository AGENTS.md and its closed public-API boundary.
+proposals and historical probe coverage. Migration implementation and ticket creation
+remain pending. One separately authorized stream-closure repair is implemented in the
+worktree, as recorded below. Preserve all existing worktree changes. Follow repository
+AGENTS.md and its closed public-API boundary. Read this handoff and its evidence guardrail
+first, then both migration documents fully before resuming the audit.
 
 TBD-01 through TBD-13 are resolved as policy, including attachment inputs,
 non-attachment runtime values, generated Java contracts, evidence metadata,
 effective-schema display and TypeSafe's native evaluation boundary. Native generated
 attachments remain deferred. Implementation and acceptance are not complete.
 TBD-14 is also resolved as policy; implementation/evidence gates are not completed
-acceptance. The next chat is a fresh-context audit of both documents in full: check
-consistency, stale proposals/statuses, code accuracy, implementation scope and mandatory
-acceptance coverage. Inspect the neighboring suite and official provider sources where
-needed. Report findings with file/line references before edits; discuss corrections one
-at a time and update documents after agreement. Do not reopen settled policy without
-concrete new evidence. No production implementation, ticket creation or paid calls yet.
+acceptance. The next chat performs the bounded readiness review below in a fresh context,
+not another open-ended search for Java declaration edge cases. Discuss concrete new
+findings one at a time before edits. Migration implementation, ticket creation and live
+acceptance have not been completed by this document audit.
+
+### Next session — bounded migration readiness review
+
+Status: handoff prepared; this readiness review has not yet been performed. No further
+established, undocumented migration gap is currently queued for agreement; that is not
+proof the migration is complete or gap-free. Most outstanding work is already agreed
+implementation and verification, not unresolved product policy.
+
+After reading AGENTS.md, this handoff and its evidence-before-findings guardrail, read
+both migration documents fully and the relevant neighboring test-suite roadmap sections.
+Check existing agreed corrections first. Review whether the known migration blockers
+have a concrete implementation delta, prerequisites, sufficient acceptance detail and
+an explicit owner/workstream. Use current code/tests to resolve missing evidence; do
+not rerun every historical probe or mistake isolated probes for integrated acceptance.
+
+| Readiness area | Bounded question and owning material |
+| --- | --- |
+| Provider schema/request fidelity | Do TBD-07/TBD-13 and the research blocker register specify the actual Anthropic root-schema and Gemini raw input/output schema integration, canonical-schema preservation, options preservation and real request-capture tests? Exclude deferred schema features from blocker criteria. |
+| Tool history, rejection and usage | Do TBD-11/TBD-12 specify implementable call-local integration, adapter evidence-retention prerequisites, captured repair requests, dispatch/side-effect prevention and usage counted once? Preserve existing retry and loop ownership. |
+| Model effort and generation caps | Do TBD-14 Framework prerequisites and the suite's selected model/settings fixtures identify native option support, unchanged total caps and captures across initial, continuation, planner and override requests? Investigate adapter gaps without paid calls or scope expansion. |
+| Dependency alignment | Is there a concrete full-Framework build/test gate for the final dependency combination and exact pin, distinct from historical isolated RC2/Boot probe evidence? |
+| Acceptance ownership and remaining scope question | Are Framework prerequisites separated from later test-suite implementation/live acceptance? Resolve or explicitly retain the suite roadmap's earlier OpenRouter checklist-scope question; do not expand the initial matrix or budget. |
+
+Deliver a concise readiness assessment: ready to ticket/implement, or blocked by named
+missing decisions/evidence. For each actual blocker, cite exact code/test/document
+anchors, what is already covered, the smallest remaining action and its evidence limit.
+Distinguish agreed policy, historical evidence, pending implementation and unverified
+live capability. Do not classify planned implementation itself as an undocumented gap.
+
+Stop after these known areas are assessed. If their handoffs are sufficient, recommend
+moving to implementation planning rather than searching for more edge cases. Do not
+create tickets, edit production code or make live provider calls during this review.
+The deferred Java declaration overview remains out of scope; do not restore its removed
+details/probes. Preserve all other worktree changes and retained probes. New findings
+must satisfy the evidence guardrail and be discussed before document edits.
+
+### Agreed audit corrections and continuation status
+
+The November 11–12 audit recorded agreed corrections and focused test requirements
+under their owning TBDs, with code/test paths, audit-time line numbers and symbols.
+Those sections are authoritative; do not duplicate their implementation wording here
+or in the research report. Earlier findings have been backfilled with evidence anchors.
+The next auditor must check existing agreed corrections before reporting a new gap.
+
+Latest completed documentation update: **fresh-context readiness-review handoff**.
+The next session follows the bounded review above; the prior scope reset remains in force.
+The [deferred overview](#deferred-java-declaration-edge-cases--scope-reset-november-12-2026)
+is the only retained record of the deferred edge cases. Their earlier detailed sections,
+mandatory restrictions/acceptance work and probe artifacts were deliberately removed.
+Do not restore them or continue annotation-by-annotation exploration during this audit.
+Focus on migration-critical provider request fidelity, validation boundaries, tool
+execution/history, status/usage handling and acceptance gates. Reopen deferred work only
+under the concrete-need and explicit-scope conditions in the overview.
+The preceding update was **TBD-13 declared map-key registration restriction**,
+with preserved baseline/candidate probes. Implementation and full acceptance remain pending.
+The preceding update was **TBD-13 open-property JSON compatibility**,
+with preserved baseline/candidate probes. This acceptance detail refines the agreed
+ordinary-input policy; implementation and full acceptance remain pending.
+The preceding update was **TBD-13 JsonUnwrapped declaration rejection**,
+with preserved baseline/candidate probes. Implementation and full acceptance remain pending.
+The preceding update was **TBD-13 UUID input contracts**, with preserved
+baseline/candidate probes. The bounded string mapping is agreed; implementation and
+full acceptance remain pending. The preceding update was **TBD-13 runtime-resource sequencing**, with
+preserved baseline/rejection/candidate registration probes. Recognize supported runtime
+leaves before recursive DTO expansion; implementation and full acceptance remain pending.
+The preceding update was **TBD-12 status/usage integration and adapter
+prerequisites**, with durable current-behavior and three-adapter RC2 probes. Its classifier,
+usage ownership and adapter evidence-retention approach are agreed; implementation and
+full acceptance remain pending. Check these agreed corrections during the bounded
+readiness review. The preceding update was **TBD-11 completed-tool-history integration**,
+with a durable current-behavior harness and RC2 mechanism probe. The agreed approach
+uses call-local state, existing tool-result/raw-response capture boundaries and a
+shared private repair helper; implementation and full acceptance remain pending.
+An earlier update was **Responses
+schema decimal fidelity** under TBD-07, with its durable baseline/candidate adapter probe.
+The preceding completed update was **ordinary output-validation decimal precision**
+under TBD-06, including local lossless parsing, focused validation/advisor tests and
+code/test references. It is agreed pending implementation, not a completed production
+fix. Nearby agreed work includes ordinary callback and step-action precision (TBD-06),
+callback trailing-content/root-shape and step-action null arguments (TBD-08), binding
+openness/numeric enum equality (TBD-10), and runtime map-key validation (TBD-13).
+No further established finding is awaiting agreement at this handoff. Continue with
+the bounded readiness review, not an open-ended defect hunt.
+
+**Completed narrow code repair, separate from migration implementation:** the user
+authorized try-with-resources in `SkillMethodBeanPostProcessor.convertToBytes` and
+`convertResourceToString` (`src/main/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessor.java:686`
+and `:720`). The worktree includes success, failure and nested-conversion closure checks
+in `src/test/java/ai/loomspan/internal/core/SkillMethodBeanPostProcessorTest.java:214`,
+`:232`, `:250` and `:350`. The earlier focused run passed 21 binder tests and eight
+`LoomspanPublicSurfaceArchitectureTest` tests; the retained Surefire reports were
+inspected at handoff, not rerun. Preserve these source/test edits and do not ticket
+this repair as missing. They do not satisfy the broader migration acceptance gates.
+
+**Restored historical probe evidence:** the latest reported missing-artifact gap is
+closed. At restoration time, the user restored `docs/maintainers/probes/` and all 13
+then-referenced probe links across the two migration documents resolved. The TBD-06 project, named tests, scripts and
+retained evidence are present. Inspected historical reports match 20 tests on each
+Boot platform, 11 resource-limit/regression tests on each platform, and two attachment
+tests. No probes were rerun to verify the restoration, and no live capability is
+established by it. Retain the reproduction instructions and historical qualifications;
+do not apply the previously proposed removal of those restored links. This preservation
+requirement excludes the later deliberately deleted deferred-edge-case probes. The directory
+is currently untracked in Git; preserve it with the other worktree changes.
+
+An additional investigation found that ordinary `OutputSchemaValidator` already
+rejects trailing JSON values and trailing garbage with its current default mapper,
+while accepting trailing whitespace (local probe, no provider calls). Do not copy
+the ordinary tool-callback trailing-content finding onto this boundary: the upstream
+callback mapper has different settings. This is not a new output-validation gap.
+
+The original broad StepAction/native-schema finding was withdrawn after tracing
+existing behavior and requirements: it did not establish a new missing requirement.
+Do not revive it or turn it into tickets without new concrete evidence. Existing
+native-schema migration work remains pending as already specified.
+
+The agreed implementation split moves all test-suite implementation and detailed
+acceptance planning to the [test-suite roadmap](../../../../loomspan-sidecar-test-suite/MIGRATION-ACCEPTANCE-ROADMAP.md). Create its tickets after
+Framework implementation. Its earlier OpenRouter checklist-scope question remains
+unresolved; the move neither expands the initial live matrix nor claims acceptance.
+Resume the document audit under the evidence-before-findings guardrail below.
+
+### Evidence-before-findings guardrail for audits and tickets
+
+Evidence anchors in the agreed findings use repository-relative paths and audit-time
+line numbers (verified November 12, 2026), with symbols/test names for navigation after
+edits. Backfilled anchors are source/test inspection, not new passing-test results.
+Earlier isolated probe outcomes retain their stated limits; temporary target probes
+are not durable acceptance tests. Each finding's focused tests remain implementation
+requirements unless an explicit completed result is recorded.
+
+Apply this guardrail in every continuation, document audit and ticket-writing context.
+TBD-01 through TBD-14 remain settled policy; this guardrail changes review discipline,
+not migration decisions. Preserve existing behavior unless a concrete gap against an
+accepted requirement justifies a change.
+
+Before presenting an actionable finding or prescribing implementation, establish:
+
+| Required evidence | Question to answer |
+| --- | --- |
+| Existing behavior | What does the complete relevant code path do, including callers, parsing, fallbacks, validation, execution and failure handling? Cite the code and relevant tests. |
+| Agreed migration requirement | Which exact accepted requirement changes or adds something at this boundary? Cite its location. |
+| Concrete difference | What is missing, incompatible or incorrect after comparing existing behavior with that requirement? Distinguish pending migration work from a defect or omission in this handoff. |
+| Existing coverage | Which tests already prove the behavior, and precisely what remains unproved? Distinguish inspected assertions from tests actually run and mock evidence from live capability. |
+| Minimal correction | What is the smallest necessary change, which existing implementation should be reused, and what behavior must remain unchanged? |
+| Evidence strength | Is the finding reproduced, established by source inspection, or still an investigation hypothesis? State limitations and tie severity to demonstrated consequences. |
+
+Do not turn an untraced code path, an absent implementation detail or unfamiliar
+behavior into a missing product decision. Complete the relevant code-and-test trace
+first. If no concrete contradiction or uncovered requirement is established, record
+an investigation question rather than an actionable finding. A plausible implementation
+risk alone does not establish a defect or justify high severity. Label documentation
+clarifications as clarifications, not application failures.
+
+Tickets must describe the delta from existing behavior. Do not prescribe rebuilding
+working functionality, invent restrictions or response shapes, or add acceptance
+requirements already covered without identifying the specific missing proof. If evidence
+is incomplete, scope bounded investigation rather than a speculative production redesign.
+Keep agreed policy, historical evidence, pending implementation and unverified live
+capability distinct. Reopen settled policy only with concrete contrary evidence.
+
+Discuss concrete gaps and proposed corrections one at a time. Report evidence before
+edits; change migration decisions only after explicit agreement. Do not carry an earlier
+audit finding into a ticket merely because it was previously reported: re-evaluate it
+against this guardrail and withdraw or narrow unsupported conclusions.
 
 ### Product priorities and why these decisions were made
 
@@ -2576,97 +3558,6 @@ bearing execution. No automatic Files API upload, media conversion or protocol f
   without newly enforcing its descriptive output schema. Preserve native answer
   extraction, object-valued answers, extra answers, forwarding and existing behavior.
   Reuse the suite's native regression coverage; no new paid native evaluation is required.
-
-### Settled TBD-14 acceptance plan
-
-The detailed TBD-14 sections above remain authoritative, including all mandatory tests.
-No further TBD-14 policy decision is identified. Preserve these agreements in the audit:
-
-- Framework owns exhaustive deterministic semantics and real adapter/pipeline captures;
-  Console owns applicable display tests. loomspan-sidecar-test-suite owns deployed/live
-  acceptance through its embedded Java Framework host and Python/SDK/Sidecar host.
-- Create a durable protected framework-acceptance suite in that neighboring repository,
-  with dedicated scenarios/skills/fixtures/expectations and a required-coverage manifest.
-  Missing/skipped cells fail completeness. Business generators/refresh commands cannot
-  modify it; fresh run artifacts cannot overwrite accepted fixtures. Shared harness
-  changes require applicable provider-free framework-suite regression.
-- Both hosts run provider-free business/TypeSafe regression. Java runs all five bounded
-  live cases on six endpoints. Sidecar runs only the representative two-tool chain on
-  direct OpenAI, Anthropic and Gemini. Other Sidecar Responses routes get deterministic
-  configuration checks; do not claim live coverage for those cells.
-
-| Endpoint | Final model/route | Reasoning |
-| --- | --- | --- |
-| OpenAI | gpt-6.1-terra, direct Responses | medium |
-| OpenRouter | openai/gpt-6.1-terra, standard OpenAI endpoint tag openai only, no fallback | medium |
-| Meta | muse-spark-1.3-contributor, direct Responses | medium |
-| Ollama | qwen3.5:4b-q4_K_M, local Responses | thinking on; boolean-only, not medium |
-| Anthropic | claude-sonnet-5-5, native Messages | native medium effort |
-| Gemini | gemini-3.8-flash, native Developer API | native MEDIUM thinking level |
-
-Use the same direct cloud selections on Sidecar. Keep business Sol/Luna assignments
-unchanged. Contributor's training-use terms are an accepted choice with purpose-built
-synthetic fixtures, not content masking. Record/recheck the Ollama 0.40.16 baseline and
-model digest from the final manifest above. Explicitly verify OpenRouter routing and
-parameter support; no provider/Flex/priority fallback. Provider medium settings are not
-a promise of equal compute.
-
-| Java case per route | Maximum physical sends | Generated tokens per send |
-| --- | --- | --- |
-| Small structured result | 1 | 1,024 |
-| Two-tool chain to structured result | 3 | 4,096 |
-| Small planned task | 4 | 4,096 |
-| Two small images plus tool | 2 | 2,048 |
-| One-page PDF plus tool | 2 | 2,048 |
-
-Per route: 12 sends and 37,888 generated tokens. Including the three Sidecar chains:
-81 sends total, 69 cloud and 12 local. Every send has at most 8,192 total input tokens,
-including instructions, schemas, replay and media. Cloud mathematical maxima are
-565,248 input and 226,304 generated tokens; generation includes reasoning and visible
-output. Short visible answers (ordinarily under 200 tokens) are a fixture target.
-
-The initial matrix has a total USD 5 ceiling, not a per-route or rerun allowance.
-Preflight current pricing/actual fixtures, reserve conservative worst-case cost before
-each send, retain uncertain-billing reservations and prior spend. Insufficient budget
-or unbounded pricing leaves a gap. Zero automatic transport retries/schema repairs;
-no fallback, cap increase, history truncation, media conversion or weakened assertions.
-Failed sends count; subsequent paid scope needs explicit authorization.
-
-One acceptance-only timeout profile on both hosts/all routes: provider request 180 s,
-proxy upstream 210 s, case mission 900 s, runner including collection grace 960 s.
-Keep existing business 480/510/2400 s and unrelated production/TypeSafe/callback settings.
-Test elapsed deadline semantics, bounded polling/collection, cancellation, no subsequent
-sends/tool dispatch from late responses, retained diagnostics/cost reservations and
-provider-disabled restoration. Do not claim cancellation reverses completed effects
-or prevents provider billing. Timeouts, capped output and missing reasoning-continuity
-evidence are failures/unverified assertions, not passes.
-
-### Remaining implementation and acceptance gates
-
-1. Align final dependencies and prove the actual factory/advisor/tool paths, schema
-   fidelity, ordered replay, refusal/incomplete handling and supported API boundaries.
-   Resolve relevant Anthropic root-constraint and Gemini raw tool-schema defects.
-2. Fix selected-model option mapping: current SpringAiChatOptionsContributor maps medium
-   to 4096 thinking tokens for Anthropic/Gemini and raises Anthropic output to at least
-   8192. That violates bounded cases; Sonnet 5.5 rejects explicit thinking budgets.
-   Capture native medium options and unchanged generation caps on initial, planner and
-   continuation requests. Verify enabled thinking is expressible on Ollama Responses.
-   Do not silently alter legacy model behavior or expand the suite budget.
-3. Migrate suite Responses request matching/envelopes/usage/proxy routing, controlled
-   responses and six-endpoint orchestration. Update YAML authoring generators together
-   with their outputs. Preserve business reference packs; legacy Chat replay does not
-   establish Responses acceptance. Add focused missing schema/media/status scenarios.
-4. Stage identifiable coherent migrated artifacts on both hosts; run applicable
-   deterministic framework, Console, protected-suite and both-host regressions. Keep
-   SDK/transport checks scoped to affected paths rather than every provider.
-5. Verify account access, actual route/parameter/media support, exact runtime/model
-   identities, effective timeout/token settings and conservative cost preflight before
-   separately authorized paid execution. Published capabilities are not passing tests.
-6. Record evidence per required cell: host/build/configuration, model/route, original
-   schema/request/diagnostics, ordered protocol state, local validation, attempts,
-   usage/cost and limits. Missing cells, credentials, adapter support, incomplete
-   artifacts and failed assertions remain open gates. Distinguish deterministic proof,
-   deployed integration, live compatibility and observed quality/performance.
 
 ### Ticket discipline
 
