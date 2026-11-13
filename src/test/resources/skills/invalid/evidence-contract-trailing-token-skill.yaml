@@ -9,4 +9,4 @@ output_schema:
   properties:
     vendorName:
       type: string
-      evidence: default-invoiceParser default-expenseLookup
+      x-loomspan-evidence: default-invoiceParser default-expenseLookup

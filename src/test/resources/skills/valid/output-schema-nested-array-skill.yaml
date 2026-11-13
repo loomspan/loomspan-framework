@@ -1,5 +1,5 @@
 name: outputSchemaNestedArraySkill
-description: Invalid nested arrays.
+description: Homogeneous nested arrays.
 model: gpt-5
 output_schema:
   type: object

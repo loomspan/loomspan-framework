@@ -9,7 +9,15 @@ coverage: source-verified
 
 ## Applicability
 
-Use an `evidence` annotation on an immediate root `output_schema` property when that output claim MUST be supported by successful direct child execution. Evidence enforces supportability; it does not prove factual correctness or data lineage, and it is not a workflow, ordering, dependency, authorization, or output-value condition language.
+The shared [standard schema compiler](standard-schemas.md) validates annotation
+shape and placement and preserves expression text. Evidence expression extraction,
+child lookup and runtime metadata consumers have incomplete canonical-schema
+integration; the current checkout cannot execute the complete application. The
+expression grammar and truth-set sections below describe the retained evaluator
+semantics, not a current end-to-end enforcement guarantee. A structurally accepted
+annotation has not thereby been parsed or checked against child declarations.
+
+Use an `x-loomspan-evidence` annotation on an immediate root `output_schema` property when that output claim MUST be supported by successful direct child execution. Evidence enforces supportability; it does not prove factual correctness or data lineage, and it is not a workflow, ordering, dependency, authorization, or output-value condition language.
 
 ```yaml
 allowed_skills:
@@ -21,15 +29,15 @@ output_schema:
   properties:
     severity:
       type: string
-      evidence: classifyIncident
+      x-loomspan-evidence: classifyIncident
     likelyCause:
       type: string
-      evidence: classifyIncident and (investigateNetwork or investigateApp)
+      x-loomspan-evidence: classifyIncident and (investigateNetwork or investigateApp)
   required: [severity, likelyCause]
   additionalProperties: false
 ```
 
-`evidence` is Loomspan orchestration metadata. It does not become a candidate JSON field or a provider schema keyword.
+`x-loomspan-evidence` is Loomspan orchestration metadata. It does not become a candidate JSON field or a provider schema keyword.
 
 ## Placement and shape
 
@@ -40,9 +48,9 @@ output_schema:
 | Nested object property | No |
 | Array `items` or a property below an item | No |
 
-Each annotation MUST be one nonblank YAML string. Null, Boolean, numeric, list, and object values are rejected without coercion. A root property without `evidence` has no inferred evidence requirement, regardless of its name, description, requiredness, siblings, or the declaring skill's children. Java skills do not declare `output_schema`; evidence declarations belong to a model-backed YAML parent. Exact direct child names may identify Java, TypeSafe, or model-backed YAML skills.
+Each annotation MUST be one nonblank YAML string. Null, Boolean, numeric, list, and object values are rejected without coercion. A root property without `x-loomspan-evidence` has no inferred evidence requirement, regardless of its name, description, requiredness, siblings, or the declaring skill's children. Java skills do not declare `output_schema`; evidence declarations belong to a model-backed YAML parent. Exact direct child names may identify Java, TypeSafe, or model-backed YAML skills.
 
-The removed top-level `evidence_contract` field is not accepted; there is no alias, compatibility reader, or merge behavior.
+Neither top-level `evidence_contract` nor schema-node `evidence` is accepted; there is no alias or merge behavior.
 
 ## Expression language
 
@@ -83,7 +91,7 @@ A reference MUST name a direct child of the declaring skill and MUST NOT name a 
 
 ## Evidence delivery versus supportability
 
-The `evidence` annotation evaluates a set of successful direct-child names; repeated calls contribute one set member. It does not inspect returned values or retrieve task results. Separately, planning missions deliver complete task-keyed direct returns to later execution units and final synthesis, including a nested child's complete final return while keeping that child's private intermediates isolated. See [complete task evidence](planning-concurrency.md#complete-task-evidence) for grouped snapshots, explicit child arguments and reference limitations.
+The `x-loomspan-evidence` annotation evaluates a set of successful direct-child names; repeated calls contribute one set member. It does not inspect returned values or retrieve task results. Separately, planning missions deliver complete task-keyed direct returns to later execution units and final synthesis, including a nested child's complete final return while keeping that child's private intermediates isolated. See [complete task evidence](planning-concurrency.md#complete-task-evidence) for grouped snapshots, explicit child arguments and reference limitations.
 
 Schema validity checks output structure, successful-child annotations check execution supportability, and complete result delivery preserves available data. None proves factual correctness, source accuracy or quote fidelity. Applications needing those guarantees must validate the returned claims against their sources.
 
@@ -91,14 +99,14 @@ Schema validity checks output structure, successful-child annotations check exec
 
 1. Identify immediate root output properties needing supportability enforcement.
 2. List the declaring skill's direct children (same-owner Private or accessible foreign Public targets) in `allowed_skills`.
-3. Put the smallest sufficient expression in each property's `evidence` annotation.
+3. Put the smallest sufficient expression in each property's `x-loomspan-evidence` annotation.
 4. Use `and` for all-required children and `or` for genuine substitutes.
 5. Verify exact casing and direct-child scope.
 6. Confirm every annotated property is coverable during planning, including optional properties.
 7. Test missing conjuncts, each OR alternative, failure/non-credit, optional omission, required failure, and nested isolation.
 8. Keep workflow sequencing and multi-intent branch policy in prompts and planning design.
 
-Catalog diagnostics identify the complete `output_schema...evidence` path. Parser and reference failures include a 1-based expression column, and a uniquely identifiable casing mistake suggests the exact allowed spelling.
+Catalog diagnostics identify the complete `output_schema...x-loomspan-evidence` path. Parser and reference failures include a 1-based expression column, and a uniquely identifiable casing mistake suggests the exact allowed spelling.
 
 ## Known limits
 
@@ -108,7 +116,7 @@ Evidence also does not impose unconditional generated-plan task cardinality. Use
 
 ## Implementation and test anchors
 
-- `YamlSkillCatalog.java` (`src/main/java/ai/loomspan/internal/skill/YamlSkillCatalog.java`) validates placement, compiles expressions once, and validates exact direct children.
+- `StandardSchemaCompiler` and `StandardSchemaCompilerTest` validate current annotation placement and scalar shape. `YamlSkillCatalog` registers canonical schemas; its expression-extraction consumer integration is incomplete.
 - `EvidenceExpressionParser.java` (`src/main/java/ai/loomspan/internal/runtime/evidence/EvidenceExpressionParser.java`) defines parsing, while `EvidenceExpression.java` (`src/main/java/ai/loomspan/internal/runtime/evidence/EvidenceExpression.java`) defines canonical rendering, evaluation, and structured unsatisfied requirements.
 - `EvidenceCoverageValidator.java` (`src/main/java/ai/loomspan/internal/runtime/evidence/EvidenceCoverageValidator.java`) defines plan and final truth sets.
 - `YamlSkillEvidencePropertyCatalogTest.java` (`src/test/java/ai/loomspan/internal/skill/YamlSkillEvidencePropertyCatalogTest.java`) and `YamlSkillEvidenceExpressionCatalogAdditionalTest.java` (`src/test/java/ai/loomspan/internal/skill/YamlSkillEvidenceExpressionCatalogAdditionalTest.java`) protect placement, scalar shape, exact identity, and diagnostics.

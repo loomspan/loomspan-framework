@@ -48,9 +48,6 @@ public class YamlSkillCatalog implements InitializingBean
     private static final int MAX_LINTER_RETRIES = 3;
     private static final int DEFAULT_OUTPUT_SCHEMA_RETRIES = 2;
     private static final int MAX_OUTPUT_SCHEMA_RETRIES = 3;
-    private static final Set<String> SUPPORTED_SCHEMA_TYPES = Set.of("object", "array", "string", "number", "integer", "boolean");
-    private static final Set<String> SUPPORTED_INPUT_SCHEMA_TYPES = Set.of("object", "array", "string", "number", "integer", "boolean", "attachment");
-    private static final Set<String> SUPPORTED_ATTACHMENT_MEDIA_TYPES = Set.of("image", "pdf", "audio", "video", "file");
     private static final int OUTPUT_SCHEMA_WARNING_DEPTH = 4;
     private static final int OUTPUT_SCHEMA_WARNING_PROPERTIES = 12;
     private static final int OUTPUT_SCHEMA_WARNING_REQUIRED = 8;
@@ -401,20 +398,11 @@ public class YamlSkillCatalog implements InitializingBean
     {
         try (InputStream inputStream = new ByteArrayInputStream(bytes))
         {
-            Object decoded = ai.loomspan.internal.serialization.YamlValues.read(inputStream);
-            Object executorConfig = null;
-            boolean configPresent = decoded instanceof Map<?, ?> map && map.containsKey("config");
-            if (configPresent) {
-                var fields = new java.util.LinkedHashMap<>((Map<?, ?>) decoded);
-                executorConfig = fields.remove("config");
-                decoded = fields;
-            }
-            JsonNode root = yamlObjectMapper.valueToTree(decoded);
-            if (configPresent && root instanceof tools.jackson.databind.node.ObjectNode object) {
-                // Form validation needs presence/type, never a JSON conversion of domain data.
-                object.set("config", executorConfig instanceof Map<?, ?>
-                        ? yamlObjectMapper.createObjectNode() : yamlObjectMapper.nullNode());
-            }
+            var decoded = ai.loomspan.internal.serialization.SkillDocumentValues.decode(
+                    inputStream, describe(resource), yamlObjectMapper);
+            Object executorConfig = decoded.executorConfig();
+            boolean configPresent = decoded.configPresent();
+            JsonNode root = decoded.root();
             if (root == null || !root.isObject())
             {
                 throw invalidSkill(resource, "manifest", "root document must be an object");
@@ -470,6 +458,10 @@ public class YamlSkillCatalog implements InitializingBean
         catch (DatabindException ex)
         {
             throw invalidSkill(resource, toFieldPath(ex), describeMappingFailure(ex));
+        }
+        catch (ai.loomspan.internal.serialization.SkillDocumentValues.InvalidDocumentException ex)
+        {
+            throw invalidSkill(resource, ex.path(), ex.detail());
         }
         catch (org.snakeyaml.engine.v2.exceptions.YamlEngineException ex)
         {
@@ -800,7 +792,7 @@ public class YamlSkillCatalog implements InitializingBean
 
     private void validateOutputSchema(Resource resource, YamlSkillManifest manifest)
     {
-        YamlSkillManifest.OutputSchemaManifest outputSchema = manifest.getOutputSchema();
+        JsonNode outputSchema = manifest.getOutputSchema();
         Integer maxRetries = manifest.getOutputSchemaMaxRetries();
 
         if (outputSchema == null)
@@ -824,17 +816,21 @@ public class YamlSkillCatalog implements InitializingBean
                     "must be between 0 and " + MAX_OUTPUT_SCHEMA_RETRIES);
         }
 
-        validateSchemaNode(resource, outputSchema, "output_schema", SchemaPlacement.ROOT, 1);
+        compileSchema(resource, manifest, false);
+        warnOnSchemaComplexity(resource, "output_schema", outputSchema, 1);
     }
 
     private void validateInputSchema(Resource resource, YamlSkillManifest manifest)
     {
-        YamlSkillManifest.InputSchemaManifest inputSchema = manifest.getInputSchema();
-        if (inputSchema == null)
-        {
-            return;
+        if (manifest.getInputSchema() != null) compileSchema(resource, manifest, true);
+    }
+
+    private void compileSchema(Resource resource, YamlSkillManifest manifest, boolean input) {
+        try {
+            if (input) manifest.compiledInputSchema(); else manifest.compiledOutputSchema();
+        } catch (ai.loomspan.internal.schema.StandardSchemaCompiler.DeclarationException ex) {
+            throw invalidSkill(resource, (input ? "input_schema" : "output_schema") + ex.path(), ex.getMessage());
         }
-        validateInputSchemaNode(resource, inputSchema, "input_schema", true, 1);
     }
 
     private EvidenceContract compileEvidenceContract(Resource resource, YamlSkillManifest manifest)
@@ -918,376 +914,16 @@ public class YamlSkillCatalog implements InitializingBean
                 .orElse(1);
     }
 
-    private void validateSchemaNode(Resource resource,
-            YamlSkillManifest.OutputSchemaManifest schema,
-            String fieldPath,
-            SchemaPlacement placement,
-            int depth)
-    {
-        if (schema == null)
-        {
-            throw invalidSkill(resource, fieldPath, "required block is missing");
-        }
-
-        validateRequiredField(resource, fieldPath + ".type", schema.getType());
-
-        if (!SUPPORTED_SCHEMA_TYPES.contains(schema.getType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".type", "unsupported schema type '" + schema.getType() + "'");
-        }
-        if (!schema.getEnumValues().isEmpty() && !"string".equals(schema.getType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".enum", "is only supported for string schemas in the MVP");
-        }
-        if (schema.getEvidence() != null && placement != SchemaPlacement.IMMEDIATE_ROOT_PROPERTY)
-        {
-            throw invalidSkill(resource, fieldPath + ".evidence",
-                    "evidence is currently supported only on immediate root output properties");
-        }
-        if (placement == SchemaPlacement.ROOT && !"object".equals(schema.getType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".type", "root " + fieldPath + " type must be 'object'");
-        }
-
-        warnOnSchemaComplexity(resource, fieldPath, schema, depth);
-
-        switch (schema.getType())
-        {
-            case "object" -> validateObjectSchema(resource, schema, fieldPath, placement, depth);
-            case "array" -> validateArraySchema(resource, schema, fieldPath, depth);
-            default -> validateScalarSchema(resource, schema, fieldPath);
-        }
-    }
-
-    private void validateInputSchemaNode(Resource resource,
-            YamlSkillManifest.InputSchemaManifest schema,
-            String fieldPath,
-            boolean root,
-            int depth)
-    {
-        if (schema == null)
-        {
-            throw invalidSkill(resource, fieldPath, "required block is missing");
-        }
-
-        validateRequiredField(resource, fieldPath + ".type", schema.getType());
-
-        if (!SUPPORTED_INPUT_SCHEMA_TYPES.contains(schema.getType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".type", "unsupported schema type '" + schema.getType() + "'");
-        }
-        if (root && !"object".equals(schema.getType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".type", "root " + fieldPath + " type must be 'object'");
-        }
-        if ("attachment".equals(schema.getType()))
-        {
-            validateAttachmentInputSchema(resource, schema, fieldPath);
-            return;
-        }
-        if (StringUtils.hasText(schema.getMediaType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".media_type", "is only supported for attachment schemas");
-        }
-        if (!schema.getAllowedContentTypes().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".allowed_content_types", "is only supported for attachment schemas");
-        }
-        if (!schema.getEnumValues().isEmpty() && !"string".equals(schema.getType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".enum", "is only supported for string schemas in the MVP");
-        }
-
-        switch (schema.getType())
-        {
-            case "object" -> validateInputObjectSchema(resource, schema, fieldPath, depth);
-            case "array" -> validateInputArraySchema(resource, schema, fieldPath, depth);
-            default -> validateInputScalarSchema(resource, schema, fieldPath);
-        }
-    }
-
-    private void validateAttachmentInputSchema(Resource resource,
-            YamlSkillManifest.InputSchemaManifest schema,
-            String fieldPath)
-    {
-        if (!schema.getProperties().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".properties", "is not supported for attachment schemas");
-        }
-        if (!schema.getRequired().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".required", "is not supported for attachment schemas");
-        }
-        if (schema.getAdditionalProperties() != null)
-        {
-            throw invalidSkill(resource, fieldPath + ".additionalProperties", "is not supported for attachment schemas");
-        }
-        if (schema.getItems() != null)
-        {
-            throw invalidSkill(resource, fieldPath + ".items", "is not supported for attachment schemas");
-        }
-        if (!schema.getEnumValues().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".enum", "is not supported for attachment schemas");
-        }
-        if (!StringUtils.hasText(schema.getMediaType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".media_type", "required field is missing or blank");
-        }
-        if (!SUPPORTED_ATTACHMENT_MEDIA_TYPES.contains(schema.getMediaType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".media_type", "unsupported attachment media_type '" + schema.getMediaType() + "'");
-        }
-        if (schema.getAllowedContentTypes().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".allowed_content_types", "must declare at least one content type");
-        }
-        for (String contentType : schema.getAllowedContentTypes())
-        {
-            if (!StringUtils.hasText(contentType))
-            {
-                throw invalidSkill(resource, fieldPath + ".allowed_content_types", "content types must not be blank");
-            }
-        }
-    }
-
-    private void validateInputObjectSchema(Resource resource,
-            YamlSkillManifest.InputSchemaManifest schema,
-            String fieldPath,
-            int depth)
-    {
-        if (schema.getAdditionalProperties() == null)
-        {
-            schema.setAdditionalProperties(Boolean.FALSE);
-        }
-        if (schema.getItems() != null)
-        {
-            throw invalidSkill(resource, fieldPath + ".items", "is only supported for array schemas");
-        }
-
-        Map<String, YamlSkillManifest.InputSchemaManifest> properties = schema.getProperties();
-        Map<String, String> canonicalByLowercase = new LinkedHashMap<>();
-
-        for (Map.Entry<String, YamlSkillManifest.InputSchemaManifest> entry : properties.entrySet())
-        {
-            String propertyName = entry.getKey();
-            if (!StringUtils.hasText(propertyName))
-            {
-                throw invalidSkill(resource, fieldPath + ".properties", "property names must not be blank");
-            }
-            String normalized = propertyName.toLowerCase(Locale.ROOT);
-            String previous = canonicalByLowercase.putIfAbsent(normalized, propertyName);
-            if (previous != null)
-            {
-                throw invalidSkill(resource, fieldPath + ".properties." + propertyName,
-                        "duplicates property '" + previous + "' when compared case-insensitively");
-            }
-            validateInputSchemaNode(resource, entry.getValue(), fieldPath + ".properties." + propertyName, false, depth + 1);
-        }
-
-        for (String requiredField : schema.getRequired())
-        {
-            if (!StringUtils.hasText(requiredField))
-            {
-                throw invalidSkill(resource, fieldPath + ".required", "required field names must not be blank");
-            }
-            if (!properties.containsKey(requiredField))
-            {
-                throw invalidSkill(resource, fieldPath + ".required",
-                        "references unknown property '" + requiredField + "'");
-            }
-        }
-    }
-
-    private void validateInputArraySchema(Resource resource,
-            YamlSkillManifest.InputSchemaManifest schema,
-            String fieldPath,
-            int depth)
-    {
-        if (!schema.getProperties().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".properties", "is only supported for object schemas");
-        }
-        if (!schema.getRequired().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".required", "is only supported for object schemas");
-        }
-        if (schema.getAdditionalProperties() != null)
-        {
-            throw invalidSkill(resource, fieldPath + ".additionalProperties", "is only supported for object schemas");
-        }
-        if (schema.getItems() == null)
-        {
-            throw invalidSkill(resource, fieldPath + ".items", "required block is missing for array schemas");
-        }
-        validateInputSchemaNode(resource, schema.getItems(), fieldPath + ".items", false, depth + 1);
-        if ("array".equals(schema.getItems().getType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".items.type", "nested array items are not supported");
-        }
-    }
-
-    private void validateInputScalarSchema(Resource resource, YamlSkillManifest.InputSchemaManifest schema, String fieldPath)
-    {
-        if (!schema.getProperties().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".properties", "is only supported for object schemas");
-        }
-        if (!schema.getRequired().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".required", "is only supported for object schemas");
-        }
-        if (schema.getAdditionalProperties() != null)
-        {
-            throw invalidSkill(resource, fieldPath + ".additionalProperties", "is only supported for object schemas");
-        }
-        if (schema.getItems() != null)
-        {
-            throw invalidSkill(resource, fieldPath + ".items", "is only supported for array schemas");
-        }
-    }
-
-    private void validateObjectSchema(Resource resource,
-            YamlSkillManifest.OutputSchemaManifest schema,
-            String fieldPath,
-            SchemaPlacement placement,
-            int depth)
-    {
-        if (schema.getAdditionalProperties() == null)
-        {
-            schema.setAdditionalProperties(Boolean.FALSE);
-        }
-        if (schema.getItems() != null)
-        {
-            throw invalidSkill(resource, fieldPath + ".items", "is only supported for array schemas");
-        }
-
-        Map<String, YamlSkillManifest.OutputSchemaManifest> properties = schema.getProperties();
-        Map<String, String> canonicalByLowercase = new LinkedHashMap<>();
-
-        for (Map.Entry<String, YamlSkillManifest.OutputSchemaManifest> entry : properties.entrySet())
-        {
-            String propertyName = entry.getKey();
-
-            if (!StringUtils.hasText(propertyName))
-            {
-                throw invalidSkill(resource, fieldPath + ".properties", "property names must not be blank");
-            }
-
-            String normalized = propertyName.toLowerCase(Locale.ROOT);
-            String previous = canonicalByLowercase.putIfAbsent(normalized, propertyName);
-
-            if (previous != null)
-            {
-                throw invalidSkill(resource, fieldPath + ".properties." + propertyName,
-                        "duplicates property '" + previous + "' when compared case-insensitively");
-            }
-
-            SchemaPlacement childPlacement = placement == SchemaPlacement.ROOT
-                    ? SchemaPlacement.IMMEDIATE_ROOT_PROPERTY
-                    : SchemaPlacement.NESTED;
-            validateSchemaNode(resource, entry.getValue(), fieldPath + ".properties." + propertyName,
-                    childPlacement, depth + 1);
-        }
-
-        for (String requiredField : schema.getRequired())
-        {
-            if (!StringUtils.hasText(requiredField))
-            {
-                throw invalidSkill(resource, fieldPath + ".required", "required field names must not be blank");
-            }
-            if (!properties.containsKey(requiredField))
-            {
-                throw invalidSkill(resource, fieldPath + ".required",
-                        "references unknown property '" + requiredField + "'");
-            }
-        }
-    }
-
-    private void validateArraySchema(Resource resource,
-            YamlSkillManifest.OutputSchemaManifest schema,
-            String fieldPath,
-            int depth)
-    {
-        if (!schema.getProperties().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".properties", "is only supported for object schemas");
-        }
-        if (!schema.getRequired().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".required", "is only supported for object schemas");
-        }
-        if (schema.getAdditionalProperties() != null)
-        {
-            throw invalidSkill(resource, fieldPath + ".additionalProperties", "is only supported for object schemas");
-        }
-        if (schema.getItems() == null)
-        {
-            throw invalidSkill(resource, fieldPath + ".items", "required block is missing for array schemas");
-        }
-
-        validateSchemaNode(resource, schema.getItems(), fieldPath + ".items", SchemaPlacement.NESTED, depth + 1);
-
-        if ("array".equals(schema.getItems().getType()))
-        {
-            throw invalidSkill(resource, fieldPath + ".items.type", "nested array items are not supported");
-        }
-    }
-
-    private void validateScalarSchema(Resource resource, YamlSkillManifest.OutputSchemaManifest schema, String fieldPath)
-    {
-        if (!schema.getProperties().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".properties", "is only supported for object schemas");
-        }
-        if (!schema.getRequired().isEmpty())
-        {
-            throw invalidSkill(resource, fieldPath + ".required", "is only supported for object schemas");
-        }
-        if (schema.getAdditionalProperties() != null)
-        {
-            throw invalidSkill(resource, fieldPath + ".additionalProperties", "is only supported for object schemas");
-        }
-        if (schema.getItems() != null)
-        {
-            throw invalidSkill(resource, fieldPath + ".items", "is only supported for array schemas");
-        }
-    }
-
-    private enum SchemaPlacement
-    {
-        ROOT,
-        IMMEDIATE_ROOT_PROPERTY,
-        NESTED
-    }
-
-    private void warnOnSchemaComplexity(Resource resource,
-            String fieldPath,
-            YamlSkillManifest.OutputSchemaManifest schema,
-            int depth)
-    {
-        if (depth > OUTPUT_SCHEMA_WARNING_DEPTH)
-        {
-            warning(resource, fieldPath, "YAML skill '" + describe(resource) + "' output_schema at '"
-                    + fieldPath + "' exceeds recommended nesting depth " + OUTPUT_SCHEMA_WARNING_DEPTH);
-        }
-        if (schema.getProperties().size() > OUTPUT_SCHEMA_WARNING_PROPERTIES)
-        {
-            warning(resource, fieldPath, "YAML skill '" + describe(resource) + "' output_schema at '"
-                    + fieldPath + "' defines " + schema.getProperties().size() + " properties; recommended maximum is "
-                    + OUTPUT_SCHEMA_WARNING_PROPERTIES);
-        }
-        if (schema.getRequired().size() > OUTPUT_SCHEMA_WARNING_REQUIRED)
-        {
-            warning(resource, fieldPath, "YAML skill '" + describe(resource) + "' output_schema at '"
-                    + fieldPath + "' defines " + schema.getRequired().size() + " required fields; recommended maximum is "
-                    + OUTPUT_SCHEMA_WARNING_REQUIRED);
-        }
-        if ("array".equals(schema.getType()) && schema.getItems() != null && "object".equals(schema.getItems().getType()))
-        {
-            warning(resource, fieldPath, "YAML skill '" + describe(resource) + "' output_schema at '"
-                    + fieldPath + "' uses arrays of objects; keep item objects shallow for best model reliability");
-        }
+    private void warnOnSchemaComplexity(Resource resource, String path, JsonNode schema, int depth) {
+        if (!schema.isObject()) return;
+        if (depth > OUTPUT_SCHEMA_WARNING_DEPTH) warning(resource, path, "schema exceeds recommended nesting depth " + OUTPUT_SCHEMA_WARNING_DEPTH);
+        JsonNode properties = schema.path("properties");
+        if (properties.size() > OUTPUT_SCHEMA_WARNING_PROPERTIES) warning(resource, path, "schema exceeds recommended property count " + OUTPUT_SCHEMA_WARNING_PROPERTIES);
+        if (schema.path("required").size() > OUTPUT_SCHEMA_WARNING_REQUIRED) warning(resource, path, "schema exceeds recommended required count " + OUTPUT_SCHEMA_WARNING_REQUIRED);
+        if ("array".equals(schema.path("type").asText()) && "object".equals(schema.path("items").path("type").asText())) warning(resource, path, "schema uses arrays of objects; keep item objects shallow for best model reliability");
+        if (properties.isObject()) for (String name : properties.propertyNames()) warnOnSchemaComplexity(resource, path + "/properties/" + name.replace("~", "~0").replace("/", "~1"), properties.get(name), depth + 1);
+        if (schema.has("items")) warnOnSchemaComplexity(resource, path + "/items", schema.get("items"), depth + 1);
+        if (schema.path("additionalProperties").isObject()) warnOnSchemaComplexity(resource, path + "/additionalProperties", schema.get("additionalProperties"), depth + 1);
     }
 
     private void warning(Resource resource, String path, String message)

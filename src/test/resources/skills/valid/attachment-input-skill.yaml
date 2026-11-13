@@ -8,8 +8,9 @@ input_schema:
   additionalProperties: false
   properties:
     image:
-      type: attachment
-      media_type: image
-      allowed_content_types:
-        - image/jpeg
+      type: string
+      x-loomspan-attachment:
+        media_type: image
+        allowed_content_types:
+          - image/jpeg
       description: Ticket image.

@@ -137,7 +137,7 @@ class SkillGenerationManagerTest
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), unknown), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
         var open = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\noutput_schema: {type: object, additionalProperties: true}\n");
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), open), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
-        var nullable = new SkillDocument("producer", producer.yaml().replace("type: string", "type: string, nullable: true"));
+        var nullable = new SkillDocument("producer", producer.yaml().replace("type: string", "type: [string, \"null\"]"));
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), nullable), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).issues())
                 .anyMatch(issue -> issue.message().contains("nullable"));
     }
@@ -215,7 +215,7 @@ class SkillGenerationManagerTest
                         output_schema:
                           type: object
                           properties:
-                            answer: {type: string, evidence: default-fixedJava, nullable: true}
+                            answer: {type: [string, "null"], x-loomspan-evidence: default-fixedJava}
                           required: [answer]
                           additionalProperties: false
                         """),

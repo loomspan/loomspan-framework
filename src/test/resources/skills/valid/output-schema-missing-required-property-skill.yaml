@@ -1,5 +1,5 @@
 name: outputSchemaMissingRequired
-description: Missing required property should fail.
+description: Required undeclared property in an open object.
 model: gpt-5
 output_schema:
   type: object

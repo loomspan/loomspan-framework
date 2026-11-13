@@ -56,6 +56,15 @@ setup steps; see [setup and integration choices](docs/setup.md). The
 [adoption journey](docs/README.md#adoption-journey) gives your assistant the next
 action and observable completion checks from assessment through runtime inspection.
 
+Authored skill input/output schemas use a supported subset of JSON Schema Draft
+2020-12 with exact names and numeric values, explicit nullable type arrays, open
+objects by default, and locally asserted standard formats. Read
+[standard schema declarations](agent-skills/loomspan-docs/references/skill-authoring/standard-schemas.md)
+for vocabulary, annotations and diagnostics. The declaration foundation has focused
+coverage; the current source checkout cannot build the complete application while
+runtime schema consumers remain inconsistent. The examples and runtime topics
+below require complete consumer integration before they are executable guarantees.
+
 ## From customer report to engineering triage
 
 Turn an unstructured support request into an assessment of impact, possible causes,

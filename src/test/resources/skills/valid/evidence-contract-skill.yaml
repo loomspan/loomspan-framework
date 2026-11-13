@@ -10,10 +10,10 @@ output_schema:
   properties:
     vendorName:
       type: string
-      evidence: default-invoiceParser
+      x-loomspan-evidence: default-invoiceParser
     isDuplicate:
       type: boolean
-      evidence: default-invoiceParser and default-expenseLookup
+      x-loomspan-evidence: default-invoiceParser and default-expenseLookup
   required:
     - vendorName
     - isDuplicate

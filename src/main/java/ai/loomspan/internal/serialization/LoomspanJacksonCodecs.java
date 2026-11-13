@@ -36,7 +36,8 @@ public final class LoomspanJacksonCodecs
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
         this.planningYaml = YAMLMapper.builder().findAndAddModules()
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
-        this.schemaTree = JsonMapper.builder().findAndAddModules().build();
+        this.schemaTree = JsonMapper.builder().findAndAddModules()
+                .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
         this.canonicalTrace = JsonMapper.builder().findAndAddModules()
                 .enable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .enable(DateTimeFeature.WRITE_DURATIONS_AS_TIMESTAMPS).build();

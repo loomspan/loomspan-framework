@@ -147,7 +147,7 @@ class ExecutorApplicationIntegrationTest {
                   type: object
                   properties:
                     message: {type: string}
-                    attachment: {type: attachment, media_type: file, allowed_content_types: [text/plain]}
+                    attachment: {type: string, x-loomspan-attachment: {media_type: file, allowed_content_types: [text/plain]}}
                   required: [message]
                   additionalProperties: false
                 """);

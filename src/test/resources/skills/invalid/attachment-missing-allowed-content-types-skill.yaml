@@ -8,5 +8,6 @@ input_schema:
   additionalProperties: false
   properties:
     image:
-      type: attachment
-      media_type: image
+      type: string
+      x-loomspan-attachment:
+        media_type: image

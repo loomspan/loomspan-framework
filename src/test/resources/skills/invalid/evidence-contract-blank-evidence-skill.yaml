@@ -9,4 +9,4 @@ output_schema:
   properties:
     vendorName:
       type: string
-      evidence: " "
+      x-loomspan-evidence: " "

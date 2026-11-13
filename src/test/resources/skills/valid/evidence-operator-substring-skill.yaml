@@ -10,4 +10,4 @@ output_schema:
   properties:
     result:
       type: string
-      evidence: default-androidCheck and (default-orderLookup or default-candyParser)
+      x-loomspan-evidence: default-androidCheck and (default-orderLookup or default-candyParser)

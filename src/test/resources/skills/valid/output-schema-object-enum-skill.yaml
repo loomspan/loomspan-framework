@@ -1,5 +1,5 @@
 name: outputSchemaObjectEnum
-description: Invalid enum usage on object schema.
+description: Valid object declaration with an unsatisfiable scalar enum.
 model: gpt-5
 output_schema:
   type: object

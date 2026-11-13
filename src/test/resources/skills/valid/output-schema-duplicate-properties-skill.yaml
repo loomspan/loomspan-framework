@@ -1,5 +1,5 @@
 name: outputSchemaDuplicateProperties
-description: Duplicate properties by case should fail.
+description: Distinct exact names differing only by case.
 model: gpt-5
 output_schema:
   type: object

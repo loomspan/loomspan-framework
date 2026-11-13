@@ -2,18 +2,9 @@ package ai.loomspan.internal.skill;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.annotation.Nulls;
-import tools.jackson.core.JsonParser;
-import tools.jackson.core.JsonToken;
-import tools.jackson.databind.DeserializationContext;
-import tools.jackson.databind.ValueDeserializer;
-import tools.jackson.databind.annotation.JsonDeserialize;
 import org.springframework.util.StringUtils;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -57,6 +48,25 @@ public class YamlSkillManifest
         }
     }
 
+
+    @JsonIgnore
+    private ai.loomspan.internal.schema.CanonicalSchema compiledInputSchema;
+    @JsonIgnore
+    private ai.loomspan.internal.schema.CanonicalSchema compiledOutputSchema;
+    ai.loomspan.internal.schema.CanonicalSchema compiledInputSchema() {
+        if (compiledInputSchema == null && inputSchema != null) compiledInputSchema = new ai.loomspan.internal.schema.StandardSchemaCompiler().compile(inputSchema,
+                ai.loomspan.internal.schema.StandardSchemaCompiler.Role.INPUT, ai.loomspan.internal.schema.StandardSchemaCompiler.Origin.AUTHORED);
+        return compiledInputSchema;
+    }
+    ai.loomspan.internal.schema.CanonicalSchema compiledOutputSchema() {
+        if (compiledOutputSchema == null && outputSchema != null) compiledOutputSchema = new ai.loomspan.internal.schema.StandardSchemaCompiler().compile(outputSchema,
+                ai.loomspan.internal.schema.StandardSchemaCompiler.Role.OUTPUT, ai.loomspan.internal.schema.StandardSchemaCompiler.Origin.AUTHORED);
+        return compiledOutputSchema;
+    }
+    void copySchemasFrom(YamlSkillManifest source) {
+        inputSchema = source.getInputSchema(); outputSchema = source.getOutputSchema();
+        compiledInputSchema = source.compiledInputSchema(); compiledOutputSchema = source.compiledOutputSchema();
+    }
 
     private final EnumSet<Field> declaredFields = EnumSet.noneOf(Field.class);
     private String name;
@@ -106,7 +116,7 @@ public class YamlSkillManifest
     private LinterManifest linter;
 
     @JsonProperty("output_schema")
-    private OutputSchemaManifest outputSchema;
+    private tools.jackson.databind.JsonNode outputSchema;
 
     @JsonProperty("output_from")
     private OutputFromManifest outputFrom;
@@ -125,7 +135,7 @@ public class YamlSkillManifest
     public boolean isOutputBindingsDeclared() { return isDeclared(Field.OUTPUT_BINDINGS); }
 
     @JsonProperty("input_schema")
-    private InputSchemaManifest inputSchema;
+    private tools.jackson.databind.JsonNode inputSchema;
 
     @JsonProperty("output_schema_max_retries")
     private Integer outputSchemaMaxRetries;
@@ -350,15 +360,16 @@ public class YamlSkillManifest
 
 
 
-    public OutputSchemaManifest getOutputSchema()
+    public tools.jackson.databind.JsonNode getOutputSchema()
     {
-        return outputSchema;
+        return outputSchema == null ? null : outputSchema.deepCopy();
     }
 
-    public void setOutputSchema(OutputSchemaManifest outputSchema)
+    public void setOutputSchema(tools.jackson.databind.JsonNode outputSchema)
     {
         declaredFields.add(Field.OUTPUT_SCHEMA);
-        this.outputSchema = outputSchema;
+        this.outputSchema = outputSchema == null ? null : outputSchema.deepCopy();
+        this.compiledOutputSchema = null;
     }
 
     public OutputFromManifest getOutputFrom() { return outputFrom; }
@@ -375,15 +386,16 @@ public class YamlSkillManifest
         public void setSkill(String skill) { this.skill = skill; }
     }
 
-    public InputSchemaManifest getInputSchema()
+    public tools.jackson.databind.JsonNode getInputSchema()
     {
-        return inputSchema;
+        return inputSchema == null ? null : inputSchema.deepCopy();
     }
 
-    public void setInputSchema(InputSchemaManifest inputSchema)
+    public void setInputSchema(tools.jackson.databind.JsonNode inputSchema)
     {
         declaredFields.add(Field.INPUT_SCHEMA);
-        this.inputSchema = inputSchema;
+        this.inputSchema = inputSchema == null ? null : inputSchema.deepCopy();
+        this.compiledInputSchema = null;
     }
 
     public Integer getOutputSchemaMaxRetries()
@@ -487,271 +499,5 @@ public class YamlSkillManifest
         }
     }
 
-
-    public static final class StrictStringScalarDeserializer extends ValueDeserializer<String>
-    {
-        @Override
-        public String deserialize(JsonParser parser, DeserializationContext context)
-        {
-            if (parser.currentToken() != JsonToken.VALUE_STRING)
-            {
-                return (String) context.handleUnexpectedToken(String.class, parser);
-            }
-            return parser.getString();
-        }
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = false)
-    public static class InputSchemaManifest
-    {
-        private String type;
-        private Map<String, InputSchemaManifest> properties = Map.of();
-        private List<String> required = List.of();
-        private Boolean additionalProperties;
-        private InputSchemaManifest items;
-
-        @JsonProperty("enum")
-        private List<String> enumValues = List.of();
-
-        private String description;
-        private String format;
-
-        @JsonProperty("media_type")
-        private String mediaType;
-
-        @JsonProperty("allowed_content_types")
-        private List<String> allowedContentTypes = List.of();
-
-        public String getType()
-        {
-            return type;
-        }
-
-        public void setType(String type)
-        {
-            this.type = StringUtils.hasText(type) ? type.trim().toLowerCase(Locale.ROOT) : type;
-        }
-
-        public Map<String, InputSchemaManifest> getProperties()
-        {
-            return properties;
-        }
-
-        public void setProperties(Map<String, InputSchemaManifest> properties)
-        {
-            if (properties == null || properties.isEmpty())
-            {
-                this.properties = Map.of();
-                return;
-            }
-            this.properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
-        }
-
-        public List<String> getRequired()
-        {
-            return required;
-        }
-
-        public void setRequired(List<String> required)
-        {
-            this.required = required == null ? List.of() : List.copyOf(required);
-        }
-
-        public Boolean getAdditionalProperties()
-        {
-            return additionalProperties;
-        }
-
-        public void setAdditionalProperties(Boolean additionalProperties)
-        {
-            this.additionalProperties = additionalProperties;
-        }
-
-        public InputSchemaManifest getItems()
-        {
-            return items;
-        }
-
-        public void setItems(InputSchemaManifest items)
-        {
-            this.items = items;
-        }
-
-        public List<String> getEnumValues()
-        {
-            return enumValues;
-        }
-
-        public void setEnumValues(List<String> enumValues)
-        {
-            this.enumValues = enumValues == null ? List.of() : List.copyOf(enumValues);
-        }
-
-        public String getDescription()
-        {
-            return description;
-        }
-
-        public void setDescription(String description)
-        {
-            this.description = StringUtils.hasText(description) ? description.trim() : null;
-        }
-
-        public String getFormat()
-        {
-            return format;
-        }
-
-        public void setFormat(String format)
-        {
-            this.format = StringUtils.hasText(format) ? format.trim() : null;
-        }
-
-        public String getMediaType()
-        {
-            return mediaType;
-        }
-
-        public void setMediaType(String mediaType)
-        {
-            this.mediaType = StringUtils.hasText(mediaType) ? mediaType.trim().toLowerCase(Locale.ROOT) : null;
-        }
-
-        public List<String> getAllowedContentTypes()
-        {
-            return allowedContentTypes;
-        }
-
-        public void setAllowedContentTypes(List<String> allowedContentTypes)
-        {
-            this.allowedContentTypes = allowedContentTypes == null ? List.of() : List.copyOf(allowedContentTypes);
-        }
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = false)
-    public static class OutputSchemaManifest
-    {
-        @JsonInclude(JsonInclude.Include.NON_NULL)
-        @JsonDeserialize(using = StrictStringScalarDeserializer.class)
-        @JsonSetter(nulls = Nulls.FAIL)
-        private String evidence;
-        private String type;
-        private Map<String, OutputSchemaManifest> properties = Map.of();
-        private List<String> required = List.of();
-        private Boolean additionalProperties;
-        private OutputSchemaManifest items;
-
-        @JsonProperty("enum")
-        private List<String> enumValues = List.of();
-
-        private String description;
-        private String format;
-        private Boolean nullable;
-
-        public String getEvidence()
-        {
-            return evidence;
-        }
-
-        public void setEvidence(String evidence)
-        {
-            this.evidence = evidence;
-        }
-
-        public String getType()
-        {
-            return type;
-        }
-
-        public void setType(String type)
-        {
-            this.type = StringUtils.hasText(type) ? type.trim().toLowerCase(Locale.ROOT) : type;
-        }
-
-        public Map<String, OutputSchemaManifest> getProperties()
-        {
-            return properties;
-        }
-
-        public void setProperties(Map<String, OutputSchemaManifest> properties)
-        {
-            if (properties == null || properties.isEmpty())
-            {
-                this.properties = Map.of();
-                return;
-            }
-            this.properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
-        }
-
-        public List<String> getRequired()
-        {
-            return required;
-        }
-
-        public void setRequired(List<String> required)
-        {
-            this.required = required == null ? List.of() : List.copyOf(required);
-        }
-
-        public Boolean getAdditionalProperties()
-        {
-            return additionalProperties;
-        }
-
-        public void setAdditionalProperties(Boolean additionalProperties)
-        {
-            this.additionalProperties = additionalProperties;
-        }
-
-        public OutputSchemaManifest getItems()
-        {
-            return items;
-        }
-
-        public void setItems(OutputSchemaManifest items)
-        {
-            this.items = items;
-        }
-
-        public List<String> getEnumValues()
-        {
-            return enumValues;
-        }
-
-        public void setEnumValues(List<String> enumValues)
-        {
-            this.enumValues = enumValues == null ? List.of() : List.copyOf(enumValues);
-        }
-
-        public String getDescription()
-        {
-            return description;
-        }
-
-        public void setDescription(String description)
-        {
-            this.description = StringUtils.hasText(description) ? description.trim() : null;
-        }
-
-        public String getFormat()
-        {
-            return format;
-        }
-
-        public void setFormat(String format)
-        {
-            this.format = StringUtils.hasText(format) ? format.trim() : null;
-        }
-
-        public Boolean getNullable()
-        {
-            return nullable;
-        }
-
-        public void setNullable(Boolean nullable)
-        {
-            this.nullable = nullable;
-        }
-    }
 
 }

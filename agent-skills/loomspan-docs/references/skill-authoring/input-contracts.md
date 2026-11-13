@@ -9,11 +9,19 @@ coverage: initial-source-verified
 
 ## Applicability
 
+For authored YAML schemas, read [standard schemas](standard-schemas.md), including
+its current integration boundary. The shared compiler's accepted declarations do
+not establish that reflected Java generation or runtime conversion already uses
+those semantics. Reflected generation, reduced input resolution and dispatch
+remain inconsistent with canonical schemas, so the current application checkout
+cannot execute the complete path. The reflected behavior and retained test
+anchors below require that integration before they are executable guarantees.
+
 Use this topic for an annotation-defined Java skill. Loomspan reflects its Java signature and `@SkillParam` metadata as the provider-facing schema, planner guidance, and root/child runtime validation contract. There is no companion YAML or input-contract inheritance layer.
 
-For executor YAML input contracts, use [executor leaf declarations](executor-skills.md): their optional `input_schema` uses the ordinary YAML validator.
+For executor YAML input contracts, use [executor leaf declarations](executor-skills.md): their optional `input_schema` uses the shared standard declaration compiler.
 
-This topic does not define the complete pure-YAML `input_schema` language.
+This topic covers reflected Java contracts; [standard schemas](standard-schemas.md) defines the authored YAML language.
 
 ## Type Decision Table
 
@@ -126,7 +134,7 @@ Use a typed map when arbitrary keys are part of the domain but all values share 
 - Loomspan does not infer fixed fields or domain rules from generic-map usage.
 - This contract supports JSON-compatible values; arbitrary Java objects and resource/container types are not accepted under unconstrained leaves. Attachment and runtime-reference inputs use their dedicated reflected contracts.
 - Requiredness and typed-null behavior outside deliberate unconstrained leaves are unchanged.
-- Complete pure-YAML schema syntax and validation remain outside this topic.
+- Authored YAML syntax and local validation are documented in [standard schemas](standard-schemas.md).
 
 ## Executable Evidence and Implementation Anchors
 

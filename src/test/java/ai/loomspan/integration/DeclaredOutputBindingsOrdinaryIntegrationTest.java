@@ -81,7 +81,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                   type: object
                   properties:
                     assessment: {type: object, additionalProperties: true}
-                    optionalExplanation: {type: string, nullable: true}
+                    optionalExplanation: {type: [string, "null"]}
                   required: [assessment]
                   additionalProperties: false
                 output_bindings:
@@ -133,7 +133,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                 output_schema:
                   type: object
                   properties:
-                    assessment: {type: object, additionalProperties: true, evidence: default-producer}
+                    assessment: {type: object, additionalProperties: true, x-loomspan-evidence: default-producer}
                     summary: {type: string}
                   required: [assessment, summary]
                   additionalProperties: false
@@ -183,8 +183,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
               type: object
               properties:
                 context:
-                  type: object
-                  nullable: true
+                  type: [object, "null"]
                   properties:
                     assessment: {type: object, additionalProperties: true}
                     summary: {type: string}

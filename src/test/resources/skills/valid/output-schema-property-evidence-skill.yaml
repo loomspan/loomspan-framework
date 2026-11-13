@@ -8,6 +8,6 @@ output_schema:
   properties:
     result:
       type: string
-      evidence: default-reviewSkill
+      x-loomspan-evidence: default-reviewSkill
   required: [result]
   additionalProperties: false

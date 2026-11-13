@@ -242,6 +242,49 @@ class YamlSkillCatalogTests {
     }
 
     @Test
+    void suppliedJsonValuesRejectKeysAndNonfiniteNumbersWithSourceAndPath() {
+        var cases = Map.of(
+                "1: value\n'1': other", "",
+                "input_schema: {type: object, properties: {true: {type: string}}}", "/input_schema/properties",
+                "typesafe: {state: [{false: value}]}", "/typesafe/state/0",
+                "input_schema: {type: object, properties: {x: {type: number, minimum: .inf}}}", "/input_schema/properties/x/minimum",
+                "typesafe: {state: {value: .nan}}", "/typesafe/state/value",
+                "typesafe: {state: {value: -.inf}}", "/typesafe/state/value");
+        cases.forEach((body, path) -> {
+            var checked = new YamlSkillCatalog(new LoomspanProperties()).checkedSupplied(
+                    List.of(new SkillDocument("json-ingress.yaml", "name: bad\ndescription: test\n" + body)), false);
+            assertThat(checked.definitions()).isEmpty();
+            assertThat(checked.issues()).singleElement().satisfies(issue -> {
+                assertThat(issue.sourceName()).isEqualTo("json-ingress.yaml");
+                assertThat(issue.fieldPath()).isEqualTo(path);
+                assertThat(issue.message()).containsAnyOf("map keys must be textual", "not JSON-compatible");
+            });
+        });
+    }
+
+    @Test
+    void quotedNumericAndBooleanPropertyNamesRemainDistinctAtRegistration() {
+        var checked = new YamlSkillCatalog(new LoomspanProperties()).checkedSupplied(
+                List.of(new SkillDocument("quoted-keys.yaml", """
+                        name: quoted
+                        description: Exact JSON property names
+                        executor: sql
+                        input_schema:
+                          type: object
+                          properties:
+                            '1': {type: string}
+                            '01': {type: string}
+                            'true': {type: string, enum: ['NaN', 'Infinity', '-Infinity']}
+                        """)), false);
+        assertThat(checked.issues()).isEmpty();
+        var properties = checked.definitions().getFirst().inputSchema().tree().path("properties");
+        assertThat(properties.size()).isEqualTo(3);
+        assertThat(properties.has("1")).isTrue();
+        assertThat(properties.has("01")).isTrue();
+        assertThat(properties.path("true").path("enum").get(1).textValue()).isEqualTo("Infinity");
+    }
+
+    @Test
     void validationReturnsComplexityWarningsWithoutLogging(CapturedOutput output) throws Exception {
         String yaml = new String(new ClassPathResource("skills/valid/output-schema-complex-skill.yaml")
                 .getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
@@ -812,12 +855,12 @@ class YamlSkillCatalogTests {
                     YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
 
                     catalog.getSkill("default-lintedSkill").linter().setType("mutated");
-                    catalog.getSkill("default-inputSchemaSkill").inputSchema().setType("string");
-                    catalog.getSkill("default-outputSchemaSkill").outputSchema().setType("string");
+                    ((tools.jackson.databind.node.ObjectNode) catalog.getSkill("default-inputSchemaSkill").inputSchema().tree()).put("type", "string");
+                    ((tools.jackson.databind.node.ObjectNode) catalog.getSkill("default-outputSchemaSkill").outputSchema().tree()).put("type", "string");
 
                     assertThat(catalog.getSkill("default-lintedSkill").linter().getType()).isEqualTo("regex");
-                    assertThat(catalog.getSkill("default-inputSchemaSkill").inputSchema().getType()).isEqualTo("object");
-                    assertThat(catalog.getSkill("default-outputSchemaSkill").outputSchema().getType()).isEqualTo("object");
+                    assertThat(catalog.getSkill("default-inputSchemaSkill").inputSchema().tree().path("type").textValue()).isEqualTo("object");
+                    assertThat(catalog.getSkill("default-outputSchemaSkill").outputSchema().tree().path("type").textValue()).isEqualTo("object");
                 });
     }
 
@@ -927,8 +970,8 @@ class YamlSkillCatalogTests {
 
                     assertThat(definition).isNotNull();
                     assertThat(definition.inputSchema()).isNotNull();
-                    assertThat(definition.inputSchema().getType()).isEqualTo("object");
-                    assertThat(definition.inputSchema().getRequired()).containsExactly("payload");
+                    assertThat(definition.inputSchema().tree().path("type").textValue()).isEqualTo("object");
+                    assertThat(definition.inputSchema().tree().path("required").get(0).textValue()).isEqualTo("payload");
                 });
     }
 
@@ -940,10 +983,11 @@ class YamlSkillCatalogTests {
                     YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class).getSkill("default-attachmentInputSkill");
 
                     assertThat(definition).isNotNull();
-                    assertThat(definition.inputSchema().getProperties().get("image").getType()).isEqualTo("attachment");
-                    assertThat(definition.inputSchema().getProperties().get("image").getMediaType()).isEqualTo("image");
-                    assertThat(definition.inputSchema().getProperties().get("image").getAllowedContentTypes())
-                            .containsExactly("image/jpeg");
+                    var image = definition.inputSchema().tree().path("properties").path("image");
+                    assertThat(image.path("type").textValue()).isEqualTo("string");
+                    var attachment = image.path("x-loomspan-attachment");
+                    assertThat(attachment.path("media_type").textValue()).isEqualTo("image");
+                    assertThat(attachment.path("allowed_content_types").get(0).textValue()).isEqualTo("image/jpeg");
                 });
     }
 
@@ -954,8 +998,8 @@ class YamlSkillCatalogTests {
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("attachment-output-skill.yaml")
-                        .hasMessageContaining("field 'output_schema.properties.image.type'")
-                        .hasMessageContaining("unsupported schema type 'attachment'"));
+                        .hasMessageContaining("field 'output_schema/properties/image/x-loomspan-attachment'")
+                        .hasMessageContaining("attachment requires an input string leaf"));
     }
 
     @Test
@@ -965,16 +1009,16 @@ class YamlSkillCatalogTests {
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("attachment-missing-allowed-content-types-skill.yaml")
-                        .hasMessageContaining("field 'input_schema.properties.image.allowed_content_types'")
-                        .hasMessageContaining("must declare at least one content type"));
+                        .hasMessageContaining("field 'input_schema/properties/image/x-loomspan-attachment/allowed_content_types'")
+                        .hasMessageContaining("requires a nonempty list of nonblank strings"));
 
         contextRunner
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/non-attachment-media-field-skill.yaml")
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("non-attachment-media-field-skill.yaml")
-                        .hasMessageContaining("field 'input_schema.properties.payload.media_type'")
-                        .hasMessageContaining("is only supported for attachment schemas"));
+                        .hasMessageContaining("field 'input_schema/properties/payload/media_type'")
+                        .hasMessageContaining("unsupported keyword 'media_type'"));
     }
 
     @Test
@@ -984,16 +1028,16 @@ class YamlSkillCatalogTests {
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("input-schema-root-array-skill.yaml")
-                        .hasMessageContaining("field 'input_schema.type'")
-                        .hasMessageContaining("root input_schema type must be 'object'"));
+                        .hasMessageContaining("field 'input_schema/type'")
+                        .hasMessageContaining("root type must be object"));
 
         contextRunner
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/input-schema-unsupported-keyword-skill.yaml")
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("input-schema-unsupported-keyword-skill.yaml")
-                        .hasMessageContaining("field 'input_schema.properties.payload.oneOf'")
-                        .hasMessageContaining("unknown field"));
+                        .hasMessageContaining("field 'input_schema/properties/payload/oneOf'")
+                        .hasMessageContaining("unsupported keyword 'oneOf'"));
     }
 
 
@@ -1021,8 +1065,8 @@ class YamlSkillCatalogTests {
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("evidence-contract-blank-evidence-skill.yaml")
-                        .hasMessageContaining("field 'output_schema.properties.vendorName.evidence'")
-                        .hasMessageContaining("expression must be a nonblank YAML string"));
+                        .hasMessageContaining("field 'output_schema/properties/vendorName/x-loomspan-evidence'")
+                        .hasMessageContaining("requires a nonblank string on an immediate root output property"));
     }
 
     @Test
@@ -1046,7 +1090,7 @@ class YamlSkillCatalogTests {
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("evidence-contract-list-expression-skill.yaml")
-                        .hasMessageContaining("field 'output_schema.properties.vendorName.evidence'"));
+                        .hasMessageContaining("field 'output_schema/properties/vendorName/x-loomspan-evidence'"));
     }
 
     @Test
@@ -1078,19 +1122,21 @@ class YamlSkillCatalogTests {
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("output-schema-unsupported-keyword-skill.yaml")
-                        .hasMessageContaining("field 'output_schema.properties.vendorName.oneOf'")
-                        .hasMessageContaining("unknown field"));
+                        .hasMessageContaining("field 'output_schema/properties/vendorName/oneOf'")
+                        .hasMessageContaining("unsupported keyword 'oneOf'"));
     }
 
     @Test
-    void failsStartupWhenOutputSchemaUsesEnumOnObjectSchema() {
+    void acceptsScalarEnumOnObjectDeclarationWithoutInventingTypeRestrictions() {
         contextRunner
-                .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/output-schema-object-enum-skill.yaml")
-                .run(context -> assertThat(context.getStartupFailure())
-                        .isNotNull()
-                        .hasMessageContaining("output-schema-object-enum-skill.yaml")
-                        .hasMessageContaining("field 'output_schema.enum'")
-                        .hasMessageContaining("is only supported for string schemas in the MVP"));
+                .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/output-schema-object-enum-skill.yaml")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    var schema = context.getBean(YamlSkillCatalog.class).getSkill("default-outputSchemaObjectEnum").outputSchema();
+                    assertThat(schema.tree().path("enum").get(0).textValue()).isEqualTo("invalid");
+                    assertThat(schema.validate(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults()
+                            .schemaTree().readTree("{}"))).isNotEmpty();
+                });
     }
 
     @Test
@@ -1100,59 +1146,62 @@ class YamlSkillCatalogTests {
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("output-schema-root-array-skill.yaml")
-                        .hasMessageContaining("field 'output_schema.type'")
-                        .hasMessageContaining("root output_schema type must be 'object'"));
+                        .hasMessageContaining("field 'output_schema/type'")
+                        .hasMessageContaining("root type must be object"));
     }
 
     @Test
-    void failsStartupWhenRequiredFieldIsMissingFromProperties() {
+    void acceptsRequiredNamesWithoutPropertyDeclarationsInOpenObjects() {
         contextRunner
-                .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/output-schema-missing-required-property-skill.yaml")
-                .run(context -> assertThat(context.getStartupFailure())
-                        .isNotNull()
-                        .hasMessageContaining("output-schema-missing-required-property-skill.yaml")
-                        .hasMessageContaining("field 'output_schema.required'")
-                        .hasMessageContaining("references unknown property 'vendorName'"));
-    }
-
-    @Test
-    void failsStartupWhenPropertiesDifferOnlyByCase() {
-        contextRunner
-                .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/output-schema-duplicate-properties-skill.yaml")
-                .run(context -> assertThat(context.getStartupFailure())
-                        .isNotNull()
-                        .hasMessageContaining("output-schema-duplicate-properties-skill.yaml")
-                        .hasMessageContaining("field 'output_schema.properties.VendorName'")
-                        .hasMessageContaining("duplicates property 'vendorName'"));
-    }
-
-    @Test
-    void defaultsAdditionalPropertiesToFalseAtEveryObjectDepth() {
-        contextRunner
-                .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/output-schema-complex-skill.yaml")
+                .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/output-schema-missing-required-property-skill.yaml")
                 .run(context -> {
-                    YamlSkillCatalog catalog = context.getBean(YamlSkillCatalog.class);
-                    YamlSkillManifest.OutputSchemaManifest root = catalog.getSkill("default-outputSchemaComplexSkill")
-                            .manifest().getOutputSchema();
-                    YamlSkillManifest.OutputSchemaManifest item = root.getProperties().get("lineItems").getItems();
-                    YamlSkillManifest.OutputSchemaManifest details = item.getProperties().get("details");
-
-                    assertThat(root.getAdditionalProperties()).isFalse();
-                    assertThat(item.getAdditionalProperties()).isFalse();
-                    assertThat(details.getAdditionalProperties()).isFalse();
+                    assertThat(context).hasNotFailed();
+                    var schema = context.getBean(YamlSkillCatalog.class).getSkill("default-outputSchemaMissingRequired").outputSchema();
+                    assertThat(schema.tree().path("required").get(0).textValue()).isEqualTo("vendorName");
+                    assertThat(schema.tree().path("properties").has("vendorName")).isFalse();
                 });
     }
 
     @Test
-    void failsStartupWhenOutputSchemaContainsNestedArrayItems()
-    {
+    void acceptsExactPropertiesThatDifferOnlyByCase() {
         contextRunner
-                .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/output-schema-nested-array-skill.yaml")
-                .run(context -> assertThat(context.getStartupFailure())
-                        .isNotNull()
-                        .hasMessageContaining("output-schema-nested-array-skill.yaml")
-                        .hasMessageContaining("field 'output_schema.properties.matrix.items.type'")
-                        .hasMessageContaining("nested array items are not supported"));
+                .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/output-schema-duplicate-properties-skill.yaml")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    var properties = context.getBean(YamlSkillCatalog.class).getSkill("default-outputSchemaDuplicateProperties")
+                            .outputSchema().tree().path("properties");
+                    assertThat(properties.has("vendorName")).isTrue();
+                    assertThat(properties.has("VendorName")).isTrue();
+                    assertThat(properties.size()).isEqualTo(2);
+                });
+    }
+
+    @Test
+    void preservesOmittedAdditionalPropertiesAtEveryObjectDepth() {
+        contextRunner
+                .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/output-schema-complex-skill.yaml")
+                .run(context -> {
+                    var root = context.getBean(YamlSkillCatalog.class).getSkill("default-outputSchemaComplexSkill")
+                            .outputSchema().tree();
+                    var item = root.path("properties").path("lineItems").path("items");
+                    var details = item.path("properties").path("details");
+                    assertThat(root.has("additionalProperties")).isFalse();
+                    assertThat(item.has("additionalProperties")).isFalse();
+                    assertThat(details.has("additionalProperties")).isFalse();
+                });
+    }
+
+    @Test
+    void acceptsHomogeneousNestedArrayItems() {
+        contextRunner
+                .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/output-schema-nested-array-skill.yaml")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    var matrix = context.getBean(YamlSkillCatalog.class).getSkill("default-outputSchemaNestedArraySkill")
+                            .outputSchema().tree().path("properties").path("matrix");
+                    assertThat(matrix.path("items").path("type").textValue()).isEqualTo("array");
+                    assertThat(matrix.path("items").path("items").path("type").textValue()).isEqualTo("string");
+                });
     }
 
     @Test

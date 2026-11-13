@@ -59,7 +59,7 @@ class ExecutorGenerationExecutionIntegrationTest {
             var infra1 = publish(reloader, "infra", List.of(leaf("same", "configured")), config("startup"), NamespaceVisibility.PUBLIC);
             assertThat(reloader.snapshot("infra").skill("infra-same").orElseThrow().kind()).isEqualTo(SkillKind.JAVA);
             publish(reloader, "caller", List.of(new SkillDocument("leaf", leaf("leaf", "infra-configured").yaml()
-                            + "input_schema: {type: object, properties: {attachment: {type: attachment, media_type: file, allowed_content_types: [application/octet-stream]}}, additionalProperties: true}\n"), leaf("empty", "infra-plain")),
+                            + "input_schema: {type: object, properties: {attachment: {type: string, x-loomspan-attachment: {media_type: file, allowed_content_types: [application/octet-stream]}}}, additionalProperties: true}\n"), leaf("empty", "infra-plain")),
                     new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE);
             assertThat(bean.invocations).isEmpty();
             var principal = UsernamePasswordAuthenticationToken.authenticated("reader", "unused", List.of());

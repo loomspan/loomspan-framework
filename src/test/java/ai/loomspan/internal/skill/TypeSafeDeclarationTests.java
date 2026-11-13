@@ -90,6 +90,33 @@ typesafe:
     }
 
     @Test
+    void catalogRetainsExactLiteralYamlNumbersThroughResolvedNativeCopies() {
+        var properties = new LoomspanProperties();
+        var connection = new LoomspanProperties.ConnectionProperties();
+        connection.setDriver(ai.loomspan.autoconfigure.AiDriver.TYPESAFE);
+        connection.setApiKey("fixture");
+        properties.getConnections().put("native", connection);
+        var model = new LoomspanProperties.ModelCatalogEntry();
+        model.setConnection("native"); model.setProviderModel("jev");
+        properties.getModels().put("judge", model);
+        var catalog = new YamlSkillCatalog(properties);
+        var checked = catalog.checkedSupplied(List.of(new SkillDocument("literal-native.yaml", """
+                name: preciseNative
+                description: Exact authored native values
+                model: judge
+                input_schema: {type: object}
+                typesafe:
+                  state: {large: 9007199254740993.0, fraction: 0.12345678901234567890123456789, exponent: 1.234567890123456789e-30}
+                  questions: {q: {type: noul, instructions: decide}}
+                """)), false);
+        assertThat(checked.issues()).isEmpty();
+        var definition = checked.definitions().getFirst();
+        var exact = LoomspanJacksonCodecs.defaults().schemaTree().readTree("{\"large\":9007199254740993.0,\"fraction\":0.12345678901234567890123456789,\"exponent\":1.234567890123456789e-30}");
+        assertThat(definition.manifest().getTypesafe().path("state")).isEqualTo(exact);
+        assertThat(definition.typeSafeDeclaration().resolve(Map.of()).json().path("state")).isEqualTo(exact);
+    }
+
+    @Test
     void parsedYamlScalarFidelityAndResolvedCopiesRemainExact() {
         var d =
                 declaration(
@@ -439,8 +466,8 @@ typesafe:
                 List.of(
                         "",
                         "input_schema: {type: string}\n",
-                        "input_schema: {type: object, properties: {file: {type: attachment,"
-                            + " media_type: image, allowed_content_types: [image/png]}}}\n")) {
+                        "input_schema: {type: object, properties: {file: {type: string,"
+                            + " x-loomspan-attachment: {media_type: image, allowed_content_types: [image/png]}}}}\n")) {
             var checked =
                     new YamlSkillCatalog(new LoomspanProperties())
                             .checkedSupplied(

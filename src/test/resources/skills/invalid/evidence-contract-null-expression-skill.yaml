@@ -6,4 +6,4 @@ allowed_skills:
 output_schema:
   type: object
   properties:
-    vendorName: { type: string, evidence: null }
+    vendorName: { type: string, x-loomspan-evidence: null }

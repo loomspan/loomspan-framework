@@ -7,7 +7,7 @@ coverage: source-verified
 
 # Executor leaf declarations and configuration
 
-An executor leaf declares an operation owned by application Java code, with YAML supplying its input contract, roles and operation configuration. Loomspan prepares and executes these leaves through the shared Java route, classifies them as `SkillKind.JAVA`, and retains their YAML declarations and exact configuration. The example below shows accepted declaration syntax.
+An executor leaf declares an operation owned by application Java code, with YAML supplying its input contract, roles and operation configuration. Loomspan prepares and executes these leaves through the shared Java route, classifies them as `SkillKind.JAVA`, and retains their YAML declarations and exact configuration. The example below shows accepted declaration syntax. The shared [standard schema topic](standard-schemas.md) distinguishes declaration validation from the current unavailable runtime consumer integration.
 
 ```yaml
 name: fetchAccount
@@ -22,11 +22,11 @@ rbac_roles: [ACCOUNT_READER]
 
 `name` and `description` are required. `executor` MUST be a nonblank textual local or qualified reference under the shared identity grammar. Local references are qualified with the declaring namespace. It references execution behavior, not a callable child, and does not belong in `allowed_skills`.
 
-`input_schema` and `rbac_roles` are optional and reuse ordinary YAML rules. Without an input schema, the existing generic object contract applies. Business input is never inherited from a parent.
+`input_schema` and `rbac_roles` are optional. Authored input schemas use the [standard declaration rules](standard-schemas.md). Without an input schema, the existing generic object contract applies. Business input is never inherited from a parent.
 
 Executor leaves MUST omit `typesafe`, `model`, `thinking_level`, `prompt`, `planning_mode`, `concurrency`, `max_steps`, `allowed_skills`, `linter`, `output_schema`, `output_schema_max_retries`, `output_from`, and `output_bindings`. Presence fails even for null, false, empty maps, empty lists or empty strings. The forms do not select precedence. `rest` is unsupported manifest syntax; every value fails unknown-field validation.
 
-`config` is permitted only on executor leaves. Omission and `{}` yield an empty immutable map. Explicit null, a bare field, a scalar or a list fail. Nested nulls, maps, lists, empty containers, scalar types and exact data keys are preserved. `config` is executor-owned domain data, not a Framework schema.
+`config` is permitted only on executor leaves. Omission and `{}` yield an empty immutable map. Explicit null, a bare field, a scalar or a list fail. Nested nulls, maps, lists, empty containers, scalar types and exact data keys are preserved. `config` is executor-owned domain data, not a Framework schema. It is decoded separately with the existing Java numeric kinds; lossless JSON-bound skill decoding applies to the rest of the document, not this actual top-level subtree.
 
 ## Namespace executor data
 

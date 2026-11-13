@@ -135,7 +135,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                   properties:
                     caseId: {type: string}
                     assessment:
-                      evidence: first
+                      x-loomspan-evidence: first
                       type: object
                       additionalProperties: true
                     rows:

@@ -63,7 +63,7 @@ class NamespaceIdentityFoundationTest {
                 String base = "name: parent\ndescription: Keep child and shared-child.\nmodel: model\nprompt: Keep child and shared-child exactly.\nplanning_mode: true\n";
                 String forwarding = base + "allowed_skills: [{name: " + child + ", required: true, max_tasks: 1}]\noutput_from: {skill: " + producer + "}\n";
                 String bindings = base + "allowed_skills:\n - name: " + child + "\n - name: consumer\n   input_bindings: {/id: {from: child_result, skill: " + producer + ", path: ''}}\n - name: shared-child\n"
-                        + "output_schema: {type: object, properties: {id: {type: string, evidence: 'child or shared-child'}}}\n"
+                        + "output_schema: {type: object, properties: {id: {type: string, x-loomspan-evidence: 'child or shared-child'}}}\n"
                         + "output_bindings: {/id: {from: child_result, skill: " + producer + ", path: ''}}\n";
                 for (String yaml : List.of(forwarding, bindings)) {
                     var checked = new YamlSkillCatalog(properties()).checkedSupplied(owner, List.of(new SkillDocument("exact source", yaml)), false);
@@ -100,7 +100,7 @@ class NamespaceIdentityFoundationTest {
                 case "forward" -> base + "allowed_skills: [{name: " + ref + ", required: true, max_tasks: 1}]\noutput_from: {skill: " + ref + "}\n";
                 case "input" -> base + "allowed_skills: [{name: consumer, input_bindings: {/id: {from: child_result, skill: " + ref + ", path: ''}}}, {name: default-child}]\n";
                 case "output" -> base + "allowed_skills: [{name: default-child}]\noutput_schema: {type: object}\noutput_bindings: {/id: {from: child_result, skill: " + ref + ", path: ''}}\n";
-                default -> base + "allowed_skills: [{name: default-child}]\noutput_schema: {type: object, properties: {id: {type: string, evidence: '" + ref + "'}}}\n";
+                default -> base + "allowed_skills: [{name: default-child}]\noutput_schema: {type: object, properties: {id: {type: string, x-loomspan-evidence: '" + ref + "'}}}\n";
             };
             // Successful producer comparison requires a matching declaration; failures must
             // be due to combined identity length rather than target availability.
@@ -112,7 +112,7 @@ class NamespaceIdentityFoundationTest {
         String base = "name: parent\ndescription: parent\nmodel: model\nallowed_skills: [{name: first}, {name: Second}]\n";
         for (String expression : List.of("  first and second", "  first and missing", "  first and )")) {
             var result = new YamlSkillCatalog(properties()).checkedSupplied("sales", List.of(new SkillDocument("raw diagnostic", base
-                    + "output_schema: {type: object, properties: {id: {type: string, evidence: '" + expression + "'}}}\n")), false);
+                    + "output_schema: {type: object, properties: {id: {type: string, x-loomspan-evidence: '" + expression + "'}}}\n")), false);
             assertThat(result.issues()).singleElement().satisfies(issue -> {
                 assertThat(issue.sourceName()).isEqualTo("raw diagnostic");
                 assertThat(issue.fieldPath()).isEqualTo("output_schema.properties.id.evidence");
@@ -151,7 +151,7 @@ class NamespaceIdentityFoundationTest {
                     case "forward" -> base+"allowed_skills: [{name: default-child, required: true, max_tasks: 1}]\noutput_from: {skill: '"+ref+"'}\n";
                     case "input" -> base+"allowed_skills: [{name: default-child, input_bindings: {/id: {from: child_result, skill: '"+ref+"', path: ''}}}]\n";
                     case "output" -> base+"allowed_skills: [{name: default-child}]\noutput_schema: {type: object}\noutput_bindings: {/id: {from: child_result, skill: '"+ref+"', path: ''}}\n";
-                    default -> base+"allowed_skills: [{name: default-child}]\noutput_schema: {type: object, properties: {id: {type: string, evidence: '"+ref+"'}}}\n";
+                    default -> base+"allowed_skills: [{name: default-child}]\noutput_schema: {type: object, properties: {id: {type: string, x-loomspan-evidence: '"+ref+"'}}}\n";
                 };
                 var checked=catalog.checkedSupplied(List.of(new SkillDocument("exact raw source",yaml)),false);
                 assertThat(checked.issues()).as(field+" "+ref).isNotEmpty();
@@ -171,7 +171,7 @@ class NamespaceIdentityFoundationTest {
                 base+"allowed_skills: [{name: "+target+", required: true, max_tasks: 1}]\noutput_from: {skill: "+target+"}\n",
                 base+"allowed_skills: [{name: default-consumer, input_bindings: {/id: {from: child_result, skill: "+target+", path: ''}}}, {name: "+target+"}]\n",
                 base+"allowed_skills: [{name: "+target+"}]\noutput_schema: {type: object}\noutput_bindings: {/id: {from: child_result, skill: "+target+", path: ''}}\n",
-                base+"allowed_skills: [{name: "+target+"}]\noutput_schema: {type: object, properties: {id: {type: string, evidence: '"+target+"'}}}\n")) {
+                base+"allowed_skills: [{name: "+target+"}]\noutput_schema: {type: object, properties: {id: {type: string, x-loomspan-evidence: '"+target+"'}}}\n")) {
             var checked=new YamlSkillCatalog(properties()).checkedSupplied(List.of(new SkillDocument("boundary",yaml)),false);
             assertThat(checked.issues()).as(yaml).isEmpty();
             var definition=checked.definitions().getFirst();

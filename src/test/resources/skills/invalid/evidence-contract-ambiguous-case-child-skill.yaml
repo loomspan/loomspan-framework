@@ -7,4 +7,4 @@ allowed_skills:
 output_schema:
   type: object
   properties:
-    vendorName: { type: string, evidence: default-INVOICEPARSER }
+    vendorName: { type: string, x-loomspan-evidence: default-INVOICEPARSER }

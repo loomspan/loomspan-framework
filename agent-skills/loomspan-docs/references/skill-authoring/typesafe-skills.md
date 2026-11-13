@@ -11,6 +11,14 @@ Authored child references and binding producers MAY be local to the containing s
 
 ## Applies when
 
+Authored `input_schema` uses [standard schema declarations](standard-schemas.md).
+Literal state, instructions and criteria pass the same JSON-bound skill decoder,
+including exact decimals, large integers, string keys and finite-number checks.
+The decoder has focused coverage, while TypeSafe output derivation, effective
+metadata and evaluator integration with canonical schemas remain incomplete.
+The current application checkout cannot execute the complete examples below;
+retained integration test anchors do not certify these runtime paths yet.
+
 Use a TypeSafe leaf for independent Choice, Noul, or Score judgments over supplied
 state. A leaf can be invoked directly through `SkillTemplate` or exposed to a normal
 chat skill as an allowed child. It has fixed question names and types, optional

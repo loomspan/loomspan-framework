@@ -11,17 +11,47 @@ public final class YamlValues {
     private static final long MAX_EXPANDED_VALUES = 1_000_000;
 
     private static Load loader() {
+        return loader(false);
+    }
+
+    private static Load loader(boolean losslessNumbers) {
+        var constructors = new java.util.HashMap<org.snakeyaml.engine.v2.nodes.Tag,
+                org.snakeyaml.engine.v2.api.ConstructNode>();
+        constructors.put(new org.snakeyaml.engine.v2.nodes.Tag("tag:yaml.org,2002:timestamp"),
+                node -> ((org.snakeyaml.engine.v2.nodes.ScalarNode)node).getValue());
+        if (losslessNumbers) constructors.put(org.snakeyaml.engine.v2.nodes.Tag.FLOAT, node -> {
+            String scalar = ((org.snakeyaml.engine.v2.nodes.ScalarNode)node).getValue();
+            // Retain nonfinite values until the JSON-bound walk can report their exact location.
+            return switch (scalar.toLowerCase(java.util.Locale.ROOT)) {
+                case ".nan" -> Double.NaN;
+                case ".inf", "+.inf" -> Double.POSITIVE_INFINITY;
+                case "-.inf" -> Double.NEGATIVE_INFINITY;
+                default -> {
+                    try { yield new java.math.BigDecimal(scalar); }
+                    catch (NumberFormatException ex) {
+                        // Defer until the JSON-bound walk: executor config uses its ordinary
+                        // constructor, whose exponent range must remain independent of BigDecimal.
+                        yield new UnrepresentableDecimal(scalar);
+                    }
+                }
+            };
+        });
         return new Load(LoadSettings.builder().setSchema(new CoreSchema())
                 // Keep explicit timestamps textual, as the existing Jackson value ingress did.
                 // Ordinary Spring values are still decoded by Boot's delegated loader.
-                .setTagConstructors(java.util.Map.of(new org.snakeyaml.engine.v2.nodes.Tag("tag:yaml.org,2002:timestamp"),
-                        node -> ((org.snakeyaml.engine.v2.nodes.ScalarNode)node).getValue()))
+                .setTagConstructors(constructors)
                 .setAllowDuplicateKeys(false).setMaxAliasesForCollections(Integer.MAX_VALUE)
                 .setCodePointLimit(Integer.MAX_VALUE).build());
     }
 
+    private record UnrepresentableDecimal(String literal) {
+        @Override public String toString() { return literal; }
+    }
+
     public static Object read(String yaml) { return acyclic(loader().loadFromString(yaml)); }
     public static Object read(java.io.InputStream input) { return acyclic(loader().loadFromInputStream(input)); }
+    /** Skill-document values use exact decimal construction before JSON conversion. */
+    static Object readSkillDocument(String yaml) { return acyclic(loader(true).loadFromString(yaml)); }
     public static Iterable<Object> documents(java.io.InputStream input) {
         var result = new java.util.ArrayList<Object>();
         loader().loadAllFromInputStream(input).forEach(value -> result.add(acyclic(value)));

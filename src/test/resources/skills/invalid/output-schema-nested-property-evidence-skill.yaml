@@ -9,4 +9,4 @@ output_schema:
     result:
       type: object
       properties:
-        detail: { type: string, evidence: default-reviewSkill }
+        detail: { type: string, x-loomspan-evidence: default-reviewSkill }

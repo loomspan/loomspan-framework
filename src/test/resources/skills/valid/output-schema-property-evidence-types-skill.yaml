@@ -9,15 +9,15 @@ output_schema:
   properties:
     ResultValue:
       type: string
-      evidence: default-reviewSkill
+      x-loomspan-evidence: default-reviewSkill
     details:
       type: object
-      evidence: default-reviewSkill and default-auditSkill
+      x-loomspan-evidence: default-reviewSkill and default-auditSkill
       properties:
         note: { type: string }
     rows:
       type: array
-      evidence: default-reviewSkill or default-auditSkill
+      x-loomspan-evidence: default-reviewSkill or default-auditSkill
       items: { type: string }
     unconstrained:
       type: string

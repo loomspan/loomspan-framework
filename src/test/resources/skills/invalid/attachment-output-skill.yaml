@@ -5,7 +5,8 @@ output_schema:
   type: object
   properties:
     image:
-      type: attachment
+      type: string
+      x-loomspan-attachment: {media_type: image, allowed_content_types: [image/png]}
   required:
     - image
   additionalProperties: false

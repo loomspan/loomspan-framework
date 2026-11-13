@@ -106,9 +106,9 @@ public final class YamlSkillDefinition
         return copyValue(manifest.getLinter(), YamlSkillManifest.LinterManifest.class);
     }
 
-    public YamlSkillManifest.OutputSchemaManifest outputSchema()
+    public ai.loomspan.internal.schema.CanonicalSchema outputSchema()
     {
-        return typesafe() ? typeSafeDeclaration().outputSchema() : copyValue(manifest.getOutputSchema(), YamlSkillManifest.OutputSchemaManifest.class);
+        return typesafe() ? typeSafeDeclaration().outputSchema() : manifest.compiledOutputSchema();
     }
 
     /** Exact direct child selected for runtime result forwarding, or null for synthesis. */
@@ -156,9 +156,9 @@ public final class YamlSkillDefinition
         return manifest.getPrompt();
     }
 
-    public YamlSkillManifest.InputSchemaManifest inputSchema()
+    public ai.loomspan.internal.schema.CanonicalSchema inputSchema()
     {
-        return copyValue(manifest.getInputSchema(), YamlSkillManifest.InputSchemaManifest.class);
+        return manifest.compiledInputSchema();
     }
 
     public boolean hasDeclaredInputSchema()
@@ -230,12 +230,30 @@ public final class YamlSkillDefinition
         {
             throw new NullPointerException("manifest must not be null");
         }
-        tools.jackson.databind.node.ObjectNode tree = COPY_MAPPER.valueToTree(source);
-        tree.remove("typesafe");
-        // Executor config is ignored for serialization and copied directly below.
-        YamlSkillManifest copy = COPY_MAPPER.treeToValue(tree, YamlSkillManifest.class);
+        // Copy ordinary manifest fields without sending schema/native JSON through application conversion.
+        YamlSkillManifest copy = new YamlSkillManifest();
+        copy.setName(source.getName());
+        copy.setDescription(source.getDescription());
+        copy.setModel(source.getModel());
+        copy.setPrompt(source.getPrompt());
+        copy.setExecutor(source.getExecutor());
+        copy.setThinkingLevel(source.getThinkingLevel());
+        copy.setAllowedSkills(source.getAllowedSkills().stream()
+                .map(value -> copyValue(value, YamlSkillManifest.AllowedSkillManifest.class)).toList());
+        copy.setRbacRoles(source.getRbacRoles());
+        copy.setPlanningMode(source.getPlanningMode());
+        copy.setConcurrency(source.getConcurrency());
+        copy.setMaxSteps(source.getMaxSteps());
+        copy.setLinter(copyValue(source.getLinter(), YamlSkillManifest.LinterManifest.class));
+        copy.setOutputFrom(copyValue(source.getOutputFrom(), YamlSkillManifest.OutputFromManifest.class));
+        var bindings = new java.util.LinkedHashMap<String, YamlSkillManifest.InputBindingManifest>();
+        source.getOutputBindings().forEach((name, value) ->
+                bindings.put(name, copyValue(value, YamlSkillManifest.InputBindingManifest.class)));
+        copy.setOutputBindings(bindings);
+        copy.setOutputSchemaMaxRetries(source.getOutputSchemaMaxRetries());
         // Share the immutable compiled declaration while detaching its mutable authored JSON.
         copy.copyTypesafeFrom(source);
+        copy.copySchemasFrom(source);
         if (source.isDeclared(YamlSkillManifest.Field.CONFIG)) copy.setConfig(source.getConfig());
         copy.declarationForm(source.declarationForm());
         copy.restoreDeclaredFields(source.declaredFields());

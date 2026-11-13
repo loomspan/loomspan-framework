@@ -164,7 +164,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                 output_schema:
                   type: object
                   properties:
-                    answer: {type: string, evidence: default-callable}
+                    answer: {type: string, x-loomspan-evidence: default-callable}
                   required: [answer]
                   additionalProperties: false
                 linter:
@@ -177,7 +177,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                   type: object
                   required: [image]
                   properties:
-                    image: {type: attachment, media_type: image, allowed_content_types: [image/jpeg]}
+                    image: {type: string, x-loomspan-attachment: {media_type: image, allowed_content_types: [image/jpeg]}}
                 """);
         var image = new org.springframework.core.io.ByteArrayResource(new byte[] {(byte) 0xff, (byte) 0xd8,
                 (byte) 0xff, 0x00, (byte) 0xd9}) {

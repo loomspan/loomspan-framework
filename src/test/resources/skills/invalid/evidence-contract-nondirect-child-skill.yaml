@@ -6,4 +6,4 @@ allowed_skills:
 output_schema:
   type: object
   properties:
-    likelyCause: { type: string, evidence: default-checkDns }
+    likelyCause: { type: string, x-loomspan-evidence: default-checkDns }

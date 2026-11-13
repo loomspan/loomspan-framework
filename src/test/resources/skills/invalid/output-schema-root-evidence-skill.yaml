@@ -5,6 +5,6 @@ allowed_skills:
   - name: default-reviewSkill
 output_schema:
   type: object
-  evidence: default-reviewSkill
+  x-loomspan-evidence: default-reviewSkill
   properties:
     result: { type: string }
