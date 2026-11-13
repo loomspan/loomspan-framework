@@ -53,7 +53,7 @@ public final class StandardSchemaCompiler {
             throw failure(path, "boolean schemas are unsupported at this location");
         }
         if (!node.isObject()) throw failure(path, "schema must be an object");
-        if (node.isEmpty()) {
+        if (node.isEmpty() || (node.size() == 1 && node.has("description") && node.get("description").isString())) {
             if (role == Role.INPUT && !path.isEmpty()) return;
             throw failure(path, "shape-free schemas are supported only at nested input locations");
         }

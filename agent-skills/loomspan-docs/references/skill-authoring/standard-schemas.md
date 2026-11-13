@@ -14,9 +14,9 @@ shared compiler also validates internally generated planning contracts under the
 PLANNING role. These declarations use the supported subset of JSON Schema Draft
 2020-12 described here; arbitrary Draft 2020-12 schemas are not accepted.
 
-The declaration compiler and JSON-bound skill decoder have focused executable
-coverage. The current source checkout has incomplete consumer integration:
-reflected Java generation, input dispatch, attachment materialization, binding
+The declaration compiler, JSON-bound skill decoder and generated Java contracts
+have focused executable coverage. The current source checkout has incomplete consumer integration:
+input dispatch, attachment materialization, binding
 projection, output correction, planning and TypeSafe/evidence metadata consumers
 do not all accept the canonical representation yet. The complete application
 build and runtime paths are unavailable while those consumers are inconsistent.
@@ -49,7 +49,7 @@ optional root `$schema` MUST be exactly
 | `minimum`, `maximum` | Inclusive numeric bounds |
 | `minLength`, `maxLength` | Nonnegative integer string-length bounds |
 | `minItems`, `maxItems` | Nonnegative integer array-length bounds |
-| Nested `{}` | Unconstrained JSON value in INPUT only, including typed input map values |
+| Nested `{}` or description-only object | Unconstrained JSON value in INPUT only, including typed input map values; descriptions remain unchanged |
 
 Types and keyword values are case-sensitive. A plain `null` type and general
 unions are unsupported. Authored boolean schemas are unsupported. Internally

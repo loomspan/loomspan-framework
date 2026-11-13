@@ -4,8 +4,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import ai.loomspan.api.SkillMethod;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
-import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
-import ai.loomspan.internal.runtime.input.SkillInputSchemaNode;
+import ai.loomspan.internal.schema.StandardSchemaCompiler;
 import org.junit.jupiter.api.Test;
 import ai.loomspan.api.SkillParam;
 import org.springframework.core.io.ByteArrayResource;
@@ -29,7 +28,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void preservesExactStringResult() {
-        var registry = new TestCapabilityRegistry();
+        var registry = new DeclarationRegistry();
         var processor = processor(registry);
         process(processor, new ExactTextBean(), "exactText");
         assertThat(registry.getCapability("default-exactText").invoker().invoke(Map.of()))
@@ -43,7 +42,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void registersAnnotatedMethodAsCallableSkill() {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new RegistrationBean(), "registrationBean");
@@ -58,7 +57,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void registersDifferentlyNamedAnnotatedMethodsOnOneBean() {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new MultipleMethodsBean(), "multipleMethodsBean");
@@ -76,7 +75,7 @@ class SkillMethodBeanPostProcessorTest {
             context.register(InheritedSecurity.class);
             context.registerBean(SecuredSubclass.class);
             context.refresh();
-            var registry = new TestCapabilityRegistry();
+            var registry = new DeclarationRegistry();
             process(processor(registry), context.getBean(SecuredSubclass.class), "securedSubclass");
             // Spring searches the inherited method's declaring class, not a subclass that does not override it.
             assertThat(registry.getCapability("default-inherited").accessPolicy())
@@ -102,7 +101,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void rejectsDefaultNamedOverloads() {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
@@ -116,7 +115,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void invokesCapabilityUsingEnvelopeMap() throws JacksonException {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new InvocationBean(), "invocationBean");
@@ -135,7 +134,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void handlesMissingOptionalParameterWithoutCrashing() throws JacksonException {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new OptionalInvocationBean(), "optionalInvocationBean");
@@ -153,7 +152,7 @@ class SkillMethodBeanPostProcessorTest {
     @Test
     void publishesDescriptionsAndBindsUnconstrainedReflectedInputs() throws JacksonException
     {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
         process(processor, new UnconstrainedInvocationBean(), "unconstrainedInvocationBean");
 
@@ -168,9 +167,9 @@ class SkillMethodBeanPostProcessorTest {
                 .isEqualTo("Any JSON-compatible value");
         assertThat(schema.path("required").size()).isEqualTo(1);
         assertThat(schema.path("required").get(0).asText()).isEqualTo(optionsName);
-        assertThat(target.inputContract().schema().properties().get(valueName).isUnconstrained()).isTrue();
-        assertThat(target.inputContract().schema().properties().get(optionsName)
-                .items().additionalPropertiesSchema().isUnconstrained()).isTrue();
+        assertThat(target.inputContract().schema().tree().path("properties").path(valueName).has("type")).isFalse();
+        assertThat(target.inputContract().schema().tree().path("properties").path(optionsName)
+                .path("items").path("additionalProperties").isEmpty()).isTrue();
 
         Map<String, Object> arguments = Map.of(
                 valueName, List.of("alpha", 2, true),
@@ -184,7 +183,7 @@ class SkillMethodBeanPostProcessorTest {
     @Test
     void rejectsOptionalPrimitiveParameterDuringSkillDiscovery()
     {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
@@ -201,7 +200,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void propagatesBusinessWrapperAndItsDiagnosticCause() {
-        var registry = new TestCapabilityRegistry();
+        var registry = new DeclarationRegistry();
         var processor = processor(registry);
         process(processor, new ThrowingInvocationBean(), "throwingInvocationBean");
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
@@ -212,7 +211,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void readsResourceBackedRefsIntoStringParameters() throws JacksonException {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new RefStringInvocationBean(), "refStringInvocationBean");
@@ -230,7 +229,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void readsResourceBackedRefsIntoByteArrayParameters() throws JacksonException {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new RefBytesInvocationBean(), "refBytesInvocationBean");
@@ -248,7 +247,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void closesEagerConversionStreamsWhenReadingFails() {
-        var registry = new TestCapabilityRegistry();
+        var registry = new DeclarationRegistry();
         var processor = processor(registry);
         process(processor, new RefStringInvocationBean(), "textBean");
         process(processor, new RefBytesInvocationBean(), "bytesBean");
@@ -304,7 +303,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void passesResourceBackedRefsThroughResourceAndInputStreamParameters() throws JacksonException {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new RefResourceInvocationBean(), "refResourceInvocationBean");
@@ -328,7 +327,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void publishesRefFriendlyInputSchemasForRefCapableParameters() throws JacksonException {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new RefBytesInvocationBean(), "refBytesInvocationBean");
@@ -348,7 +347,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void materializesNestedResourceLeavesInsideTypedRecordParameters() throws JacksonException {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new NestedRecordInvocationBean(), "nestedRecordInvocationBean");
@@ -371,7 +370,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void materializesResourceLeavesInsideTypedCollectionParameters() throws JacksonException {
-        TestCapabilityRegistry registry = new TestCapabilityRegistry();
+        DeclarationRegistry registry = new DeclarationRegistry();
         SkillMethodBeanPostProcessor processor = processor(registry);
 
         process(processor, new TypedCollectionInvocationBean(), "typedCollectionInvocationBean");
@@ -390,7 +389,7 @@ class SkillMethodBeanPostProcessorTest {
 
     @Test
     void preservesObjectValuedAdditionalPropertiesWhenResolvingInputContracts() {
-        SkillInputContract contract = new SkillInputContractResolver().resolveFromToolSchema("""
+        SkillInputContract contract = authoredContract("""
                 {
                   "type": "object",
                   "properties": {
@@ -406,14 +405,14 @@ class SkillMethodBeanPostProcessorTest {
                 }
                 """);
 
-        assertThat(contract.schema().properties().get("payload").additionalPropertiesSchema()).isNotNull();
-        assertThat(contract.schema().properties().get("payload").additionalPropertiesSchema().type()).isEqualTo("string");
+        assertThat(contract.schema().tree().path("properties").path("payload").get("additionalProperties")).isNotNull();
+        assertThat(contract.schema().tree().path("properties").path("payload").get("additionalProperties").path("type").asText()).isEqualTo("string");
         assertThat(contract.isGeneric()).isFalse();
     }
 
     @Test
     void treatsStrictEmptyObjectSchemaAsConcreteContract() {
-        SkillInputContract contract = new SkillInputContractResolver().resolveFromToolSchema("""
+        SkillInputContract contract = authoredContract("""
                 {
                   "type": "object",
                   "additionalProperties": false
@@ -421,11 +420,11 @@ class SkillMethodBeanPostProcessorTest {
                 """);
 
         assertThat(contract.isGeneric()).isFalse();
-        assertThat(contract.schema().allowsAdditionalProperties()).isFalse();
+        assertThat(contract.schema().tree().path("additionalProperties").asBoolean()).isFalse();
     }
 
     @Test void registersDistinctNamespacesAndCanonicalDuplicates() {
-        var registry = new TestCapabilityRegistry(); var processor=processor(registry);
+        var registry = new DeclarationRegistry(); var processor=processor(registry);
         process(processor,new NamespacedBean(),"namespaced");
         assertThat(registry.getAllCapabilities()).extracting(CapabilityMetadata::name).containsExactlyInAnyOrder("tax-search","orders-search","tax-Search");
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> process(processor,new DuplicateNamespaceBean(),"duplicate"))
@@ -440,7 +439,7 @@ class SkillMethodBeanPostProcessorTest {
         @SkillMethod(namespace="TAX", name="search", description="duplicate") String search() { throw new AssertionError(); }
     }
     @Test void enforcesIndependentJavaNamespaceAndCombinedLimits() {
-        var registry=new TestCapabilityRegistry(); var processor=processor(registry);
+        var registry=new DeclarationRegistry(); var processor=processor(registry);
         process(processor,new JavaLimitAccepted(),"accepted");
         assertThat(registry.getAllCapabilities().getFirst().name()).hasSize(64);
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> process(processor,new JavaNamespaceOversized(),"badNamespace"))
@@ -458,7 +457,21 @@ class SkillMethodBeanPostProcessorTest {
         @SkillMethod(namespace="nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn", name="ssssssssssssssssssssssssssssssss", description="rejected") String bad() { throw new AssertionError(); }
     }
 
-    private SkillMethodBeanPostProcessor processor(TestCapabilityRegistry registry) {
+    // Read the real producer directly; no catalog/runtime replacement is used by these declaration tests.
+    private static final class DeclarationRegistry {
+        private SkillMethodBeanPostProcessor processor;
+        void bind(SkillMethodBeanPostProcessor value) { processor = value; }
+        List<CapabilityMetadata> getAllCapabilities() { return processor.capabilities(); }
+        CapabilityMetadata getCapability(String name) {
+            return processor.capabilities().stream().filter(capability -> capability.name().equals(name)).findFirst().orElse(null);
+        }
+    }
+    private SkillInputContract authoredContract(String schema) {
+        return new SkillInputContract(SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
+                new StandardSchemaCompiler().compile(schema, StandardSchemaCompiler.Role.INPUT, StandardSchemaCompiler.Origin.AUTHORED));
+    }
+
+    private SkillMethodBeanPostProcessor processor(DeclarationRegistry registry) {
         SkillMethodBeanPostProcessor processor = new SkillMethodBeanPostProcessor();
         registry.bind(processor);
         processor.setBeanFactory(beanFactory);

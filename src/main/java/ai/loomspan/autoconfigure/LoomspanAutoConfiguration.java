@@ -82,13 +82,11 @@ public class LoomspanAutoConfiguration
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     static SkillMethodBeanPostProcessor skillMethodBeanPostProcessor(
-            LoomspanJacksonCodecs codecs,
-            SkillInputContractResolver skillInputContractResolver)
+            LoomspanJacksonCodecs codecs)
     {
         return SkillMethodBeanPostProcessor.create(
                 codecs.applicationConversion(),
-                codecs.schemaTree(),
-                skillInputContractResolver);
+                codecs.schemaTree());
     }
 
     @Bean

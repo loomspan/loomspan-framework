@@ -1,18 +1,15 @@
 package ai.loomspan.internal.core;
 
 import ai.loomspan.api.SkillKind;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.JavaType;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.introspect.BeanPropertyDefinition;
 import ai.loomspan.api.SkillMethod;
 import ai.loomspan.api.SkillExecutor;
 import ai.loomspan.api.SkillExecutorInvocation;
 import ai.loomspan.api.SkillParam;
-import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
+import ai.loomspan.internal.runtime.input.SkillInputContract;
+import ai.loomspan.internal.schema.CanonicalSchema;
 import ai.loomspan.internal.serialization.LoomspanMethodInputSchemaGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +47,6 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
     private final Map<String, SkillExecutorRegistration> executorsByName = new LinkedHashMap<>();
     private final ObjectMapper objectMapper;
     private final JavaSkillInvoker javaInvoker;
-    private final SkillInputContractResolver inputContractResolver;
     private final LoomspanMethodInputSchemaGenerator schemaGenerator;
     private final Set<String> processedBeanNames = ConcurrentHashMap.newKeySet();
     private BeanFactory beanFactory;
@@ -117,22 +113,20 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
     public SkillMethodBeanPostProcessor()
     {
         this(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion(),
-                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree(), new SkillInputContractResolver());
+                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree());
     }
 
     public static SkillMethodBeanPostProcessor create(ObjectMapper applicationMapper,
-            ObjectMapper schemaMapper, SkillInputContractResolver inputContractResolver)
+            ObjectMapper schemaMapper)
     {
-        return new SkillMethodBeanPostProcessor(applicationMapper, schemaMapper, inputContractResolver);
+        return new SkillMethodBeanPostProcessor(applicationMapper, schemaMapper);
     }
 
-    private SkillMethodBeanPostProcessor(ObjectMapper objectMapper, ObjectMapper schemaMapper,
-            SkillInputContractResolver inputContractResolver)
+    private SkillMethodBeanPostProcessor(ObjectMapper objectMapper, ObjectMapper schemaMapper)
     {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.javaInvoker = new JavaSkillInvoker(objectMapper);
-        this.inputContractResolver = Objects.requireNonNull(inputContractResolver, "inputContractResolver must not be null");
-        this.schemaGenerator = new LoomspanMethodInputSchemaGenerator(
+        this.schemaGenerator = new LoomspanMethodInputSchemaGenerator(objectMapper,
                 Objects.requireNonNull(schemaMapper, "schemaMapper must not be null"));
     }
 
@@ -218,17 +212,19 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
     {
         validateSkillParameters(beanName, method, contractMethod);
         String capabilityDescription = annotation.description().isBlank() ? method.getName() : annotation.description();
-        String inputSchema = buildInputSchema(method, contractMethod);
+        List<JavaType> parameterTypes = schemaGenerator.parameterTypes(method, targetClass);
+        CanonicalSchema schema = schemaGenerator.generate(method, contractMethod, parameterTypes);
+        String inputSchema = schema.tree().toString();
         String location = beanName + "#" + method.toGenericString();
         SkillIdentity identity = identity(beanName, method, annotation.namespace(), annotation.name(), "SkillMethod");
         String name = identity.toString();
-        CapabilityInvoker invoker = arguments -> invokeSkillMethod(beanName, method, contractMethod, name, arguments);
+        CapabilityInvoker invoker = arguments -> invokeSkillMethod(beanName, method, contractMethod, parameterTypes, name, arguments);
         var policy = new ai.loomspan.internal.security.SkillAccessPolicyResolver()
                 .resolve(method, targetClass);
         CapabilityMetadata metadata = new CapabilityMetadata(location, identity, capabilityDescription,
                 SkillExecutionDescriptor.none(), policy, invoker, SkillKind.JAVA,
                 new CapabilityToolDescriptor(name, capabilityDescription, inputSchema, null),
-                inputContractResolver.resolveJavaCapability(inputSchema),
+                new SkillInputContract(SkillInputContract.SkillInputContractKind.JAVA_REFLECTED, schema),
                 new SkillSource(null, beanName, method.toGenericString(), null));
         CapabilityMetadata existing = capabilitiesByName.putIfAbsent(name, metadata);
         if (existing != null)
@@ -330,158 +326,10 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
                 .anyMatch(parameter -> parameter.isAnnotationPresent(SkillParam.class));
     }
 
-    private String buildInputSchema(Method method, Method contractMethod)
-    {
-        try
-        {
-            JsonNode schema = schemaGenerator.generate(method);
-            JsonNode propertiesNode = schema.path("properties");
-            if (propertiesNode instanceof ObjectNode propertiesObject)
-            {
-                Parameter[] parameters = method.getParameters();
-                Parameter[] contractParameters = contractMethod.getParameters();
-                for (int index = 0; index < parameters.length; index++)
-                {
-                    Parameter parameter = parameters[index];
-                    Parameter contractParameter = contractParameters[index];
-                    String schemaName = contractParameter.getName();
-                    JsonNode parameterSchema = propertiesObject.remove(parameter.getName());
-                    if (parameterSchema != null)
-                    {
-                        propertiesObject.set(schemaName, parameterSchema);
-                        applyContractParameterMetadata((ObjectNode) schema, parameterSchema,
-                                parameter.getName(), schemaName, contractParameter, parameter);
-                        applyRuntimeInputSemantics(parameterSchema, objectMapper.constructType(parameter.getParameterizedType()));
-                    }
-                }
-            }
-            return objectMapper.writeValueAsString(schema);
-        }
-        catch (JacksonException ex)
-        {
-            throw new IllegalStateException("Failed to build method input schema for " + method, ex);
-        }
-    }
-
-    private void applyContractParameterMetadata(ObjectNode rootSchema,
-            JsonNode parameterSchema,
-            String implementationParameterName,
-            String parameterName,
-            Parameter contractParameter,
-            Parameter implementationParameter)
-    {
-        SkillParam skillParam = contractParameter.getAnnotation(SkillParam.class);
-        if (skillParam == null)
-        {
-            skillParam = implementationParameter.getAnnotation(SkillParam.class);
-        }
-        if (skillParam != null
-                && parameterSchema instanceof ObjectNode objectSchema
-                && !skillParam.description().isBlank())
-        {
-            objectSchema.put("description", skillParam.description());
-        }
-
-        ArrayNode required = rootSchema.withArray("required");
-        boolean generatedRequired = false;
-        for (int index = required.size() - 1; index >= 0; index--)
-        {
-            String requiredName = required.get(index).asText();
-            if (parameterName.equals(requiredName) || implementationParameterName.equals(requiredName))
-            {
-                generatedRequired = true;
-                required.remove(index);
-            }
-        }
-        if (skillParam == null ? generatedRequired : skillParam.required())
-        {
-            required.add(parameterName);
-        }
-    }
-
-    private void applyRuntimeInputSemantics(JsonNode schemaNode, JavaType targetType)
-    {
-        if (!(schemaNode instanceof ObjectNode objectSchema) || targetType == null)
-        {
-            return;
-        }
-
-        Class<?> rawClass = targetType.getRawClass();
-        if (isRefCapableBindableType(rawClass))
-        {
-            rewriteAsRefFriendlyString(objectSchema, rawClass);
-            return;
-        }
-
-        if (targetType.isCollectionLikeType() || rawClass.isArray())
-        {
-            JsonNode itemsNode = objectSchema.get("items");
-            if (itemsNode != null)
-            {
-                applyRuntimeInputSemantics(itemsNode, targetType.getContentType());
-            }
-            return;
-        }
-
-        if (targetType.isMapLikeType())
-        {
-            JsonNode additionalPropertiesNode = objectSchema.get("additionalProperties");
-            if (additionalPropertiesNode != null && additionalPropertiesNode.isObject())
-            {
-                applyRuntimeInputSemantics(additionalPropertiesNode, targetType.getContentType());
-            }
-            return;
-        }
-
-        if (isSimpleBindableType(rawClass))
-        {
-            return;
-        }
-
-        JsonNode propertiesNode = objectSchema.get("properties");
-        if (!(propertiesNode instanceof ObjectNode propertiesObject))
-        {
-            return;
-        }
-
-        propertyTypes(targetType).forEach((propertyName, propertyType) ->
-        {
-            JsonNode propertySchema = propertiesObject.get(propertyName);
-            if (propertySchema != null)
-            {
-                applyRuntimeInputSemantics(propertySchema, propertyType);
-            }
-        });
-    }
-
-    private void rewriteAsRefFriendlyString(ObjectNode schemaNode, Class<?> rawClass)
-    {
-        schemaNode.removeAll();
-        schemaNode.put("type", "string");
-        schemaNode.put("description", refFriendlyDescription(rawClass));
-        schemaNode.put("x-loomspan-runtime-ref-capable", true);
-    }
-
-    private String refFriendlyDescription(Class<?> rawClass)
-    {
-        if (byte[].class.equals(rawClass))
-        {
-            return "Provide a ref:// URI for binary content or an inline string value when appropriate.";
-        }
-        if (Resource.class.isAssignableFrom(rawClass))
-        {
-            return "Provide a ref:// URI for the resource content.";
-        }
-        if (InputStream.class.isAssignableFrom(rawClass))
-        {
-            return "Provide a ref:// URI for the stream content.";
-        }
-        return "Provide the value inline or as a ref:// URI.";
-    }
-
     private Object invokeSkillMethod(String beanName,
             Method method,
             Method contractMethod,
+            List<JavaType> parameterTypes,
             String skillName,
             Map<String, Object> arguments)
     {
@@ -490,7 +338,7 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
 
         try
         {
-            Object[] invocationArguments = bindArguments(method, contractMethod, safeArguments, openedStreams);
+            Object[] invocationArguments = bindArguments(method, contractMethod, parameterTypes, safeArguments, openedStreams);
             return javaInvoker.invoke(beanFactory, beanName, method, contractMethod, skillName, invocationArguments);
         }
         finally
@@ -501,6 +349,7 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
 
     private Object[] bindArguments(Method method,
             Method contractMethod,
+            List<JavaType> parameterTypes,
             Map<String, Object> arguments,
             List<InputStream> openedStreams)
     {
@@ -523,19 +372,18 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
                 bound[index] = null;
                 continue;
             }
-            bound[index] = convertArgument(parameter, rawValue, openedStreams);
+            bound[index] = convertArgument(parameter, parameterTypes.get(index), rawValue, openedStreams);
         }
         return bound;
     }
 
-    private Object convertArgument(Parameter parameter, Object rawValue, List<InputStream> openedStreams)
+    private Object convertArgument(Parameter parameter, JavaType parameterJavaType, Object rawValue, List<InputStream> openedStreams)
     {
         if (rawValue == null)
         {
             return null;
         }
 
-        JavaType parameterJavaType = objectMapper.constructType(parameter.getParameterizedType());
         Class<?> parameterType = parameterJavaType.getRawClass();
 
         if (Resource.class.isAssignableFrom(parameterType))
@@ -564,7 +412,51 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
         }
 
         Object materializedValue = materializeValue(rawValue, parameterJavaType, openedStreams);
-        return objectMapper.convertValue(materializedValue, parameterJavaType);
+        return bindMaterializedContainer(materializedValue, parameterJavaType);
+    }
+
+    private Object bindMaterializedContainer(Object value, JavaType type)
+    {
+        if (value == null) return null;
+        // Only runtime-handle containers need this path. Ordinary DTO/scalar conversion
+        // remains owned by the application mapper, including its conversion failures.
+        if (!containsRuntimeLeaf(type)) return objectMapper.convertValue(value, type);
+        Class<?> raw = type.getRawClass();
+        if (LoomspanMethodInputSchemaGenerator.isRuntimeLeaf(raw))
+        {
+            if (!raw.isInstance(value)) return objectMapper.convertValue(value, type);
+            return value;
+        }
+        JavaType childType = type.getContentType();
+        if (type.isArrayType() && value instanceof List<?> items)
+        {
+            Object array = java.lang.reflect.Array.newInstance(childType.getRawClass(), items.size());
+            for (int i = 0; i < items.size(); i++)
+                java.lang.reflect.Array.set(array, i, bindMaterializedContainer(items.get(i), childType));
+            return array;
+        }
+        if (type.isCollectionLikeType() && value instanceof java.util.Collection<?> items
+                && java.util.Collection.class.isAssignableFrom(raw))
+        {
+            @SuppressWarnings("unchecked")
+            java.util.Collection<Object> result = (java.util.Collection<Object>) objectMapper.convertValue(List.of(), type);
+            for (Object item : items) result.add(bindMaterializedContainer(item, childType));
+            return result;
+        }
+        if (type.isMapLikeType() && value instanceof Map<?, ?> values)
+        {
+            @SuppressWarnings("unchecked")
+            Map<Object,Object> result = (Map<Object,Object>) objectMapper.convertValue(Map.of(), type);
+            values.forEach((key, item) -> result.put(key, bindMaterializedContainer(item, childType)));
+            return result;
+        }
+        return objectMapper.convertValue(value, type);
+    }
+
+    private boolean containsRuntimeLeaf(JavaType type)
+    {
+        if (LoomspanMethodInputSchemaGenerator.isRuntimeLeaf(type.getRawClass())) return true;
+        return type.isContainerType() && type.getContentType() != null && containsRuntimeLeaf(type.getContentType());
     }
 
     private Object materializeValue(Object rawValue, JavaType targetType, List<InputStream> openedStreams)
@@ -657,13 +549,6 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
                 || Boolean.class.equals(rawClass)
                 || Enum.class.isAssignableFrom(rawClass)
                 || Object.class.equals(rawClass);
-    }
-
-    private boolean isRefCapableBindableType(Class<?> rawClass)
-    {
-        return byte[].class.equals(rawClass)
-                || Resource.class.isAssignableFrom(rawClass)
-                || InputStream.class.isAssignableFrom(rawClass);
     }
 
     private Resource convertToResource(Parameter parameter, Object rawValue)

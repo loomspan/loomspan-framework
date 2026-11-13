@@ -1,12 +1,12 @@
 package ai.loomspan.internal.runtime.input;
 
-import java.util.List;
-import java.util.Map;
+import ai.loomspan.internal.schema.CanonicalSchema;
+import ai.loomspan.internal.schema.StandardSchemaCompiler;
 import java.util.Objects;
 
 public record SkillInputContract(
         SkillInputContractKind kind,
-        SkillInputSchemaNode schema)
+        CanonicalSchema schema)
 {
     public SkillInputContract
     {
@@ -18,7 +18,8 @@ public record SkillInputContract(
     {
         return new SkillInputContract(
                 SkillInputContractKind.GENERIC,
-                new SkillInputSchemaNode("object", Map.of(), List.of(), Boolean.TRUE, null, null, List.of(), null, null, false, true));
+                new StandardSchemaCompiler().compile("{\"type\":\"object\",\"additionalProperties\":true}",
+                        StandardSchemaCompiler.Role.INPUT, StandardSchemaCompiler.Origin.GENERATED));
     }
 
     public boolean isGeneric()
@@ -28,7 +29,7 @@ public record SkillInputContract(
 
     public boolean allowsEmptyInput()
     {
-        return schema.required().isEmpty();
+        return schema.tree().path("required").isEmpty();
     }
 
     public enum SkillInputContractKind

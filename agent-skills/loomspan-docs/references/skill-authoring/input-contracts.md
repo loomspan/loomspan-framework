@@ -2,20 +2,20 @@
 audience: loomspan-skill-builder
 status: development
 applies_to: bundled-loomspan-revision
-coverage: initial-source-verified
+coverage: canonical-java-declarations
 ---
 
 # Reflected Java Input Contracts
 
 ## Applicability
 
-For authored YAML schemas, read [standard schemas](standard-schemas.md), including
-its current integration boundary. The shared compiler's accepted declarations do
-not establish that reflected Java generation or runtime conversion already uses
-those semantics. Reflected generation, reduced input resolution and dispatch
-remain inconsistent with canonical schemas, so the current application checkout
-cannot execute the complete path. The reflected behavior and retained test
-anchors below require that integration before they are executable guarantees.
+For authored YAML schemas, read [standard schemas](standard-schemas.md). Java
+registration generates and compiles canonical input schemas using that same
+compiler. Registration, JSON-bound validation and registered Java binding have
+focused executable coverage. Input dispatch, runtime-value validation, reference
+resolution and planner consumers remain inconsistent with canonical contracts;
+the complete application build and public invocation path are unavailable. Direct
+binding tests do not establish runtime ingress or provider acceptance.
 
 Use this topic for an annotation-defined Java skill. Loomspan reflects its Java signature and `@SkillParam` metadata as the provider-facing schema, planner guidance, and root/child runtime validation contract. There is no companion YAML or input-contract inheritance layer.
 
@@ -27,24 +27,59 @@ This topic covers reflected Java contracts; [standard schemas](standard-schemas.
 
 | Java declaration | Enforced reflected meaning | Authoring decision |
 | --- | --- | --- |
-| `Object` | Any JSON-compatible value: JSON null where existing optionality permits it, string, boolean, number, object, or array | Use only when the value is deliberately shape-free |
+| `Object` | Any JSON-compatible value, including null, string, boolean, finite number, object, or array | Use only when the value is deliberately shape-free |
 | `Map<String, Object>` | A JSON object with arbitrary string keys whose values may be any JSON-compatible value | Use for genuinely open metadata or heterogeneous dictionaries |
 | `Map<String, T>` | A JSON object whose every entry value follows the reflected contract for `T` | Use when keys are open but values have one stable type |
 | Record or DTO | A closed JSON object with reflected named properties | SHOULD be the default when planners need discoverable field names and types |
 | Array or `List<T>` | A JSON array whose items follow the reflected contract for `T` | Choose `T` to communicate the real item shape |
-| Recursive DTO | A bounded object-shaped schema; cycle protection does not turn the recursive leaf into arbitrary JSON | Use only when the recursive domain shape is intentional |
+| UUID | String without an added format assertion; malformed text can still fail Java conversion | Supply a valid UUID string |
+| Enum | String choices use Java constant names, honoring effective `JsonProperty` names | Use exactly an advertised choice |
+| Recursive DTO | Registration rejects direct, mutual, collection-item and map-value cycles | Use an acyclic exposed input declaration |
+| Resource, InputStream or byte[] | Marked string schema recognized before bean traversal | Use the existing runtime-reference path; direct handles require its runtime adapter |
 
-`@SkillParam(required = false)` controls omission at the method-parameter boundary. It does not make a typed value accept JSON null generally. Optional primitive parameters are invalid because omission binds `null`; use the boxed type. This change does not alter those requiredness rules.
+`@SkillParam(required = false)` controls omission at the method-parameter boundary. It does not make a typed value accept JSON null generally. Optional primitive parameters are invalid because omission binds `null`; use the boxed type. A required unconstrained Object parameter must be present but may be null; optional omission stays absent in the input contract. Required controls presence, not a non-null constraint.
 
 ## Enforced Semantics
 
-- Java `Object` is emitted as the JSON Schema empty schema `{}` at that value node. Loomspan preserves this unconstrained meaning through internal resolution and provider publication; it does not rewrite it to `type: object`.
-- Unconstrained values preserve scalar kinds and recursively normalize maps and lists into immutable containers. Non-JSON application objects, non-string map keys, and non-finite floating-point values are rejected with path-qualified validation issues.
+- Java `Object` is emitted as the JSON Schema empty schema `{}` at that value node. The canonical contract retains this meaning and any description; it does not rewrite it to `type: object`.
+- Unconstrained leaves declare JSON values, not arbitrary Java objects. Runtime ingress must reject non-JSON objects, non-string map keys and non-finite numbers before conversion; the complete ingress path is currently unavailable. JSON-bound canonical validation does not perform Java runtime-handle adaptation.
 - `Map<String, Object>` does not infer keys, property names, or domain constraints. Scalars, nested objects, arrays, and JSON null values may appear under its string keys.
-- Typed maps remain typed. Existing string, integer, number, boolean, enum, DTO, required-field, coercion, and closed-object rules apply to each entry value.
+- Typed maps remain typed. String, integer, number, boolean, enum, DTO, required-field and closed-object constraints apply to every entry value. Numeric strings do not satisfy integer schemas; validation does not coerce values.
 - Planner examples and verbose rules label unconstrained leaves as `any JSON value`. An open generic map is not a no-argument tool.
 - Root invocation and receiving validation use the same reflected contract. A planning parent with [declared input bindings](input-bindings.md) publishes a separate projected argument contract for that child call. Java does not declare a YAML `input_schema`.
 - A root captures its complete skill generation before object conversion and input validation. That captured contract remains authoritative for the admitted invocation and all descendants; a later generation affects only later roots.
+
+## Java declaration and binding fidelity
+
+- Property names come from the application binding mapper, including naming
+  strategies, explicit property names and mixins. The dedicated schema mapper
+  handles schema JSON. Supply exactly the published names, including nested names.
+- Inherited method parameters and DTO members use their resolved generic types.
+  Finite nesting such as `Box<Box<String>>` and repeated DTOs in independent
+  branches remain valid. Recursive exposed declarations reject at registration
+  with method, input path and type-cycle diagnostics; no open-object fallback is
+  published. Recursive state inside an executor implementation is not inspected.
+- Map declarations permit String keys and raw/Object keys accepting JSON string
+  names. Resolved numeric, enum and custom key types reject at registration,
+  including nested and inherited generic locations. Custom key deserializers do
+  not make those declarations supported. Arbitrary application key-transforming
+  customization is not modeled as a schema feature.
+- Effective enabled `JsonUnwrapped` rejects at registration, including field,
+  getter, mixin, prefix/suffix and nested/container declarations. Disabled
+  annotations preserve ordinary nested binding.
+- Interface contract parameter names, descriptions and requiredness are selected
+  by parameter position, even when implementation names overlap or are swapped.
+- Resource, InputStream and byte[] leaves retain internal
+  `x-loomspan-runtime-ref-capable` metadata at direct, property, item and map-value
+  locations. A nonblank `SkillParam.description` is retained exactly; absent or
+  blank text uses the existing reference guidance. Provider schema copies remove
+  the marker at actual schema nodes while preserving data properties with the
+  same name, descriptions and standard constraints.
+- Binding a supported Resource-valued list, map or array retains assignable
+  Resource handles without serializing their internals or reading their content.
+  Converting a Resource to text/bytes still reads it; managed streams retain
+  success/failure cleanup. Actual reference resolution and runtime-handle
+  validation require the unavailable runtime integration described above.
 
 Minimal Java skill:
 
@@ -57,7 +92,7 @@ Map<String, Object> rank(
 }
 ```
 
-The exact callable name is `rankTransportOptions`; use it in `SkillTemplate` or a YAML parent's `allowed_skills`. No YAML wrapper is required or accepted.
+The exact callable name is `default-rankTransportOptions`; use it in `SkillTemplate` or a YAML parent's `allowed_skills`. No YAML wrapper is required or accepted.
 
 ## Generated Input Guidance
 
@@ -138,9 +173,18 @@ Use a typed map when arbitrary keys are part of the domain but all values share 
 
 ## Executable Evidence and Implementation Anchors
 
-- `LoomspanMethodInputSchemaGeneratorTest` (`src/test/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGeneratorTest.java`) protects direct `Object`, generic-map transport payloads, typed maps, and recursive DTO generation.
-- `SkillInputContractResolverTest` (`src/test/java/ai/loomspan/internal/runtime/input/SkillInputContractResolverTest.java`) protects empty-schema parsing/serialization and the distinction between unconstrained, generic top-level, and strict empty-object contracts.
-- `SkillInputValidatorTest` (`src/test/java/ai/loomspan/internal/runtime/input/SkillInputValidatorTest.java`) protects JSON-kind preservation, immutable recursive normalization, and visible rejection of unsupported values and schema kinds.
-- `StepPromptBuilderTest` (`src/test/java/ai/loomspan/internal/runtime/step/StepPromptBuilderTest.java`) and `StepActionValidatorTest` (`src/test/java/ai/loomspan/internal/runtime/step/StepActionValidatorTest.java`) protect planner guidance and pre-side-effect validation.
-- `SkillGenerationManagerTest` (`src/test/java/ai/loomspan/internal/skill/SkillGenerationManagerTest.java`) protects complete immutable generation assembly and fixed Java declarations.
-- `LoomspanMethodInputSchemaGenerator` (`src/main/java/ai/loomspan/internal/serialization/LoomspanMethodInputSchemaGenerator.java`), `SkillInputContractResolver` (`src/main/java/ai/loomspan/internal/runtime/input/SkillInputContractResolver.java`), `SkillInputValidator` (`src/main/java/ai/loomspan/internal/runtime/input/SkillInputValidator.java`), and `SkillInputPromptRenderer` (`src/main/java/ai/loomspan/internal/runtime/input/SkillInputPromptRenderer.java`) define the current production path.
+- `LoomspanMethodInputSchemaGeneratorTest` covers canonical Object/map semantics,
+  exact typed-map values and recursive declaration rejection.
+- `JavaInputDeclarationTest` covers actual registration, canonical JSON validation,
+  effective naming/generics, enum/UUID binding, declaration restrictions,
+  descriptions, Resource identity, proxy advice and executor handoff. Runtime
+  handles in these fixtures are direct/already resolved binder inputs.
+- `SkillMethodBeanPostProcessorTest` preserves registration, conversion, failure
+  and stream cleanup controls using the real postprocessor.
+- `StandardSchemaCompilerTest` covers standard presence/null rules, described
+  unconstrained leaves, role restrictions, parent bounds and exact assertions.
+- `LoomspanMethodInputSchemaGenerator`, `SkillMethodBeanPostProcessor` and
+  `CanonicalSchema` own canonical Java declaration publication and binding.
+  Resolver, validator and prompt-renderer integration remains unavailable;
+  retained tests named in the guidance section identify its consumers rather
+  than a green complete runtime path.

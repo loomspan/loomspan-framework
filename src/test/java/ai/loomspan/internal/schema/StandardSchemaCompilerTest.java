@@ -87,4 +87,19 @@ class StandardSchemaCompilerTest {
             assertThrows(DeclarationException.class,()->COMPILER.compile(root("{\"type\":\"array\",\"items\":false}"),role,Origin.GENERATED));
         }
     }
+    @Test void describedUnconstrainedInputLeavesKeepPresenceAndParentConstraints() {
+        for(Origin origin:Origin.values()) {
+            var schema=COMPILER.compile("{\"type\":\"object\",\"properties\":{\"x\":{\"description\":\" exact \"}},\"required\":[\"x\"],\"additionalProperties\":false}",Role.INPUT,origin);
+            for(String value:List.of("null","true","4","\"ref://literal\"","{}","[null,1]")) check(schema,"{\"x\":"+value+"}",true);
+            check(schema,"{}",false);check(schema,"{\"x\":null,\"extra\":1}",false);
+            assertEquals(" exact ",schema.tree().at("/properties/x/description").asText());
+            for(Role role:List.of(Role.OUTPUT,Role.PLANNING)) assertThrows(DeclarationException.class,()->COMPILER.compile(root("{\"description\":\"text\"}"),role,origin));
+            assertThrows(DeclarationException.class,()->COMPILER.compile("{\"description\":\"text\"}",Role.INPUT,origin));
+            assertThrows(DeclarationException.class,()->COMPILER.compile(root("{\"description\":4}"),Role.INPUT,origin));
+            assertThrows(DeclarationException.class,()->COMPILER.compile(root("{\"description\":\"text\",\"default\":null}"),Role.INPUT,origin));
+        }
+        var bounded=compile(root("{\"type\":\"array\",\"minItems\":1,\"maxItems\":2,\"items\":{\"description\":\"anything\"}}"),Role.INPUT);
+        check(bounded,"{\"x\":[]}",false);check(bounded,"{\"x\":[null,true,{}]}",false);check(bounded,"{\"x\":[null]}",true);
+    }
+
 }

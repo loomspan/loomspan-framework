@@ -48,7 +48,7 @@ The example registers `default-invoiceExists`. See the [identity rules](../skill
 
 `@SkillParam` is a runtime parameter annotation with `description() default ""` and `required() default true`. Descriptions SHOULD explain meaning and constraints. Optional parameters MUST use nullable reference types: omission binds null, so an optional primitive fails startup.
 
-The Java signature and parameter metadata supply the input contract for root validation, tool publication, and planner guidance. Read [reflected Java input contracts](../skill-authoring/input-contracts.md) for scalars, Object, generic and typed maps, DTOs, collections, runtime references, and null semantics.
+The Java signature and parameter metadata produce a compiled canonical input contract and tool schema. Generation uses resolved inherited generic types and the application mapper's binding names. Complete root validation and planner integration are currently unavailable while canonical consumers remain inconsistent. Read [reflected Java input contracts](../skill-authoring/input-contracts.md) for scalars, Object, generic and typed maps, DTOs, collections, runtime references, and null semantics.
 
 Successful Java values use one conversion contract for both declaration roles:
 
