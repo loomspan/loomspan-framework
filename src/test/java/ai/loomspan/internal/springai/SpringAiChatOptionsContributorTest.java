@@ -8,8 +8,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
+import com.anthropic.models.messages.OutputConfig;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SpringAiChatOptionsContributorTest
 {
@@ -62,6 +64,29 @@ class SpringAiChatOptionsContributorTest
         assertThat(options.getThinking().asEnabled().budgetTokens()).isEqualTo(expectedBudget);
         assertThat(options.getMaxTokens()).isEqualTo(expectedMaxTokens);
         assertThat(options.getThinking().asEnabled().budgetTokens()).isLessThan(options.getMaxTokens().longValue());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"low, LOW", "medium, MEDIUM", "high, HIGH"})
+    void selectedAnthropicNativeEffortDoesNotInflateGenerationCap(String level, String effort)
+    {
+        AnthropicChatOptions options = (AnthropicChatOptions) contributor.createOptions(configuration(
+                AiDriver.ANTHROPIC, "claude-sonnet-5-5", level)).build();
+        assertThat(options.getMaxTokens()).isEqualTo(AnthropicChatOptions.DEFAULT_MAX_TOKENS);
+        assertThat(options.getThinking().isAdaptive()).isTrue();
+        assertThat(options.getOutputConfig().effort()).contains(OutputConfig.Effort.of(effort.toLowerCase()));
+    }
+
+    @Test
+    void selectedAnthropicThinkingIsOptionalAndUnsupportedLevelsFailLocally()
+    {
+        AnthropicChatOptions options = (AnthropicChatOptions) contributor.createOptions(configuration(
+                AiDriver.ANTHROPIC, "claude-sonnet-5-5", null)).build();
+        assertThat(options.getThinking()).isNull();
+        assertThat(options.getOutputConfig()).isNull();
+        assertThatThrownBy(() -> contributor.createOptions(configuration(
+                AiDriver.ANTHROPIC, "claude-sonnet-5-5", "unsupported")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Unsupported thinking level 'unsupported'");
     }
 
     private EffectiveSkillExecutionConfiguration configuration(AiDriver driver, String model, String thinking)

@@ -1,6 +1,7 @@
 package ai.loomspan.internal.springai;
 
 import ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration;
+import com.anthropic.models.messages.OutputConfig;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
@@ -38,6 +39,18 @@ public final class SpringAiChatOptionsContributor
         AnthropicChatOptions.Builder builder = AnthropicChatOptions.builder().model(configuration.providerModel());
         if (configuration.thinkingLevel() != null)
         {
+            if ("claude-sonnet-5-5".equals(configuration.providerModel()))
+            {
+                OutputConfig.Effort effort = switch (configuration.thinkingLevel())
+                {
+                    case "low" -> OutputConfig.Effort.LOW;
+                    case "medium" -> OutputConfig.Effort.MEDIUM;
+                    case "high" -> OutputConfig.Effort.HIGH;
+                    default -> throw new IllegalArgumentException("Unsupported thinking level '"
+                            + configuration.thinkingLevel() + "'");
+                };
+                return builder.effort(effort).thinkingAdaptive();
+            }
             int thinkingBudget = budget(configuration.thinkingLevel());
             int maxTokens = Math.max(AnthropicChatOptions.DEFAULT_MAX_TOKENS, Math.multiplyExact(thinkingBudget, 2));
             builder.maxTokens(maxTokens).thinkingEnabled(thinkingBudget);

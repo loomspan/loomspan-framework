@@ -277,3 +277,9 @@ defect-reproduction assertion is not a repaired adapter or hosted capability.
 - [Migration roadmap](../phases/spring-ai-responses-migration.md)
 - [Historical schema research](../phases/standard-json-schema-research.md)
 - [TBD-06 reproduction and retained evidence](../../../docs/maintainers/probes/tbd-06/README.md)
+
+## Developer decision — November 13, 2026
+
+After Step 4 reported PR30-B03, the developer authorized completing this iteration with Spring AI 2.1.0-RC2 dependency defects deferred to `ai/thoughts/phases/pr-30-blockers.md`, following the existing PR30-B01/B02 pattern. Skip the PR30-B03 failing correctness case by default while retaining its complete assertions behind `loomspan.pr30.blockers=true`. Record reproduction, scope, exact artifact and closure requirements. This supersedes this ticket's requirement to remain incomplete pending the dependency correction; it does not establish root-schema fidelity or close PR30-B03. Resume Step 4 verification and fresh independent Step 5 review under the approved full profile. The intended later work with Spring AI is a future dependency-fix effort; no external submission is authorized now.
+
+Functionality assessment: deterministic local checks support broad integration operation (1,866 passing cases in the pre-deferral full run), with known limitations in Anthropic tool root schemas, Responses decimal fidelity and required non-ciphertext reasoning replay. No live-provider acceptance was performed. Preserve all other controls and do not generalize skip permission to unrelated failures.

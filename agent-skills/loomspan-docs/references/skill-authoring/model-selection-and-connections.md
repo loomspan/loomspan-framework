@@ -117,6 +117,21 @@ The following thinking rules apply to chat models.
 
 A model alias MAY declare `thinking-levels`. A skill's `thinking_level` MUST be one of those configured values. If the alias has no configured levels, the skill MUST omit `thinking_level`. Thinking options are adapted to the selected driver at request time; the connection remains reusable across model aliases.
 
+For the exact Anthropic provider model `claude-sonnet-5-5`, `low`, `medium`
+and `high` select native output effort and adaptive thinking. No explicit thinking
+budget is sent and the generation cap is unchanged. Omitted thinking remains
+omitted. Other Anthropic model IDs retain the existing explicit-budget mapping:
+low 1024/4096, medium 4096/8192, high 8192/16384 (thinking budget/max tokens).
+This exact-model mapping does not infer support for other model IDs or establish
+hosted availability. Unsupported levels fail locally.
+
+Known Anthropic adapter limitation in the pinned Spring AI `2.1.0-RC2`:
+ordinary tool schemas lose root entries such as `additionalProperties`, although
+nested constraints and typed-map schemas survive. Full tool-schema fidelity is
+unresolved. Native raw output configuration can preserve format schemas and
+existing effort when copied; this adapter evidence does not establish ordinary
+mission or planner native-output orchestration.
+
 ## Configuration and diagnosis
 
 1. Create a named entry under `loomspan.connections` for each endpoint/account.
@@ -141,7 +156,9 @@ For chat drivers, the identical bounded guidance is recorded on every failed phy
 - Responses acceptance and adapter limits: `SharedResponsesProtocolIntegrationTest` and
   `SpringAiProviderIntegrationTest`; exact schema/reasoning failures remain explicit.
 - Request options and tool-loop assembly: `SpringAiChatOptionsContributorTest` and `SpringAiChatClientAssemblerIntegrationTest`.
-- Wire behavior: `ConnectionProtocolTest`.
+- Wire behavior: `ConnectionProtocolTest` and `AnthropicProtocolIntegrationTest`
+  (native effort, unchanged caps, changing raw output schemas, legacy controls and
+  active nested/canonical controls and the opt-in blocked full tool-root fidelity assertion).
 - Call budgets/default transport phases: `LoomspanProperties#validateRequestTimeout`,
   `ProviderRequestTimeoutIntegrationTest` (shared Responses, Anthropic and both Gemini modes,
   delayed headers, active body deadline, configured success, actual client defaults).

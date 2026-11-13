@@ -1,8 +1,8 @@
 # PR 30 implementation blockers
 
 This register carries unresolved dependency requirements across the PR 30 ticket
-sequence. On November 13, 2026, the developer authorized tracking the known adapter
-defects here and skipping their failing correctness cases by default so subsequent
+sequence. On November 13, 2026, the developer authorized tracking the Responses adapter
+defects PR30-B01/B02 here and skipping their failing correctness cases by default so subsequent
 tickets can proceed. Assertions and fixtures remain in the codebase. A passing
 default build with these skips does not establish fidelity for the blocked cases.
 The earlier pipeline results remain historical evidence; this decision does not
@@ -96,3 +96,53 @@ error and nine skips (seven here plus two existing diagnostic skips). The comple
 child-binding class then passed all 17 cases in isolation without changes to its
 test or deadline. That timeout did not reproduce; the full run is not claimed green.
 Exact commands and logs are recorded in the linked results artifact.
+
+## PR30-B03 — Anthropic tool root-schema loss (SAI-03)
+
+**Status:** Open; full root-fidelity correctness case skipped by default under the
+explicit developer decision of November 13, 2026 recorded in the PR 30.1.3 ticket.
+The complete assertion runs with `loomspan.pr30.blockers=true`. This later decision
+extends the default-skip pattern to B03; it does not close the defect or establish
+schema fidelity. Independent nested-schema and canonical controls remain active.
+
+Tested artifact: `org.springframework.ai:spring-ai-anthropic:2.1.0-RC2`, JAR SHA-256
+`9067b55f3febc01cc2a16650d870f71911bc4fa414efd309f46147216008815e`.
+`AnthropicChatModel.toAnthropicTool` constructs `InputSchema` from `properties` and
+`required`, losing authored root entries. The new approved-profile Framework capture
+preserves nested constraints and typed-map value schemas, but drops root `$schema`,
+`description` and `additionalProperties:false`.
+
+- **Retained correctness test:** `AnthropicProtocolIntegrationTest#toolInputSchemaPreservesApprovedRootAndNestedConstraints`.
+  It retains complete tree equality behind the explicit blocker assumption.
+  `toolNestedConstraintsAndCanonicalSchemaRemainUnchanged` independently runs
+  nested/required equality, non-strict tools, canonical callback schema preservation
+  and exactly one loopback request by default.
+- **Reproduction:** `mvn -B '-Dtest=AnthropicProtocolIntegrationTest#toolInputSchemaPreservesApprovedRootAndNestedConstraints' '-Dloomspan.pr30.blockers=true' test`.
+- **Strategy:** Keep the official adapter and tool loop. No verified fixed shipped
+  artifact was established in PR 30.1.3 research; upstream main still had the lossy
+  mapper. Native output options do not repair this tool conversion. No copied model
+  class, singleton mutation, body rewrite, fallback or weakened contract is permitted.
+- **Ownership:** PR 30.1.3 owns this unresolved adapter requirement; PR 30.4.3
+  reconciles it with the integrated matrix. It is not deferred to schema consumers.
+- **Closure:** Consume an acceptable upstream correction/release, record exact
+  coordinates/commit/checksum, and pass this complete wire comparison plus native
+  output/effort/cap, legacy and preservation controls. A merged upstream PR alone is
+  insufficient. Remove the assumption after the fix. PR 30.1.3 may complete its
+  current iteration under the explicit deferral after default verification and
+  fresh independent review; this is distinct from B03 closure and full fidelity.
+
+See `ai/thoughts/plans/2026-11-13-pr-30.1.3-anthropic-results.md` for commands and
+actual verification. Live provider calls and external submissions remain unauthorized.
+
+
+### PR30-B03 verification under default deferral
+
+On November 13, 2026, default focused contributor/protocol/architecture verification
+ran 23 cases with zero failures/errors and exactly one B03 skip. The opt-in full-root
+method ran one case and failed the complete schema equality assertion as expected,
+with zero errors/skips. The default full suite then passed 1,877 cases with zero
+failures/errors and ten skips (B03, seven prior Responses and two existing diagnostic
+cases). The independent nested/canonical tool control stays active. These results
+permit iteration completion under the explicit developer decision and do not
+establish root-schema fidelity or close this blocker. Exact commands and logs are
+recorded in the PR 30.1.3 results artifact linked above.
