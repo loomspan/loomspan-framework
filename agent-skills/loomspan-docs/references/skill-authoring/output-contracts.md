@@ -265,6 +265,38 @@ Legacy `nullable` and schema-node `evidence` are rejected. Use
 
 ## Guidance, validation, and retries
 
+### Ordinary final-output correction
+
+Ordinary schema, linter and evidence correction carries the original instructions
+and input/media, completed tool exchanges, and the latest raw provider reply.
+Completed call/result associations and retained provider replay parts remain
+intact. Existing [adapter replay limits](model-selection-and-connections.md)
+still apply; correction cannot restore parts already omitted by an adapter.
+Repeated correction replaces the owned replay segment; it does not accumulate
+rejected schema answers or duplicate completed exchanges. With output bindings,
+the replayed candidate is the model contribution, while the returned output is
+the validated complete assembly from the fixed source snapshots.
+
+Once ordinary final-output correction begins, executable tool callbacks are
+removed from each repair request, including model defaults. A returned tool
+selection fails before dispatch, without executing it or starting another
+recovery loop. Previously completed side effects are neither repeated nor
+rolled back. Authors MUST make a correction answer from the completed work.
+
+Existing schema/linter/evidence correction counts and physical-call/usage quotas
+still apply. Schema and evidence exhaustion fail; linter exhaustion retains its
+last response and failed linter outcome. Linter/evidence system feedback keeps
+its existing accumulated behavior. Planning correction and step-loop final
+correction have their separate existing policies.
+
+Local evidence: `OrdinaryFinalOutputRepairIntegrationTest` captures real advisors,
+the canonical tool manager and all three official serializers over loopback HTTP,
+including combined/repeated repair, raw provider parts, model-default callbacks
+and media. `OrdinaryFinalOutputRepairLifecycleTest` exercises real sessions,
+nested/concurrent isolation, usage quotas, cancellation and bound composition.
+These checks do not establish live provider acceptance or complete application
+restoration; the applicability limits above still apply.
+
 For ordinary model execution without `output_bindings`, Loomspan places the complete effective contract in the first request. For ordinary synthesis in planning mode without output bindings, it places the same contract in the first `FINAL_RESPONSE` request, after required plan tasks complete; tool-call steps do not receive final-output guidance. The renderer includes every normalized node, required or optional presence, nullable or non-null values, effective object openness, array items, enum, format, and description. It does not include evidence expressions, mappings, retry settings, or provider metadata.
 
 Loomspan requests a native JSON Schema response format and then parses and validates the returned JSON losslessly against the canonical contract. It does not silently coerce, insert, remove, or repair candidate fields. With `output_schema_max_retries: N`, a non-planning output allows one initial validated response plus at most `N` semantic corrections. Planning final-response validation uses its planning retry path. For physical-attempt identity, accounting, correction-message composition, and trace diagnosis, read [traces-and-debugging.md](traces-and-debugging.md).

@@ -1,6 +1,7 @@
 package ai.loomspan.internal.outputschema;
 
 import ai.loomspan.testkit.CorrectionEvidenceFixtures;
+import ai.loomspan.internal.springai.OrdinaryFinalOutputRepair;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.ModelTraceContext;
@@ -103,7 +104,8 @@ class OutputSchemaCallAdvisorTest {
                 new SystemMessage("BASELINE_SYSTEM"),
                 new UserMessage("BASELINE_USER")), options), Map.of(
                         "request-sentinel", "preserved",
-                        ModelTraceContext.REQUEST_CONTEXT_KEY, traceMarker));
+                        ModelTraceContext.REQUEST_CONTEXT_KEY, traceMarker,
+                        OrdinaryFinalOutputRepair.CONTEXT_KEY, new OrdinaryFinalOutputRepair()));
 
         ChatClientResponse response = advisor.adviseCall(baseline, chain);
 
@@ -123,7 +125,9 @@ class OutputSchemaCallAdvisorTest {
         assertThat(chain.requests.get(2).prompt().getInstructions().get(1).getText()).isEqualTo("BASELINE_USER");
         assertThat(chain.requests.get(2).context()).containsEntry("request-sentinel", "preserved");
         assertThat(chain.requests.get(2).context().get(ModelTraceContext.REQUEST_CONTEXT_KEY)).isSameAs(traceMarker);
-        assertThat(chain.requests.get(2).prompt().getOptions()).isEqualTo(options);
+        assertThat(chain.requests.get(2).prompt().getOptions()).isInstanceOf(OpenAiResponsesChatOptions.class);
+        assertThat(chain.requests.get(2).prompt().getOptions().getModel()).isEqualTo(options.getModel());
+        assertThat(chain.requests.get(2).prompt().getOptions().getTemperature()).isEqualTo(options.getTemperature());
         assertThat((OutputSchemaOutcome) response.context().get(OutputSchemaCallAdvisor.CONTEXT_KEY))
                 .extracting(OutputSchemaOutcome::attempt, OutputSchemaOutcome::retryCount)
                 .containsExactly(3, 2);
@@ -140,7 +144,7 @@ class OutputSchemaCallAdvisorTest {
         assertThat(chain.requests).hasSize(2);
         assertThat(chain.requests.get(1).prompt().getInstructions())
                 .extracting(message -> message.getMessageType())
-                .containsExactly(MessageType.SYSTEM, MessageType.USER, MessageType.USER);
+                .containsExactly(MessageType.SYSTEM, MessageType.USER, MessageType.ASSISTANT, MessageType.USER);
         assertThat(chain.requests.get(1).prompt().getUserMessage().getText())
                 .contains("previous response could not be parsed as JSON")
                 .doesNotContain("Parser reason");
@@ -672,7 +676,7 @@ class OutputSchemaCallAdvisorTest {
     }
 
     private static ChatClientRequest request(String text) {
-        return new ChatClientRequest(new Prompt(text), Map.of());
+        return new ChatClientRequest(new Prompt(text, org.springframework.ai.model.tool.ToolCallingChatOptions.builder().build()), Map.of(OrdinaryFinalOutputRepair.CONTEXT_KEY, new OrdinaryFinalOutputRepair()));
     }
 
     private static String text(ChatClientResponse response) {
@@ -711,6 +715,8 @@ class OutputSchemaCallAdvisorTest {
             requests.add(chatClientRequest.copy());
             int attemptNumber = index.incrementAndGet();
             String responseText = responses.get(Math.min(attemptNumber - 1, responses.size() - 1));
+            ((OrdinaryFinalOutputRepair) chatClientRequest.context().get(OrdinaryFinalOutputRepair.CONTEXT_KEY))
+                    .captureRaw(new AssistantMessage(responseText));
             return ChatClientResponse.builder()
                     .chatResponse(new ChatResponse(List.of(new Generation(new AssistantMessage(responseText)))))
                     .context(ModelTraceContext.RESPONSE_ATTEMPT_CONTEXT_KEY, Map.of(

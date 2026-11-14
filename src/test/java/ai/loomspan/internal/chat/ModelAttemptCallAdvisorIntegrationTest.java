@@ -1,6 +1,7 @@
 package ai.loomspan.internal.chat;
 
 import ai.loomspan.testkit.CorrectionEvidenceFixtures;
+import ai.loomspan.internal.springai.OrdinaryRepairTestClients;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import ai.loomspan.internal.outputschema.OutputSchemaOutcome;
 import ai.loomspan.internal.outputschema.OutputSchemaOutcomeStatus;
@@ -108,10 +109,10 @@ class ModelAttemptCallAdvisorIntegrationTest
                 ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding,
                         () -> state.openMissionFrame(session, "default-test_skill", Map.of()));
                 openFrame(binding, state, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
-                var client = ChatClient.builder(runtime.chatModel()).defaultAdvisors(
+                var client = OrdinaryRepairTestClients.builder(runtime.chatModel()).defaultAdvisors(
                         new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), usage)).build();
                 java.util.function.Supplier<String> call = () -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
-                        binding, () -> client.prompt().user("unchanged")
+                        binding, () -> OrdinaryRepairTestClients.prepare(client.prompt()).user("unchanged")
                                 .options(OpenAiResponsesChatOptions.builder().model("test-model"))
                                 .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
                                 .call().content());
@@ -173,10 +174,10 @@ class ModelAttemptCallAdvisorIntegrationTest
             List<OutputSchemaOutcome> outcomes = new ArrayList<>();
             var advisor = new OutputSchemaCallAdvisor("equipment", schema, new OutputSchemaValidator(),
                     new OutputSchemaPromptAugmentor(), 2, outcomes::add);
-            var client = ChatClient.builder(runtime.chatModel()).defaultAdvisors(advisor,
+            var client = OrdinaryRepairTestClients.builder(runtime.chatModel()).defaultAdvisors(advisor,
                     new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), usage)).build();
             assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding,
-                    () -> client.prompt().system("ORIGINAL_SYSTEM").user("Compare NB-P240-017 event E17")
+                    () -> OrdinaryRepairTestClients.prepare(client.prompt()).system("ORIGINAL_SYSTEM").user("Compare NB-P240-017 event E17")
                             .options(OpenAiResponsesChatOptions.builder().model("test-model"))
                             .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
                             .call().content()))
@@ -240,7 +241,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                         new ProviderAttemptCallAdvisor(runtime(model), stateService, new ModelUsageExtractor(), usageService))
                 .build();
 
-        String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+        String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt())
                 .system("system")
                 .user("user")
                 .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext))
@@ -293,8 +294,7 @@ class ModelAttemptCallAdvisorIntegrationTest
         {
             server.enqueue(openAiToolCall("call-1", "first"));
             server.enqueue(openAiText("invalid"));
-            server.enqueue(openAiToolCall("call-2", "second"));
-            server.enqueue(openAiText("OK: corrected"));
+                        server.enqueue(openAiText("OK: corrected"));
             LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
             properties.setDriver(AiDriver.OPENAI);
             properties.setApiKey("test-key");
@@ -311,7 +311,7 @@ class ModelAttemptCallAdvisorIntegrationTest
             AtomicInteger toolExecutions = new AtomicInteger();
             List<String> toolValues = new ArrayList<>();
             ToolCallback tool = FunctionToolCallback.<Map<String, Object>, String>builder(
-                            "lookup",
+                            "test-lookup",
                             (arguments, context) ->
                             {
                                 toolExecutions.incrementAndGet();
@@ -325,13 +325,13 @@ class ModelAttemptCallAdvisorIntegrationTest
             LinterCallAdvisor semanticPolicy = new LinterCallAdvisor(
                     "default-test_skill", "regex", Pattern.compile("^OK:.*$"),
                     "Return an OK response.", 1, ignored -> { });
-            ChatClient client = ChatClient.builder(runtime.chatModel())
+            ChatClient client = OrdinaryRepairTestClients.builder(runtime.chatModel())
                     .defaultAdvisors(semanticPolicy,
                             new ProviderAttemptCallAdvisor(runtime, stateService,
                                     new ModelUsageExtractor(), usageService))
                     .build();
 
-            String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+            String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt())
                     .user("user")
                     .options(OpenAiResponsesChatOptions.builder().model("gpt-test"))
                     .toolCallbacks(tool)
@@ -340,22 +340,23 @@ class ModelAttemptCallAdvisorIntegrationTest
                     .content());
 
             assertThat(content).isEqualTo("OK: corrected");
-            assertThat(server.getRequestCount()).isEqualTo(4);
-            assertThat(toolExecutions).hasValue(2);
-            assertThat(toolValues).containsExactly("first", "second");
-            assertThat(server.takeRequest().getBody().readUtf8()).contains("\"name\":\"lookup\"");
+            assertThat(server.getRequestCount()).isEqualTo(3);
+            assertThat(toolExecutions).hasValue(1);
+            assertThat(toolValues).containsExactly("first");
+            assertThat(server.takeRequest().getBody().readUtf8()).contains("\"name\":\"test-lookup\"");
             assertThat(server.takeRequest().getBody().readUtf8()).contains("\"call_id\":\"call-1\"");
-            assertThat(server.takeRequest().getBody().readUtf8()).contains("\"name\":\"lookup\"");
-            assertThat(server.takeRequest().getBody().readUtf8()).contains("\"call_id\":\"call-2\"");
+            String repair = server.takeRequest().getBody().readUtf8();
+            assertThat(repair).contains("looked-up-first", "call-1", "invalid");
+            assertThat(LoomspanJacksonCodecs.defaults().planningJson().readTree(repair).path("tools").isEmpty()).isTrue();
 
             // Semantic validation wraps the AI 2 tool advisor; every inner model turn crosses the
             // physical-attempt advisor exactly once.
-            assertThat(session.getSessionUsage().orElseThrow().providerAttempts()).isEqualTo(4);
-            assertThat(session.getSessionUsage().orElseThrow().modelCalls()).isEqualTo(4);
+            assertThat(session.getSessionUsage().orElseThrow().providerAttempts()).isEqualTo(3);
+            assertThat(session.getSessionUsage().orElseThrow().modelCalls()).isEqualTo(3);
             assertThat(records(session).stream()
-                    .filter(record -> record.recordType() == TraceRecordType.MODEL_REQUEST_SENT)).hasSize(4);
+                    .filter(record -> record.recordType() == TraceRecordType.MODEL_REQUEST_SENT)).hasSize(3);
             assertThat(records(session).stream()
-                    .filter(record -> record.recordType() == TraceRecordType.MODEL_RESPONSE_RECEIVED)).hasSize(4);
+                    .filter(record -> record.recordType() == TraceRecordType.MODEL_RESPONSE_RECEIVED)).hasSize(3);
         }
     }
 
@@ -382,7 +383,7 @@ class ModelAttemptCallAdvisorIntegrationTest
             openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
             AtomicInteger toolExecutions = new AtomicInteger();
             ToolCallback tool = FunctionToolCallback.<Map<String, Object>, String>builder(
-                            "lookup",
+                            "test-lookup",
                             (arguments, context) ->
                             {
                                 toolExecutions.incrementAndGet();
@@ -399,13 +400,13 @@ class ModelAttemptCallAdvisorIntegrationTest
             OutputSchemaCallAdvisor semanticPolicy = new OutputSchemaCallAdvisor(
                     "default-test_skill", outputSchema, new OutputSchemaValidator(), new OutputSchemaPromptAugmentor(),
                     1, ignored -> { });
-            ChatClient client = ChatClient.builder(runtime.chatModel())
+            ChatClient client = OrdinaryRepairTestClients.builder(runtime.chatModel())
                     .defaultAdvisors(semanticPolicy,
                             new ProviderAttemptCallAdvisor(runtime, stateService,
                                     new ModelUsageExtractor(), usageService))
                     .build();
 
-            String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+            String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt())
                     .user("user")
                     .options(OpenAiResponsesChatOptions.builder().model("gpt-test"))
                     .toolCallbacks(tool)
@@ -426,7 +427,9 @@ class ModelAttemptCallAdvisorIntegrationTest
             String retryBody = server.takeRequest().getBody().readUtf8();
             assertThat(retryBody)
                     .contains("{\\\"result\\\":1}")
-                    .contains("Do NOT call any tools again");
+                    .contains("Do NOT call any tools again")
+                    .contains("looked-up-first", "call-1");
+            assertThat(LoomspanJacksonCodecs.defaults().planningJson().readTree(retryBody).path("tools").isEmpty()).isTrue();
         }
     }
 
@@ -448,7 +451,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                 .defaultAdvisors(new ProviderAttemptCallAdvisor(runtime(throwingModel), stateService, new ModelUsageExtractor(), usageService))
                 .build();
 
-        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt())
                 .user("user")
                 .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext))
                 .call()
@@ -515,7 +518,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                         new ModelUsageExtractor(), usageService))
                 .build();
 
-        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt())
                 .user("user")
                 .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext))
                 .call()
@@ -586,7 +589,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                         stateService, new ModelUsageExtractor(), usageService))
                 .build();
 
-        String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+        String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt())
                 .user("user")
                 .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext))
                 .call()
@@ -669,7 +672,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                         new ModelUsageExtractor(), usageService))
                 .build();
 
-        String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+        String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt())
                 .user("user")
                 .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
                 .call()
@@ -750,7 +753,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                         new ModelUsageExtractor(), usageService))
                 .build();
 
-        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt())
                 .user("user")
                 .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
                 .call()
@@ -831,7 +834,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                         new ProviderAttemptCallAdvisor(runtime(model), stateService, new ModelUsageExtractor(), usageService))
                 .build();
 
-        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt())
                 .user("user")
                 .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext))
                 .call()
@@ -879,7 +882,7 @@ class ModelAttemptCallAdvisorIntegrationTest
         {
             try
             {
-                ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt().user("user")
+                ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt()).user("user")
                         .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext))
                         .call().content());
             }
@@ -927,7 +930,7 @@ class ModelAttemptCallAdvisorIntegrationTest
         Thread.currentThread().interrupt();
         try
         {
-            assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt().user("user")
+            assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt()).user("user")
                     .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext()))
                     .call().content())).isInstanceOf(CancellationException.class);
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
@@ -970,11 +973,11 @@ class ModelAttemptCallAdvisorIntegrationTest
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
             openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
             ModelTraceContext traceContext = traceContext();
-            ChatClient client = ChatClient.builder(runtime.chatModel())
+            ChatClient client = OrdinaryRepairTestClients.builder(runtime.chatModel())
                     .defaultAdvisors(new ProviderAttemptCallAdvisor(runtime, stateService,
                             new ModelUsageExtractor(), usageService)).build();
 
-            String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> client.prompt()
+            String content = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> OrdinaryRepairTestClients.prepare(client.prompt())
                     .user("hello")
                     .options(OpenAiResponsesChatOptions.builder().model("routed-model"))
                     .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, traceContext))
@@ -1054,7 +1057,7 @@ class ModelAttemptCallAdvisorIntegrationTest
     private static MockResponse openAiToolCall(String callId, String value)
     {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"chatcmpl-tool","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"%s","name":"lookup","arguments":"{\\"value\\":\\"%s\\"}","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                {"id":"chatcmpl-tool","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"%s","name":"test-lookup","arguments":"{\\"value\\":\\"%s\\"}","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(callId, value));
     }
 
@@ -1103,6 +1106,11 @@ class ModelAttemptCallAdvisorIntegrationTest
         private QueueChatModel(List<ChatResponse> responses)
         {
             this.responses = new ArrayDeque<>(responses);
+        }
+
+        @Override
+        public org.springframework.ai.chat.prompt.ChatOptions getOptions() {
+            return OpenAiResponsesChatOptions.builder().model("test-model").build();
         }
 
         @Override

@@ -57,20 +57,61 @@ class SpringAiChatClientAssemblerIntegrationTest
         {
             server.enqueue(toolCall("call-1", "first"));
             server.enqueue(text("invalid"));
-            server.enqueue(toolCall("call-2", "second"));
             server.enqueue(text("OK: corrected"));
             Harness harness = harness(server, true);
 
             String result = harness.call(ModelInteractionMode.STANDARD);
 
             assertThat(result).isEqualTo("OK: corrected");
-            assertThat(server.getRequestCount()).isEqualTo(4);
-            assertThat(harness.toolExecutions).hasValue(2);
-            assertThat(harness.session.getSessionUsage().orElseThrow().providerAttempts()).isEqualTo(4);
+            assertThat(server.getRequestCount()).isEqualTo(3);
+            assertThat(harness.toolExecutions).hasValue(1);
+            assertThat(harness.session.getSessionUsage().orElseThrow().providerAttempts()).isEqualTo(3);
             var tools = JSON.readTree(server.takeRequest().getBody().readUtf8()).path("tools");
             assertThat(tools).extracting(tool -> tool.path("name").asString())
                     .containsExactlyInAnyOrder("tax-lookup", PlannerInabilityTool.NAME);
+            server.takeRequest();
+            assertCompletedRepair(JSON.readTree(server.takeRequest().getBody().readUtf8()));
         }
+    }
+
+    @Test
+    void productionAssemblerRejectsRepairToolCallsAfterRecordingThePhysicalResponse() throws Exception
+    {
+        try (var server = new MockWebServer()) {
+            server.enqueue(toolCall("call-1", "first"));
+            server.enqueue(text("invalid"));
+            server.enqueue(toolCall("forbidden", "second"));
+            Harness harness = harness(server, true);
+            assertThatThrownBy(() -> harness.call(ModelInteractionMode.STANDARD))
+                    .hasMessageContaining("ordinary final-output repair");
+            assertThat(harness.toolExecutions).hasValue(1);
+            assertThat(server.getRequestCount()).isEqualTo(3);
+            var usage = harness.session.getSessionUsage().orElseThrow();
+            assertThat(usage.providerAttempts()).isEqualTo(3);
+            assertThat(usage.modelCalls()).isEqualTo(3);
+            assertThat(usage.usageUnits()).isEqualTo(6);
+            server.takeRequest(); server.takeRequest();
+            assertCompletedRepair(JSON.readTree(server.takeRequest().getBody().readUtf8()));
+        }
+    }
+
+    private static void assertCompletedRepair(JsonNode wire) {
+        assertThat(wire.path("tools").isMissingNode() || wire.path("tools").isEmpty()).isTrue();
+        var input = wire.path("input");
+        assertThat(input).filteredOn(item -> item.path("type").asText().equals("function_call"))
+                .singleElement().satisfies(item -> {
+                    assertThat(item.path("call_id").asText()).isEqualTo("call-1");
+                    assertThat(item.path("name").asText()).isEqualTo("tax-lookup");
+                });
+        assertThat(input).filteredOn(item -> item.path("type").asText().equals("function_call_output"))
+                .singleElement().satisfies(item -> {
+                    assertThat(item.path("call_id").asText()).isEqualTo("call-1");
+                    assertThat(item.path("output").asText()).isEqualTo("\"looked-up-first\"");
+                });
+        assertThat(ai.loomspan.testkit.ResponsesFixtures.transcript(wire))
+                .filteredOn(message -> message.path("role").asText().equals("assistant"))
+                .singleElement().satisfies(message -> assertThat(message.path("content").asText()).isEqualTo("invalid"));
+        assertThat(wire.toString()).contains("Linter validation failed", "system", "user");
     }
 
     @Test

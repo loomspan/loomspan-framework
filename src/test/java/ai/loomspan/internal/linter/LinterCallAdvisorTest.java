@@ -1,5 +1,6 @@
 package ai.loomspan.internal.linter;
 
+import ai.loomspan.internal.springai.OrdinaryFinalOutputRepair;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.JournalEntry;
@@ -203,13 +204,13 @@ class LinterCallAdvisorTest {
     }
 
     private static ChatClientRequest request(String text) {
-        return new ChatClientRequest(new Prompt(text), Map.of());
+        return new ChatClientRequest(new Prompt(text, org.springframework.ai.model.tool.ToolCallingChatOptions.builder().build()), Map.of(OrdinaryFinalOutputRepair.CONTEXT_KEY, new OrdinaryFinalOutputRepair()));
     }
 
     private static ChatClientRequest request(String userText, String systemText) {
         return new ChatClientRequest(new Prompt(List.of(
                 new org.springframework.ai.chat.messages.SystemMessage(systemText),
-                new org.springframework.ai.chat.messages.UserMessage(userText))), Map.of());
+                new org.springframework.ai.chat.messages.UserMessage(userText)), org.springframework.ai.model.tool.ToolCallingChatOptions.builder().build()), Map.of(OrdinaryFinalOutputRepair.CONTEXT_KEY, new OrdinaryFinalOutputRepair()));
     }
 
     private static String text(ChatClientResponse response) {
@@ -247,6 +248,8 @@ class LinterCallAdvisorTest {
             }
             requests.add(chatClientRequest.copy());
             String responseText = responses.get(Math.min(index.getAndIncrement(), responses.size() - 1));
+            ((OrdinaryFinalOutputRepair) chatClientRequest.context().get(OrdinaryFinalOutputRepair.CONTEXT_KEY))
+                    .captureRaw(new AssistantMessage(responseText));
             return ChatClientResponse.builder()
                     .chatResponse(new ChatResponse(List.of(new Generation(new AssistantMessage(responseText)))))
                     .build();

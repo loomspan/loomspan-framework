@@ -91,9 +91,8 @@ public final class EvidenceContractCallAdvisor implements CallAdvisor
                             ModelTraceContext.attemptFrom(response.context())),
                     result.issues()));
 
-            currentRequest = currentRequest.mutate()
-                    .prompt(appendHint(currentRequest.prompt(), result))
-                    .build();
+            currentRequest = ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.repair(
+                    currentRequest, prompt -> appendHint(prompt, result), java.util.List.of());
 
             downstreamChain = callAdvisorChain.copy(this);
             attempt++;

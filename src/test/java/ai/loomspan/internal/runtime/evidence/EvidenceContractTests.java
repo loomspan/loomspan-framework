@@ -1,5 +1,7 @@
 package ai.loomspan.internal.runtime.evidence;
 
+import ai.loomspan.internal.springai.OrdinaryFinalOutputRepair;
+
 import tools.jackson.databind.json.JsonMapper;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import org.junit.jupiter.api.Test;
@@ -102,7 +104,7 @@ class EvidenceContractTests {
     private static ChatClientRequest request(String userText, String systemText) {
         return new ChatClientRequest(new Prompt(List.of(
                 new SystemMessage(systemText),
-                new UserMessage(userText))), Map.of());
+                new UserMessage(userText)), org.springframework.ai.model.tool.ToolCallingChatOptions.builder().build()), Map.of(OrdinaryFinalOutputRepair.CONTEXT_KEY, new OrdinaryFinalOutputRepair()));
     }
 
     private static final class RecordingChain implements CallAdvisorChain {
@@ -136,9 +138,11 @@ class EvidenceContractTests {
             }
             requests.add(chatClientRequest.copy());
             String responseText = responses.get(Math.min(index.getAndIncrement(), responses.size() - 1));
-            return ChatClientResponse.builder()
+            var response = ChatClientResponse.builder()
                     .chatResponse(new ChatResponse(List.of(new Generation(new AssistantMessage(responseText)))))
                     .build();
+            OrdinaryFinalOutputRepair.capture(chatClientRequest, response);
+            return response;
         }
 
         @Override

@@ -37,6 +37,8 @@ final class CanonicalToolCallingManager implements ToolCallingManager {
     }
 
     @Override public ToolExecutionResult executeToolCalls(Prompt prompt, ChatResponse response) {
+        var repair = OrdinaryFinalOutputRepair.from(prompt);
+        if (repair != null) repair.requireDispatchAllowed();
         var driver = prompt.getOptions() instanceof org.springframework.ai.anthropic.AnthropicChatOptions
                 ? ai.loomspan.autoconfigure.AiDriver.ANTHROPIC
                 : prompt.getOptions() instanceof org.springframework.ai.google.genai.GoogleGenAiChatOptions
@@ -91,7 +93,9 @@ final class CanonicalToolCallingManager implements ToolCallingManager {
             if (selectionCount != 1) throw new IllegalArgumentException("Planner inability must be the only tool selection");
             throw PlannerInabilityTool.accept(control);
         }
-        return delegate.executeToolCalls(prompt, changedResponse ? new ChatResponse(generations, response.getMetadata()) : response);
+        var result = delegate.executeToolCalls(prompt, changedResponse ? new ChatResponse(generations, response.getMetadata()) : response);
+        if (repair != null) repair.completed(prompt, result);
+        return result;
     }
 
     private static List<ToolCallback> boundCallbacks(ToolCallingChatOptions options) {

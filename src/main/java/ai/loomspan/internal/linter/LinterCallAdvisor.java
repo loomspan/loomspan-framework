@@ -113,9 +113,8 @@ public final class LinterCallAdvisor implements CallAdvisor
                             ModelTraceContext.attemptFrom(response.context())),
                     failureMessage));
 
-            currentRequest = currentRequest.mutate()
-                    .prompt(appendHint(currentRequest.prompt(), failureMessage))
-                    .build();
+            currentRequest = ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.repair(
+                    currentRequest, prompt -> appendHint(prompt, failureMessage), java.util.List.of());
 
             downstreamChain = callAdvisorChain.copy(this);
             attempt++;

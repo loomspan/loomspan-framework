@@ -1,5 +1,6 @@
 package ai.loomspan.internal.runtime.evidence;
 
+import ai.loomspan.internal.springai.OrdinaryFinalOutputRepair;
 import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.ExecutionBindingScope;
 import ai.loomspan.internal.core.TestExecutionBindings;
@@ -30,10 +31,6 @@ class EvidenceContractAdvisorAdditionalTest
     @Test
     void unsupportedRequiredClaimFailsAfterToolFreeRetriesAndPreservesExpressionDiagnostics()
     {
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType("object");
-        schema.setProperties(Map.of("result", scalar("string")));
-        schema.setRequired(List.of("result"));
         List<EvidenceCoverageResult> failures = new ArrayList<>();
         EvidenceContractCallAdvisor advisor = new EvidenceContractCallAdvisor(
                 "default-handleIncident",
@@ -104,18 +101,11 @@ class EvidenceContractAdvisorAdditionalTest
         assertThat(chain.requests.getLast().prompt().getSystemMessage().getText().split("Evidence validation failed", -1)).hasSize(budget + 1);
     }
 
-    private static YamlSkillManifest.OutputSchemaManifest scalar(String type)
-    {
-        YamlSkillManifest.OutputSchemaManifest scalar = new YamlSkillManifest.OutputSchemaManifest();
-        scalar.setType(type);
-        return scalar;
-    }
-
     private static ChatClientRequest request()
     {
         return new ChatClientRequest(new Prompt(List.of(
                 new SystemMessage("Return the required JSON result."),
-                new UserMessage("Handle incident"))), Map.of());
+                new UserMessage("Handle incident")), org.springframework.ai.model.tool.ToolCallingChatOptions.builder().build()), Map.of(OrdinaryFinalOutputRepair.CONTEXT_KEY, new OrdinaryFinalOutputRepair()));
     }
 
     private static final class RecordingChain implements CallAdvisorChain
@@ -153,6 +143,8 @@ class EvidenceContractAdvisorAdditionalTest
             }
             requests.add(request.copy());
             String response = responses.get(Math.min(index.getAndIncrement(), responses.size() - 1));
+            ((OrdinaryFinalOutputRepair) request.context().get(OrdinaryFinalOutputRepair.CONTEXT_KEY))
+                    .captureRaw(new AssistantMessage(response));
             return ChatClientResponse.builder()
                     .chatResponse(new ChatResponse(List.of(new Generation(new AssistantMessage(response)))))
                     .build();

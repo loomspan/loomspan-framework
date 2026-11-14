@@ -77,7 +77,7 @@ primary        := SKILL_NAME | "(" expression ")"
 | Plan validation | Nonblank, case-sensitive `PlanTask.capabilityName()` values | Every evidence-annotated root property, including optional properties |
 | Final output validation | Direct child names recorded only after successful completion in the current YAML mission | Evidence-annotated top-level properties present in the schema-valid candidate |
 
-Planned, started, failed, cancelled, merely visible, wrong-case, or blank capability names do not satisfy final validation. Repeated successful calls remain one set member. An unsupported optional property may be removed during output retry; a required property ultimately fails when its expression remains unsatisfied. Evidence retry uses already completed work and MUST NOT call tools again.
+Planned, started, failed, cancelled, merely visible, wrong-case, or blank capability names do not satisfy final validation. Repeated successful calls remain one set member. An unsupported optional property may be removed during output retry; a required property ultimately fails when its expression remains unsatisfied. Evidence retry receives completed tool exchanges and the latest raw provider candidate, with executable callbacks removed. A returned tool selection fails before dispatch; it MUST NOT execute further work. See [ordinary final-output correction](output-contracts.md#ordinary-final-output-correction) for replay, binding snapshots, budgets and exhaustion.
 
 Evidence correction can still make additional physical model attempts and consume model-call and usage quotas. See [traces-and-debugging.md](traces-and-debugging.md) for retry identity and accounting semantics.
 
@@ -115,6 +115,8 @@ Evidence expressions are monotonic and name-only. They do not inspect tool outpu
 Evidence also does not impose unconditional generated-plan task cardinality. Use [planning-task-constraints.md](planning-task-constraints.md) for explicit per-child minimums and maximums; those constraints do not change evidence truth sets.
 
 ## Implementation and test anchors
+
+- `OrdinaryFinalOutputRepairIntegrationTest` exercises real evidence/schema/linter advisors separately and together, canonical dispatch and actual three-adapter repair serialization; `OrdinaryFinalOutputRepairLifecycleTest` covers invocation isolation and real accounting. These local advisor checks do not certify the incomplete catalog expression-extraction boundary.
 
 - `StandardSchemaCompiler` and `StandardSchemaCompilerTest` validate current annotation placement and scalar shape. `YamlSkillCatalog` registers canonical schemas; its expression-extraction consumer integration is incomplete.
 - `EvidenceExpressionParser.java` (`src/main/java/ai/loomspan/internal/runtime/evidence/EvidenceExpressionParser.java`) defines parsing, while `EvidenceExpression.java` (`src/main/java/ai/loomspan/internal/runtime/evidence/EvidenceExpression.java`) defines canonical rendering, evaluation, and structured unsatisfied requirements.

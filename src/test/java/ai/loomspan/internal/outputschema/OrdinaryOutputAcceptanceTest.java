@@ -1,5 +1,7 @@
 package ai.loomspan.internal.outputschema;
 
+import ai.loomspan.internal.springai.OrdinaryFinalOutputRepair;
+
 import ai.loomspan.internal.core.AdvisorTraceFact;
 import ai.loomspan.internal.core.ExecutionBinding;
 import ai.loomspan.internal.core.ExecutionBindingScope;
@@ -51,7 +53,7 @@ class OrdinaryOutputAcceptanceTest {
                 new OutputSchemaValidator(JsonMapper.builder().build()), new OutputSchemaPromptAugmentor(),
                 1, outcomes::add, facts::add);
         var options = OpenAiResponsesChatOptions.builder().model("fixture").maxOutputTokens(1024).build();
-        var original = new ChatClientRequest(new Prompt("Task", options), Map.of("marker", "retained"));
+        var original = new ChatClientRequest(new Prompt("Task", options), Map.of("marker", "retained", OrdinaryFinalOutputRepair.CONTEXT_KEY, new OrdinaryFinalOutputRepair()));
 
         var accepted = advisor.adviseCall(original, chain);
 
@@ -59,8 +61,9 @@ class OrdinaryOutputAcceptanceTest {
         assertThat(chain.requests).hasSize(2).allSatisfy(request -> {
             assertThat(request.context()).containsEntry("marker", "retained");
             assertThat(request.context().get(OutputSchemaCallAdvisor.OUTPUT_CONTRACT_KEY)).isSameAs(contract);
-            assertThat(request.prompt().getOptions()).isEqualTo(options);
+            assertThat(((OpenAiResponsesChatOptions) request.prompt().getOptions()).getMaxOutputTokens()).isEqualTo(1024);
         });
+        assertThat(((OpenAiResponsesChatOptions) chain.requests.get(1).prompt().getOptions()).getToolCallbacks()).isEmpty();
         assertThat(chain.requests.get(1).prompt().getInstructions())
                 .filteredOn(message -> message.getMessageType() == MessageType.ASSISTANT)
                 .singleElement().satisfies(message -> assertThat(message.getText()).isEqualTo(candidate));
@@ -205,7 +208,7 @@ class OrdinaryOutputAcceptanceTest {
     private static OutputSchemaCallAdvisor advisor(CanonicalSchema schema, int retries) {
         return new OutputSchemaCallAdvisor("default-ordinary", schema, new OutputSchemaValidator(), new OutputSchemaPromptAugmentor(), retries, ignored -> {});
     }
-    private static ChatClientRequest request() { return new ChatClientRequest(new Prompt("Task"), Map.of()); }
+    private static ChatClientRequest request() { return new ChatClientRequest(new Prompt("Task", OpenAiResponsesChatOptions.builder().model("fixture").build()), Map.of(OrdinaryFinalOutputRepair.CONTEXT_KEY, new OrdinaryFinalOutputRepair())); }
     private static ChatClientResponse response(String text) {
         return ChatClientResponse.builder().chatResponse(new ChatResponse(List.of(new Generation(new AssistantMessage(text))))).build();
     }
@@ -215,7 +218,9 @@ class OrdinaryOutputAcceptanceTest {
         RecordingChain(List<ChatClientResponse> responses) { this.responses = responses; }
         public ChatClientResponse nextCall(ChatClientRequest request) {
             requests.add(request.copy());
-            return responses.get(Math.min(requests.size() - 1, responses.size() - 1));
+            var response = responses.get(Math.min(requests.size() - 1, responses.size() - 1));
+            OrdinaryFinalOutputRepair.capture(request, response);
+            return response;
         }
         public List<CallAdvisor> getCallAdvisors() { return List.of(); }
         public CallAdvisorChain copy(CallAdvisor after) { return this; }

@@ -149,6 +149,7 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
                 throw failure;
             }
             sessionUsageService.recordProviderAttemptOutcome(session, context.skillName(), context.identity(), "succeeded", null, null);
+            ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.capture(request, linkedResponse);
             return linkedResponse;
         }
         throw new IllegalStateException("provider retry loop exhausted without a terminal result");

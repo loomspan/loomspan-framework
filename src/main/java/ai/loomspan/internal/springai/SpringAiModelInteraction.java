@@ -44,6 +44,8 @@ public final class SpringAiModelInteraction implements ModelInteraction
         String system = interactionRequest.systemPrompt();
         ChatClient.ChatClientRequestSpec request = chatClient.prompt()
                 .system(exposeControl ? system + PlannerInabilityTool.CALLER_GUIDANCE : system);
+        OrdinaryFinalOutputRepair repair = interactionRequest.planning() ? null : new OrdinaryFinalOutputRepair();
+        if (repair != null) request = request.toolContext(Map.of(OrdinaryFinalOutputRepair.CONTEXT_KEY, repair));
         if (interactionRequest.input().attachments().isEmpty())
         {
             request = request.user(interactionRequest.input().userText());
@@ -67,6 +69,7 @@ public final class SpringAiModelInteraction implements ModelInteraction
                 .advisors(spec ->
                 {
                     spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, interactionRequest.traceContext());
+                    if (repair != null) spec.param(OrdinaryFinalOutputRepair.CONTEXT_KEY, repair);
                     if (interactionRequest.outputContract() != null)
                     {
                         spec.param(ai.loomspan.internal.outputschema.OutputSchemaCallAdvisor.OUTPUT_CONTRACT_KEY,

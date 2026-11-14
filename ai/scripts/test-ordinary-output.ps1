@@ -108,6 +108,7 @@ $taskSources += @(
  'ai/loomspan/internal/springai/SpringAiToolCallbackAdapter.java',
  'ai/loomspan/internal/springai/OrdinaryToolArguments.java',
  'ai/loomspan/internal/springai/NativeOutputContract.java',
+ 'ai/loomspan/internal/springai/OrdinaryFinalOutputRepair.java',
  'ai/loomspan/internal/springai/SpringAiProviderIntegration.java',
  'ai/loomspan/internal/springai/ProviderCallException.java',
  'ai/loomspan/internal/autoconfigure/SafeAiConnectionConfigurationException.java',

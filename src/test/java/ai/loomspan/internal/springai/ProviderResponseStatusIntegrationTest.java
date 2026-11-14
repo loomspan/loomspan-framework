@@ -178,14 +178,18 @@ class ProviderResponseStatusIntegrationTest
 
     @ParameterizedTest
     @EnumSource(value = AiDriver.class, names = {"OPENAI", "ANTHROPIC", "GEMINI"})
-    void incompletePlanningResponseNeverReachesJsonOrYamlParser(AiDriver driver) throws Exception
+    void incompletePlanningResponseNeverReachesJsonParser(AiDriver driver) throws Exception
     {
         try (Harness h = new Harness(driver))
         {
             h.enqueue(text(driver, incomplete(driver), "{\"capabilityName\":\"default-test_skill\",\"tasks\":[]}"));
             var jsonParser = org.mockito.Mockito.mock(tools.jackson.databind.ObjectMapper.class);
-            var yamlParser = org.mockito.Mockito.mock(tools.jackson.databind.ObjectMapper.class);
-            var planner = new ai.loomspan.internal.runtime.planning.DefaultPlanningService(h.state, jsonParser, yamlParser);
+            var planReader = org.mockito.Mockito.mock(tools.jackson.databind.ObjectReader.class);
+            org.mockito.Mockito.when(jsonParser.reader()).thenReturn(planReader);
+            org.mockito.Mockito.when(planReader.with(tools.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS))
+                    .thenReturn(planReader);
+            var planner = new ai.loomspan.internal.runtime.planning.DefaultPlanningService(h.state, jsonParser);
+            org.mockito.Mockito.clearInvocations(jsonParser, planReader);
             var manifest = new YamlSkillManifest();
             manifest.setName("test_skill");
             manifest.setDescription("Fixture planner");
@@ -198,7 +202,7 @@ class ProviderResponseStatusIntegrationTest
             assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(h.binding, () -> planner.initializePlan(
                     h.session, "Plan fixture", Map.of(), definition, interaction, List.of())))
                     .isInstanceOf(ai.loomspan.internal.provider.ProviderResponseRejectedException.class);
-            org.mockito.Mockito.verifyNoInteractions(jsonParser, yamlParser);
+            org.mockito.Mockito.verifyNoInteractions(jsonParser, planReader);
             assertThat(h.server.getRequestCount()).isEqualTo(1);
             assertThat(h.facts(TraceRecordType.PLAN_CREATED)).isEmpty();
             assertThat(h.facts(TraceRecordType.PLAN_RETRY_REQUESTED)).isEmpty();

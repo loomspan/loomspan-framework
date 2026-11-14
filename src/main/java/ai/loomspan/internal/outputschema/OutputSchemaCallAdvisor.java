@@ -15,7 +15,6 @@ import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
 import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 
@@ -186,9 +185,9 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
                             ModelTraceContext.attemptFrom(response.context())),
                     OutputValidationPolicy.limitIssues(result.issues(), MAX_ISSUES_IN_OUTCOME)));
 
-            currentRequest = baselineRequest.mutate()
-                    .prompt(buildRetryPrompt(baselineRequest.prompt(), candidate, result))
-                    .build();
+            currentRequest = ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.repair(
+                    baselineRequest, java.util.function.UnaryOperator.identity(),
+                    List.of(new UserMessage(OutputValidationFeedback.ordinarySchemaCorrection(result, compositionDefinition != null))));
 
             downstreamChain = callAdvisorChain.copy(this);
             attempt++;
@@ -255,19 +254,6 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         {
             return false;
         }
-    }
-
-    private Prompt buildRetryPrompt(Prompt baselinePrompt,
-            String candidate,
-            OutputSchemaValidationResult result)
-    {
-        List<Message> messages = new ArrayList<>(baselinePrompt.getInstructions());
-        if (candidate != null && !candidate.isEmpty())
-        {
-            messages.add(new AssistantMessage(candidate));
-        }
-        messages.add(new UserMessage(OutputValidationFeedback.ordinarySchemaCorrection(result, compositionDefinition != null)));
-        return new Prompt(messages, baselinePrompt.getOptions());
     }
 
     private String extractAssistantText(ChatClientResponse response)
