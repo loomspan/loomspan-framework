@@ -145,11 +145,6 @@ class NestedSuccessfulSkillBoundaryTest
 
     private static EvidenceContract parentContract()
     {
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType("object");
-        YamlSkillManifest.OutputSchemaManifest value = new YamlSkillManifest.OutputSchemaManifest();
-        value.setType("string");
-        schema.setProperties(Map.of("likelyCause", value, "internalProbe", value));
         return ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(Map.of(
                 "likelyCause", "default-classifyIncident and default-investigateNetwork",
                 "internalProbe", "default-checkDns"));

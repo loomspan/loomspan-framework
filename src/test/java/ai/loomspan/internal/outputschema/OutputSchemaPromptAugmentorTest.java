@@ -1,11 +1,13 @@
 package ai.loomspan.internal.outputschema;
 
-import ai.loomspan.internal.skill.YamlSkillManifest;
+import ai.loomspan.internal.schema.CanonicalSchema;
+import ai.loomspan.internal.schema.StandardSchemaCompiler;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,47 +17,15 @@ class OutputSchemaPromptAugmentorTest
     @Test
     void augmentsPromptWithCompleteRecursiveEffectiveContractInDeclaredOrder()
     {
-        YamlSkillManifest.OutputSchemaManifest root = node("object");
-        root.setAdditionalProperties(false);
-
-        YamlSkillManifest.OutputSchemaManifest transport = node("object");
-        transport.setAdditionalProperties(true);
-        YamlSkillManifest.OutputSchemaManifest outbound = node("object");
-        outbound.setNullable(true);
-        outbound.setAdditionalProperties(true);
-        outbound.setDescription("Selected outbound option from the digest.");
-        YamlSkillManifest.OutputSchemaManifest mode = node("string");
-        mode.setEnumValues(List.of("train, express", "flight\"overnight"));
-        LinkedHashMap<String, YamlSkillManifest.OutputSchemaManifest> transportProperties = new LinkedHashMap<>();
-        transportProperties.put("outbound", outbound);
-        transportProperties.put("mode", mode);
-        transport.setProperties(transportProperties);
-        transport.setRequired(List.of("outbound"));
-
-        YamlSkillManifest.OutputSchemaManifest questions = node("array");
-        questions.setItems(node("string"));
-        questions.setDescription("Questions still needing answers.");
-
-        YamlSkillManifest.OutputSchemaManifest rows = node("array");
-        YamlSkillManifest.OutputSchemaManifest row = node("object");
-        row.setAdditionalProperties(false);
-        YamlSkillManifest.OutputSchemaManifest date = node("string");
-        date.setFormat("date");
-        date.setEvidence("SENTINEL_EVIDENCE");
-        row.setProperties(new LinkedHashMap<>(java.util.Map.of("date", date)));
-        row.setRequired(List.of("date"));
-        rows.setItems(row);
-
-        YamlSkillManifest.OutputSchemaManifest empty = node("object");
-        empty.setAdditionalProperties(false);
-
-        LinkedHashMap<String, YamlSkillManifest.OutputSchemaManifest> properties = new LinkedHashMap<>();
-        properties.put("transport", transport);
-        properties.put("questions", questions);
-        properties.put("rows", rows);
-        properties.put("empty.object[]", empty);
-        root.setProperties(properties);
-        root.setRequired(List.of("transport", "rows"));
+        var root = compile("""
+                {"type":"object","additionalProperties":false,"properties":{
+                  "transport":{"type":"object","additionalProperties":true,"properties":{
+                    "outbound":{"type":["object","null"],"additionalProperties":true,"description":"Selected outbound option from the digest."},
+                    "mode":{"type":"string","enum":["train, express","flight\\\"overnight"]}},"required":["outbound"]},
+                  "questions":{"type":"array","items":{"type":"string"},"description":"Questions still needing answers.","x-loomspan-evidence":"SENTINEL_EVIDENCE"},
+                  "rows":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"date":{"type":"string","format":"date"}},"required":["date"]}},
+                  "empty.object[]":{"type":"object","additionalProperties":false}},"required":["transport","rows"]}
+                """);
 
         Prompt augmented = new OutputSchemaPromptAugmentor().augment(
                 new Prompt(List.of(new SystemMessage("ORIGINAL SYSTEM"))), root);
@@ -66,7 +36,6 @@ class OutputSchemaPromptAugmentorTest
                 Return JSON only.
                 Do not include markdown fences, commentary, or prose.
                 Use the configured field names exactly.
-                Omit unknown fields unless they are explicitly allowed.
 
                 Property semantics:
                 - required: the property must be present
@@ -78,7 +47,7 @@ class OutputSchemaPromptAugmentorTest
                 $ — object, non-null, additionalProperties=false
                   $.transport — object, required, non-null, additionalProperties=true
                     $.transport.outbound — object, required, nullable, additionalProperties=true - Selected outbound option from the digest.
-                    $.transport.mode — string, optional, non-null, enum=["train, express", "flight\\\"overnight"]
+                    $.transport.mode — string, optional, non-null, enum=["train, express","flight\\\"overnight"]
                   $.questions — array, optional, non-null - Questions still needing answers.
                     $.questions[] — string, non-null
                   $.rows — array, required, non-null
@@ -92,10 +61,33 @@ class OutputSchemaPromptAugmentorTest
                 .doesNotContain("response format");
     }
 
-    private YamlSkillManifest.OutputSchemaManifest node(String type)
-    {
-        YamlSkillManifest.OutputSchemaManifest node = new YamlSkillManifest.OutputSchemaManifest();
-        node.setType(type);
-        return node;
+    @ParameterizedTest
+    @ValueSource(strings = {"", ",\"additionalProperties\":true", ",\"additionalProperties\":false"})
+    void rendersRootAndNestedStandardOpenness(String openness) {
+        var contract = compile("{\"type\":\"object\",\"properties\":{\"nested\":{\"type\":\"object\"" + openness + "}}" + openness + "}");
+        String expected = openness.endsWith("false") ? "false" : "true";
+        var prompt = new OutputSchemaPromptAugmentor().augment(new Prompt("Task"), contract);
+        assertThat(prompt.getSystemMessage().getText())
+                .contains("$ — object, non-null, additionalProperties=" + expected)
+                .contains("$.nested — object, optional, non-null, additionalProperties=" + expected)
+                .doesNotContain("Omit unknown fields unless");
+    }
+
+    @Test
+    void rendersScalarEnumValuesAndEveryBoundWithoutChangingCanonicalTree() {
+        var contract = compile("""
+                {"type":"object","properties":{
+                 "number":{"type":"number","enum":[1,2.5],"minimum":1,"maximum":3},
+                 "text":{"type":["string","null"],"minLength":2,"maxLength":4,"format":"uuid","description":"Original description"},
+                 "items":{"type":"array","items":{"type":"boolean","enum":[true,false]},"minItems":1,"maxItems":3}}}
+                """);
+        String before = contract.tree().toString();
+        String rendered = new OutputSchemaPromptAugmentor().renderContract(contract);
+        assertThat(rendered).contains("enum=[1,2.5]", "minimum=1", "maximum=3", "minLength=2", "maxLength=4", "format=uuid", "minItems=1", "maxItems=3", "enum=[true,false]", "Original description");
+        assertThat(contract.tree().toString()).isEqualTo(before);
+    }
+
+    private static CanonicalSchema compile(String json) {
+        return new StandardSchemaCompiler().compile(json, StandardSchemaCompiler.Role.OUTPUT, StandardSchemaCompiler.Origin.AUTHORED);
     }
 }

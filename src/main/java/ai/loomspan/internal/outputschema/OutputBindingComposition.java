@@ -95,19 +95,7 @@ public final class OutputBindingComposition {
         return new Result(content,provenance(),validate(content,original));
     }
     private OutputSchemaValidationResult validate(String content, CanonicalSchema contract) {
-        if (content == null || content.isBlank()) return OutputSchemaValidationResult.failed(OutputSchemaFailureMode.INVALID_JSON,
-                List.of(new OutputSchemaValidationIssue("$", "Model contribution must be JSON.", null, "invalid_json", null,null,null,null,null,null,null)));
-        JsonNode instance;
-        try { instance = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree(content); }
-        catch (tools.jackson.core.JacksonException ex) {
-            return OutputSchemaValidationResult.failed(OutputSchemaFailureMode.INVALID_JSON,
-                    List.of(new OutputSchemaValidationIssue("$", ex.getMessage(), null, "invalid_json", null,null,null,null,null,null,null)));
-        }
-        var errors = contract.validate(instance);
-        if (errors.isEmpty()) return OutputSchemaValidationResult.passed();
-        return OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED, errors.stream()
-                .map(error -> new OutputSchemaValidationIssue(error.getInstanceLocation().toString(), error.toString(), null,
-                        "schema_validation", null,null,null,null,null,null,null)).toList());
+        return new OutputSchemaValidator().validate(content, contract);
     }
     private Result failed(String candidate,String code,String message) {
         return new Result(candidate,provenance(),OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED,

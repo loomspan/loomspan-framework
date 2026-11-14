@@ -455,7 +455,7 @@ class SpringAiChatClientAssemblerIntegrationTest
                     factory.create(definition, mode).call(new ModelInteractionRequest(
                             "system", new RenderedMissionInput("user", List.of(), Map.of()),
                             new ModelTraceContext(ModelExecutionIdentity.from(definition.requireExecutionConfiguration()),
-                                    "default-test", "mission"), capabilities, planning)).content());
+                                    "default-test", "mission"), capabilities, planning, null)).content());
         }
     }
 

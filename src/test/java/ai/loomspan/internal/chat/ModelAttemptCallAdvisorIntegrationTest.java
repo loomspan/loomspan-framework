@@ -166,8 +166,10 @@ class ModelAttemptCallAdvisorIntegrationTest
             ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding,
                     () -> state.openMissionFrame(session, "default-test_skill", Map.of()));
             openFrame(binding, state, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
-            var schema = new YamlSkillManifest.OutputSchemaManifest();
-            schema.setType("object");
+            var schema = new ai.loomspan.internal.schema.StandardSchemaCompiler().compile("""
+                    {"type":"object","properties":{},"additionalProperties":false}
+                    """, ai.loomspan.internal.schema.StandardSchemaCompiler.Role.OUTPUT,
+                    ai.loomspan.internal.schema.StandardSchemaCompiler.Origin.AUTHORED);
             List<OutputSchemaOutcome> outcomes = new ArrayList<>();
             var advisor = new OutputSchemaCallAdvisor("equipment", schema, new OutputSchemaValidator(),
                     new OutputSchemaPromptAugmentor(), 2, outcomes::add);
@@ -390,13 +392,10 @@ class ModelAttemptCallAdvisorIntegrationTest
                     .inputType(new ParameterizedTypeReference<Map<String, Object>>() { })
                     .inputSchema("{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}},\"required\":[\"value\"]}")
                     .build();
-            YamlSkillManifest.OutputSchemaManifest valueSchema = new YamlSkillManifest.OutputSchemaManifest();
-            valueSchema.setType("string");
-            YamlSkillManifest.OutputSchemaManifest outputSchema = new YamlSkillManifest.OutputSchemaManifest();
-            outputSchema.setType("object");
-            outputSchema.setProperties(Map.of("result", valueSchema));
-            outputSchema.setRequired(List.of("result"));
-            outputSchema.setAdditionalProperties(false);
+            var outputSchema = new ai.loomspan.internal.schema.StandardSchemaCompiler().compile("""
+                    {"type":"object","properties":{"result":{"type":"string"}},"required":["result"],"additionalProperties":false}
+                    """, ai.loomspan.internal.schema.StandardSchemaCompiler.Role.OUTPUT,
+                    ai.loomspan.internal.schema.StandardSchemaCompiler.Origin.AUTHORED);
             OutputSchemaCallAdvisor semanticPolicy = new OutputSchemaCallAdvisor(
                     "default-test_skill", outputSchema, new OutputSchemaValidator(), new OutputSchemaPromptAugmentor(),
                     1, ignored -> { });

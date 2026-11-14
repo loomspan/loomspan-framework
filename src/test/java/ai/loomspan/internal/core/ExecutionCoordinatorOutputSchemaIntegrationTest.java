@@ -204,23 +204,13 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
         manifest.setAllowedSkills(List.of());
         manifest.setPlanningMode(false);
 
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType("object");
-        YamlSkillManifest.OutputSchemaManifest vendorName = new YamlSkillManifest.OutputSchemaManifest();
-        vendorName.setType("string");
-        YamlSkillManifest.OutputSchemaManifest totalAmount = new YamlSkillManifest.OutputSchemaManifest();
-        totalAmount.setType("number");
-        Map<String, YamlSkillManifest.OutputSchemaManifest> properties = new LinkedHashMap<>();
-        properties.put("vendorName", vendorName);
-        properties.put("totalAmount", totalAmount);
-        if (withLinter) {
-            YamlSkillManifest.OutputSchemaManifest status = new YamlSkillManifest.OutputSchemaManifest();
-            status.setType("string");
-            properties.put("status", status);
-        }
-        schema.setProperties(properties);
-        schema.setRequired(List.of("vendorName", "totalAmount"));
-        schema.setAdditionalProperties(false);
+        var schema = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+        schema.put("type", "object").put("additionalProperties", false);
+        var properties = schema.putObject("properties");
+        properties.putObject("vendorName").put("type", "string");
+        properties.putObject("totalAmount").put("type", "number");
+        if (withLinter) properties.putObject("status").put("type", "string");
+        schema.putArray("required").add("vendorName").add("totalAmount");
         manifest.setOutputSchema(schema);
         manifest.setOutputSchemaMaxRetries(2);
 

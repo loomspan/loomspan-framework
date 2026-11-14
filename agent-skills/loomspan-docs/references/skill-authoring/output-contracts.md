@@ -2,7 +2,7 @@
 audience: loomspan-skill-builder
 status: development
 applies_to: bundled-loomspan-revision
-coverage: local-canonical-bindings
+coverage: local-canonical-bindings-and-ordinary-output
 ---
 
 # Output Contracts
@@ -15,11 +15,11 @@ For accepted declaration vocabulary, nullability, openness, assertions, formats
 and annotations, read [standard schemas](standard-schemas.md). The shared
 compiler and binding projection/composition have focused local coverage. The current checkout cannot
 build the complete application while schema consumers remain inconsistent.
-Binding-owned checks use canonical schemas and the shared validator. General
-forwarding, engine completion, guidance, correction, provider request attachment
-and effective metadata integration remain incomplete. Their retained test anchors
-are not passing application guarantees. Local composition checks alone do not
-restore those consumers.
+Ordinary validation, recursive guidance, bounded correction, native request
+attachment and binding composition have focused actual-source coverage.
+Full engine/public invocation, forwarding, planning and effective metadata
+integration remain unavailable. Their retained full-graph test anchors are not
+passing application guarantees.
 
 [TypeSafe leaves](typesafe-skills.md) have a generated descriptive output schema
 and return the complete provider answers without answer validation or repair.
@@ -267,7 +267,44 @@ Legacy `nullable` and schema-node `evidence` are rejected. Use
 
 For ordinary model execution without `output_bindings`, Loomspan places the complete effective contract in the first request. For ordinary synthesis in planning mode without output bindings, it places the same contract in the first `FINAL_RESPONSE` request, after required plan tasks complete; tool-call steps do not receive final-output guidance. The renderer includes every normalized node, required or optional presence, nullable or non-null values, effective object openness, array items, enum, format, and description. It does not include evidence expressions, mappings, retry settings, or provider metadata.
 
-Loomspan then parses and validates the returned JSON. It does not silently coerce, insert, remove, or repair candidate fields and does not request a provider-native JSON Schema response format. With `output_schema_max_retries: N`, a non-planning output allows one initial validated response plus at most `N` semantic corrections. Planning final-response validation uses its planning retry path. For physical-attempt identity, accounting, correction-message composition, and trace diagnosis, read [traces-and-debugging.md](traces-and-debugging.md).
+Loomspan requests a native JSON Schema response format and then parses and validates the returned JSON losslessly against the canonical contract. It does not silently coerce, insert, remove, or repair candidate fields. With `output_schema_max_retries: N`, a non-planning output allows one initial validated response plus at most `N` semantic corrections. Planning final-response validation uses its planning retry path. For physical-attempt identity, accounting, correction-message composition, and trace diagnosis, read [traces-and-debugging.md](traces-and-debugging.md).
+
+## Native output mapping
+
+Ordinary schema-bearing initial calls, semantic corrections and tool-loop
+continuations carry the canonical or binding-projected generation contract.
+Text-only calls retain text mode. Provider preparation operates on detached copies;
+canonical and prepared native schema facts remain distinct in request diagnostics.
+Raw provider response parts remain evidence; application-facing composition replaces
+text once and preserves ordered non-text parts, metadata and other generations.
+
+| Driver | Native format and request-copy rules |
+| --- | --- |
+| Shared `openai` | Responses `text.format` with `json_schema` and strict true. Preserve assertions. Its strict mapping rejects optional declared properties and objects without explicit `additionalProperties:false` before sending. The same mapping serves OpenAI, Meta, OpenRouter and Ollama. |
+| `anthropic` | Messages `output_config.format` JSON Schema. Omit `minimum`, `maximum`, `minLength`, `maxLength`, `maxItems`, and `minItems` other than 0/1 at actual schema nodes. Keep minItems 0/1 and every format. Objects must explicitly be closed or preparation fails. Existing native effort is preserved. |
+| `gemini` | generateContent JSON MIME/schema options. Framework preserves all approved assertions; pinned SDK narrowing remains a known limitation. |
+
+Anthropic's omissions follow its documented Messages schema rejections (documentation
+checked November 13, 2026, Spring AI 2.1.0-RC2/Anthropic SDK 3.4.0). They weaken
+native generation guarantees; every omitted constraint remains locally enforced
+and may consume correction attempts. Non-strict tool schemas receive no such
+omissions. Properties named after keywords remain data. No format omission is
+established. See [Claude structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs).
+
+Unsupported structural contracts fail without closure, all-required conversion,
+null insertion, wrapping, map conversion or fallback. A provider schema/support
+rejection escapes once; it does not trigger output correction or error-driven
+keyword stripping. Existing transient transport retries remain separate. Earlier
+tool effects are not rolled back. Local schema loading makes no provider probes.
+
+`NativeOutputContractTest`, `OrdinaryNativeOutputIntegrationTest` and
+`OrdinaryOutputAcceptanceTest` verify request copies, actual loopback initial/
+correction/tool-continuation wiring, failure counts, local constraints and response
+preservation. Loopback serialization is not live endpoint acceptance/enforcement.
+The pinned Responses decimal wire defect and Gemini raw-schema narrowing
+remain unresolved; [model/connection limits](model-selection-and-connections.md)
+describe those dependency boundaries. Planner/step native formatting is separately
+incomplete; do not infer it from ordinary generation coverage.
 
 ## Authoring procedure
 
@@ -304,10 +341,12 @@ Loomspan then parses and validates the returned JSON. It does not silently coerc
   see [standard schemas](standard-schemas.md#executable-anchors).
 - `YamlSkillCatalog`, `YamlSkillManifest` and `YamlSkillDefinition` wire canonical
   declarations into registration and generation ownership.
-- `OutputSchemaValidator`, `OutputSchemaPromptAugmentor`, `OutputSchemaCallAdvisor`,
-  `StepPromptBuilder` and the mission engine are runtime consumers whose canonical
-  integration is incomplete. Their retained tests do not certify the new schema
-  representation until the application builds and those checks execute.
+- `OutputSchemaValidatorTest`, `OutputSchemaPromptAugmentorTest`,
+  `OrdinaryOutputAcceptanceTest`, `NativeOutputContractTest` and
+  `OrdinaryNativeOutputIntegrationTest` cover ordinary lossless acceptance, guidance,
+  bounded correction, request-copy mapping and response composition against actual
+  production sources. `StepPromptBuilderTest` and complete mission/engine checks
+  remain blocked by planning and metadata consumers in the full source graph.
 
 ## Namespace publication boundary
 

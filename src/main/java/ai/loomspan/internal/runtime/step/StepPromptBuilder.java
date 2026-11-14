@@ -131,7 +131,7 @@ final class StepPromptBuilder
             int stepNumber,
             List<CompletedTaskResult> completedTaskResults,
             @Nullable String executionSummary,
-            @Nullable YamlSkillManifest.OutputSchemaManifest outputSchema)
+            @Nullable ai.loomspan.internal.schema.CanonicalSchema outputSchema)
     {
         Objects.requireNonNull(plan, "plan must not be null");
         Objects.requireNonNull(objective, "objective must not be null");
@@ -208,7 +208,7 @@ final class StepPromptBuilder
     }
 
     private static void appendOutputSchemaGuidance(StringBuilder sb,
-            @Nullable YamlSkillManifest.OutputSchemaManifest outputSchema)
+            @Nullable ai.loomspan.internal.schema.CanonicalSchema outputSchema)
     {
         if (outputSchema == null)
         {

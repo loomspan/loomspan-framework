@@ -7,7 +7,7 @@ import ai.loomspan.internal.core.AdvisorTraceFact;
 import ai.loomspan.internal.core.AdvisorTraceRecorder;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.ModelTraceContext;
-import ai.loomspan.internal.skill.YamlSkillManifest;
+import ai.loomspan.internal.schema.CanonicalSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClientRequest;
@@ -28,13 +28,14 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
     private static final Logger log = LoggerFactory.getLogger(OutputSchemaCallAdvisor.class);
 
     public static final String CONTEXT_KEY = "loomspan.output-schema.outcome";
+    public static final String OUTPUT_CONTRACT_KEY = "loomspan.outputContract";
     public static final String PLANNING_CALL_KEY = "loomspan.advisor.planning-call";
 
     private static final int MAX_ISSUES_IN_OUTCOME = 4;
     static final int MAX_CORRECTION_CODE_POINTS = OutputValidationFeedback.MAX_CORRECTION_CODE_POINTS;
 
     private final String skillName;
-    private final YamlSkillManifest.OutputSchemaManifest schema;
+    private final CanonicalSchema schema;
     private final OutputSchemaValidator validator;
     private final OutputSchemaPromptAugmentor promptAugmentor;
     private final int maxRetries;
@@ -50,7 +51,7 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
     }
 
     public OutputSchemaCallAdvisor(String skillName,
-            YamlSkillManifest.OutputSchemaManifest schema,
+            CanonicalSchema schema,
             OutputSchemaValidator validator,
             OutputSchemaPromptAugmentor promptAugmentor,
             int maxRetries,
@@ -60,7 +61,7 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
     }
 
     public OutputSchemaCallAdvisor(String skillName,
-            YamlSkillManifest.OutputSchemaManifest schema,
+            CanonicalSchema schema,
             OutputSchemaValidator validator,
             OutputSchemaPromptAugmentor promptAugmentor,
             int maxRetries,
@@ -94,10 +95,12 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
         }
 
         OutputBindingComposition composition = compositionDefinition == null ? null : invocationComposition();
-        Prompt initialPrompt = promptAugmentor.augment(chatClientRequest.prompt(), composition == null ? schema : composition.projection().schema());
+        CanonicalSchema effectiveSchema = composition == null ? schema : composition.projection().schema();
+        Prompt initialPrompt = promptAugmentor.augment(chatClientRequest.prompt(), effectiveSchema);
         if (composition != null) initialPrompt = initialPrompt.augmentSystemMessage(message -> message.mutate().text(message.getText() + "\n" + composition.guidance()).build());
         ChatClientRequest baselineRequest = chatClientRequest.mutate()
                 .prompt(initialPrompt)
+                .context(OUTPUT_CONTRACT_KEY, effectiveSchema)
                 .build();
         ChatClientRequest currentRequest = baselineRequest;
 
@@ -122,8 +125,22 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
                     var originalResponse = response.chatResponse();
                     var generation = originalResponse.getResult();
                     var output = generation.getOutput();
-                    var replacement = new org.springframework.ai.chat.model.Generation(AssistantMessage.builder().content(assembled.content()).properties(output.getMetadata()).toolCalls(output.getToolCalls()).media(output.getMedia()).build(), generation.getMetadata());
-                    response = response.mutate().chatResponse(new org.springframework.ai.chat.model.ChatResponse(List.of(replacement), originalResponse.getMetadata())).build();
+                    var parts = new ArrayList<org.springframework.ai.chat.messages.part.MessagePart>();
+                    boolean replaced = false;
+                    for (var part : output.getParts()) {
+                        if (part instanceof org.springframework.ai.chat.messages.part.TextPart text) {
+                            if (!replaced) {
+                                parts.add(new org.springframework.ai.chat.messages.part.TextPart(assembled.content(), text.payload(), text.attributes()));
+                                replaced = true;
+                            }
+                        } else parts.add(part);
+                    }
+                    if (!replaced) parts.add(org.springframework.ai.chat.messages.part.TextPart.of(assembled.content()));
+                    var replacement = new org.springframework.ai.chat.model.Generation(AssistantMessage.builder()
+                            .parts(parts).properties(output.getMetadata()).build(), generation.getMetadata());
+                    var generations = new ArrayList<>(originalResponse.getResults());
+                    generations.set(0, replacement);
+                    response = response.mutate().chatResponse(new org.springframework.ai.chat.model.ChatResponse(generations, originalResponse.getMetadata())).build();
                 }
                 return record(response, OutputValidationPolicy.schemaOutcome(skillName, attempt, maxRetries, true, null, List.of(), MAX_ISSUES_IN_OUTCOME));
             }

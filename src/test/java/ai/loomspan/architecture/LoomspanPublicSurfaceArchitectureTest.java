@@ -117,6 +117,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.provider.RetryDelaySource", "Public only for typed internal retry delay trace metadata."),
             Map.entry("ai.loomspan.internal.springai.SpringAiProviderIntegration", "Public only as the official Spring AI integration boundary used by internal auto-configuration."),
             Map.entry("ai.loomspan.internal.springai.SpringAiChatOptionsContributor", "Public only for framework-owned Spring AI client assembly."),
+            Map.entry("ai.loomspan.internal.springai.NativeOutputContract", "Public only for per-request formatting at the cross-package provider-attempt boundary."),
             Map.entry("ai.loomspan.internal.springai.SpringAiModelInteraction", "Public only to adapt Spring AI behind the neutral model boundary."),
             Map.entry("ai.loomspan.internal.springai.SpringAiModelInteractionFactory", "Public only for framework-owned Spring AI composition."),
             Map.entry("ai.loomspan.internal.model.ModelInteraction", "Public only as the neutral internal model boundary."),

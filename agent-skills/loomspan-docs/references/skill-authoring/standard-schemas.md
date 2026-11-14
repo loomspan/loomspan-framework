@@ -2,7 +2,7 @@
 audience: loomspan-skill-builder
 status: development
 applies_to: bundled-loomspan-revision
-coverage: declaration-and-local-bindings
+coverage: declaration-local-bindings-and-ordinary-output
 ---
 
 # Standard schema declarations
@@ -18,7 +18,7 @@ The declaration compiler, JSON-bound skill decoder and generated Java contracts
 have focused executable coverage. Child-input and output-binding projection,
 assembly/composition and bounded binding compatibility checks also use canonical
 trees and shared local validation. The current source checkout has incomplete consumer integration:
-full input dispatch, output correction, planning and TypeSafe/evidence metadata consumers
+full input dispatch, planning and TypeSafe/evidence metadata consumers
 do not all accept the canonical representation yet. The complete application
 build and runtime paths are unavailable while those consumers are inconsistent.
 A successful foundation validation does not establish an executable skill tree,
@@ -27,8 +27,11 @@ declaration syntax, not a runnable end-to-end application.
 
 The compiler validates supported declarations and instances locally without
 coercion, default insertion or mutation. Provider schema copies omit recognized
-Loomspan annotations at schema nodes and preserve standard assertions. Sending
-or enforcing that copy at a provider is a separate integration concern.
+Loomspan annotations at schema nodes. Ordinary generation and correction use
+native response schemas, with the explicit Anthropic assertion omissions described
+in [output contracts](output-contracts.md#native-output-mapping). All assertions
+remain in local acceptance. SDK wire fidelity and hosted enforcement are separate
+from canonical validity and local acceptance.
 
 ## Required shape and vocabulary
 
@@ -306,3 +309,15 @@ and `OrdinaryToolArgumentsTest` cover these local boundaries with actual validat
 reader, schema generation and registered Java binding sources. They do not prove
 complete public invocation, the actual callback/manager graph or provider request
 fidelity while the surrounding application build is unavailable.
+
+## Ordinary output acceptance
+
+Ordinary generated output is parsed by a private strict, lossless reader before
+canonical validation. Exact decimals and large integers cannot become valid by
+rounding. A second JSON value or trailing garbage rejects; trailing whitespace
+is permitted. No coercion, case folding, defaults or null insertion occurs.
+Malformed JSON and completed schema violations use the existing bounded output
+correction budget; operational validation failures escape as failures.
+`OutputSchemaValidatorTest`, `OrdinaryOutputAcceptanceTest` and
+`NativeOutputContractTest` exercise this boundary. Full application publication,
+planning and metadata integration still require the complete source graph.

@@ -138,15 +138,9 @@ class SkillAdvisorResolverEvidenceTraceTest
         manifest.setModel("gpt-5");
         manifest.setOutputSchemaMaxRetries(2);
 
-        YamlSkillManifest.OutputSchemaManifest vendorName = new YamlSkillManifest.OutputSchemaManifest();
-        vendorName.setType("string");
-        vendorName.setEvidence("default-invoiceParser");
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType("object");
-        schema.setProperties(Map.of("vendorName", vendorName));
-        schema.setRequired(List.of("vendorName"));
-        schema.setAdditionalProperties(false);
-        manifest.setOutputSchema(schema);
+        manifest.setOutputSchema(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","properties":{"vendorName":{"type":"string","x-loomspan-evidence":"default-invoiceParser"}},"required":["vendorName"],"additionalProperties":false}
+                """));
 
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),

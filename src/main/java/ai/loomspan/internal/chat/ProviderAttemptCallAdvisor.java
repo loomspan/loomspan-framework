@@ -67,6 +67,8 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
         if (!(rawContext instanceof ModelTraceContext context))
             throw new IllegalStateException("loomspan model call is missing its call-local trace context");
 
+        request = ai.loomspan.internal.springai.NativeOutputContract.prepare(request, runtime.driver(), context);
+
         ExecutionBinding binding = ExecutionBindingScope.requireCurrent();
         LoomspanSession session = binding.session();
         ExecutionFrame frame = binding.branch().requireLeaf();
@@ -206,7 +208,16 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
     private Map<String, Object> requestPayload(ChatClientRequest request)
     {
         List<Map<String, Object>> messages = request.prompt().getInstructions().stream().map(this::messagePayload).toList();
-        return Map.of("messages", messages);
+        var payload = new LinkedHashMap<String, Object>();
+        payload.put("messages", messages);
+        Object contract = request.context().get(ai.loomspan.internal.outputschema.OutputSchemaCallAdvisor.OUTPUT_CONTRACT_KEY);
+        if (contract instanceof ai.loomspan.internal.schema.CanonicalSchema canonical)
+        {
+            payload.put("canonicalGenerationSchema", canonical.tree());
+            // This is the prepared native option, not a claim about SDK wire fidelity (PR30-B01/B04).
+            payload.put("preparedNativeSchema", request.context().get(ai.loomspan.internal.springai.NativeOutputContract.PREPARED_SCHEMA_KEY));
+        }
+        return Collections.unmodifiableMap(payload);
     }
 
     private Map<String, Object> messagePayload(Message message)

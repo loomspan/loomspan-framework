@@ -1117,7 +1117,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                     "step-" + stepNumber);
 
             return modelInteraction.call(new ModelInteractionRequest(
-                    stepPrompt, renderedInput, modelTraceContext, List.of(), false)).content();
+                    stepPrompt, renderedInput, modelTraceContext, List.of(), false, null)).content();
         }
         catch (RuntimeException | Error ex)
         {

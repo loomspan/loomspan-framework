@@ -20,10 +20,9 @@ class OutputValidationAdvisorOrderingTest {
     void preservesNestedAdvisorOrderAndResetsDownstreamAttempts() {
         var manifest = new YamlSkillManifest();
         manifest.setName("parent"); manifest.setOutputSchemaMaxRetries(1);
-        var scalar = new YamlSkillManifest.OutputSchemaManifest(); scalar.setType("string");
-        var schema = new YamlSkillManifest.OutputSchemaManifest(); schema.setType("object");
-        schema.setProperties(Map.of("result", scalar, "claim", scalar));
-        schema.setRequired(List.of("result")); schema.setAdditionalProperties(false); manifest.setOutputSchema(schema);
+        manifest.setOutputSchema(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","properties":{"result":{"type":"string"},"claim":{"type":"string"}},"required":["result"],"additionalProperties":false}
+                """));
         var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern(".*GOOD.*"); regex.setMessage("Use GOOD");
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(1); linter.setRegex(regex); manifest.setLinter(linter);
         var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest,

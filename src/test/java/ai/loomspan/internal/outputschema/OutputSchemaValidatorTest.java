@@ -1,321 +1,168 @@
 package ai.loomspan.internal.outputschema;
 
-import ai.loomspan.internal.skill.YamlSkillManifest;
+import ai.loomspan.internal.schema.CanonicalSchema;
+import ai.loomspan.internal.schema.StandardSchemaCompiler;
 import org.junit.jupiter.api.Test;
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.TokenStreamLocation;
-import tools.jackson.databind.ObjectMapper;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import tools.jackson.databind.json.JsonMapper;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-class OutputSchemaValidatorTest
-{
+class OutputSchemaValidatorTest {
     private final OutputSchemaValidator validator = new OutputSchemaValidator();
 
     @Test
-    void reportsBoundedParserFactsForMalformedJson()
-    {
-        String candidate = """
-                {"estimatedTotal": 49 + 0,
-                 "note": "\ud83d\ude80\nline"} // comment
-                """;
-
-        OutputSchemaValidationIssue issue = validator.validate(candidate, objectSchema(Map.of(), List.of(), true))
-                .issues().getFirst();
-
+    void reportsBoundedParserFactsForMalformedJson() {
+        String candidate = "{\"estimatedTotal\":49 + 0,\n\"note\":\"🚀\\nline\"} // comment";
+        var issue = validator.validate(candidate, schema("{\"type\":\"object\"}")).issues().getFirst();
         assertThat(issue.code()).isEqualTo(OutputSchemaValidator.INVALID_JSON);
         assertThat(issue.reason()).isNotBlank();
-        assertThat(issue.reason().codePointCount(0, issue.reason().length()))
-                .isLessThanOrEqualTo(OutputSchemaValidationIssue.MAX_REASON_CODE_POINTS);
+        assertThat(issue.reason().codePointCount(0, issue.reason().length())).isLessThanOrEqualTo(240);
         assertThat(issue.line()).isPositive();
         assertThat(issue.column()).isPositive();
         assertThat(issue.characterOffset()).isNotNegative();
-        assertThat(issue.fragment()).startsWith("\"").endsWith("\"");
-        assertThat(issue.fragment().codePointCount(0, issue.fragment().length()))
-                .isLessThanOrEqualTo(OutputSchemaValidationIssue.MAX_FRAGMENT_CODE_POINTS);
-        assertThat(issue.fragment()).doesNotContain("\n");
-        assertThat(issue.message()).doesNotContain("JacksonException", " at [Source:");
+        assertThat(issue.fragment()).startsWith("\"").endsWith("\"").doesNotContain("\n");
+        assertThat(issue.fragment().codePointCount(0, issue.fragment().length())).isLessThanOrEqualTo(120);
     }
 
     @Test
-    void fallsBackWhenParserFactsAreUnavailable() throws Exception
-    {
-        ObjectMapper mapper = mock(ObjectMapper.class);
-        JacksonException failure = mock(JacksonException.class);
-        when(failure.getOriginalMessage()).thenReturn("  ");
-        when(failure.getLocation()).thenReturn(TokenStreamLocation.NA);
-        when(mapper.readTree("malformed")).thenThrow(failure);
-        when(mapper.readTree("null-tree")).thenReturn(null);
-
-        OutputSchemaValidationIssue issue = new OutputSchemaValidator(mapper)
-                .validate("malformed", scalarSchema("string", false)).issues().getFirst();
-
-        assertThat(issue.message()).isEqualTo("Response is not valid JSON.");
-        assertThat(issue.reason()).isNull();
-        assertThat(issue.line()).isNull();
-        assertThat(issue.column()).isNull();
-        assertThat(issue.characterOffset()).isNull();
-        assertThat(issue.fragment()).isNull();
-
-        OutputSchemaValidationIssue nullTree = new OutputSchemaValidator(mapper)
-                .validate("null-tree", scalarSchema("string", false)).issues().getFirst();
-        assertThat(nullTree.message()).isEqualTo("Response is not valid JSON.");
-        assertThat(nullTree).extracting(OutputSchemaValidationIssue::reason,
-                OutputSchemaValidationIssue::line,
-                OutputSchemaValidationIssue::column,
-                OutputSchemaValidationIssue::characterOffset,
-                OutputSchemaValidationIssue::fragment)
-                .containsOnlyNulls();
-
-        OutputSchemaValidationIssue blank = validator.validate("  ", scalarSchema("string", false)).issues().getFirst();
-        assertThat(blank).extracting(OutputSchemaValidationIssue::reason,
-                OutputSchemaValidationIssue::line,
-                OutputSchemaValidationIssue::column,
-                OutputSchemaValidationIssue::characterOffset,
-                OutputSchemaValidationIssue::fragment)
-                .containsOnlyNulls();
+    void blankOutputHasNoInventedParserLocation() {
+        for (String candidate : new String[]{null, "", " \t\n"}) {
+            var issue = validator.validate(candidate, schema("{\"type\":\"object\"}")).issues().getFirst();
+            assertThat(issue.code()).isEqualTo("invalid_json");
+            assertThat(issue).extracting(OutputSchemaValidationIssue::line, OutputSchemaValidationIssue::column,
+                    OutputSchemaValidationIssue::characterOffset, OutputSchemaValidationIssue::fragment).containsOnlyNulls();
+        }
     }
 
     @Test
-    void capsParserAndSchemaFactsAtTheirUnicodeBoundaries() throws Exception
-    {
-        ObjectMapper mapper = mock(ObjectMapper.class);
-        JacksonException failure = mock(JacksonException.class);
-        TokenStreamLocation location = mock(TokenStreamLocation.class);
-        when(failure.getOriginalMessage()).thenReturn("r".repeat(241));
-        when(failure.getLocation()).thenReturn(location);
-        when(location.getLineNr()).thenReturn(1);
-        when(location.getColumnNr()).thenReturn(150);
-        when(location.getCharOffset()).thenReturn(150L);
-        String malformed = "x".repeat(300);
-        when(mapper.readTree(malformed)).thenThrow(failure);
-
-        OutputSchemaValidationIssue parserIssue = new OutputSchemaValidator(mapper)
-                .validate(malformed, scalarSchema("string", false)).issues().getFirst();
-
-        assertThat(parserIssue.reason().codePointCount(0, parserIssue.reason().length())).isEqualTo(240);
-        assertThat(parserIssue.fragment().codePointCount(0, parserIssue.fragment().length())).isEqualTo(120);
-
-        YamlSkillManifest.OutputSchemaManifest enumSchema = scalarSchema("string", false);
-        enumSchema.setEnumValues(List.of("e".repeat(300)));
-        OutputSchemaValidationIssue enumIssue = validator.validate("\"different\"", enumSchema).issues().getFirst();
-        assertThat(enumIssue.expected().codePointCount(0, enumIssue.expected().length())).isEqualTo(256);
-        assertThat(enumIssue.message().codePointCount(0, enumIssue.message().length()))
-                .isLessThanOrEqualTo(OutputSchemaValidationIssue.MAX_MESSAGE_CODE_POINTS);
+    void parserAndSchemaFactsRespectUnicodeBounds() {
+        String malformed = "{\"🚀\":\"" + "🚀".repeat(200) + "\",\"value\":oops}";
+        var parserIssue = validator.validate(malformed, schema("{\"type\":\"object\"}")).issues().getFirst();
+        assertThat(parserIssue.fragment().codePointCount(0, parserIssue.fragment().length())).isLessThanOrEqualTo(120);
+        assertThat(parserIssue.fragment().codePoints()).noneMatch(c -> c >= 0xD800 && c <= 0xDFFF);
+        var enumContract = valueSchema("{\"type\":\"string\",\"enum\":[\"" + "🚀".repeat(300) + "\"]}");
+        var issue = validator.validate("{\"value\":\"different\"}", enumContract).issues().getFirst();
+        assertThat(issue.message().codePointCount(0, issue.message().length())).isLessThanOrEqualTo(512);
+        if (issue.expected() != null) assertThat(issue.expected().codePointCount(0, issue.expected().length())).isLessThanOrEqualTo(256);
     }
 
     @Test
-    void reportsFullPathExpectedAndActualSchemaFacts()
-    {
-        YamlSkillManifest.OutputSchemaManifest outbound = objectSchema(Map.of(), List.of(), true);
-        YamlSkillManifest.OutputSchemaManifest returnLeg = objectSchema(Map.of(), List.of(), true);
-        returnLeg.setNullable(true);
-        YamlSkillManifest.OutputSchemaManifest transport = objectSchema(
-                linkedMap("outbound", outbound, "returnLeg", returnLeg),
-                List.of("outbound", "returnLeg"), false);
-        YamlSkillManifest.OutputSchemaManifest root = objectSchema(
-                Map.of("transport", transport), List.of("transport"), false);
+    void usesExactIndependentPropertyNamesAndStandardRequiredness() {
+        var contract = schema("""
+                {"type":"object","properties":{"name":{"type":"string"},"Name":{"type":"integer"},"a.b":{"type":"string"},"🚀":{"type":"boolean"}},
+                 "required":["name","Name","a.b","🚀"],"additionalProperties":false}
+                """);
+        assertThat(validator.validate("{\"name\":\"x\",\"Name\":2,\"a.b\":\"exact\",\"🚀\":true}", contract).valid()).isTrue();
+        var missing = validator.validate("{\"Name\":2,\"a.b\":\"exact\",\"🚀\":true}", contract);
+        assertThat(missing.valid()).isFalse();
+        assertThat(missing.issues()).anySatisfy(issue -> assertThat(issue.code()).isEqualTo("required"));
+        assertThat(validator.validate("{\"name\":\"x\",\"Name\":2,\"a.b\":1,\"🚀\":false}", contract).issues())
+                .anySatisfy(issue -> assertThat(issue.path()).isEqualTo("/a.b"));
+    }
 
-        List<OutputSchemaValidationIssue> issues = validator.validate("""
-                {"transport":{"outbound":"flight","returnLeg":"train"}}
-                """, root).issues();
-
-        assertThat(issues).extracting(OutputSchemaValidationIssue::path)
-                .containsExactly("$.transport.outbound", "$.transport.returnLeg");
-        assertThat(issues).extracting(OutputSchemaValidationIssue::expected)
-                .containsExactly("object", "object or null");
-        assertThat(issues).extracting(OutputSchemaValidationIssue::actual)
-                .containsExactly("string", "string");
-        assertThat(issues).extracting(OutputSchemaValidationIssue::message)
-                .containsExactly("expected object, received string", "expected object or null, received string");
+    @ParameterizedTest
+    @ValueSource(strings = {"", ",\"additionalProperties\":true", ",\"additionalProperties\":false"})
+    void rootAndNestedObjectOpennessUsesStandardDefaults(String openness) {
+        var contract = schema("{\"type\":\"object\",\"properties\":{\"nested\":{\"type\":\"object\"" + openness + "}}" + openness + "}");
+        boolean open = !openness.endsWith("false");
+        assertThat(validator.validate("{\"extra\":1}", contract).valid()).isEqualTo(open);
+        assertThat(validator.validate("{\"nested\":{\"extra\":1}}", contract).valid()).isEqualTo(open);
+        assertThat(validator.validate("{\"nested\":{}}", contract).valid()).isTrue();
     }
 
     @Test
-    void distinguishesArraysScalarsNumbersAndJsonNull()
-    {
-        Map<String, YamlSkillManifest.OutputSchemaManifest> properties = new LinkedHashMap<>();
-        properties.put("arrayValue", arraySchema());
-        properties.put("stringValue", scalarSchema("string", false));
-        properties.put("integerValue", scalarSchema("integer", false));
-        properties.put("numberValue", scalarSchema("number", false));
-        properties.put("booleanValue", scalarSchema("boolean", false));
-        properties.put("nonnullValue", scalarSchema("object", false));
-
-        List<OutputSchemaValidationIssue> issues = validator.validate("""
-                {"arrayValue":{},"stringValue":1,"integerValue":1.5,"numberValue":"1", "booleanValue":[],"nonnullValue":null}
-                """, objectSchema(properties, List.copyOf(properties.keySet()), false)).issues();
-
-        assertThat(issues).extracting(OutputSchemaValidationIssue::expected)
-                .containsExactly("array", "string", "integer", "number", "boolean", "object");
-        assertThat(issues).extracting(OutputSchemaValidationIssue::actual)
-                .containsExactly("object", "integer", "number", "string", "array", "null");
+    void omissionAndNullAreIndependentWithoutCoercion() {
+        var contract = schema("""
+                {"type":"object","properties":{"optional":{"type":"string"},"requiredNullable":{"type":["string","null"]}},"required":["requiredNullable"],"additionalProperties":false}
+                """);
+        assertThat(validator.validate("{\"requiredNullable\":null}", contract).valid()).isTrue();
+        assertThat(validator.validate("{\"optional\":null,\"requiredNullable\":null}", contract).valid()).isFalse();
+        assertThat(validator.validate("{}", contract).valid()).isFalse();
+        assertThat(validator.validate("{\"requiredNullable\":1}", contract).valid()).isFalse();
     }
 
     @Test
-    void reportsConstraintFactsForMissingUnknownEnumAndAmbiguousProperties()
-    {
-        YamlSkillManifest.OutputSchemaManifest status = scalarSchema("string", false);
-        status.setEnumValues(List.of("OPEN", "CLOSED"));
-        YamlSkillManifest.OutputSchemaManifest schema = objectSchema(
-                linkedMap("vendorName", scalarSchema("string", false), "status", status),
-                List.of("vendorName", "status"), false);
-
-        List<OutputSchemaValidationIssue> issues = validator.validate("""
-                {"status":"SECRET_SENTINEL","Status":"OPEN","extra":"SECRET_VALUE"}
-                """, schema).issues();
-
-        assertThat(issues).extracting(OutputSchemaValidationIssue::code)
-                .containsExactly(
-                        OutputSchemaValidator.AMBIGUOUS_PROPERTY,
-                        OutputSchemaValidator.UNKNOWN_PROPERTY,
-                        OutputSchemaValidator.MISSING_REQUIRED);
-        assertThat(issues).extracting(OutputSchemaValidationIssue::path)
-                .containsExactly("$", "$.extra", "$.vendorName");
-        assertThat(issues).allSatisfy(issue -> {
-            assertThat(issue.expected()).isNotBlank();
-            assertThat(issue.actual()).isNotBlank();
-            assertThat(issue.message()).doesNotContain("SECRET_SENTINEL", "SECRET_VALUE");
-        });
-
-        OutputSchemaValidationIssue enumIssue = validator.validate(
-                "{\"vendorName\":\"Acme\",\"status\":\"SECRET_SENTINEL\"}", schema).issues().getFirst();
-        assertThat(enumIssue.code()).isEqualTo(OutputSchemaValidator.ENUM_MISMATCH);
-        assertThat(enumIssue.expected()).contains("OPEN", "CLOSED");
-        assertThat(enumIssue.actual()).isEqualTo("string");
-        assertThat(enumIssue.message()).doesNotContain("SECRET_SENTINEL");
+    void validatesOrdinaryTypesScalarEnumsAndNestedHomogeneousArrays() {
+        var contract = valueSchema("""
+                {"type":"array","items":{"type":"object","properties":{"count":{"type":"integer","enum":[1,2.0]},"active":{"type":"boolean","enum":[true]},"status":{"type":["string","null"],"enum":["OPEN",null]}},"required":["count","active","status"],"additionalProperties":false}}
+                """);
+        assertThat(validator.validate("{\"value\":[{\"count\":2,\"active\":true,\"status\":null}]}", contract).valid()).isTrue();
+        var failures = validator.validate("{\"value\":[{\"count\":1.5,\"active\":\"true\",\"status\":\"OTHER\"}]}", contract);
+        assertThat(failures.valid()).isFalse();
+        assertThat(failures.issues()).extracting(OutputSchemaValidationIssue::path)
+                .contains("/value/0/count", "/value/0/active", "/value/0/status");
     }
 
     @Test
-    void treatsPresenceAndNullabilityAsIndependentConstraints()
-    {
-        YamlSkillManifest.OutputSchemaManifest optionalObject = objectSchema(Map.of(), List.of(), false);
-        YamlSkillManifest.OutputSchemaManifest requiredNullable = objectSchema(Map.of(), List.of(), false);
-        requiredNullable.setNullable(true);
-        YamlSkillManifest.OutputSchemaManifest schema = objectSchema(
-                linkedMap("optionalObject", optionalObject, "requiredNullable", requiredNullable),
-                List.of("requiredNullable"), false);
-
-        assertThat(validator.validate("{\"requiredNullable\":null}", schema).valid()).isTrue();
-        assertThat(validator.validate("{\"optionalObject\":{},\"requiredNullable\":null}", schema).valid()).isTrue();
-
-        OutputSchemaValidationIssue nullOptional = validator.validate(
-                "{\"optionalObject\":null,\"requiredNullable\":null}", schema).issues().getFirst();
-        assertThat(nullOptional.code()).isEqualTo(OutputSchemaValidator.TYPE_MISMATCH);
-        assertThat(nullOptional.path()).isEqualTo("$.optionalObject");
-
-        OutputSchemaValidationIssue missingRequired = validator.validate("{}", schema).issues().getFirst();
-        assertThat(missingRequired.code()).isEqualTo(OutputSchemaValidator.MISSING_REQUIRED);
-        assertThat(missingRequired.path()).isEqualTo("$.requiredNullable");
+    void locallyEnforcesEveryApprovedAssertionThatAnthropicMayOmit() {
+        String[][] cases = {
+                {"{\"type\":\"number\",\"minimum\":2}", "1", "2"},
+                {"{\"type\":\"number\",\"maximum\":2}", "3", "2"},
+                {"{\"type\":\"string\",\"minLength\":2}", "\"x\"", "\"xy\""},
+                {"{\"type\":\"string\",\"maxLength\":2}", "\"xyz\"", "\"xy\""},
+                {"{\"type\":\"array\",\"items\":{\"type\":\"integer\"},\"minItems\":2}", "[1]", "[1,2]"},
+                {"{\"type\":\"array\",\"items\":{\"type\":\"integer\"},\"maxItems\":2}", "[1,2,3]", "[1,2]"}
+        };
+        for (String[] fixture : cases) {
+            var contract = valueSchema(fixture[0]);
+            assertThat(validator.validate("{\"value\":" + fixture[1] + "}", contract).valid()).as(fixture[0]).isFalse();
+            assertThat(validator.validate("{\"value\":" + fixture[2] + "}", contract).valid()).as(fixture[0]).isTrue();
+        }
+        assertThat(validator.validate("{\"value\":\"🚀\"}", valueSchema("{\"type\":\"string\",\"maxLength\":1}")).valid()).isTrue();
     }
 
     @Test
-    void doesNotEnforceFormatOrDescription()
-    {
-        YamlSkillManifest.OutputSchemaManifest date = scalarSchema("string", false);
-        date.setFormat("date");
-        date.setDescription("An ISO calendar date.");
-        YamlSkillManifest.OutputSchemaManifest schema = objectSchema(Map.of("date", date), List.of("date"), false);
-
-        assertThat(validator.validate("{\"date\":\"not-a-date\"}", schema).valid()).isTrue();
-        assertThat(validator.validate("{\"date\":42}", schema).issues().getFirst().code())
-                .isEqualTo(OutputSchemaValidator.TYPE_MISMATCH);
+    void enforcesFormatButKeepsDescriptionAsAnnotation() {
+        var contract = valueSchema("{\"type\":\"string\",\"format\":\"date\",\"description\":\"The word birthday is descriptive.\"}");
+        assertThat(validator.validate("{\"value\":\"not-a-date\"}", contract).valid()).isFalse();
+        assertThat(validator.validate("{\"value\":\"2026-11-13\"}", contract).valid()).isTrue();
     }
 
     @Test
-    void validatesArrayItemsRecursivelyWithIndexedPaths()
-    {
-        YamlSkillManifest.OutputSchemaManifest status = scalarSchema("string", false);
-        status.setEnumValues(List.of("OPEN", "CLOSED"));
-        YamlSkillManifest.OutputSchemaManifest row = objectSchema(
-                linkedMap("amount", scalarSchema("number", false), "status", status),
-                List.of("amount", "status"), false);
-        YamlSkillManifest.OutputSchemaManifest rows = scalarSchema("array", false);
-        rows.setItems(row);
-        YamlSkillManifest.OutputSchemaManifest schema = objectSchema(Map.of("rows", rows), List.of("rows"), false);
+    void preservesExactDecimalBoundsEvenWithCallerSuppliedLossyMapper() {
+        var lossless = new OutputSchemaValidator(JsonMapper.builder().build());
+        var upper = valueSchema("{\"type\":\"number\",\"maximum\":1}");
+        var lower = valueSchema("{\"type\":\"number\",\"minimum\":-1}");
+        for (String number : new String[]{"1.0000000000000001", "10000000000000001e-16", "1.00000000000000000000000000000000000000001"}) {
+            String candidate = "{\"value\":" + number + "}";
+            assertThat(lossless.validate(candidate, upper).valid()).as(number).isFalse();
+            assertThat(candidate).isEqualTo("{\"value\":" + number + "}");
+        }
+        for (String number : new String[]{"-1.0000000000000001", "-10000000000000001e-16"})
+            assertThat(lossless.validate("{\"value\":" + number + "}", lower).valid()).as(number).isFalse();
+        assertThat(lossless.validate("{\"value\":1.0000000000000000}", upper).valid()).isTrue();
+        assertThat(lossless.validate("{\"value\":-1e0}", lower).valid()).isTrue();
+        assertThat(lossless.validate("{\"value\":90071992547409931234567890123456789}", valueSchema("{\"type\":\"integer\"}")).valid()).isTrue();
+        var nested = valueSchema("{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"amount\":{\"type\":\"number\",\"maximum\":1}},\"required\":[\"amount\"]}}");
+        assertThat(lossless.validate("{\"value\":[{\"amount\":1.0000000000000001}]}", nested).valid()).isFalse();
+        assertThat(lossless.validate("{\"value\":[{\"amount\":1}]}", nested).valid()).isTrue();
+    }
 
-        List<OutputSchemaValidationIssue> issues = validator.validate(
-                "{\"rows\":[{\"amount\":\"many\",\"status\":\"UNKNOWN\"}]}", schema).issues();
-
-        assertThat(issues).extracting(OutputSchemaValidationIssue::path)
-                .containsExactly("$.rows[0].amount", "$.rows[0].status");
-        assertThat(issues).extracting(OutputSchemaValidationIssue::code)
-                .containsExactly(OutputSchemaValidator.TYPE_MISMATCH, OutputSchemaValidator.ENUM_MISMATCH);
+    @ParameterizedTest
+    @ValueSource(strings = {"{} {}", "{} null", "{} trailing", "{} //comment"})
+    void rejectsTrailingTokensAndGarbage(String candidate) {
+        assertThat(validator.validate(candidate, schema("{\"type\":\"object\"}")).failureMode()).isEqualTo(OutputSchemaFailureMode.INVALID_JSON);
     }
 
     @Test
-    void respectsAdditionalPropertiesForNestedObjects()
-    {
-        YamlSkillManifest.OutputSchemaManifest open = objectSchema(
-                Map.of("known", scalarSchema("string", false)), List.of(), true);
-        YamlSkillManifest.OutputSchemaManifest closed = objectSchema(
-                Map.of("known", scalarSchema("string", false)), List.of(), false);
-        YamlSkillManifest.OutputSchemaManifest schema = objectSchema(
-                linkedMap("open", open, "closed", closed), List.of("open", "closed"), false);
-
-        assertThat(validator.validate("{\"open\":{\"extra\":1},\"closed\":{}}", schema).valid()).isTrue();
-        OutputSchemaValidationIssue issue = validator.validate(
-                "{\"open\":{},\"closed\":{\"extra\":1}}", schema).issues().getFirst();
-        assertThat(issue.code()).isEqualTo(OutputSchemaValidator.UNKNOWN_PROPERTY);
-        assertThat(issue.path()).isEqualTo("$.closed.extra");
+    void acceptsOnlyWhitespaceAfterOneJsonValue() {
+        assertThat(validator.validate("{} \t\n\r", schema("{\"type\":\"object\"}")).valid()).isTrue();
     }
 
     @Test
-    void escapesPathSignificantPropertyNamesWithoutCollisions()
-    {
-        YamlSkillManifest.OutputSchemaManifest nested = objectSchema(
-                Map.of("b", scalarSchema("string", false)), List.of("b"), false);
-        YamlSkillManifest.OutputSchemaManifest schema = objectSchema(
-                linkedMap("a.b", scalarSchema("string", false), "a", nested), List.of("a.b", "a"), false);
-
-        List<OutputSchemaValidationIssue> issues = validator.validate(
-                "{\"a.b\":1,\"a\":{\"b\":2}}", schema).issues();
-
-        assertThat(issues).extracting(OutputSchemaValidationIssue::path)
-                .containsExactly("$[\"a.b\"]", "$.a.b");
+    void operationalValidationFailureIsNeverAnInvalidInstanceVerdict() {
+        var contract = mock(CanonicalSchema.class);
+        when(contract.validate(any())).thenThrow(new IllegalStateException("validator unavailable"));
+        assertThatThrownBy(() -> validator.validate("{}", contract)).isInstanceOf(IllegalStateException.class).hasMessage("validator unavailable");
     }
 
-    private static YamlSkillManifest.OutputSchemaManifest objectSchema(
-            Map<String, YamlSkillManifest.OutputSchemaManifest> properties,
-            List<String> required,
-            boolean additionalProperties)
-    {
-        YamlSkillManifest.OutputSchemaManifest schema = scalarSchema("object", false);
-        schema.setProperties(properties);
-        schema.setRequired(required);
-        schema.setAdditionalProperties(additionalProperties);
-        return schema;
+    private static CanonicalSchema valueSchema(String value) {
+        return schema("{\"type\":\"object\",\"properties\":{\"value\":" + value + "},\"required\":[\"value\"],\"additionalProperties\":false}");
     }
-
-    private static YamlSkillManifest.OutputSchemaManifest arraySchema()
-    {
-        YamlSkillManifest.OutputSchemaManifest schema = scalarSchema("array", false);
-        schema.setItems(scalarSchema("string", false));
-        return schema;
-    }
-
-    private static YamlSkillManifest.OutputSchemaManifest scalarSchema(String type, boolean nullable)
-    {
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType(type);
-        schema.setNullable(nullable);
-        return schema;
-    }
-
-    private static Map<String, YamlSkillManifest.OutputSchemaManifest> linkedMap(
-            String firstName,
-            YamlSkillManifest.OutputSchemaManifest first,
-            String secondName,
-            YamlSkillManifest.OutputSchemaManifest second)
-    {
-        Map<String, YamlSkillManifest.OutputSchemaManifest> values = new LinkedHashMap<>();
-        values.put(firstName, first);
-        values.put(secondName, second);
-        return values;
+    private static CanonicalSchema schema(String json) {
+        return new StandardSchemaCompiler().compile(json, StandardSchemaCompiler.Role.OUTPUT, StandardSchemaCompiler.Origin.AUTHORED);
     }
 }

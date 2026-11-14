@@ -527,7 +527,7 @@ public class DefaultPlanningService implements PlanningService
                     new RenderedMissionInput(planningUserMessage, List.of(), Map.of()),
                     modelTraceContext,
                     List.of(),
-                    true));
+                    true, null));
             String planPayload = result.content();
             Map<String, Object> modelAttempt = ModelTraceContext.attemptFrom(result.context());
 

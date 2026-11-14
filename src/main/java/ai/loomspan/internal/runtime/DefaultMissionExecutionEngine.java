@@ -132,7 +132,8 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
                         "mission");
 
                 String content = modelInteraction.call(new ModelInteractionRequest(
-                        executionPrompt, renderedInput, modelTraceContext, visibleTools, false)).content();
+                        executionPrompt, renderedInput, modelTraceContext, visibleTools, false,
+                        composition == null ? definition.outputSchema() : composition.projection().schema())).content();
                 if (composition != null) {
                     if (capturedBinding.requireMission().lastLinterOutcome().map(outcome -> outcome.status() == ai.loomspan.internal.linter.LinterOutcomeStatus.EXHAUSTED).orElse(false))
                         throw new IllegalArgumentException("binding_linter_validation: Assembled output exhausted configured regex linter correction.");

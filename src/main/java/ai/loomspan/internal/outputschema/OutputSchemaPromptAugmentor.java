@@ -1,16 +1,16 @@
 package ai.loomspan.internal.outputschema;
 
-import ai.loomspan.internal.skill.YamlSkillManifest;
+import ai.loomspan.internal.schema.CanonicalSchema;
+import tools.jackson.databind.JsonNode;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.util.StringUtils;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 public final class OutputSchemaPromptAugmentor
 {
-    public Prompt augment(Prompt prompt, YamlSkillManifest.OutputSchemaManifest schema)
+    public Prompt augment(Prompt prompt, CanonicalSchema schema)
     {
         Objects.requireNonNull(prompt, "prompt must not be null");
         Objects.requireNonNull(schema, "schema must not be null");
@@ -18,7 +18,6 @@ public final class OutputSchemaPromptAugmentor
                 Return JSON only.
                 Do not include markdown fences, commentary, or prose.
                 Use the configured field names exactly.
-                Omit unknown fields unless they are explicitly allowed.
 
                 %s
                 """.formatted(renderContract(schema)).stripTrailing();
@@ -28,7 +27,7 @@ public final class OutputSchemaPromptAugmentor
                 .build());
     }
 
-    public String renderContract(YamlSkillManifest.OutputSchemaManifest schema)
+    public String renderContract(CanonicalSchema schema)
     {
         Objects.requireNonNull(schema, "schema must not be null");
         StringBuilder builder = new StringBuilder("""
@@ -40,56 +39,44 @@ public final class OutputSchemaPromptAugmentor
 
                 Output contract:
                 """);
-        renderNode(builder, schema, "$", 0, null);
+        renderNode(builder, schema.tree(), "$", 0, null);
         return builder.toString().stripTrailing();
     }
 
-    private void renderNode(StringBuilder builder,
-            YamlSkillManifest.OutputSchemaManifest schema,
-            String path,
-            int depth,
-            String presence)
+    private void renderNode(StringBuilder builder, JsonNode schema, String path, int depth, String presence)
     {
-        builder.append("  ".repeat(depth)).append(path).append(" — ").append(schema.getType());
-        if (presence != null)
-        {
-            builder.append(", ").append(presence);
+        builder.append("  ".repeat(depth)).append(path).append(" — ");
+        if (schema.isBoolean()) {
+            builder.append(schema.booleanValue() ? "any value" : "framework-owned; omit").append('\n');
+            return;
         }
-        builder.append(Boolean.TRUE.equals(schema.getNullable()) ? ", nullable" : ", non-null");
-        if ("object".equals(schema.getType()))
-        {
-            builder.append(", additionalProperties=")
-                    .append(Boolean.TRUE.equals(schema.getAdditionalProperties()));
-        }
-        if (!schema.getEnumValues().isEmpty())
-        {
-            builder.append(", enum=[")
-                    .append(schema.getEnumValues().stream()
-                            .map(OutputSchemaPath::jsonString)
-                            .collect(Collectors.joining(", ")))
-                    .append(']');
-        }
-        if (StringUtils.hasText(schema.getFormat()))
-        {
-            builder.append(", format=").append(schema.getFormat());
-        }
-        if (StringUtils.hasText(schema.getDescription()))
-        {
-            builder.append(" - ").append(schema.getDescription());
-        }
+        JsonNode type = schema.path("type");
+        boolean nullable = type.isString() && "null".equals(type.asString()) || type.isArray()
+                && java.util.stream.StreamSupport.stream(type.spliterator(), false).anyMatch(t -> "null".equals(t.asString()));
+        String baseType = type.isArray() ? java.util.stream.StreamSupport.stream(type.spliterator(), false)
+                .map(JsonNode::asString).filter(t -> !"null".equals(t)).collect(Collectors.joining(" or ")) : type.asString();
+        builder.append(baseType);
+        if (presence != null) builder.append(", ").append(presence);
+        builder.append(nullable ? ", nullable" : ", non-null");
+        if ("object".equals(baseType)) builder.append(", additionalProperties=")
+                .append(!schema.has("additionalProperties") || !schema.path("additionalProperties").isBoolean()
+                        || schema.path("additionalProperties").booleanValue());
+        if (schema.has("enum")) builder.append(", enum=").append(schema.get("enum"));
+        for (String keyword : java.util.List.of("format", "minimum", "maximum", "minLength", "maxLength", "minItems", "maxItems"))
+            if (schema.has(keyword)) builder.append(", ").append(keyword).append('=')
+                    .append(schema.get(keyword).isString() ? schema.get(keyword).asString() : schema.get(keyword).toString());
+        if (StringUtils.hasText(schema.path("description").asString("")))
+            builder.append(" - ").append(schema.path("description").asString());
         builder.append('\n');
-
-        if ("object".equals(schema.getType()))
-        {
-            for (Map.Entry<String, YamlSkillManifest.OutputSchemaManifest> entry : schema.getProperties().entrySet())
-            {
-                String childPresence = schema.getRequired().contains(entry.getKey()) ? "required" : "optional";
-                renderNode(builder, entry.getValue(), OutputSchemaPath.property(path, entry.getKey()), depth + 1, childPresence);
+        if ("object".equals(baseType)) {
+            for (var entry : schema.path("properties").properties()) {
+                boolean required = java.util.stream.StreamSupport.stream(schema.path("required").spliterator(), false)
+                        .anyMatch(value -> entry.getKey().equals(value.asString()));
+                renderNode(builder, entry.getValue(), OutputSchemaPath.property(path, entry.getKey()), depth + 1,
+                        required ? "required" : "optional");
             }
-        }
-        else if ("array".equals(schema.getType()) && schema.getItems() != null)
-        {
-            renderNode(builder, schema.getItems(), path + "[]", depth + 1, null);
+        } else if ("array".equals(baseType) && schema.has("items")) {
+            renderNode(builder, schema.get("items"), path + "[]", depth + 1, null);
         }
     }
 

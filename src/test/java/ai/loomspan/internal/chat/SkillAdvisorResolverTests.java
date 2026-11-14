@@ -109,16 +109,11 @@ class SkillAdvisorResolverTests {
         manifest.setDescription(manifest.getName());
         manifest.setModel("gpt-5");
         if (withOutputSchema) {
-            YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-            schema.setType("object");
-            YamlSkillManifest.OutputSchemaManifest vendorName = new YamlSkillManifest.OutputSchemaManifest();
-            vendorName.setType("string");
-            if (withEvidenceContract) {
-                vendorName.setEvidence("default-invoiceParser");
-            }
-            schema.setProperties(java.util.Map.of("vendorName", vendorName));
-            schema.setRequired(java.util.List.of("vendorName"));
-            schema.setAdditionalProperties(false);
+            var schema = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+            schema.put("type", "object").put("additionalProperties", false);
+            var vendorName = schema.putObject("properties").putObject("vendorName").put("type", "string");
+            if (withEvidenceContract) vendorName.put("x-loomspan-evidence", "default-invoiceParser");
+            schema.putArray("required").add("vendorName");
             manifest.setOutputSchema(schema);
             manifest.setOutputSchemaMaxRetries(2);
         }

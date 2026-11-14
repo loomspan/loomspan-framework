@@ -12,7 +12,8 @@ public record ModelInteractionRequest(
         RenderedMissionInput input,
         ModelTraceContext traceContext,
         List<BoundCapability> capabilities,
-        boolean planning)
+        boolean planning,
+        ai.loomspan.internal.schema.CanonicalSchema outputContract)
 {
     public ModelInteractionRequest
     {

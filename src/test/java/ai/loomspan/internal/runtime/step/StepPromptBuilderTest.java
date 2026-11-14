@@ -706,9 +706,13 @@ class StepPromptBuilderTest {
         ExecutionPlan plan = createTwoTaskPlan()
                 .updateTask("t-1", task -> task.complete("parsed"))
                 .updateTask("t-2", task -> task.complete("matched"));
-        YamlSkillManifest.OutputSchemaManifest schema = duplicateInvoiceOutputSchema();
-        schema.getProperties().get("invoiceDate").setNullable(true);
-        schema.getProperties().get("reasoning").setNullable(true);
+        ai.loomspan.internal.schema.CanonicalSchema schema = duplicateInvoiceOutputSchema();
+        var tree = schema.tree();
+        ((tools.jackson.databind.node.ObjectNode) tree.path("properties").path("invoiceDate")).putArray("type").add("string").add("null");
+        ((tools.jackson.databind.node.ObjectNode) tree.path("properties").path("reasoning")).putArray("type").add("string").add("null");
+        schema = new ai.loomspan.internal.schema.StandardSchemaCompiler().compile(tree,
+                ai.loomspan.internal.schema.StandardSchemaCompiler.Role.OUTPUT,
+                ai.loomspan.internal.schema.StandardSchemaCompiler.Origin.AUTHORED);
 
         String prompt = buildPromptForCurrentMode(
                 plan, "objective", 3, null, "Step 2 complete", List.of(mockTool("default-invoiceParser")), true, schema);
@@ -757,7 +761,7 @@ class StepPromptBuilderTest {
             String executionSummary,
             List<BoundCapability> visibleTools,
             boolean finalResponseOnly,
-            YamlSkillManifest.OutputSchemaManifest outputSchema)
+            ai.loomspan.internal.schema.CanonicalSchema outputSchema)
     {
         return buildPromptForCurrentMode(plan, objective, null, stepNumber, completedTaskResults == null ? List.of() : completedTaskResults, executionSummary,
                 visibleTools, finalResponseOnly, false, outputSchema);
@@ -771,7 +775,7 @@ class StepPromptBuilderTest {
             String executionSummary,
             List<BoundCapability> visibleTools,
             boolean finalResponseOnly,
-            YamlSkillManifest.OutputSchemaManifest outputSchema)
+            ai.loomspan.internal.schema.CanonicalSchema outputSchema)
     {
         return buildPromptForCurrentMode(plan, objective, missionInput, stepNumber, completedTaskResults == null ? List.of() : completedTaskResults, executionSummary,
                 visibleTools, finalResponseOnly, false, outputSchema);
@@ -786,7 +790,7 @@ class StepPromptBuilderTest {
             List<BoundCapability> visibleTools,
             boolean finalResponseOnly,
             boolean forceVerboseToolArgumentGuidance,
-            YamlSkillManifest.OutputSchemaManifest outputSchema)
+            ai.loomspan.internal.schema.CanonicalSchema outputSchema)
     {
         if (finalResponseOnly)
         {
@@ -801,32 +805,32 @@ class StepPromptBuilderTest {
                 visibleTools, forceVerboseToolArgumentGuidance);
     }
 
-    private YamlSkillManifest.OutputSchemaManifest duplicateInvoiceOutputSchema() {
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType("object");
-        schema.setAdditionalProperties(false);
+    private ai.loomspan.internal.schema.CanonicalSchema duplicateInvoiceOutputSchema() {
+        return new ai.loomspan.internal.schema.StandardSchemaCompiler().compile("""
+                {"type":"object","additionalProperties":false,"properties":{
+                  "isDuplicate":{"type":"boolean","x-loomspan-evidence":"default-invoiceParser and default-expenseLookup"},
+                  "vendorName":{"type":"string"},"totalAmount":{"type":"number"},
+                  "invoiceDate":{"type":"string"},"reasoning":{"type":"string"}},
+                 "required":["isDuplicate","vendorName","totalAmount","invoiceDate","reasoning"]}
+                """, ai.loomspan.internal.schema.StandardSchemaCompiler.Role.OUTPUT,
+                ai.loomspan.internal.schema.StandardSchemaCompiler.Origin.AUTHORED);
+    }
 
-        YamlSkillManifest.OutputSchemaManifest isDuplicate = new YamlSkillManifest.OutputSchemaManifest();
-        isDuplicate.setType("boolean");
-        isDuplicate.setEvidence("default-invoiceParser and default-expenseLookup");
-        YamlSkillManifest.OutputSchemaManifest vendorName = new YamlSkillManifest.OutputSchemaManifest();
-        vendorName.setType("string");
-        YamlSkillManifest.OutputSchemaManifest totalAmount = new YamlSkillManifest.OutputSchemaManifest();
-        totalAmount.setType("number");
-        YamlSkillManifest.OutputSchemaManifest invoiceDate = new YamlSkillManifest.OutputSchemaManifest();
-        invoiceDate.setType("string");
-        YamlSkillManifest.OutputSchemaManifest reasoning = new YamlSkillManifest.OutputSchemaManifest();
-        reasoning.setType("string");
-
-        Map<String, YamlSkillManifest.OutputSchemaManifest> properties = new java.util.LinkedHashMap<>();
-        properties.put("isDuplicate", isDuplicate);
-        properties.put("vendorName", vendorName);
-        properties.put("totalAmount", totalAmount);
-        properties.put("invoiceDate", invoiceDate);
-        properties.put("reasoning", reasoning);
-        schema.setProperties(properties);
-        schema.setRequired(List.of("isDuplicate", "vendorName", "totalAmount", "invoiceDate", "reasoning"));
-        return schema;
+    @Test
+    void finalGuidanceUsesStandardRootAndNestedOpenness() {
+        for (String openness : List.of("", ",\"additionalProperties\":true", ",\"additionalProperties\":false")) {
+            var schema = new ai.loomspan.internal.schema.StandardSchemaCompiler().compile(
+                    "{\"type\":\"object\"" + openness + ",\"properties\":{\"details\":{\"type\":\"object\"" + openness + "}}}",
+                    ai.loomspan.internal.schema.StandardSchemaCompiler.Role.OUTPUT,
+                    ai.loomspan.internal.schema.StandardSchemaCompiler.Origin.AUTHORED);
+            var plan = createTwoTaskPlan().updateTask("t-1", task -> task.complete("parsed"))
+                    .updateTask("t-2", task -> task.complete("matched"));
+            String prompt = buildPromptForCurrentMode(plan, "objective", 3, null, null, List.of(), true, schema);
+            String expected = openness.contains("false") ? "false" : "true";
+            assertThat(prompt).contains("$ — object, non-null, additionalProperties=" + expected,
+                    "$.details — object, optional, non-null, additionalProperties=" + expected)
+                    .doesNotContain("unless they are explicitly allowed");
+        }
     }
 
     private ExecutionPlan createTwoTaskPlan() {

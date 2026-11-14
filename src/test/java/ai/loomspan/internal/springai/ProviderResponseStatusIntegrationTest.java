@@ -50,8 +50,10 @@ class ProviderResponseStatusIntegrationTest
         {
             h.enqueue(text(driver, incomplete(driver), VALID_JSON));
             List<OutputSchemaOutcome> outcomes = new ArrayList<>();
-            var schema = new YamlSkillManifest.OutputSchemaManifest();
-            schema.setType("object");
+            var schema = new ai.loomspan.internal.schema.StandardSchemaCompiler().compile("""
+                    {"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}
+                    """, ai.loomspan.internal.schema.StandardSchemaCompiler.Role.OUTPUT,
+                    ai.loomspan.internal.schema.StandardSchemaCompiler.Origin.AUTHORED);
             var validation = new OutputSchemaCallAdvisor("default-test_skill", schema,
                     new OutputSchemaValidator(), new OutputSchemaPromptAugmentor(), 2, outcomes::add);
             var lintOutcomes = new AtomicInteger();

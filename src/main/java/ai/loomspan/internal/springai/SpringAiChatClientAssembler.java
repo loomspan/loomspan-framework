@@ -119,7 +119,10 @@ final class SpringAiChatClientAssembler
         List<Advisor> advisors = resolvedAdvisors(skillAdvisorResolver.resolve(definition), includeFinalResponseValidators,
                 new ProviderAttemptCallAdvisor(runtime, executionStateService, modelUsageExtractor, sessionUsageService));
         ChatClient.Builder builder = chatClientBuilderFactory.create(chatModel);
-        builder.defaultOptions(optionsContributor.createOptions(executionConfiguration));
+        // Native formatting must start from the complete typed provider snapshot. In
+        // particular Gemini replaces generationConfig rather than merging it later.
+        builder.defaultOptions(chatModel.getDefaultOptions().mutate()
+                .combineWith(optionsContributor.createOptions(executionConfiguration)));
         if (!advisors.isEmpty())
         {
             builder.defaultAdvisors(advisors);

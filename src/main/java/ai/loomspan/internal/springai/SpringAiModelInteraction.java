@@ -67,6 +67,11 @@ public final class SpringAiModelInteraction implements ModelInteraction
                 .advisors(spec ->
                 {
                     spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY, interactionRequest.traceContext());
+                    if (interactionRequest.outputContract() != null)
+                    {
+                        spec.param(ai.loomspan.internal.outputschema.OutputSchemaCallAdvisor.OUTPUT_CONTRACT_KEY,
+                                interactionRequest.outputContract());
+                    }
                     if (interactionRequest.planning())
                     {
                         spec.param(ai.loomspan.internal.outputschema.OutputSchemaCallAdvisor.PLANNING_CALL_KEY, true);

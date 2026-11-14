@@ -151,8 +151,8 @@ Known Anthropic adapter limitation in the pinned Spring AI `2.1.0-RC2`:
 ordinary tool schemas lose root entries such as `additionalProperties`, although
 nested constraints and typed-map schemas survive. Full tool-schema fidelity is
 unresolved. Native raw output configuration can preserve format schemas and
-existing effort when copied; this adapter evidence does not establish ordinary
-mission or planner native-output orchestration.
+existing effort when copied; ordinary output attachment and bounded correction have loopback integration
+coverage; full mission and planner orchestration remain incomplete.
 
 For the exact Gemini provider model `gemini-3.8-flash`, `low`, `medium` and
 `high` select native `LOW`, `MEDIUM` and `HIGH`. No numeric thinking budget is
@@ -168,7 +168,8 @@ before HTTP; ordinary-input typed maps, unconstrained leaves and reserved false
 properties cannot be assumed to survive. Complete raw-schema fidelity remains
 unresolved. Changing serializable per-request schemas preserves native thinking
 and generation caps, but does not establish full raw-schema support or migrated
-ordinary/planner output orchestration. At this adapter boundary, request-local
+full application/planner output orchestration. Ordinary initial/correction and
+tool-continuation wiring have loopback coverage through the same adapter. At this adapter boundary, request-local
 typed options must copy the effective target defaults before replacing the schema;
 a fresh schema-only builder replaces those defaults, losing native thinking and
 the configured cap. Fresh effective-target defaults also prevent carrying an old

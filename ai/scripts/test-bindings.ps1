@@ -27,6 +27,7 @@ $taskSources = @(
  'ai/loomspan/internal/runtime/input/SkillInputValidationResult.java',
  'ai/loomspan/internal/outputschema/OutputBindingProjection.java',
  'ai/loomspan/internal/outputschema/OutputBindingComposition.java',
+ 'ai/loomspan/internal/outputschema/OutputSchemaValidator.java',
  'ai/loomspan/internal/outputschema/OutputSchemaValidationIssue.java',
  'ai/loomspan/internal/outputschema/OutputSchemaValidationResult.java',
  'ai/loomspan/internal/outputschema/OutputSchemaFailureMode.java',

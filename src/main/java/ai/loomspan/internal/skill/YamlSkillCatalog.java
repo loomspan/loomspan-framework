@@ -676,7 +676,7 @@ public class YamlSkillCatalog implements InitializingBean
 
     private static boolean overlappingIgnoringCase(List<String> left, List<String> right) {
         for (int i = 0; i < Math.min(left.size(), right.size()); i++)
-            if (!ai.loomspan.internal.outputschema.OutputSchemaValidator.propertyNamesMatch(left.get(i), right.get(i))) return false;
+            if (!left.get(i).equals(right.get(i))) return false;
         return true;
     }
     private void validateRawConcurrency(Resource resource, JsonNode root, String skillName)
