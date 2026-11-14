@@ -96,7 +96,14 @@ public final class StandardSchemaCompiler {
         if (!value.path("media_type").isString() || !Set.of("image", "pdf", "audio", "video", "file").contains(value.path("media_type").textValue())) throw failure(path + "/media_type", "unsupported attachment media type");
         var content = value.get("allowed_content_types");
         if (content == null || !content.isArray() || content.isEmpty()) throw failure(path + "/allowed_content_types", "requires a nonempty list of nonblank strings");
-        for (var item : content) if (!item.isString() || item.textValue().isBlank()) throw failure(path + "/allowed_content_types", "requires nonblank strings");
+        for (int i = 0; i < content.size(); i++) {
+            var item = content.get(i);
+            if (!item.isString() || item.textValue().isBlank()) throw failure(path + "/allowed_content_types", "requires nonblank strings");
+            try { org.springframework.util.MimeTypeUtils.parseMimeType(item.textValue()); }
+            catch (IllegalArgumentException ex) {
+                throw failure(path + "/allowed_content_types/" + i, "invalid attachment MIME '" + item.textValue() + "': " + ex.getMessage());
+            }
+        }
     }
     private static String escape(String value) { return value.replace("~", "~0").replace("/", "~1"); }
     private static DeclarationException failure(String path, String detail) { return new DeclarationException(path, detail); }

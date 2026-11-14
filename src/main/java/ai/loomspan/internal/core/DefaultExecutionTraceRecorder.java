@@ -49,6 +49,20 @@ public final class DefaultExecutionTraceRecorder implements ExecutionTraceRecord
     }
 
     @Override
+    public void recordAttachments(LoomspanSession session, String skillName, List<Map<String, Object>> attachments)
+    {
+        ExecutionBinding binding = requireBinding(session);
+        MissionContext mission = binding.requireMission();
+        if (!skillName.equals(mission.skillName())) throw new IllegalArgumentException("Attachment skill does not match owning mission");
+        ExecutionFrame missionFrame = binding.branch().leafToRootSnapshot().stream()
+                .filter(frame -> frame.frameId().equals(mission.missionFrameId()) && frame.route().equals(skillName)
+                        && (frame.traceFrameType() == TraceFrameType.ROOT_MISSION || frame.traceFrameType() == TraceFrameType.SKILL_EXECUTION))
+                .findFirst().orElseThrow(() -> new IllegalStateException("Attachments require the owning mission frame"));
+        if (!attachments.isEmpty()) recordAgainstFrame(session, missionFrame, TraceRecordType.FRAME_METADATA_RECORDED,
+                Map.of(), Map.of("attachments", List.copyOf(attachments)));
+    }
+
+    @Override
     public void recordModelResponseReceived(LoomspanSession session, ExecutionFrame frame, ModelTraceContext context,
             Map<String, Object> attempt, ModelUsageRecord usage, Object payload)
     {

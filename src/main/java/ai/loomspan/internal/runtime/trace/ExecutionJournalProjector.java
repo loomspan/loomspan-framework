@@ -9,6 +9,7 @@ import ai.loomspan.internal.core.JournalLevel;
 import ai.loomspan.internal.core.TraceRecord;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +32,11 @@ public final class ExecutionJournalProjector
     {
         // The journal is the single developer-facing projection we keep in the runtime.
         List<JournalEntry> entries = new ArrayList<>();
+        Map<String, JsonNode> attachmentsByFrame = new HashMap<>();
 
         for (TraceRecord record : records == null ? List.<TraceRecord>of() : records)
         {
-            appendRecord(entries, record);
+            appendRecord(entries, record, attachmentsByFrame);
         }
 
         return new ExecutionJournal(entries);
@@ -43,25 +45,36 @@ public final class ExecutionJournalProjector
     public ExecutionJournal project(ai.loomspan.internal.core.ExecutionTraceHandle traceHandle) throws java.io.IOException
     {
         List<JournalEntry> entries = new ArrayList<>();
+        Map<String, JsonNode> attachmentsByFrame = new HashMap<>();
 
         traceHandle.readRecords(record ->
         {
-            appendRecord(entries, record);
+            appendRecord(entries, record, attachmentsByFrame);
         });
 
         return new ExecutionJournal(entries);
     }
 
-    private void appendRecord(List<JournalEntry> entries, TraceRecord record)
+    private void appendRecord(List<JournalEntry> entries, TraceRecord record, Map<String, JsonNode> attachmentsByFrame)
     {
-        JournalEntry entry = toJournalEntry(record);
+        if (record == null) return;
+        if (record.recordType() == ai.loomspan.internal.core.TraceRecordType.FRAME_METADATA_RECORDED
+                && isMissionFrame(record) && record.data() != null)
+        {
+            JsonNode attachments = record.data().get("attachments");
+            if (attachments != null && attachments.isArray() && !attachments.isEmpty())
+                attachmentsByFrame.put(record.frameId(), sanitize(attachments));
+        }
+        JsonNode attachments = record.recordType() == ai.loomspan.internal.core.TraceRecordType.FRAME_CLOSED
+                ? attachmentsByFrame.remove(record.frameId()) : null;
+        JournalEntry entry = toJournalEntry(record, attachments);
         if (entry != null)
         {
             entries.add(entry);
         }
     }
 
-    private JournalEntry toJournalEntry(TraceRecord record)
+    private JournalEntry toJournalEntry(TraceRecord record, JsonNode attachments)
     {
         if (record == null)
         {
@@ -70,7 +83,7 @@ public final class ExecutionJournalProjector
 
         return switch (record.recordType())
         {
-            case FRAME_OPENED, FRAME_CLOSED -> skillLifecycleEntry(record);
+            case FRAME_OPENED, FRAME_CLOSED -> skillLifecycleEntry(record, attachments);
             case MODEL_THOUGHT_CAPTURED -> entry(record, JournalLevel.INFO, JournalEntryType.THOUGHT, sanitize(record.data()));
             case RESULT_FORWARDED -> entry(record, JournalLevel.INFO, JournalEntryType.RESULT_FORWARDED,
                     Map.of("skillName", record.metadata().get("skillName"), "planId", record.metadata().get("planId"),
@@ -91,10 +104,15 @@ public final class ExecutionJournalProjector
         };
     }
 
-    private JournalEntry skillLifecycleEntry(TraceRecord record)
+    private boolean isMissionFrame(TraceRecord record)
     {
-        if (record.frameType() != ai.loomspan.internal.core.TraceFrameType.ROOT_MISSION
-                && record.frameType() != ai.loomspan.internal.core.TraceFrameType.SKILL_EXECUTION)
+        return record.frameType() == ai.loomspan.internal.core.TraceFrameType.ROOT_MISSION
+                || record.frameType() == ai.loomspan.internal.core.TraceFrameType.SKILL_EXECUTION;
+    }
+
+    private JournalEntry skillLifecycleEntry(TraceRecord record, JsonNode attachments)
+    {
+        if (!isMissionFrame(record))
         {
             return null;
         }
@@ -102,6 +120,7 @@ public final class ExecutionJournalProjector
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("skillName", record.route());
         if (!opened) copyMetadata(details, record, "status");
+        if (!opened && attachments != null) details.put("attachments", attachments);
         return entry(record, JournalLevel.INFO,
                 opened ? JournalEntryType.SKILL_STARTED : JournalEntryType.SKILL_FINISHED, details);
     }

@@ -90,7 +90,7 @@ class DefaultMissionInputMaterializerTest
                 "Extract ticket",
                 Map.of("image", textNamedJpeg)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Attachment field 'image'")
+                .hasMessageContaining("Attachment field '/image'")
                 .hasMessageContaining("content does not match declared image type 'image/jpeg'");
     }
 
@@ -124,7 +124,7 @@ class DefaultMissionInputMaterializerTest
                 "Extract ticket",
                 Map.of("image", "ref://forms/missing.jpg")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Attachment field 'image'")
+                .hasMessageContaining("Attachment field '/image'")
                 .hasMessageContaining("ref://forms/missing.jpg");
     }
 
@@ -163,16 +163,10 @@ class DefaultMissionInputMaterializerTest
         manifest.setDescription("Attachment skill");
         manifest.setModel("model");
 
-        YamlSkillManifest.InputSchemaManifest root = new YamlSkillManifest.InputSchemaManifest();
-        root.setType("object");
-        root.setRequired(java.util.List.of("image"));
-        root.setAdditionalProperties(false);
-        YamlSkillManifest.InputSchemaManifest image = new YamlSkillManifest.InputSchemaManifest();
-        image.setType("attachment");
-        image.setMediaType("image");
-        image.setAllowedContentTypes(java.util.List.of("image/jpeg"));
-        root.setProperties(Map.of("image", image));
-        manifest.setInputSchema(root);
+        manifest.setInputSchema(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","required":["image"],"additionalProperties":false,"properties":{
+                  "image":{"type":"string","x-loomspan-attachment":{"media_type":"image","allowed_content_types":["image/jpeg"]}}}}
+                """));
 
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new ByteArrayResource(new byte[0]),

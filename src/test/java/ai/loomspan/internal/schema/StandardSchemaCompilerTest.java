@@ -8,6 +8,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import static ai.loomspan.internal.schema.StandardSchemaCompiler.*;
 
 class StandardSchemaCompilerTest {
+    @Test void rejectsMalformedMimeAmongValidDeclaredTypes() {
+        for (String mime : List.of("not-a-mime", "image/", "/jpeg")) {
+            var error = assertThrows(DeclarationException.class, () -> compile(root("{\"type\":\"string\",\"x-loomspan-attachment\":{\"media_type\":\"image\",\"allowed_content_types\":[\"image/jpeg\",\"" + mime + "\"]}}"), Role.INPUT));
+            assertEquals("/properties/x/x-loomspan-attachment/allowed_content_types/1", error.path());
+            assertTrue(error.getMessage().contains(mime));
+        }
+    }
+    @Test void acceptsParsedMimeWithoutRewritingDeclaration() {
+        for (String mime : List.of("image/jpeg", "IMAGE/JPEG", "ImAgE/JpEg", "application/pdf; profile=MixedCase")) {
+            var schema = compile(root("{\"type\":\"string\",\"x-loomspan-attachment\":{\"media_type\":\"file\",\"allowed_content_types\":[\"" + mime + "\"]}}"), Role.INPUT);
+            assertEquals(mime, schema.tree().at("/properties/x/x-loomspan-attachment/allowed_content_types/0").asText());
+        }
+    }
     static final StandardSchemaCompiler COMPILER = new StandardSchemaCompiler();
     static JsonNode json(String value) { return LoomspanJacksonCodecs.defaults().schemaTree().readTree(value); }
     static CanonicalSchema compile(String schema, Role role) { return COMPILER.compile(schema, role, Origin.AUTHORED); }

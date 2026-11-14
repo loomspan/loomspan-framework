@@ -199,6 +199,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.outputschema.OutputSchemaValidationResult", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.outputschema.OutputSchemaValidator", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.runtime.attachment.LoomspanAttachment", "Public only for Java collaboration between distinct internal subsystem packages."),
+            Map.entry("ai.loomspan.internal.runtime.attachment.AttachmentSchemaNodes", "Public only for shared attachment schema traversal and JSON Pointer construction between internal recording and materialization packages."),
             Map.entry("ai.loomspan.internal.runtime.attachment.DefaultMissionInputMaterializer", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.runtime.attachment.MissionInputMaterializer", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.runtime.attachment.RenderedMissionInput", "Public only for Java collaboration between distinct internal subsystem packages."),

@@ -234,6 +234,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                 lifecycle.requireOpenForNewWork(capturedBinding);
                 sessionUsageService.recordMissionStart(session, skillName);
                 RenderedMissionInput renderedInput = missionInputMaterializer.materialize(session, definition, objective, missionInput);
+                if (!renderedInput.attachments().isEmpty())
+                    executionStateService.recordAttachments(session, skillName, attachmentDescriptors(renderedInput));
 
                 if (planningEnabled)
                 {

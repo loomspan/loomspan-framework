@@ -1,0 +1,12 @@
+name: attachmentMalformedMime
+description: Reject malformed MIME before execution.
+model: gpt-5
+prompt: Describe the image.
+input_schema:
+  type: object
+  properties:
+    image:
+      type: string
+      x-loomspan-attachment:
+        media_type: image
+        allowed_content_types: [image/jpeg, not-a-mime]

@@ -23,7 +23,7 @@ public record LoomspanAttachment(
         Objects.requireNonNull(contentType, "contentType must not be null");
         Objects.requireNonNull(mediaType, "mediaType must not be null");
         Objects.requireNonNull(resource, "resource must not be null");
-        metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
+        metadata = metadata == null ? Map.of() : ai.loomspan.internal.util.ImmutableContainers.copyMap(metadata);
     }
 
     public Map<String, Object> descriptor()
@@ -47,6 +47,6 @@ public record LoomspanAttachment(
         {
             descriptor.put("metadata", metadata);
         }
-        return Map.copyOf(descriptor);
+        return ai.loomspan.internal.util.ImmutableContainers.copyMap(descriptor);
     }
 }

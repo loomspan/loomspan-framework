@@ -3,7 +3,10 @@ package ai.loomspan.internal.runtime.attachment;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.MissionInputMessageFormatter;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
-import ai.loomspan.internal.runtime.input.SkillInputSchemaNode;
+import ai.loomspan.internal.runtime.input.SkillInputValidator;
+import ai.loomspan.internal.schema.StandardSchemaCompiler;
+import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
+import tools.jackson.databind.JsonNode;
 import ai.loomspan.internal.skill.YamlSkillDefinition;
 import ai.loomspan.internal.vfs.RefResolver;
 import org.springframework.core.io.Resource;
@@ -69,12 +72,19 @@ public class DefaultMissionInputMaterializer implements MissionInputMaterializer
             return new RenderedMissionInput(userText, List.of(), safeInput);
         }
 
-        SkillInputSchemaNode schema = inputContractResolver.fromManifest(definition.inputSchema());
+        var admission = new SkillInputValidator().validate(safeInput, inputContractResolver.resolveYamlCapability(definition));
+        if (!admission.valid()) throw new IllegalArgumentException("Invalid attachment mission input: " + admission.issues());
+        JsonNode schema = definition.inputSchema().tree();
         List<LoomspanAttachment> attachments = new ArrayList<>();
         Object traceSafe = materializeNode(session, schema, safeInput, "", attachments);
         Map<String, Object> traceSafeInput = traceSafe instanceof Map<?, ?> map
                 ? castMap(map)
                 : Map.of();
+        AttachmentSchemaNodes.replaceAttachmentLeaves(schema);
+        var descriptorContract = new StandardSchemaCompiler().compile(schema,
+                StandardSchemaCompiler.Role.INPUT, StandardSchemaCompiler.Origin.GENERATED);
+        var issues = descriptorContract.validate(LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(traceSafeInput));
+        if (!issues.isEmpty()) throw new IllegalArgumentException("Invalid materialized attachment input: " + issues);
         return new RenderedMissionInput(
                 MissionInputMessageFormatter.buildUserMessage(objective, traceSafeInput),
                 attachments,
@@ -88,49 +98,50 @@ public class DefaultMissionInputMaterializer implements MissionInputMaterializer
     }
 
     private Object materializeNode(LoomspanSession session,
-            SkillInputSchemaNode schema,
+            JsonNode schema,
             Object value,
             String path,
             List<LoomspanAttachment> attachments)
     {
-        if (schema.isAttachment())
+        if (value == null || schema == null) return value;
+        if (AttachmentSchemaNodes.isAttachment(schema))
         {
             LoomspanAttachment attachment = materializeAttachment(session, schema, value, path);
             attachments.add(attachment);
             return attachment.descriptor();
         }
-        if (schema.isObject() && value instanceof Map<?, ?> map)
+        if (value instanceof Map<?, ?> map)
         {
             LinkedHashMap<String, Object> traceSafe = new LinkedHashMap<>();
             map.forEach((key, childValue) ->
             {
                 String childName = String.valueOf(key);
-                SkillInputSchemaNode childSchema = schema.properties().get(childName);
+                JsonNode childSchema = AttachmentSchemaNodes.property(schema, childName);
                 if (childSchema == null)
                 {
                     traceSafe.put(childName, childValue);
                 }
                 else
                 {
-                    traceSafe.put(childName, materializeNode(session, childSchema, childValue, join(path, childName), attachments));
+                    traceSafe.put(childName, materializeNode(session, childSchema, childValue, AttachmentSchemaNodes.child(path, childName), attachments));
                 }
             });
-            return Map.copyOf(traceSafe);
+            return java.util.Collections.unmodifiableMap(traceSafe);
         }
-        if (schema.isArray() && value instanceof List<?> list && schema.items() != null)
+        if (value instanceof List<?> list && schema.has("items"))
         {
             List<Object> traceSafe = new ArrayList<>(list.size());
             for (int index = 0; index < list.size(); index++)
             {
-                traceSafe.add(materializeNode(session, schema.items(), list.get(index), path + "[" + index + "]", attachments));
+                traceSafe.add(materializeNode(session, schema.get("items"), list.get(index), AttachmentSchemaNodes.child(path, Integer.toString(index)), attachments));
             }
-            return List.copyOf(traceSafe);
+            return java.util.Collections.unmodifiableList(traceSafe);
         }
         return value;
     }
 
     private LoomspanAttachment materializeAttachment(LoomspanSession session,
-            SkillInputSchemaNode schema,
+            JsonNode schema,
             Object value,
             String path)
     {
@@ -170,31 +181,28 @@ public class DefaultMissionInputMaterializer implements MissionInputMaterializer
                     + "' must be backed by a repeatable Resource, not an already-open stream");
         }
 
-        String contentType = detectContentType(resource, schema.allowedContentTypes());
-        if (!schema.allowedContentTypes().contains(contentType))
+        JsonNode annotation = schema.get("x-loomspan-attachment");
+        List<String> allowedContentTypes = new ArrayList<>();
+        annotation.path("allowed_content_types").forEach(type -> allowedContentTypes.add(type.asText()));
+        AttachmentMediaType mediaType = AttachmentMediaType.fromManifest(annotation.path("media_type").asText());
+        String contentType = detectContentType(resource, allowedContentTypes);
+        var parsed = MimeTypeUtils.parseMimeType(contentType);
+        if (allowedContentTypes.stream().map(MimeTypeUtils::parseMimeType).noneMatch(parsed::equals))
         {
             throw new IllegalArgumentException("Attachment field '" + path + "' content type '" + contentType
-                    + "' is not allowed; expected one of " + schema.allowedContentTypes());
+                    + "' is not allowed; expected one of " + allowedContentTypes);
         }
-        validateMediaSignature(resource, contentType, AttachmentMediaType.fromManifest(schema.attachmentMediaType()), path);
-
-        Long size = contentLength(resource);
-        if (size != null && size > maxSizeBytes())
-        {
-            throw new IllegalArgumentException("Attachment field '" + path + "' is " + size
-                    + " bytes, exceeding configured limit of " + maxSizeBytes() + " bytes");
-        }
-
-        String digest = digest(resource, path);
+        validateMediaSignature(resource, parsed.getType() + "/" + parsed.getSubtype(), mediaType, path);
+        ReadResult read = digest(resource, path, maxSizeBytes());
         return new LoomspanAttachment(
                 path,
                 resource.getFilename(),
                 contentType,
-                AttachmentMediaType.fromManifest(schema.attachmentMediaType()),
+                mediaType,
                 source,
-                size,
-                digest,
-                Map.of("allowedContentTypes", schema.allowedContentTypes()),
+                read.size(),
+                read.sha256(),
+                Map.of("allowedContentTypes", allowedContentTypes),
                 resource);
     }
 
@@ -294,21 +302,9 @@ public class DefaultMissionInputMaterializer implements MissionInputMaterializer
         return true;
     }
 
-    @Nullable
-    private Long contentLength(Resource resource)
-    {
-        try
-        {
-            long length = resource.contentLength();
-            return length >= 0 ? length : null;
-        }
-        catch (IOException ex)
-        {
-            return null;
-        }
-    }
+    private record ReadResult(long size, String sha256) {}
 
-    private String digest(Resource resource, String path)
+    private ReadResult digest(Resource resource, String path, long limit)
     {
         try (InputStream inputStream = resource.getInputStream())
         {
@@ -316,17 +312,18 @@ public class DefaultMissionInputMaterializer implements MissionInputMaterializer
             byte[] buffer = new byte[8192];
             long total = 0;
             int read;
-            while ((read = inputStream.read(buffer)) != -1)
+            while ((read = inputStream.read(buffer, 0,
+                    (int) (Math.min(buffer.length - 1L, Math.max(0, limit - total)) + 1))) != -1)
             {
-                total += read;
-                if (total > maxSizeBytes())
+                if (read > limit - total)
                 {
                     throw new IllegalArgumentException("Attachment field '" + path
-                            + "' exceeds configured limit of " + maxSizeBytes() + " bytes");
+                            + "' is exceeding configured limit of " + limit + " bytes");
                 }
+                total += read;
                 digest.update(buffer, 0, read);
             }
-            return HexFormat.of().formatHex(digest.digest());
+            return new ReadResult(total, HexFormat.of().formatHex(digest.digest()));
         }
         catch (NoSuchAlgorithmException ex)
         {
@@ -334,12 +331,8 @@ public class DefaultMissionInputMaterializer implements MissionInputMaterializer
         }
         catch (IOException ex)
         {
-            return null;
+            throw new IllegalArgumentException("Attachment field '" + path + "' could not be read: " + ex.getMessage(), ex);
         }
     }
 
-    private String join(String parent, String child)
-    {
-        return parent == null || parent.isBlank() ? child : parent + "." + child;
-    }
 }

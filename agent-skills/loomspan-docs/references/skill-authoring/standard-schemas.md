@@ -16,7 +16,7 @@ PLANNING role. These declarations use the supported subset of JSON Schema Draft
 
 The declaration compiler, JSON-bound skill decoder and generated Java contracts
 have focused executable coverage. The current source checkout has incomplete consumer integration:
-full input dispatch, attachment materialization, binding
+full input dispatch, binding
 projection, output correction, planning and TypeSafe/evidence metadata consumers
 do not all accept the canonical representation yet. The complete application
 build and runtime paths are unavailable while those consumers are inconsistent.
@@ -143,7 +143,8 @@ deliverable, factually correct, or safe for an application operation.
 | `x-loomspan-runtime-ref-capable` | Boolean on GENERATED INPUT string leaves only; authored declarations are rejected |
 
 An attachment's `media_type` MUST be one of `image`, `pdf`, `audio`, `video`,
-`file`. `allowed_content_types` MUST be a nonempty array of nonblank strings;
+`file`. `allowed_content_types` MUST be a nonempty array of nonblank, syntactically
+valid MIME strings parsed by Spring's media MIME parser;
 unknown annotation fields are rejected. The annotation can occur on nested
 properties, string array items, properties under array-object items, and typed
 input map values. Surrounding standard constraints remain effective.
@@ -160,8 +161,8 @@ input_schema:
   additionalProperties: false
 ```
 
-This declaration check does not certify MIME parsing, Resource conversion,
-reference resolution or provider attachment transport. Evidence annotation
+Malformed MIME entries fail loading with their schema location and authored value.
+MIME syntax does not establish provider/model support. Evidence annotation
 validation preserves the exact expression text and property name; it does not
 parse expression grammar or resolve child references. Read
 [evidence contracts](evidence-contracts.md) for expression semantics and the
@@ -171,6 +172,56 @@ Provider copies remove only these three recognized annotations at actual schema
 nodes: root, `properties` values, `items`, and schema-valued
 `additionalProperties`. Similarly named ordinary properties are preserved.
 Canonical schemas retain the annotations and every original accepted value.
+
+## Attachment materialization and recorded descriptors
+
+At declared attachment leaves, inputs MAY be strict `ref://` strings or repeatable
+Spring `Resource` values. Reference strings satisfy the standard string assertions
+before resolution. Those string assertions do not constrain a direct Resource's
+filename or bytes. Ordinary siblings, requiredness, object openness and array bounds
+remain validated. Missing optional values produce no media; explicit null produces
+no media only when the leaf permits null. Required nullable fields must be present.
+
+Materialization walks named properties first, then schema-valued
+`additionalProperties` for unnamed keys, and array `items`. It preserves input keys,
+array positions, omission and null. Boolean openness and unmarked fields do not
+declare attachments. Canonical inputs and provider schema copies are unchanged;
+an internal descriptor view and private descriptor schema validate materialized
+attachments without serializing Resources.
+
+Filename extensions supply MIME detection where recognized; otherwise one declared
+allowed MIME supplies the existing fallback. Missing filenames remain missing.
+Allowed-type comparisons use parsed MIME equality, including case-insensitive
+type/subtype, without changing authored parameter values. Image signatures are
+checked. Already-open stream Resources reject. One bounded read computes actual
+size and SHA-256 and enforces `loomspan.session.attachments.max-size` (20 MiB by
+default); it does not pre-read `contentLength()`. Unreadable and oversized resources
+fail with field location before planning/model work. Resource access boundaries
+remain in force; no automatic upload, conversion or provider fallback is implied.
+
+Descriptors carry `attachment`, `fieldPath`, available `name`, `contentType`,
+`mediaType`, `source`, actual `sizeBytes`, `sha256` and metadata. A direct Resource
+uses source `resource` without an invented reference/name. `fieldPath` is JSON
+Pointer: literal `a.b` is `/a.b`, nested `a` then `b` is `/a/b`, array item zero is
+`/files/0`, and `/` and `~` in keys escape as `~1` and `~0`. Descriptors contain no
+Resource handles or file contents. Planning receives descriptors; execution receives
+the associated media Resources.
+
+Successful nonempty collections are recorded once on the owning mission frame as
+`FRAME_METADATA_RECORDED.data.attachments` before planning or no-model completion.
+They remain available if the mission later fails. Failed materialization does not
+emit a successful collection. Finished journal and observer details carry the same
+collection, subject only to the existing journal field-name redaction rules;
+canonical traces preserve descriptor content. The live activity projection does not
+carry this collection.
+
+`AttachmentMaterializationContractTest` verifies the actual local validator,
+materializer, immutable containers and descriptor paths with mocked session/catalog
+collaborators. `ExecutionJournalProjectorTest` and `SkillExecutionViewMapperTest`
+verify list/stream projection and mapped observer details. Complete coordinator,
+engine and public observer invocation remain unavailable while the broader source
+graph is inconsistent; their integration tests are retained. This local evidence
+does not establish provider file decoding or Console attachment rendering.
 
 ## Skill document ingestion and diagnostics
 
@@ -227,7 +278,8 @@ actual JSON strings and nulls still satisfy the canonical leaf assertions. Every
 array item and map value is checked independently. Standard surrounding required,
 closed-object, sibling and array-bound assertions remain effective. Binding owns
 conversion failures and stream cleanup. Attachment Resource/ref admission is a
-separate first pass and does not certify MIME/materialization or transport.
+separate first pass; the attachment materializer then performs the checks above.
+Neither pass certifies provider transport.
 
 Under explicit contracts, only marked or attachment leaves select reference
 resolution. Unmarked strings, unconstrained values and open extras preserve literal

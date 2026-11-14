@@ -1902,7 +1902,7 @@ class StepLoopMissionExecutionEngineTest {
                 """
                 {"stepAction":"FINAL_RESPONSE","finalResponse":"Finished"}
                 """);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-attachment", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("step-loop-attachment", "default-rootVisibleSkill", 3);
 
         try (ExecutorService missionExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             StepLoopMissionExecutionEngine engine = engine(stateService, planningService, missionExecutor, attachmentDefinition());
@@ -1920,12 +1920,192 @@ class StepLoopMissionExecutionEngineTest {
         }
 
         assertThat(chatClient.userMediaSeen()).hasSize(2);
+        assertStepAttachmentRecord(session, "/image", "resource");
         assertThat(chatClient.userMediaSeen()).allSatisfy(media -> assertThat(media.mimeType().toString()).isEqualTo("image/jpeg"));
         assertThat(chatClient.userMessagesSeen()).hasSize(2);
         assertThat(chatClient.userMessagesSeen()).allSatisfy(message -> assertThat(message)
                 .contains("\"attachment\" : true", "\"contentType\" : \"image/jpeg\"")
                 .doesNotContain("SECRET_IMAGE_BYTES")
                 .doesNotContain("ByteArrayResource"));
+    }
+
+    @Test
+    void stepAttachmentsAreRecordedBeforePlanningAndSurviveItsFailure() {
+        for (boolean reference : List.of(false, true)) {
+            var state = new DefaultExecutionStateService(FIXED_CLOCK);
+            var planning = mock(PlanningService.class);
+            var session = TestLoomspanSessions.withId("step-attachments-planning-" + reference, "default-rootVisibleSkill", 3);
+            var resource = imageResource(null, "SECRET_IMAGE_BYTES");
+            var modelCalls = new AtomicInteger();
+            ai.loomspan.internal.model.ModelInteraction model = request -> { modelCalls.incrementAndGet(); throw new AssertionError("model called"); };
+            var failure = new IllegalStateException("planning failed after attachment read");
+            when(planning.initializePlan(eq(session), any(), any(), any(), eq(model), any())).thenAnswer(invocation -> {
+                var record = assertStepAttachmentRecord(session, "/image", reference ? "ref://ticket.jpg" : "resource");
+                assertThat(record.data().path("attachments").get(0).path("name").isNull()).isTrue();
+                throw failure;
+            });
+            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                var materializer = new ai.loomspan.internal.runtime.attachment.DefaultMissionInputMaterializer((value, current) -> resource);
+                var engine = new StepLoopMissionExecutionEngine(planning, state, Duration.ofSeconds(5), executor,
+                        new NoOpSessionUsageService(), materializer);
+                assertThatThrownBy(() -> executeMission(engine, session, attachmentDefinition(), "inspect",
+                        Map.of("image", reference ? "ref://ticket.jpg" : resource), model, List.of())).isSameAs(failure);
+            }
+            assertStepAttachmentRecord(session, "/image", reference ? "ref://ticket.jpg" : "resource");
+            assertThat(modelCalls).hasValue(0);
+        }
+    }
+
+    @Test
+    void stepMaterializationFailureDoesNotRecordDescriptorsOrInvokePlanningOrModel() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var planning = mock(PlanningService.class);
+        var session = TestLoomspanSessions.withId("step-attachments-invalid", "default-rootVisibleSkill", 3);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = engine(state, planning, executor, attachmentDefinition());
+            assertThatThrownBy(() -> executeMission(engine, session, attachmentDefinition(), "inspect",
+                    Map.of("image", new ByteArrayResource(new byte[]{1, 2, 3})),
+                    request -> { throw new AssertionError("invalid attachment must not invoke model"); }, List.of()))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.FRAME_METADATA_RECORDED);
+        org.mockito.Mockito.verifyNoInteractions(planning);
+    }
+
+    @Test
+    void stepUnreadableAndOversizedDocumentsPreventPlanningModelAndSuccessfulDescriptors() {
+        for (boolean unreadable : List.of(true, false)) for (boolean reference : List.of(true, false)) {
+            var state = new DefaultExecutionStateService(FIXED_CLOCK);
+            var planning = mock(PlanningService.class);
+            var session = TestLoomspanSessions.withId("step-document-read-failure-" + unreadable + reference, "default-rootVisibleSkill", 3);
+            var manifest = attachmentDefinition().manifest();
+            manifest.setInputSchema(LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                    {"type":"object","properties":{"document":{"type":"string","x-loomspan-attachment":{
+                      "media_type":"pdf","allowed_content_types":["application/pdf"]}}},"required":["document"]}
+                    """));
+            var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+            var readFailure = new java.io.IOException("document stream cannot open");
+            var bytesRead = new AtomicInteger(); var opens = new AtomicInteger(); var closed = new AtomicBoolean();
+            var resource = new org.springframework.core.io.AbstractResource() {
+                @Override public String getDescription() { return "repeatable document"; }
+                @Override public String getFilename() { return "document.pdf"; }
+                @Override public java.io.InputStream getInputStream() throws java.io.IOException {
+                    opens.incrementAndGet();
+                    if (unreadable) throw readFailure;
+                    return new java.io.ByteArrayInputStream(new byte[65536]) {
+                        @Override public synchronized int read(byte[] bytes, int offset, int length) {
+                            int count = super.read(bytes, offset, length);
+                            if (count > 0) bytesRead.addAndGet(count);
+                            return count;
+                        }
+                        @Override public void close() { closed.set(true); }
+                    };
+                }
+            };
+            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                var materializer = new ai.loomspan.internal.runtime.attachment.DefaultMissionInputMaterializer((value, current) -> resource,
+                        new SkillInputContractResolver(), org.springframework.util.unit.DataSize.ofBytes(16));
+                var engine = new StepLoopMissionExecutionEngine(planning, state, Duration.ofSeconds(5), executor,
+                        new NoOpSessionUsageService(), materializer);
+                var failure = org.assertj.core.api.Assertions.catchThrowable(() -> executeMission(engine, session, definition, "inspect",
+                        Map.of("document", reference ? "ref://document.pdf" : resource),
+                        request -> { throw new AssertionError("failed materialization must prevent model invocation"); }, List.of()));
+                assertThat(failure).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("/document");
+                if (unreadable) assertThat(failure.getCause()).isSameAs(readFailure);
+                else {
+                    assertThat(failure).hasMessageContaining("configured limit of 16 bytes");
+                    assertThat(bytesRead).hasValue(17);
+                    assertThat(closed).isTrue();
+                }
+                assertThat(opens).hasValue(1);
+            }
+            org.mockito.Mockito.verifyNoInteractions(planning);
+            assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.FRAME_METADATA_RECORDED);
+        }
+    }
+
+    @Test
+    void stepPreservesMultipleNestedReferenceAndDirectAttachmentAssociations() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var manifest = attachmentDefinition().manifest();
+        manifest.setInputSchema(LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","properties":{"files":{"type":"object","additionalProperties":{
+                  "type":"array","items":{"type":"string","x-loomspan-attachment":{
+                  "media_type":"image","allowed_content_types":["image/jpeg"]}}}}}}
+                """));
+        var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        var direct = imageResource(null, "direct bytes");
+        var resolved = imageResource("ref.jpg", "reference bytes");
+        var session = TestLoomspanSessions.withId("step-attachments-multiple", "default-rootVisibleSkill", 3);
+        var complete = singleTaskPlan().updateTask("t-1", task -> task.complete("done"));
+        var calls = new AtomicInteger();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = new StepLoopMissionExecutionEngine(new InitializingPlanningService(state, complete), state,
+                    Duration.ofSeconds(5), executor, new NoOpSessionUsageService(),
+                    new ai.loomspan.internal.runtime.attachment.DefaultMissionInputMaterializer((value, current) -> resolved));
+            var result = executeMission(engine, session, definition, "inspect",
+                    Map.of("files", Map.of("a/b~c", List.of("ref://ref.jpg", direct))), request -> {
+                        calls.incrementAndGet();
+                        assertThat(request.input().attachments()).extracting(ai.loomspan.internal.runtime.attachment.LoomspanAttachment::resource)
+                                .containsExactly(resolved, direct);
+                        assertThat(request.input().attachments()).extracting(ai.loomspan.internal.runtime.attachment.LoomspanAttachment::fieldPath)
+                                .containsExactly("/files/a~1b~0c/0", "/files/a~1b~0c/1");
+                        var records = readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.FRAME_METADATA_RECORDED).toList();
+                        assertThat(records).hasSize(1);
+                        assertThat(records.getFirst().data().path("attachments").size()).isEqualTo(2);
+                        assertThat(records.getFirst().data().path("attachments").get(0).path("source").asText()).isEqualTo("ref://ref.jpg");
+                        assertThat(records.getFirst().data().path("attachments").get(1).path("name").isNull()).isTrue();
+                        return ai.loomspan.internal.model.ModelInteractionResult.content("{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"Finished\"}");
+                    }, List.of());
+            assertThat(result).isEqualTo("Finished");
+        }
+        assertThat(calls).hasValue(1);
+        assertThat(readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.FRAME_METADATA_RECORDED)).hasSize(1);
+    }
+
+    @Test
+    void stepAttachmentsAreRecordedBeforeAllBoundNoModelCompletion() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var manifest = attachmentDefinition().manifest();
+        manifest.setOutputSchema(LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","properties":{"report":{"type":"string"}},"required":["report"],"additionalProperties":false}
+                """));
+        var output = new YamlSkillManifest.InputBindingManifest();
+        output.setFrom("child_result"); output.setSkill("default-invoiceParser"); output.setPath("");
+        manifest.setOutputBindings(Map.of("/report", output));
+        var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        var plan = singleTaskPlan().updateTask("t-1", task -> task.complete("\"exact report\""));
+        var session = TestLoomspanSessions.withId("step-attachments-no-model", "default-rootVisibleSkill", 3);
+        var binding = TestExecutionBindings.missionBinding(session);
+        binding.requireMission().recordCompletedTaskResult("t-1", "default-invoiceParser", "\"exact report\"");
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = engine(state, new InitializingPlanningService(state, plan), executor, definition);
+            var result = ExecutionBindingScope.supplyWith(binding, () -> executeMission(engine, session, definition,
+                    "compose", Map.of("image", imageResource(null, "SECRET_IMAGE_BYTES")),
+                    request -> { throw new AssertionError("all-bound completion must not call a model"); }, List.of()));
+            assertThat(result).isEqualTo("{\"report\":\"exact report\"}");
+        }
+        var metadata = assertStepAttachmentRecord(session, "/image", "resource");
+        assertThat(metadata.frameId()).isEqualTo(binding.requireMission().missionFrameId());
+        var records = readRecords(session);
+        var assembled = records.stream().filter(record -> record.recordType() == TraceRecordType.RESULT_ASSEMBLED).findFirst().orElseThrow();
+        assertThat(records.indexOf(metadata)).isLessThan(records.indexOf(assembled));
+    }
+
+    private static TraceRecord assertStepAttachmentRecord(LoomspanSession session, String path, String source) {
+        var metadata = readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.FRAME_METADATA_RECORDED).toList();
+        assertThat(metadata).hasSize(1);
+        var record = metadata.getFirst();
+        assertThat(record.frameType()).isEqualTo(TraceFrameType.ROOT_MISSION);
+        assertThat(record.route()).isEqualTo("default-rootVisibleSkill");
+        assertThat(record.data().path("attachments").size()).isEqualTo(1);
+        var attachment = record.data().path("attachments").get(0);
+        assertThat(attachment.path("fieldPath").asText()).isEqualTo(path);
+        assertThat(attachment.path("source").asText()).isEqualTo(source);
+        assertThat(attachment.has("sizeBytes")).isTrue();
+        assertThat(attachment.path("sha256").asText()).hasSize(64);
+        assertThat(record.data().toString()).doesNotContain("SECRET_IMAGE_BYTES", "ByteArrayResource", "base64");
+        return record;
     }
 
     @Test
@@ -3656,17 +3836,12 @@ class StepLoopMissionExecutionEngineTest {
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
-    private static YamlSkillManifest.InputSchemaManifest attachmentInputSchema() {
-        YamlSkillManifest.InputSchemaManifest root = new YamlSkillManifest.InputSchemaManifest();
-        root.setType("object");
-        root.setRequired(List.of("image"));
-        root.setAdditionalProperties(false);
-        YamlSkillManifest.InputSchemaManifest image = new YamlSkillManifest.InputSchemaManifest();
-        image.setType("attachment");
-        image.setMediaType("image");
-        image.setAllowedContentTypes(List.of("image/jpeg"));
-        root.setProperties(Map.of("image", image));
-        return root;
+    private static tools.jackson.databind.JsonNode attachmentInputSchema() {
+        return LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","required":["image"],"additionalProperties":false,
+                 "properties":{"image":{"type":"string","x-loomspan-attachment":{
+                    "media_type":"image","allowed_content_types":["image/jpeg"]}}}}
+                """);
     }
 
     private static ByteArrayResource imageResource(String filename, String content) {

@@ -13,7 +13,6 @@ import ai.loomspan.internal.runtime.tool.CapabilityBindingFactory;
 import ai.loomspan.internal.runtime.tool.ToolSurfaceService;
 import ai.loomspan.internal.security.AccessGuard;
 import ai.loomspan.internal.skill.YamlSkillDefinition;
-import ai.loomspan.internal.skill.YamlSkillManifest;
 import org.springframework.core.io.Resource;
 import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
@@ -406,7 +405,7 @@ public class ExecutionCoordinator
         {
             return value;
         }
-        return traceSafeNode(definition.inputSchema(), value, "");
+        return traceSafeNode(definition.inputSchema().tree(), value, "");
     }
 
     private Object traceSafeJavaInput(Object value)
@@ -428,50 +427,50 @@ public class ExecutionCoordinator
         return value;
     }
 
-    private Object traceSafeNode(YamlSkillManifest.InputSchemaManifest schema, Object value, String path)
+    private Object traceSafeNode(tools.jackson.databind.JsonNode schema, Object value, String path)
     {
-        if (schema == null)
+        if (schema == null || value == null)
         {
             return value;
         }
-        if ("attachment".equals(schema.getType()))
+        if (ai.loomspan.internal.runtime.attachment.AttachmentSchemaNodes.isAttachment(schema))
         {
             return attachmentPlaceholder(value, path, schema);
         }
-        if ("object".equals(schema.getType()) && value instanceof Map<?, ?> map)
+        if (value instanceof Map<?, ?> map)
         {
             LinkedHashMap<String, Object> safe = new LinkedHashMap<>();
             map.forEach((key, childValue) ->
             {
                 String childName = String.valueOf(key);
                 safe.put(childName, traceSafeNode(
-                        schema.getProperties().get(childName),
+                        ai.loomspan.internal.runtime.attachment.AttachmentSchemaNodes.property(schema, childName),
                         childValue,
-                        join(path, childName)));
+                        ai.loomspan.internal.runtime.attachment.AttachmentSchemaNodes.child(path, childName)));
             });
             return Collections.unmodifiableMap(safe);
         }
-        if ("array".equals(schema.getType()) && value instanceof List<?> list && schema.getItems() != null)
+        if (value instanceof List<?> list && schema.has("items"))
         {
             List<Object> safe = new ArrayList<>(list.size());
             for (int index = 0; index < list.size(); index++)
             {
-                safe.add(traceSafeNode(schema.getItems(), list.get(index), path + "[" + index + "]"));
+                safe.add(traceSafeNode(schema.get("items"), list.get(index), ai.loomspan.internal.runtime.attachment.AttachmentSchemaNodes.child(path, Integer.toString(index))));
             }
             return Collections.unmodifiableList(safe);
         }
         return value;
     }
 
-    private Map<String, Object> attachmentPlaceholder(Object value,
+    private Object attachmentPlaceholder(Object value,
             String path,
-            YamlSkillManifest.InputSchemaManifest schema)
+            tools.jackson.databind.JsonNode schema)
     {
         LinkedHashMap<String, Object> placeholder = new LinkedHashMap<>();
         placeholder.put("attachment", true);
         placeholder.put("fieldPath", path);
-        placeholder.put("mediaType", schema.getMediaType());
-        placeholder.put("allowedContentTypes", schema.getAllowedContentTypes());
+        placeholder.put("mediaType", schema.path("x-loomspan-attachment").path("media_type").asText());
+        placeholder.put("allowedContentTypes", schema.path("x-loomspan-attachment").path("allowed_content_types"));
         if (value instanceof String text && text.matches("^ref://\\S+$"))
         {
             placeholder.put("source", text);
@@ -483,14 +482,9 @@ public class ExecutionCoordinator
         }
         else
         {
-            placeholder.put("source", "redacted");
+            return value;
         }
-        return Map.copyOf(placeholder);
-    }
-
-    private String join(String parent, String child)
-    {
-        return parent == null || parent.isBlank() ? child : parent + "." + child;
+        return ai.loomspan.internal.util.ImmutableContainers.copyMap(placeholder);
     }
 
     private CapabilityMetadata requireCapability(ExecutionBinding binding, String skillName)

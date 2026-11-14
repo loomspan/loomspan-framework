@@ -1022,6 +1022,18 @@ class YamlSkillCatalogTests {
     }
 
     @Test
+    void rejectsMalformedMimeAmongValidAttachmentTypesAtLoading() {
+        contextRunner
+                .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/attachment-malformed-mime-skill.yaml")
+                .run(context -> assertThat(context.getStartupFailure())
+                        .isNotNull()
+                        .hasMessageContaining("attachment-malformed-mime-skill.yaml")
+                        .hasMessageContaining("attachmentMalformedMime")
+                        .hasMessageContaining("input_schema/properties/image/x-loomspan-attachment/allowed_content_types/1")
+                        .hasMessageContaining("not-a-mime"));
+    }
+
+    @Test
     void failsStartupWhenInputSchemaUsesUnsupportedKeywordOrNonObjectRoot() {
         contextRunner
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/input-schema-root-array-skill.yaml")

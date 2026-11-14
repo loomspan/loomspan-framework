@@ -925,7 +925,7 @@ class ExecutionCoordinatorTest {
     }
 
     @Test
-    void redactsDeclaredAttachmentInputBeforeOpeningMissionFrame() {
+    void preservesInvalidDeclaredAttachmentInputInCanonicalMissionFrame() {
         EffectiveSkillExecutionConfiguration executionConfiguration = new EffectiveSkillExecutionConfiguration(
                 "gpt-5",
                 "test-connection", AiDriver.OPENAI,
@@ -963,7 +963,7 @@ class ExecutionCoordinatorTest {
                 session,
                 null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Attachment field 'image'");
+                .hasMessageContaining("/image");
 
         TraceRecord rootFrameOpened = readTraceRecords(session).stream()
                 .filter(record -> record.recordType() == TraceRecordType.FRAME_OPENED)
@@ -971,10 +971,113 @@ class ExecutionCoordinatorTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(String.valueOf(rootFrameOpened.data()))
-                .contains("\"attachment\":true")
-                .contains("\"source\":\"redacted\"")
-                .doesNotContain("SECRET_IMAGE_BYTES")
-                .doesNotContain("data:image/jpeg");
+                .contains("SECRET_IMAGE_BYTES")
+                .contains("data:image/jpeg")
+                .doesNotContain("\"source\":\"redacted\"");
+    }
+
+    @Test
+    void recordsAttachmentMapsNullsUnnamedResourcesAndDistinctJsonPointersWithoutChangingInput() {
+        var mapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree();
+        String leaf = "{\"type\":[\"string\",\"null\"],\"x-loomspan-attachment\":{\"media_type\":\"image\",\"allowed_content_types\":[\"image/jpeg\"]}}";
+        var schema = mapper.readTree("""
+                {"type":"object","required":["image"],"additionalProperties":false,"properties":{
+                  "image":LEAF,"a.b":LEAF,"a":{"type":"object","properties":{"b":LEAF}},
+                  "files[0]":LEAF,"files":{"type":"array","items":LEAF},
+                  "a/b~c":LEAF,"":{"type":"string","x-loomspan-attachment":{"media_type":"image","allowed_content_types":["image/jpeg"]}},
+                  "map":{"type":"object","properties":{"count":{"type":"integer"}},"additionalProperties":LEAF},
+                  "nestedMap":{"type":"object","additionalProperties":{"type":"object","additionalProperties":LEAF}}
+                }}
+                """.replace("LEAF", leaf));
+        var unnamed = new ByteArrayResource(new byte[]{(byte) 0xff, (byte) 0xd8, (byte) 0xff, 1});
+        var named = new ByteArrayResource(new byte[]{(byte) 0xff, (byte) 0xd8, (byte) 0xff, 2}) {
+            @Override public String getFilename() { return "ticket.jpg"; }
+        };
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("image", null);
+        input.put("a.b", "ref://literal.jpg"); input.put("a", Map.of("b", named));
+        input.put("files[0]", unnamed); input.put("files", java.util.Arrays.asList(null, "ref://array.jpg"));
+        input.put("a/b~c", named); input.put("", unnamed);
+        var map = new LinkedHashMap<String, Object>(); map.put("count", 4); map.put("x/y~z", unnamed); map.put("nil", null);
+        input.put("map", map); input.put("nestedMap", Map.of("group", Map.of("item", "ref://nested.jpg")));
+        var rendered = new java.util.concurrent.atomic.AtomicReference<ai.loomspan.internal.runtime.attachment.RenderedMissionInput>();
+        var coordinator = attachmentCoordinator(schema, (session, definition, objective, missionInput, model, tools, planning, authentication) -> {
+            rendered.set(new ai.loomspan.internal.runtime.attachment.DefaultMissionInputMaterializer((value, current) -> named)
+                    .materialize(session, definition, objective, missionInput));
+            return "materialized";
+        });
+        var session = TestLoomspanSessions.create("coordinator-attachment-pointers", "default-rootVisibleSkill", 3, null, TracePersistencePolicy.ALWAYS);
+        assertThat(coordinator.execute("default-rootVisibleSkill", "inspect", input, session, null)).isEqualTo("materialized");
+        assertThat(input.get("a.b")).isEqualTo("ref://literal.jpg");
+        assertThat(((Map<?, ?>) input.get("a")).get("b")).isSameAs(named);
+        assertThat(map).containsEntry("count", 4).containsEntry("nil", null);
+        var recorded = missionOpened(session, "default-rootVisibleSkill").data().path("missionInput");
+        assertThat(recorded.path("image").isNull()).isTrue();
+        assertThat(recorded.path("files").get(0).isNull()).isTrue();
+        assertThat(recorded.path("map").path("nil").isNull()).isTrue();
+        assertThat(recorded.path("map").path("count").asInt()).isEqualTo(4);
+        assertThat(recorded.path("a.b").path("fieldPath").asText()).isEqualTo("/a.b");
+        assertThat(recorded.path("a").path("b").path("fieldPath").asText()).isEqualTo("/a/b");
+        assertThat(recorded.path("files[0]").path("fieldPath").asText()).isEqualTo("/files[0]");
+        assertThat(recorded.path("files").get(1).path("fieldPath").asText()).isEqualTo("/files/1");
+        assertThat(recorded.path("a/b~c").path("fieldPath").asText()).isEqualTo("/a~1b~0c");
+        assertThat(recorded.path("").path("fieldPath").asText()).isEqualTo("/");
+        assertThat(recorded.path("map").path("x/y~z").path("fieldPath").asText()).isEqualTo("/map/x~1y~0z");
+        assertThat(recorded.path("nestedMap").path("group").path("item").path("fieldPath").asText()).isEqualTo("/nestedMap/group/item");
+        assertThat(recorded.path("files[0]").path("source").asText()).isEqualTo("resource");
+        assertThat(recorded.path("files[0]").path("name").isNull()).isTrue();
+        assertThat(recorded.path("a.b").path("source").asText()).isEqualTo("ref://literal.jpg");
+        assertThat(recorded.toString()).doesNotContain("ByteArrayResource", "base64", "sha256");
+        assertThat(rendered.get().attachments()).extracting(ai.loomspan.internal.runtime.attachment.LoomspanAttachment::fieldPath)
+                .containsExactly("/a.b", "/a/b", "/files[0]", "/files/1", "/a~1b~0c", "/", "/map/x~1y~0z", "/nestedMap/group/item");
+        assertThat(rendered.get().traceSafeInput()).containsEntry("image", null);
+        assertThat(rendered.get().attachments().get(2).resource()).isSameAs(unnamed);
+    }
+
+    @Test
+    void nullableAttachmentRecordingPreservesPresenceWhileProhibitedNullAndMissingRequiredStillFail() {
+        for (boolean nullable : List.of(false, true)) {
+            var schema = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                    {"type":"object","required":["image"],"additionalProperties":false,"properties":{
+                    "image":{"type":TYPE,"x-loomspan-attachment":{"media_type":"image","allowed_content_types":["image/jpeg"]}}}}
+                    """.replace("TYPE", nullable ? "[\"string\",\"null\"]" : "\"string\""));
+            var rendered = new java.util.concurrent.atomic.AtomicReference<ai.loomspan.internal.runtime.attachment.RenderedMissionInput>();
+            var coordinator = attachmentCoordinator(schema, (session, definition, objective, missionInput, model, tools, planning, authentication) -> {
+                rendered.set(new ai.loomspan.internal.runtime.attachment.DefaultMissionInputMaterializer((value, current) -> {
+                    throw new AssertionError("null/missing must not resolve a resource");
+                }).materialize(session, definition, objective, missionInput));
+                return "materialized";
+            });
+            var session = TestLoomspanSessions.create("coordinator-null-" + nullable, "default-rootVisibleSkill", 3, null, TracePersistencePolicy.ALWAYS);
+            var input = new LinkedHashMap<String, Object>(); input.put("image", null);
+            if (nullable) {
+                assertThat(coordinator.execute("default-rootVisibleSkill", "inspect", input, session, null)).isEqualTo("materialized");
+                assertThat(rendered.get().attachments()).isEmpty();
+                assertThat(rendered.get().traceSafeInput()).containsEntry("image", null);
+            } else assertThatThrownBy(() -> coordinator.execute("default-rootVisibleSkill", "inspect", input, session, null))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("/image");
+            assertThat(missionOpened(session, "default-rootVisibleSkill").data().path("missionInput").path("image").isNull()).isTrue();
+            assertThat(readTraceRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.FRAME_METADATA_RECORDED);
+            var absent = TestLoomspanSessions.create("coordinator-missing-" + nullable, "default-rootVisibleSkill", 3, null, TracePersistencePolicy.ALWAYS);
+            assertThatThrownBy(() -> coordinator.execute("default-rootVisibleSkill", "inspect", Map.of(), absent, null))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    private static ExecutionCoordinator attachmentCoordinator(tools.jackson.databind.JsonNode schema, MissionExecutionEngine engine) {
+        var configuration = new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
+        var manifest = attachmentManifest("default-rootVisibleSkill"); manifest.setInputSchema(schema);
+        var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, configuration);
+        var catalog = new StubYamlSkillCatalog(definition);
+        var registry = new TestCapabilityRegistry();
+        registry.register("default-rootVisibleSkill", new CapabilityMetadata("yaml:root", "default-rootVisibleSkill", "root",
+                SkillExecutionDescriptor.from(configuration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
+                arguments -> { throw new AssertionError("YAML must enter mission engine"); }, SkillKind.YAML,
+                CapabilityToolDescriptor.generic("default-rootVisibleSkill", "root"),
+                new ai.loomspan.internal.runtime.input.SkillInputContractResolver().resolveYamlCapability(definition), null));
+        return coordinator(catalog, registry, (name, session, authentication) -> List.of(),
+                new RecordingModelInteractionFactory(new FakeCoordinatorChatClient(null, "unused", null, false)),
+                (value, session) -> value, null, engine);
     }
 
     @Test
@@ -1768,16 +1871,11 @@ class ExecutionCoordinatorTest {
     private static YamlSkillManifest attachmentManifest(String name) {
         YamlSkillManifest manifest = manifest(name, List.of());
         manifest.setPlanningMode(false);
-        YamlSkillManifest.InputSchemaManifest root = new YamlSkillManifest.InputSchemaManifest();
-        root.setType("object");
-        root.setRequired(List.of("image"));
-        root.setAdditionalProperties(false);
-        YamlSkillManifest.InputSchemaManifest image = new YamlSkillManifest.InputSchemaManifest();
-        image.setType("attachment");
-        image.setMediaType("image");
-        image.setAllowedContentTypes(List.of("image/jpeg"));
-        root.setProperties(Map.of("image", image));
-        manifest.setInputSchema(root);
+        manifest.setInputSchema(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","required":["image"],"additionalProperties":false,
+                 "properties":{"image":{"type":"string","x-loomspan-attachment":{
+                    "media_type":"image","allowed_content_types":["image/jpeg"]}}}}
+                """));
         return manifest;
     }
 

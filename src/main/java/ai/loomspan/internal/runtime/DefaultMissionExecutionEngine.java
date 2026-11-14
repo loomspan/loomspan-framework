@@ -86,6 +86,8 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
             ExecutionBinding capturedBinding = ExecutionBindingScope.requireCurrent();
             MissionLifecycle lifecycle = capturedBinding.requireMission().lifecycle();
             RenderedMissionInput renderedInput = missionInputMaterializer.materialize(session, definition, objective, missionInput);
+            if (!renderedInput.attachments().isEmpty())
+                executionStateService.recordAttachments(session, skillName, attachmentDescriptors(renderedInput));
             if (planningEnabled)
             {
                 planningService.initializePlan(session, objective, planningInput(missionInput, renderedInput), definition, modelInteraction, visibleTools);
@@ -159,7 +161,7 @@ public class DefaultMissionExecutionEngine implements MissionExecutionEngine
                             + "' (driver " + executionConfiguration.driver().name() + ", provider model '"
                             + executionConfiguration.providerModel() + "') failed with " + renderedInput.attachments().size()
                             + " attachment(s) [" + mediaDetails
-                            + "]. Use a model/driver that supports the declared attachment media.", runtimeException);
+                            + "].", runtimeException);
                 }
                 throw ex;
             }

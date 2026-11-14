@@ -11,6 +11,6 @@ public record RenderedMissionInput(
     public RenderedMissionInput
     {
         attachments = attachments == null ? List.of() : List.copyOf(attachments);
-        traceSafeInput = traceSafeInput == null ? Map.of() : Map.copyOf(traceSafeInput);
+        traceSafeInput = traceSafeInput == null ? Map.of() : ai.loomspan.internal.util.ImmutableContainers.copyMap(traceSafeInput);
     }
 }

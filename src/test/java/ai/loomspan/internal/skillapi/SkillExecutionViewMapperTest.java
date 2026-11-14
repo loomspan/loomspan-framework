@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -18,6 +20,51 @@ class SkillExecutionViewMapperTest
 {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final SkillExecutionViewMapper mapper = new SkillExecutionViewMapper(objectMapper);
+
+    @Test
+    void observerMappingRetainsAttachmentCollectionWithExistingJournalException() {
+        var descriptor = new LinkedHashMap<String, Object>();
+        descriptor.put("attachment", true);
+        descriptor.put("fieldPath", "/photos/0/a~1b~0");
+        descriptor.put("name", null);
+        descriptor.put("source", "resource");
+        descriptor.put("contentType", "image/jpeg");
+        descriptor.put("mediaType", "IMAGE");
+        descriptor.put("metadata", Map.of("token", "canonical value", "label", "unchanged"));
+        var data = objectMapper.valueToTree(Map.of("attachments", List.of(descriptor,
+                Map.of("fieldPath", "/other", "source", "ref://original"))));
+        var metadata = new ai.loomspan.internal.core.TraceRecord("trace", "session-1", 1,
+                Instant.parse("2026-07-15T12:00:00Z"), ai.loomspan.internal.core.TraceRecordType.FRAME_METADATA_RECORDED,
+                "mission", null, ai.loomspan.internal.core.TraceFrameType.ROOT_MISSION, "default-skill", "worker", Map.of(), data);
+        var closed = new ai.loomspan.internal.core.TraceRecord("trace", "session-1", 2,
+                Instant.parse("2026-07-15T12:00:01Z"), ai.loomspan.internal.core.TraceRecordType.FRAME_CLOSED,
+                "mission", null, ai.loomspan.internal.core.TraceFrameType.ROOT_MISSION, "default-skill", "worker",
+                Map.of("status", "failed"), null);
+        var journal = new ai.loomspan.internal.runtime.trace.ExecutionJournalProjector().project(List.of(metadata, closed));
+
+        var view = mapper.map("session-1", journal);
+
+        assertThat(view.events()).singleElement().satisfies(event -> {
+            assertThat(event.type()).isEqualTo("SKILL_FINISHED");
+            assertThat(event.frameId()).isEqualTo("mission");
+            assertThat(event.details()).containsEntry("status", "failed");
+            assertThat(event.details().get("attachments")).isInstanceOf(List.class);
+            var attachments = (List<?>) event.details().get("attachments");
+            assertThat(attachments).hasSize(2);
+            var first = (Map<?, ?>) attachments.getFirst();
+            assertThat(first.get("fieldPath")).isEqualTo("/photos/0/a~1b~0");
+            assertThat(first.containsKey("name")).isTrue();
+            assertThat(first.get("name")).isNull();
+            assertThat(first.get("source")).isEqualTo("resource");
+            assertThat(((Map<?, ?>) first.get("metadata")).get("token")).isEqualTo("[redacted]");
+            assertThat(((Map<?, ?>) first.get("metadata")).get("label")).isEqualTo("unchanged");
+            assertThat(((Map<?, ?>) attachments.get(1)).get("source")).isEqualTo("ref://original");
+            assertThat(first.containsKey("sizeBytes")).isFalse();
+            assertThatThrownBy(() -> attachments.clear()).isInstanceOf(UnsupportedOperationException.class);
+        });
+        assertThat(metadata.data().path("attachments").get(0).path("metadata").path("token").asText())
+                .isEqualTo("canonical value");
+    }
 
     @Test
     void mapsSelectedJournalEntriesToPublicEventsInOrder()
@@ -60,7 +107,9 @@ class SkillExecutionViewMapperTest
     @Test
     void refusesToMapSessionWithoutRetainedFinalizedHistory()
     {
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(3, "entry");
+        LoomspanSession session = org.mockito.Mockito.mock(LoomspanSession.class);
+        org.mockito.Mockito.when(session.getSessionId()).thenReturn("session-without-history");
+        org.mockito.Mockito.when(session.getFinalizedExecutionJournal()).thenReturn(java.util.Optional.empty());
 
         assertThatThrownBy(() -> mapper.map(session))
                 .isInstanceOf(IllegalStateException.class)

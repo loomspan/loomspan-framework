@@ -69,6 +69,8 @@ public interface ExecutionTraceRecorder
 
     void recordFrameClosed(LoomspanSession session, ExecutionFrame frame, Map<String, Object> metadata);
 
+    void recordAttachments(LoomspanSession session, String skillName, List<Map<String, Object>> attachments);
+
     void recordModelRequestSent(LoomspanSession session, ExecutionFrame frame, ModelTraceContext context,
             Map<String, Object> attempt, Object payload);
 
