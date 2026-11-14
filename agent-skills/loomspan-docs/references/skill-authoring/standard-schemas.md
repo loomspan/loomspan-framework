@@ -306,8 +306,12 @@ and local pre-dispatch validation protects execution correctness.
 
 `SkillInputValidatorTest`, `InputIngressBindingTest`, `InputReferenceTraversalTest`
 and `OrdinaryToolArgumentsTest` cover these local boundaries with actual validator,
-reader, schema generation and registered Java binding sources. These local checks alone do not prove complete public invocation, the actual
-callback/manager graph or provider request fidelity.
+reader, schema generation and registered Java binding sources.
+`ExecutorApplicationIntegrationTest` adds actual public root validation and
+standard-tool child execution with reference-to-Resource resolution;
+`DeclaredChildInputBindingsIntegrationTest#nativeLeafReceivesDynamicBindingsWithExactReceiverAndDirectValidation`
+adds direct/parent-bound native invocation. Those focused paths do not prove every
+callback/manager shape or provider request fidelity.
 
 ## Ordinary output acceptance
 

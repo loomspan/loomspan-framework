@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-/** Actual resolver tests; root compilation currently blocked by downstream catalog/output consumers. */
+/** Actual resolver tests covering canonical contracts and detached provider views. */
 class SkillInputContractResolverTest {
     final SkillInputContractResolver resolver=new SkillInputContractResolver();
     @Test void yamlUsesItsCompiledCanonicalContractWithoutRewriting() {

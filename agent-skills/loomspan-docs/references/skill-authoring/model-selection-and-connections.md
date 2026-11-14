@@ -151,8 +151,9 @@ Known Anthropic adapter limitation in the pinned Spring AI `2.1.0-RC2`:
 ordinary tool schemas lose root entries such as `additionalProperties`, although
 nested constraints and typed-map schemas survive. Full tool-schema fidelity is
 unresolved. Native raw output configuration can preserve format schemas and
-existing effort when copied; ordinary output attachment and bounded correction have loopback integration
-coverage; full mission and planner orchestration remain incomplete.
+existing effort when copied; ordinary output attachment and bounded correction have
+loopback integration coverage. Those checks do not certify every mission/planner
+path or hosted schema enforcement.
 
 For the exact Gemini provider model `gemini-3.8-flash`, `low`, `medium` and
 `high` select native `LOW`, `MEDIUM` and `HIGH`. No numeric thinking budget is

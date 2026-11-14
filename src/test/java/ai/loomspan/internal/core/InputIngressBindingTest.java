@@ -14,7 +14,7 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
 /** Real generated/authored contracts -> ingress validator -> registered Java binder.
- * This direct composition does not exercise the blocked public/coordinator dispatch graph. */
+ * This direct composition does not exercise the public/coordinator dispatch graph. */
 class InputIngressBindingTest {
     final SkillInputValidator validator=new SkillInputValidator();
     CapabilityMetadata register(Object bean) {

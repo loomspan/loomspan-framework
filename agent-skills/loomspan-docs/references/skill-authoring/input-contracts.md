@@ -13,11 +13,10 @@ For authored YAML schemas, read [standard schemas](standard-schemas.md). Java
 registration generates and compiles canonical input schemas using that same
 compiler. Registration, JSON-bound validation and registered Java binding have
 focused executable coverage. Local runtime-value admission and reference selection
-are also covered using the real validator and traversal sources. The complete
-application build, public invocation and actual callback/manager graph remain
-unavailable because surrounding binding, attachment, output and planner consumers
-are inconsistent with canonical contracts. Local composition does not establish
-full dispatch or provider acceptance.
+are also covered using the real validator and traversal sources. Connected executor
+tests exercise public root invocation and standard-tool child dispatch with
+reference-to-Resource resolution. These paths do not certify every reflected Java
+dispatch shape or provider schema fidelity.
 
 Use this topic for an annotation-defined Java skill. Loomspan reflects its Java signature and `@SkillParam` metadata as the provider-facing schema, planner guidance, and root/child runtime validation contract. There is no companion YAML or input-contract inheritance layer.
 
@@ -80,7 +79,7 @@ This topic covers reflected Java contracts; [standard schemas](standard-schemas.
 - Binding a supported Resource-valued list, map or array retains assignable
   Resource handles without serializing their internals or reading their content.
   Converting a Resource to text/bytes still reads it; managed streams retain
-  success/failure cleanup. The local runtime adapter accepts marked direct handles without reads, checks actual strings/nulls against their canonical leaves, then validates surrounding structure using a private view. Original handles reach binding unchanged. Reference selection follows marked leaves; explicit unconstrained/open values keep literal ref:// strings. Complete dispatch remains subject to the integration limitation above.
+  success/failure cleanup. The local runtime adapter accepts marked direct handles without reads, checks actual strings/nulls against their canonical leaves, then validates surrounding structure using a private view. Original handles reach binding unchanged. Reference selection follows marked leaves; explicit unconstrained/open values keep literal ref:// strings. `ExecutorApplicationIntegrationTest` exercises a standard-tool child resolving a session reference to a Resource before application execution; it does not cover every reflected container shape through dispatch.
 
 Minimal Java skill:
 
@@ -185,6 +184,8 @@ Use a typed map when arbitrary keys are part of the domain but all values share 
   unconstrained leaves, role restrictions, parent bounds and exact assertions.
 - `LoomspanMethodInputSchemaGenerator`, `SkillMethodBeanPostProcessor` and
   `CanonicalSchema` own canonical Java declaration publication and binding.
-  The validator, local reference selection and argument reader have focused coverage; full resolver/session, callback/manager and prompt-renderer integration remain unavailable;
-  retained integration tests named in the guidance section identify consumers rather
-  than a green complete runtime path.
+  The validator, local reference selection and argument reader have focused coverage.
+- `ExecutorApplicationIntegrationTest` covers real startup, public root validation,
+  standard-tool child dispatch and reference-to-Resource resolution. Prompt renderer
+  and builder tests cover contract-specific guidance. These checks do not establish
+  every callback/manager path or hosted provider acceptance.

@@ -60,10 +60,12 @@ Authored skill input/output schemas use a supported subset of JSON Schema Draft
 2020-12 with exact names and numeric values, explicit nullable type arrays, open
 objects by default, and locally asserted standard formats. Read
 [standard schema declarations](agent-skills/loomspan-docs/references/skill-authoring/standard-schemas.md)
-for vocabulary, annotations and diagnostics. The declaration foundation has focused
-coverage; the current source checkout cannot build the complete application while
-runtime schema consumers remain inconsistent. The examples and runtime topics
-below require complete consumer integration before they are executable guarantees.
+for vocabulary, annotations and diagnostics. The same canonical contracts drive
+input validation, generated Java declarations, binding and local output acceptance.
+Native provider restrictions and known adapter limitations are documented in
+[output contracts](agent-skills/loomspan-docs/references/skill-authoring/output-contracts.md#native-output-mapping)
+and [model connections](agent-skills/loomspan-docs/references/skill-authoring/model-selection-and-connections.md).
+Local validation does not establish hosted schema enforcement or model quality.
 
 ## From customer report to engineering triage
 

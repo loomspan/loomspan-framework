@@ -2,7 +2,7 @@
 audience: loomspan-skill-builder
 status: development
 applies_to: bundled-loomspan-revision
-coverage: local-canonical-bindings
+coverage: canonical-bindings-and-focused-native-dispatch
 ---
 
 # Declared Child Input Bindings
@@ -14,11 +14,11 @@ receiving input contract remains authoritative; the calling model generates only
 unbound arguments under a separate projected contract. Binding grants no access
 and does not change invocation limits or the captured configuration generation.
 
-The canonical projection, declaration checks, source assembly and exact receiving
-validation have local focused coverage. Full child dispatch, prompt integration
-and public invocation remain unavailable while the surrounding application schema
-consumers are inconsistent. The execution examples and integration anchors below
-describe the retained contract, not a passing complete application run.
+Canonical projection, declaration checks, source assembly, exact receiving validation
+and generated prompt guidance have focused coverage. A connected native TypeSafe
+case exercises direct and bound-child invocation through `SkillTemplate`, including
+rejection before native sends. The complete example below is validated as one
+generation; it illustrates dataflow rather than uniform native-provider execution.
 
 Authored child references and binding producers MAY be local to the containing skill's namespace or explicitly qualified; local `search` in `sales` compiles to `sales-search`. Mixed spellings compare canonically and never search other namespaces. Runtime/model names remain qualified. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and boundary rules. Declarations keep local `name` components.
 
@@ -89,9 +89,12 @@ that a future source contains the selected key.
 ## Complete example
 
 Save these three declarations as separate files. `assistant` MUST be a configured
-model alias; connection configuration is outside these skill files. This example
-uses the same schema and mapping shape as
-`DeclaredChildInputBindingsIntegrationTest#deliversLargeBoundEvidenceFromEmptyModelArguments`.
+model alias; connection configuration is outside these skill files.
+`DeclaredChildInputBindingsIntegrationTest#completeAuthoringExampleLoadsAsOneValidatedGeneration`
+loads these three declarations together. This is a structural/dataflow example:
+the producer's open output object does not satisfy OpenAI/Anthropic native-output
+closure requirements. See [native output mapping](output-contracts.md#native-output-mapping)
+before selecting a model-backed output contract.
 
 ```yaml
 name: root
@@ -209,9 +212,9 @@ arguments remain. These same rules apply to ordinary and verbose correction prom
 `StepPromptBuilderTest#contractSpecificGuidanceAgreesWithValidationInNormalAndVerboseVariants`,
 `nestedOptionalityAndOpenBoundDestinationsKeepTheirExactContractMeaning`,
 `bindingCreatedOptionalAncestorRequiresItsUnboundRequiredSibling`, and
-`unknownAndUnsupportedShapesGetNeutralGuidance` are retained prompt-consumer anchors;
-their canonical integration is incomplete. Unsupported authored declarations now
-fail the shared compiler rather than entering a prompt fallback. These anchors do
+`unknownAndUnsupportedShapesGetNeutralGuidance` exercise canonical prompt guidance.
+Unsupported authored declarations fail the shared compiler rather than entering
+a prompt fallback. These anchors do
 not establish improved live model accuracy.
 
 The model MUST NOT provide a bound destination, even an equal value or null, nor
@@ -284,10 +287,13 @@ Focused tests: `YamlSkillCatalogTests`, `ChildInputBindingTest`,
 `StepActionValidatorTest`, `StepPromptBuilderTest`,
 `DeclaredChildInputBindingsIntegrationTest` and `BindingIsolationIntegrationTest`.
 Projection, declaration, assembler and decoder tests establish local deterministic
-mechanics with canonical schemas. Retained prompt, dispatch and facade integration
-tests require restoration of the complete application source graph; their presence
-does not certify those paths. Local checks establish neither provider fidelity nor
-improved live model reliability. Large evidence still consumes the receiving model's context.
+mechanics with canonical schemas. `StepPromptBuilderTest` verifies generated guidance;
+`DeclaredChildInputBindingsIntegrationTest#nativeLeafReceivesDynamicBindingsWithExactReceiverAndDirectValidation`
+exercises direct and parent-bound native requests through the public facade with
+unchanged exact receiving validation. Other producer/consumer and isolation matrices
+need their own verification; these focused checks do not establish every dispatch
+path, provider fidelity or improved live model reliability. Large evidence still
+consumes the receiving model's context.
 
 ## Output destination
 

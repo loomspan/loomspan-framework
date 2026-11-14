@@ -7,7 +7,7 @@ coverage: source-verified
 
 # Executor leaf declarations and configuration
 
-An executor leaf declares an operation owned by application Java code, with YAML supplying its input contract, roles and operation configuration. Loomspan prepares and executes these leaves through the shared Java route, classifies them as `SkillKind.JAVA`, and retains their YAML declarations and exact configuration. The example below shows accepted declaration syntax. The shared [standard schema topic](standard-schemas.md) distinguishes declaration validation from the current unavailable runtime consumer integration.
+An executor leaf declares an operation owned by application Java code, with YAML supplying its input contract, roles and operation configuration. Loomspan prepares and executes these leaves through the shared Java route, classifies them as `SkillKind.JAVA`, and retains their YAML declarations and exact configuration. The example below shows accepted declaration syntax. The shared [standard schema topic](standard-schemas.md) defines input validation; the application example below exercises root and standard-tool child execution.
 
 ```yaml
 name: fetchAccount

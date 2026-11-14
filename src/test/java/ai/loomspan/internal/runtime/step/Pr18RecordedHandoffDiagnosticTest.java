@@ -24,7 +24,8 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.any;
 
-/** Opt-in capture using immutable sibling-suite sources, with no provider or tool side effects. */
+/** Historical opt-in capture using immutable sibling-suite sources and recorded Chat responses,
+ * with no provider or tool side effects; not current Responses acceptance coverage. */
 @EnabledIfSystemProperty(named = "pr18.diagnostic", matches = "true")
 class Pr18RecordedHandoffDiagnosticTest {
     @Test

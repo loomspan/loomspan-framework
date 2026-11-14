@@ -52,7 +52,7 @@
     {
       "name": "loomspan.connections.*.headers",
       "type": "java.util.Map<java.lang.String,java.lang.String>",
-      "description": "Sensitive static headers supported only for the OpenAI and Anthropic drivers; use them for supported provider-specific headers such as anthropic-beta."
+      "description": "Static headers supported for the OpenAI, Anthropic and TypeSafe drivers; use them for provider-specific headers such as anthropic-beta. TypeSafe Authorization is owned by api-key."
     },
     {
       "name": "loomspan.connections.*.openai.organization-id",
