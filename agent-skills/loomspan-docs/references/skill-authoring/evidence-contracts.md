@@ -10,12 +10,9 @@ coverage: source-verified
 ## Applicability
 
 The shared [standard schema compiler](standard-schemas.md) validates annotation
-shape and placement and preserves expression text. Evidence expression extraction,
-child lookup and runtime metadata consumers have incomplete canonical-schema
-integration; the current checkout cannot execute the complete application. The
-expression grammar and truth-set sections below describe the retained evaluator
-semantics, not a current end-to-end enforcement guarantee. A structurally accepted
-annotation has not thereby been parsed or checked against child declarations.
+shape and placement and preserves expression text. Catalog registration compiles
+expressions and checks direct-child references separately from structural schema
+validation. Planning and final-output validation apply the truth sets below.
 
 Use an `x-loomspan-evidence` annotation on an immediate root `output_schema` property when that output claim MUST be supported by successful direct child execution. Evidence enforces supportability; it does not prove factual correctness or data lineage, and it is not a workflow, ordering, dependency, authorization, or output-value condition language.
 
@@ -49,6 +46,13 @@ output_schema:
 | Array `items` or a property below an item | No |
 
 Each annotation MUST be one nonblank YAML string. Null, Boolean, numeric, list, and object values are rejected without coercion. A root property without `x-loomspan-evidence` has no inferred evidence requirement, regardless of its name, description, requiredness, siblings, or the declaring skill's children. Java skills do not declare `output_schema`; evidence declarations belong to a model-backed YAML parent. Exact direct child names may identify Java, TypeSafe, or model-backed YAML skills.
+
+Claim property names are exact: `Result`, `result`, ` result` and `result ` are
+independent names. Lookup never trims whitespace or folds case. An absent optional
+claim needs no execution credit; a present claim, including a permitted null,
+requires its expression to be satisfied. Required absence fails structural
+validation before evidence evaluation. Ordinary data properties named `evidence`
+or `x-loomspan-evidence` do not become annotations.
 
 Neither top-level `evidence_contract` nor schema-node `evidence` is accepted; there is no alias or merge behavior.
 
@@ -116,9 +120,9 @@ Evidence also does not impose unconditional generated-plan task cardinality. Use
 
 ## Implementation and test anchors
 
-- `OrdinaryFinalOutputRepairIntegrationTest` exercises real evidence/schema/linter advisors separately and together, canonical dispatch and actual three-adapter repair serialization; `OrdinaryFinalOutputRepairLifecycleTest` covers invocation isolation and real accounting. These local advisor checks do not certify the incomplete catalog expression-extraction boundary.
+- `OrdinaryFinalOutputRepairIntegrationTest` exercises real evidence/schema/linter advisors separately and together, canonical dispatch and actual three-adapter repair serialization; `OrdinaryFinalOutputRepairLifecycleTest` covers invocation isolation and real accounting. Catalog expression extraction and exact claim lookup are covered by the evidence catalog and contract tests.
 
-- `StandardSchemaCompiler` and `StandardSchemaCompilerTest` validate current annotation placement and scalar shape. `YamlSkillCatalog` registers canonical schemas; its expression-extraction consumer integration is incomplete.
+- `StandardSchemaCompiler` and `StandardSchemaCompilerTest` validate current annotation placement and scalar shape. `YamlSkillCatalog` registers canonical schemas; its expression extraction uses the existing Boolean parser and exact claim keys.
 - `EvidenceExpressionParser.java` (`src/main/java/ai/loomspan/internal/runtime/evidence/EvidenceExpressionParser.java`) defines parsing, while `EvidenceExpression.java` (`src/main/java/ai/loomspan/internal/runtime/evidence/EvidenceExpression.java`) defines canonical rendering, evaluation, and structured unsatisfied requirements.
 - `EvidenceCoverageValidator.java` (`src/main/java/ai/loomspan/internal/runtime/evidence/EvidenceCoverageValidator.java`) defines plan and final truth sets.
 - `YamlSkillEvidencePropertyCatalogTest.java` (`src/test/java/ai/loomspan/internal/skill/YamlSkillEvidencePropertyCatalogTest.java`) and `YamlSkillEvidenceExpressionCatalogAdditionalTest.java` (`src/test/java/ai/loomspan/internal/skill/YamlSkillEvidenceExpressionCatalogAdditionalTest.java`) protect placement, scalar shape, exact identity, and diagnostics.

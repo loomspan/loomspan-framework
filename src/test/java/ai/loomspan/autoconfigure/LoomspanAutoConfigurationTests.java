@@ -171,8 +171,6 @@ class LoomspanAutoConfigurationTests {
                 {
                     LoomspanJacksonCodecs codecs = context.getBean(LoomspanJacksonCodecs.class);
                     LoomspanSessionRunner sessionRunner = context.getBean(LoomspanSessionRunner.class);
-                    SkillInputContractResolver inputContractResolver =
-                            context.getBean(SkillInputContractResolver.class);
                     DefaultSkillTemplate skillTemplate = (DefaultSkillTemplate) context.getBean(SkillTemplate.class);
                     DefaultAccessGuard accessGuard = (DefaultAccessGuard) context.getBean(ai.loomspan.internal.security.AccessGuard.class);
                     DefaultPlanningService planningService =
@@ -182,8 +180,6 @@ class LoomspanAutoConfigurationTests {
 
                     assertThat(ReflectionTestUtils.getField(sessionRunner, "canonicalTraceMapper"))
                             .isSameAs(codecs.canonicalTrace());
-                    assertThat(ReflectionTestUtils.getField(inputContractResolver, "objectMapper"))
-                            .isSameAs(codecs.applicationConversion());
                     assertThat(ReflectionTestUtils.getField(skillTemplate, "objectMapper"))
                             .isSameAs(codecs.applicationConversion());
                     assertThat(ReflectionTestUtils.getField(skillTemplate, "roleEvaluator"))
@@ -193,7 +189,9 @@ class LoomspanAutoConfigurationTests {
                     assertThat(ReflectionTestUtils.getField(beanPostProcessor, "objectMapper"))
                             .isSameAs(codecs.applicationConversion());
                     Object schemaGenerator = ReflectionTestUtils.getField(beanPostProcessor, "schemaGenerator");
-                    assertThat(ReflectionTestUtils.getField(schemaGenerator, "mapper"))
+                    assertThat(ReflectionTestUtils.getField(schemaGenerator, "bindingMapper"))
+                            .isSameAs(codecs.applicationConversion());
+                    assertThat(ReflectionTestUtils.getField(schemaGenerator, "schemaMapper"))
                             .isSameAs(codecs.schemaTree());
                 });
     }
@@ -235,7 +233,7 @@ class LoomspanAutoConfigurationTests {
     }
 
     @Test
-    void reusesSharedSkillInputContractResolverAcrossRegistrationPaths() {
+    void generationManagerUsesSharedResolverAndRetainsReflectedRegistrationContracts() {
         contextRunner
                 .withUserConfiguration(MappedSkillTargetConfiguration.class)
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/none/*.yaml")
@@ -244,7 +242,10 @@ class LoomspanAutoConfigurationTests {
                     SkillMethodBeanPostProcessor beanPostProcessor = context.getBean(SkillMethodBeanPostProcessor.class);
                     SkillGenerationManager manager = context.getBean(SkillGenerationManager.class);
 
-                    assertThat(ReflectionTestUtils.getField(beanPostProcessor, "inputContractResolver")).isSameAs(resolver);
+                    var reflected = beanPostProcessor.capabilities().stream()
+                            .filter(capability -> capability.name().equals("default-deterministicTarget")).findFirst().orElseThrow();
+                    assertThat(manager.active("default").capability(reflected.name()).inputContract().schema().tree())
+                            .isEqualTo(reflected.inputContract().schema().tree());
                     assertThat(ReflectionTestUtils.getField(manager, "inputs")).isSameAs(resolver);
                 });
     }

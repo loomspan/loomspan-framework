@@ -25,9 +25,10 @@ class NamespaceSettingsTest {
         var child = new ExecutionBinding(session, new MissionContext(session, "tax-child", "child", parent.mission()), parent.branch(), tax, snapshot);
         var materializer = new ai.loomspan.internal.runtime.attachment.DefaultMissionInputMaterializer(mock(ai.loomspan.internal.vfs.RefResolver.class));
         var manifest = new YamlSkillManifest(); manifest.setName("child");
-        var schema = new YamlSkillManifest.InputSchemaManifest(); schema.setType("object");
-        var image = new YamlSkillManifest.InputSchemaManifest(); image.setType("attachment"); image.setMediaType("image"); image.setAllowedContentTypes(List.of("image/jpeg"));
-        schema.setProperties(Map.of("image", image)); manifest.setInputSchema(schema);
+        manifest.setInputSchema(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","properties":{"image":{"type":"string","x-loomspan-attachment":{
+                "media_type":"image","allowed_content_types":["image/jpeg"]}}}}
+                """));
         var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "tax", new ByteArrayResource(new byte[0]), manifest,
                 new EffectiveSkillExecutionConfiguration("model", "connection", AiDriver.OPENAI, "provider", null));
         var resource = new ByteArrayResource(new byte[]{(byte)255,(byte)216,(byte)255,1,2,3,4,5}) {

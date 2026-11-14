@@ -53,7 +53,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining(filename)
-                        .hasMessageContaining("field 'output_schema.properties.vendorName.evidence'"));
+                        .hasMessageContaining("field 'output_schema/properties/vendorName/x-loomspan-evidence'"));
     }
 
     @Test
@@ -63,7 +63,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/evidence-contract-nondirect-child-skill.yaml")
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
-                        .hasMessageContaining("field 'output_schema.properties.likelyCause.evidence'")
+                        .hasMessageContaining("field 'output_schema.properties.likelyCause.x-loomspan-evidence'")
                         .hasMessageContaining("column 1")
                         .hasMessageContaining("skill 'default-checkDns' is not a direct allowed child"));
     }
@@ -75,7 +75,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/evidence-contract-reserved-child-skill.yaml")
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
-                        .hasMessageContaining("field 'output_schema.properties.result.evidence'")
+                        .hasMessageContaining("field 'output_schema.properties.result.x-loomspan-evidence'")
                         .hasMessageContaining("column 1")
                         .hasMessageContaining("reserved operator 'and'"));
     }
@@ -109,7 +109,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/evidence-contract-malformed-expression-skill.yaml")
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
-                        .hasMessageContaining("field 'output_schema.properties.vendorName.evidence'")
+                        .hasMessageContaining("field 'output_schema.properties.vendorName.x-loomspan-evidence'")
                         .hasMessageContaining("column 26")
                         .hasMessageContaining("expected a skill name or '('"));
     }
@@ -121,7 +121,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/evidence-contract-trailing-token-skill.yaml")
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
-                        .hasMessageContaining("field 'output_schema.properties.vendorName.evidence'")
+                        .hasMessageContaining("field 'output_schema.properties.vendorName.x-loomspan-evidence'")
                         .hasMessageContaining("column 23")
                         .hasMessageContaining("expected 'and', 'or', or end of expression"));
     }

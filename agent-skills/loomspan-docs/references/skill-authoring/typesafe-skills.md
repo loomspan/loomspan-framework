@@ -14,10 +14,9 @@ Authored child references and binding producers MAY be local to the containing s
 Authored `input_schema` uses [standard schema declarations](standard-schemas.md).
 Literal state, instructions and criteria pass the same JSON-bound skill decoder,
 including exact decimals, large integers, string keys and finite-number checks.
-The decoder has focused coverage, while TypeSafe output derivation, effective
-metadata and evaluator integration with canonical schemas remain incomplete.
-The current application checkout cannot execute the complete examples below;
-retained integration test anchors do not certify these runtime paths yet.
+Generated result metadata uses standard descriptive schemas through the same
+catalog and forwarding path as ordinary output metadata. Native response acceptance
+requires an object-valued `answers`; the generated schema is not enforced against it.
 
 Use a TypeSafe leaf for independent Choice, Noul, or Score judgments over supplied
 state. A leaf can be invoked directly through `SkillTemplate` or exposed to a normal
@@ -193,11 +192,23 @@ not sensitivity classification. It does not apply to arbitrary state/description
 objects or returned answers.
 
 Knowable literal constraints and expression syntax are checked at registration.
-After ordinary input validation/normalization, resolution and complete request
+After exact standard input validation without coercion, resolution and complete request
 checks run once before any provider reservation or send. Missing paths, invalid
 resolved criteria, and non-JSON-compatible input, including non-finite numbers,
 fail locally. `SkillTemplate.validate` remains a root input/access pre-check;
 it does not execute native substitution or call the provider.
+
+TypeSafe input schemas are required. Attachment annotations are rejected at every
+supported schema node, including nested properties, array items and typed-map
+values. A property merely named `x-loomspan-attachment` is ordinary data. Shape-free
+input leaves still accept only JSON-compatible native request values, never Java
+resource objects.
+
+Captured requests retain exact numeric values across detached reads and transport
+retries. Native response envelopes are decoded with arbitrary decimal precision
+before trace evidence and answer extraction. Long fractional and exponent-form
+values remain numeric in nested answers and diagnostic evidence. This preserves
+numbers, not their original JSON lexical spelling.
 
 ## Scoped substitution
 
@@ -280,7 +291,7 @@ Empty/extended answers retain those semantics. Failure/cancellation propagates
 through existing mission behavior without a substitute result.
 
 [Input bindings](input-bindings.md) enforce exact transferred subtrees; ordinary
-direct inputs retain existing normalization. Parent `output_bindings` consume
+direct inputs use the same exact, no-coercion validation. Parent `output_bindings` consume
 the generated schema under existing partial registration checks and validate
 selected values against destination contracts at runtime. Fixed disjoint Choice
 enums or Score number-to-integer bindings can fail registration; dynamic criteria
@@ -442,8 +453,8 @@ covers expression/pointer limits and name collisions; and
 complete descriptive schema table. These checks exercise
 `TypeSafeDeclaration#tokens`, `#resolve`, `#validate`, and `#deriveSchema`.
 
-`TypeSafeSkillIntegrationTest#acceptedNormalizedAndExactBoundInputsProduceEqualNativeRequests`
-proves ordinary normalization versus exact bound transfer through public invocation.
+`TypeSafeSkillIntegrationTest#invalidScalarInputsDoNotSendAndTypedDirectAndBoundInputsProduceEqualNativeRequests`
+protects rejected stringified numbers and equivalent typed direct/bound requests.
 `TypeSafeSkillIntegrationTest#concurrentDynamicScoreLevelsStayPrivateAndMetadataRemainsStable`
 proves private Score levels/results and stable catalog metadata during overlapping
 local calls. Existing Choice/reload and retry fixtures protect generation capture

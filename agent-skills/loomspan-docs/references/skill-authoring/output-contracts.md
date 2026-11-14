@@ -12,21 +12,18 @@ Authored child references and binding producers MAY be local to the containing s
 ## Applicability
 
 For accepted declaration vocabulary, nullability, openness, assertions, formats
-and annotations, read [standard schemas](standard-schemas.md). The shared
-compiler and binding projection/composition have focused local coverage. The current checkout cannot
-build the complete application while schema consumers remain inconsistent.
-Ordinary validation, recursive guidance, bounded correction, native request
-attachment and binding composition have focused actual-source coverage.
-Full engine/public invocation, forwarding, planning and effective metadata
-integration remain unavailable. Their retained full-graph test anchors are not
-passing application guarantees.
+and annotations, read [standard schemas](standard-schemas.md). The shared compiler,
+binding projection/composition, ordinary validation, recursive guidance, bounded
+correction, forwarding and effective metadata use canonical standard schemas.
+Local integration tests exercise public invocation and native loopback requests;
+they do not establish live provider enforcement or remove SDK limitations.
 
 [TypeSafe leaves](typesafe-skills.md) have a generated descriptive output schema
 and return the complete provider answers without answer validation or repair.
 The authored `output_schema` rules below apply to ordinary chat skills. A parent
 can bind from or forward a TypeSafe child's result under the existing rules.
 
-Use this topic to choose final synthesis, declared output assembly with `output_bindings`, or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract describes the intended structured result and supplies a local standard validator; runtime guidance and semantic correction require the consumer integration described above. Java skills have no YAML `output_schema`; their null/void results become empty text, Strings remain exact, and other results become JSON. See [Java results](../java-api/java-skills.md#inputs-results-and-lifecycle).
+Use this topic to choose final synthesis, declared output assembly with `output_bindings`, or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract describes the intended structured result and supplies a local standard validator; runtime guidance and bounded semantic correction use the same canonical contract. Java skills have no YAML `output_schema`; their null/void results become empty text, Strings remain exact, and other results become JSON. See [Java results](../java-api/java-skills.md#inputs-results-and-lifecycle).
 
 Explicit provider refusal/incompleteness terminates before schema, linter or
 evidence correction, even when the returned JSON matches the contract. No
@@ -209,7 +206,7 @@ ownership conflicts, exact insertion and complete validation. `OutputBindingIsol
 retains mission/plan isolation controls. `DeclaredOutputBindingsOrdinaryIntegrationTest`
 and `DeclaredOutputBindingsPlanningIntegrationTest` retain facade completion and
 correction, root/nested omitted/true/false openness, required-work completion and
-model/Java/executor source cases; those full-graph checks are currently blocked.
+model/Java/executor source cases.
 The provider protocol tests retain generated false-property schema fidelity controls;
 local schema serialization is not provider acceptance. `ConsoleTraceFixtureCorpusTest`
 retains the Java assembly authority fixture for Console readers.
@@ -229,7 +226,15 @@ bindings, and exact missing/cased probability lookup. Dynamic values register
 against open metadata and fail at the receiving runtime contract when incompatible;
 fully bound success and failure require no final synthesis or repair request.
 
-Public `SkillDescriptor.outputSchema()`, planner tool descriptions and Console skill detail are consumers of captured output metadata. Their canonical-schema integration is incomplete. The foundation retains exact authored standard assertions and nullable type arrays; its provider copies remove recognized Loomspan annotations only. This does not certify public catalog rendering or provider-native response formats.
+Public `SkillDescriptor.outputSchema()`, registered catalogs, observability DTOs
+and Console skill detail expose the same captured effective structural metadata.
+It retains standard assertions, descriptions, nullable type arrays and nested
+structure while omitting child-local `x-loomspan-evidence`. Properties named
+`evidence` or `x-loomspan-evidence` remain data, including below nested objects.
+Canonical declarations, compiled evidence contracts and exact original YAML remain
+separate. Forwarding a producer's structure never inherits its execution evidence
+requirements. Provider-specific schema omissions affect detached request copies
+only; Console renders the structural schema as inert text.
 
 Java and model producers without a schema leave this metadata null, never a fabricated `{}`. Derived metadata is immutable and does not become a parent's authored validator, evidence requirement, linter, or retry policy. The actual model producer retains its own validation and correction; Java/executor do not gain output-validation guarantees. Metadata and structured validation do not establish factual correctness.
 
@@ -294,8 +299,7 @@ the canonical tool manager and all three official serializers over loopback HTTP
 including combined/repeated repair, raw provider parts, model-default callbacks
 and media. `OrdinaryFinalOutputRepairLifecycleTest` exercises real sessions,
 nested/concurrent isolation, usage quotas, cancellation and bound composition.
-These checks do not establish live provider acceptance or complete application
-restoration; the applicability limits above still apply.
+These checks do not establish live provider acceptance; the adapter limits above still apply.
 
 For ordinary model execution without `output_bindings`, Loomspan places the complete effective contract in the first request. For ordinary synthesis in planning mode without output bindings, it places the same contract in the first `FINAL_RESPONSE` request, after required plan tasks complete; tool-call steps do not receive final-output guidance. The renderer includes every normalized node, required or optional presence, nullable or non-null values, effective object openness, array items, enum, format, and description. It does not include evidence expressions, mappings, retry settings, or provider metadata.
 
@@ -335,8 +339,8 @@ correction/tool-continuation wiring, failure counts, local constraints and respo
 preservation. Loopback serialization is not live endpoint acceptance/enforcement.
 The pinned Responses decimal wire defect and Gemini raw-schema narrowing
 remain unresolved; [model/connection limits](model-selection-and-connections.md)
-describe those dependency boundaries. Planner/step native formatting is separately
-incomplete; do not infer it from ordinary generation coverage.
+describe those dependency boundaries. Planning and step execution own separate
+generated contracts; ordinary generation coverage does not establish their provider support.
 
 ## Authoring procedure
 
@@ -350,7 +354,6 @@ incomplete; do not infer it from ordinary generation coverage.
 
 ## Known limitations
 
-- Complete runtime consumer integration is unavailable; see Applicability.
 - Composition, references, conditionals, tuple schemas, `pattern` and unlisted
   assertions are outside the supported declaration profile.
 - There is no minimum-useful-content rule. An object without required children
@@ -377,8 +380,7 @@ incomplete; do not infer it from ordinary generation coverage.
   `OrdinaryOutputAcceptanceTest`, `NativeOutputContractTest` and
   `OrdinaryNativeOutputIntegrationTest` cover ordinary lossless acceptance, guidance,
   bounded correction, request-copy mapping and response composition against actual
-  production sources. `StepPromptBuilderTest` and complete mission/engine checks
-  remain blocked by planning and metadata consumers in the full source graph.
+  production sources. `StepPromptBuilderTest` and mission/engine tests cover connected planning and metadata consumers.
 
 ## Namespace publication boundary
 

@@ -14,15 +14,14 @@ shared compiler also validates internally generated planning contracts under the
 PLANNING role. These declarations use the supported subset of JSON Schema Draft
 2020-12 described here; arbitrary Draft 2020-12 schemas are not accepted.
 
-The declaration compiler, JSON-bound skill decoder and generated Java contracts
-have focused executable coverage. Child-input and output-binding projection,
-assembly/composition and bounded binding compatibility checks also use canonical
-trees and shared local validation. The current source checkout has incomplete consumer integration:
-TypeSafe/catalog consumers still prevent a complete root build. Planning and step consumers have actual-source local tests with only those unrelated collaborators substituted by throwing signatures. The complete application
-build and runtime paths are unavailable while those consumers are inconsistent.
-A successful foundation validation does not establish an executable skill tree,
-provider transport fidelity, or provider enforcement. Examples below demonstrate
-declaration syntax, not a runnable end-to-end application.
+The declaration compiler, JSON-bound skill decoder, generated Java contracts,
+input admission, binding projection/composition, native TypeSafe consumers and
+effective catalogs use canonical trees and shared local validation. Effective
+catalog/display metadata retains supported standard assertions and descriptions,
+removing only recognized execution annotations at schema-node locations. Provider
+request adaptations operate on separate copies and cannot weaken that metadata.
+Canonical declarations and original YAML retain authored annotations. Local validity
+does not establish SDK wire fidelity or hosted provider enforcement.
 
 The compiler validates supported declarations and instances locally without
 coercion, default insertion or mutation. Provider schema copies omit recognized
@@ -221,10 +220,9 @@ carry this collection.
 `AttachmentMaterializationContractTest` verifies the actual local validator,
 materializer, immutable containers and descriptor paths with mocked session/catalog
 collaborators. `ExecutionJournalProjectorTest` and `SkillExecutionViewMapperTest`
-verify list/stream projection and mapped observer details. Complete coordinator,
-engine and public observer invocation remain unavailable while the broader source
-graph is inconsistent; their integration tests are retained. This local evidence
-does not establish provider file decoding or Console attachment rendering.
+verify list/stream projection and mapped observer details. These local checks do not establish complete coordinator, engine or public observer
+invocation, provider file decoding or Console attachment rendering. Consult the
+matching runtime integration tests for those boundaries.
 
 ## Skill document ingestion and diagnostics
 
@@ -305,9 +303,8 @@ and local pre-dispatch validation protects execution correctness.
 
 `SkillInputValidatorTest`, `InputIngressBindingTest`, `InputReferenceTraversalTest`
 and `OrdinaryToolArgumentsTest` cover these local boundaries with actual validator,
-reader, schema generation and registered Java binding sources. They do not prove
-complete public invocation, the actual callback/manager graph or provider request
-fidelity while the surrounding application build is unavailable.
+reader, schema generation and registered Java binding sources. These local checks alone do not prove complete public invocation, the actual
+callback/manager graph or provider request fidelity.
 
 ## Ordinary output acceptance
 
@@ -318,11 +315,13 @@ is permitted. No coercion, case folding, defaults or null insertion occurs.
 Malformed JSON and completed schema violations use the existing bounded output
 correction budget; operational validation failures escape as failures.
 `OutputSchemaValidatorTest`, `OrdinaryOutputAcceptanceTest` and
-`NativeOutputContractTest` exercise this boundary. Full application publication and metadata integration still require the complete source graph.
+`NativeOutputContractTest` exercise this boundary. TypeSafe and direct/forwarded structural metadata are additionally covered by
+`TypeSafeSkillIntegrationTest` and `SkillDependencyValidatorTest`.
 
 
 ## Planning and step acceptance
 
 Planning owns a separate generated native contract and accepts raw JSON only. Its all-required nullable shape is a deliberate Framework generation choice, not a conversion of user schemas. Parser, canonical, conversion and semantic failures share the existing single planning correction. See [generated planning contract](planning-concurrency.md#generated-task-contract).
 
-Actual planner and engine tests cover canonical semantics, bindings/evidence, exact model-origin decimal values, explicit-null argument-root rejection, omission/nested-null controls, bounded correction, required work and final-phase tool prohibition. Loopback planner initial/correction requests retain 4096 total-generation caps and accepted route options for direct Responses, OpenRouter, Meta, Ollama and Anthropic. Independent calls preserve formatting isolation. Gemini's nullable planning schema currently fails in the official SDK's Schema fallback before any HTTP request; successful Gemini planner serialization remains blocked, with no contract weakening or fallback. These local tests do not establish hosted enforcement or full application/public invocation. TypeSafe/catalog restoration and integrated reconciliation remain separate checks.
+Actual planner and engine tests cover canonical semantics, bindings/evidence, exact model-origin decimal values, explicit-null argument-root rejection, omission/nested-null controls, bounded correction, required work and final-phase tool prohibition. Loopback planner initial/correction requests retain 4096 total-generation caps and accepted route options for direct Responses, OpenRouter, Meta, Ollama and Anthropic. Independent calls preserve formatting isolation. Gemini's nullable planning schema currently fails in the official SDK's Schema fallback before any HTTP request; successful Gemini planner serialization remains blocked, with no contract weakening or fallback. These local tests do not establish hosted enforcement or full application/public invocation. TypeSafe/catalog boundaries have their own integration checks; hosted enforcement
+remains separate.

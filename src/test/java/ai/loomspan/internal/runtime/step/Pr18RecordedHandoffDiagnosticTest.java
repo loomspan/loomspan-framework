@@ -147,10 +147,10 @@ class Pr18RecordedHandoffDiagnosticTest {
         return catalog;
     }
     private static void assertRecordedBoundaries(ai.loomspan.internal.runtime.input.SkillInputContract contract) {
-        assertThat(contract.schema().allowsAdditionalProperties()).isFalse();
-        var context = contract.schema().properties().get("context");
-        assertThat(context.allowsAdditionalProperties()).isTrue();
-        assertThat(context.required()).containsExactlyInAnyOrder("equipmentAssessment", "assetContext", "serviceHistory", "referenceEvidence", "serviceTerms");
+        assertThat(contract.schema().tree().path("additionalProperties").asBoolean(true)).isFalse();
+        var context = contract.schema().tree().path("properties").path("context");
+        assertThat(context.path("additionalProperties").asBoolean(true)).isTrue();
+        assertThat(context.path("required").valueStream().map(tools.jackson.databind.JsonNode::textValue).toList()).containsExactlyInAnyOrder("equipmentAssessment", "assetContext", "serviceHistory", "referenceEvidence", "serviceTerms");
     }
     private static final class CapturedRequest extends RuntimeException { }
 }

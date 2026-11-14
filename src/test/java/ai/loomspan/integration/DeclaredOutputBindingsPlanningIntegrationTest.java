@@ -45,7 +45,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                 output_schema:
                   type: object
                   properties:
-                    selected: {%s}
+                    selected: {%s, x-loomspan-evidence: evaluation}
                   required: [selected]
                   additionalProperties: false
                 output_bindings:
@@ -55,7 +55,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                 name: evaluation
                 description: Native producer
                 model: native
-                input_schema: {type: object, properties: {options: {type: object, additionalProperties: true}}, required: [options]}
+                input_schema: {type: object, properties: {options: {type: object, additionalProperties: true}}, required: [options], additionalProperties: false}
                 typesafe:
                   state: ${/input}
                   questions:

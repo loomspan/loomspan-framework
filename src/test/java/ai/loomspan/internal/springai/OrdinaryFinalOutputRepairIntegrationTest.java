@@ -157,7 +157,7 @@ class OrdinaryFinalOutputRepairIntegrationTest {
         if (mode.equals("linter") || mode.equals("combined")) builder.defaultAdvisors(new LinterCallAdvisor("ordinary-fixture", "regex",
                 Pattern.compile("(?s).*accepted.*"), "Include accepted", retries, outcome -> {}));
         if (mode.equals("evidence") || mode.equals("combined")) builder.defaultAdvisors(new EvidenceContractCallAdvisor("ordinary-fixture",
-                EvidenceContract.compiled(Map.of("claim", new EvidenceExpressionParser().parse("test-unperformed")), Map.of("claim", "claim")),
+                EvidenceContract.compiled(Map.of("claim", new EvidenceExpressionParser().parse("test-unperformed"))),
                 new EvidenceBackedOutputValidator(), retries, outcome -> {}, outcome -> {}, fact -> {}));
         return builder.build();
     }

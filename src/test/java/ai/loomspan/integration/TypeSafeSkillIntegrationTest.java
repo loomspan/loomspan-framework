@@ -27,13 +27,69 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /** Public facade, actual native HTTP and captured-generation evidence. */
 class TypeSafeSkillIntegrationTest {
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree();
     @TempDir Path directory;
     private final List<String> sessionIds = new CopyOnWriteArrayList<>();
 
     @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration
     static class App {}
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/", "/api/"})
+    void nestedDecimalsRemainExactInRetryBodiesAnswersAndTraceEvidence(String prefix) throws Exception {
+        var fraction = new java.math.BigDecimal("0.12345678901234567890123456789");
+        var exponent = new java.math.BigDecimal("1.2345678901234567890123456789E-30");
+        String answers = "{\"extra\":{" + "\"fraction\":" + fraction + ",\"nested\":[" + exponent + "]}}";
+        String envelope = "{\"answers\":" + answers + ",\"outside\":" + exponent
+                + ",\"usage\":{\"input_tokens\":2,\"output_tokens\":3}}";
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(new MockResponse().setResponseCode(529).setBody("retry"));
+            server.enqueue(success(envelope));
+            runner(server, prefix, leaf()).withPropertyValues(
+                    "loomspan.connections.native.provider-retry.enabled=true",
+                    "loomspan.connections.native.provider-retry.max-attempts=2",
+                    "loomspan.connections.native.provider-retry.initial-backoff=0ms",
+                    "loomspan.connections.native.provider-retry.max-backoff=0ms",
+                    "loomspan.connections.native.provider-retry.jitter=0").run(context -> {
+                assertThat(context).hasNotFailed();
+                var input = new LinkedHashMap<String, Object>(input("A"));
+                input.put("fraction", fraction); input.put("nested", List.of(Map.of("exponent", exponent)));
+                var result = JSON.readTree(invoke(context.getBean(SkillTemplate.class), input));
+                assertThat(result.at("/extra/fraction").decimalValue()).isEqualByComparingTo(fraction);
+                assertThat(result.at("/extra/nested/0").decimalValue()).isEqualByComparingTo(exponent);
+                assertThat(result).isEqualTo(JSON.readTree(answers));
+                var trace = traces(context);
+                var requests = records(trace, "MODEL_REQUEST_SENT");
+                assertThat(requests).hasSize(2);
+                for (var request : requests) {
+                    var data = logicalData(trace, request);
+                    assertThat(data.at("/request/state/fraction").decimalValue()).isEqualByComparingTo(fraction);
+                    assertThat(data.at("/request/state/nested/0/exponent").decimalValue()).isEqualByComparingTo(exponent);
+                }
+                var responses = records(trace, "MODEL_RESPONSE_RECEIVED");
+                assertThat(responses).hasSize(1);
+                var evidence = logicalData(trace, responses.getFirst()).path("envelope");
+                assertThat(evidence.at("/answers/extra/fraction").decimalValue()).isEqualByComparingTo(fraction);
+                assertThat(evidence.at("/answers/extra/nested/0").decimalValue()).isEqualByComparingTo(exponent);
+                assertThat(evidence.path("outside").decimalValue()).isEqualByComparingTo(exponent);
+                assertThat(usage(trace).path("providerAttempts").intValue()).isEqualTo(2);
+                assertThat(usage(trace).path("modelCalls").intValue()).isEqualTo(1);
+                assertThat(usage(trace).path("totalUnits").intValue()).isEqualTo(5);
+            });
+            var first = server.takeRequest(2, TimeUnit.SECONDS);
+            var second = server.takeRequest(2, TimeUnit.SECONDS);
+            assertThat(first.getPath()).isEqualTo(prefix.equals("/") ? "/v1/systemone" : "/api/v1/systemone");
+            String body = first.getBody().readUtf8();
+            assertThat(second.getBody().readUtf8()).isEqualTo(body);
+            var wire = JSON.readTree(body);
+            assertThat(wire.propertyNames()).containsExactlyInAnyOrder("state", "questions", "model");
+            assertThat(wire.at("/state/fraction").decimalValue()).isEqualByComparingTo(fraction);
+            assertThat(wire.at("/state/nested/0/exponent").decimalValue()).isEqualByComparingTo(exponent);
+            assertThat(wire.path("model").textValue()).isEqualTo("typesafe/jev-verbatim");
+            assertThat(server.getRequestCount()).isEqualTo(2);
+        }
+    }
 
     private String leaf() {
         return """
@@ -80,6 +136,53 @@ class TypeSafeSkillIntegrationTest {
 
     private static MockResponse success(String envelope) {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody(envelope);
+    }
+
+    @Test
+    void standardInputsRejectBeforeNativeSendAndPreserveNullableMapsAndUnconstrainedValues() throws Exception {
+        String schema = """
+                input_schema:
+                  type: object
+                  additionalProperties: false
+                  required: [count, ready, email, rows, lookup, anything, candidates]
+                  properties:
+                    count: {type: integer, minimum: 1, maximum: 2}
+                    ready: {type: boolean}
+                    email: {type: string, format: email, minLength: 3, maxLength: 50}
+                    rows: {type: array, minItems: 1, maxItems: 2, items: {type: array, items: {type: [string, 'null']}}}
+                    lookup: {type: object, additionalProperties: {type: integer, minimum: 0}}
+                    anything: {}
+                    candidates: {type: object, additionalProperties: true}
+                """.stripTrailing();
+        String document = leaf().replace("input_schema:\n  type: object\n  additionalProperties: true", schema);
+        var valid = new LinkedHashMap<String, Object>();
+        valid.put("count", 1); valid.put("ready", true); valid.put("email", "a@example.com");
+        valid.put("rows", List.of(Arrays.asList(null, "exact"))); valid.put("lookup", Map.of("entry", 2));
+        valid.put("anything", Map.of("nested", List.of(true, "3"))); valid.put("candidates", Map.of("A", "yes"));
+        try (var server = new MockWebServer()) {
+            server.enqueue(success("{\"answers\":{}}"));
+            runner(server, "/", document).run(context -> {
+                assertThat(context).hasNotFailed();
+                var template = context.getBean(SkillTemplate.class);
+                for (var change : List.<Map.Entry<String, Object>>of(
+                        Map.entry("count", "1"), Map.entry("count", 3), Map.entry("ready", "true"),
+                        Map.entry("email", "invalid"), Map.entry("rows", List.of()),
+                        Map.entry("rows", List.of(List.of("a"), List.of("b"), List.of("c"))),
+                        Map.entry("lookup", Map.of("entry", "2")), Map.entry("extra", "not allowed"),
+                        Map.entry("anything", new org.springframework.core.io.ByteArrayResource(new byte[] {1})))) {
+                    var invalid = new LinkedHashMap<>(valid); invalid.put(change.getKey(), change.getValue());
+                    assertThatThrownBy(() -> invoke(template, invalid)).isInstanceOf(SkillInputValidationException.class);
+                    assertThat(server.getRequestCount()).isZero();
+                }
+                var wrongCase = new LinkedHashMap<>(valid); wrongCase.put("Count", wrongCase.remove("count"));
+                assertThatThrownBy(() -> invoke(template, wrongCase)).isInstanceOf(SkillInputValidationException.class);
+                assertThat(server.getRequestCount()).isZero();
+                assertThat(invoke(template, valid)).isEqualTo("{}");
+            });
+            var wire = JSON.readTree(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8());
+            assertThat(wire.path("state")).isEqualTo(JSON.valueToTree(valid));
+            assertThat(server.getRequestCount()).isEqualTo(1);
+        }
     }
 
     private static Map<String, Object> input(String candidate) {
@@ -888,9 +991,9 @@ class TypeSafeSkillIntegrationTest {
                                 assertThat(JSON.readTree(template.invoke("default-summarizeContact", fixedInput)))
                                         .isEqualTo(JSON.valueToTree(Map.of(
                                                 "department", "technical",
-                                                "repeatProbability", 0.9,
-                                                "severity", 0.75,
-                                                "technicalProbability", 0.9)));
+                                                "repeatProbability", new java.math.BigDecimal("0.9"),
+                                                "severity", new java.math.BigDecimal("0.75"),
+                                                "technicalProbability", new java.math.BigDecimal("0.9"))));
                             });
             assertThat(failure.get()).isNull();
             assertThat(server.getRequestCount()).isEqualTo(6);
@@ -1030,7 +1133,7 @@ typesafe:
     }
 
     @Test
-    void acceptedNormalizedAndExactBoundInputsProduceEqualNativeRequests() throws Exception {
+    void invalidScalarInputsDoNotSendAndTypedDirectAndBoundInputsProduceEqualNativeRequests() throws Exception {
         String document =
                 """
 name: judgment
@@ -1123,7 +1226,9 @@ output_from: {skill: default-judgment}
                                                         new SkillDocument("leaf", document),
                                                         new SkillDocument("parent", parent)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class))));
                                 var template = context.getBean(SkillTemplate.class);
-                                assertThat(invoke(template, Map.of("count", "3"))).isEqualTo("{}");
+                                assertThatThrownBy(() -> invoke(template, Map.of("count", "3"))).isInstanceOf(SkillInputValidationException.class);
+                                assertThat(nativeRequests).isEmpty();
+                                assertThat(invoke(template, Map.of("count", 3))).isEqualTo("{}");
                                 assertThat(
                                                 template.invoke(
                                                         "default-boundJudgment",
@@ -1225,7 +1330,7 @@ output_from: {skill: default-judgment}
     }
 
     @Test
-    void ordinaryInputNormalizationPrecedesNativeResolution() throws Exception {
+    void ordinaryInputValidationPrecedesNativeResolutionWithoutCoercion() throws Exception {
         String document =
                 leaf().replace(
                                 "additionalProperties: true",
@@ -1234,21 +1339,14 @@ output_from: {skill: default-judgment}
                                         + "  required: [count]");
         try (MockWebServer server = new MockWebServer()) {
             server.enqueue(success("{\"answers\":{}}"));
-            server.enqueue(success("{\"answers\":{}}"));
             runner(server, "/", document)
                     .run(
                             context -> {
                                 assertThat(context).hasNotFailed();
                                 var template = context.getBean(SkillTemplate.class);
-                                assertThat(
-                                                invoke(
-                                                        template,
-                                                        Map.of(
-                                                                "count",
-                                                                "3",
-                                                                "candidates",
-                                                                Map.of("A", "yes"))))
-                                        .isEqualTo("{}");
+                                assertThatThrownBy(() -> invoke(template, Map.of("count", "3", "candidates", Map.of("A", "yes"))))
+                                        .isInstanceOf(SkillInputValidationException.class);
+                                assertThat(server.getRequestCount()).isZero();
                                 assertThat(
                                                 invoke(
                                                         template,
@@ -1261,11 +1359,9 @@ output_from: {skill: default-judgment}
                             });
             JsonNode first =
                     JSON.readTree(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8());
-            JsonNode second =
-                    JSON.readTree(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8());
             assertThat(first.at("/state/count").isNumber()).isTrue();
             assertThat(first.at("/state/count").doubleValue()).isEqualTo(3);
-            assertThat(second.at("/state/count").doubleValue()).isEqualTo(3);
+            assertThat(server.getRequestCount()).isEqualTo(1);
         }
     }
 

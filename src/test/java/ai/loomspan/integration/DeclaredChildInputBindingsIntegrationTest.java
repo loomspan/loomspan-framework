@@ -28,11 +28,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Actual supported facade/dispatch with local provider responses. */
 class DeclaredChildInputBindingsIntegrationTest {
     @org.junit.jupiter.api.Test
-    void nativeLeafReceivesDynamicBindingsWithExactReceiverValidationAndOrdinaryDirectNormalization() throws Exception {
+    void nativeLeafReceivesDynamicBindingsWithExactReceiverAndDirectValidation() throws Exception {
         Path skills = Files.createDirectory(directory.resolve("native-binding"));
         String nativeLeaf = """
                 name: evaluation
-                description: Evaluate normalized evidence
+                description: Evaluate exact evidence
                 model: native
                 input_schema:
                   type: object
@@ -88,7 +88,10 @@ class DeclaredChildInputBindingsIntegrationTest {
                 assertThat(context).hasNotFailed();
                 var template = context.getBean(SkillTemplate.class);
                 var candidates = Map.of("KeepCase", Map.of("description", "original"));
-                assertThat(template.invoke("default-evaluation", Map.of("amount", "4", "candidates", candidates))).isEqualTo("{}");
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-evaluation", Map.of("amount", "4", "candidates", candidates)))
+                        .isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
+                assertThat(nativeBodies).isEmpty();
+                assertThat(template.invoke("default-evaluation", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{}");
                 assertThat(template.invoke("default-root", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{}");
                 org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", Map.of("amount", "4", "candidates", candidates)))
                         .hasStackTraceContaining("binding_assembled_input_invalid");

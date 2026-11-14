@@ -1,7 +1,8 @@
 package ai.loomspan.internal.typesafe;
 
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
-import ai.loomspan.internal.skill.YamlSkillManifest.OutputSchemaManifest;
+import ai.loomspan.internal.schema.CanonicalSchema;
+import ai.loomspan.internal.schema.StandardSchemaCompiler;
 
 import tools.jackson.core.JsonPointer;
 import tools.jackson.databind.JsonNode;
@@ -20,22 +21,23 @@ import java.util.Set;
 public final class TypeSafeDeclaration {
     private static final ObjectMapper JSON = LoomspanJacksonCodecs.defaults().schemaTree();
     private final JsonNode declaration;
-    private final OutputSchemaManifest schema;
+    private final CanonicalSchema schema;
     private final Map<String, List<Token>> templates;
 
     private TypeSafeDeclaration(JsonNode declaration) {
         this.declaration = declaration == null ? null : declaration.deepCopy();
         templates = compileTemplates(this.declaration);
         validate(this.declaration, true, templates);
-        schema = deriveSchema(this.declaration.get("questions"));
+        schema = new StandardSchemaCompiler().compile(deriveSchema(this.declaration.get("questions")),
+                StandardSchemaCompiler.Role.OUTPUT, StandardSchemaCompiler.Origin.GENERATED);
     }
 
     public static TypeSafeDeclaration compile(JsonNode declaration) {
         return new TypeSafeDeclaration(declaration);
     }
 
-    public OutputSchemaManifest outputSchema() {
-        return JSON.convertValue(schema, OutputSchemaManifest.class);
+    public CanonicalSchema outputSchema() {
+        return schema;
     }
 
     public ResolvedRequest resolve(Object normalizedInput) {
@@ -468,17 +470,17 @@ public final class TypeSafeDeclaration {
         require(false, path, "value is not JSON-compatible: " + value.getClass().getName());
     }
 
-    private static OutputSchemaManifest deriveSchema(JsonNode questions) {
-        Map<String, OutputSchemaManifest> answers = new LinkedHashMap<>();
+    private static ObjectNode deriveSchema(JsonNode questions) {
+        Map<String, ObjectNode> answers = new LinkedHashMap<>();
         questions
                 .properties()
                 .forEach(
                         e -> {
                             JsonNode q = e.getValue();
                             String type = q.get("type").stringValue();
-                            Map<String, OutputSchemaManifest> fields = new LinkedHashMap<>();
-                            OutputSchemaManifest identity = scalar("string", null);
-                            identity.setEnumValues(List.of(type));
+                            Map<String, ObjectNode> fields = new LinkedHashMap<>();
+                            ObjectNode identity = scalar("string", null);
+                            identity.set("enum", JSON.valueToTree(List.of(type)));
                             fields.put("type", identity);
                             if (type.equals("noul"))
                                 fields.put(
@@ -491,7 +493,7 @@ public final class TypeSafeDeclaration {
                                                 && (type.equals("choice")
                                                         ? criteria.isObject()
                                                         : criteria.isArray());
-                                OutputSchemaManifest value =
+                                ObjectNode value =
                                         scalar(
                                                 type.equals("choice") ? "string" : "number",
                                                 type.equals("choice")
@@ -503,14 +505,14 @@ public final class TypeSafeDeclaration {
                                                                 : "Score from 0 through supplied"
                                                                       + " level count minus one.");
                                 if (type.equals("choice") && fixed)
-                                    value.setEnumValues(
+                                    value.set("enum", JSON.valueToTree(
                                             criteria.properties().stream()
                                                     .map(Map.Entry::getKey)
-                                                    .toList());
+                                                    .toList()));
                                 fields.put(type, value);
                                 fields.put(
                                         "confidence", scalar("number", "Confidence from 0 to 1."));
-                                Map<String, OutputSchemaManifest> probabilities =
+                                Map<String, ObjectNode> probabilities =
                                         new LinkedHashMap<>();
                                 if (fixed) {
                                     if (type.equals("choice"))
@@ -530,12 +532,12 @@ public final class TypeSafeDeclaration {
                                                     scalar("number", "Probability from 0 to 1."));
                                 }
                                 var probabilityMap = object(probabilities, !fixed);
-                                probabilityMap.setDescription(
+                                probabilityMap.put("description",
                                         "Candidate or level to probability mapping, from 0 to 1.");
                                 fields.put("probabilities", probabilityMap);
                                 if (type.equals("score")) {
                                     var legend = object(Map.of(), true);
-                                    legend.setDescription("Provider-returned level descriptions.");
+                                    legend.put("description", "Provider-returned level descriptions.");
                                     fields.put("legend", legend);
                                 }
                             }
@@ -544,19 +546,19 @@ public final class TypeSafeDeclaration {
         return object(answers, false);
     }
 
-    private static OutputSchemaManifest scalar(String type, String description) {
-        var node = new OutputSchemaManifest();
-        node.setType(type);
-        node.setDescription(description);
+    private static ObjectNode scalar(String type, String description) {
+        var node = JSON.createObjectNode().put("type", type);
+        if (description != null) node.put("description", description);
         return node;
     }
 
-    private static OutputSchemaManifest object(
-            Map<String, OutputSchemaManifest> fields, boolean additional) {
+    private static ObjectNode object(Map<String, ObjectNode> fields, boolean additional) {
         var node = scalar("object", null);
-        node.setProperties(fields);
-        node.setRequired(new ArrayList<>(fields.keySet()));
-        node.setAdditionalProperties(additional);
+        var properties = JSON.createObjectNode();
+        fields.forEach(properties::set);
+        node.set("properties", properties);
+        node.set("required", JSON.valueToTree(new ArrayList<>(fields.keySet())));
+        node.put("additionalProperties", additional);
         return node;
     }
 }

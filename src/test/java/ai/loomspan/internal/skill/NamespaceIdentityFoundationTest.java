@@ -79,7 +79,7 @@ class NamespaceIdentityFoundationTest {
                         assertThat(definition.allowedSkillConstraints().get(1).inputBindings().getFirst().skillIdentity().toString()).isEqualTo(owner + "-child");
                         assertThat(definition.outputBindings().getFirst().skillIdentity().toString()).isEqualTo(owner + "-child");
                         assertThat(definition.evidenceContract().canonicalExpressionForClaim("id")).isEqualTo(owner + "-child or shared-child");
-                        assertThat(definition.manifest().getOutputSchema().getProperties().get("id").getEvidence()).isEqualTo("child or shared-child");
+                        assertThat(definition.manifest().getOutputSchema().at("/properties/id/x-loomspan-evidence").textValue()).isEqualTo("child or shared-child");
                     }
                 }
             }
@@ -115,7 +115,7 @@ class NamespaceIdentityFoundationTest {
                     + "output_schema: {type: object, properties: {id: {type: string, x-loomspan-evidence: '" + expression + "'}}}\n")), false);
             assertThat(result.issues()).singleElement().satisfies(issue -> {
                 assertThat(issue.sourceName()).isEqualTo("raw diagnostic");
-                assertThat(issue.fieldPath()).isEqualTo("output_schema.properties.id.evidence");
+                assertThat(issue.fieldPath()).isEqualTo("output_schema.properties.id.x-loomspan-evidence");
                 assertThat(issue.message()).contains("column 13");
                 if (expression.contains("second")) assertThat(issue.message()).contains("sales-Second", "did you mean");
             });

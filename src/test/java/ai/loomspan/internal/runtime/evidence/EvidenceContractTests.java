@@ -30,6 +30,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 class EvidenceContractTests {
 
     @Test
+    void caseAndWhitespaceDistinctClaimsHaveIndependentLookupAndPresence() {
+        var expressions = new LinkedHashMap<String, String>();
+        expressions.put("Result", "default-upper");
+        expressions.put("result", "default-lower");
+        expressions.put(" result", "default-leading");
+        expressions.put("result ", "default-trailing");
+        var contract = TestEvidenceContracts.compiled(expressions);
+        var mapper = JsonMapper.builder().build();
+        expressions.forEach((name, expression) -> {
+            assertThat(contract.canonicalExpressionForClaim(name)).isEqualTo(expression);
+            var candidate = mapper.createObjectNode().putNull(name);
+            assertThat(contract.presentClaims(candidate)).containsExactly(name);
+            var result = new EvidenceBackedOutputValidator().validate(candidate, contract, Set.of());
+            assertThat(result.issues()).singleElement().extracting(EvidenceCoverageIssue::claimName).isEqualTo(name);
+            assertThat(new EvidenceBackedOutputValidator().validate(candidate, contract, Set.of(expression)).complete()).isTrue();
+        });
+        assertThat(contract.expressionForClaim(null)).isNull();
+        assertThat(contract.expressionForClaim("RESULT")).isNull();
+        assertThat(contract.presentClaims(mapper.createObjectNode().put("RESULT", "unannotated"))).isEmpty();
+        assertThat(new EvidenceBackedOutputValidator().validate(mapper.createObjectNode(), contract, Set.of()).complete()).isTrue();
+    }
+
+    @Test
     void preservesDiagnosticClaimExpressionAndSkillOrder() {
         LinkedHashMap<String, String> requiredExpressions = new LinkedHashMap<>();
         requiredExpressions.put("vendorName", "default-invoiceParser");
@@ -46,13 +69,14 @@ class EvidenceContractTests {
     }
 
     @Test
-    void normalizesClaimsToolsAndPresentClaimLookups() throws Exception {
+    void usesExactClaimsAndPreservesSkillIdentity() throws Exception {
         EvidenceContract contract = TestEvidenceContracts.compiled(Map.of(
                 "vendorName", "default-invoiceParser",
                 "isDuplicate", "default-invoiceParser and default-expenseLookup"));
         EvidenceBackedOutputValidator validator = new EvidenceBackedOutputValidator();
 
-        assertThat(contract.canonicalExpressionForClaim("VENDORNAME")).isEqualTo("default-invoiceParser");
+        assertThat(contract.canonicalExpressionForClaim("VENDORNAME")).isNull();
+        assertThat(contract.canonicalExpressionForClaim("vendorName")).isEqualTo("default-invoiceParser");
         assertThat(contract.canonicalExpressionForClaim("isDuplicate")).isEqualTo("default-invoiceParser and default-expenseLookup");
 
         EvidenceCoverageResult result = validator.validate(

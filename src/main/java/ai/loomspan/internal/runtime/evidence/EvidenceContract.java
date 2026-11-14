@@ -5,22 +5,18 @@ import tools.jackson.databind.JsonNode;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 public final class EvidenceContract
 {
-    private static final EvidenceContract EMPTY = new EvidenceContract(Map.of(), Map.of());
+    private static final EvidenceContract EMPTY = new EvidenceContract(Map.of());
 
     private final Map<String, EvidenceExpression> expressionsByClaim;
-    private final Map<String, String> canonicalClaimByNormalized;
 
-    private EvidenceContract(Map<String, EvidenceExpression> expressionsByClaim,
-            Map<String, String> canonicalClaimByNormalized)
+    private EvidenceContract(Map<String, EvidenceExpression> expressionsByClaim)
     {
         this.expressionsByClaim = Collections.unmodifiableMap(new LinkedHashMap<>(expressionsByClaim));
-        this.canonicalClaimByNormalized = Collections.unmodifiableMap(new LinkedHashMap<>(canonicalClaimByNormalized));
     }
 
     public static EvidenceContract empty()
@@ -28,12 +24,11 @@ public final class EvidenceContract
         return EMPTY;
     }
 
-    public static EvidenceContract compiled(Map<String, EvidenceExpression> expressionsByClaim,
-            Map<String, String> canonicalClaimByNormalized)
+    public static EvidenceContract compiled(Map<String, EvidenceExpression> expressionsByClaim)
     {
         return expressionsByClaim == null || expressionsByClaim.isEmpty()
                 ? empty()
-                : new EvidenceContract(expressionsByClaim, canonicalClaimByNormalized);
+                : new EvidenceContract(expressionsByClaim);
     }
 
     public boolean isEmpty()
@@ -48,8 +43,7 @@ public final class EvidenceContract
 
     public EvidenceExpression expressionForClaim(String claimName)
     {
-        String canonical = canonicalClaimByNormalized.get(normalizeKey(claimName));
-        return canonical == null ? null : expressionsByClaim.get(canonical);
+        return expressionsByClaim.get(claimName);
     }
 
     public String canonicalExpressionForClaim(String claimName)
@@ -67,10 +61,9 @@ public final class EvidenceContract
         LinkedHashSet<String> presentClaims = new LinkedHashSet<>();
         candidate.propertyNames().forEach(fieldName ->
         {
-            String canonicalClaim = canonicalClaimByNormalized.get(normalizeKey(fieldName));
-            if (canonicalClaim != null)
+            if (expressionsByClaim.containsKey(fieldName))
             {
-                presentClaims.add(canonicalClaim);
+                presentClaims.add(fieldName);
             }
         });
         return Collections.unmodifiableSet(presentClaims);
@@ -81,8 +74,4 @@ public final class EvidenceContract
         return expressionsByClaim;
     }
 
-    private static String normalizeKey(String value)
-    {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
-    }
 }

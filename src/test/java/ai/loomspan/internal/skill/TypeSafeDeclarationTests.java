@@ -17,6 +17,27 @@ import java.util.Map;
 
 class TypeSafeDeclarationTests {
     @Test
+    void numericSubstitutionsAndRepeatedDetachedReadsPreserveArbitraryPrecision() {
+        var d = declaration("""
+                state: {fraction: '${/input/fraction}', nested: '${/input/nested}', text: 'n=${/input/fraction}'}
+                questions: {q: {type: noul, instructions: decide}}
+                """);
+        var fraction = new java.math.BigDecimal("0.12345678901234567890123456789");
+        var exponent = new java.math.BigDecimal("1.2345678901234567890123456789E-30");
+        var nested = new java.util.ArrayList<>(List.of(Map.of("exponent", exponent)));
+        var input = new LinkedHashMap<String, Object>();
+        input.put("fraction", fraction); input.put("nested", nested);
+        var captured = d.resolve(input);
+        input.clear(); nested.clear();
+        for (int read = 0; read < 3; read++) {
+            var copy = captured.json();
+            assertThat(copy.at("/state/fraction").decimalValue()).isEqualByComparingTo(fraction);
+            assertThat(copy.at("/state/nested/0/exponent").decimalValue()).isEqualByComparingTo(exponent);
+            assertThat(copy.at("/state/text").textValue()).isEqualTo("n=" + fraction);
+            ((tools.jackson.databind.node.ObjectNode) copy.path("state")).removeAll();
+        }
+    }
+    @Test
     void incompatibleModelAliasesRejectBeforeRegistration() {
         var props = new LoomspanProperties();
         for (var driver : List.of(ai.loomspan.autoconfigure.AiDriver.OPENAI, ai.loomspan.autoconfigure.AiDriver.TYPESAFE)) {
@@ -366,7 +387,7 @@ questions: {q: {type: choice, criteria: {A: {Name: first, name: second}}}}
 name: judgment
 description: native
 model: judge
-input_schema: {type: object}
+input_schema: {type: object, properties: {x-loomspan-attachment: {type: string}, evidence: {type: object, additionalProperties: {}}}}
 typesafe:
   state: literal
   questions:
@@ -376,6 +397,7 @@ typesafe:
         assertThat(result.issues()).isEmpty();
         var definition = result.definitions().getFirst();
         assertThat(definition.typesafe()).isTrue();
+        assertThat(definition.evidenceContract().isEmpty()).isTrue();
         assertThat(definition.typeSafeDeclaration()).isSameAs(definition.typeSafeDeclaration());
         var copied = definition.manifest();
         assertThat(copied.compiledTypesafe()).isSameAs(definition.typeSafeDeclaration());
@@ -485,6 +507,26 @@ typesafe:
             assertThat(checked.issues()).hasSize(1);
             assertThat(checked.issues().getFirst().fieldPath()).startsWith("input_schema");
         }
+    }
+
+    @Test
+    void attachmentsRejectAtEverySupportedSchemaNodeIncludingMapValues() {
+        String attachment = "{type: string, x-loomspan-attachment: {media_type: image, allowed_content_types: [image/png]}}";
+        var schemas = new LinkedHashMap<String, String>();
+        schemas.put("input_schema.properties.file.x-loomspan-attachment", "{type: object, properties: {file: " + attachment + "}}");
+        schemas.put("input_schema.properties.nested.properties.file.x-loomspan-attachment", "{type: object, properties: {nested: {type: object, properties: {file: " + attachment + "}}}}");
+        schemas.put("input_schema.properties.files.items.x-loomspan-attachment", "{type: object, properties: {files: {type: array, items: " + attachment + "}}}");
+        schemas.put("input_schema.properties.files.items.properties.file.x-loomspan-attachment", "{type: object, properties: {files: {type: array, items: {type: object, properties: {file: " + attachment + "}}}}}");
+        schemas.put("input_schema.additionalProperties.x-loomspan-attachment", "{type: object, additionalProperties: " + attachment + "}");
+        schemas.put("input_schema.additionalProperties.items.additionalProperties.x-loomspan-attachment", "{type: object, additionalProperties: {type: array, items: {type: object, additionalProperties: " + attachment + "}}}");
+        schemas.forEach((path, schema) -> {
+            var checked = new YamlSkillCatalog(new LoomspanProperties()).checkedSupplied(List.of(new SkillDocument("attachments",
+                    "name: judge\ndescription: native\nmodel: judge\ninput_schema: " + schema + "\ntypesafe: {state: text, questions: {q: {type: noul, instructions: decide}}}\n")), false);
+            assertThat(checked.issues()).singleElement().satisfies(issue -> {
+                assertThat(issue.fieldPath()).isEqualTo(path);
+                assertThat(issue.message()).contains("not supported for TypeSafe");
+            });
+        });
     }
 
     private TypeSafeDeclaration declaration(String yaml) {
@@ -743,22 +785,22 @@ questions:
   dynamicScore: {type: score, criteria: '${/input/levels}'}
   noul: {type: noul, instructions: decide}
 """);
-        var schema = d.outputSchema();
-        assertThat(schema.getRequired())
+        var schema = d.outputSchema().tree();
+        assertThat(strings(schema.path("required")))
                 .containsExactly("fixed", "dynamic", "score", "dynamicScore", "noul");
-        assertThat(schema.getAdditionalProperties()).isFalse();
-        assertThat(schema.getType()).isEqualTo("object");
-        for (String name : schema.getRequired()) {
-            var answer = schema.getProperties().get(name);
+        assertThat(schema.path("additionalProperties").booleanValue()).isFalse();
+        assertThat(schema.path("type").textValue()).isEqualTo("object");
+        for (String name : strings(schema.path("required"))) {
+            var answer = schema.path("properties").path(name);
             String type =
                     name.equals("noul")
                             ? "noul"
                             : name.toLowerCase(java.util.Locale.ROOT).contains("score")
                                     ? "score"
                                     : "choice";
-            assertThat(answer.getType()).isEqualTo("object");
-            assertThat(answer.getAdditionalProperties()).isTrue();
-            assertThat(answer.getRequired())
+            assertThat(answer.path("type").textValue()).isEqualTo("object");
+            assertThat(answer.path("additionalProperties").booleanValue()).isTrue();
+            assertThat(strings(answer.path("required")))
                     .containsExactlyElementsOf(
                             type.equals("noul")
                                     ? List.of("type", "noul")
@@ -771,103 +813,91 @@ questions:
                                                     "confidence",
                                                     "probabilities",
                                                     "legend"));
-            assertThat(answer.getProperties().keySet())
-                    .containsExactlyElementsOf(answer.getRequired());
-            assertThat(answer.getProperties().get("type").getType()).isEqualTo("string");
-            assertThat(answer.getProperties().get("type").getEnumValues()).containsExactly(type);
-            assertThat(answer.getProperties().get(type).getType())
+            assertThat(answer.path("properties").propertyNames())
+                    .containsExactlyElementsOf(strings(answer.path("required")));
+            assertThat(answer.path("properties").path("type").path("type").textValue()).isEqualTo("string");
+            assertThat(strings(answer.path("properties").path("type").path("enum"))).containsExactly(type);
+            assertThat(answer.path("properties").path(type).path("type").textValue())
                     .isEqualTo(type.equals("choice") ? "string" : "number");
             if (type.equals("noul")) {
-                assertThat(answer.getProperties().get("noul").getDescription())
+                assertThat(answer.path("properties").path("noul").path("description").textValue())
                         .isEqualTo("Probability of yes, from 0 to 1.");
                 continue;
             }
-            assertThat(answer.getProperties().get("confidence").getType()).isEqualTo("number");
-            assertThat(answer.getProperties().get("confidence").getDescription())
+            assertThat(answer.path("properties").path("confidence").path("type").textValue()).isEqualTo("number");
+            assertThat(answer.path("properties").path("confidence").path("description").textValue())
                     .contains("0 to 1");
-            var probabilities = answer.getProperties().get("probabilities");
-            assertThat(probabilities.getType()).isEqualTo("object");
-            assertThat(probabilities.getDescription()).contains("0 to 1");
+            var probabilities = answer.path("properties").path("probabilities");
+            assertThat(probabilities.path("type").textValue()).isEqualTo("object");
+            assertThat(probabilities.path("description").textValue()).contains("0 to 1");
             boolean dynamic = name.startsWith("dynamic");
-            assertThat(probabilities.getAdditionalProperties()).isEqualTo(dynamic);
-            assertThat(probabilities.getRequired())
+            assertThat(probabilities.path("additionalProperties").booleanValue()).isEqualTo(dynamic);
+            assertThat(strings(probabilities.path("required")))
                     .containsExactlyElementsOf(
                             dynamic
                                     ? List.of()
                                     : type.equals("choice")
                                             ? List.of("One", "Two")
                                             : List.of("0", "1"));
-            assertThat(probabilities.getProperties().keySet())
-                    .containsExactlyElementsOf(probabilities.getRequired());
+            assertThat(probabilities.path("properties").propertyNames())
+                    .containsExactlyElementsOf(strings(probabilities.path("required")));
             probabilities
-                    .getProperties()
-                    .values()
+                    .path("properties")
                     .forEach(
                             probability -> {
-                                assertThat(probability.getType()).isEqualTo("number");
-                                assertThat(probability.getDescription()).contains("0 to 1");
+                                assertThat(probability.path("type").textValue()).isEqualTo("number");
+                                assertThat(probability.path("description").textValue()).contains("0 to 1");
                             });
             if (type.equals("score")) {
-                assertThat(answer.getProperties().get("score").getDescription())
+                assertThat(answer.path("properties").path("score").path("description").textValue())
                         .isEqualTo(
                                 dynamic
                                         ? "Score from 0 through supplied level count minus one."
                                         : "Score from 0 through 1.");
-                var legend = answer.getProperties().get("legend");
-                assertThat(legend.getType()).isEqualTo("object");
-                assertThat(legend.getAdditionalProperties()).isTrue();
-                assertThat(legend.getProperties()).isEmpty();
-                assertThat(legend.getRequired()).isEmpty();
+                var legend = answer.path("properties").path("legend");
+                assertThat(legend.path("type").textValue()).isEqualTo("object");
+                assertThat(legend.path("additionalProperties").booleanValue()).isTrue();
+                assertThat(legend.path("properties")).isEmpty();
+                assertThat(legend.path("required")).isEmpty();
             }
         }
         assertThat(LoomspanJacksonCodecs.defaults().schemaTree().writeValueAsString(schema))
                 .doesNotContain("\"minimum\"", "\"maximum\"");
-        assertThat(
-                        schema.getProperties()
-                                .get("fixed")
-                                .getProperties()
-                                .get("choice")
-                                .getEnumValues())
+        assertThat(strings(schema.path("properties").path("fixed")
+                                .path("properties").path("choice")
+                                .path("enum")))
                 .containsExactly("One", "Two");
-        assertThat(
-                        schema.getProperties()
-                                .get("fixed")
-                                .getProperties()
-                                .get("probabilities")
-                                .getRequired())
+        assertThat(strings(schema.path("properties").path("fixed")
+                                .path("properties").path("probabilities")
+                                .path("required")))
                 .containsExactly("One", "Two");
-        assertThat(
-                        schema.getProperties()
-                                .get("dynamic")
-                                .getProperties()
-                                .get("probabilities")
-                                .getAdditionalProperties())
+        assertThat(schema.path("properties").path("dynamic")
+                                .path("properties").path("probabilities")
+                                .path("additionalProperties").booleanValue())
                 .isTrue();
-        assertThat(
-                        schema.getProperties()
-                                .get("score")
-                                .getProperties()
-                                .get("probabilities")
-                                .getRequired())
+        assertThat(strings(schema.path("properties").path("score")
+                                .path("properties").path("probabilities")
+                                .path("required")))
                 .containsExactly("0", "1");
         assertThat(
-                        schema.getProperties()
-                                .get("score")
-                                .getProperties()
-                                .get("legend")
-                                .getAdditionalProperties())
+                        schema.path("properties").path("score")
+                                .path("properties").path("legend")
+                                .path("additionalProperties").booleanValue())
                 .isTrue();
         d.resolve(Map.of("candidates", Map.of("X", "x"), "levels", List.of("low")));
         d.resolve(Map.of("candidates", Map.of("Y", "y"), "levels", List.of("low", "high")));
-        schema.setRequired(List.of());
-        assertThat(d.outputSchema().getRequired()).hasSize(5);
+        ((tools.jackson.databind.node.ObjectNode) schema).set("required", LoomspanJacksonCodecs.defaults().schemaTree().createArrayNode());
+        assertThat(d.outputSchema().tree().path("required")).hasSize(5);
         assertThat(
-                        d.outputSchema()
-                                .getProperties()
-                                .get("dynamic")
-                                .getProperties()
-                                .get("choice")
-                                .getEnumValues())
+                        d.outputSchema().tree()
+                                .path("properties").path("dynamic")
+                                .path("properties").path("choice")
+                                .path("enum"))
                 .isEmpty();
+    }
+    private static List<String> strings(tools.jackson.databind.JsonNode values) {
+        var result = new java.util.ArrayList<String>();
+        values.forEach(value -> result.add(value.textValue()));
+        return result;
     }
 }

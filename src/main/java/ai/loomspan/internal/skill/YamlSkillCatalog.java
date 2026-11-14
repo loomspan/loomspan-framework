@@ -31,7 +31,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -497,10 +496,14 @@ public class YamlSkillCatalog implements InitializingBean
         return form;
     }
 
-    private void rejectTypeSafeAttachments(Resource resource, YamlSkillManifest manifest, YamlSkillManifest.InputSchemaManifest schema, String path) {
-        if ("attachment".equals(schema.getType())) throw invalidNamedSkill(resource, manifest, path, "attachment nodes are not supported for TypeSafe skills");
-        schema.getProperties().forEach((name, child) -> rejectTypeSafeAttachments(resource, manifest, child, path + ".properties." + name));
-        if (schema.getItems() != null) rejectTypeSafeAttachments(resource, manifest, schema.getItems(), path + ".items");
+    private void rejectTypeSafeAttachments(Resource resource, YamlSkillManifest manifest, JsonNode schema, String path) {
+        if (schema.has("x-loomspan-attachment"))
+            throw invalidNamedSkill(resource, manifest, path + ".x-loomspan-attachment", "attachments are not supported for TypeSafe skills");
+        schema.path("properties").properties().forEach(entry ->
+                rejectTypeSafeAttachments(resource, manifest, entry.getValue(), path + ".properties." + entry.getKey()));
+        if (schema.has("items")) rejectTypeSafeAttachments(resource, manifest, schema.get("items"), path + ".items");
+        if (schema.path("additionalProperties").isObject())
+            rejectTypeSafeAttachments(resource, manifest, schema.get("additionalProperties"), path + ".additionalProperties");
     }
 
     private void validateRawOutputFrom(Resource resource, JsonNode root, String skillName)
@@ -846,16 +849,17 @@ public class YamlSkillCatalog implements InitializingBean
                 .map(child -> SkillIdentity.parse(child.getName()).toString())
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
-        for (Map.Entry<String, YamlSkillManifest.OutputSchemaManifest> entry
-                : manifest.getOutputSchema().getProperties().entrySet())
+        for (Map.Entry<String, JsonNode> entry
+                : manifest.compiledOutputSchema().tree().path("properties").properties())
         {
             String claimName = entry.getKey();
-            String evidence = entry.getValue().getEvidence();
+            JsonNode annotation = entry.getValue().get("x-loomspan-evidence");
+            String evidence = annotation == null ? null : annotation.textValue();
             if (evidence == null)
             {
                 continue;
             }
-            String fieldPath = "output_schema.properties." + claimName + ".evidence";
+            String fieldPath = "output_schema.properties." + claimName + ".x-loomspan-evidence";
             if (!StringUtils.hasText(evidence))
             {
                 throw invalidSkill(resource, fieldPath,
@@ -891,9 +895,7 @@ public class YamlSkillCatalog implements InitializingBean
             compiled.put(claimName, expression);
         }
 
-        Map<String, String> normalizedClaims = new LinkedHashMap<>();
-        compiled.keySet().forEach(claim -> normalizedClaims.put(claim.toLowerCase(Locale.ROOT), claim));
-        return EvidenceContract.compiled(compiled, normalizedClaims);
+        return EvidenceContract.compiled(compiled);
     }
 
     private int referenceColumn(ai.loomspan.internal.runtime.evidence.EvidenceExpression expression,
@@ -920,10 +922,16 @@ public class YamlSkillCatalog implements InitializingBean
         JsonNode properties = schema.path("properties");
         if (properties.size() > OUTPUT_SCHEMA_WARNING_PROPERTIES) warning(resource, path, "schema exceeds recommended property count " + OUTPUT_SCHEMA_WARNING_PROPERTIES);
         if (schema.path("required").size() > OUTPUT_SCHEMA_WARNING_REQUIRED) warning(resource, path, "schema exceeds recommended required count " + OUTPUT_SCHEMA_WARNING_REQUIRED);
-        if ("array".equals(schema.path("type").asText()) && "object".equals(schema.path("items").path("type").asText())) warning(resource, path, "schema uses arrays of objects; keep item objects shallow for best model reliability");
+        if (schemaType(schema, "array") && schemaType(schema.path("items"), "object")) warning(resource, path, "schema uses arrays of objects; keep item objects shallow for best model reliability");
         if (properties.isObject()) for (String name : properties.propertyNames()) warnOnSchemaComplexity(resource, path + "/properties/" + name.replace("~", "~0").replace("/", "~1"), properties.get(name), depth + 1);
         if (schema.has("items")) warnOnSchemaComplexity(resource, path + "/items", schema.get("items"), depth + 1);
         if (schema.path("additionalProperties").isObject()) warnOnSchemaComplexity(resource, path + "/additionalProperties", schema.get("additionalProperties"), depth + 1);
+    }
+
+    private static boolean schemaType(JsonNode schema, String expected) {
+        JsonNode type = schema.path("type");
+        return type.isString() ? expected.equals(type.textValue())
+                : type.isArray() && type.valueStream().anyMatch(value -> value.isString() && expected.equals(value.textValue()));
     }
 
     private void warning(Resource resource, String path, String message)

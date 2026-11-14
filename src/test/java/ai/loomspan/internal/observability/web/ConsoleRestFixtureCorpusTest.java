@@ -193,19 +193,8 @@ class ConsoleRestFixtureCorpusTest
         return result;
     }
 
-    private static Map<String, Object> schemaMetadata(ai.loomspan.internal.skill.YamlSkillManifest.OutputSchemaManifest schema) {
-        var result = new LinkedHashMap<String, Object>();
-        if (schema.getType() != null) result.put("type", schema.getType());
-        if (schema.getDescription() != null) result.put("description", schema.getDescription());
-        if (schema.getProperties() != null && !schema.getProperties().isEmpty()) {
-            var properties = new LinkedHashMap<String, Object>();
-            schema.getProperties().forEach((key, child) -> properties.put(key, schemaMetadata(child)));
-            result.put("properties", properties);
-        }
-        if (schema.getRequired() != null && !schema.getRequired().isEmpty()) result.put("required", schema.getRequired());
-        if (schema.getEnumValues() != null && !schema.getEnumValues().isEmpty()) result.put("enum", schema.getEnumValues());
-        if (schema.getAdditionalProperties() != null) result.put("additionalProperties", schema.getAdditionalProperties());
-        return result;
+    private static tools.jackson.databind.JsonNode schemaMetadata(ai.loomspan.internal.schema.CanonicalSchema schema) {
+        return schema.structuralTree();
     }
 
     private static void activeExecutionContracts(Map<String, Object> result,

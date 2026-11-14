@@ -152,8 +152,8 @@ class ExecutionCoordinatorTest {
         assertThat(failure).isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
         assertThat(((ai.loomspan.api.SkillInputValidationException) failure).getIssues())
                 .anySatisfy(issue -> {
-                    assertThat(issue.path()).isEqualTo("requiredInput");
-                    assertThat(issue.code()).isEqualTo("missing_required");
+                    assertThat(issue.path()).isEqualTo("/requiredInput");
+                    assertThat(issue.code()).isEqualTo("type");
                 });
         assertThat(childExecuted).isFalse();
         assertThat(readTraceRecords(session)).filteredOn(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
@@ -172,21 +172,11 @@ class ExecutionCoordinatorTest {
     {
         var configuration = new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
         YamlSkillManifest childManifest = manifest("default-compareOptions", List.of());
-        var root = new YamlSkillManifest.InputSchemaManifest();
-        root.setType("object");
-        root.setRequired(List.of("requiredInput"));
-        var context = new YamlSkillManifest.InputSchemaManifest();
-        context.setType("object");
-        var evidence = new YamlSkillManifest.InputSchemaManifest();
-        evidence.setType("array");
-        var item = new YamlSkillManifest.InputSchemaManifest();
-        item.setType("object");
-        evidence.setItems(item);
-        context.setProperties(Map.of("referenceEvidence", evidence));
-        var required = new YamlSkillManifest.InputSchemaManifest();
-        required.setType("string");
-        root.setProperties(Map.of("context", context, "requiredInput", required));
-        childManifest.setInputSchema(root);
+        childManifest.setInputSchema(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","required":["requiredInput"],"properties":{
+                  "context":{"type":"object","properties":{"referenceEvidence":{"type":"array","items":{"type":"object"}}}},
+                  "requiredInput":{"type":"string"}}}
+                """));
         var parentDefinition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest("default-parentSkill", List.of("default-compareOptions")), configuration);
         var childDefinition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), childManifest, configuration);
         var catalog = new StubYamlSkillCatalog(parentDefinition, childDefinition);

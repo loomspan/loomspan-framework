@@ -168,7 +168,7 @@ class LoomspanAutoConfigurationBoundaryTest
     {
         Set<String> codecBackedCoreFactories = Set.of(
                 "skillMethodBeanPostProcessor", "LoomspanSessionRunner", "yamlSkillCatalog", "skillGenerationManager",
-                "skillInputContractResolver", "skillTemplate", "planningService",
+                "skillTemplate", "planningService",
                 "stepLoopMissionExecutionEngine");
         assertThat(Arrays.stream(LoomspanAutoConfiguration.class.getDeclaredMethods())
                 .filter(method -> codecBackedCoreFactories.contains(method.getName())))

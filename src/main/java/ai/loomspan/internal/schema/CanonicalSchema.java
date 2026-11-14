@@ -12,7 +12,9 @@ public final class CanonicalSchema {
     private final Schema validator;
     CanonicalSchema(JsonNode tree, Schema validator) { this.tree = tree.deepCopy(); this.validator = validator; }
     public JsonNode tree() { return tree.deepCopy(); }
-    public JsonNode providerTree() { var copy = tree.deepCopy(); strip(copy); return copy; }
+    /** Detached structural contract, without execution-local annotations. */
+    public JsonNode structuralTree() { var copy = tree.deepCopy(); strip(copy); return copy; }
+    public JsonNode providerTree() { return structuralTree(); }
     private static void strip(JsonNode node) {
         if (!(node instanceof ObjectNode object)) return;
         for (String name : StandardSchemaCompiler.ANNOTATIONS) object.remove(name);

@@ -630,7 +630,7 @@ class DefaultSkillTemplateTest {
         var template=new DefaultSkillTemplate(registry.manager(),router,runner,new ObjectMapper(),new SkillInputValidator(),new SkillRoleEvaluator(null,null),null);
         for(Object key:java.util.Arrays.asList(1,true,null)) {
             var collision=new LinkedHashMap<Object,Object>();collision.put(key,"numeric");collision.put("1","string");
-            for(Map<String,Object> input:List.<Map<String,Object>>of((Map)collision,Map.of("value",collision),Map.of("extra",List.of(Map.of("deep",collision))))) {
+            for(Map<String,Object> input:List.<Map<String,Object>>of((Map<String,Object>)(Map<?,?>)collision,Map.of("value",collision),Map.of("extra",List.of(Map.of("deep",collision))))) {
                 assertThatThrownBy(()->template.validate(capability.name(),input)).isInstanceOf(SkillInputValidationException.class);
                 assertThatThrownBy(()->template.invoke(capability.name(),input)).isInstanceOf(SkillInputValidationException.class);
                 assertThat(collision).hasSize(2);assertThat(collision.get(key)).isEqualTo("numeric");assertThat(collision.get("1")).isEqualTo("string");

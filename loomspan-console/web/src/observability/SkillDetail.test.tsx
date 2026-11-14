@@ -59,6 +59,22 @@ test("TypeSafe detail retains source label, original declaration and descriptive
   expect(screen.queryByText("Method")).toBeNull();
 });
 
+test.each(["YAML", "TYPESAFE"] as const)("rich effective %s schema remains inert text beside exact source", async (kind) => {
+  const yaml = "# exact original\r\nname: CheckDns\r\noutput_from: {skill: producer}\r\n";
+  const schema = JSON.stringify({type: "object", description: "<script>execute()</script>", additionalProperties: false,
+    properties: {evidence: {type: ["string", "null"], minLength: 1, maxLength: 20},
+      "x-loomspan-evidence": {type: "array", minItems: 1, maxItems: 3,
+        items: {type: "object", properties: {value: {type: "number", minimum: 0.25, maximum: 10}}}}}});
+  vi.mocked(getSkillDetail).mockResolvedValue({ targetScopeId: "scope-1", registeredName: "default-CheckDns",
+    kind, declaration: "YAML", sourcePath: "original", yaml, outputSchema: schema });
+  render(<SkillDetailView />);
+  await screen.findByText("default-CheckDns");
+  const output = document.querySelector('pre[aria-label="Effective output schema"]');
+  expect(output?.textContent).toBe(schema);
+  expect(output?.querySelector("script")).toBeNull();
+  expect(screen.getByLabelText("Skill YAML source").textContent).toBe(yaml);
+});
+
 test("stale skill deep link resets before requesting the identifier", async () => {
   route.scope = "scope-old";
   render(<SkillDetailView />);

@@ -1111,7 +1111,7 @@ class YamlSkillCatalogTests {
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/evidence-contract-wrong-case-child-skill.yaml")
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
-                        .hasMessageContaining("field 'output_schema.properties.vendorName.evidence'")
+                        .hasMessageContaining("field 'output_schema.properties.vendorName.x-loomspan-evidence'")
                         .hasMessageContaining("column 1")
                         .hasMessageContaining("did you mean 'default-invoiceParser'?"));
     }

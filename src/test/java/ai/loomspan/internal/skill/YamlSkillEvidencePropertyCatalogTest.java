@@ -50,9 +50,9 @@ class YamlSkillEvidencePropertyCatalogTest
                     assertThat(definition.evidenceContract().claims()).containsExactly("result");
                     assertThat(definition.evidenceContract().canonicalExpressionForClaim("result"))
                             .isEqualTo("default-reviewSkill");
-                    assertThat(definition.outputSchema().getProperties().get("result").getType())
+                    assertThat(definition.outputSchema().tree().at("/properties/result/type").textValue())
                             .isEqualTo("string");
-                    assertThat(definition.outputSchema().getRequired()).containsExactly("result");
+                    assertThat(definition.outputSchema().tree().path("required").valueStream().map(tools.jackson.databind.JsonNode::textValue).toList()).containsExactly("result");
                 });
     }
 
@@ -68,13 +68,13 @@ class YamlSkillEvidencePropertyCatalogTest
 
                     assertThat(definition.evidenceContract().claims())
                             .containsExactly("ResultValue", "details", "rows");
-                    assertThat(definition.evidenceContract().canonicalExpressionForClaim("resultvalue"))
+                    assertThat(definition.evidenceContract().canonicalExpressionForClaim("ResultValue"))
                             .isEqualTo("default-reviewSkill");
                     assertThat(definition.evidenceContract().canonicalExpressionForClaim("unconstrained"))
                             .isNull();
-                    assertThat(definition.outputSchema().getProperties().get("details").getProperties())
-                            .containsKey("note");
-                    assertThat(definition.outputSchema().getProperties().get("rows").getItems().getType())
+                    assertThat(definition.outputSchema().tree().at("/properties/details/properties").has("note"))
+                            .isTrue();
+                    assertThat(definition.outputSchema().tree().at("/properties/rows/items/type").textValue())
                             .isEqualTo("string");
                 });
     }
@@ -90,10 +90,10 @@ class YamlSkillEvidencePropertyCatalogTest
 
     @ParameterizedTest
     @CsvSource({
-            "output-schema-root-evidence-skill.yaml,output_schema.evidence",
-            "output-schema-nested-property-evidence-skill.yaml,output_schema.properties.result.properties.detail.evidence",
-            "output-schema-item-evidence-skill.yaml,output_schema.properties.results.items.evidence",
-            "output-schema-item-property-evidence-skill.yaml,output_schema.properties.results.items.properties.detail.evidence"
+            "output-schema-root-evidence-skill.yaml,output_schema/x-loomspan-evidence",
+            "output-schema-nested-property-evidence-skill.yaml,output_schema/properties/result/properties/detail/x-loomspan-evidence",
+            "output-schema-item-evidence-skill.yaml,output_schema/properties/results/items/x-loomspan-evidence",
+            "output-schema-item-property-evidence-skill.yaml,output_schema/properties/results/items/properties/detail/x-loomspan-evidence"
     })
     void rejectsEvidenceOutsideImmediateRootPropertiesWithFullPath(String filename, String fieldPath)
     {
@@ -102,6 +102,6 @@ class YamlSkillEvidencePropertyCatalogTest
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("field '" + fieldPath + "'")
-                        .hasMessageContaining("evidence is currently supported only on immediate root output properties"));
+                        .hasMessageContaining("requires a nonblank string on an immediate root output property"));
     }
 }

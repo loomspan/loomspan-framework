@@ -74,12 +74,11 @@ class YamlSkillDefinitionTest
     @Test
     void preservesEvidenceAndAbsenceAcrossDefinitionDefensiveCopies()
     {
-        YamlSkillManifest.OutputSchemaManifest annotated = outputSchema("string");
-        annotated.setEvidence("default-reviewSkill");
-        YamlSkillManifest.OutputSchemaManifest unannotated = outputSchema("array");
-        unannotated.setItems(outputSchema("string"));
-        YamlSkillManifest.OutputSchemaManifest root = outputSchema("object");
-        root.setProperties(Map.of("ResultValue", annotated, "notes", unannotated));
+        var root = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","properties":{
+                  "ResultValue":{"type":"string","x-loomspan-evidence":"default-reviewSkill"},
+                  "notes":{"type":"array","items":{"type":"string"}}}}
+                """);
 
         YamlSkillManifest manifest = manifest("llm_evidence_copy_skill");
         manifest.setOutputSchema(root);
@@ -87,12 +86,12 @@ class YamlSkillDefinitionTest
                 Map.of("ResultValue", "default-reviewSkill"));
         YamlSkillDefinition definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", resource(), manifest, CONFIGURATION, contract);
 
-        YamlSkillManifest.OutputSchemaManifest first = definition.outputSchema();
-        assertThat(first.getProperties().get("ResultValue").getEvidence()).isEqualTo("default-reviewSkill");
-        assertThat(first.getProperties().get("notes").getEvidence()).isNull();
-        assertThat(first.getProperties().get("notes").getItems().getEvidence()).isNull();
-        first.getProperties().get("ResultValue").setEvidence("mutated");
-        assertThat(definition.outputSchema().getProperties().get("ResultValue").getEvidence())
+        var first = definition.outputSchema().tree();
+        assertThat(first.at("/properties/ResultValue/x-loomspan-evidence").textValue()).isEqualTo("default-reviewSkill");
+        assertThat(first.at("/properties/notes").has("x-loomspan-evidence")).isFalse();
+        assertThat(first.at("/properties/notes/items").has("x-loomspan-evidence")).isFalse();
+        ((tools.jackson.databind.node.ObjectNode) first.at("/properties/ResultValue")).put("x-loomspan-evidence", "mutated");
+        assertThat(definition.outputSchema().tree().at("/properties/ResultValue/x-loomspan-evidence").textValue())
                 .isEqualTo("default-reviewSkill");
     }
 
@@ -141,13 +140,6 @@ class YamlSkillDefinitionTest
         manifest.setName(name);
         manifest.setDescription(name);
         return manifest;
-    }
-
-    private static YamlSkillManifest.OutputSchemaManifest outputSchema(String type)
-    {
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType(type);
-        return schema;
     }
 
     private static ByteArrayResource resource()

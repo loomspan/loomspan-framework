@@ -114,6 +114,10 @@ class EvidenceCoverageValidatorTest
                 Set.of("default-classifyIncident"));
         assertThat(unsupportedOptional.issues()).extracting(EvidenceCoverageIssue::claimName)
                 .containsExactly("optionalDetail");
+        var presentNull = JsonMapper.builder().build().readTree("{\"optionalDetail\":null}");
+        assertThat(outputValidator.validate(presentNull, contract, Set.of()).issues())
+                .extracting(EvidenceCoverageIssue::claimName).containsExactly("optionalDetail");
+        assertThat(outputValidator.validate(presentNull, contract, Set.of("default-investigateNetwork")).complete()).isTrue();
     }
 
     private EvidenceCoverageResult finalCoverage(EvidenceContract contract, Set<String> successfulSkills)
@@ -124,13 +128,11 @@ class EvidenceCoverageValidatorTest
     private EvidenceContract contract(Map<String, String> expressions)
     {
         LinkedHashMap<String, EvidenceExpression> compiled = new LinkedHashMap<>();
-        LinkedHashMap<String, String> canonical = new LinkedHashMap<>();
         expressions.forEach((claim, expression) ->
         {
             compiled.put(claim, parser.parse(expression));
-            canonical.put(claim.toLowerCase(java.util.Locale.ROOT), claim);
         });
-        return EvidenceContract.compiled(compiled, canonical);
+        return EvidenceContract.compiled(compiled);
     }
 
     private static ExecutionPlan plan(String... capabilityNames)

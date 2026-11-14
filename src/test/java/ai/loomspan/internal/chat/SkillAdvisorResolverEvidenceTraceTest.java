@@ -153,7 +153,7 @@ class SkillAdvisorResolverEvidenceTraceTest
 
     private static ChatClientRequest request()
     {
-        return new ChatClientRequest(new Prompt("Return vendor JSON"), Map.of());
+        return new ChatClientRequest(new Prompt("Return vendor JSON", org.springframework.ai.model.tool.ToolCallingChatOptions.builder().build()), Map.of(ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.CONTEXT_KEY, new ai.loomspan.internal.springai.OrdinaryFinalOutputRepair()));
     }
 
     private static final class RecordingChain implements CallAdvisorChain
@@ -188,9 +188,11 @@ class SkillAdvisorResolverEvidenceTraceTest
             }
             requests.add(request.copy());
             String response = responses.get(Math.min(index.getAndIncrement(), responses.size() - 1));
-            return ChatClientResponse.builder()
+            var result = ChatClientResponse.builder()
                     .chatResponse(new ChatResponse(List.of(new Generation(new AssistantMessage(response)))))
                     .build();
+            ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.capture(request, result);
+            return result;
         }
 
         @Override

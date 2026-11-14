@@ -64,6 +64,7 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.autoconfigure.AiDriver");
 
     private static final Map<String, String> TECHNICALLY_PUBLIC_INTERNAL_TYPES = Map.ofEntries(
+            Map.entry("ai.loomspan.internal.springai.OrdinaryFinalOutputRepair", "Public only for framework-owned correction replay and tool prohibition across runtime packages."),
             Map.entry("ai.loomspan.internal.schema.CanonicalSchema", "Public only for immutable standard schema snapshots across framework packages."),
             Map.entry("ai.loomspan.internal.schema.StandardSchemaCompiler", "Public only for shared declaration compilation across framework packages."),
             Map.entry("ai.loomspan.internal.serialization.SkillDocumentValues", "Public only for lossless skill ingress across framework packages."),

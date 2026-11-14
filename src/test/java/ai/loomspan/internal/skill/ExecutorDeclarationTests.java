@@ -30,7 +30,7 @@ class ExecutorDeclarationTests {
         assertThat(definition.executor()).isEqualTo("infrastructure-sql");
         assertThat(definition.executionConfiguration()).isNull();
         assertThat(definition.rbacRoles()).containsExactly("reader");
-        assertThat(definition.inputSchema().getProperties()).containsKey("id");
+        assertThat(definition.inputSchema().tree().path("properties").has("id")).isTrue();
         assertThat(definition.config()).containsEntry("Nil", null).containsEntry("Upper", "A").containsEntry("upper", "B").containsEntry("literal.dot", "kept");
         assertThat(definition.config().get("List")).isEqualTo(java.util.Arrays.asList(null, Map.of(), List.of(), 7, 2.5, true, "7"));
         assertThatThrownBy(() -> definition.config().put("new", 1)).isInstanceOf(UnsupportedOperationException.class);
