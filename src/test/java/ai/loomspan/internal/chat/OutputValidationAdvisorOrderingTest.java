@@ -31,12 +31,30 @@ class OutputValidationAdvisorOrderingTest {
         var requests = new ArrayList<Prompt>();
         var candidates = new ArrayDeque<>(List.of("{\"result\":\"BAD\",\"claim\":\"unsupported\"}",
                 "{\"result\":3}", "{\"result\":\"BAD\"}", "{\"result\":\"GOOD\"}"));
-        ChatModel model = prompt -> { requests.add(prompt); return new ChatResponse(List.of(new Generation(new AssistantMessage(candidates.remove())))); };
+        ChatModel model = new ChatModel() {
+            @Override public ChatResponse call(Prompt prompt) {
+                requests.add(prompt);
+                var raw = new AssistantMessage(candidates.remove());
+                var options = (org.springframework.ai.model.tool.ToolCallingChatOptions) prompt.getOptions();
+                ((ai.loomspan.internal.springai.OrdinaryFinalOutputRepair) options.getToolContext()
+                        .get(ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.CONTEXT_KEY)).captureRaw(raw);
+                return new ChatResponse(List.of(new Generation(raw)));
+            }
+            @Override public org.springframework.ai.chat.prompt.ChatOptions getOptions() {
+                return org.springframework.ai.openai.responses.OpenAiResponsesChatOptions.builder().model("fixture").build();
+            }
+        };
         var records = new ArrayList<TraceRecord>();
         new LoomspanSessionRunner(3).callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
             TestExecutionBindings.callWithCurrentSessionMission(() -> {
-                var client = ChatClient.builder(model).defaultAdvisors(new DefaultSkillAdvisorResolver(new DefaultExecutionStateService(Clock.systemUTC())).resolve(definition)).build();
-                assertThat(client.prompt().user("Return JSON").call().content()).isEqualTo("{\"result\":\"GOOD\"}");
+                var client = ChatClient.builder(model)
+                        .defaultOptions(org.springframework.ai.openai.responses.OpenAiResponsesChatOptions.builder().model("fixture"))
+                        .defaultAdvisors(new DefaultSkillAdvisorResolver(new DefaultExecutionStateService(Clock.systemUTC())).resolve(definition)).build();
+                var repair = new ai.loomspan.internal.springai.OrdinaryFinalOutputRepair();
+                assertThat(client.prompt().user("Return JSON")
+                        .toolContext(Map.of(ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.CONTEXT_KEY, repair))
+                        .advisors(spec -> spec.param(ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.CONTEXT_KEY, repair))
+                        .call().content()).isEqualTo("{\"result\":\"GOOD\"}");
                 session.readTraceRecords(records::add); return null;
             }));
         var mutations = records.stream().filter(r -> r.recordType() == TraceRecordType.ADVISOR_REQUEST_MUTATION_RECORDED || r.recordType() == TraceRecordType.ADVISOR_RESPONSE_MUTATION_RECORDED).toList();

@@ -728,7 +728,9 @@ class ConcurrentGroupedExecutionIntegrationTest
     {
         try
         {
-            return PLAN_MAPPER.writeValueAsString(plan);
+            var contribution = (tools.jackson.databind.node.ObjectNode) PLAN_MAPPER.valueToTree(plan);
+            contribution.remove("planId");
+            return PLAN_MAPPER.writeValueAsString(contribution);
         }
         catch (JacksonException ex)
         {

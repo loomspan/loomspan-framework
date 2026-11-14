@@ -97,7 +97,6 @@ class YamlSkillCatalogTests {
                 Map.entry("unknown field", "{/id: {from: input, path: /id, extra: true}}"),
                 Map.entry("root", "{'': {from: input, path: /id}}"),
                 Map.entry("overlap", "{/id: {from: input, path: /id}, /id/a: {from: input, path: /id}}"),
-                Map.entry("case overlap", "{/id: {from: input, path: /id}, /ID/a: {from: input, path: /id}}"),
                 Map.entry("duplicate", "{/id: {from: input, path: /id}, /id: {from: input, path: /other}}"),
                 Map.entry("nonplanning child", "{/id: {from: child_result, skill: default-producer, path: ''}}"));
         return invalid.entrySet().stream().map(entry -> DynamicTest.dynamicTest(entry.getKey(), () -> {
@@ -106,6 +105,23 @@ class YamlSkillCatalogTests {
             assertThat(checked.definitions()).isEmpty();
             assertThat(checked.issues()).hasSize(1);
         }));
+    }
+
+    @Test
+    void acceptsCaseDistinctOutputBindingDestinations() {
+        var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(List.of(new SkillDocument("case-distinct", """
+                name: bound
+                description: case distinct
+                model: forward-model
+                output_schema: {type: object}
+                output_bindings:
+                  /id: {from: input, path: /id}
+                  /ID/a: {from: input, path: /id}
+                """)), false);
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions()).singleElement().satisfies(definition ->
+                assertThat(definition.outputBindings()).extracting(binding -> binding.destination().pointer())
+                        .containsExactly("/id", "/ID/a"));
     }
 
     @Test
@@ -1224,8 +1240,7 @@ class YamlSkillCatalogTests {
                     assertThat(context).hasNotFailed();
                     assertThat(context.getBean(YamlSkillCatalog.class).getSkill("default-outputSchemaComplexSkill")).isNotNull();
                     assertThat(output.getOut())
-                            .contains("output_schema")
-                            .contains("recommended");
+                            .contains("schema exceeds recommended nesting depth 4");
                 });
     }
 

@@ -255,14 +255,24 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
 
         private OrderedAdvisedSequenceChatClient(List<Advisor> advisors, List<String> responses) {
             this.responses = responses;
-            org.springframework.ai.chat.model.ChatModel model = prompt -> {
-                requestSystemMessagesSeen.add(prompt.getSystemMessage().getText());
-                requestMessagesSeen.add(List.copyOf(prompt.getInstructions()));
-                String responseText = responses.get(Math.min(callCount, responses.size() - 1));
-                callCount++;
-                return new ChatResponse(List.of(new Generation(new AssistantMessage(responseText))));
+            org.springframework.ai.chat.model.ChatModel model = new org.springframework.ai.chat.model.ChatModel() {
+                @Override public ChatResponse call(Prompt prompt) {
+                    requestSystemMessagesSeen.add(prompt.getSystemMessage().getText());
+                    requestMessagesSeen.add(List.copyOf(prompt.getInstructions()));
+                    String responseText = responses.get(Math.min(callCount, responses.size() - 1));
+                    callCount++;
+                    var raw = new AssistantMessage(responseText);
+                    var options = (org.springframework.ai.model.tool.ToolCallingChatOptions) prompt.getOptions();
+                    ((ai.loomspan.internal.springai.OrdinaryFinalOutputRepair) options.getToolContext()
+                            .get(ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.CONTEXT_KEY)).captureRaw(raw);
+                    return new ChatResponse(List.of(new Generation(raw)));
+                }
+                @Override public org.springframework.ai.chat.prompt.ChatOptions getOptions() {
+                    return org.springframework.ai.openai.responses.OpenAiResponsesChatOptions.builder().model("fixture").build();
+                }
             };
             this.delegate = ChatClient.builder(model)
+                    .defaultOptions(org.springframework.ai.openai.responses.OpenAiResponsesChatOptions.builder().model("fixture"))
                     .defaultAdvisors(advisors.stream()
                             .sorted(Comparator.comparingInt(Advisor::getOrder))
                             .toList())

@@ -179,6 +179,13 @@ class OrdinaryNativeOutputIntegrationTest
                 var client = client(runtime, options(runtime, identity, 1024, null), schema, 2, mock(ExecutionStateService.class));
                 assertThatThrownBy(() -> call(client, runtime, identity, schema)).hasMessageContaining("incompatibility")
                         .hasMessageContaining("ordinary-fixture").hasMessageContaining(identity).hasMessageContaining("schema=$/");
+                if (runtime.driver() == AiDriver.OPENAI) {
+                    var optional = compile("{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{\"maybe\":{\"type\":[\"string\",\"null\"]}}}");
+                    var optionalClient = client(runtime, options(runtime, identity, 1024, null), optional, 2, mock(ExecutionStateService.class));
+                    assertThatThrownBy(() -> call(optionalClient, runtime, identity, optional))
+                            .hasMessageContaining("incompatibility").hasMessageContaining("every declared property")
+                            .hasMessageContaining("$/properties/maybe");
+                }
                 assertThatThrownBy(() -> compile("{\"type\":\"object\",\"properties\":{\"bad\":{\"type\":\"string\",\"format\":\"invented\"}}}"))
                         .isInstanceOfSatisfying(StandardSchemaCompiler.DeclarationException.class,
                                 failure -> assertThat(failure.path()).isEqualTo("/properties/bad/format"));

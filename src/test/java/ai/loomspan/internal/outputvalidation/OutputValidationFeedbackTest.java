@@ -42,6 +42,6 @@ class OutputValidationFeedbackTest {
         assertThat(rendered).contains("additional issue(s) omitted.").endsWith("Return one complete corrected JSON object only, with no explanation, markdown, or code fences.");
         assertThat(OutputValidationFeedback.planningSchemaSummary(result.issues()).split("; ")).hasSize(3);
         var unknown = new OutputSchemaValidationIssue("$.authoredName", "bad", null, OutputSchemaValidator.UNKNOWN_PROPERTY, null, null, null, null, null, null, null);
-        assertThat(OutputValidationFeedback.ordinarySchemaSummary(List.of(unknown), 4)).isEqualTo("output object: validation issue code unknown_property");
+        assertThat(OutputValidationFeedback.ordinarySchemaSummary(List.of(unknown), 4)).isEqualTo("output object: validation issue code additionalProperties");
     }
 }

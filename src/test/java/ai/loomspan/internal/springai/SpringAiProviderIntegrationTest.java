@@ -409,7 +409,8 @@ class SpringAiProviderIntegrationTest
             assertThat(failure.details().classification()).isEqualTo(ProviderFailureClassification.TRANSIENT);
             assertThat(failure.details().providerErrorCode()).isEqualTo("ORIGINAL_CODE");
             assertThat(failure.responseEvidence().get("usage"))
-                    .isEqualTo(new tools.jackson.databind.ObjectMapper().readValue(usage, java.util.Map.class));
+                    .isEqualTo(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults()
+                            .schemaTree().readValue(usage, java.util.Map.class));
             assertThat(failure.responseUsage()).as("invalid counts must never become exact narrowed usage").isNull();
             assertThat(failure.details().diagnostics()).singleElement().satisfies(diagnostic ->
                     assertThat(diagnostic.get("text")).isEqualTo(json));

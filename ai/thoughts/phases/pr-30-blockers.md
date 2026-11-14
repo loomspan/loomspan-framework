@@ -13,6 +13,20 @@ Tested dependency: `org.springframework.ai:spring-ai-openai:2.1.0-RC2`, Spring B
 Keep one shared Responses implementation; this deferral does not authorize copied
 adapters, SDK singleton mutation, HTTP-body rewrites, fallback or weaker schemas.
 
+## Final-ticket continuation approval — November 14, 2026
+
+The developer explicitly authorized completing PR 30.4.3 while B01–B05 remain
+open, testing all available Framework behavior and moving forward with the
+Framework. The developer will work with the Spring AI team through upstream pull
+requests; this work is not a prerequisite for the current ticket's completion.
+This extends the existing default-skip deferrals to the final ticket's current
+iteration. Keep the complete correctness assertions and opt-in reproductions,
+and report blocked integrated cases and skips explicitly. Required default
+Framework/Console verification and fresh independent review must still pass.
+Ticket completion is distinct from blocker closure and unqualified migration
+acceptance; the closure conditions below remain outstanding. No new defect,
+weaker assertion, copied adapter, body rewrite, fallback or live call is approved.
+
 ## PR30-B01 — Responses schema decimal precision (SAI-06)
 
 **Status:** Open; four parameter cases skipped by default.
@@ -189,6 +203,16 @@ SDK: `com.google.genai:google-genai:1.73.0`, JAR SHA-256
 - **Owner:** PR 30.1.4 retains the unresolved adapter requirement. 30.2.2/30.2.3
   own schema generation/validation/binding; 30.3.1/30.3.2 own ordinary/planner
   consumer schema/default copying; 30.4.3 reconciles integrated checks.
+- **Integrated B04 consumer:** Under the November 14 final-ticket continuation
+  approval, only the `GEMINI` parameter of
+  `ProviderResponseStatusIntegrationTest#incompletePlanningResponseNeverReachesJsonParser`
+  also uses the blocker assumption. Its complete status/parser/usage assertions
+  remain unchanged and run with `loomspan.pr30.blockers=true`. The nullable plan
+  schema fails inside the same SDK conversion before HTTP, so this case cannot
+  reach its intended incomplete-response boundary. OpenAI/Anthropic parameters
+  and available Gemini status controls remain active. Count this one integrated
+  invocation separately from the fourteen original B01–B05 invocations. Remove
+  this assumption and pass the complete case when B04 is corrected.
 - **Closure:** Verify an acceptable upstream artifact/commit, record its identity,
   pass complete raw output/tool assertions and native/options/preservation checks.
   A merged change or SDK-only success does not prove the adapter ships the fix.

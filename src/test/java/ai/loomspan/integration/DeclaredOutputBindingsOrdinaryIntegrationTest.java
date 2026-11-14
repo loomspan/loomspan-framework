@@ -61,7 +61,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
         });
     }
     @Test void openRootKeepsProviderForAdditionalOutputSpace() throws Exception {
-        custom("""
+        customLocal("""
                 output_schema:
                   type: object
                   properties:
@@ -70,13 +70,13 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                   additionalProperties: true
                 output_bindings:
                   /assessment: {from: input, path: /assessment}
-                """,List.of("{\"extra\":\"reasoned\"}"),body->assertThat(body).doesNotContain("$.assessment \u2014 object"),(template,calls)-> {
+                """,List.of("{\"extra\":\"reasoned\"}"),request->assertThat(request.outputContract().tree().path("properties").has("assessment")).isFalse(),(template,calls)-> {
             assertThat(template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")))).contains("original","extra","reasoned");
             assertThat(calls.get()).isEqualTo(1);
         });
     }
     @Test void optionalUnboundPropertyKeepsProviderEvenWhenOmitted() throws Exception {
-        custom("""
+        customLocal("""
                 output_schema:
                   type: object
                   properties:
@@ -86,7 +86,11 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                   additionalProperties: false
                 output_bindings:
                   /assessment: {from: input, path: /assessment}
-                """,List.of("{}"),body->assertThat(body).contains("optionalExplanation", "optional", "nullable"),(template,calls)-> {
+                """,List.of("{}"),request->{
+                    var schema=request.outputContract().tree();
+                    assertThat(schema.at("/properties/optionalExplanation/type").toString()).isEqualTo("[\"string\",\"null\"]");
+                    assertThat(schema.path("required").toString()).doesNotContain("optionalExplanation");
+                },(template,calls)-> {
             assertThat(template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")))).contains("original").doesNotContain("optionalExplanation");
             assertThat(calls.get()).isEqualTo(1);
         });
@@ -127,9 +131,9 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                   /assessment: {from: input, path: /assessment}
                 """.formatted(additional);
         boolean modelOwnedSpace = !openness.equals("false");
-        custom(contract, modelOwnedSpace ? List.of(nested ? "{\"context\":{\"extra\":\"reasoned\"}}" : "{\"extra\":\"reasoned\"}") : List.of(),
-                body -> {
-                    var schema = JsonMapper.builder().build().readTree(body).at("/text/format/schema");
+        customLocal(contract, modelOwnedSpace ? List.of(nested ? "{\"context\":{\"extra\":\"reasoned\"}}" : "{\"extra\":\"reasoned\"}") : List.of(),
+                request -> {
+                    var schema = request.outputContract().tree();
                     assertThat(schema.isObject()).isTrue();
                     var object = nested ? schema.path("properties").path("context") : schema;
                     assertThat(object.path("properties").has("assessment")).isFalse();
@@ -229,6 +233,58 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
             """; }
     private void custom(String contract,List<String> candidates,java.util.function.Consumer<String> requestCheck,
             java.util.function.BiConsumer<SkillTemplate,AtomicInteger> check) throws Exception {
+        writeCustom(contract);
+        AtomicInteger calls=new AtomicInteger();
+        try(MockWebServer server=new MockWebServer()) {
+            server.setDispatcher(new Dispatcher() { public MockResponse dispatch(RecordedRequest request) {
+                String body=request.getBody().readUtf8();requestCheck.accept(body);
+                int attempt=calls.getAndIncrement();
+                assertThat(attempt).isLessThan(candidates.size());
+                String content=candidates.get(attempt);
+                return ai.loomspan.testkit.ResponsesFixtures.text(content);
+            }});server.start();
+            new ApplicationContextRunner().withUserConfiguration(App.class).withPropertyValues("spring.main.web-application-type=none","loomspan.skills.locations="+directory.toUri()+"*.yaml","loomspan.connections.local.driver=openai","loomspan.connections.local.base-url="+server.url("/"),"loomspan.connections.local.api-key=local-test","loomspan.models.local.connection=local","loomspan.models.local.provider-model=deterministic").run(context->{ assertThat(context).hasNotFailed();check.accept(context.getBean(SkillTemplate.class),calls); });
+        }
+    }
+
+    /** Public invocation and real local validation/composition, without claiming a provider supports open/optional native output. */
+    private void customLocal(String contract, List<String> candidates,
+            java.util.function.Consumer<ai.loomspan.internal.model.ModelInteractionRequest> requestCheck,
+            java.util.function.BiConsumer<SkillTemplate,AtomicInteger> check) throws Exception {
+        writeCustom(contract);
+        AtomicInteger calls=new AtomicInteger();
+        new ApplicationContextRunner().withUserConfiguration(App.class)
+                .withBean("bindingSemantics", ai.loomspan.internal.model.ModelInteractionFactory.class, () -> (definition, mode) -> {
+                    org.springframework.ai.chat.model.ChatModel model = new org.springframework.ai.chat.model.ChatModel() {
+                        @Override public org.springframework.ai.chat.model.ChatResponse call(org.springframework.ai.chat.prompt.Prompt prompt) {
+                            int attempt=calls.getAndIncrement();
+                            assertThat(attempt).isLessThan(candidates.size());
+                            var raw=new org.springframework.ai.chat.messages.AssistantMessage(candidates.get(attempt));
+                            var options=(org.springframework.ai.model.tool.ToolCallingChatOptions)prompt.getOptions();
+                            ((ai.loomspan.internal.springai.OrdinaryFinalOutputRepair)options.getToolContext()
+                                    .get(ai.loomspan.internal.springai.OrdinaryFinalOutputRepair.CONTEXT_KEY)).captureRaw(raw);
+                            return new org.springframework.ai.chat.model.ChatResponse(List.of(new org.springframework.ai.chat.model.Generation(raw)));
+                        }
+                        @Override public org.springframework.ai.chat.prompt.ChatOptions getOptions() {
+                            return org.springframework.ai.openai.responses.OpenAiResponsesChatOptions.builder().model("fixture").build();
+                        }
+                    };
+                    var client=org.springframework.ai.chat.client.ChatClient.builder(model)
+                            .defaultOptions(org.springframework.ai.openai.responses.OpenAiResponsesChatOptions.builder().model("fixture"))
+                            .defaultAdvisors(new ai.loomspan.internal.chat.DefaultSkillAdvisorResolver(
+                                    new ai.loomspan.internal.runtime.state.DefaultExecutionStateService(java.time.Clock.systemUTC())).resolve(definition))
+                            .build();
+                    var interaction=new ai.loomspan.internal.springai.SpringAiModelInteraction(client,mode);
+                    return request -> { requestCheck.accept(request); return interaction.call(request); };
+                }, definition -> definition.setPrimary(true))
+                .withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations="+directory.toUri()+"*.yaml",
+                        "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=http://127.0.0.1:1",
+                        "loomspan.connections.local.api-key=local-test", "loomspan.models.local.connection=local",
+                        "loomspan.models.local.provider-model=deterministic")
+                .run(context -> { assertThat(context).hasNotFailed(); check.accept(context.getBean(SkillTemplate.class),calls); });
+    }
+
+    private void writeCustom(String contract) throws Exception {
         Files.writeString(directory.resolve("comparison.yaml"),"""
                 name: comparison
                 description: Compare accepted evidence
@@ -243,17 +299,6 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                   additionalProperties: false
                 """+contract);
         Files.writeString(directory.resolve("producer.yaml"),"name: producer\ndescription: Evidence producer\nmodel: local\nprompt: Produce accepted evidence.\n");
-        AtomicInteger calls=new AtomicInteger();
-        try(MockWebServer server=new MockWebServer()) {
-            server.setDispatcher(new Dispatcher() { public MockResponse dispatch(RecordedRequest request) {
-                String body=request.getBody().readUtf8();requestCheck.accept(body);
-                int attempt=calls.getAndIncrement();
-                assertThat(attempt).isLessThan(candidates.size());
-                String content=candidates.get(attempt);
-                return ai.loomspan.testkit.ResponsesFixtures.text(content);
-            }});server.start();
-            new ApplicationContextRunner().withUserConfiguration(App.class).withPropertyValues("spring.main.web-application-type=none","loomspan.skills.locations="+directory.toUri()+"*.yaml","loomspan.connections.local.driver=openai","loomspan.connections.local.base-url="+server.url("/"),"loomspan.connections.local.api-key=local-test","loomspan.models.local.connection=local","loomspan.models.local.provider-model=deterministic").run(context->{ assertThat(context).hasNotFailed();check.accept(context.getBean(SkillTemplate.class),calls); });
-        }
     }
     private void run(boolean mixed,java.util.function.BiConsumer<SkillTemplate,AtomicInteger> check) throws Exception {
         run(mixed,"",null,check);

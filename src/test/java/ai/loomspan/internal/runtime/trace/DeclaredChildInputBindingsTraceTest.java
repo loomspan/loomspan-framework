@@ -62,7 +62,7 @@ class DeclaredChildInputBindingsTraceTest {
         var invoker = new DefaultCapabilityInvoker(router, mock(PlanningService.class), state);
         var bindings = List.of(binding("/caseId", ChildInputBinding.SourceKind.INPUT, "/requestId", null),
                 binding("/evidence", ChildInputBinding.SourceKind.CHILD_RESULT, "/data", "default-producer"));
-        Map<String,Object> rawArguments = Map.of("count", "7");
+        Map<String,Object> rawArguments = Map.of("count", 7);
         ExecutionBindingScope.supplyWith(execution, () -> {
             state.recordStepEvent(session, execution.branch().leaf().orElseThrow(), TraceRecordType.STEP_ACTION_PROPOSED,
                     Map.of("taskId", "consumer-task"), Map.of("toolArguments", rawArguments));

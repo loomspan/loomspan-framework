@@ -57,10 +57,12 @@ class FakeCoordinatorChatClient implements ModelInteraction {
                 throw new IllegalStateException(ex);
             }
         }
-        Object payload = firstCallReturnsPlan && current == 1 ? plan : content;
+        Object payload = request.planning() ? plan : content;
         if (payload instanceof ExecutionPlan executionPlan) {
             try {
-                return withAttemptContext(request, OBJECT_MAPPER.writeValueAsString(executionPlan));
+                var contribution = (tools.jackson.databind.node.ObjectNode) OBJECT_MAPPER.valueToTree(executionPlan);
+                contribution.remove("planId");
+                return withAttemptContext(request, OBJECT_MAPPER.writeValueAsString(contribution));
             }
             catch (JacksonException ex) {
                 throw new IllegalStateException(ex);

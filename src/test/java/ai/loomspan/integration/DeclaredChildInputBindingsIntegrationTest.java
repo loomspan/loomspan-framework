@@ -366,7 +366,30 @@ class DeclaredChildInputBindingsIntegrationTest {
             name: producer
             description: Assess one case
             """ + (kind.equals("executor") ? "executor: fixture\n" : "model: local\nprompt: PRODUCER. Return the complete assessment.\n"
-                    + "output_schema_max_retries: 1\noutput_schema:\n  type: object\n  properties:\n    data: {type: object, additionalProperties: true}\n  required: [data]\n  additionalProperties: false\n") + """
+                    + """
+                    output_schema_max_retries: 1
+                    output_schema:
+                      type: object
+                      properties:
+                        data:
+                          type: object
+                          properties:
+                            case: {type: string}
+                            amount: {type: integer}
+                            decimal: {type: number}
+                            rows:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  value: {type: string}
+                                required: [value]
+                                additionalProperties: false
+                          required: [case, amount, decimal, rows]
+                          additionalProperties: false
+                      required: [data]
+                      additionalProperties: false
+                    """) + """
             input_schema:
               type: object
               properties:
