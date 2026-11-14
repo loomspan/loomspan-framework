@@ -24,11 +24,13 @@ An applicable declaration MUST be a non-null Boolean. Applicability is checked b
 
 ## Generated task contract
 
-Every generated task has one exact visible `capabilityName`, a `dependsOn` array of task-ID strings, and an optional nullable `parallelGroup`.
+Planning generation uses a dedicated Framework-owned native schema, independent of the skill's final output schema. The response MUST be one raw JSON object; YAML, fences, status aliases, unknown fields and model-owned `planId` are rejected. Framework generates the plan identity. Root fields `capabilityName`, `createdAt`, `status` and `tasks`, and all nine prompted task fields, MUST be present. Initial status is `VALID` (null retains its existing default) and task status is exactly `PENDING`. Nullable task `intent`, `expectedOutputs`, `parallelGroup` and `note` retain their runtime defaults. This deliberately all-required generated format does not rewrite authored schemas.
+
+Every generated task has one exact visible `capabilityName`, a `dependsOn` array of task-ID strings, and a nullable `parallelGroup`.
 
 | Field or concept | Enforced rule |
 | --- | --- |
-| `parallelGroup` | Omitted/null means ungrouped. A string MUST match `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$` exactly. |
+| `parallelGroup` | Required null means ungrouped. A string MUST match `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$` exactly. |
 | Group width | A non-null group MUST contain at least two tasks. |
 | Group membership | Only one maximal consecutive run may use a group identifier. Identifiers are case-sensitive. |
 | Execution unit | Each ungrouped task is a singleton unit; each consecutive same-group run is one grouped unit. Task-list order is unit order. |
@@ -41,7 +43,7 @@ Generated planning guidance asks for dependencies on earlier tasks whose results
 
 `DefaultPlanningService` and `PlanningServiceTest#planningPromptDeclaresDirectResultDependenciesDespiteOrderingBarriers` protect this guidance in actual planning requests. The offline test uses singleton and grouped predecessors with a required result, an unrelated result, and a transitive source; it verifies prompt wording and unchanged acceptance of direct edges. `PlanningServiceTest#planningPromptAllowsEveryEarlierGroupMemberWhenAllResultsAreRequired` also verifies guidance and unchanged acceptance when all members' results are directly required. These tests do not demonstrate improved live-model accuracy.
 
-Minimal valid generated-task fragment:
+Partial generated-task fragment showing only grouping and dependencies (not a complete planning response):
 
 ```json
 [
@@ -55,7 +57,7 @@ The `fetch` unit precedes the singleton `combine` unit. A dependency from `fetch
 
 ## Validation and correction
 
-Loomspan validates task IDs, exact visible bindings, dependency shape/order, and grouping on the normalized raw JSON/YAML tree before constructing or storing an `ExecutionPlan`. Structural issues participate in the same one-total-correction protocol as task counts and evidence coverage. A still-invalid corrected attempt produces no `PLAN_CREATED`, stored plan, or step execution.
+Loomspan validates the JSON-only candidate against its canonical planning schema, then validates task IDs, exact visible bindings, dependency shape/order and grouping before accepting or storing an `ExecutionPlan`. JSON parsing, schema, typed conversion, structural, task-count, binding and evidence failures share one total correction. Provider and operational validation failures propagate through their existing owners and do not consume candidate correction. A still-invalid corrected attempt produces no `PLAN_CREATED`, stored plan, or step execution.
 
 The validator reports all non-cascading issues with stable codes. It does not repair identifiers, order, bindings, dependencies, or groups.
 
@@ -107,6 +109,12 @@ own external work after Loomspan has finalized the run. Loomspan does not roll
 back, compensate, or claim to stop those external side effects.
 
 A non-null `parallelGroup` remains a positive author safety assertion, not proof that tasks overlapped. Authors MUST group only work whose capability calls, shared resources, and external side effects are safe to run concurrently.
+
+## Step action values
+
+Model-generated tool arguments and final-response trees preserve decimal values before validation, dispatch and final serialization. An original value outside a declared numeric bound cannot become acceptable by rounding. An explicitly null `CALL_TOOL.toolArguments` root rejects before dispatch and uses the existing one-retry action allowance. Omission retains the existing empty-map behavior; `{}` is valid only when the effective contract allows it, and permitted null fields inside objects retain their values. A corrected action keeps its assigned task/tool. Completed tool work remains completed if later synthesis fails; Loomspan does not claim rollback.
+
+`StepLoopMissionExecutionEngineTest` exercises these boundaries through the actual engine, including plain injected mapper defaults, nested fractional/exponent values, exact bounds, correction exhaustion, omission, nested null and retained completed work.
 
 ## Planner inability
 

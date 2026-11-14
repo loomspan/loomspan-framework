@@ -177,7 +177,9 @@ final class StepActionValidator
                     .reduce((left, right) -> left + "; " + right)
                     .orElse("Invalid tool arguments.");
             return StepValidationResult.rejected(
-                    "Tool '%s' arguments failed validation: %s".formatted(action.toolName(), detail));
+                    "Tool '%s' arguments failed validation: %s. Effective argument schema: %s. Supplied arguments: %s"
+                            .formatted(action.toolName(), detail, contract.schema().providerTree(),
+                                    ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().writeValueAsString(arguments)));
         }
         List<String> placeholderPaths = new ArrayList<>();
         collectPlaceholderPaths(validation.normalizedInput(), "", placeholderPaths);

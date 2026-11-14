@@ -200,7 +200,8 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
         assertThat(finals.get()).isEqualTo(mixed ? 2 : 0); assertThat(children.get()).isEqualTo(kind.equals("executor") ? 3 : 2);
     }
     private static Map<String,Object> task(String name) {
-        return Map.of("taskId",name,"title",name,"status","PENDING","capabilityName","default-" + name,"intent","work","dependsOn",List.of(),"expectedOutputs",List.of("result"));
+        Map<String,Object> task = new java.util.LinkedHashMap<>(Map.of("taskId",name,"title",name,"status","PENDING","capabilityName","default-" + name,"intent","work","dependsOn",List.of(),"expectedOutputs",List.of("result")));
+        task.put("parallelGroup", null); task.put("note", ""); return task;
     }
     @ParameterizedTest
     @CsvSource({"omitted,false", "true,false", "false,false", "omitted,true", "true,true", "false,true"})

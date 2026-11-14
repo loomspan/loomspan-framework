@@ -12,7 +12,7 @@ import ai.loomspan.internal.core.LoomspanSessionRunner;
 import ai.loomspan.internal.core.SkillExecutionDescriptor;
 import ai.loomspan.internal.core.TestCapabilityRegistry;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
-import ai.loomspan.internal.runtime.input.SkillInputSchemaNode;
+
 import ai.loomspan.internal.runtime.input.SkillInputValidator;
 import ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandleFactory;
 import ai.loomspan.internal.runtime.trace.ImmediateCompletionRetention;
@@ -204,10 +204,10 @@ class SkillGenerationExecutionIntegrationTest
     {
         SkillInputContract input = new SkillInputContract(
                 SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
-                new SkillInputSchemaNode("object",
-                        Map.of(requiredField, new SkillInputSchemaNode("string", Map.of(), List.of(), null,
-                                null, List.of(), null, null, false, true)),
-                        List.of(requiredField), Boolean.FALSE, null, List.of(), null, null, false, true));
+                new ai.loomspan.internal.runtime.input.SkillInputContractResolver().fromJsonSchema(
+                        ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().writeValueAsString(Map.of(
+                                "type", "object", "properties", Map.of(requiredField, Map.of("type", "string")),
+                                "required", List.of(requiredField), "additionalProperties", false))));
         return new CapabilityMetadata(id, "default-invoiceParser", "Invoice parser",
                 SkillExecutionDescriptor.none(), policy, arguments -> "unused", SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"), input, null);

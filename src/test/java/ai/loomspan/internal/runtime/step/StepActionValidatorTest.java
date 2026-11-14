@@ -57,7 +57,7 @@ class StepActionValidatorTest {
     void projectedArgumentsAcceptEmptyAndSiblingOnlyWhileGuardRejectsOverridesEvenForGenericContracts() {
         var binding = new ChildInputBinding(ObjectFieldPath.parse("/context/evidence", false),
                 ChildInputBinding.SourceKind.INPUT, ObjectFieldPath.parse("/source", true), null);
-        for (String schema : List.of("{}", """
+        for (String schema : List.of("{\"type\":\"object\"}", """
                 {"type":"object","properties":{"context":{"type":"object",
                  "properties":{"evidence":{},"reasoning":{"type":"string"}},"required":["evidence"],"additionalProperties":true}},
                  "required":["context"],"additionalProperties":false}
@@ -110,7 +110,7 @@ class StepActionValidatorTest {
 
         @Test
         void bareObjectToolSchemaRemainsPermissive() {
-            List<BoundCapability> genericObjectTools = List.of(mockTool("default-invoiceParser", "{}"));
+            List<BoundCapability> genericObjectTools = List.of(mockTool("default-invoiceParser", "{\"type\":\"object\"}"));
 
             StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of("input", "text"));
             StepValidationResult result = validateCurrentMode(action, plan, genericObjectTools, true);
@@ -204,7 +204,7 @@ class StepActionValidatorTest {
             StepAction action = StepAction.callTool("t-1", "default-invoiceParser", Map.of());
             StepValidationResult result = validateCurrentMode(action, plan, schemaAwareTools, true);
             assertThat(result.valid()).isFalse();
-            assertThat(result.rejectionReason()).contains("missing_required");
+            assertThat(result.rejectionReason()).contains("required");
             assertThat(result.rejectionReason()).contains("rawText");
         }
 
@@ -263,8 +263,8 @@ class StepActionValidatorTest {
             StepValidationResult result = validateCurrentMode(action, plan, schemaAwareTools, true);
 
             assertThat(result.valid()).isFalse();
-            assertThat(result.rejectionReason()).contains("coercion_failed");
-            assertThat(result.rejectionReason()).contains("unknown_field");
+            assertThat(result.rejectionReason()).contains("type");
+            assertThat(result.rejectionReason()).contains("additionalProperties");
         }
 
         @Test
@@ -316,7 +316,7 @@ class StepActionValidatorTest {
             StepValidationResult result = validateCurrentMode(action, plan, tools, true);
 
             assertThat(result.valid()).isFalse();
-            assertThat(result.rejectionReason()).contains("missing_required");
+            assertThat(result.rejectionReason()).contains("required");
             assertThat(result.rejectionReason()).contains("rawText");
         }
 
@@ -396,7 +396,7 @@ class StepActionValidatorTest {
             StepValidationResult result = validateCurrentMode(action, plan, typedMapTools, true);
 
             assertThat(result.valid()).isFalse();
-            assertThat(result.rejectionReason()).contains("count [type_mismatch]");
+            assertThat(result.rejectionReason()).contains("/count [type]");
         }
 
         @Test
@@ -412,7 +412,7 @@ class StepActionValidatorTest {
             StepValidationResult result = validateCurrentMode(action, plan, strictEmptyTools, true);
 
             assertThat(result.valid()).isFalse();
-            assertThat(result.rejectionReason()).contains("unknown_field");
+            assertThat(result.rejectionReason()).contains("additionalProperties");
             assertThat(result.rejectionReason()).contains("extra");
         }
     }

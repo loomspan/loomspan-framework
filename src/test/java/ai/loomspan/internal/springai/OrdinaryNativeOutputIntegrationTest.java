@@ -265,7 +265,8 @@ class OrdinaryNativeOutputIntegrationTest
         });
     }
 
-    private static ChatClient client(ProviderConnectionRuntime runtime, ChatOptions options, CanonicalSchema schema, int retries,
+
+    static ChatClient client(ProviderConnectionRuntime runtime, ChatOptions options, CanonicalSchema schema, int retries,
             ExecutionStateService state)
     {
         var builder = ChatClient.builder(runtime.requireChatModel(), io.micrometer.observation.ObservationRegistry.NOOP, null, null,
@@ -277,7 +278,7 @@ class OrdinaryNativeOutputIntegrationTest
         return builder.build();
     }
 
-    private static ModelInteractionResult call(ChatClient client, ProviderConnectionRuntime runtime, String identity, CanonicalSchema schema)
+    static ModelInteractionResult call(ChatClient client, ProviderConnectionRuntime runtime, String identity, CanonicalSchema schema)
     {
         return call(client, runtime, identity, schema, new RenderedMissionInput("generate", List.of(), Map.of()));
     }
@@ -300,7 +301,7 @@ class OrdinaryNativeOutputIntegrationTest
         });
     }
 
-    private static ModelInteractionResult call(ChatClient client, ProviderConnectionRuntime runtime, String identity, CanonicalSchema schema,
+    static ModelInteractionResult call(ChatClient client, ProviderConnectionRuntime runtime, String identity, CanonicalSchema schema,
             RenderedMissionInput input)
     {
         var session = mock(LoomspanSession.class);
@@ -315,7 +316,7 @@ class OrdinaryNativeOutputIntegrationTest
                 .call(new ModelInteractionRequest("fixture", input, trace, List.of(), false, schema)));
     }
 
-    private static ChatOptions options(ProviderConnectionRuntime runtime, String identity, int cap, ToolCallback callback)
+    static ChatOptions options(ProviderConnectionRuntime runtime, String identity, int cap, ToolCallback callback)
     {
         var configured = new SpringAiChatOptionsContributor().createOptions(new EffectiveSkillExecutionConfiguration(
                 "fixture", "loopback", runtime.driver(), identity, identity.startsWith("qwen") ? null : "medium"));
@@ -334,16 +335,16 @@ class OrdinaryNativeOutputIntegrationTest
         return options.build();
     }
 
-    private static CanonicalSchema contract(AiDriver driver, String name)
+    static CanonicalSchema contract(AiDriver driver, String name)
     {
         // Gemini's simple single-string adapter control is distinct from retained PR30-B04 raw schema cases.
         return compile("{\"type\":\"object\",\"properties\":{\"" + name + "\":{\"type\":\"string\",\"minLength\":2}},\"required\":[\"" + name + "\"]"
                 + (driver == AiDriver.GEMINI ? "}" : ",\"additionalProperties\":false}"));
     }
-    private static CanonicalSchema compile(String schema) {
+    static CanonicalSchema compile(String schema) {
         return new StandardSchemaCompiler().compile(schema, StandardSchemaCompiler.Role.OUTPUT, StandardSchemaCompiler.Origin.AUTHORED);
     }
-    private static void assertNative(JsonNode body, AiDriver driver, String identity, int cap, CanonicalSchema schema)
+    static void assertNative(JsonNode body, AiDriver driver, String identity, int cap, CanonicalSchema schema)
     {
         var expected = schema.providerTree();
         if (driver == AiDriver.ANTHROPIC) ((tools.jackson.databind.node.ObjectNode)expected.path("properties").valueStream().findFirst().orElseThrow()).remove("minLength");
@@ -381,19 +382,19 @@ class OrdinaryNativeOutputIntegrationTest
         }
         assertThat(body.path("model").asText(identity)).isEqualTo(identity);
     }
-    private static JsonNode nativeSchema(JsonNode body, AiDriver driver) {
+    static JsonNode nativeSchema(JsonNode body, AiDriver driver) {
         return body.at(switch(driver) { case OPENAI -> "/text/format/schema"; case ANTHROPIC -> "/output_config/format/schema"; default -> "/generationConfig/responseJsonSchema"; });
     }
-    private static void assertNoFormat(ChatOptions options) {
+    static void assertNoFormat(ChatOptions options) {
         if (options instanceof OpenAiResponsesChatOptions typed) assertThat(typed.getResponseFormat()).isNull();
         if (options instanceof AnthropicChatOptions typed) assertThat(typed.getOutputConfig().format()).isEmpty();
         if (options instanceof GoogleGenAiChatOptions typed) assertThat(typed.getOutputSchema()).isNull();
     }
-    private static JsonNode request(MockWebServer server) throws Exception {
+    static JsonNode request(MockWebServer server) throws Exception {
         var request = server.takeRequest(3, TimeUnit.SECONDS); assertThat(request).isNotNull();
         return JSON.readTree(request.getBody().readUtf8());
     }
-    private static MockResponse text(AiDriver driver, String text) {
+    static MockResponse text(AiDriver driver, String text) {
         if (driver == AiDriver.OPENAI) return ResponsesFixtures.text(text);
         if (driver == AiDriver.ANTHROPIC) return response(Map.of("id", "fixture", "type", "message", "role", "assistant", "model", "fixture",
                 "content", List.of(Map.of("type", "text", "text", text)), "stop_reason", "end_turn", "usage", Map.of("input_tokens", 1, "output_tokens", 1)));
@@ -413,7 +414,7 @@ class OrdinaryNativeOutputIntegrationTest
         return new MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(body);
     }
     private static MockResponse response(Object body) { return new MockResponse().setHeader("Content-Type", "application/json").setBody(JSON.writeValueAsString(body)); }
-    private static void local(String identity, LocalCase action) throws Exception {
+    static void local(String identity, LocalCase action) throws Exception {
         AiDriver driver = identity.startsWith("claude") ? AiDriver.ANTHROPIC : identity.startsWith("gemini") ? AiDriver.GEMINI : AiDriver.OPENAI;
         try (var server = new MockWebServer()) {
             String base = server.url("/").toString();
@@ -429,6 +430,6 @@ class OrdinaryNativeOutputIntegrationTest
             } finally { if (driver == AiDriver.GEMINI) Client.setDefaultBaseUrls(Optional.empty(), Optional.empty()); }
         }
     }
-    @FunctionalInterface private interface LocalCase { void run(MockWebServer server, ProviderConnectionRuntime runtime) throws Exception; }
+    @FunctionalInterface interface LocalCase { void run(MockWebServer server, ProviderConnectionRuntime runtime) throws Exception; }
 }
 

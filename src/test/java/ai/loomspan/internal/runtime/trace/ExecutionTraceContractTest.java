@@ -458,7 +458,7 @@ class ExecutionTraceContractTest {
                 .orElseThrow();
         assertThat(rejectedResponse.metadata()).doesNotContainKey("planId");
         assertThat(rejectedResponse.data().path("generations").get(0).path("text").asText())
-                .contains("\"planId\": \"plan-weak\"");
+                .isEqualTo(weakPlanJson());
         assertThat(planChain(records, "rejected-candidate-plan")).isEmpty();
         assertThat(acceptingResponse.metadata().get("retrySequenceId"))
                 .isEqualTo(primaryCreation.metadata().get("retrySequenceId"));
@@ -510,6 +510,7 @@ class ExecutionTraceContractTest {
                 ProviderRetryPolicy.from(retry),
                 ignored -> ProviderFailureDetails.unknown());
         ChatClient client = ChatClient.builder(model)
+                .defaultOptions(org.springframework.ai.openai.responses.OpenAiResponsesChatOptions.builder().model("openai/gpt-5"))
                 .defaultAdvisors(new ProviderAttemptCallAdvisor(
                         runtime, stateService, new ModelUsageExtractor(), usageService))
                 .build();
@@ -521,6 +522,11 @@ class ExecutionTraceContractTest {
 
         private QueueChatModel(String... responses) {
             this.responses = new ArrayDeque<>(List.of(responses));
+        }
+
+        @Override
+        public org.springframework.ai.chat.prompt.ChatOptions getOptions() {
+            return org.springframework.ai.openai.responses.OpenAiResponsesChatOptions.builder().model("openai/gpt-5").build();
         }
 
         @Override
@@ -604,7 +610,7 @@ class ExecutionTraceContractTest {
     private static String weakPlanJson() {
         return """
                 {
-                  "planId": "plan-weak",
+
                   "capabilityName": "default-duplicateInvoiceChecker",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
@@ -620,7 +626,7 @@ class ExecutionTraceContractTest {
     private static String repeatedCapabilityPlanJson() {
         return """
                 {
-                  "planId": "transport-plan",
+
                   "capabilityName": "compareTransport",
                   "createdAt": "2026-08-22T12:00:00Z",
                   "status": "VALID",
@@ -636,7 +642,7 @@ class ExecutionTraceContractTest {
     private static String correctedPlanJson() {
         return """
                 {
-                  "planId": "plan-corrected",
+
                   "capabilityName": "default-duplicateInvoiceChecker",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",

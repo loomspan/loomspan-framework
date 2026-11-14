@@ -8,7 +8,7 @@ import ai.loomspan.internal.core.PlanTask;
 import ai.loomspan.internal.outputschema.OutputSchemaPromptAugmentor;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.runtime.input.SkillInputPromptRenderer;
-import ai.loomspan.internal.runtime.input.SkillInputSchemaNode;
+import tools.jackson.databind.JsonNode;
 import ai.loomspan.internal.runtime.input.SkillInputValidator;
 import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import ai.loomspan.internal.skill.YamlSkillManifest;
@@ -240,15 +240,15 @@ final class StepPromptBuilder
         }
 
         SkillInputContract contract = tool.argumentContract();
-        SkillInputPromptRenderer.DetailLevel detailLevel = forceVerboseToolArgumentGuidance || useVerboseDetail(contract.schema())
+        SkillInputPromptRenderer.DetailLevel detailLevel = forceVerboseToolArgumentGuidance || useVerboseDetail(contract.schema().tree())
                 ? SkillInputPromptRenderer.DetailLevel.VERBOSE
                 : SkillInputPromptRenderer.DetailLevel.COMPACT;
 
-        boolean summarized = !contract.isGeneric() && supportsSummary(contract.schema()) && contract.schema().isObject();
+        boolean summarized = !contract.isGeneric() && "object".equals(type(contract.schema().tree()));
         boolean emptyValid = summarized && new SkillInputValidator().validate(Map.of(), contract).valid()
                 && tool.validateModelArguments(Map.of()).isEmpty();
-        boolean closedEmpty = summarized && contract.schema().properties().isEmpty()
-                && !contract.schema().allowsAdditionalProperties();
+        boolean closedEmpty = summarized && contract.schema().tree().path("properties").isEmpty()
+                && contract.schema().tree().path("additionalProperties").isBoolean() && !contract.schema().tree().path("additionalProperties").booleanValue();
         String guidance;
         if (tool.dispatchEligibility().eligible() || (closedEmpty && emptyValid))
         {
@@ -261,10 +261,10 @@ final class StepPromptBuilder
             guidance = "toolArguments: {} is valid. Include optional contributions needed by the skill/task instructions; "
                     + "contract optionality does not override a task instruction requesting a contribution.";
         }
-        else if (summarized && !contract.schema().required().isEmpty())
+        else if (summarized && !required(contract.schema().tree()).isEmpty())
         {
             guidance = "Supply the required unbound arguments at the top level: "
-                    + LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(contract.schema().required().stream().sorted().toList())
+                    + LoomspanJacksonCodecs.defaults().planningJson().writeValueAsString(required(contract.schema().tree()).stream().sorted().toList())
                     + ". Follow the scoped nested requirements below. The envelope's empty argument object is incomplete.";
         }
         else
@@ -286,56 +286,34 @@ final class StepPromptBuilder
                         + "\nEffective model argument schema: " + effectiveSchema);
     }
 
-    // Reuse the resolver's conservative vocabulary proof; unsupported shapes must not receive a partial summary.
-    private static boolean supportsSummary(SkillInputSchemaNode schema)
-    {
-        return schema.dispatchProofSupported()
-                && schema.properties().values().stream().allMatch(StepPromptBuilder::supportsSummary)
-                && (schema.items() == null || supportsSummary(schema.items()))
-                && (schema.additionalPropertiesSchema() == null || supportsSummary(schema.additionalPropertiesSchema()));
+
+    private static java.util.List<String> required(JsonNode schema) {
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (JsonNode name : schema.path("required")) {
+            JsonNode property = schema.path("properties").path(name.asText());
+            if (!property.isBoolean() || property.booleanValue()) names.add(name.asText());
+        }
+        return names;
     }
-
-    private static boolean useVerboseDetail(SkillInputSchemaNode schema)
-    {
-        return maxDepth(schema, 1) > 2 || countProperties(schema) > 6;
+    private static String type(JsonNode schema) {
+        JsonNode type = schema.path("type");
+        if (type.isString()) return type.asText();
+        for (JsonNode value : type) if (!"null".equals(value.asText())) return value.asText();
+        return "";
     }
-
-    private static int maxDepth(SkillInputSchemaNode schema, int depth)
-    {
-        if (schema == null)
-        {
-            return depth;
-        }
-        if (schema.isArray())
-        {
-            return maxDepth(schema.items(), depth + 1);
-        }
-        if (!schema.isObject())
-        {
-            return depth;
-        }
-
-        int propertyDepth = schema.properties().values().stream()
-                .mapToInt(child -> maxDepth(child, depth + 1))
-                .max()
-                .orElse(depth);
-
-        int additionalDepth = schema.additionalPropertiesSchema() == null
-                ? depth
-                : maxDepth(schema.additionalPropertiesSchema(), depth + 1);
-
-        return Math.max(propertyDepth, additionalDepth);
+    private static boolean useVerboseDetail(JsonNode schema) { return maxDepth(schema, 1) > 2 || countProperties(schema) > 6; }
+    private static int maxDepth(JsonNode schema, int depth) {
+        int result = depth;
+        for (JsonNode value : schema.path("properties")) result = Math.max(result, maxDepth(value, depth + 1));
+        if (schema.has("items")) result = Math.max(result, maxDepth(schema.get("items"), depth + 1));
+        if (schema.path("additionalProperties").isObject()) result = Math.max(result, maxDepth(schema.get("additionalProperties"), depth + 1));
+        return result;
     }
-
-    private static int countProperties(SkillInputSchemaNode schema)
-    {
-        if (schema == null || !schema.isObject())
-        {
-            return 0;
-        }
-
-        return schema.properties().size()
-                + schema.properties().values().stream().mapToInt(StepPromptBuilder::countProperties).sum()
-                + countProperties(schema.additionalPropertiesSchema());
+    private static int countProperties(JsonNode schema) {
+        int result = schema.path("properties").size();
+        for (JsonNode value : schema.path("properties")) result += countProperties(value);
+        if (schema.has("items")) result += countProperties(schema.get("items"));
+        if (schema.path("additionalProperties").isObject()) result += countProperties(schema.get("additionalProperties"));
+        return result;
     }
 }

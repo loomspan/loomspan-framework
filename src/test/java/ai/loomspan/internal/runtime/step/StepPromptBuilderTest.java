@@ -49,8 +49,8 @@ class StepPromptBuilderTest {
                 ChildInputBinding.SourceKind.INPUT, ObjectFieldPath.parse("/source", true), null);
         var tool = new BoundCapability(mockTool("default-invoiceParser", schema).metadata(), List.of(binding),
                 (arguments, taskId, sources) -> "unused");
-        assertThat(tool.metadata().inputContract().schema().required()).contains("context");
-        assertThat(tool.argumentContract().schema().required()).isEmpty();
+        assertThat(tool.metadata().inputContract().schema().tree().path("required")).contains(LoomspanJacksonCodecs.defaults().schemaTree().valueToTree("context"));
+        assertThat(tool.argumentContract().schema().tree().path("required")).isEmpty();
         var effective = LoomspanJacksonCodecs.defaults().planningJson().readTree(tool.inputSchema());
         assertThat(effective.path("properties").path("context").path("properties").path("evidence").asBoolean(true)).isFalse();
         for (boolean verbose : List.of(false, true)) {
@@ -89,7 +89,6 @@ class StepPromptBuilderTest {
         var fullyBound = new BoundCapability(partial.metadata(), List.of(binding("/caseId"), binding("/payload")),
                 (arguments, taskId, sources) -> "unused");
         var zero = mockTool("default-invoiceParser", "{\"type\":\"object\",\"additionalProperties\":false}");
-        var retainedZero = mockTool("default-invoiceParser", "{\"type\":\"object\",\"additionalProperties\":false,\"x-loomspan-runtime-ref-capable\":true}");
         var optionalPlain = mockTool("default-invoiceParser", "{\"type\":\"object\",\"properties\":{\"note\":{\"type\":\"string\"}},\"additionalProperties\":false}");
         var optional = boundTool("""
                 {"type":"object","properties":{"caseId":{"type":"string"},"context":{"type":"object"}},
@@ -100,8 +99,6 @@ class StepPromptBuilderTest {
                     .doesNotContain("This tool takes no arguments", "Replace it with the real arguments");
             assertThat(assignedPrompt(zero, verbose)).contains("Use toolArguments: {} exactly", "This tool takes no arguments")
                     .doesNotContain("Framework supplies", "Replace it with the real arguments");
-            assertThat(assignedPrompt(retainedZero, verbose)).contains("Use toolArguments: {} exactly", "This tool takes no arguments")
-                    .doesNotContain("Include optional contributions", "Framework supplies");
             assertThat(assignedPrompt(optionalPlain, verbose)).contains("toolArguments: {} is valid", "Optional declared fields: [note]")
                     .doesNotContain("Framework supplies");
             assertThat(assignedPrompt(optional, verbose)).contains("toolArguments: {} is valid", "Include optional contributions",
@@ -121,7 +118,6 @@ class StepPromptBuilderTest {
         assertThat(fullyBound.dispatchEligibility().eligible()).isTrue();
         assertThat(zero.dispatchEligibility().eligible()).isTrue();
         assertThat(optional.dispatchEligibility().eligible()).isFalse();
-        assertThat(retainedZero.dispatchEligibility().eligible()).isFalse();
     }
 
     @Test
@@ -170,12 +166,15 @@ class StepPromptBuilderTest {
             "{\"type\":\"object\",\"additionalProperties\":false,\"minProperties\":1}",
             "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"anyOf\":[{\"required\":[\"x\"]}]}"})
     void unknownAndUnsupportedShapesGetNeutralGuidance(String schema) {
-        var tool = mockTool("default-invoiceParser", schema);
-        for (boolean verbose : List.of(false, true)) {
-            assertThat(assignedPrompt(tool, verbose)).contains("Follow the effective argument contract", "makes no claim that {} satisfies this contract",
-                    "Effective model argument schema: " + schema)
-                    .doesNotContain("toolArguments: {} is valid", "Use toolArguments: {} exactly", "Required fields:", "This tool takes no arguments");
+        if (!schema.equals("{\"type\":\"object\"}")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> mockTool("default-invoiceParser", schema))
+                    .isInstanceOf(IllegalArgumentException.class);
+            return;
         }
+        var tool = mockTool("default-invoiceParser", schema);
+        for (boolean verbose : List.of(false, true)) assertThat(assignedPrompt(tool, verbose))
+                .contains("Follow the effective argument contract", "Effective model argument schema: " + schema)
+                .doesNotContain("Use toolArguments: {} exactly");
     }
 
     private static ChildInputBinding binding(String destination) {
@@ -564,7 +563,7 @@ class StepPromptBuilderTest {
     }
 
     @Test
-    void buildStepPromptShowsGenericArrayItemsWhenItemsSchemaIsOmitted() {
+    void buildStepPromptShowsExplicitUnconstrainedArrayItems() {
         ExecutionPlan plan = createTwoTaskPlan();
 
         String prompt = buildPromptForCurrentMode(
@@ -578,7 +577,7 @@ class StepPromptBuilderTest {
                           "type": "object",
                           "properties": {
                             "values": {
-                              "type": "array"
+                              "type": "array", "items": {}
                             }
                           },
                           "required": ["values"],

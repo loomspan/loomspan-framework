@@ -480,15 +480,15 @@ class StepLoopMissionExecutionEngineTest {
     void assembledOutputPoliciesValidateExactBoundDecimals(boolean mixed) {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var manifest = outputBindingDefinition(mixed ? 2 : 1, false).manifest();
-        var number = new YamlSkillManifest.OutputSchemaManifest(); number.setType("number");
-        var properties = new LinkedHashMap<String, YamlSkillManifest.OutputSchemaManifest>();
+        var number = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode(); number.put("type", "number");
+        var properties = new LinkedHashMap<String, tools.jackson.databind.node.ObjectNode>();
         properties.put("report", number);
         if (mixed) {
-            var summary = new YamlSkillManifest.OutputSchemaManifest(); summary.setType("string");
+            var summary = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode(); summary.put("type", "string");
             properties.put("summary", summary);
         }
-        manifest.getOutputSchema().setProperties(properties);
-        manifest.getOutputSchema().setRequired(mixed ? List.of("report", "summary") : List.of("report"));
+        setOutputSchemaField(manifest, "properties", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(properties));
+        setOutputSchemaField(manifest, "required", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(mixed ? List.of("report", "summary") : List.of("report")));
         String decimal = "0.12345678901234567890123456789";
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(0);
         var regex = new YamlSkillManifest.RegexManifest();
@@ -611,9 +611,9 @@ class StepLoopMissionExecutionEngineTest {
     void contributionFailureUsesSchemaBudgetAndCompleteAssemblyPolicies(boolean corrected) {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var manifest = outputBindingDefinition(2, false).manifest(); manifest.setOutputSchemaMaxRetries(1);
-        var scalar = new YamlSkillManifest.OutputSchemaManifest(); scalar.setType("string");
-        manifest.getOutputSchema().setProperties(Map.of("report", scalar, "summary", scalar, "reasoning", scalar));
-        manifest.getOutputSchema().setRequired(List.of("report", "summary"));
+        var scalar = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode(); scalar.put("type", "string");
+        setOutputSchemaField(manifest, "properties", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(Map.of("report", scalar, "summary", scalar, "reasoning", scalar)));
+        setOutputSchemaField(manifest, "required", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(List.of("report", "summary")));
         var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern("(?s)(?=.*AUTHORITATIVE)(?=.*GOOD).*"); regex.setMessage("Use GOOD");
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(1); linter.setRegex(regex); manifest.setLinter(linter);
         var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION,
@@ -648,15 +648,20 @@ class StepLoopMissionExecutionEngineTest {
         if (!corrected) assertThat(records).noneMatch(r -> r.recordType() == TraceRecordType.LINTER_RECORDED || r.recordType() == TraceRecordType.EVIDENCE_VALIDATION_FAILED || r.recordType() == TraceRecordType.EVIDENCE_VALIDATION_PASSED);
     }
 
+    private static void setOutputSchemaField(YamlSkillManifest manifest, String field, tools.jackson.databind.JsonNode value) {
+        var tree = (tools.jackson.databind.node.ObjectNode) manifest.getOutputSchema();
+        tree.set(field, value); manifest.setOutputSchema(tree);
+    }
+
     private static YamlSkillDefinition outputBindingDefinition(int maxSteps, boolean concurrent) {
         var manifest = definitionWithMaxSteps(maxSteps).manifest();
         manifest.setConcurrency(concurrent);
         var descriptor = new YamlSkillManifest.InputBindingManifest();
         descriptor.setFrom("child_result"); descriptor.setSkill("default-invoiceParser"); descriptor.setPath("");
         manifest.setOutputBindings(Map.of("/report", descriptor));
-        var schema = new YamlSkillManifest.OutputSchemaManifest(); schema.setType("object"); schema.setAdditionalProperties(false);
-        var report = new YamlSkillManifest.OutputSchemaManifest(); report.setType("string");
-        schema.setProperties(Map.of("report", report)); schema.setRequired(List.of("report")); manifest.setOutputSchema(schema);
+        var schema = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode(); schema.put("type", "object"); schema.put("additionalProperties", false);
+        var report = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode(); report.put("type", "string");
+        schema.set("properties", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(Map.of("report", report))); schema.set("required", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(List.of("report"))); manifest.setOutputSchema(schema);
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
 
@@ -665,9 +670,9 @@ class StepLoopMissionExecutionEngineTest {
         var descriptor = new YamlSkillManifest.InputBindingManifest();
         descriptor.setFrom("child_result"); descriptor.setSkill("default-expenseLookup"); descriptor.setPath("");
         var bindings = new LinkedHashMap<>(manifest.getOutputBindings()); bindings.put("/other",descriptor); manifest.setOutputBindings(bindings);
-        var fields = new LinkedHashMap<>(manifest.getOutputSchema().getProperties());
-        var other = new YamlSkillManifest.OutputSchemaManifest(); other.setType("string"); fields.put("other",other);
-        manifest.getOutputSchema().setProperties(fields); manifest.getOutputSchema().setRequired(List.of("report","other"));
+        var fields = new LinkedHashMap<>(LoomspanJacksonCodecs.defaults().schemaTree().convertValue(manifest.getOutputSchema().get("properties"), java.util.LinkedHashMap.class));
+        var other = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode(); other.put("type", "string"); fields.put("other",other);
+        setOutputSchemaField(manifest, "properties", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(fields)); setOutputSchemaField(manifest, "required", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(List.of("report","other")));
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]),manifest,EXECUTION_CONFIGURATION);
     }
 
@@ -965,9 +970,9 @@ class StepLoopMissionExecutionEngineTest {
     void synthesisInabilityPreservesCompletedWorkAndBypassesOutputAcceptance() {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
         var manifest = outputBindingDefinition(2, false).manifest();
-        var scalar = new YamlSkillManifest.OutputSchemaManifest(); scalar.setType("string");
-        manifest.getOutputSchema().setProperties(Map.of("report", scalar, "summary", scalar));
-        manifest.getOutputSchema().setRequired(List.of("report", "summary"));
+        var scalar = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode(); scalar.put("type", "string");
+        setOutputSchemaField(manifest, "properties", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(Map.of("report", scalar, "summary", scalar)));
+        setOutputSchemaField(manifest, "required", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(List.of("report", "summary")));
         var regex = new YamlSkillManifest.RegexManifest(); regex.setPattern(".*GOOD.*");
         var linter = new YamlSkillManifest.LinterManifest(); linter.setType("regex"); linter.setMaxRetries(1); linter.setRegex(regex);
         manifest.setLinter(linter);
@@ -1628,7 +1633,7 @@ class StepLoopMissionExecutionEngineTest {
 
         assertThat(chatClient.systemMessagesSeen()).hasSize(3);
         assertThat(chatClient.systemMessagesSeen().get(1) + chatClient.userMessagesSeen().get(1))
-                .contains("missing_required")
+                .contains("required")
                 .contains("rawText")
                 .contains("YOUR PREVIOUS ACTION WAS INVALID");
     }
@@ -3558,6 +3563,140 @@ class StepLoopMissionExecutionEngineTest {
                 .containsEntry("stepNumber", 1);
     }
 
+
+
+    @Test
+    void exactOutOfRangeArgumentsRejectBeforeCallbackAndCorrectOnce() {
+        String limit = "0.12345678901234567890123456789";
+        String outside = "1.23456789012345678901234567891e-1";
+        String schema = "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"number\",\"maximum\":" + limit + "}},\"required\":[\"value\"],\"additionalProperties\":false}";
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var effects = new AtomicInteger();
+        var callback = new BoundCapability(toolWithSchema("default-invoiceParser", schema, "unused").metadata(), List.of(),
+                (args, task, results) -> {
+                    assertThat(args.get("value")).isEqualTo(new java.math.BigDecimal(limit));
+                    effects.incrementAndGet(); return "ok";
+                });
+        String action = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{\"value\":%s}}";
+        var sequence = new SequenceChatClient(action.formatted(outside), action.formatted(limit),
+                "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"done\"}");
+        ai.loomspan.internal.model.ModelInteraction model = request -> {
+            if (sequence.systemMessagesSeen().size() < 2) assertThat(effects).hasValue(0);
+            return sequence.call(request);
+        };
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
+                    TestLoomspanSessions.withId("exact-input-bound", "default-test_entry", 3), definition(), model, List.of(callback))).isEqualTo("done");
+        }
+        assertThat(effects).hasValue(1);
+        assertThat(sequence.userMessagesSeen().get(1)).contains(outside, "maximum");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void exactFinalBoundaryCorrectsOrExhaustsWithoutReplayingCompletedWork(boolean exhaust) {
+        String limit = "0.12345678901234567890123456789";
+        String outside = "0.123456789012345678901234567891";
+        var manifest = definition().manifest();
+        manifest.setOutputSchema(LoomspanJacksonCodecs.defaults().schemaTree().readTree(
+                "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"number\",\"maximum\":" + limit + "}},\"required\":[\"value\"],\"additionalProperties\":false}"));
+        manifest.setOutputSchemaMaxRetries(1);
+        var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var effects = new AtomicInteger();
+        var callback = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
+                (args, task, results) -> { effects.incrementAndGet(); return "retained successful result"; });
+        String action = "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":{\"value\":%s}}";
+        var sequence = new SequenceChatClient(
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{}}",
+                action.formatted(outside), action.formatted(exhaust ? outside : limit));
+        var session = TestLoomspanSessions.withId("exact-final-bound", "default-test_entry", 3);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor);
+            if (exhaust) assertThatThrownBy(() -> executeMission(engine, session, definition, sequence, List.of(callback)))
+                    .hasMessageContaining("validation exhausted");
+            else assertThat(LoomspanJacksonCodecs.defaults().schemaTree().readTree(executeMission(engine, session, definition, sequence, List.of(callback)))
+                    .path("value").decimalValue()).isEqualByComparingTo(limit);
+        }
+        assertThat(effects).hasValue(1);
+        assertThat(session.getExecutionPlanSnapshot().findTask("t-1").orElseThrow().status()).isEqualTo(PlanTaskStatus.COMPLETED);
+        assertThat(sequence.systemMessagesSeen()).hasSize(3);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void nullArgumentRootCorrectsBeforeAnyEffectsOrExhausts(boolean exhaust) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var session = TestLoomspanSessions.withId("null-root", "default-test_entry", 3);
+        var count = new AtomicInteger();
+        String invalid = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":null}";
+        String valid = invalid.replace("null", "{}");
+        var sequence = new SequenceChatClient(invalid, exhaust ? invalid : valid,
+                "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"done\"}");
+        var metadata = toolWithSchema("default-invoiceParser",
+                "{\"type\":\"object\",\"properties\":{\"optional\":{\"type\":\"string\"}},\"additionalProperties\":false}", "unused").metadata();
+        var callback = new BoundCapability(metadata, List.of(), (args, task, results) -> {
+            assertThat(args).isEmpty(); count.incrementAndGet(); return "ok";
+        });
+        assertThat(callback.dispatchEligibility().eligible()).isFalse();
+        ai.loomspan.internal.model.ModelInteraction model = request -> {
+            if (sequence.systemMessagesSeen().size() < 2) assertThat(count).hasValue(0);
+            return sequence.call(request);
+        };
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor);
+            if (exhaust) assertThatThrownBy(() -> executeMission(engine, session, definition(), model, List.of(callback)))
+                    .hasMessageContaining("after 2 attempts");
+            else assertThat(executeMission(engine, session, definition(), model, List.of(callback))).isEqualTo("done");
+        }
+        assertThat(count).hasValue(exhaust ? 0 : 1);
+        assertThat(sequence.systemMessagesSeen()).hasSize(exhaust ? 2 : 3);
+        assertThat(sequence.systemMessagesSeen().get(1)).contains("t-1");
+        assertThat(sequence.userMessagesSeen().get(1)).contains("explicit null", "toolArguments");
+    }
+
+    @Test
+    void omittedArgumentsRetainEmptyObjectSemantics() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var count = new AtomicInteger();
+        var callback = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
+                (args, task, results) -> { assertThat(args).isEmpty(); count.incrementAndGet(); return "ok"; });
+        var model = new SequenceChatClient(
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\"}",
+                "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"done\"}");
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            assertThat(executeMission(engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor),
+                    TestLoomspanSessions.withId("omit-root", "default-test_entry", 3), definition(), model, List.of(callback))).isEqualTo("done");
+        }
+        assertThat(count).hasValue(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void modelDecimalsReachCallbacksAndFinalTreesExactly(boolean bareFinal) {
+        String fraction = "0.12345678901234567890123456789";
+        String exponent = "1.2345678901234567890123456789e-20";
+        String object = "{\"nested\":[" + fraction + ", {\"exponent\":" + exponent + "}],\"integer\":123456789012345678901234567890}";
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var observed = new AtomicReference<Map<String,Object>>();
+        var callback = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
+                (args, task, results) -> { observed.set(args); return "ok"; });
+        var model = new SequenceChatClient(
+                "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":" + object + "}",
+                bareFinal ? object : "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":" + object + "}");
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = new StepLoopMissionExecutionEngine(new InitializingPlanningService(state, singleTaskPlan()), state,
+                    Duration.ofSeconds(5), executor, new NoOpSessionUsageService(),
+                    (sessionArg, definitionArg, objectiveArg, inputArg) -> new ai.loomspan.internal.runtime.attachment.RenderedMissionInput(objectiveArg, List.of(), Map.of()), new tools.jackson.databind.json.JsonMapper());
+            String result = executeMission(engine, TestLoomspanSessions.withId("exact-action", "default-test_entry", 3), definition(), model, List.of(callback));
+            var exact = LoomspanJacksonCodecs.defaults().schemaTree();
+            assertThat(exact.readTree(result)).isEqualTo(exact.readTree(object));
+        }
+        var nested = (List<?>) observed.get().get("nested");
+        assertThat(nested.get(0)).isEqualTo(new java.math.BigDecimal(fraction));
+        assertThat(((Map<?,?>) nested.get(1)).get("exponent")).isEqualTo(new java.math.BigDecimal(exponent));
+    }
+
     @Test
     void preservesExplicitNullArgumentsInTheStepLoopToolPath()
     {
@@ -3867,13 +4006,13 @@ class StepLoopMissionExecutionEngineTest {
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setOutputSchemaMaxRetries(1);
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType("object");
-        schema.setAdditionalProperties(false);
-        YamlSkillManifest.OutputSchemaManifest resultField = new YamlSkillManifest.OutputSchemaManifest();
-        resultField.setType("string");
-        schema.setProperties(Map.of("result", resultField));
-        schema.setRequired(List.of("result"));
+        tools.jackson.databind.node.ObjectNode schema = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+        schema.put("type", "object");
+        schema.put("additionalProperties", false);
+        tools.jackson.databind.node.ObjectNode resultField = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+        resultField.put("type", "string");
+        schema.set("properties", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(Map.of("result", resultField)));
+        schema.set("required", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(List.of("result")));
         manifest.setOutputSchema(schema);
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest, EXECUTION_CONFIGURATION);
     }
@@ -3885,17 +4024,17 @@ class StepLoopMissionExecutionEngineTest {
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setOutputSchemaMaxRetries(1);
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType("object");
-        schema.setAdditionalProperties(false);
-        YamlSkillManifest.OutputSchemaManifest resultField = new YamlSkillManifest.OutputSchemaManifest();
-        resultField.setType("string");
-        YamlSkillManifest.OutputSchemaManifest reasoningField = new YamlSkillManifest.OutputSchemaManifest();
-        reasoningField.setType("string");
-        schema.setProperties(Map.of(
+        tools.jackson.databind.node.ObjectNode schema = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+        schema.put("type", "object");
+        schema.put("additionalProperties", false);
+        tools.jackson.databind.node.ObjectNode resultField = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+        resultField.put("type", "string");
+        tools.jackson.databind.node.ObjectNode reasoningField = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+        reasoningField.put("type", "string");
+        schema.set("properties", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(Map.of(
                 "result", resultField,
-                "reasoning", reasoningField));
-        schema.setRequired(List.of("result"));
+                "reasoning", reasoningField)));
+        schema.set("required", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(List.of("result")));
         manifest.setOutputSchema(schema);
         Map<String, String> contract = Map.of(
                 "result", "default-invoiceParser",

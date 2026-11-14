@@ -354,7 +354,7 @@ public class LoomspanAutoConfiguration
             LoomspanJacksonCodecs codecs)
     {
         return new DefaultPlanningService(executionStateService,
-                codecs.planningJson(), codecs.planningYaml());
+                codecs.planningJson());
     }
 
     @Bean

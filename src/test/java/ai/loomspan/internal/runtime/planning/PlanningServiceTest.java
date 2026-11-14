@@ -167,58 +167,34 @@ class PlanningServiceTest {
     }
 
     @Test
-    void acceptsJsonAndYamlPlansWithoutPlanId() {
-        List<String> payloads = List.of(
-                planJson("remove-me", PlanTaskStatus.PENDING)
-                        .replaceFirst("\\s*\"planId\"\\s*:\\s*\"[^\"]+\"\\s*,", ""),
-                YAML_PLAN_WITH_LLM_STATUSES.replaceFirst("(?m)^planId:.*\\R", ""));
-
-        for (int index = 0; index < payloads.size(); index++) {
-            DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
-            String expectedId = "framework-plan-" + index;
-            DefaultPlanningService planningService = planningService(stateService, () -> expectedId);
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "session-no-model-id-" + index, "default-test_entry", 3);
-
-            ExecutionPlan accepted = initializePlan(planningService,
-                    session,
-                    "hello",
-                    null,
-                    rootDefinition(index == 0 ? "default-rootVisibleSkill" : "default-invoiceParser"),
-                    new SimpleChatClient(null, payloads.get(index)),
-                    List.of(toolCallback(index == 0 ? "default-allowedVisibleSkill" : "default-invoiceParser", "test")))
-                    .orElseThrow();
-
-            assertThat(accepted.planId()).isEqualTo(expectedId);
+    void rejectsYamlFencesTrailingContentAndUnsolicitedPlanIdentity() {
+        String valid = planJson("unused", PlanTaskStatus.PENDING);
+        for (String payload : List.of(YAML_PLAN_WITH_LLM_STATUSES, "```json\n" + valid + "\n```", valid + " {}",
+                valid.replaceFirst("\\{", "{\"planId\":\"untrusted\","))) {
+            var state = new DefaultExecutionStateService(FIXED_CLOCK);
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("strict-plan", "default-test_entry", 3);
+            var model = new SequencePlanningChatClient(payload, payload);
+            assertThatThrownBy(() -> initializePlan(new DefaultPlanningService(state), session, "hello", null,
+                    rootDefinition(), model, defaultVisibleTools())).hasMessageContaining("Plan validation failed");
+            assertThat(model.systemMessagesSeen()).hasSize(2);
+            assertThat(planFor(session)).isEmpty();
         }
     }
 
     @Test
-    void overwritesUnsolicitedJsonAndYamlPlanId() {
-        List<String> payloads = List.of(
-                planJson("adversarial", PlanTaskStatus.PENDING),
-                planJson("adversarial", PlanTaskStatus.PENDING).replace("\"adversarial\"", "12345"),
-                planJson("adversarial", PlanTaskStatus.PENDING).replace("\"adversarial\"", "\"   \""),
-                YAML_PLAN_WITH_LLM_STATUSES,
-                YAML_PLAN_WITH_LLM_STATUSES.replace("planId: 12345", "planId: adversarial"),
-                YAML_PLAN_WITH_LLM_STATUSES.replace("planId: 12345", "planId: '   '"));
-
-        for (int index = 0; index < payloads.size(); index++) {
-            DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
-            String expectedId = "trusted-plan-" + index;
-            DefaultPlanningService planningService = planningService(stateService, () -> expectedId);
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "session-unsolicited-id-" + index, "default-test_entry", 3);
-            ExecutionPlan accepted = initializePlan(planningService, session,
-                    "hello",
-                    null,
-                    rootDefinition(index < 3 ? "default-rootVisibleSkill" : "default-invoiceParser"),
-                    new SimpleChatClient(null, payloads.get(index)),
-                    List.of(toolCallback(index < 3 ? "default-allowedVisibleSkill" : "default-invoiceParser", "test")))
-                    .orElseThrow();
-
-            assertThat(accepted.planId()).isEqualTo(expectedId);
-        }
+    void correctsMalformedJsonIntoDedicatedNativePlan() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("correct-json", "default-test_entry", 3);
+        var requests = new ArrayList<ai.loomspan.internal.model.ModelInteractionRequest>();
+        initializePlan(new DefaultPlanningService(state), session, "hello", null, rootDefinition(), request -> {
+            requests.add(request);
+            return new ModelInteractionResult(requests.size() == 1 ? "not json" : planJson("unused", PlanTaskStatus.PENDING),
+                    Map.of(ModelTraceContext.RESPONSE_ATTEMPT_CONTEXT_KEY, request.traceContext().nextAttempt()));
+        }, defaultVisibleTools()).orElseThrow();
+        assertThat(requests).hasSize(2);
+        assertThat(requests.getFirst().outputContract()).isSameAs(PlanningOutputContract.SCHEMA);
+        assertThat(requests.getLast().outputContract()).isSameAs(PlanningOutputContract.SCHEMA);
+        assertThat(requests.getFirst().input().attachments()).isEmpty();
     }
 
     @Test
@@ -360,67 +336,61 @@ class PlanningServiceTest {
     }
 
     @Test
-    void initializesPlanFromYamlWithNormalizedStatuses() {
-        DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
-        DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-yaml", "default-test_entry", 3);
+    void rejectsYamlAndPreservesNoAcceptedPlan() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("yaml-rejected", "default-test_entry", 3);
+        assertThatThrownBy(() -> initializePlan(new DefaultPlanningService(state), session, "hello", null,
+                rootDefinition(), new SimpleChatClient(null, YAML_PLAN_WITH_LLM_STATUSES), defaultVisibleTools()))
+                .hasMessageContaining("Plan validation failed");
+        assertThat(planFor(session)).isEmpty();
+    }
 
-        ExecutionPlan plan = initializePlan(planningService,
-                        session,
-                        "parse invoice",
-                        null,
-                        rootDefinition("default-invoiceParser"),
-                        new SimpleChatClient(null, YAML_PLAN_WITH_LLM_STATUSES),
-                        List.of(toolCallback("default-invoiceParser", "test")))
-                .orElseThrow();
 
-        assertThat(plan.planId()).isNotBlank().isNotEqualTo("12345");
-        assertThat(plan.status()).isEqualTo(PlanStatus.VALID);
-        assertThat(plan.findTask("67890")).isPresent();
-        assertThat(plan.findTask("67890").orElseThrow().status()).isEqualTo(PlanTaskStatus.COMPLETED);
+    @Test
+    void operationalValidationFailurePropagatesWithoutCandidateCorrectionOrStorage() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("operational-validation", "default-test_entry", 3);
+        var failure = new IllegalStateException("validation unavailable exact original detail");
+        var evidence = new EvidenceCoverageValidator() {
+            @Override public ai.loomspan.internal.runtime.evidence.EvidenceCoverageResult validatePlanCoverage(
+                    ExecutionPlan plan, ai.loomspan.internal.runtime.evidence.EvidenceContract contract) { throw failure; }
+        };
+        var planner = new DefaultPlanningService(state, LoomspanJacksonCodecs.defaults().planningJson(),
+                new PlanTaskConstraintValidator(), evidence, () -> "runtime-id");
+        var model = new SequencePlanningChatClient(planJson("unused", PlanTaskStatus.PENDING));
+        assertThatThrownBy(() -> initializePlan(planner, session, "hello", null, rootDefinition(), model, defaultVisibleTools()))
+                .isSameAs(failure);
+        assertThat(model.systemMessagesSeen()).hasSize(1);
+        assertThat(planFor(session)).isEmpty();
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.PLAN_RETRY_REQUESTED
+                || record.recordType() == TraceRecordType.PLAN_CREATED);
     }
 
     @Test
-    void normalizesFailureLikeTaskStatusesToFailedAndRejectsLegacyBlockedTaskStatus() {
-        for (String taskStatus : List.of("FAILED", "FAILURE", "ERROR", "INVALID", "STALE")) {
-            DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
-            DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-            LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "session-task-status-" + taskStatus, "default-test_entry", 3);
-            String payload = planJson("model-plan-id", PlanTaskStatus.PENDING)
-                    .replace("\"status\": \"PENDING\"", "\"status\": \"" + taskStatus + "\"");
-
-            ExecutionPlan accepted = initializePlan(planningService,
-                    session, "hello", null, rootDefinition(), new SimpleChatClient(null, payload), defaultVisibleTools())
-                    .orElseThrow();
-
-            assertThat(accepted.tasks()).extracting(PlanTask::status)
-                    .containsExactly(PlanTaskStatus.FAILED);
-        }
-
-        DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
-        DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "session-task-status-blocked", "default-test_entry", 3);
-        String legacyPayload = planJson("model-plan-id", PlanTaskStatus.PENDING)
-                .replace("\"status\": \"PENDING\"", "\"status\": \"BLOCKED\"");
-
-        assertThatThrownBy(() -> initializePlan(planningService,
-                session, "hello", null, rootDefinition(), new SimpleChatClient(null, legacyPayload), defaultVisibleTools()))
-                .hasMessageContaining("Failed to parse planning response");
+    void providerFailurePropagatesOnceWithoutPlanningCorrection() {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("provider-failure", "default-test_entry", 3);
+        var count = new AtomicInteger();
+        var failure = new IllegalArgumentException("provider schema support rejection original detail");
+        assertThatThrownBy(() -> initializePlan(new DefaultPlanningService(state), session, "hello", null, rootDefinition(),
+                request -> { count.incrementAndGet(); throw failure; }, defaultVisibleTools())).isSameAs(failure);
+        assertThat(count).hasValue(1);
         assertThat(planFor(session)).isEmpty();
+        assertThat(readRecords(session)).noneMatch(record -> record.recordType() == TraceRecordType.PLAN_RETRY_REQUESTED
+                || record.recordType() == TraceRecordType.PLAN_CREATED);
+    }
 
-        DefaultExecutionStateService planStatusStateService = new DefaultExecutionStateService(FIXED_CLOCK);
-        DefaultPlanningService planStatusPlanningService = new DefaultPlanningService(planStatusStateService);
-        LoomspanSession planStatusSession = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "session-plan-status-blocked", "default-test_entry", 3);
-        String planStatusPayload = planJson("model-plan-id", PlanTaskStatus.PENDING)
-                .replace("\"status\": \"VALID\"", "\"status\": \"BLOCKED\"");
-
-        assertThat(initializePlan(planStatusPlanningService,
-                planStatusSession, "hello", null, rootDefinition(),
-                new SimpleChatClient(null, planStatusPayload), defaultVisibleTools()).orElseThrow().status())
-                .isEqualTo(PlanStatus.INVALID);
+    @Test
+    void rejectsAliasesAndLaterTaskAndPlanStatuses() {
+        for (String status : List.of("FAILED", "FAILURE", "ERROR", "INVALID", "STALE", "SUCCESS", "BLOCKED", "pending")) {
+            var state = new DefaultExecutionStateService(FIXED_CLOCK);
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("status-rejected", "default-test_entry", 3);
+            String payload = planJson("unused", PlanTaskStatus.PENDING).replace("\"PENDING\"", "\"" + status + "\"");
+            assertThatThrownBy(() -> initializePlan(new DefaultPlanningService(state), session, "hello", null,
+                    rootDefinition(), new SimpleChatClient(null, payload), defaultVisibleTools()))
+                    .hasMessageContaining("Plan validation failed");
+            assertThat(planFor(session)).isEmpty();
+        }
     }
 
     @Test
@@ -443,7 +413,7 @@ class PlanningServiceTest {
                     rootDefinition(payload.startsWith("{") ? "default-rootVisibleSkill" : "default-invoiceParser"),
                     new SimpleChatClient(null, payload),
                     List.of(toolCallback(payload.startsWith("{") ? "default-allowedVisibleSkill" : "default-invoiceParser", "test"))))
-                    .hasMessageContaining("Failed to parse planning response");
+                    .hasMessageContaining("Plan validation failed");
         }
     }
 
@@ -463,7 +433,7 @@ class PlanningServiceTest {
                 rootDefinition(),
                 new SimpleChatClient(null, stalePlan),
                 defaultVisibleTools()))
-                .hasMessageContaining("Failed to parse planning response");
+                .hasMessageContaining("Plan validation failed");
         assertThat(planFor(session)).isEmpty();
     }
 
@@ -1058,12 +1028,12 @@ class PlanningServiceTest {
             }
         };
         LoomspanJacksonCodecs codecs = LoomspanJacksonCodecs.defaults();
-        DefaultPlanningService planningService = new DefaultPlanningService(stateService, codecs.planningJson(), codecs.planningYaml(),
+        DefaultPlanningService planningService = new DefaultPlanningService(stateService, codecs.planningJson(),
                 constraints, evidence, () -> "accepted-structure-plan");
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
                 "structure-corrected", "default-test_entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(
-                invalidStructureYaml(), correctedMultiToolPlanJson());
+                invalidStructureJson(), correctedMultiToolPlanJson());
 
         ExecutionPlan accepted = initializePlan(planningService,
                 session, "check invoice", null, duplicateInvoiceDefinition(), chatClient,
@@ -1071,11 +1041,11 @@ class PlanningServiceTest {
                 .orElseThrow();
 
         assertThat(accepted.tasks().getFirst().parallelGroup()).isNull();
-        assertThat(constraintCalls).hasValue(1);
-        assertThat(evidenceCalls).hasValue(1);
+        assertThat(constraintCalls).hasValue(2);
+        assertThat(evidenceCalls).hasValue(2);
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
         assertThat(chatClient.systemMessagesSeen().getLast())
-                .contains("[parallel-group-type]", "[plan-dependency]");
+                .contains("[parallel-group-format]", "[plan-dependency]");
         assertThat(readRecords(session)).filteredOn(record -> record.recordType() == TraceRecordType.PLAN_VALIDATION_FAILED)
                 .singleElement()
                 .satisfies(record -> {
@@ -1083,9 +1053,9 @@ class PlanningServiceTest {
                             .containsEntry("retryCount", 0)
                             .containsEntry("validationStatus", "retrying")
                             .containsEntry("severity", "ERROR")
-                            .containsEntry("issueCodes", List.of("parallel-group-type", "plan-dependency"))
+                            .containsEntry("issueCodes", List.of("parallel-group-format", "plan-dependency"))
                             .containsKeys("attemptId", "retrySequenceId");
-                    assertThat(record.data().toString()).contains("parallel-group-type", "plan-dependency", "\"severity\":\"ERROR\"");
+                    assertThat(record.data().toString()).contains("parallel-group-format", "plan-dependency", "\"severity\":\"ERROR\"");
                 });
         assertThat(readRecords(session)).anyMatch(record -> record.recordType() == TraceRecordType.PLAN_CREATED);
     }
@@ -1142,13 +1112,13 @@ class PlanningServiceTest {
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
                 "structure-exhausted", "default-test_entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(
-                invalidStructureYaml(), invalidStructureYaml());
+                invalidStructureJson(), invalidStructureJson());
 
         assertThatThrownBy(() -> initializePlan(planningService,
                 session, "check invoice", null, rootDefinition("default-duplicateInvoiceChecker"), chatClient,
                 List.of(toolCallback("default-invoiceParser", "parse"))))
                 .hasMessageContaining("Plan validation failed")
-                .hasMessageContaining("parallel-group-type")
+                .hasMessageContaining("parallel-group-format")
                 .hasMessageContaining("plan-dependency");
 
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
@@ -1164,8 +1134,8 @@ class PlanningServiceTest {
     void sharesOneRetryAcrossTypedThenStructuralAndStructuralThenTypedFailures()
     {
         for (List<String> responses : List.of(
-                List.of(weakSingleToolPlanJson(), invalidStructureYaml()),
-                List.of(invalidStructureYaml(), weakSingleToolPlanJson())))
+                List.of(weakSingleToolPlanJson(), invalidStructureJson()),
+                List.of(invalidStructureJson(), weakSingleToolPlanJson())))
         {
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
             DefaultPlanningService planningService = new DefaultPlanningService(stateService);
@@ -1188,8 +1158,8 @@ class PlanningServiceTest {
     void sharesOneRetryAcrossEvidenceThenStructuralAndStructuralThenEvidenceFailures()
     {
         for (List<String> responses : List.of(
-                List.of(weakSingleToolPlanJson(), invalidStructureYaml()),
-                List.of(invalidStructureYaml(), weakSingleToolPlanJson())))
+                List.of(weakSingleToolPlanJson(), invalidStructureJson()),
+                List.of(invalidStructureJson(), weakSingleToolPlanJson())))
         {
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
             DefaultPlanningService planningService = new DefaultPlanningService(stateService);
@@ -1288,7 +1258,7 @@ class PlanningServiceTest {
     private static String weakSingleToolPlanJson() {
         return """
                 {
-                  "planId": "plan-weak",
+
                   "capabilityName": "default-duplicateInvoiceChecker",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
@@ -1334,7 +1304,7 @@ class PlanningServiceTest {
     private static String correctedMultiToolPlanJson() {
         return """
                 {
-                  "planId": "plan-strong",
+
                   "capabilityName": "default-duplicateInvoiceChecker",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
@@ -1396,13 +1366,13 @@ class PlanningServiceTest {
         manifest.setName("duplicateInvoiceChecker");
         manifest.setDescription("default-duplicateInvoiceChecker");
         manifest.setModel("gpt-5");
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType("object");
-        schema.setProperties(Map.of(
+        tools.jackson.databind.node.ObjectNode schema = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+        schema.put("type", "object");
+        schema.set("properties", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(Map.of(
                 "vendorName", scalarSchema("string"),
-                "isDuplicate", scalarSchema("boolean")));
-        schema.setRequired(List.of("vendorName", "isDuplicate"));
-        schema.setAdditionalProperties(false);
+                "isDuplicate", scalarSchema("boolean"))));
+        schema.set("required", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(List.of("vendorName", "isDuplicate")));
+        schema.put("additionalProperties", false);
         manifest.setOutputSchema(schema);
         manifest.setOutputSchemaMaxRetries(1);
         Map<String, String> contract = Map.of(
@@ -1474,9 +1444,9 @@ class PlanningServiceTest {
                 EXECUTION_CONFIGURATION);
     }
 
-    private static YamlSkillManifest.OutputSchemaManifest scalarSchema(String type) {
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType(type);
+    private static tools.jackson.databind.node.ObjectNode scalarSchema(String type) {
+        tools.jackson.databind.node.ObjectNode schema = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+        schema.put("type", type);
         return schema;
     }
 
@@ -1494,30 +1464,16 @@ class PlanningServiceTest {
                         "default-allowedVisibleSkill", "Use tool", List.of(), List.of(), null, null)));
     }
 
-    private static String invalidStructureYaml()
-    {
-        return """
-                capabilityName: default-duplicateInvoiceChecker
-                createdAt: 2026-03-15T12:00:00Z
-                status: VALID
-                tasks:
-                  - taskId: t-1
-                    title: Parse invoice
-                    status: PENDING
-                    capabilityName: default-invoiceParser
-                    intent: Parse
-                    dependsOn: t-0
-                    expectedOutputs: []
-                    parallelGroup: 7
-                    note: ""
-                """;
+    private static String invalidStructureJson() {
+        return correctedMultiToolPlanJson().replaceFirst("\\[\\]", "[\"missing\"]")
+                .replaceFirst("\"parallelGroup\": null", "\"parallelGroup\": \"bad group\"");
     }
 
     private static String groupedPlanJson()
     {
         return """
                 {
-                  "planId": "model-plan-id",
+
                   "capabilityName": "default-rootVisibleSkill",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
@@ -1563,7 +1519,6 @@ class PlanningServiceTest {
         LoomspanJacksonCodecs codecs = LoomspanJacksonCodecs.defaults();
         return new DefaultPlanningService(stateService,
                 codecs.planningJson(),
-                codecs.planningYaml(),
                 new PlanTaskConstraintValidator(),
                 new EvidenceCoverageValidator(),
                 planIdSupplier);
@@ -1572,7 +1527,7 @@ class PlanningServiceTest {
     private static String planJson(String id, PlanTaskStatus status) {
         return """
                 {
-                  "planId": "%s",
+
                   "capabilityName": "default-rootVisibleSkill",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
@@ -1585,11 +1540,12 @@ class PlanningServiceTest {
                       "intent": "Use tool",
                       "dependsOn": [],
                       "expectedOutputs": [],
-                      "parallelGroup": null
+                      "parallelGroup": null,
+                      "note": ""
                     }
                   ]
                 }
-                """.formatted(id, status.name());
+                """.formatted(status.name());
     }
 
     private static final Map<LoomspanSession, ai.loomspan.internal.core.ExecutionBinding> BINDINGS =

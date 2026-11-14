@@ -3,7 +3,8 @@ package ai.loomspan.internal.runtime.planning;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.ObjectReader;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.node.ObjectNode;
 import ai.loomspan.internal.core.LoomspanSession;
 import ai.loomspan.internal.core.CapabilityMetadata;
@@ -42,7 +43,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -60,7 +60,7 @@ public class DefaultPlanningService implements PlanningService
 
     private final ExecutionStateService executionStateService;
     private final ObjectMapper objectMapper;
-    private final ObjectMapper yamlObjectMapper;
+    private final ObjectReader planReader;
     private final PlanTaskConstraintValidator planTaskConstraintValidator;
     private final EvidenceCoverageValidator evidenceCoverageValidator;
     private final PlanStructureValidator planStructureValidator = new PlanStructureValidator();
@@ -71,31 +71,28 @@ public class DefaultPlanningService implements PlanningService
         this(
                 executionStateService,
                 defaultObjectMapper(),
-                defaultYamlObjectMapper(),
                 new PlanTaskConstraintValidator(),
                 new EvidenceCoverageValidator(),
                 () -> UUID.randomUUID().toString());
     }
 
     public DefaultPlanningService(ExecutionStateService executionStateService,
-            ObjectMapper planningJsonMapper,
-            ObjectMapper planningYamlMapper)
+            ObjectMapper planningJsonMapper)
     {
-        this(executionStateService, planningJsonMapper, planningYamlMapper,
+        this(executionStateService, planningJsonMapper,
                 new PlanTaskConstraintValidator(), new EvidenceCoverageValidator(),
                 () -> UUID.randomUUID().toString());
     }
 
     DefaultPlanningService(ExecutionStateService executionStateService,
             ObjectMapper objectMapper,
-            ObjectMapper yamlObjectMapper,
             PlanTaskConstraintValidator planTaskConstraintValidator,
             EvidenceCoverageValidator evidenceCoverageValidator,
             Supplier<String> planIdSupplier)
     {
         this.executionStateService = Objects.requireNonNull(executionStateService, "executionStateService must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
-        this.yamlObjectMapper = Objects.requireNonNull(yamlObjectMapper, "yamlObjectMapper must not be null");
+        this.planReader = objectMapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
         this.planTaskConstraintValidator = Objects.requireNonNull(planTaskConstraintValidator, "planTaskConstraintValidator must not be null");
         this.evidenceCoverageValidator = Objects.requireNonNull(evidenceCoverageValidator, "evidenceCoverageValidator must not be null");
         this.planIdSupplier = Objects.requireNonNull(planIdSupplier, "planIdSupplier must not be null");
@@ -302,13 +299,44 @@ public class DefaultPlanningService implements PlanningService
                     evidenceContract,
                     modelTraceContext);
 
+            JsonNode planTree;
+            try {
+                planTree = planReader.readTree(attemptResult.payload());
+            } catch (JacksonException | IllegalArgumentException ex) {
+                if (retryCandidate(session, planningFrame, attemptResult, retryCount, "Invalid planning JSON: " + ex.getMessage())) {
+                    retryFeedback = "Invalid planning JSON: " + ex.getMessage();
+                    retryCount++;
+                    continue;
+                }
+                throw new IllegalStateException("Plan validation failed for skill '" + capabilityName + "': " + ex.getMessage(), ex);
+            }
+            // Validation operational failures deliberately propagate; only completed verdicts correct.
+            var schemaIssues = PlanningOutputContract.SCHEMA.validate(planTree);
+            if (!schemaIssues.isEmpty()) {
+                String feedback = "Planning schema violations: " + schemaIssues;
+                if (retryCandidate(session, planningFrame, attemptResult, retryCount, feedback)) {
+                    retryFeedback = feedback; retryCount++; continue;
+                }
+                throw new IllegalStateException("Plan validation failed for skill '" + capabilityName + "': " + feedback);
+            }
+            ((ObjectNode) planTree).put("planId", requireNonBlank(planIdSupplier.get(), "planId"));
+            try {
+                convertPlan(planTree, capabilityName);
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                String feedback = "Invalid typed planning candidate: " + ex.getMessage();
+                if (retryCandidate(session, planningFrame, attemptResult, retryCount, feedback)) {
+                    retryFeedback = feedback; retryCount++; continue;
+                }
+                throw ex;
+            }
+
             Set<String> visibleCapabilityNames = visibleTools == null ? Set.of() : visibleTools.stream()
                     .filter(Objects::nonNull)
                     .map(BoundCapability::name)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
             PlanStructureValidationResult structureValidation = planStructureValidator.validate(
-                    attemptResult.planTree(), visibleCapabilityNames, capabilityName);
+                    planTree, visibleCapabilityNames, capabilityName);
             if (structureValidation.hasErrors())
             {
                 String combinedFeedback = structureValidation.retryFeedback();
@@ -316,7 +344,7 @@ public class DefaultPlanningService implements PlanningService
                 // declaration counts, evidence and binding edges in the same correction.
                 ExecutionPlan candidate = null;
                 try {
-                    candidate = convertPlan(attemptResult.planTree(), capabilityName);
+                    candidate = convertPlan(planTree, capabilityName);
                 } catch (IllegalArgumentException | IllegalStateException ignored) {
                     // A malformed task cannot be interpreted as a typed plan; structure
                     // feedback remains authoritative and no candidate plan is stored.
@@ -357,7 +385,7 @@ public class DefaultPlanningService implements PlanningService
                                 .formatted(capabilityName, combinedFeedback));
             }
 
-            ExecutionPlan plan = convertPlan(attemptResult.planTree(), capabilityName);
+            ExecutionPlan plan = convertPlan(planTree, capabilityName);
 
             PlanTaskConstraintValidationResult validation = planTaskConstraintValidator.validate(
                     plan, taskConstraints);
@@ -527,12 +555,12 @@ public class DefaultPlanningService implements PlanningService
                     new RenderedMissionInput(planningUserMessage, List.of(), Map.of()),
                     modelTraceContext,
                     List.of(),
-                    true, null));
+                    true, PlanningOutputContract.SCHEMA));
             String planPayload = result.content();
             Map<String, Object> modelAttempt = ModelTraceContext.attemptFrom(result.context());
 
             return new PlanningAttemptResult(
-                    parseNormalizedPlanTree(planPayload, capabilityName),
+                    planPayload,
                     planningPrompt,
                     planningUserMessage,
                     modelAttempt);
@@ -703,7 +731,7 @@ public class DefaultPlanningService implements PlanningService
                 - task status must be exactly: PENDING
                 - dependsOn must be a JSON array of taskId strings (empty array if no dependencies)
                 - expectedOutputs must be a JSON array of strings
-                - parallelGroup may be omitted or null for an ungrouped task; otherwise it must match ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ exactly
+                - parallelGroup must be null for an ungrouped task; otherwise it must match ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ exactly
                 - Return raw JSON only - no additional text before or after
                 Planning rules:
                 - Each task must have a distinct purpose that advances the mission.
@@ -795,28 +823,13 @@ public class DefaultPlanningService implements PlanningService
         return plan.updateTask(taskId, updater);
     }
 
-    private JsonNode parseNormalizedPlanTree(String payload, String capabilityName)
-    {
-        String unwrapped = unwrapFencedBlock(payload);
-        log.debug(
-                "Parsing plan for capability='{}' looksLikeJson={} payloadPreview={}...",
-                capabilityName,
-                looksLikeJson(unwrapped),
-                preview(unwrapped));
-
-        try
-        {
-            JsonNode tree = parsePlanTree(unwrapped, capabilityName);
-            normalizePlanTree(tree);
-            return tree;
-        }
-        catch (JacksonException ex)
-        {
-            throw new IllegalStateException(
-                    "Failed to parse planning response for capability '" + capabilityName
-                            + "' as JSON or YAML. Payload preview: " + preview(unwrapped),
-                    ex);
-        }
+    private boolean retryCandidate(LoomspanSession session, ExecutionFrame frame,
+            PlanningAttemptResult attempt, int retryCount, String feedback) {
+        var issues = List.of(new PlanStructureIssue("planning-candidate", feedback));
+        recordPlanStructureEvent(session, frame, TraceRecordType.PLAN_VALIDATION_FAILED, issues, retryCount, attempt.modelAttempt());
+        if (retryCount >= MAX_PLANNING_VALIDATION_RETRIES) return false;
+        recordPlanStructureEvent(session, frame, TraceRecordType.PLAN_RETRY_REQUESTED, issues, retryCount, attempt.modelAttempt());
+        return true;
     }
 
     private ExecutionPlan convertPlan(JsonNode tree, String capabilityName)
@@ -828,7 +841,7 @@ public class DefaultPlanningService implements PlanningService
         catch (JacksonException ex)
         {
             throw new IllegalStateException(
-                    "Failed to parse planning response for capability '" + capabilityName + "' as JSON or YAML.", ex);
+                    "Failed to parse planning response for capability '" + capabilityName + "' as JSON.", ex);
         }
     }
 
@@ -840,36 +853,6 @@ public class DefaultPlanningService implements PlanningService
                     "Task '%s' is bound to capability '%s' but received '%s'."
                             .formatted(task.taskId(), task.capabilityName(), capabilityName));
         }
-    }
-
-    private JsonNode parsePlanTree(String payload, String capabilityName) throws JacksonException
-    {
-        if (looksLikeJson(payload))
-        {
-            try
-            {
-                return objectMapper.readTree(payload);
-            }
-            catch (JacksonException ex)
-            {
-                log.debug("JSON plan parsing failed for capability='{}'; trying YAML tree parsing", capabilityName, ex);
-            }
-        }
-
-        return yamlObjectMapper.readTree(payload);
-    }
-
-    private void normalizePlanTree(JsonNode tree)
-    {
-        if (!(tree instanceof ObjectNode planNode))
-        {
-            return;
-        }
-
-        normalizePlanStatus(planNode);
-        normalizeTaskStatuses(planNode.get("tasks"));
-        planNode.remove("planId");
-        planNode.put("planId", requireNonBlank(planIdSupplier.get(), "planId"));
     }
 
     private Map<String, Object> requireAcceptedAttempt(Map<String, Object> modelAttempt)
@@ -893,126 +876,9 @@ public class DefaultPlanningService implements PlanningService
         return value;
     }
 
-    private void normalizePlanStatus(ObjectNode planNode)
-    {
-        JsonNode statusNode = planNode.get("status");
-        if (statusNode == null || !statusNode.isTextual())
-        {
-            return;
-        }
-
-        String normalizedStatus = normalizePlanStatusValue(statusNode.asText());
-        if (normalizedStatus != null)
-        {
-            planNode.put("status", normalizedStatus);
-        }
-    }
-
-    private void normalizeTaskStatuses(@Nullable JsonNode tasksNode)
-    {
-        if (!(tasksNode instanceof ArrayNode taskArray))
-        {
-            return;
-        }
-        for (JsonNode taskNode : taskArray)
-        {
-            if (!(taskNode instanceof ObjectNode objectTaskNode))
-            {
-                continue;
-            }
-            JsonNode statusNode = objectTaskNode.get("status");
-            if (statusNode == null || !statusNode.isTextual())
-            {
-                continue;
-            }
-            String normalizedStatus = normalizeTaskStatusValue(statusNode.asText());
-            if (normalizedStatus != null)
-            {
-                objectTaskNode.put("status", normalizedStatus);
-            }
-        }
-    }
-
-    @Nullable
-    private String normalizePlanStatusValue(String rawStatus)
-    {
-        String normalized = canonicalizeEnumToken(rawStatus);
-        return switch (normalized)
-        {
-            case "VALID", "STALE", "INVALID" -> normalized;
-            case "EXECUTED", "EXECUTING", "COMPLETED", "COMPLETE", "SUCCESS", "SUCCEEDED", "DONE", "READY", "PENDING", "IN_PROGRESS", "INPROGRESS", "ACTIVE", "RUNNING", "OPEN", "NEW", "CURRENT", "ONGOING", "STARTED" -> PlanStatus.VALID.name();
-            case "FAILED", "FAILURE", "ERROR", "BLOCKED" -> PlanStatus.INVALID.name();
-            default -> null;
-        };
-    }
-
-    @Nullable
-    private String normalizeTaskStatusValue(String rawStatus)
-    {
-        String normalized = canonicalizeEnumToken(rawStatus);
-        return switch (normalized)
-        {
-            case "PENDING", "IN_PROGRESS", "COMPLETED", "FAILED" -> normalized;
-            case "SUCCESS", "SUCCEEDED", "DONE", "COMPLETE", "EXECUTED" -> PlanTaskStatus.COMPLETED.name();
-            case "RUNNING", "ACTIVE", "EXECUTING", "INPROGRESS" -> PlanTaskStatus.IN_PROGRESS.name();
-            case "WAITING", "READY", "TODO", "NEW", "OPEN", "QUEUED", "NOT_STARTED" -> PlanTaskStatus.PENDING.name();
-            case "FAILURE", "ERROR", "INVALID", "STALE" -> PlanTaskStatus.FAILED.name();
-            default -> null;
-        };
-    }
-
-    private String canonicalizeEnumToken(String rawStatus)
-    {
-        return rawStatus == null
-                ? ""
-                : rawStatus.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
-    }
-
-    private String unwrapFencedBlock(String payload)
-    {
-        String safePayload = payload == null ? "" : payload.trim();
-        if (safePayload.startsWith("```"))
-        {
-            int firstNewline = safePayload.indexOf('\n');
-            int lastFence = safePayload.lastIndexOf("```");
-            if (firstNewline >= 0 && lastFence > firstNewline)
-            {
-                return safePayload.substring(firstNewline + 1, lastFence).trim();
-            }
-        }
-
-        if (safePayload.startsWith("---"))
-        {
-            safePayload = safePayload.substring(3).trim();
-        }
-
-        return safePayload;
-    }
-
-    private boolean looksLikeJson(String payload)
-    {
-        return payload.startsWith("{") || payload.startsWith("[");
-    }
-
-    private String preview(String payload)
-    {
-        if (payload == null || payload.isBlank())
-        {
-            return "<empty>";
-        }
-
-        String normalized = payload.replace('\n', ' ').replace('\r', ' ').trim();
-        return normalized.length() <= 200 ? normalized : normalized.substring(0, 200);
-    }
-
     private static ObjectMapper defaultObjectMapper()
     {
         return ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().planningJson();
-    }
-
-    private static ObjectMapper defaultYamlObjectMapper()
-    {
-        return ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().planningYaml();
     }
 
     private String stringifyPlan(ExecutionPlan plan)
@@ -1020,7 +886,7 @@ public class DefaultPlanningService implements PlanningService
         return plan == null ? "" : plan.toString();
     }
 
-    private record PlanningAttemptResult(JsonNode planTree,
+    private record PlanningAttemptResult(String payload,
             String prompt,
             String userMessage,
             Map<String, Object> modelAttempt)

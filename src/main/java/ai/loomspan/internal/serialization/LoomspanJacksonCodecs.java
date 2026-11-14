@@ -20,7 +20,6 @@ public final class LoomspanJacksonCodecs
     private final ObjectMapper applicationConversion;
     private final ObjectMapper skillYaml;
     private final ObjectMapper planningJson;
-    private final ObjectMapper planningYaml;
     private final ObjectMapper schemaTree;
     private final ObjectMapper canonicalTrace;
     private final ObjectMapper strictObservability;
@@ -33,8 +32,6 @@ public final class LoomspanJacksonCodecs
                 .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
         this.planningJson = JsonMapper.builder().findAndAddModules()
-                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
-        this.planningYaml = YAMLMapper.builder().findAndAddModules()
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
         this.schemaTree = JsonMapper.builder().findAndAddModules()
                 .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
@@ -52,7 +49,6 @@ public final class LoomspanJacksonCodecs
     public ObjectMapper applicationConversion() { return applicationConversion; }
     public ObjectMapper skillYaml() { return skillYaml; }
     public ObjectMapper planningJson() { return planningJson; }
-    public ObjectMapper planningYaml() { return planningYaml; }
     public ObjectMapper schemaTree() { return schemaTree; }
     public ObjectMapper canonicalTrace() { return canonicalTrace; }
     public ObjectMapper strictObservability() { return strictObservability; }

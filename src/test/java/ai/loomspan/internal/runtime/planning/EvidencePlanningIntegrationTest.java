@@ -1,4 +1,5 @@
 package ai.loomspan.internal.runtime.planning;
+import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.internal.core.LoomspanSession;
@@ -105,14 +106,14 @@ class EvidencePlanningIntegrationTest
         manifest.setName("handleIncident");
         manifest.setDescription("Handle an incident");
         manifest.setModel("gpt-5");
-        YamlSkillManifest.OutputSchemaManifest schema = new YamlSkillManifest.OutputSchemaManifest();
-        schema.setType("object");
-        schema.setAdditionalProperties(false);
-        schema.setProperties(Map.of(
+        tools.jackson.databind.node.ObjectNode schema = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+        schema.put("type", "object");
+        schema.put("additionalProperties", false);
+        schema.set("properties", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(Map.of(
                 "severity", scalar("string"),
                 "likelyCause", scalar("string"),
-                "userMessage", scalar("string")));
-        schema.setRequired(List.of("severity", "userMessage"));
+                "userMessage", scalar("string"))));
+        schema.set("required", LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(List.of("severity", "userMessage")));
         manifest.setOutputSchema(schema);
         Map<String, String> evidence = Map.of(
                 "severity", "default-classifyIncident",
@@ -127,10 +128,10 @@ class EvidencePlanningIntegrationTest
                 ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(evidence));
     }
 
-    private static YamlSkillManifest.OutputSchemaManifest scalar(String type)
+    private static tools.jackson.databind.node.ObjectNode scalar(String type)
     {
-        YamlSkillManifest.OutputSchemaManifest scalar = new YamlSkillManifest.OutputSchemaManifest();
-        scalar.setType(type);
+        tools.jackson.databind.node.ObjectNode scalar = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+        scalar.put("type", type);
         return scalar;
     }
 

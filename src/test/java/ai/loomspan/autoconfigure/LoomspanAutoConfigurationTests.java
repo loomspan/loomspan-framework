@@ -190,8 +190,6 @@ class LoomspanAutoConfigurationTests {
                             .isSameAs(ReflectionTestUtils.getField(accessGuard, "evaluator"));
                     assertThat(ReflectionTestUtils.getField(planningService, "objectMapper"))
                             .isSameAs(codecs.planningJson());
-                    assertThat(ReflectionTestUtils.getField(planningService, "yamlObjectMapper"))
-                            .isSameAs(codecs.planningYaml());
                     assertThat(ReflectionTestUtils.getField(beanPostProcessor, "objectMapper"))
                             .isSameAs(codecs.applicationConversion());
                     Object schemaGenerator = ReflectionTestUtils.getField(beanPostProcessor, "schemaGenerator");

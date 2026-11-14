@@ -9,6 +9,53 @@ class SkillInputPromptRendererTest
     private final SkillInputContractResolver resolver = new SkillInputContractResolver();
 
     @Test
+    void retainsRequiredNamesOutsidePropertiesAtEachOpenObjectScope() {
+        var contract = resolver.resolveJavaCapability("""
+                {"type":"object","properties":{
+                  "optionalParent":{"type":"object","required":["nestedUnlisted"],
+                    "additionalProperties":{"type":"string"}}},
+                  "required":["unlisted"],"additionalProperties":true}
+                """);
+        for (var mode : SkillInputPromptRenderer.DetailLevel.values()) {
+            assertThat(renderer.renderToolArgumentsExample(contract, mode))
+                    .contains("At `$` (top level): Required fields: [unlisted]",
+                            "At `$.optionalParent`: Required fields: [nestedUnlisted]",
+                            "Required child fields do not require an optional parent");
+        }
+        var validator = new SkillInputValidator();
+        assertThat(validator.validate(java.util.Map.of(), contract).valid()).isFalse();
+        assertThat(validator.validate(java.util.Map.of("unlisted", "value"), contract).valid()).isTrue();
+        assertThat(validator.validate(java.util.Map.of("unlisted", "value", "optionalParent", java.util.Map.of()), contract).valid()).isFalse();
+        assertThat(validator.validate(java.util.Map.of("unlisted", "value", "optionalParent",
+                java.util.Map.of("nestedUnlisted", "nested value")), contract).valid()).isTrue();
+        var closed = resolver.resolveJavaCapability("""
+                {"type":"object","required":["unlisted"],"additionalProperties":false}
+                """);
+        for (var mode : SkillInputPromptRenderer.DetailLevel.values()) {
+            assertThat(renderer.renderToolArgumentsExample(closed, mode))
+                    .contains("Required fields: [unlisted]")
+                    .doesNotContain("You must pass an empty object");
+        }
+    }
+
+    @Test
+    void canonicalNullableEnumsAndReservedFieldsRemainFaithfulInBothModes() {
+        var contract = resolver.resolveJavaCapability("""
+                {"type":"object","properties":{
+                  "maybe":{"type":["string","null"],"enum":["yes",null]},
+                  "object":{"type":["object","null"],"properties":{"child":{"type":"boolean"}},"required":["child"]},
+                  "reserved":false},"required":["maybe"],"additionalProperties":false}
+                """);
+        for (var mode : SkillInputPromptRenderer.DetailLevel.values()) {
+            String rendered = renderer.renderToolArgumentsExample(contract, mode);
+            assertThat(rendered).contains("At `$.maybe`: null is permitted", "At `$.object`: null is permitted",
+                    "Required fields: [maybe]", "Required child fields do not require an optional parent", "yes", "null")
+                    .doesNotContain("reserved");
+        }
+        assertThat(new SkillInputValidator().validate(java.util.Collections.singletonMap("maybe", null), contract).valid()).isTrue();
+    }
+
+    @Test
     void preservesDescriptionsAtExactPathsInBothModes()
     {
         String multiline = "  Units: ms; `literal.*[]` and \"quotes\".\nKeep this line.\r\nBackslash: \\  ";
@@ -50,14 +97,10 @@ class SkillInputPromptRendererTest
     @Test
     void rendersYamlDescriptionsThroughSharedResolvedNodes()
     {
-        var root = new ai.loomspan.internal.skill.YamlSkillManifest.InputSchemaManifest();
-        root.setType("object");
-        root.setDescription("YAML root");
-        var child = new ai.loomspan.internal.skill.YamlSkillManifest.InputSchemaManifest();
-        child.setType("string");
-        child.setDescription("YAML field");
-        root.setProperties(java.util.Map.of("field", child));
-        var contract = new SkillInputContract(SkillInputContract.SkillInputContractKind.YAML_EXPLICIT, resolver.fromManifest(root));
+        var root = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","description":"YAML root","properties":{"field":{"type":"string","description":"YAML field"}}}
+                """);
+        var contract = new SkillInputContract(SkillInputContract.SkillInputContractKind.YAML_EXPLICIT, resolver.fromJsonSchema(root.toString()));
         for (var mode : SkillInputPromptRenderer.DetailLevel.values())
         {
             assertThat(renderer.renderToolArgumentsExample(contract, mode))
@@ -122,7 +165,7 @@ class SkillInputPromptRendererTest
                   "literal":{"type":"object","properties":{"dot":{"type":"object"}}},
                   "tags":{"type":"object","properties":{"declared":{"type":"boolean"}},
                     "additionalProperties":{"type":"string","enum":["east","west"]}},
-                  "anything":{},"untyped":{"type":"array"}},"additionalProperties":true}
+                  "anything":{},"untyped":{"type":"array","items":{}}},"additionalProperties":true}
                 """);
         for (var mode : SkillInputPromptRenderer.DetailLevel.values())
         {

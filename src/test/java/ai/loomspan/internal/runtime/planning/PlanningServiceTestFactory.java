@@ -18,7 +18,6 @@ public final class PlanningServiceTestFactory {
         LoomspanJacksonCodecs codecs = LoomspanJacksonCodecs.defaults();
         return new DefaultPlanningService(stateService,
                 codecs.planningJson(),
-                codecs.planningYaml(),
                 new PlanTaskConstraintValidator(),
                 new EvidenceCoverageValidator(),
                 planIdSupplier);

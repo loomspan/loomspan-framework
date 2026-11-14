@@ -53,7 +53,9 @@ public class SimpleChatClient implements ModelInteraction {
                 new CapturedMedia(MimeType.valueOf(attachment.contentType()), attachment.resource())));
         if (plan != null) {
             try {
-                return withAttemptContext(request, OBJECT_MAPPER.writeValueAsString(plan));
+                var tree = (tools.jackson.databind.node.ObjectNode) OBJECT_MAPPER.valueToTree(plan);
+                if (request.planning()) tree.remove("planId");
+                return withAttemptContext(request, OBJECT_MAPPER.writeValueAsString(tree));
             }
             catch (JacksonException ex) {
                 throw new IllegalStateException("Failed to serialize execution plan", ex);

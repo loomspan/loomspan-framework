@@ -111,6 +111,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
     private final ObjectMapper objectMapper;
     private final ObjectReader stepActionTypeReader;
     private final ObjectReader inabilityReader;
+    private final ObjectReader actionReader;
+    private final ObjectReader actionTreeReader;
     private final OutputSchemaValidator outputSchemaValidator;
     private final EvidenceBackedOutputValidator evidenceBackedOutputValidator;
     private final int defaultMaxSteps;
@@ -188,6 +190,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         this.missionExecutor = Objects.requireNonNull(missionExecutor, "missionExecutor must not be null");
         this.sessionUsageService = Objects.requireNonNull(sessionUsageService, "sessionUsageService must not be null");
         this.objectMapper = Objects.requireNonNull(schemaMapper, "schemaMapper must not be null");
+        this.actionReader = objectMapper.readerFor(StepAction.class).with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+        this.actionTreeReader = objectMapper.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
         this.stepActionTypeReader = objectMapper.readerFor(StepActionType.class)
                 .without(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
         this.inabilityReader = objectMapper.reader().with(
@@ -1222,7 +1226,12 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                     return invalidInability();
                 return new ParsedStepAction(StepAction.cannotComplete(reason.asString()), null);
             }
-            StepAction parsed = objectMapper.readValue(unwrapped, StepAction.class);
+            JsonNode raw = actionTreeReader.readTree(unwrapped);
+            StepAction parsed = actionReader.readValue(unwrapped);
+            if (parsed != null && parsed.stepAction() == StepActionType.CALL_TOOL
+                    && raw.has("toolArguments") && raw.get("toolArguments").isNull()) {
+                return new ParsedStepAction(null, new StepActionCorrection.Failure("CALL_TOOL toolArguments must be an object; explicit null is invalid"));
+            }
             if (parsed == null)
             {
                 return new ParsedStepAction(null, new StepActionCorrection.Failure("Step-action parsing failed: JSON null is not an action"));
@@ -1230,7 +1239,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             if (parsed.stepAction() == StepActionType.CANNOT_COMPLETE) return invalidInability();
             if (finalResponseOnly && (parsed.stepAction() == null || parsed.stepAction() != StepActionType.FINAL_RESPONSE))
             {
-                JsonNode node = objectMapper.readTree(unwrapped);
+                JsonNode node = raw;
                 if (looksLikeBareFinalResponsePayload(node))
                 {
                     return new ParsedStepAction(StepAction.finalResponse(node), null);

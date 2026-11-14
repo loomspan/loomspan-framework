@@ -231,7 +231,6 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.runtime.input.SkillInputContract", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.runtime.input.SkillInputContractResolver", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.runtime.input.SkillInputPromptRenderer", "Public only for Java collaboration between distinct internal subsystem packages."),
-            Map.entry("ai.loomspan.internal.runtime.input.SkillInputSchemaNode", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.runtime.input.SkillInputValidationIssue", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.runtime.input.SkillInputValidationResult", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.runtime.input.SkillInputValidator", "Public only for Java collaboration between distinct internal subsystem packages."),
