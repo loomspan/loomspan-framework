@@ -28,9 +28,9 @@ public final class ChildInputBindingDeclarations {
                         issues.add(label + "duplicate or overlapping destination");
                 destinations.add(binding.destination());
                 SkillInputContract receiver = receivers.get(child.name());
-                if (receiver != null) checkPath(receiver.schema(), binding.destination(), label, issues);
+                if (receiver != null) checkPath(receiver.schema().tree(), binding.destination(), label, issues);
                 if (binding.sourceKind() == ChildInputBinding.SourceKind.INPUT) {
-                    if (parent != null) checkPath(parent.schema(), binding.sourcePath(), label + "parent source ", issues);
+                    if (parent != null) checkPath(parent.schema().tree(), binding.sourcePath(), label + "parent source ", issues);
                 } else {
                     producers.add(binding.skill());
                     var producer = names.get(binding.skill());
@@ -54,16 +54,20 @@ public final class ChildInputBindingDeclarations {
         for (String producer : graph.getOrDefault(name, Set.of())) if (cycle(producer, graph, visiting, done)) return true;
         visiting.remove(name); done.add(name); return false;
     }
-    private static void checkPath(SkillInputSchemaNode node, ObjectFieldPath path, String label, List<String> issues) {
+    private static void checkPath(tools.jackson.databind.JsonNode node, ObjectFieldPath path, String label, List<String> issues) {
         for (String token : path.tokens()) {
-            if (node.isUnconstrained()) return;
-            if (!node.isObject()) { issues.add(label + "path traverses a non-object schema at " + path.pointer()); return; }
-            SkillInputSchemaNode next = node.properties().get(token);
+            if (!node.has("type")) return;
+            var type = node.path("type");
+            boolean object = type.isString() && "object".equals(type.textValue());
+            if (type.isArray()) for (var member : type) object |= "object".equals(member.asText());
+            if (!object) { issues.add(label + "path traverses a non-object schema at " + path.pointer()); return; }
+            var next = node.path("properties").get(token);
             if (next == null) {
-                if (!node.allowsAdditionalProperties()) { issues.add(label + "path selects undeclared field in closed object " + path.pointer()); return; }
-                next = node.additionalPropertiesSchema();
+                if (node.path("additionalProperties").isBoolean() && !node.path("additionalProperties").booleanValue()) { issues.add(label + "path selects undeclared field in closed object " + path.pointer()); return; }
+                next = node.path("additionalProperties").isObject() ? node.get("additionalProperties") : null;
                 if (next == null) return;
             }
+            if (next.isBoolean() && !next.booleanValue()) { issues.add(label + "path selects prohibited field " + path.pointer()); return; }
             node = next;
         }
     }

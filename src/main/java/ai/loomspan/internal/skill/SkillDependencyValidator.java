@@ -194,16 +194,16 @@ public final class SkillDependencyValidator {
     private static void validateOutputBindings(YamlSkillDefinition definition, SkillInputContract input,
             Map<String, String> effectiveSchemas, List<SkillValidationIssue> issues) {
         if (definition.outputBindings().isEmpty()) return;
-        var mapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion();
-        var destinationSchema = mapper.valueToTree(bindingOutputSchemaMetadata(definition.outputSchema()));
-        var inputSchema = input == null ? null : mapper.valueToTree(inputSchemaMetadata(input.schema()));
+        var mapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree();
+        var destinationSchema = definition.outputSchema().tree();
+        var inputSchema = input == null ? null : input.schema().tree();
         for (var binding : definition.outputBindings()) {
             String label = "Output binding " + binding.destination().pointer() + ": ";
             try {
-                var target = selectBindingSchema(destinationSchema, binding.destination(), true);
+                var target = BindingSchemaCompatibility.select(destinationSchema, binding.destination(), true);
                 tools.jackson.databind.JsonNode source;
                 if (binding.sourceKind() == ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT)
-                    source = selectBindingSchema(inputSchema, binding.sourcePath(), false);
+                    source = BindingSchemaCompatibility.select(inputSchema, binding.sourcePath(), false);
                 else {
                     var producer = definition.allowedSkillConstraints().stream()
                             .filter(child -> child.identity().equals(binding.skillIdentity())).findFirst().orElseThrow(
@@ -212,117 +212,13 @@ public final class SkillDependencyValidator {
                         throw new IllegalArgumentException("producer cannot have exactly one task '" + binding.skill() + "'");
                     String producerSchema = effectiveSchemas.get(binding.skill());
                     var tree = producerSchema == null ? null : mapper.readTree(producerSchema);
-                    if (tree != null) applyOutputDefaultOpenness(tree);
-                    source = selectBindingSchema(tree, binding.sourcePath(), false);
+                    source = BindingSchemaCompatibility.select(tree, binding.sourcePath(), false);
                 }
-                checkBindingCompatibility(source, target, "selected value");
+                BindingSchemaCompatibility.check(source, target, "selected value");
             } catch (IllegalArgumentException ex) {
                 issues.add(error(definition, "output_bindings", label + ex.getMessage()));
             }
         }
-    }
-
-    private static Map<String, Object> bindingOutputSchemaMetadata(YamlSkillManifest.OutputSchemaManifest schema) {
-        var metadata = outputSchemaMetadata(schema);
-        var mapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion();
-        var tree = mapper.valueToTree(metadata);
-        applyOutputDefaultOpenness(tree);
-        return mapper.convertValue(tree, new tools.jackson.core.type.TypeReference<Map<String, Object>>() {});
-    }
-
-    private static void applyOutputDefaultOpenness(tools.jackson.databind.JsonNode schema) {
-        if (schema.isObject()) {
-            if ("object".equals(schema.path("type").asText()) && !schema.has("additionalProperties"))
-                ((tools.jackson.databind.node.ObjectNode) schema).put("additionalProperties", false);
-            for (var property : schema.path("properties").properties()) applyOutputDefaultOpenness(property.getValue());
-            if (schema.has("items")) applyOutputDefaultOpenness(schema.get("items"));
-        }
-    }
-
-    /** Open or unknown schema branches are runtime obligations; never infer producer shapes. */
-    private static tools.jackson.databind.JsonNode selectBindingSchema(tools.jackson.databind.JsonNode node,
-            ai.loomspan.internal.runtime.input.ObjectFieldPath path, boolean destination) {
-        for (String token : path.tokens()) {
-            if (node == null || ai.loomspan.internal.runtime.input.SkillInputSchemaNode.ANY_TYPE.equals(node.path("type").asText())) return null;
-            if (!"object".equals(node.path("type").asText()))
-                throw new IllegalArgumentException((destination ? "destination" : "source") + " path traverses a non-object schema at " + path.pointer());
-            var properties = node.path("properties");
-            var next = properties.get(token);
-            if (next == null && destination)
-                for (var field : properties.properties())
-                    if (ai.loomspan.internal.outputschema.OutputSchemaValidator.propertyNamesMatch(field.getKey(), token)) { next = field.getValue(); break; }
-            if (next == null) {
-                if (node.path("additionalProperties").isBoolean() && !node.path("additionalProperties").booleanValue())
-                    throw new IllegalArgumentException((destination ? "destination" : "source") + " path selects an undeclared field in a closed object at " + path.pointer());
-                if (!node.path("additionalProperties").isObject()) return null;
-                next = node.get("additionalProperties");
-            }
-            node = next;
-        }
-        return node;
-    }
-
-    private static void checkBindingCompatibility(tools.jackson.databind.JsonNode source,
-            tools.jackson.databind.JsonNode target, String location) {
-        if (source == null || target == null) return;
-        String from = source.path("type").asText(), to = target.path("type").asText();
-        if (ai.loomspan.internal.runtime.input.SkillInputSchemaNode.ANY_TYPE.equals(from)) return;
-        if (!from.equals(to) && !(from.equals("integer") && to.equals("number")))
-            throw new IllegalArgumentException("statically incompatible types at " + location + ": " + from + " -> " + to);
-        if (source.path("nullable").asBoolean(false) && !target.path("nullable").asBoolean(false))
-            throw new IllegalArgumentException("nullable source is incompatible with non-nullable destination at " + location);
-        var destinationEnum = target.path("enum");
-        if (destinationEnum.isArray() && !destinationEnum.isEmpty()) {
-            var sourceEnum = source.path("enum");
-            if (sourceEnum.isArray() && !sourceEnum.isEmpty()) {
-                boolean intersects = false;
-                for (var candidate : sourceEnum) for (var allowed : destinationEnum)
-                    if (candidate.equals(allowed)) intersects = true;
-                if (!intersects) throw new IllegalArgumentException("statically incompatible enums at " + location);
-            }
-        }
-        if (from.equals("array")) checkBindingCompatibility(source.get("items"), target.get("items"), location + "[]");
-        if (from.equals("object")) {
-            var sourceProperties = source.path("properties");
-            var targetProperties = target.path("properties");
-            for (var field : sourceProperties.properties()) {
-                var receiver = targetProperties.get(field.getKey());
-                if (receiver == null) for (var declared : targetProperties.properties())
-                    if (ai.loomspan.internal.outputschema.OutputSchemaValidator.propertyNamesMatch(declared.getKey(), field.getKey())) { receiver = declared.getValue(); break; }
-                if (receiver == null && target.path("additionalProperties").isBoolean()
-                        && !target.path("additionalProperties").booleanValue()) {
-                    // Optional producer fields may be absent; only guaranteed fields prove a conflict.
-                    for (var required : source.path("required"))
-                        if (required.asText().equals(field.getKey()))
-                            throw new IllegalArgumentException("required source field is not allowed in closed destination at " + location + "/" + field.getKey());
-                }
-                checkBindingCompatibility(field.getValue(), receiver, location + "/" + field.getKey());
-            }
-            for (var required : target.path("required")) {
-                boolean declared = false;
-                for (String property : sourceProperties.propertyNames())
-                    if (ai.loomspan.internal.outputschema.OutputSchemaValidator.propertyNamesMatch(property, required.asText())) declared = true;
-                if (!declared && source.path("additionalProperties").isBoolean()
-                        && !source.path("additionalProperties").booleanValue())
-                    throw new IllegalArgumentException("closed source cannot supply required destination field at " + location + "/" + required.asText());
-            }
-        }
-    }
-
-    private static Map<String, Object> inputSchemaMetadata(ai.loomspan.internal.runtime.input.SkillInputSchemaNode schema) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("type", schema.type());
-        if (!schema.properties().isEmpty()) {
-            Map<String, Object> properties = new LinkedHashMap<>();
-            schema.properties().forEach((name, child) -> properties.put(name, inputSchemaMetadata(child)));
-            result.put("properties", properties);
-        }
-        result.put("required", schema.required());
-        if (schema.additionalPropertiesSchema() != null) result.put("additionalProperties", inputSchemaMetadata(schema.additionalPropertiesSchema()));
-        else if (schema.additionalProperties() != null) result.put("additionalProperties", schema.additionalProperties());
-        if (schema.items() != null) result.put("items", inputSchemaMetadata(schema.items()));
-        if (!schema.enumValues().isEmpty()) result.put("enum", schema.enumValues());
-        return result;
     }
 
     private static String resolveOutputSchema(YamlSkillDefinition definition,
@@ -347,32 +243,12 @@ public final class SkillDependencyValidator {
         }
         else if (definition.form() != YamlSkillDefinition.Form.EXECUTOR && definition.outputSchema() != null) {
             var mapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion();
-            schema = mapper.writeValueAsString(outputSchemaMetadata(definition.outputSchema()));
+            schema = mapper.writeValueAsString(definition.outputSchema().providerTree());
         }
         visiting.remove(name);
         resolved.add(name);
         if (schema != null) schemas.put(name, schema);
         return schema;
-    }
-
-    /** Schema shape metadata excludes child-local evidence orchestration annotations. */
-    private static Map<String, Object> outputSchemaMetadata(YamlSkillManifest.OutputSchemaManifest schema)
-    {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("type", schema.getType());
-        if (!schema.getProperties().isEmpty()) {
-            Map<String, Object> properties = new LinkedHashMap<>();
-            schema.getProperties().forEach((name, child) -> properties.put(name, outputSchemaMetadata(child)));
-            result.put("properties", properties);
-        }
-        if (!schema.getRequired().isEmpty()) result.put("required", schema.getRequired());
-        if (schema.getAdditionalProperties() != null) result.put("additionalProperties", schema.getAdditionalProperties());
-        if (schema.getItems() != null) result.put("items", outputSchemaMetadata(schema.getItems()));
-        if (!schema.getEnumValues().isEmpty()) result.put("enum", schema.getEnumValues());
-        if (schema.getDescription() != null) result.put("description", schema.getDescription());
-        if (schema.getFormat() != null) result.put("format", schema.getFormat());
-        if (schema.getNullable() != null) result.put("nullable", schema.getNullable());
-        return result;
     }
 
     private static SkillValidationIssue error(YamlSkillDefinition definition, String path, String message)

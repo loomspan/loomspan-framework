@@ -112,7 +112,7 @@ class SkillGenerationManagerTest
                   required: [CaseId, answer]
                   additionalProperties: false
                 output_bindings:
-                  /caseid: {from: input, path: /id}
+                  /CaseId: {from: input, path: /id}
                   /answer: {from: child_result, skill: default-producer, path: /value}
                 """;
         var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\noutput_schema: {type: object, properties: {value: {type: string}}, additionalProperties: false}\n");
@@ -123,8 +123,9 @@ class SkillGenerationManagerTest
                 Map.entry("count zero", parent.replace("max_tasks: 2", "max_tasks: 0")),
                 Map.entry("count minimum", parent.replace("max_tasks: 2", "min_tasks: 2")),
                 Map.entry("unknown source", parent.replace("path: /id", "path: /absent")),
-                Map.entry("closed destination", parent.replace("/caseid:", "/absent:")),
-                Map.entry("scalar ancestor", parent.replace("/caseid:", "/caseid/child:")),
+                Map.entry("closed destination", parent.replace("/CaseId:", "/absent:")),
+                Map.entry("case mismatch", parent.replace("/CaseId:", "/caseid:")),
+                Map.entry("scalar ancestor", parent.replace("/CaseId:", "/CaseId/child:")),
                 Map.entry("array traversal", parent.replace("id: {type: integer}", "id: {type: array, items: {type: integer}}").replace("path: /id", "path: /id/0")),
                 Map.entry("types", parent.replace("CaseId: {type: number}", "CaseId: {type: boolean}")),
                 Map.entry("producer source", parent.replace("path: /value", "path: /absent")));
@@ -140,6 +141,72 @@ class SkillGenerationManagerTest
         var nullable = new SkillDocument("producer", producer.yaml().replace("type: string", "type: [string, \"null\"]"));
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), nullable), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).issues())
                 .anyMatch(issue -> issue.message().contains("nullable"));
+    }
+
+    @Test
+    void publicationBindingPathsUseStandardOpennessAtRootAndNestedObjects(@TempDir Path directory) {
+        var javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of());
+        var manager = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
+        manager.afterSingletonsInstantiated();
+        for (String openness : new String[]{"", ", additionalProperties: true", ", additionalProperties: false"}) {
+            for (boolean nested : new boolean[]{false, true}) {
+                String object = "{type: object" + openness + "}";
+                String root = nested ? "{type: object, properties: {nested: " + object + "}, additionalProperties: false}" : object;
+                String path = nested ? "/nested/unknown" : "/unknown";
+                String producer = "name: producer\ndescription: producer\nmodel: model\noutput_schema: " + root + "\n";
+                String sourceParent = bindingParent("{type: object, properties: {result: {type: string}}, additionalProperties: false}",
+                        "/result", path);
+                var sourceResult = manager.validate(manager.capturePreparation("default"), List.of(
+                        new SkillDocument("parent", sourceParent), new SkillDocument("producer", producer)),
+                        ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+                assertThat(sourceResult.valid()).as("source %s nested=%s", openness, nested).isEqualTo(!openness.contains("false"));
+                String destinationParent = bindingParent(root, path, "/value");
+                var destinationResult = manager.validate(manager.capturePreparation("default"), List.of(
+                        new SkillDocument("parent", destinationParent), new SkillDocument("producer",
+                        "name: producer\ndescription: producer\nmodel: model\noutput_schema: {type: object, properties: {value: {type: string}}, additionalProperties: false}\n")),
+                        ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+                assertThat(destinationResult.valid()).as("destination %s nested=%s", openness, nested).isEqualTo(!openness.contains("false"));
+            }
+        }
+    }
+
+    @Test
+    void publicationWholeObjectCompatibilityPreservesOmittedOpenness(@TempDir Path directory) {
+        var javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of());
+        var manager = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
+        manager.afterSingletonsInstantiated();
+        String producer = "name: producer\ndescription: producer\nmodel: model\noutput_schema: {type: object, properties: {value: {type: object, properties: {extra: {type: string}}, required: [extra]}}}\n";
+        for (String openness : new String[]{"", ", additionalProperties: true", ", additionalProperties: false"}) {
+            String parent = bindingParent("{type: object, properties: {result: {type: object" + openness + "}}, additionalProperties: false}", "/result", "/value");
+            var result = manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent),
+                    new SkillDocument("producer", producer)), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+            assertThat(result.valid()).as(openness).isEqualTo(!openness.contains("false"));
+        }
+    }
+
+    @Test
+    void publicationNumericEnumsCompareExactNumericValues(@TempDir Path directory) {
+        var javaSkills = mock(SkillMethodBeanPostProcessor.class);
+        when(javaSkills.capabilities()).thenReturn(List.of());
+        var manager = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
+        manager.afterSingletonsInstantiated();
+        for (String[] pair : new String[][]{{"1", "1.0", "true"}, {"1", "1e0", "true"}, {"1.0", "1.00", "true"},
+                {"1.0000000000000000000000000001", "1.0000000000000000000000000002", "false"}, {"1", "2", "false"}, {"1", "'1'", "false"}}) {
+            String parent = bindingParent("{type: object, properties: {result: {type: number, enum: [" + pair[1] + "]}}, additionalProperties: false}", "/result", "/value");
+            String producer = "name: producer\ndescription: producer\nmodel: model\noutput_schema: {type: object, properties: {value: {type: number, enum: [" + pair[0] + "]}}, additionalProperties: false}\n";
+            var result = manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent),
+                    new SkillDocument("producer", producer)), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+            assertThat(result.valid()).as("%s -> %s", pair[0], pair[1]).isEqualTo(Boolean.parseBoolean(pair[2]));
+            if (!result.valid()) assertThat(result.issues()).anyMatch(issue -> issue.fieldPath().equals("output_bindings") && issue.message().contains("enums"));
+        }
+    }
+
+    private static String bindingParent(String outputSchema, String destination, String source) {
+        return "name: parent\ndescription: parent\nmodel: model\nplanning_mode: true\nallowed_skills: [{name: default-producer, max_tasks: 1}]\n"
+                + "output_schema: " + outputSchema + "\noutput_bindings:\n  " + destination
+                + ": {from: child_result, skill: default-producer, path: " + source + "}\n";
     }
 
     @Test
@@ -226,7 +293,7 @@ class SkillGenerationManagerTest
         assertThat(manager.validate(manager.capturePreparation("default"), documents, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
         SkillGeneration generation = manager.prepare(manager.capturePreparation("default"), documents, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
         String schema = generation.skillCatalog().skill("default-producer").orElseThrow().outputSchema();
-        assertThat(schema).contains("answer", "nullable", "additionalProperties").doesNotContain("evidence");
+        assertThat(schema).contains("answer", "null", "additionalProperties").doesNotContain("evidence");
         assertThat(generation.definition("default-producer").evidenceContract().isEmpty()).isFalse();
         assertThat(generation.definition("default-inner").outputSchema()).isNull();
         assertThat(generation.definition("default-inner").evidenceContract().isEmpty()).isTrue();

@@ -1,13 +1,11 @@
 package ai.loomspan.internal.runtime.input;
 
-import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import ai.loomspan.internal.schema.StandardSchemaCompiler;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
+import java.util.*;
 
-/** One compiled authority for model schemas and reserved-path checks. */
+/** One canonical authority for advertised model input and reserved-path checks. */
 public final class ChildInputBindingProjection {
     private final List<ChildInputBinding> bindings;
     private final SkillInputContract argumentContract;
@@ -16,7 +14,9 @@ public final class ChildInputBindingProjection {
         this.bindings = List.copyOf(bindings);
         this.argumentContract = bindings.isEmpty() ? receivingContract : new SkillInputContract(
                 SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
-                project(receivingContract.schema(), bindings.stream().map(b -> b.destination().tokens()).toList()));
+                new StandardSchemaCompiler().compile(project(receivingContract.schema().tree(),
+                        bindings.stream().map(b -> b.destination().tokens()).toList()),
+                        StandardSchemaCompiler.Role.INPUT, StandardSchemaCompiler.Origin.GENERATED));
         this.dispatchEligibility = proveDispatch(receivingContract);
     }
     public SkillInputContract argumentContract() { return argumentContract; }
@@ -24,80 +24,58 @@ public final class ChildInputBindingProjection {
     public DispatchEligibility dispatchEligibility() { return dispatchEligibility; }
     public record DispatchEligibility(boolean eligible, String reason) {}
     private DispatchEligibility proveDispatch(SkillInputContract receiving) {
-        var root = receiving.schema();
-        if (!supportedTree(root) || bindings.stream().anyMatch(binding -> binding.destination().tokens().size() != 1))
+        var root = receiving.schema().tree();
+        if (!supportedTree(root) || bindings.stream().anyMatch(b -> b.destination().tokens().size() != 1))
             return new DispatchEligibility(false, "unsupported_or_ambiguous_shape");
-        if (receiving.isGeneric() || !root.isObject() || root.allowsAdditionalProperties())
+        if (receiving.isGeneric() || !root.path("additionalProperties").isBoolean()
+                || root.path("additionalProperties").booleanValue())
             return new DispatchEligibility(false, "open_or_unknown_contract");
-        if (root.runtimeRefCapable() || root.isAttachment())
-            return new DispatchEligibility(false, "unsupported_or_ambiguous_shape");
-        var projected = argumentContract.schema();
-        if (!projected.properties().isEmpty() || !projected.required().isEmpty())
-            return new DispatchEligibility(false, "unbound_input_remains");
+        var projected = argumentContract.schema().tree();
+        for (var property : projected.path("properties"))
+            if (!property.isBoolean() || property.booleanValue())
+                return new DispatchEligibility(false, "unbound_input_remains");
+        if (!projected.path("required").isEmpty()) return new DispatchEligibility(false, "unbound_input_remains");
         if (!new SkillInputValidator().validate(Map.of(), argumentContract).valid() || !validateModelArguments(Map.of()).isEmpty())
             return new DispatchEligibility(false, "unsupported_or_ambiguous_shape");
         return new DispatchEligibility(true, "eligible");
     }
-    private static boolean supportedTree(SkillInputSchemaNode node) {
-        return node.dispatchProofSupported() && !node.isUnconstrained()
-                && node.properties().values().stream().allMatch(ChildInputBindingProjection::supportedTree)
-                && (node.items() == null || supportedTree(node.items()))
-                && (node.additionalPropertiesSchema() == null || supportedTree(node.additionalPropertiesSchema()));
+    private static boolean supportedTree(JsonNode node) {
+        if (node.isBoolean()) return !node.booleanValue();
+        if (!node.has("type") || node.has("x-loomspan-attachment") || node.path("x-loomspan-runtime-ref-capable").asBoolean(false)) return false;
+        for (var child : node.path("properties")) if (!supportedTree(child)) return false;
+        return (!node.has("items") || supportedTree(node.get("items")))
+                && (!node.path("additionalProperties").isObject() || supportedTree(node.get("additionalProperties")));
     }
-    public String inputSchema() {
-        var mapper = LoomspanJacksonCodecs.defaults().schemaTree();
-        var resolver = new SkillInputContractResolver();
-        Map<String, Object> schema = mapper.readValue(resolver.toJsonSchema(argumentContract), Map.class);
-        for (var binding : bindings) {
-            Map<String, Object> current = schema;
-            var tokens = binding.destination().tokens();
-            for (int i = 0; i < tokens.size(); i++) {
-                Map<String, Object> properties = (Map<String, Object>) current.computeIfAbsent("properties", key -> new LinkedHashMap<>());
-                if (i == tokens.size() - 1) properties.put(tokens.get(i), false);
-                else current = (Map<String, Object>) properties.computeIfAbsent(tokens.get(i), key -> new LinkedHashMap<>());
-            }
-        }
-        return mapper.writeValueAsString(schema);
-    }
+    public String inputSchema() { return argumentContract.schema().providerTree().toString(); }
     public List<String> validateModelArguments(Map<String, Object> arguments) {
         List<String> issues = new ArrayList<>();
         for (var binding : bindings) {
-            Object current = arguments;
-            var tokens = binding.destination().tokens();
-            for (int i = 0; i < tokens.size(); i++) {
-                if (!(current instanceof Map<?, ?> map)) {
-                    issues.add("Prohibited model override: non-object ancestor of bound destination " + binding.destination().pointer());
-                    break;
-                }
-                if (!map.containsKey(tokens.get(i))) break;
-                if (i == tokens.size() - 1) {
-                    issues.add("Prohibited model override of bound destination " + binding.destination().pointer()); break;
-                }
-                current = map.get(tokens.get(i));
-            }
+            try { ChildInputBindingAssembler.checkDestination(arguments, binding.destination()); }
+            catch (IllegalArgumentException ex) { issues.add(ex.getMessage()); }
         }
         return List.copyOf(issues);
     }
-    private static SkillInputSchemaNode project(SkillInputSchemaNode node, List<List<String>> paths) {
-        Map<String, SkillInputSchemaNode> properties = new LinkedHashMap<>(node.properties());
-        LinkedHashSet<String> required = new LinkedHashSet<>(node.required());
-        Map<String, List<List<String>>> grouped = new LinkedHashMap<>();
-        paths.forEach(path -> grouped.computeIfAbsent(path.getFirst(), key -> new ArrayList<>()).add(path));
-        for (var group : grouped.entrySet()) {
+    private static ObjectNode project(JsonNode node, List<List<String>> paths) {
+        ObjectNode copy = (ObjectNode) node.deepCopy();
+        copy.put("type", "object");
+        ObjectNode properties = copy.has("properties") ? (ObjectNode) copy.get("properties") : copy.putObject("properties");
+        Set<String> required = new LinkedHashSet<>();
+        copy.path("required").forEach(value -> required.add(value.asText()));
+        Map<String, List<List<String>>> groups = new LinkedHashMap<>();
+        paths.forEach(path -> groups.computeIfAbsent(path.getFirst(), key -> new ArrayList<>()).add(path));
+        for (var group : groups.entrySet()) {
             String key = group.getKey();
             if (group.getValue().stream().anyMatch(path -> path.size() == 1)) {
-                properties.remove(key); required.remove(key); continue;
+                properties.put(key, false); required.remove(key); continue;
             }
-            SkillInputSchemaNode child = properties.get(key);
-            if (child == null) child = node.additionalPropertiesSchema();
-            if (child == null || child.isUnconstrained()) child = SkillInputContract.genericObject().schema();
+            JsonNode child = properties.get(key);
+            if (child == null) child = copy.get("additionalProperties");
+            if (child == null || !child.isObject()) child = copy.objectNode();
             var projected = project(child, group.getValue().stream().map(path -> path.subList(1, path.size())).toList());
-            properties.put(key, projected);
-            // Binding creates this ancestor even when its receiving property was optional.
-            if (projected.required().isEmpty()) required.remove(key); else required.add(key);
+            properties.set(key, projected);
+            if (projected.path("required").isEmpty()) required.remove(key); else required.add(key);
         }
-        return new SkillInputSchemaNode(node.isUnconstrained() ? "object" : node.type(), properties, List.copyOf(required),
-                node.additionalProperties(), node.additionalPropertiesSchema(), node.items(), node.enumValues(),
-                node.description(), node.format(), node.runtimeRefCapable(), node.attachment(), node.attachmentMediaType(), node.allowedContentTypes(), node.dispatchProofSupported());
+        var array = copy.putArray("required"); required.forEach(array::add);
+        return copy;
     }
 }

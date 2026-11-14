@@ -2,7 +2,7 @@
 audience: loomspan-skill-builder
 status: development
 applies_to: bundled-loomspan-revision
-coverage: source-verified
+coverage: local-canonical-bindings
 ---
 
 # Output Contracts
@@ -13,12 +13,13 @@ Authored child references and binding producers MAY be local to the containing s
 
 For accepted declaration vocabulary, nullability, openness, assertions, formats
 and annotations, read [standard schemas](standard-schemas.md). The shared
-compiler has focused declaration/instance coverage. The current checkout cannot
+compiler and binding projection/composition have focused local coverage. The current checkout cannot
 build the complete application while schema consumers remain inconsistent.
-The forwarding, binding, guidance, correction and metadata sections below describe
-the consumer design and retained test anchors; those runtime paths are not
-currently executable guarantees for canonical schemas. Successful local schema
-validation alone does not restore them.
+Binding-owned checks use canonical schemas and the shared validator. General
+forwarding, engine completion, guidance, correction, provider request attachment
+and effective metadata integration remain incomplete. Their retained test anchors
+are not passing application guarantees. Local composition checks alone do not
+restore those consumers.
 
 [TypeSafe leaves](typesafe-skills.md) have a generated descriptive output schema
 and return the complete provider answers without answer validation or repair.
@@ -122,6 +123,14 @@ Top-level `output_bindings` uses the same destination-keyed map and descriptors 
 
 A model-backed skill MUST declare an object `output_schema`. `output_from` and `output_bindings` MUST NOT coexist, including explicit null declarations. Destination paths MUST be nonempty and nonoverlapping. Duplicate YAML keys and unknown descriptor fields are rejected. Known source/destination paths and compatible types are checked against the captured complete generation. Open or unspecified source schemas require runtime checks; Java return types and executor result text never invent producer contracts.
 
+Source and destination property names match exactly; `/Name` and `/name` are
+distinct keys. Publication checks preserve omitted object openness, equivalent to
+explicit true at both root and nested objects; explicit false still rejects
+statically impossible paths and transfers. Enum overlap compares numeric values
+exactly (`1`, `1.0`, `1e0` and `1.00` are equivalent), with type-sensitive equality
+for other scalar values. These bounded structural checks do not prove future
+runtime values or general schema implication.
+
 This full assembly combines two direct-child objects with the current input identifier. `assistant` must be a configured model alias; declare each producer separately with its own input contract. The selected child results must be objects compatible with these destination schemas.
 
 ```yaml
@@ -180,13 +189,30 @@ output_bindings:
 
 Initial and corrective output instructions describe only the projected unbound contract. Full input and accepted-result evidence remain available for reasoning. Required unbound siblings remain enforced, including inside optional ancestors created by binding insertion. A bound ancestor owns its entire subtree. The model MUST NOT supply a bound destination, even an equal value or null, or a blocking scalar/array/null ancestor. Such contribution errors can consume the normal bounded output correction budget; accepted children are not replayed.
 
-Framework resolves every binding, including optional destinations, then copies containers and validates the complete original contract before publication. Selected values retain exact numbers, strings, null and ordered arrays without coercion or date rewriting. JSON-looking nested strings remain strings; plain-text child results remain text. Newly assembled JSON need not preserve source lexical whitespace. Existing `output_from` retains exact full-text semantics.
+Framework resolves every binding, including optional destinations, and checks each
+known selected destination contract before model contribution. It validates the
+model contribution against its separate projected contract before inserting exact
+selected values, then validates the complete assembly against the unchanged
+original contract. Bounds and asserted formats remain effective at each applicable
+boundary. Selected values retain exact numbers, strings, null and ordered arrays
+without coercion or date rewriting. JSON-looking nested strings remain strings;
+plain-text child results remain text. Newly assembled JSON need not preserve source
+lexical whitespace. Existing `output_from` retains exact full-text semantics.
 
-Missing paths differ from explicit null. Unavailable, ambiguous, failed, cross-invocation or contract-invalid sources fail with diagnostics and never fall back to model copying. Source snapshots and the captured generation remain stable across correction. Fully bound output skips final synthesis only when no optional/required declared field or open field space remains model-owned. An open root or unbound open object can still require a model contribution. A planning full assembly costs N task steps; a mixed output costs N+1.
+Missing paths differ from explicit null. Unavailable, ambiguous, failed, cross-invocation or contract-invalid sources fail with diagnostics and never fall back to model copying. Source snapshots and the captured generation remain stable across correction. Fully bound output skips final synthesis only when no optional/required declared field or open field space remains model-owned. Omitted `additionalProperties` is open just as true is, at both root and partially bound nested ancestors. A wholly bound object owns its entire subtree even when that object's schema is open. A planning full assembly costs N task steps; a mixed output costs N+1. Required accepted work and source checks still apply before synthesis can be skipped.
 
 `RESULT_ASSEMBLED` identifies ownership and whether a model contribution was required. Its payload is the validated assembled output, while original model and child records retain their evidence. See [assembly diagnostics](traces-and-debugging.md#declared-output-assembly).
 
-Implementation evidence: `OutputBindingProjection`, `OutputBindingComposition`, `ChildInputBindingAssembler`, `PlanOutputBindingProducerValidator`, and the ordinary and step mission engines. `OutputBindingCompositionTest` protects projection, ownership conflicts and exact insertion; `OutputBindingIsolationTest` protects concurrent/nested invocation and generation snapshots. `DeclaredOutputBindingsOrdinaryIntegrationTest` and `DeclaredOutputBindingsPlanningIntegrationTest` exercise facade completion and correction, including model/Java/executor sources. `ConsoleTraceFixtureCorpusTest` exports current Java assembly authority for Console readers.
+Local implementation/test anchors: `OutputBindingProjection`,
+`OutputBindingComposition`, `ChildInputBindingAssembler`, `BindingSchemaCompatibility` and their focused tests protect projection, bounded publication analysis,
+ownership conflicts, exact insertion and complete validation. `OutputBindingIsolationTest`
+retains mission/plan isolation controls. `DeclaredOutputBindingsOrdinaryIntegrationTest`
+and `DeclaredOutputBindingsPlanningIntegrationTest` retain facade completion and
+correction, root/nested omitted/true/false openness, required-work completion and
+model/Java/executor source cases; those full-graph checks are currently blocked.
+The provider protocol tests retain generated false-property schema fidelity controls;
+local schema serialization is not provider acceptance. `ConsoleTraceFixtureCorpusTest`
+retains the Java assembly authority fixture for Console readers.
 
 ## Effective output metadata
 

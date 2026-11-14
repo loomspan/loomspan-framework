@@ -266,6 +266,27 @@ class SharedResponsesProtocolIntegrationTest {
         }
     }
 
+    @Test void generatedChildOwnershipReservationSurvivesToolSchemaSerialization() throws Exception {
+        String schema = """
+                {"type":"object","properties":{"summary":{"type":"string","minLength":1},"reserved":false},"required":["summary"],"additionalProperties":false}
+                """;
+        try (var server = new MockWebServer()) {
+            server.start();
+            server.enqueue(ResponsesFixtures.text("ok"));
+            var effects = new AtomicInteger();
+            var callback = callback(effects, schema);
+            client(model(server), requestOptions("gpt-6.1-terra", 1024).toolCallbacks(callback).build())
+                    .prompt("fixture").call().content();
+            var body = JSON.readTree(server.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8());
+            assertThat(body.at("/tools/0/parameters")).isEqualTo(JSON.readTree(schema));
+            assertThat(body.at("/tools/0/parameters/properties/reserved").isBoolean()).isTrue();
+            assertThat(body.at("/tools/0/parameters/properties/reserved").booleanValue()).isFalse();
+            assertThat(body.at("/tools/0/strict").asBoolean()).isFalse();
+            assertThat(callback.getToolDefinition().inputSchema()).isEqualTo(schema);
+            assertThat(effects).hasValue(0);
+        }
+    }
+
     @Test void perCallSchemasReplacePreviousSchemasWithoutMutation() throws Exception {
         try(var server=new MockWebServer()) {
             server.start();

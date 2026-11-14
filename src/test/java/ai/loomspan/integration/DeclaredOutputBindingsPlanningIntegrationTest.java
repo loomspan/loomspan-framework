@@ -202,6 +202,82 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
     private static Map<String,Object> task(String name) {
         return Map.of("taskId",name,"title",name,"status","PENDING","capabilityName","default-" + name,"intent","work","dependsOn",List.of(),"expectedOutputs",List.of("result"));
     }
+    @ParameterizedTest
+    @CsvSource({"omitted,false", "true,false", "false,false", "omitted,true", "true,true", "false,true"})
+    void finalGenerationFollowsRootAndNestedOpennessAfterRequiredWork(String openness, boolean nested) throws Exception {
+        boolean modelOwnedSpace = !openness.equals("false");
+        String additional = openness.equals("omitted") ? "" : ", additionalProperties: " + openness;
+        String output = nested ? """
+                output_schema:
+                  type: object
+                  properties:
+                    context: {type: [object, "null"], properties: {value: {type: string}}, required: [value]%s}
+                  required: [context]
+                  additionalProperties: false
+                output_bindings:
+                  /context/value: {from: input, path: /value}
+                """.formatted(additional) : """
+                output_schema: {type: object, properties: {value: {type: string}}, required: [value]%s}
+                output_bindings:
+                  /value: {from: input, path: /value}
+                """.formatted(additional);
+        Files.writeString(directory.resolve("root.yaml"), """
+                name: root
+                description: Complete required work before output assembly
+                model: local
+                planning_mode: true
+                max_steps: 3
+                prompt: Complete all accepted work before returning.
+                input_schema: {type: object, properties: {value: {type: string}}, required: [value], additionalProperties: false}
+                allowed_skills:
+                  - {name: first, required: true, max_tasks: 1}
+                  - {name: later, required: true, max_tasks: 1}
+                """ + output);
+        for (String name : List.of("first", "later")) Files.writeString(directory.resolve(name + ".yaml"),
+                "name: " + name + "\ndescription: Required unrelated work\nexecutor: fixture\n");
+        var completed = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var finals = new AtomicInteger();
+        var failure = new AtomicReference<Throwable>();
+        try (var server = new MockWebServer()) {
+            server.setDispatcher(new Dispatcher() {
+                @Override public MockResponse dispatch(RecordedRequest request) {
+                    try {
+                        var body = JSON.readTree(request.getBody().readUtf8());
+                        String system = ai.loomspan.testkit.ResponsesFixtures.transcript(body).get(0).path("content").asText();
+                        if (system.contains("Create an ordered flight plan"))
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-05T00:00:00Z", "status", "VALID", "tasks", List.of(task("first"), task("later")))));
+                        if (system.contains("coordinator-assigned task")) {
+                            var match = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
+                            assertThat(match.find()).isTrue();
+                            String name = match.group(1);
+                            return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", name.substring("default-".length()), "toolName", name, "toolArguments", Map.of())));
+                        }
+                        assertThat(modelOwnedSpace).isTrue();
+                        assertThat(completed).containsExactly("default-first", "default-later");
+                        finals.incrementAndGet();
+                        Map<String, Object> contribution = nested ? Map.of("context", Map.of("extra", "reasoned")) : Map.of("extra", "reasoned");
+                        return response(JSON.writeValueAsString(Map.of("stepAction", "FINAL_RESPONSE", "finalResponse", contribution)));
+                    } catch (Throwable ex) { failure.compareAndSet(null, ex); return new MockResponse().setResponseCode(500); }
+                }
+            });
+            server.start();
+            new ApplicationContextRunner().withUserConfiguration(App.class)
+                    .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> { completed.add(invocation.skillName()); return "completed"; }))
+                    .withPropertyValues("spring.main.web-application-type=none", "loomspan.skills.locations=" + directory.toUri() + "*.yaml",
+                            "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=" + server.url("/v1"),
+                            "loomspan.connections.local.api-key=fixture", "loomspan.connections.local.provider-retry.enabled=false",
+                            "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=deterministic")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        String result = context.getBean(SkillTemplate.class).invoke("default-root", Map.of("value", "exact"));
+                        assertThat(result).contains("exact");
+                        if (modelOwnedSpace) assertThat(result).contains("extra", "reasoned");
+                    });
+        }
+        assertThat(failure.get()).isNull();
+        assertThat(completed).containsExactly("default-first", "default-later");
+        assertThat(finals.get()).isEqualTo(modelOwnedSpace ? 1 : 0);
+    }
     private static MockResponse response(String content) {
         return ai.loomspan.testkit.ResponsesFixtures.text(content);
     }

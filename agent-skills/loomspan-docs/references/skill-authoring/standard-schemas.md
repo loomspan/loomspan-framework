@@ -2,7 +2,7 @@
 audience: loomspan-skill-builder
 status: development
 applies_to: bundled-loomspan-revision
-coverage: declaration-foundation
+coverage: declaration-and-local-bindings
 ---
 
 # Standard schema declarations
@@ -15,9 +15,10 @@ PLANNING role. These declarations use the supported subset of JSON Schema Draft
 2020-12 described here; arbitrary Draft 2020-12 schemas are not accepted.
 
 The declaration compiler, JSON-bound skill decoder and generated Java contracts
-have focused executable coverage. The current source checkout has incomplete consumer integration:
-full input dispatch, binding
-projection, output correction, planning and TypeSafe/evidence metadata consumers
+have focused executable coverage. Child-input and output-binding projection,
+assembly/composition and bounded binding compatibility checks also use canonical
+trees and shared local validation. The current source checkout has incomplete consumer integration:
+full input dispatch, output correction, planning and TypeSafe/evidence metadata consumers
 do not all accept the canonical representation yet. The complete application
 build and runtime paths are unavailable while those consumers are inconsistent.
 A successful foundation validation does not establish an executable skill tree,
@@ -259,6 +260,13 @@ Unlimited evaluation provides no CPU or memory guarantee.
 - `YamlSkillCatalog`, `YamlSkillManifest` and `YamlSkillDefinition` own registration
   wiring and retained definition snapshots. Foundation tests do not establish
   complete catalog, dispatch, correction, evidence or provider integration.
+- `ChildInputBindingProjection`, `ChildInputBindingDeclarations`,
+  `ChildInputBindingAssembler`, `OutputBindingProjection` and
+  `OutputBindingComposition` use canonical ownership projections and shared instance
+  validation. Their focused tests cover generated false reservations, exact names,
+  root/nested openness, source snapshots, exact transfers and bounds/formats.
+  `BindingSchemaCompatibilityTest` separately covers exact numeric enum overlap;
+  they do not certify complete publication, engine synthesis or actual provider requests.
 
 ## Ordinary input admission
 

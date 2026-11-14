@@ -122,7 +122,7 @@ public final class YamlSkillDefinition
         return manifest.getOutputBindings().entrySet().stream().map(entry -> {
             var descriptor = entry.getValue();
             return new ai.loomspan.internal.runtime.input.ChildInputBinding(
-                    canonicalOutputDestination(entry.getKey()),
+                    ai.loomspan.internal.runtime.input.ObjectFieldPath.parse(entry.getKey(), false),
                     switch (descriptor.getFrom()) {
                         case "input" -> ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT;
                         case "child_result" -> ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.CHILD_RESULT;
@@ -132,24 +132,6 @@ public final class YamlSkillDefinition
     }
 
     public boolean isOutputBindingsDeclared() { return manifest.isOutputBindingsDeclared(); }
-
-    private ai.loomspan.internal.runtime.input.ObjectFieldPath canonicalOutputDestination(String pointer) {
-        var path = ai.loomspan.internal.runtime.input.ObjectFieldPath.parse(pointer, false);
-        var schema = manifest.getOutputSchema();
-        var tokens = new java.util.ArrayList<String>();
-        for (String token : path.tokens()) {
-            String canonical = token;
-            if (schema != null) {
-                for (String property : schema.getProperties().keySet())
-                    if (ai.loomspan.internal.outputschema.OutputSchemaValidator.propertyNamesMatch(property, token)) { canonical = property; break; }
-                schema = schema.getProperties().get(canonical);
-            }
-            tokens.add(canonical);
-        }
-        String canonicalPointer = tokens.stream().map(token -> "/" + token.replace("~", "~0").replace("/", "~1"))
-                .collect(java.util.stream.Collectors.joining());
-        return new ai.loomspan.internal.runtime.input.ObjectFieldPath(canonicalPointer, tokens);
-    }
 
     public String prompt()
     {

@@ -2,7 +2,7 @@
 audience: loomspan-skill-builder
 status: development
 applies_to: bundled-loomspan-revision
-coverage: source-verified
+coverage: local-canonical-bindings
 ---
 
 # Declared Child Input Bindings
@@ -13,6 +13,12 @@ Model, TypeSafe, annotation-only Java, and executor YAML children use the same f
 receiving input contract remains authoritative; the calling model generates only
 unbound arguments under a separate projected contract. Binding grants no access
 and does not change invocation limits or the captured configuration generation.
+
+The canonical projection, declaration checks, source assembly and exact receiving
+validation have local focused coverage. Full child dispatch, prompt integration
+and public invocation remain unavailable while the surrounding application schema
+consumers are inconsistent. The execution examples and integration anchors below
+describe the retained contract, not a passing complete application run.
 
 Authored child references and binding producers MAY be local to the containing skill's namespace or explicitly qualified; local `search` in `sales` compiles to `sales-search`. Mixed spellings compare canonically and never search other namespaces. Runtime/model names remain qualified. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and boundary rules. Declarations keep local `name` components.
 
@@ -30,12 +36,15 @@ additional YAML flag is needed. Eligibility is specific to this parent's binding
 | Any optional or required unbound property | Model |
 | Open additional properties, generic or absent schema | Model |
 | Nested binding destination, such as `/context/value` | Model (conservative presence/omission fallback) |
-| Unsupported/reference/composition/default/constant/conditional or ambiguous schema shape | Model |
+| Unconstrained input leaf or runtime/attachment shape | Model (conservative proof exclusion) |
 
 Whole bound objects and arrays MAY qualify; their exact values still come from
 the source. Framework never synthesizes defaults, constants, nulls or ancestor
 objects to establish eligibility. Binding all required fields alone is insufficient.
-Unknown raw schema keywords remain proof exclusions even inside bound subtrees.
+Unsupported references, composition, defaults, constants, conditionals and unknown
+schema keywords fail declaration admission. Valid nullable type arrays remain
+accepted declarations; null values still require the complete receiving contract
+to permit null. No invalid declaration becomes a permissive dispatch fallback.
 
 Both origins use the normal assigned validator, invocation-time source assembly,
 complete receiving-input validation, caller access and lifecycle checks. Missing,
@@ -72,6 +81,10 @@ parent input source paths are checked against the complete generation. Open or
 unconstrained source branches and undeclared producer output shapes require
 runtime validation. No output shape is inferred from a Java return type or executor
 result text. Unknown, self-referencing and cyclic producers are rejected.
+Property names match exactly: `/Name` and `/name` select distinct fields. Omitted
+`additionalProperties` leaves an object open at every depth, just as explicit true
+does; explicit false rejects undeclared paths. Open-path admission does not prove
+that a future source contains the selected key.
 
 ## Complete example
 
@@ -168,8 +181,9 @@ model arguments again.
 
 ## Two contracts and dependencies
 
-Bound fields are absent from required model contributions and examples, and the
-serialized model schema forbids them, including below open/generic objects.
+Bound fields are absent from required model contributions and examples. The
+canonical projected model schema installs generated `false` property schemas to
+forbid them, including below open/generic objects and typed extensions.
 Unbound constraints remain intact. A binding-created ancestor MAY be omitted if
 it needs no required model contribution. If it was originally optional but a
 binding creates it, unbound required siblings MUST be supplied. Initial and
@@ -186,7 +200,7 @@ contract. This does not override authored instructions requesting useful optiona
 content. Names mentioned only in prompt conventions, such as
 `context.candidateReasoning` in an open context object, do not become declared or
 required schema fields. Required unbound fields are identified at the root and
-through scoped nested rules. Unknown or unsupported shapes receive neutral
+through scoped nested rules. Generic or otherwise unproven effective shapes receive neutral
 effective-contract guidance without a promise that `{}` is valid or a partial
 required-field summary. Bound destinations remain prohibited within open objects.
 The JSON action envelope is illustrative; it is incomplete when required model
@@ -195,8 +209,10 @@ arguments remain. These same rules apply to ordinary and verbose correction prom
 `StepPromptBuilderTest#contractSpecificGuidanceAgreesWithValidationInNormalAndVerboseVariants`,
 `nestedOptionalityAndOpenBoundDestinationsKeepTheirExactContractMeaning`,
 `bindingCreatedOptionalAncestorRequiresItsUnboundRequiredSibling`, and
-`unknownAndUnsupportedShapesGetNeutralGuidance` compare guidance with unchanged
-projection/validation semantics. They do not establish improved live model accuracy.
+`unknownAndUnsupportedShapesGetNeutralGuidance` are retained prompt-consumer anchors;
+their canonical integration is incomplete. Unsupported authored declarations now
+fail the shared compiler rather than entering a prompt fallback. These anchors do
+not establish improved live model accuracy.
 
 The model MUST NOT provide a bound destination, even an equal value or null, nor
 a scalar/null/array ancestor that prevents insertion. Ancestor objects holding
@@ -216,9 +232,9 @@ before a consumer. See [planning concurrency](planning-concurrency.md).
 ## Exact values and failures
 
 For a [TypeSafe child](typesafe-skills.md), bindings assemble and validate the same
-receiving input before native request substitution. Ordinary direct input may
-normalize a numeric string; the bound subtree must already have the exact numeric
-type. Native state/instructions/criteria references can traverse arrays, but
+receiving input before native request substitution. Ordinary and bound JSON inputs
+use exact names and types without numeric/Boolean string coercion or date rewriting.
+Native state/instructions/criteria references can traverse arrays, but
 parent binding pointers retain the object-only rules above. Returned named answers
 are the result root: select `/department/choice` without an `/answers` prefix.
 Fixed descriptive output metadata helps existing registration checks; dynamic
@@ -237,9 +253,10 @@ Ordinary nested JSON-looking strings remain strings. Original accepted text stay
 unchanged for diagnostics and forwarding. Arrays retain order and absent optional
 fields remain absent. Each consumer receives detached containers.
 
-Bound subtrees undergo full required/type/closed/enum/format checks without
+Bound subtrees undergo full required/type/closed/enum/format and numeric/string/array
+bound checks without
 numeric/Boolean string coercion or date rewriting. Valid dates retain their exact
-spelling; invalid dates fail. Unbound inputs keep ordinary normalization.
+spelling; invalid dates fail. Unbound inputs use the same exact standard validation.
 Failures distinguish declaration, plan dependency, unavailable/ambiguous source,
 model override and assembled-input contract errors. Overrides may use ordinary
 action correction; unavailable sources and invalid assembled inputs fail before
@@ -266,8 +283,11 @@ Focused tests: `YamlSkillCatalogTests`, `ChildInputBindingTest`,
 `AcceptedResultDecoderTest`, `ChildInputBindingAssemblerTest`,
 `StepActionValidatorTest`, `StepPromptBuilderTest`,
 `DeclaredChildInputBindingsIntegrationTest` and `BindingIsolationIntegrationTest`.
-These establish deterministic mechanics, not improved live model reliability or
-business reasoning. Large evidence still consumes the receiving model's context.
+Projection, declaration, assembler and decoder tests establish local deterministic
+mechanics with canonical schemas. Retained prompt, dispatch and facade integration
+tests require restoration of the complete application source graph; their presence
+does not certify those paths. Local checks establish neither provider fidelity nor
+improved live model reliability. Large evidence still consumes the receiving model's context.
 
 ## Output destination
 

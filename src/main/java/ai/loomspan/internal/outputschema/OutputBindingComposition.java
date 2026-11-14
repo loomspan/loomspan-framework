@@ -3,17 +3,19 @@ package ai.loomspan.internal.outputschema;
 import ai.loomspan.internal.core.MissionContext;
 import ai.loomspan.internal.runtime.input.*;
 import ai.loomspan.internal.skill.YamlSkillDefinition;
-import ai.loomspan.internal.skill.YamlSkillManifest.OutputSchemaManifest;
+import ai.loomspan.internal.schema.CanonicalSchema;
+import ai.loomspan.internal.schema.StandardSchemaCompiler;
+import tools.jackson.databind.JsonNode;
 import java.util.*;
 import tools.jackson.databind.ObjectMapper;
 
 /** Invocation-local source snapshot and shared complete-output composition authority. */
 public final class OutputBindingComposition {
     public record Result(String content, List<Map<String,Object>> provenance, OutputSchemaValidationResult validation) { }
-    private final OutputSchemaManifest original;
+    private final CanonicalSchema original;
     private final OutputBindingProjection projection;
     private final ObjectMapper mapper;
-    private final OutputSchemaValidator validator;
+
     private final ChildInputBindingAssembler.Assembly selected;
     private MissionContext mission;
     private ai.loomspan.internal.core.ExecutionPlan capturedPlan;
@@ -35,17 +37,21 @@ public final class OutputBindingComposition {
             for (var result : mission.completedTaskResults()) if (capturedPlan.tasks().stream().noneMatch(t -> t.taskId().equals(result.taskId()))) throw new IllegalArgumentException("binding_source_unavailable: Result is outside accepted plan: " + result.taskId());
         }
     }
-    public OutputBindingComposition(OutputSchemaManifest schema, List<ChildInputBinding> bindings, Map<String,Object> input,
+    public OutputBindingComposition(CanonicalSchema schema, List<ChildInputBinding> bindings, Map<String,Object> input,
             List<MissionContext.CompletedTaskResult> results, String ownerFrame, ObjectMapper mapper) {
-        this.original = OutputBindingProjection.copy(schema);
+        this.original = schema;
         this.projection = new OutputBindingProjection(original, bindings);
-        this.mapper = mapper; validator = new OutputSchemaValidator(mapper);
+        this.mapper = mapper;
         selected = new ChildInputBindingAssembler().assemble(Map.of(),bindings,input,results,ownerFrame);
         // Each immutable selected value must satisfy its native destination contract before any model call.
         for (var binding : bindings) {
-            ObjectSchemaValue value = destination(selected.arguments(), original, binding.destination().tokens());
+            ObjectSchemaValue value = destination(selected.arguments(), original.tree(), binding.destination().tokens());
             if (value.schema()!=null) {
-                var validation = validator.validate(mapper.writeValueAsString(value.value()),value.schema());
+                var wrapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+                wrapper.put("type", "object"); wrapper.putObject("properties").set("value", value.schema());
+                var contract = new StandardSchemaCompiler().compile(wrapper, StandardSchemaCompiler.Role.OUTPUT, StandardSchemaCompiler.Origin.GENERATED);
+                Map<String,Object> instance = new LinkedHashMap<>(); instance.put("value", value.value());
+                var validation = validate(mapper.writeValueAsString(instance), contract);
                 if (!validation.valid()) throw new IllegalArgumentException("binding_output_validation: Destination "
                         + binding.destination().pointer()+": "+validation.issues());
             }
@@ -64,15 +70,14 @@ public final class OutputBindingComposition {
         }
         Object decoded = new AcceptedResultDecoder().decode(candidate);
         if (!(decoded instanceof Map<?,?> object)) {
-            var invalid = validator.validate(candidate, projection.schema());
+            var invalid = validate(candidate, projection.schema());
             return new Result(candidate,provenance(),invalid.valid() ? OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED, List.of(new OutputSchemaValidationIssue("$","Model contribution must be an object.",null,"binding_model_override",null,null,null,null,null,null,null))) : invalid);
         }
         Map<String,Object> contribution = (Map<String,Object>) object;
         var overrides = projection.validateModelContribution(contribution);
         if (!overrides.isEmpty()) return failed(candidate,"binding_model_override",String.join("; ",overrides));
-        var contributionValidation = validator.validate(candidate,projection.schema());
+        var contributionValidation = validate(candidate,projection.schema());
         if (!contributionValidation.valid()) return new Result(candidate,provenance(),contributionValidation);
-        // Canonicalize only object containers on bound paths; retain all unbound values and field spellings.
         Map<String,Object> assembled = (Map<String,Object>) DeepInputValues.mutableCopy(contribution);
         for (var binding : projection.bindings()) {
             Map<String,Object> target = assembled;
@@ -80,26 +85,39 @@ public final class OutputBindingComposition {
             var tokens = binding.destination().tokens();
             for (int i=0;i<tokens.size()-1;i++) {
                 String token=tokens.get(i);
-                String actual=target.keySet().stream().filter(k->OutputSchemaValidator.propertyNamesMatch(k, token)).findFirst().orElse(token);
-                Object child=target.remove(actual);
-                if (child==null) child=new LinkedHashMap<String,Object>();
-                target.put(token,child); target=(Map<String,Object>)child;
+                target.computeIfAbsent(token, ignored -> new LinkedHashMap<String,Object>());
+                target=(Map<String,Object>)target.get(token);
                 source=((Map<?,?>)source).get(token);
             }
             target.put(tokens.getLast(),DeepInputValues.mutableCopy(((Map<?,?>)source).get(tokens.getLast())));
         }
         String content=mapper.writeValueAsString(assembled);
-        return new Result(content,provenance(),validator.validate(content,original));
+        return new Result(content,provenance(),validate(content,original));
+    }
+    private OutputSchemaValidationResult validate(String content, CanonicalSchema contract) {
+        if (content == null || content.isBlank()) return OutputSchemaValidationResult.failed(OutputSchemaFailureMode.INVALID_JSON,
+                List.of(new OutputSchemaValidationIssue("$", "Model contribution must be JSON.", null, "invalid_json", null,null,null,null,null,null,null)));
+        JsonNode instance;
+        try { instance = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree(content); }
+        catch (tools.jackson.core.JacksonException ex) {
+            return OutputSchemaValidationResult.failed(OutputSchemaFailureMode.INVALID_JSON,
+                    List.of(new OutputSchemaValidationIssue("$", ex.getMessage(), null, "invalid_json", null,null,null,null,null,null,null)));
+        }
+        var errors = contract.validate(instance);
+        if (errors.isEmpty()) return OutputSchemaValidationResult.passed();
+        return OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED, errors.stream()
+                .map(error -> new OutputSchemaValidationIssue(error.getInstanceLocation().toString(), error.toString(), null,
+                        "schema_validation", null,null,null,null,null,null,null)).toList());
     }
     private Result failed(String candidate,String code,String message) {
         return new Result(candidate,provenance(),OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED,
                 List.of(new OutputSchemaValidationIssue("$",message,null,code,null,null,null,null,null,null,null))));
     }
-    private record ObjectSchemaValue(Object value,OutputSchemaManifest schema) { }
-    private static ObjectSchemaValue destination(Object value,OutputSchemaManifest schema,List<String> tokens) {
+    private record ObjectSchemaValue(Object value,JsonNode schema) { }
+    private static ObjectSchemaValue destination(Object value,JsonNode schema,List<String> tokens) {
         for (String token:tokens) {
             value=((Map<?,?>)value).get(token);
-            if(schema!=null) schema=schema.getProperties().entrySet().stream().filter(e->OutputSchemaValidator.propertyNamesMatch(e.getKey(), token)).map(Map.Entry::getValue).findFirst().orElse(null);
+            if(schema!=null) schema=schema.path("properties").get(token);
         }
         return new ObjectSchemaValue(value,schema);
     }

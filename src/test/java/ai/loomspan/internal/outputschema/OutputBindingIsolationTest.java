@@ -12,9 +12,9 @@ import static org.assertj.core.api.Assertions.*;
 class OutputBindingIsolationTest {
     private static YamlSkillDefinition definition(String owner) {
         var manifest = new YamlSkillManifest(); manifest.setName(SkillIdentity.parse(owner).localName());
-        var root = new YamlSkillManifest.OutputSchemaManifest(); root.setType("object"); root.setAdditionalProperties(false);
-        var value = new YamlSkillManifest.OutputSchemaManifest(); value.setType("string");
-        root.setProperties(Map.of("value", value)); root.setRequired(List.of("value")); manifest.setOutputSchema(root);
+        manifest.setOutputSchema(LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
+                {"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":false}
+                """));
         var binding = new YamlSkillManifest.InputBindingManifest(); binding.setFrom("child_result"); binding.setSkill("default-producer"); binding.setPath("");
         manifest.setOutputBindings(Map.of("/value",binding));
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]),manifest,
@@ -50,5 +50,33 @@ class OutputBindingIsolationTest {
         var composition = new OutputBindingComposition(definition("default-root"),mission,LoomspanJacksonCodecs.defaults().schemaTree());
         mission.storePlan(mission.currentPlan().orElseThrow().withStatus(PlanStatus.STALE));
         assertThatThrownBy(composition::composeEmpty).hasMessageContaining("Accepted plan changed");
+    }
+    @Test void incompleteUnrelatedWorkRejectsOtherwiseFullyBoundOutput() {
+        var session = TestLoomspanSessions.withId("incomplete-output", "default-root", 5);
+        var mission = owner(session, "default-root", "owner", null, "exact");
+        var producer = mission.currentPlan().orElseThrow().tasks().getFirst();
+        var later = new PlanTask("later", "unrelated required work", PlanTaskStatus.PENDING, "default-later", "work", List.of(), List.of(), null, null);
+        mission.storePlan(new ExecutionPlan("same-plan", "default-root", Instant.EPOCH, List.of(producer, later)));
+        assertThatThrownBy(() -> new OutputBindingComposition(definition("default-root"), mission, LoomspanJacksonCodecs.defaults().schemaTree()))
+                .hasMessageContaining("Accepted work is incomplete: later");
+    }
+    @Test void acceptedTaskProducerAndExtraResultChecksPrecedeAssemblyPublication() {
+        var session = TestLoomspanSessions.withId("mismatched-output", "default-root", 5);
+        var mismatch = owner(session, "default-root", "mismatch", null, "exact");
+        mismatch.storePlan(new ExecutionPlan("same-plan", "default-root", Instant.EPOCH,
+                List.of(new PlanTask("same-task", "work", PlanTaskStatus.COMPLETED, "default-other", "work", List.of(), List.of(), null, null))));
+        assertThatThrownBy(() -> new OutputBindingComposition(definition("default-root"), mismatch, LoomspanJacksonCodecs.defaults().schemaTree()))
+                .hasMessageContaining("Accepted task producer differs");
+        var extra = owner(session, "default-root", "extra", null, "exact");
+        extra.recordCompletedTaskResult("outside", "default-other", "unrelated");
+        assertThatThrownBy(() -> new OutputBindingComposition(definition("default-root"), extra, LoomspanJacksonCodecs.defaults().schemaTree()))
+                .hasMessageContaining("Result is outside accepted plan");
+    }
+    @Test void owningMissionClosureRejectsCapturedComposition() {
+        var session = TestLoomspanSessions.withId("closed-output", "default-root", 5);
+        var mission = owner(session, "default-root", "owner", null, "exact");
+        var composition = new OutputBindingComposition(definition("default-root"), mission, LoomspanJacksonCodecs.defaults().schemaTree());
+        mission.lifecycle().closeNow();
+        assertThatThrownBy(composition::composeEmpty).hasMessageContaining("no longer open");
     }
 }

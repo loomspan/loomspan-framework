@@ -58,7 +58,7 @@ class AnthropicProtocolIntegrationTest
                "records":{"type":"object","additionalProperties":{"type":"object","properties":{"name":{"type":"string"}},"required":["name"],"additionalProperties":false}},
                "nested":{"type":"object","additionalProperties":{"type":"object","additionalProperties":{"type":"integer"}}},
                "rows":{"type":"array","minItems":1,"maxItems":3,"items":{"type":"object","properties":{"map":{"type":"object","additionalProperties":{"type":"string"}}},"required":["map"],"additionalProperties":false}},
-               "anything":{}},"required":["code","quantities"]}
+               "anything":{},"reserved":false},"required":["code","quantities"]}
             """;
 
     @ParameterizedTest
@@ -171,6 +171,8 @@ class AnthropicProtocolIntegrationTest
             JsonNode actual = body.at("/tools/0/input_schema");
             JsonNode expected = JSON.readTree(TOOL_SCHEMA);
             assertThat(actual.path("properties")).isEqualTo(expected.path("properties"));
+            assertThat(actual.at("/properties/reserved").isBoolean()).isTrue();
+            assertThat(actual.at("/properties/reserved").booleanValue()).isFalse();
             assertThat(body.at("/tools/0/strict").asBoolean(false)).isFalse();
             assertThat(callback.getToolDefinition().inputSchema()).isEqualTo(TOOL_SCHEMA);
             assertThat(server.getRequestCount()).isEqualTo(1);

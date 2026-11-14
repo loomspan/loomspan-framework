@@ -102,11 +102,45 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
     }
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings={"{\"CONTEXT\":{\"ASSESSMENT\":{\"exact\":\"original\"},\"summary\":\"bad\"}}","{\"context\":null}","{\"context\":[]}"})
-    void aliasesAndBlockingAncestorsUseBoundedCorrection(String override) throws Exception {
+    void exactCaseMismatchesAndBlockingAncestorsUseBoundedCorrection(String override) throws Exception {
         custom(nestedContract(),List.of(override,"{\"context\":{\"summary\":\"reasoned\"}}"),body->assertThat(body).contains("Framework supplies these output destinations"),(template,calls)-> {
             assertThat(template.invoke("default-comparison",Map.of("assessment",Map.of("exact","original")))).contains("original","reasoned").doesNotContain("bad");
             assertThat(calls.get()).isEqualTo(2);
         });
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"omitted,false", "true,false", "false,false", "omitted,true", "true,true", "false,true"})
+    void rootAndNestedOpennessDetermineWhetherFinalGenerationRemains(String openness, boolean nested) throws Exception {
+        String additional = openness.equals("omitted") ? "" : ", additionalProperties: " + openness;
+        String contract = nested ? """
+                output_schema:
+                  type: object
+                  properties:
+                    context: {type: [object, "null"], properties: {assessment: {type: object, additionalProperties: true}}, required: [assessment]%s}
+                  required: [context]
+                  additionalProperties: false
+                output_bindings:
+                  /context/assessment: {from: input, path: /assessment}
+                """.formatted(additional) : """
+                output_schema: {type: object, properties: {assessment: {type: object, additionalProperties: true}}, required: [assessment]%s}
+                output_bindings:
+                  /assessment: {from: input, path: /assessment}
+                """.formatted(additional);
+        boolean modelOwnedSpace = !openness.equals("false");
+        custom(contract, modelOwnedSpace ? List.of(nested ? "{\"context\":{\"extra\":\"reasoned\"}}" : "{\"extra\":\"reasoned\"}") : List.of(),
+                body -> {
+                    var schema = JsonMapper.builder().build().readTree(body).at("/text/format/schema");
+                    assertThat(schema.isObject()).isTrue();
+                    var object = nested ? schema.path("properties").path("context") : schema;
+                    assertThat(object.path("properties").has("assessment")).isFalse();
+                    assertThat(object.has("additionalProperties")).isEqualTo(!openness.equals("omitted"));
+                    if (object.has("additionalProperties")) assertThat(object.path("additionalProperties").asBoolean()).isTrue();
+                }, (template, calls) -> {
+                    String output = template.invoke("default-comparison", Map.of("assessment", Map.of("exact", "original")));
+                    assertThat(output).contains("original");
+                    if (modelOwnedSpace) assertThat(output).contains("extra", "reasoned");
+                    assertThat(calls.get()).isEqualTo(modelOwnedSpace ? 1 : 0);
+                });
     }
     @Test void dynamicBoundTypeMismatchFailsBeforeProviderAndWithoutAssembly() throws Exception {
         custom("""
