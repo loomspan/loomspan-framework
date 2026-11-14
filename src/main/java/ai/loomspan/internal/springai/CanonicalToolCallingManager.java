@@ -73,6 +73,9 @@ final class CanonicalToolCallingManager implements ToolCallingManager {
                 }
                 String canonical = SkillIdentity.parse(call.name()).toString();
                 if (!bound.contains(canonical)) throw new IllegalArgumentException("Unbound tool selection '" + call.name() + "'");
+                // Spring's delegate replaces blank arguments with {}; reject before the original root is lost.
+                if (call.arguments() == null || call.arguments().isBlank())
+                    throw new IllegalArgumentException("Tool arguments must contain exactly one JSON object");
                 if (canonical.equals(call.name())) parts.add(part);
                 else {
                     parts.add(new ToolCallPart(new AssistantMessage.ToolCall(call.id(), call.type(), canonical,

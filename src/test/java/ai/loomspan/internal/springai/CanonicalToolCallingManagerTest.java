@@ -180,6 +180,108 @@ class CanonicalToolCallingManagerTest {
         assertThat(before.toolCall().name()).isEqualTo("Tax-calculateTax");
     }
 
+
+    /** Uses the actual Spring manager and callback, with a mocked downstream capability boundary. */
+    @ParameterizedTest @NullSource
+    @ValueSource(strings = {"", " ", "{", "null", "\"\"", "\"text\"", "[]", "[{}]", "1", "1.25", "true", "false",
+            "{} {}", "{} 1", "{} \"text\"", "{} true", "{} null", "{} trailing garbage"})
+    void ordinaryCallbacksRejectRootsAndTrailingContentThroughRealManager(String arguments) {
+        var capability = SpringAiToolCallbackAdapterTest.capability("{\"type\":\"object\"}");
+        var callback = SpringAiToolCallbackAdapterTest.adapt(capability);
+        var prompt = new Prompt("user", ToolCallingChatOptions.builder().toolCallbacks(callback).build());
+        var manager = new CanonicalToolCallingManager(ToolCallingManager.builder().build());
+        assertThatThrownBy(() -> manager.executeToolCalls(prompt,
+                new ChatResponse(List.of(generation(call(capability.name(), arguments))))))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(capability, never()).invoke(any(), any());
+    }
+
+    @Test void ordinaryCallbacksKeepEmptyObjectsNestedNullAndWhitespaceThroughRealManager() {
+        var capability = SpringAiToolCallbackAdapterTest.capability("{\"type\":\"object\"}");
+        when(capability.invoke(anyMap(), isNull())).thenReturn(Map.of("accepted", true));
+        var callback = SpringAiToolCallbackAdapterTest.adapt(capability);
+        var prompt = new Prompt("user", ToolCallingChatOptions.builder().toolCallbacks(callback).build());
+        var manager = new CanonicalToolCallingManager(ToolCallingManager.builder().build());
+        for (String arguments : List.of("{} \r\n\t", "{\"value\":null}  ")) {
+            manager.executeToolCalls(prompt, new ChatResponse(List.of(generation(call(capability.name(), arguments)))));
+        }
+        var captured = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(capability, times(2)).invoke(captured.capture(), isNull());
+        assertThat(captured.getAllValues().getFirst()).isEmpty();
+        assertThat(captured.getAllValues().getLast()).containsEntry("value", null);
+    }
+
+    static class DecimalTarget {
+        int calls;
+        java.math.BigDecimal received;
+        Map<String, Object> nested;
+        @ai.loomspan.api.SkillMethod(namespace="numbers", name="decimal", description="Exact decimal input")
+        public Object decimal(java.math.BigDecimal value,
+                @ai.loomspan.api.SkillParam(required=false) Map<String, Object> nested) {
+            calls++;
+            received = value;
+            this.nested = nested;
+            return value;
+        }
+    }
+
+    /** Decoder -> canonical validator -> real registered Java binder. Capability/auth pipeline is mocked. */
+    @Test void realManagerDecoderAndValidatorPreserveJavaDecimalsAndRejectRoundedBoundaryBeforeInvocation() {
+        var target = new DecimalTarget();
+        var factory = new org.springframework.beans.factory.support.StaticListableBeanFactory();
+        factory.addBean("decimal", target);
+        var processor = ai.loomspan.internal.core.SkillMethodBeanPostProcessor.create(
+                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion(),
+                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree());
+        processor.setBeanFactory(factory);
+        processor.postProcessAfterInitialization(target, "decimal");
+        var metadata = processor.capabilities().getFirst();
+        var compiler = new ai.loomspan.internal.schema.StandardSchemaCompiler();
+        var canonical = compiler.compile("""
+                {"type":"object","properties":{
+                  "value":{"type":"number","minimum":0,"maximum":1},
+                  "nested":{"type":"object","additionalProperties":{}}},
+                 "required":["value"],"additionalProperties":false}
+                """, ai.loomspan.internal.schema.StandardSchemaCompiler.Role.INPUT,
+                ai.loomspan.internal.schema.StandardSchemaCompiler.Origin.AUTHORED);
+        var contract = new ai.loomspan.internal.runtime.input.SkillInputContract(
+                ai.loomspan.internal.runtime.input.SkillInputContract.SkillInputContractKind.YAML_EXPLICIT, canonical);
+        var validator = new ai.loomspan.internal.runtime.input.SkillInputValidator();
+        var capability = SpringAiToolCallbackAdapterTest.capability(metadata.tool().inputSchema());
+        when(capability.name()).thenReturn(metadata.name());
+        when(capability.invoke(anyMap(), isNull())).thenAnswer(invocation -> {
+            Map<String, Object> input = invocation.getArgument(0);
+            var checked = validator.validate(input, contract);
+            if (!checked.valid()) throw new IllegalArgumentException("Invalid ordinary arguments: " + checked.issues());
+            return metadata.invoker().invoke(checked.normalizedInput());
+        });
+        var callback = SpringAiToolCallbackAdapterTest.adapt(capability);
+        var prompt = new Prompt("user", ToolCallingChatOptions.builder().toolCallbacks(callback).build());
+        var manager = new CanonicalToolCallingManager(ToolCallingManager.builder().build());
+        String raw = """
+                {"value":0.12345678901234567890123456789,
+                 "nested":{"fraction":9.876543210987654321e30,"values":[1.234567890123456789e-30,null]}}
+                """;
+        var response = new ChatResponse(List.of(generation(call(capability.name(), raw))));
+        manager.executeToolCalls(prompt, response);
+        assertThat(target.calls).isEqualTo(1);
+        assertThat(target.received).isEqualTo(new java.math.BigDecimal("0.12345678901234567890123456789"));
+        assertThat(target.nested.get("fraction")).isEqualTo(new java.math.BigDecimal("9.876543210987654321e30"));
+        assertThat(target.nested.get("values")).isEqualTo(Arrays.asList(new java.math.BigDecimal("1.234567890123456789e-30"), null));
+        assertThat(response.getResult().getOutput().getToolCalls().getFirst().arguments()).isEqualTo(raw);
+        for (String invalid : List.of("1.000000000000000000000000000001", "-0.000000000000000000000000000001")) {
+            var rejected = new ChatResponse(List.of(generation(call(capability.name(), "{\"value\":" + invalid + "}"))));
+            var feedback = manager.executeToolCalls(prompt, rejected);
+            assertThat(feedback.conversationHistory().toString()).contains("Invalid ordinary arguments");
+            assertThat(target.calls).isEqualTo(1);
+        }
+        // Schema validity does not make an unbound selection available.
+        assertThatThrownBy(() -> manager.executeToolCalls(prompt,
+                new ChatResponse(List.of(generation(call("other-decimal", "{\"value\":0.5}"))))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(target.calls).isEqualTo(1);
+    }
+
     private static AssistantMessage richMessage(String name) {
         var opaque = new org.springframework.ai.chat.messages.part.OpaquePayload(
                 "openai.responses", "encrypted_content", "opaque exact payload");

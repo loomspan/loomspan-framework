@@ -205,9 +205,9 @@ public class LoomspanAutoConfiguration
 
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    SkillInputContractResolver skillInputContractResolver(LoomspanJacksonCodecs codecs)
+    SkillInputContractResolver skillInputContractResolver()
     {
-        return new SkillInputContractResolver(codecs.applicationConversion());
+        return new SkillInputContractResolver();
     }
 
     @Bean

@@ -46,7 +46,7 @@ public final class ChildInputBindingProjection {
     }
     public String inputSchema() {
         var mapper = LoomspanJacksonCodecs.defaults().schemaTree();
-        var resolver = new SkillInputContractResolver(mapper);
+        var resolver = new SkillInputContractResolver();
         Map<String, Object> schema = mapper.readValue(resolver.toJsonSchema(argumentContract), Map.class);
         for (var binding : bindings) {
             Map<String, Object> current = schema;

@@ -1,110 +1,46 @@
 package ai.loomspan.internal.runtime.input;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import ai.loomspan.internal.skill.YamlSkillManifest;
+import ai.loomspan.internal.schema.*;
+import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
+import ai.loomspan.internal.skill.YamlSkillDefinition;
 import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-import java.util.List;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
-class SkillInputContractResolverTest
-{
-    private final SkillInputContractResolver resolver = new SkillInputContractResolver();
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    @Test
-    void preservesAttachmentMetadataInInputContractAndJsonSchema() throws Exception
-    {
-        SkillInputSchemaNode schema = resolver.fromManifest(attachmentInputManifest());
-
-        SkillInputSchemaNode image = schema.properties().get("image");
-        assertThat(image.isAttachment()).isTrue();
-        assertThat(image.attachmentMediaType()).isEqualTo("image");
-        assertThat(image.allowedContentTypes()).containsExactly("image/jpeg");
-
-        String jsonSchema = resolver.toJsonSchema(
-                new SkillInputContract(SkillInputContract.SkillInputContractKind.YAML_EXPLICIT, schema));
-        JsonNode imageNode = objectMapper.readTree(jsonSchema).path("properties").path("image");
-        assertThat(imageNode.path("type").asText()).isEqualTo("string");
-        assertThat(imageNode.path("x-loomspan-attachment").asBoolean()).isTrue();
-        assertThat(imageNode.path("x-loomspan-media-type").asText()).isEqualTo("image");
-        assertThat(imageNode.path("x-loomspan-allowed-content-types").get(0).asText()).isEqualTo("image/jpeg");
+/** Actual resolver tests; root compilation currently blocked by downstream catalog/output consumers. */
+class SkillInputContractResolverTest {
+    final SkillInputContractResolver resolver=new SkillInputContractResolver();
+    @Test void yamlUsesItsCompiledCanonicalContractWithoutRewriting() {
+        var schema=new StandardSchemaCompiler().compile("{\"type\":\"object\",\"properties\":{\"file\":{\"type\":\"string\",\"x-loomspan-attachment\":{\"media_type\":\"file\",\"allowed_content_types\":[\"text/plain\"]}}}}",StandardSchemaCompiler.Role.INPUT,StandardSchemaCompiler.Origin.AUTHORED);
+        var definition=mock(YamlSkillDefinition.class);when(definition.hasDeclaredInputSchema()).thenReturn(true);when(definition.inputSchema()).thenReturn(schema);
+        var contract=resolver.resolveYamlCapability(definition);
+        assertThat(contract.schema()).isSameAs(schema);assertThat(contract.kind()).isEqualTo(SkillInputContract.SkillInputContractKind.YAML_EXPLICIT);
+        assertThat(schema.tree().at("/properties/file/x-loomspan-attachment/media_type").asText()).isEqualTo("file");
+        assertThat(LoomspanJacksonCodecs.defaults().schemaTree().readTree(resolver.toJsonSchema(contract)).at("/properties/file").has("x-loomspan-attachment")).isFalse();
     }
-
-    @Test
-    void preservesUnconstrainedNodesAcrossJsonSchemaRoundTrip() throws Exception
-    {
-        SkillInputSchemaNode schema = resolver.fromJsonSchema("""
-                {
-                  "type": "object",
-                  "properties": {
-                    "value": {
-                      "description": "Any caller-supplied JSON value",
-                      "x-loomspan-runtime-ref-capable": true
-                    },
-                    "values": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "items": {
-                      "type": "array",
-                      "items": {}
-                    }
-                  },
-                  "additionalProperties": false
-                }
+    @Test void preservesExactStandardTreesAndStripsOnlyProviderAnnotationsAtSchemaNodes() {
+        var schema=resolver.fromJsonSchema("""
+                {"type":"object","properties":{
+                  "value":{"description":" exact "},
+                  "x-loomspan-runtime-ref-capable":{"type":"string"},
+                  "handle":{"type":["string","null"],"description":"reference","minLength":4,"x-loomspan-runtime-ref-capable":true},
+                  "map":{"type":"object","additionalProperties":{}},
+                  "items":{"type":"array","minItems":1,"items":{"type":"number","minimum":0.12345678901234567890123456789,"enum":[null,1,true]}}
+                },"required":["value"],"additionalProperties":false}
                 """);
-
-        SkillInputSchemaNode value = schema.properties().get("value");
-        assertThat(value.isUnconstrained()).isTrue();
-        assertThat(value.description()).isEqualTo("Any caller-supplied JSON value");
-        assertThat(value.runtimeRefCapable()).isTrue();
-        assertThat(schema.properties().get("values").additionalPropertiesSchema().isUnconstrained()).isTrue();
-        assertThat(schema.properties().get("items").items().isUnconstrained()).isTrue();
-
-        String serialized = resolver.toJsonSchema(
-                new SkillInputContract(SkillInputContract.SkillInputContractKind.JAVA_REFLECTED, schema));
-        JsonNode roundTrip = objectMapper.readTree(serialized);
-        assertThat(roundTrip.path("properties").path("value").has("type")).isFalse();
-        assertThat(roundTrip.path("properties").path("value").path("description").asText())
-                .isEqualTo("Any caller-supplied JSON value");
-        assertThat(roundTrip.path("properties").path("values").path("additionalProperties").size()).isZero();
-        assertThat(roundTrip.path("properties").path("items").path("items").size()).isZero();
-        assertThat(resolver.fromJsonSchema(serialized)).isEqualTo(schema);
+        var before=schema.tree();var contract=new SkillInputContract(SkillInputContract.SkillInputContractKind.JAVA_REFLECTED,schema);
+        var provider=LoomspanJacksonCodecs.defaults().schemaTree().readTree(resolver.toJsonSchema(contract));
+        assertThat(schema.tree()).isEqualTo(before);assertThat(provider).isEqualTo(schema.providerTree());
+        assertThat(provider.at("/properties/handle").has("x-loomspan-runtime-ref-capable")).isFalse();
+        assertThat(provider.at("/properties/x-loomspan-runtime-ref-capable/type").asText()).isEqualTo("string");
+        assertThat(provider.at("/properties/handle/description").asText()).isEqualTo("reference");
+        assertThat(provider.at("/properties/value").has("type")).isFalse();
     }
-
-    @Test
-    void keepsGenericTopLevelAndStrictEmptyObjectContractsDistinctFromAny()
-    {
-        SkillInputContract generic = resolver.resolveFromToolSchema("{\"type\":\"object\"}");
-        SkillInputContract strict = resolver.resolveFromToolSchema(
-                "{\"type\":\"object\",\"additionalProperties\":false}");
-        SkillInputContract any = resolver.resolveFromToolSchema("{}");
-
-        assertThat(generic.isGeneric()).isTrue();
-        assertThat(strict.isGeneric()).isFalse();
-        assertThat(strict.schema().isObject()).isTrue();
-        assertThat(strict.schema().allowsAdditionalProperties()).isFalse();
-        assertThat(any.isGeneric()).isFalse();
-        assertThat(any.schema().isUnconstrained()).isTrue();
-    }
-
-    static YamlSkillManifest.InputSchemaManifest attachmentInputManifest()
-    {
-        YamlSkillManifest.InputSchemaManifest root = new YamlSkillManifest.InputSchemaManifest();
-        root.setType("object");
-        root.setRequired(List.of("image"));
-        root.setAdditionalProperties(false);
-
-        YamlSkillManifest.InputSchemaManifest image = new YamlSkillManifest.InputSchemaManifest();
-        image.setType("attachment");
-        image.setMediaType("image");
-        image.setAllowedContentTypes(List.of("image/jpeg"));
-        image.setDescription("Ticket image");
-        root.setProperties(Map.of("image", image));
-        return root;
+    @Test void distinguishesAbsentGenericShapeAndExplicitContracts() {
+        for(String schema:java.util.Arrays.asList(null,"","{\"type\":\"object\"}","{\"type\":\"object\",\"additionalProperties\":true}")) assertThat(resolver.resolveFromToolSchema(schema).isGeneric()).isTrue();
+        for(String schema:java.util.List.of("{\"type\":\"object\",\"additionalProperties\":false}","{\"type\":\"object\",\"additionalProperties\":{}}", "{\"type\":\"object\",\"properties\":{\"value\":{}}}")) assertThat(resolver.resolveFromToolSchema(schema).isGeneric()).isFalse();
+        assertThatThrownBy(()->resolver.resolveFromToolSchema("{}")).isInstanceOf(StandardSchemaCompiler.DeclarationException.class);
+        assertThat(resolver.resolveJavaCapability("{\"type\":\"object\"}").isGeneric()).isFalse();
+        var absent=mock(YamlSkillDefinition.class);assertThat(resolver.resolveYamlCapability(absent).isGeneric()).isTrue();
     }
 }

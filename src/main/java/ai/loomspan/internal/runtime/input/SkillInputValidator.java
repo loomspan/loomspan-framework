@@ -1,437 +1,209 @@
 package ai.loomspan.internal.runtime.input;
 
-import java.time.DateTimeException;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-
+import ai.loomspan.internal.schema.CanonicalSchema;
+import ai.loomspan.internal.schema.StandardSchemaCompiler;
+import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import org.springframework.core.io.Resource;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.io.InputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.*;
 
+/** Java-value admission followed by the shared standard-schema validator. No input coercion. */
 public class SkillInputValidator
 {
+    private final StandardSchemaCompiler compiler = new StandardSchemaCompiler();
+
     public SkillInputValidationResult validate(Map<String, Object> input, SkillInputContract contract)
     {
-        return validateExact(input, contract, List.of());
+        Objects.requireNonNull(contract, "contract must not be null");
+        Map<String, Object> original = input == null ? Map.of() : input;
+        var state = new Admission(contract.isGeneric());
+        JsonNode schema = contract.schema().tree();
+        Object view = state.visit(original, schema, "");
+        if (state.issues.isEmpty() && !contract.isGeneric())
+        {
+            CanonicalSchema structural = contract.schema();
+            if (state.adapted)
+            {
+                weakenRuntimeLeaves(schema);
+                structural = compiler.compile(schema, StandardSchemaCompiler.Role.INPUT, StandardSchemaCompiler.Origin.GENERATED);
+            }
+            state.standardIssues(structural, view, original, "", false);
+        }
+        return new SkillInputValidationResult(state.issues.isEmpty(), snapshotMap(original), List.copyOf(state.issues));
     }
 
-    /** Validates full receiving inputs without normalizing author-bound subtrees. */
+    /** Assembly retains its call boundary; all ordinary validation now has exact semantics. */
     public SkillInputValidationResult validateExact(Map<String, Object> input, SkillInputContract contract,
             List<List<String>> exactPaths)
     {
-        Objects.requireNonNull(contract, "contract must not be null");
-        Map<String, Object> safeInput = input == null ? Map.of() : input;
+        Objects.requireNonNull(exactPaths, "exactPaths must not be null");
+        return validate(input, contract);
+    }
 
-        if (contract.isGeneric() && exactPaths.isEmpty())
+    private final class Admission
+    {
+        private final boolean generic;
+        private final List<SkillInputValidationIssue> issues = new ArrayList<>();
+        private final Map<JsonNode, CanonicalSchema> leafValidators = new HashMap<>();
+        private boolean adapted;
+        private Admission(boolean generic) { this.generic = generic; }
+
+        private Object visit(Object value, JsonNode schema, String path)
         {
-            return new SkillInputValidationResult(true, DeepInputValues.immutableMap(safeInput), List.of());
+            boolean attachment = schema != null && schema.path("x-loomspan-attachment").isObject();
+            boolean marked = schema != null && schema.path("x-loomspan-runtime-ref-capable").isBoolean()
+                    && schema.path("x-loomspan-runtime-ref-capable").booleanValue() && !attachment;
+            if ((marked && runtimeValue(value)) || (attachment && value instanceof Resource))
+            {
+                adapted = true;
+                return null;
+            }
+            if (value instanceof Map<?, ?> map)
+            {
+                var result = new LinkedHashMap<String, Object>();
+                for (var entry : map.entrySet())
+                {
+                    if (!(entry.getKey() instanceof String key))
+                    {
+                        issues.add(new SkillInputValidationIssue(path, "non_string_key",
+                                "Expected string object keys.", entry.getKey()));
+                        continue;
+                    }
+                    result.put(key, visit(entry.getValue(), propertySchema(schema, key), child(path, key)));
+                }
+                if (marked || attachment) leafCheck(result, value, schema, path);
+                return result;
+            }
+            if (value instanceof List<?> list)
+            {
+                var result = new ArrayList<Object>(list.size());
+                JsonNode itemSchema = schema == null ? null : schema.get("items");
+                for (int i = 0; i < list.size(); i++) result.add(visit(list.get(i), itemSchema, child(path, Integer.toString(i))));
+                if (marked || attachment) leafCheck(result, value, schema, path);
+                return result;
+            }
+            if (generic)
+            {
+                if (value != null && value.getClass().isArray() && !(value instanceof byte[]))
+                    for (int i = 0; i < java.lang.reflect.Array.getLength(value); i++)
+                        visit(java.lang.reflect.Array.get(value, i), null, child(path, Integer.toString(i)));
+                return value;
+            }
+            if (!jsonScalar(value))
+            {
+                issues.add(new SkillInputValidationIssue(path, "non_json_value", "Expected a JSON-compatible value.", value));
+                return null;
+            }
+            if (marked || attachment)
+            {
+                leafCheck(value, value, schema, path);
+                if (attachment && value instanceof String text && !text.matches("^ref://\\S+$"))
+                    issues.add(new SkillInputValidationIssue(path, "invalid_attachment", "Expected an exact ref:// reference or Resource.", value));
+            }
+            return value;
         }
 
-        List<SkillInputValidationIssue> issues = new ArrayList<>();
-        Object normalized = validateNode(safeInput, contract.schema(), "", issues, new ExactPolicy(List.of(), exactPaths));
-        Map<String, Object> normalizedMap = normalized instanceof Map<?, ?> map
-                ? castMap(map)
-                : Map.of();
+        private void leafCheck(Object view, Object original, JsonNode schema, String path)
+        {
+            // A failed compatibility walk must never serialize arbitrary caller objects.
+            if (!issues.isEmpty()) return;
+            CanonicalSchema validator = leafValidators.computeIfAbsent(schema, leaf -> {
+                ObjectNode wrapper = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
+                wrapper.put("type", "object");
+                wrapper.putObject("properties").set("value", leaf.deepCopy());
+                return compiler.compile(wrapper, StandardSchemaCompiler.Role.INPUT, StandardSchemaCompiler.Origin.GENERATED);
+            });
+            Map<String, Object> wrapped = new LinkedHashMap<>();
+            // Even an invalid container may have adapted descendants; never serialize its original handles.
+            wrapped.put("value", view);
+            standardIssues(validator, wrapped, original, path, true);
+        }
 
-        return new SkillInputValidationResult(issues.isEmpty(), normalizedMap, List.copyOf(issues));
+        private void standardIssues(CanonicalSchema validator, Object view, Object original, String prefix, boolean wrapped)
+        {
+            JsonNode instance = LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(view);
+            for (var error : validator.validate(instance))
+            {
+                String location = error.getInstanceLocation().toString();
+                if (wrapped) location = location.equals("/value") ? "" : location.replaceFirst("^/value/", "/");
+                Object rejected = at(original, location);
+                // NetworkNT messages may render the private view; report only assertion and original path.
+                issues.add(new SkillInputValidationIssue(prefix + location, error.getKeyword(),
+                        "Input violates '" + error.getKeyword() + "' at " + (prefix + location).replaceFirst("^$", "/") + ".", rejected));
+            }
+        }
+    }
+
+    private static boolean jsonScalar(Object value)
+    {
+        return value == null || value instanceof String || value instanceof Boolean || value instanceof Byte
+                || value instanceof Short || value instanceof Integer || value instanceof Long
+                || value instanceof BigInteger || value instanceof BigDecimal
+                || value instanceof Float f && Float.isFinite(f) || value instanceof Double d && Double.isFinite(d);
+    }
+
+    private static boolean runtimeValue(Object value)
+    {
+        return value instanceof Resource || value instanceof InputStream || value instanceof byte[];
+    }
+
+    private static JsonNode propertySchema(JsonNode schema, String name)
+    {
+        if (schema == null) return null;
+        JsonNode declared = schema.path("properties").get(name);
+        return declared != null ? declared : schema.path("additionalProperties").isObject() ? schema.get("additionalProperties") : null;
+    }
+
+    private static void weakenRuntimeLeaves(JsonNode schema)
+    {
+        if (!(schema instanceof ObjectNode object)) return;
+        if (schema.path("x-loomspan-runtime-ref-capable").asBoolean(false)
+                || schema.path("x-loomspan-attachment").isObject())
+        {
+            object.removeAll();
+            return;
+        }
+        schema.path("properties").forEach(SkillInputValidator::weakenRuntimeLeaves);
+        if (schema.has("items")) weakenRuntimeLeaves(schema.get("items"));
+        if (schema.path("additionalProperties").isObject()) weakenRuntimeLeaves(schema.get("additionalProperties"));
+    }
+
+    private static String child(String path, String token) { return path + "/" + token.replace("~", "~0").replace("/", "~1"); }
+
+    private static Object at(Object original, String pointer)
+    {
+        Object current = original;
+        if (pointer.isEmpty()) return current;
+        for (String part : pointer.substring(1).split("/", -1))
+        {
+            String token = part.replace("~1", "/").replace("~0", "~");
+            if (current instanceof Map<?, ?> map) current = map.get(token);
+            else if (current instanceof List<?> list)
+            {
+                try { current = list.get(Integer.parseInt(token)); }
+                catch (IndexOutOfBoundsException | NumberFormatException ex) { return null; }
+            }
+            else return null;
+        }
+        return current;
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> castMap(Map<?, ?> map)
+    private static Map<String, Object> snapshotMap(Map<String, Object> value) { return (Map<String, Object>) snapshot(value); }
+    private static Object snapshot(Object value)
     {
-        return (Map<String, Object>) map;
-    }
-
-    private Object validateNode(Object value,
-            SkillInputSchemaNode schema,
-            String path,
-            List<SkillInputValidationIssue> issues, ExactPolicy policy)
-    {
-        return switch (schema.type())
-        {
-            case SkillInputSchemaNode.ANY_TYPE -> validateUnconstrained(value, path, issues);
-            case "object" -> validateObject(value, schema, path, issues, policy);
-            case "array" -> validateArray(value, schema, path, issues, policy);
-            case "integer" -> validateInteger(value, schema, path, issues, policy);
-            case "number" -> validateNumber(value, schema, path, issues, policy);
-            case "boolean" -> validateBoolean(value, schema, path, issues, policy);
-            case "string" -> validateString(value, schema, path, issues, policy);
-            case "attachment" -> validateAttachment(value, schema, path, issues);
-            default -> {
-                issues.add(issue(path, "unsupported_schema_type",
-                        "Unsupported input schema type '" + schema.type() + "'.", value));
-                yield value;
-            }
-        };
-    }
-
-    private Object validateUnconstrained(Object value,
-            String path,
-            List<SkillInputValidationIssue> issues)
-    {
-        if (value == null || value instanceof String || value instanceof Boolean)
-        {
-            return value;
-        }
-        if (value instanceof Float floatValue)
-        {
-            if (Float.isFinite(floatValue))
-            {
-                return value;
-            }
-            issues.add(issue(path, "non_json_value", "Expected a JSON-compatible value.", value));
-            return value;
-        }
-        if (value instanceof Double doubleValue)
-        {
-            if (Double.isFinite(doubleValue))
-            {
-                return value;
-            }
-            issues.add(issue(path, "non_json_value", "Expected a JSON-compatible value.", value));
-            return value;
-        }
-        if (value instanceof Number)
-        {
-            return value;
-        }
-        if (value instanceof Map<?, ?> mapValue)
-        {
-            LinkedHashMap<String, Object> normalized = new LinkedHashMap<>();
-            for (Map.Entry<?, ?> entry : mapValue.entrySet())
-            {
-                if (!(entry.getKey() instanceof String fieldName))
-                {
-                    issues.add(issue(path, "non_json_value", "JSON object keys must be strings.", entry.getKey()));
-                    continue;
-                }
-                normalized.put(fieldName,
-                        validateUnconstrained(entry.getValue(), join(path, fieldName), issues));
-            }
-            return immutableMap(normalized);
-        }
-        if (value instanceof List<?> listValue)
-        {
-            List<Object> normalized = new ArrayList<>();
-            for (int i = 0; i < listValue.size(); i++)
-            {
-                normalized.add(validateUnconstrained(listValue.get(i), path + "[" + i + "]", issues));
-            }
-            return immutableList(normalized);
-        }
-
-        issues.add(issue(path, "non_json_value", "Expected a JSON-compatible value.", value));
-        return value;
-    }
-
-    private Object validateObject(Object value,
-            SkillInputSchemaNode schema,
-            String path,
-            List<SkillInputValidationIssue> issues, ExactPolicy policy)
-    {
-        if (!(value instanceof Map<?, ?> mapValue))
-        {
-            issues.add(issue(path, "type_mismatch", "Expected object input.", value));
-            return Map.of();
-        }
-
-        LinkedHashMap<String, Object> normalized = new LinkedHashMap<>();
-        for (String required : schema.required())
-        {
-            if (!mapValue.containsKey(required) || (mapValue.get(required) == null
-                    && !(policy.child(required).exact() && schema.properties().get(required) != null
-                        && SkillInputSchemaNode.ANY_TYPE.equals(schema.properties().get(required).type()))))
-            {
-                issues.add(issue(join(path, required), "missing_required", "Required field is missing.", null));
-            }
-        }
-        for (Map.Entry<?, ?> entry : mapValue.entrySet())
-        {
-            String fieldName = String.valueOf(entry.getKey());
-            SkillInputSchemaNode child = schema.properties().get(fieldName);
-            if (child == null)
-            {
-                if (!schema.allowsAdditionalProperties())
-                {
-                    issues.add(issue(join(path, fieldName), "unknown_field", "Unknown field is not allowed.", entry.getValue()));
-                }
-                else if (schema.additionalPropertiesSchema() != null)
-                {
-                    normalized.put(
-                            fieldName,
-                            validateNode(entry.getValue(), schema.additionalPropertiesSchema(), join(path, fieldName), issues, policy.child(fieldName)));
-                }
-                else
-                {
-                    normalized.put(fieldName, policy.child(fieldName).exact()
-                            ? validateUnconstrained(entry.getValue(), join(path, fieldName), issues)
-                            : validateOpenBranch(entry.getValue(), join(path, fieldName), issues, policy.child(fieldName)));
-                }
-                continue;
-            }
-            normalized.put(fieldName, validateNode(entry.getValue(), child, join(path, fieldName), issues, policy.child(fieldName)));
-        }
-
-        return immutableMap(normalized);
-    }
-
-    private Object validateOpenBranch(Object value, String path,
-            List<SkillInputValidationIssue> issues, ExactPolicy policy)
-    {
-        if (policy.exact()) return validateUnconstrained(value, path, issues);
         if (value instanceof Map<?, ?> map)
         {
-            Map<String, Object> copied = new LinkedHashMap<>();
-            map.forEach((key, child) -> copied.put((String) key,
-                    validateOpenBranch(child, join(path, (String) key), issues, policy.child((String) key))));
-            return immutableMap(copied);
+            var copy = new LinkedHashMap<Object, Object>();
+            map.forEach((key, item) -> copy.put(key, snapshot(item)));
+            return Collections.unmodifiableMap(copy);
         }
-        return DeepInputValues.immutableCopy(value);
-    }
-
-    private Object validateArray(Object value,
-            SkillInputSchemaNode schema,
-            String path,
-            List<SkillInputValidationIssue> issues, ExactPolicy policy)
-    {
-        if (!(value instanceof List<?> listValue))
-        {
-            issues.add(issue(path, "type_mismatch", "Expected array input.", value));
-            return List.of();
-        }
-        if (schema.items() == null)
-        {
-            return policy.exact() ? validateUnconstrained(listValue, path, issues)
-                    : DeepInputValues.immutableCopy(listValue);
-        }
-        List<Object> normalized = new ArrayList<>();
-        for (int i = 0; i < listValue.size(); i++)
-        {
-            normalized.add(validateNode(listValue.get(i), schema.items(), path + "[" + i + "]", issues, policy.child(Integer.toString(i))));
-        }
-        return immutableList(normalized);
-    }
-
-    private Object validateInteger(Object value,
-            SkillInputSchemaNode schema,
-            String path,
-            List<SkillInputValidationIssue> issues, ExactPolicy policy)
-    {
-        if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long
-                || value instanceof java.math.BigInteger)
-        {
-            return value;
-        }
-        if (!policy.exact() && value instanceof String text)
-        {
-            try
-            {
-                long parsed = Long.parseLong(text);
-                if (parsed >= Integer.MIN_VALUE && parsed <= Integer.MAX_VALUE)
-                {
-                    return (int) parsed;
-                }
-                return parsed;
-            }
-            catch (NumberFormatException ex)
-            {
-                issues.add(issue(path, "coercion_failed", "Could not coerce value to integer.", value));
-                return value;
-            }
-        }
-        issues.add(issue(path, "type_mismatch", "Expected integer input.", value));
+        if (value instanceof List<?> list) return Collections.unmodifiableList(list.stream().map(SkillInputValidator::snapshot).toList());
         return value;
     }
-
-    private Object validateNumber(Object value,
-            SkillInputSchemaNode schema,
-            String path,
-            List<SkillInputValidationIssue> issues, ExactPolicy policy)
-    {
-        if (value instanceof Number)
-        {
-            if (policy.exact() && ((value instanceof Double d && !Double.isFinite(d))
-                    || (value instanceof Float f && !Float.isFinite(f))))
-            {
-                issues.add(issue(path, "type_mismatch", "Expected finite number input.", value));
-            }
-            return value;
-        }
-        if (!policy.exact() && value instanceof String text)
-        {
-            try
-            {
-                return Double.parseDouble(text);
-            }
-            catch (NumberFormatException ex)
-            {
-                issues.add(issue(path, "coercion_failed", "Could not coerce value to number.", value));
-                return value;
-            }
-        }
-        issues.add(issue(path, "type_mismatch", "Expected number input.", value));
-        return value;
-    }
-
-    private Object validateBoolean(Object value,
-            SkillInputSchemaNode schema,
-            String path,
-            List<SkillInputValidationIssue> issues, ExactPolicy policy)
-    {
-        if (value instanceof Boolean)
-        {
-            return value;
-        }
-        if (!policy.exact() && value instanceof String text)
-        {
-            String normalized = text.trim().toLowerCase(Locale.ROOT);
-            if ("true".equals(normalized))
-            {
-                return true;
-            }
-            if ("false".equals(normalized))
-            {
-                return false;
-            }
-            issues.add(issue(path, "coercion_failed", "Could not coerce value to boolean.", value));
-            return value;
-        }
-        issues.add(issue(path, "type_mismatch", "Expected boolean input.", value));
-        return value;
-    }
-
-    private Object validateString(Object value,
-            SkillInputSchemaNode schema,
-            String path,
-            List<SkillInputValidationIssue> issues, ExactPolicy policy)
-    {
-        if (acceptsRuntimeRefValue(schema, value))
-        {
-            return value;
-        }
-        if (!(value instanceof String text))
-        {
-            issues.add(issue(path, "type_mismatch", "Expected string input.", value));
-            return value;
-        }
-        if (!schema.enumValues().isEmpty() && !schema.enumValues().contains(text))
-        {
-            issues.add(issue(path, "enum_mismatch", "Value must be one of " + schema.enumValues() + ".", value));
-        }
-        if ("date".equals(schema.format()))
-        {
-            String normalized = normalizeDate(text, policy.exact());
-            if (normalized == null)
-            {
-                issues.add(issue(path, "invalid_date_format", "Date must match YYYY-MM-DD or MM/DD/YYYY style input.", value));
-                return value;
-            }
-            return policy.exact() ? text : normalized;
-        }
-        return text;
-    }
-
-    private boolean acceptsRuntimeRefValue(SkillInputSchemaNode schema, Object value)
-    {
-        if (value == null || !schema.isString() || !schema.runtimeRefCapable())
-        {
-            return false;
-        }
-        return value instanceof byte[]
-                || value instanceof Resource
-                || value instanceof InputStream;
-    }
-
-    private Object validateAttachment(Object value,
-            SkillInputSchemaNode schema,
-            String path,
-            List<SkillInputValidationIssue> issues)
-    {
-        if (value instanceof String text && text.matches("^ref://\\S+$"))
-        {
-            return text;
-        }
-        if (value instanceof Resource)
-        {
-            return value;
-        }
-
-        issues.add(issue(path, "type_mismatch",
-                "Expected attachment input as a strict ref:// value or Spring Resource.", value));
-        return value;
-    }
-
-    private String normalizeDate(String value, boolean exact)
-    {
-        if (value == null || value.isBlank())
-        {
-            return null;
-        }
-
-        List<DateTimeFormatter> formatters = List.of(
-                DateTimeFormatter.ISO_LOCAL_DATE,
-                dateFormatter("M/d/uuuu", exact),
-                dateFormatter("M-d-uuuu", exact));
-
-        for (DateTimeFormatter formatter : formatters)
-        {
-            try
-            {
-                return LocalDate.parse(value, formatter).toString();
-            }
-            catch (DateTimeException ignored)
-            {
-            }
-        }
-        return null;
-    }
-
-    private DateTimeFormatter dateFormatter(String pattern, boolean exact)
-    {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
-        return exact ? formatter.withResolverStyle(java.time.format.ResolverStyle.STRICT) : formatter;
-    }
-
-    private SkillInputValidationIssue issue(String path, String code, String message, Object rejectedValue)
-    {
-        return new SkillInputValidationIssue(path == null ? "" : path, code, message, rejectedValue);
-    }
-
-    private Map<String, Object> immutableMap(Map<String, Object> values)
-    {
-        return Collections.unmodifiableMap(new LinkedHashMap<>(values));
-    }
-
-    private List<Object> immutableList(List<Object> values)
-    {
-        return Collections.unmodifiableList(new ArrayList<>(values));
-    }
-
-    private String join(String parent, String child)
-    {
-        return parent == null || parent.isBlank() ? child : parent + "." + child;
-    }
-    private record ExactPolicy(List<String> current, List<List<String>> roots)
-    {
-        boolean exact()
-        {
-            return roots.stream().anyMatch(root -> current.size() >= root.size()
-                    && current.subList(0, root.size()).equals(root));
-        }
-
-        ExactPolicy child(String token)
-        {
-            List<String> path = new ArrayList<>(current);
-            path.add(token);
-            return new ExactPolicy(List.copyOf(path), roots);
-        }
-    }
-
 }

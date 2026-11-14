@@ -2,7 +2,7 @@
 audience: loomspan-skill-builder
 status: development
 applies_to: bundled-loomspan-revision
-coverage: canonical-java-declarations
+coverage: canonical-input-admission
 ---
 
 # Reflected Java Input Contracts
@@ -12,10 +12,12 @@ coverage: canonical-java-declarations
 For authored YAML schemas, read [standard schemas](standard-schemas.md). Java
 registration generates and compiles canonical input schemas using that same
 compiler. Registration, JSON-bound validation and registered Java binding have
-focused executable coverage. Input dispatch, runtime-value validation, reference
-resolution and planner consumers remain inconsistent with canonical contracts;
-the complete application build and public invocation path are unavailable. Direct
-binding tests do not establish runtime ingress or provider acceptance.
+focused executable coverage. Local runtime-value admission and reference selection
+are also covered using the real validator and traversal sources. The complete
+application build, public invocation and actual callback/manager graph remain
+unavailable because surrounding binding, attachment, output and planner consumers
+are inconsistent with canonical contracts. Local composition does not establish
+full dispatch or provider acceptance.
 
 Use this topic for an annotation-defined Java skill. Loomspan reflects its Java signature and `@SkillParam` metadata as the provider-facing schema, planner guidance, and root/child runtime validation contract. There is no companion YAML or input-contract inheritance layer.
 
@@ -42,7 +44,7 @@ This topic covers reflected Java contracts; [standard schemas](standard-schemas.
 ## Enforced Semantics
 
 - Java `Object` is emitted as the JSON Schema empty schema `{}` at that value node. The canonical contract retains this meaning and any description; it does not rewrite it to `type: object`.
-- Unconstrained leaves declare JSON values, not arbitrary Java objects. Runtime ingress must reject non-JSON objects, non-string map keys and non-finite numbers before conversion; the complete ingress path is currently unavailable. JSON-bound canonical validation does not perform Java runtime-handle adaptation.
+- Unconstrained leaves declare JSON values, not arbitrary Java objects. Local admission rejects non-JSON objects, non-string map keys and non-finite numbers before conversion, including open undeclared properties and nested lists/maps. Numeric and string keys never collapse into one property. Standard validation preserves values without coercion.
 - `Map<String, Object>` does not infer keys, property names, or domain constraints. Scalars, nested objects, arrays, and JSON null values may appear under its string keys.
 - Typed maps remain typed. String, integer, number, boolean, enum, DTO, required-field and closed-object constraints apply to every entry value. Numeric strings do not satisfy integer schemas; validation does not coerce values.
 - Planner examples and verbose rules label unconstrained leaves as `any JSON value`. An open generic map is not a no-argument tool.
@@ -78,8 +80,7 @@ This topic covers reflected Java contracts; [standard schemas](standard-schemas.
 - Binding a supported Resource-valued list, map or array retains assignable
   Resource handles without serializing their internals or reading their content.
   Converting a Resource to text/bytes still reads it; managed streams retain
-  success/failure cleanup. Actual reference resolution and runtime-handle
-  validation require the unavailable runtime integration described above.
+  success/failure cleanup. The local runtime adapter accepts marked direct handles without reads, checks actual strings/nulls against their canonical leaves, then validates surrounding structure using a private view. Original handles reach binding unchanged. Reference selection follows marked leaves; explicit unconstrained/open values keep literal ref:// strings. Complete dispatch remains subject to the integration limitation above.
 
 Minimal Java skill:
 
@@ -140,7 +141,7 @@ validation rules, defaults, data bindings or permission to invent absent values.
 `StepPromptBuilderTest#compactAndVerboseSelectionsKeepObjectRulesAcrossPropertyThreshold`
 protects detail selection. `StepLoopMissionExecutionEngineTest#preservesScopedGuidanceAndEvidenceThroughObjectBoundaryCorrection`
 captures ordinary and corrective requests and checks evidence fidelity and
-validation before execution. `SkillInputValidatorTest#scopedRenderingContractRetainsValidationAndTypedExtraValueBoundaries`
+validation before execution. `SkillInputValidatorTest#ordinaryUnconstrainedLeavesDoNotBypassParentChecks`
 protects unchanged enforcement separately from model guidance. This subsection
 describes generated guidance for resolved contracts; it does not document the
 complete pure-YAML schema language.
@@ -149,8 +150,7 @@ complete pure-YAML schema language.
 lossless path/text association; `rendersYamlDescriptionsThroughSharedResolvedNodes`
 checks manifest resolution. `StepLoopMissionExecutionEngineTest#sendsAuthoredDescriptionsInCompactVerboseAndCorrectiveModelRequests`
 captures actual deterministic model requests and validation before execution;
-`SkillInputValidatorTest#descriptionsDoNotChangeValidationOrNormalization` compares
-enforcement with and without descriptions. These tests establish prompt coverage,
+`SkillInputValidatorTest#acceptsEquivalentAuthoredGeneratedJsonValuesAndPresenceWithoutCoercion` covers described unconstrained values without changing admission. Retained prompt tests identify expected prompt coverage,
 not measured model accuracy. Live model comparisons are optional and are not a
 prerequisite for relying on this rendering behavior.
 
@@ -185,6 +185,6 @@ Use a typed map when arbitrary keys are part of the domain but all values share 
   unconstrained leaves, role restrictions, parent bounds and exact assertions.
 - `LoomspanMethodInputSchemaGenerator`, `SkillMethodBeanPostProcessor` and
   `CanonicalSchema` own canonical Java declaration publication and binding.
-  Resolver, validator and prompt-renderer integration remains unavailable;
-  retained tests named in the guidance section identify its consumers rather
+  The validator, local reference selection and argument reader have focused coverage; full resolver/session, callback/manager and prompt-renderer integration remain unavailable;
+  retained integration tests named in the guidance section identify consumers rather
   than a green complete runtime path.

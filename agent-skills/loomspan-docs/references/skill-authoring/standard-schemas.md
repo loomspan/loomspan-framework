@@ -16,7 +16,7 @@ PLANNING role. These declarations use the supported subset of JSON Schema Draft
 
 The declaration compiler, JSON-bound skill decoder and generated Java contracts
 have focused executable coverage. The current source checkout has incomplete consumer integration:
-input dispatch, attachment materialization, binding
+full input dispatch, attachment materialization, binding
 projection, output correction, planning and TypeSafe/evidence metadata consumers
 do not all accept the canonical representation yet. The complete application
 build and runtime paths are unavailable while those consumers are inconsistent.
@@ -208,3 +208,41 @@ Unlimited evaluation provides no CPU or memory guarantee.
 - `YamlSkillCatalog`, `YamlSkillManifest` and `YamlSkillDefinition` own registration
   wiring and retained definition snapshots. Foundation tests do not establish
   complete catalog, dispatch, correction, evidence or provider integration.
+
+## Ordinary input admission
+
+Explicit authored and generated inputs receive recursive Java-value checks before
+JSON conversion. String-keyed maps, lists, JSON scalars and finite standard numbers
+are accepted; arbitrary Java objects, non-string keys, non-finite numbers and
+unmarked Resource/InputStream/byte[] values reject before binding. These checks
+also cover undeclared properties when `additionalProperties` is true, omitted or
+`{}`. An open schema grants JSON shape freedom, not arbitrary Java-value access.
+Validation preserves exact values, property names, omission and permitted null.
+Numeric and boolean strings are not coerced; date strings must satisfy the
+standard format rather than being rewritten.
+
+Generated Resource, InputStream and byte[] leaves retain their internal runtime
+marker. Direct handles at those leaves pass a type gate without reading content;
+actual JSON strings and nulls still satisfy the canonical leaf assertions. Every
+array item and map value is checked independently. Standard surrounding required,
+closed-object, sibling and array-bound assertions remain effective. Binding owns
+conversion failures and stream cleanup. Attachment Resource/ref admission is a
+separate first pass and does not certify MIME/materialization or transport.
+
+Under explicit contracts, only marked or attachment leaves select reference
+resolution. Unmarked strings, unconstrained values and open extras preserve literal
+`ref://` text, including nested text. Genuine generic contracts retain separate
+recursive resolution behavior. Resolution does not bypass resource authorization.
+
+The local ordinary tool argument reader accepts exactly one JSON object, including
+`{}` where the contract allows it. Root null, strings, arrays, numbers, booleans,
+empty input and trailing JSON/garbage reject; trailing whitespace is permitted.
+Nested decimals and large integers retain their values before local validation.
+Native tool strictness is not enabled: models can still emit invalid arguments,
+and local pre-dispatch validation protects execution correctness.
+
+`SkillInputValidatorTest`, `InputIngressBindingTest`, `InputReferenceTraversalTest`
+and `OrdinaryToolArgumentsTest` cover these local boundaries with actual validator,
+reader, schema generation and registered Java binding sources. They do not prove
+complete public invocation, the actual callback/manager graph or provider request
+fidelity while the surrounding application build is unavailable.

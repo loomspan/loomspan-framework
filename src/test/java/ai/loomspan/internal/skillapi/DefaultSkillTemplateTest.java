@@ -19,7 +19,7 @@ import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import org.springframework.context.support.StaticApplicationContext;
 import ai.loomspan.internal.core.SkillExecutionDescriptor;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
-import ai.loomspan.internal.runtime.input.SkillInputSchemaNode;
+import ai.loomspan.internal.runtime.input.SkillInputContractResolver;
 import ai.loomspan.internal.runtime.input.SkillInputValidator;
 import ai.loomspan.internal.security.SkillRoleEvaluator;
 import org.junit.jupiter.api.Test;
@@ -526,18 +526,9 @@ class DefaultSkillTemplateTest {
                 noopInvoker(),
                 SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"),
-                new SkillInputContract(
-                        SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
-                        new SkillInputSchemaNode(
-                                "object",
-                                Map.of("payload", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
-                                List.of("payload"),
-                                Boolean.FALSE,
-                                null,
-                                List.of(),
-                                null,
-                                null,
-                                false, true)),
+                new SkillInputContractResolver().resolveJavaCapability("""
+                        {"type":"object","properties":{"payload":{"type":"string"}},"required":["payload"],"additionalProperties":false}
+                        """),
                 null);
         registry.register("default-invoiceParser", yamlSkill);
         when(router.execute(eq(yamlSkill), eq(Map.of("payload", "hello")), any(), eq(null))).thenReturn("\"ok\"");
@@ -623,6 +614,58 @@ class DefaultSkillTemplateTest {
         verify(router, never()).execute(eq(yamlSkill), eq(Map.of()), any(), eq(null));
     }
 
+    /** Retained actual public map-boundary fixtures; execution awaits full source restoration. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Test void publicMapRejectsNonStringKeysAndNonJsonValuesBeforeAdmissionOrExecution() {
+        TestCapabilityRegistry registry=new TestCapabilityRegistry();
+        var router=mock(CapabilityExecutionRouter.class);
+        var runner=mock(LoomspanSessionRunner.class);
+        var contract=new SkillInputContractResolver().resolveJavaCapability("""
+                {"type":"object","properties":{"value":{"type":"object","additionalProperties":{}}}}
+                """);
+        var capability=new CapabilityMetadata("java:keys","default-keys","keys",SkillExecutionDescriptor.none(),
+                ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),input->{throw new AssertionError("must not execute");},
+                SkillKind.JAVA,CapabilityToolDescriptor.generic("default-keys","keys"),contract,null);
+        registry.register(capability.name(),capability);
+        var template=new DefaultSkillTemplate(registry.manager(),router,runner,new ObjectMapper(),new SkillInputValidator(),new SkillRoleEvaluator(null,null),null);
+        for(Object key:java.util.Arrays.asList(1,true,null)) {
+            var collision=new LinkedHashMap<Object,Object>();collision.put(key,"numeric");collision.put("1","string");
+            for(Map<String,Object> input:List.<Map<String,Object>>of((Map)collision,Map.of("value",collision),Map.of("extra",List.of(Map.of("deep",collision))))) {
+                assertThatThrownBy(()->template.validate(capability.name(),input)).isInstanceOf(SkillInputValidationException.class);
+                assertThatThrownBy(()->template.invoke(capability.name(),input)).isInstanceOf(SkillInputValidationException.class);
+                assertThat(collision).hasSize(2);assertThat(collision.get(key)).isEqualTo("numeric");assertThat(collision.get("1")).isEqualTo("string");
+            }
+        }
+        var stream=new java.io.InputStream(){public int read(){throw new AssertionError("do not consume");}};
+        var resource=new org.springframework.core.io.AbstractResource(){public String getDescription(){return "untouched";}public java.io.InputStream getInputStream(){throw new AssertionError("do not open");}};
+        for(Object invalid:List.of(stream,resource,new byte[]{1},new Object(),Double.NaN,Float.POSITIVE_INFINITY)) {
+            var input=Map.<String,Object>of("extra",List.of(Map.of("deep",invalid)));
+            assertThatThrownBy(()->template.validate(capability.name(),input)).isInstanceOf(SkillInputValidationException.class);
+            assertThatThrownBy(()->template.invoke(capability.name(),input)).isInstanceOf(SkillInputValidationException.class);
+            assertThat(((Map<?,?>)((List<?>)input.get("extra")).getFirst()).get("deep")).isSameAs(invalid);
+        }
+        org.mockito.Mockito.verifyNoInteractions(router,runner);
+    }
+
+    @Test void publicMapPreservesPresentNullOptionalAbsenceAndExactValues() {
+        TestCapabilityRegistry registry=new TestCapabilityRegistry();var router=mock(CapabilityExecutionRouter.class);
+        var contract=new SkillInputContractResolver().resolveJavaCapability("""
+                {"type":"object","required":["value"],"properties":{"value":{},"optional":{}},"additionalProperties":false}
+                """);
+        var capability=new CapabilityMetadata("java:json","default-json","json",SkillExecutionDescriptor.none(),
+                ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),input->"unused",SkillKind.JAVA,
+                CapabilityToolDescriptor.generic("default-json","json"),contract,null);
+        registry.register(capability.name(),capability);
+        var template=new DefaultSkillTemplate(registry.manager(),router,new LoomspanSessionRunner(4),new ObjectMapper(),new SkillInputValidator(),new SkillRoleEvaluator(null,null),null);
+        when(router.execute(eq(capability),any(),any(),eq(null))).thenAnswer(call->{
+            Map<String,Object> received=call.getArgument(1);assertThat(received).containsKey("value").doesNotContainKey("optional");return "ok";
+        });
+        var input=new LinkedHashMap<String,Object>();input.put("value",null);
+        template.validate(capability.name(),input);assertThat(template.invoke(capability.name(),input)).isEqualTo("ok");assertThat(input).containsEntry("value",null).doesNotContainKey("optional");
+        var exact=new java.math.BigDecimal("0.12345678901234567890123456789");input.put("value",Map.of("literal","ref://ordinary","number",exact));
+        assertThat(template.invoke(capability.name(),input)).isEqualTo("ok");assertThat(((Map<?,?>)input.get("value")).get("number")).isSameAs(exact);
+        assertThatThrownBy(()->template.invoke(capability.name(),Map.of())).isInstanceOf(SkillInputValidationException.class);
+    }
     private CapabilityMetadata yamlSkillMetadata() {
         return new CapabilityMetadata(
                 "yaml:invoiceParser",
@@ -632,18 +675,9 @@ class DefaultSkillTemplateTest {
                 noopInvoker(),
                 SkillKind.JAVA,
                 CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"),
-                new SkillInputContract(
-                        SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
-                        new SkillInputSchemaNode(
-                                "object",
-                                Map.of("payload", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
-                                List.of("payload"),
-                                Boolean.FALSE,
-                                null,
-                                List.of(),
-                                null,
-                                null,
-                                false, true)),
+                new SkillInputContractResolver().resolveJavaCapability("""
+                        {"type":"object","properties":{"payload":{"type":"string"}},"required":["payload"],"additionalProperties":false}
+                        """),
                 null);
     }
 

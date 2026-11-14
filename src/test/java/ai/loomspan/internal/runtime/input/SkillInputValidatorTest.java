@@ -1,505 +1,215 @@
 package ai.loomspan.internal.runtime.input;
 
+import ai.loomspan.internal.schema.StandardSchemaCompiler;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
+import org.springframework.core.io.AbstractResource;
+import java.io.*;
+import java.math.*;
+import java.util.*;
+import static org.assertj.core.api.Assertions.*;
 
-import java.io.ByteArrayInputStream;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
-class SkillInputValidatorTest {
-
-    private final SkillInputValidator validator = new SkillInputValidator();
-
-    @Test
-    void exactPolicyUsesLiteralKeysAndKeepsCompleteReceivingConstraints() {
-        var contract = new SkillInputContractResolver().resolveJavaCapability("""
-                {"type":"object","properties":{"a.b":{"type":"integer"},"a":{"type":"object",
-                 "properties":{"b":{"type":"integer"}},"additionalProperties":false},
-                 "bound":{"type":"object","properties":{"kind":{"type":"string","enum":["accepted"]}},
-                 "required":["kind"],"additionalProperties":false}},"additionalProperties":false}
-                """);
-        var accepted = validator.validateExact(Map.of("a.b", 1, "a", Map.of("b", "2"),
-                "bound", Map.of("kind", "accepted")), contract, List.of(List.of("a.b"), List.of("bound")));
-        assertThat(accepted.valid()).isTrue();
-        assertThat(((Map<?,?>) accepted.normalizedInput().get("a")).get("b")).isEqualTo(2);
-        assertThat(validator.validateExact(Map.of("a.b", "1"), contract, List.of(List.of("a.b"))).valid()).isFalse();
-        for (Map<String,Object> invalid : List.<Map<String,Object>>of(Map.of(), Map.of("kind", "wrong"),
-                Map.of("kind", "accepted", "extra", "forbidden")))
-            assertThat(validator.validateExact(Map.of("bound", invalid), contract, List.of(List.of("bound"))).valid()).isFalse();
-        var typedNull = new LinkedHashMap<String,Object>();
-        typedNull.put("a.b", null);
-        assertThat(validator.validateExact(typedNull, contract, List.of(List.of("a.b"))).valid()).isFalse();
-        assertThat(validator.validateExact(Map.of("bound", Map.of("number", Double.POSITIVE_INFINITY)),
-                SkillInputContract.genericObject(), List.of(List.of("bound", "number"))).valid()).isFalse();
+class SkillInputValidatorTest
+{
+    final SkillInputValidator validator = new SkillInputValidator();
+    static final StandardSchemaCompiler compiler = new StandardSchemaCompiler();
+    static SkillInputContract contract(String schema) { return contract(schema, StandardSchemaCompiler.Origin.AUTHORED); }
+    static SkillInputContract contract(String schema, StandardSchemaCompiler.Origin origin) {
+        return new SkillInputContract(origin == StandardSchemaCompiler.Origin.AUTHORED
+                ? SkillInputContract.SkillInputContractKind.YAML_EXPLICIT : SkillInputContract.SkillInputContractKind.JAVA_REFLECTED,
+                compiler.compile(schema, StandardSchemaCompiler.Role.INPUT, origin));
     }
+    static String root(String leaf) { return "{\"type\":\"object\",\"properties\":{\"value\":"+leaf+"}}"; }
+    static Map<String,Object> input(Object value) { var map=new LinkedHashMap<String,Object>();map.put("value",value);return map; }
+    static final String MARK = "\"x-loomspan-runtime-ref-capable\":true";
+    static String marked(String assertions) { return "{\"type\":\"string\","+MARK+assertions+"}"; }
+    static class NoReadResource extends AbstractResource {
+        int opens;
+        public String getDescription(){return "untouched";}
+        public InputStream getInputStream(){opens++;throw new AssertionError("must not open");}
+    }
+    static class NoReadStream extends InputStream {
+        int reads;
+        public int read(){reads++;throw new AssertionError("must not read");}
+    }
+    static class NoSerialization { public String getValue(){throw new AssertionError("must not serialize");} }
 
-    @Test
-    void exactBoundSubtreesRejectCoercionAndRetainDatesAndNumbers() {
-        var contract = new SkillInputContractResolver().resolveJavaCapability("""
-                {"type":"object","properties":{"bound":{"type":"object","properties":{
-                 "integer":{"type":"integer"},"number":{"type":"number"},
-                 "flag":{"type":"boolean"},"date":{"type":"string","format":"date"}},
-                 "required":["integer","number","flag","date"],"additionalProperties":false},
-                 "unbound":{"type":"integer"}},"required":["bound","unbound"],"additionalProperties":false}
-                """);
-        var bound = Map.<String,Object>of("integer", new java.math.BigInteger("999999999999999999999999"),
-                "number", new java.math.BigDecimal("1.234567890123456789"), "flag", true, "date", "1/2/2026");
-        var valid = validator.validateExact(Map.of("bound", bound, "unbound", "42"), contract, List.of(List.of("bound")));
-        assertThat(valid.valid()).isTrue();
-        assertThat(valid.normalizedInput().get("bound")).isEqualTo(bound);
-        assertThat(valid.normalizedInput().get("unbound")).isEqualTo(42);
-        for (String field : List.of("integer", "number", "flag")) {
-            var invalid = new LinkedHashMap<>(bound);
-            invalid.put(field, "true".equals(field) ? "true" : "1");
-            assertThat(validator.validateExact(Map.of("bound", invalid, "unbound", "42"), contract,
-                    List.of(List.of("bound"))).valid()).isFalse();
+    @Test void acceptsEquivalentAuthoredGeneratedJsonValuesAndPresenceWithoutCoercion() {
+        for (var origin:StandardSchemaCompiler.Origin.values()) {
+            var c=contract("{\"type\":\"object\",\"required\":[\"value\"],\"properties\":{\"value\":{\"description\":\" exact \"}},\"additionalProperties\":false}",origin);
+            for(Object value:Arrays.asList(null,"ref://literal",true,4,5L,new BigInteger("123456789012345678901234567890"),new BigDecimal("0.12345678901234567890123456789"),1.5f,2.5d,Map.of("nested",List.of("x",true)),Arrays.asList(null,Map.of("a","ref://literal")))) {
+                var values=input(value);var before=new LinkedHashMap<>(values);
+                var result=validator.validate(values,c);
+                assertThat(result.valid()).as("%s => %s",value,result.issues()).isTrue();
+                assertThat(result.normalizedInput()).isEqualTo(before);assertThat(values).isEqualTo(before);
+                if(!(value instanceof Map || value instanceof List)) assertThat(result.normalizedInput().get("value")).isSameAs(value);
+            }
+            assertThat(validator.validate(Map.of(),c).valid()).isFalse();
+            var optional=contract(root("{}"),origin);
+            assertThat(validator.validate(Map.of(),optional).normalizedInput()).doesNotContainKey("value");
+            assertThat(validator.validate(input(null),optional).normalizedInput()).containsEntry("value",null);
+            assertThat(c.schema().tree().at("/properties/value/description").asText()).isEqualTo(" exact ");
         }
-        var nonfinite = new LinkedHashMap<>(bound);
-        nonfinite.put("number", Double.NaN);
-        assertThat(validator.validateExact(Map.of("bound", nonfinite, "unbound", "42"), contract,
-                List.of(List.of("bound"))).valid()).isFalse();
-        var invalidDate = new LinkedHashMap<>(bound);
-        invalidDate.put("date", "2/30/2026");
-        assertThat(validator.validateExact(Map.of("bound", invalidDate, "unbound", "42"), contract,
-                List.of(List.of("bound"))).valid()).isFalse();
-        var ordinary = validator.validate(Map.of("bound", bound, "unbound", "42"), contract);
-        assertThat(((Map<?,?>) ordinary.normalizedInput().get("bound")).get("date")).isEqualTo("2026-01-02");
     }
 
-    @Test
-    void exactNullAtRequiredUnconstrainedLeafDiffersFromAbsentAndContainersAreDetached() {
-        var contract = new SkillInputContractResolver().resolveJavaCapability("""
-                {"type":"object","properties":{"literal.dot":{},"rows":{"type":"array"}},
-                 "required":["literal.dot"],"additionalProperties":true}
-                """);
-        var input = new LinkedHashMap<String,Object>();
-        input.put("literal.dot", null);
-        var mutableChild = new LinkedHashMap<String,Object>(Map.of("value", "original"));
-        input.put("rows", new java.util.ArrayList<>(List.of(mutableChild)));
-        input.put("open", mutableChild);
-        var valid = validator.validateExact(input, contract, List.of(List.of("literal.dot")));
-        assertThat(valid.valid()).isTrue();
-        assertThat(valid.normalizedInput()).containsEntry("literal.dot", null);
-        mutableChild.put("value", "changed");
-        assertThat(valid.normalizedInput().get("open")).isEqualTo(Map.of("value", "original"));
-        assertThat(valid.normalizedInput().get("rows")).isEqualTo(List.of(Map.of("value", "original")));
-        input.remove("literal.dot");
-        assertThat(validator.validateExact(input, contract, List.of(List.of("literal.dot"))).valid()).isFalse();
-        var generic = validator.validate(input, SkillInputContract.genericObject());
-        mutableChild.put("value", "changed again");
-        assertThat(generic.normalizedInput().get("open")).isEqualTo(Map.of("value", "changed"));
+    @Test void standardTypesFormatsEnumsAndBoundsAreExact() {
+        for(String leaf:List.of("{\"type\":\"integer\"}","{\"type\":\"number\"}","{\"type\":\"boolean\"}"))
+            assertThat(validator.validate(input("1"),contract(root(leaf))).valid()).isFalse();
+        var date=contract(root("{\"type\":\"string\",\"format\":\"date\"}"));
+        assertThat(validator.validate(input("2026-11-13"),date).valid()).isTrue();
+        for(String text:List.of("11/13/2026","2026-02-30","2026-1-1")) assertThat(validator.validate(input(text),date).valid()).isFalse();
+        var numeric=contract(root("{\"type\":\"number\",\"maximum\":1.00000000000000000001}"));
+        assertThat(validator.validate(input(new BigDecimal("1.00000000000000000002")),numeric).valid()).isFalse();
+        var text=contract(root("{\"type\":\"string\",\"minLength\":2,\"maxLength\":3,\"enum\":[\"yes\"]}"));
+        for(String value:List.of("y","yes!","YES")) assertThat(validator.validate(input(value),text).valid()).isFalse();
+        assertThat(validator.validate(input("yes"),text).valid()).isTrue();
     }
 
-    @Test
-    void descriptionsDoNotChangeValidationOrNormalization() {
-        var resolver = new SkillInputContractResolver();
-        String schema = """
-                {"type":"object","properties":{
-                  "count":{"type":"integer"},
-                  "optional":{"type":"object","properties":{"code":{"type":"string","enum":["east","west"]}},
-                    "required":["code"],"additionalProperties":false},
-                  "rows":{"type":"array","items":{"type":"integer"}},
-                  "tags":{"type":"object","additionalProperties":{"type":"string"}}},
-                 "required":["count"],"additionalProperties":false}
-                """;
-        var plain = resolver.resolveJavaCapability(schema);
-        var described = resolver.resolveJavaCapability(schema.replace("\"type\":", "\"description\":\"Default 99; require all data from context\",\"type\":"));
-        for (var mode : SkillInputPromptRenderer.DetailLevel.values()) {
-            new SkillInputPromptRenderer().renderToolArgumentsExample(described, mode);
-            for (var input : List.<Map<String, Object>>of(Map.of("count", "2"),
-                    Map.of("count", 2, "optional", Map.of("code", "east"), "rows", List.of(1, 2), "tags", Map.of("extra", "v")),
-                    Map.of(), Map.of("count", 2, "optional", Map.of()),
-                    Map.of("count", 2, "optional", Map.of("code", "invalid")),
-                    Map.of("count", 2, "rows", List.of("invalid")), Map.of("count", 2, "tags", Map.of("extra", List.of(1))),
-                    Map.of("count", 2, "extra", "forbidden"))) {
-                assertThat(validator.validate(input, described)).isEqualTo(validator.validate(input, plain));
+    @Test void rejectsNonJsonValuesRecursivelyAtAllOrdinaryOpenLocationsWithoutReading() {
+        var resource=new NoReadResource();var stream=new NoReadStream();
+        var invalid=List.of(new NoSerialization(),resource,stream,new byte[]{1},Float.NaN,Float.POSITIVE_INFINITY,Float.NEGATIVE_INFINITY,Double.NaN,Double.POSITIVE_INFINITY,Double.NEGATIVE_INFINITY,new java.util.concurrent.atomic.AtomicInteger(1));
+        for(var origin:StandardSchemaCompiler.Origin.values()) for(String openness:List.of("",",\"additionalProperties\":true",",\"additionalProperties\":{}")) {
+            var open=contract("{\"type\":\"object\""+openness+"}",origin);
+            for(Object value:invalid) for(Object nested:List.of(value,Map.of("deep",value),List.of(Map.of("deep",value)))) {
+                var values=input(nested); var before=new LinkedHashMap<>(values);
+                var result=validator.validate(values,open);
+                assertThat(result.valid()).as("%s %s",openness,value.getClass()).isFalse();
+                assertThat(result.issues()).anySatisfy(issue->{assertThat(issue.code()).isEqualTo("non_json_value");assertThat(issue.path()).startsWith("/value");assertThat(issue.rejectedValue()).isSameAs(value);});
+                assertThat(values).isEqualTo(before);
             }
         }
+        for(Object value:invalid) for(String leaf:List.of("{}","{\"type\":\"string\"}","{\"type\":\"string\",\"x-loomspan-runtime-ref-capable\":false}"))
+            assertThat(validator.validate(input(value),contract(root(leaf),StandardSchemaCompiler.Origin.GENERATED)).valid()).isFalse();
+        assertThat(resource.opens).isZero();assertThat(stream.reads).isZero();
     }
 
-    @Test
-    void scopedRenderingContractRetainsValidationAndTypedExtraValueBoundaries() {
-        var contract = new SkillInputContractResolver().resolveJavaCapability("""
-                {"type":"object","properties":{
-                  "shipmentId":{"type":"string"},"details":{"type":"object",
-                    "properties":{"routingEvidence":{}},"required":["routingEvidence"],"additionalProperties":true},
-                  "tags":{"type":"object","properties":{"declared":{"type":"boolean"}},"additionalProperties":{"type":"string"}}},
-                 "required":["shipmentId","details"],"additionalProperties":false}
-                """);
-        var evidence = new LinkedHashMap<String, Object>();
-        evidence.put("null", null);
-        evidence.put("list", List.of("east", Map.of("quote", 73)));
-        var valid = Map.<String, Object>of("shipmentId", "S-42", "details", Map.of("routingEvidence", evidence, "extra", evidence),
-                "tags", Map.of("declared", true, "extra", "east"));
-        var accepted = validator.validate(valid, contract);
-        assertThat(accepted.valid()).isTrue();
-        assertThat(accepted.normalizedInput()).isEqualTo(valid);
-        var rootExtra = new LinkedHashMap<>(valid);
-        rootExtra.put("extra", evidence);
-        assertThat(validator.validate(rootExtra, contract).issues()).extracting(SkillInputValidationIssue::code).contains("unknown_field");
-        assertThat(validator.validate(Map.of("shipmentId", "S-42", "details", Map.of("extra", evidence)), contract).issues())
-                .extracting(SkillInputValidationIssue::code).contains("missing_required");
-        var typedExtra = new LinkedHashMap<>(valid);
-        typedExtra.put("tags", Map.of("declared", true, "extra", List.of("east")));
-        assertThat(validator.validate(typedExtra, contract).valid()).isFalse();
+    @SuppressWarnings({"unchecked","rawtypes"})
+    @Test void rejectsRuntimeMapKeysAndCollisionsBeforeCopyOrConversion() {
+        for(Object key:Arrays.asList(1,true,null)) {
+            var bad=new LinkedHashMap<Object,Object>();bad.put(key,"numeric");bad.put("1","string");
+            for(var c:List.of(contract(root("{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}")),contract(root("{}")),SkillInputContract.genericObject())) {
+                for(Map<String,Object> values:List.of(input(bad),input(List.of(Map.of("deep",bad))),(Map)bad)) {
+                    var result=validator.validate(values,c);
+                    assertThat(result.valid()).isFalse();assertThat(result.issues()).anyMatch(issue->issue.code().equals("non_string_key"));
+                    assertThat(bad).hasSize(2);assertThat(bad.get(key)).isEqualTo("numeric");assertThat(bad.get("1")).isEqualTo("string");
+                }
+            }
+        }
+        var valid=contract(root("{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}"));
+        assertThat(validator.validate(input(Map.of("a/b~c","ok"," name ","text")),valid).valid()).isTrue();
     }
 
-    @Test
-    void validatesAndNormalizesInputContractCases() {
-        SkillInputContract contract = new SkillInputContract(
-                SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
-                new SkillInputSchemaNode(
-                        "object",
-                        Map.of(
-                                "payload", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false, true),
-                                "count", new SkillInputSchemaNode("integer", Map.of(), List.of(), null, null, List.of(), null, null, false, true),
-                                "mode", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of("A", "B"), null, null, false, true),
-                                "options", new SkillInputSchemaNode(
-                                        "object",
-                                        Map.of("enabled", new SkillInputSchemaNode("boolean", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
-                                        List.of("enabled"),
-                                        Boolean.FALSE,
-                                        null,
-                                        List.of(),
-                                        null,
-                                        null,
-                                        false, true)),
-                        List.of("payload", "options"),
-                        Boolean.FALSE,
-                        null,
-                        List.of(),
-                        null,
-                        null,
-                        false, true));
-
-        SkillInputValidationResult result = validator.validate(Map.of(
-                "payload", "hello",
-                "count", "3",
-                "mode", "C",
-                "options", Map.of(),
-                "extra", "nope"), contract);
-
-        assertThat(result.valid()).isFalse();
-        assertThat(result.normalizedInput().get("count")).isEqualTo(3);
-        assertThat(result.issues()).extracting(SkillInputValidationIssue::code)
-                .contains("enum_mismatch", "missing_required", "unknown_field");
+    @Test void runtimeLeavesAcceptOnlyMarkedDirectTypesAndKeepIdentityAndSchemas() {
+        var resource=new NoReadResource();var stream=new NoReadStream();var bytes=new byte[]{1,2};
+        var c=contract(root(marked(",\"minLength\":5,\"description\":\"handle\"")),StandardSchemaCompiler.Origin.GENERATED);
+        var canonical=c.schema().tree();var provider=c.schema().providerTree();
+        for(Object handle:List.of(resource,stream,bytes)) {
+            var values=input(handle);var result=validator.validate(values,c);
+            assertThat(result.valid()).as("%s",result.issues()).isTrue();
+            assertThat(result.normalizedInput().get("value")).isSameAs(handle);assertThat(values.get("value")).isSameAs(handle);
+        }
+        assertThat(validator.validate(input("short"),c).valid()).isTrue();
+        assertThat(validator.validate(input("bad"),c).valid()).isFalse();
+        assertThat(validator.validate(input(null),c).valid()).isFalse();
+        assertThat(validator.validate(input(4),c).valid()).isFalse();
+        assertThat(c.schema().tree()).isEqualTo(canonical);assertThat(c.schema().providerTree()).isEqualTo(provider);
+        assertThat(provider.at("/properties/value").has("x-loomspan-runtime-ref-capable")).isFalse();
+        assertThat(provider.at("/properties/value/type").asText()).isEqualTo("string");
+        assertThat(resource.opens).isZero();assertThat(stream.reads).isZero();
     }
 
-    @Test
-    void normalizesSupportedDateFormatsAndRejectsUnsupportedDates() {
-        SkillInputContract contract = new SkillInputContract(
-                SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
-                new SkillInputSchemaNode(
-                        "object",
-                        Map.of("invoiceDate", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, "date", false, true)),
-                        List.of("invoiceDate"),
-                        Boolean.FALSE,
-                        null,
-                        List.of(),
-                        null,
-                        null,
-                        false, true));
-
-        SkillInputValidationResult accepted = validator.validate(Map.of("invoiceDate", "3/30/2026"), contract);
-        SkillInputValidationResult rejected = validator.validate(Map.of("invoiceDate", "2026-03-30T10:15:00"), contract);
-
-        assertThat(accepted.valid()).isTrue();
-        assertThat(accepted.normalizedInput().get("invoiceDate")).isEqualTo("2026-03-30");
-        assertThat(rejected.valid()).isFalse();
-        assertThat(rejected.issues()).extracting(SkillInputValidationIssue::code).containsExactly("invalid_date_format");
+    @Test void checksEveryMarkedArrayAndMapOccurrenceBeforeWeakeningSharedSchemas() {
+        var resource=new NoReadResource();String leaf=marked(",\"minLength\":5,\"maxLength\":20,\"enum\":[\"ref://valid\"]");
+        var array=contract(root("{\"type\":\"array\",\"minItems\":1,\"maxItems\":3,\"items\":"+leaf+"}"),StandardSchemaCompiler.Origin.GENERATED);
+        assertThat(validator.validate(input(List.of(resource,"ref://valid")),array).valid()).isTrue();
+        for(Object bad:Arrays.asList("bad","ref://other",null,1,Map.of("x",true))) {
+            var result=validator.validate(input(Arrays.asList(resource,"ref://valid",bad)),array);
+            assertThat(result.valid()).isFalse();assertThat(result.issues()).anyMatch(issue->issue.path().equals("/value/2") && Objects.equals(issue.rejectedValue(),bad));
+        }
+        assertThat(validator.validate(input(List.of(resource,resource,resource,resource)),array).valid()).isFalse();
+        assertThat(validator.validate(input(List.of()),array).valid()).isFalse();
+        var map=contract(root("{\"type\":\"object\",\"additionalProperties\":"+leaf+"}"),StandardSchemaCompiler.Origin.GENERATED);
+        assertThat(validator.validate(input(Map.of("first",resource,"second","bad")),map).valid()).isFalse();
+        assertThat(resource.opens).isZero();
     }
 
-    @Test
-    void genericContractRemainsPermissive() {
-        SkillInputValidationResult result = validator.validate(Map.of("anything", List.of("goes")), SkillInputContract.genericObject());
-
-        assertThat(result.valid()).isTrue();
-        assertThat(result.issues()).isEmpty();
+    @Test void runtimeAdaptationRetainsNestedParentsSiblingsFalsePropertiesAndOriginalDiagnostics() {
+        var resource=new NoReadResource();
+        String schema="{\"type\":\"object\",\"required\":[\"value\"],\"additionalProperties\":false,\"properties\":{\"value\":{\"type\":\"object\",\"required\":[\"handle\",\"count\"],\"additionalProperties\":false,\"properties\":{\"handle\":"+marked("")+",\"count\":{\"type\":\"integer\"},\"reserved\":false}}}}";
+        var c=contract(schema,StandardSchemaCompiler.Origin.GENERATED);
+        assertThat(validator.validate(input(Map.of("handle",resource,"count",1)),c).valid()).isTrue();
+        for(Map<String,Object> bad:List.<Map<String,Object>>of(Map.of("handle",resource),Map.of("handle",resource,"count","1"),Map.of("handle",resource,"count",1,"extra",true),Map.of("handle",resource,"count",1,"reserved",true))) {
+            var values=input(bad);var result=validator.validate(values,c);
+            assertThat(result.valid()).isFalse();assertThat(result.issues()).allSatisfy(issue->{
+                assertThat(issue.message()).doesNotContain("/value/value","placeholder","x-loomspan");
+                if(issue.path().equals("/value")) assertThat(issue.rejectedValue()).isSameAs(bad);
+            });
+            assertThat(values.get("value")).isSameAs(bad);
+        }
+        assertThat(validator.validate(Map.of(),c).valid()).isFalse();assertThat(resource.opens).isZero();
     }
 
-    @Test
-    void preservesNullValuesInsteadOfThrowing() {
-        SkillInputContract contract = new SkillInputContract(
-                SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
-                new SkillInputSchemaNode(
-                        "object",
-                        Map.of("optionalField", new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
-                        List.of(),
-                        Boolean.TRUE,
-                        null,
-                        List.of(),
-                        null,
-                        null,
-                        false, true));
-
-        java.util.LinkedHashMap<String, Object> input = new java.util.LinkedHashMap<>();
-        input.put("optionalField", null);
-
-        SkillInputValidationResult result = validator.validate(input, contract);
-
-        assertThat(result.valid()).isFalse();
-        assertThat(result.normalizedInput()).containsEntry("optionalField", null);
-        assertThat(result.issues()).extracting(SkillInputValidationIssue::code).containsExactly("type_mismatch");
+    @Test void nullableMarkedPresenceIsIndependentFromRuntimePlaceholders() {
+        var resource=new NoReadResource();String leaf="{\"type\":[\"string\",\"null\"],"+MARK+"}";
+        var c=contract("{\"type\":\"object\",\"required\":[\"value\"],\"properties\":{\"value\":"+leaf+",\"optional\":"+leaf+",\"items\":{\"type\":\"array\",\"items\":"+leaf+"},\"map\":{\"type\":\"object\",\"additionalProperties\":"+leaf+"}}}",StandardSchemaCompiler.Origin.GENERATED);
+        var values=input(null);values.put("items",Arrays.asList(resource,null));values.put("map",input(null));
+        var result=validator.validate(values,c);assertThat(result.valid()).as("%s",result.issues()).isTrue();
+        assertThat(result.normalizedInput()).containsEntry("value",null).doesNotContainKey("optional");
+        assertThat(validator.validate(Map.of("items",List.of(resource)),c).valid()).isFalse();
+        values.put("optional",null);assertThat(validator.validate(values,c).valid()).isTrue();
     }
 
-    @Test
-    void allowsRuntimeRefBackedValuesForRefFriendlyStringContracts() {
-        SkillInputContract contract = new SkillInputContract(
-                SkillInputContract.SkillInputContractKind.JAVA_REFLECTED,
-                new SkillInputSchemaNode(
-                        "object",
-                        Map.of("payload", new SkillInputSchemaNode(
-                                "string",
-                                Map.of(),
-                                List.of(),
-                                null,
-                                null,
-                                List.of(),
-                                "Provide a ref:// URI for binary content or an inline string value when appropriate.",
-                                null,
-                                true, true)),
-                        List.of("payload"),
-                        Boolean.FALSE,
-                        null,
-                        List.of(),
-                        null,
-                        null,
-                        false, true));
-
-        SkillInputValidationResult result = validator.validate(
-                Map.of("payload", new ByteArrayResource(new byte[]{1, 2, 3})),
-                contract);
-
-        assertThat(result.valid()).isTrue();
-        assertThat(result.normalizedInput().get("payload")).isInstanceOf(ByteArrayResource.class);
-    }
-
-    @Test
-    void doesNotInferRuntimeRefSupportFromDescriptionTextAlone() {
-        SkillInputContract contract = new SkillInputContract(
-                SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
-                new SkillInputSchemaNode(
-                        "object",
-                        Map.of("payload", new SkillInputSchemaNode(
-                                "string",
-                                Map.of(),
-                                List.of(),
-                                null,
-                                null,
-                                List.of(),
-                                "This help text mentions ref:// but is not a runtime binding contract.",
-                                null,
-                                false, true)),
-                        List.of("payload"),
-                        Boolean.FALSE,
-                        null,
-                        List.of(),
-                        null,
-                        null,
-                        false, true));
-
-        SkillInputValidationResult result = validator.validate(
-                Map.of("payload", new ByteArrayResource(new byte[]{1, 2, 3})),
-                contract);
-
-        assertThat(result.valid()).isFalse();
-        assertThat(result.issues()).extracting(SkillInputValidationIssue::code).containsExactly("type_mismatch");
-    }
-
-    @Test
-    void validatesMapLikeAdditionalPropertiesAgainstNestedSchema() {
-        SkillInputContract contract = new SkillInputContract(
-                SkillInputContract.SkillInputContractKind.JAVA_REFLECTED,
-                new SkillInputSchemaNode(
-                        "object",
-                        Map.of("payload", new SkillInputSchemaNode(
-                                "object",
-                                Map.of(),
-                                List.of(),
-                                null,
-                                new SkillInputSchemaNode("string", Map.of(), List.of(), null, null, List.of(), null, null, false, true),
-                                null,
-                                List.of(),
-                                null,
-                                null,
-                                false, true)),
-                        List.of("payload"),
-                        Boolean.FALSE,
-                        null,
-                        List.of(),
-                        null,
-                        null,
-                        false, true));
-
-        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-        payload.put("vendor", "Acme");
-        payload.put("count", 3);
-
-        SkillInputValidationResult result = validator.validate(Map.of("payload", payload), contract);
-
-        assertThat(result.valid()).isFalse();
-        assertThat(result.normalizedInput()).containsKey("payload");
-        assertThat(result.issues()).extracting(SkillInputValidationIssue::path).containsExactly("payload.count");
-        assertThat(result.issues()).extracting(SkillInputValidationIssue::code).containsExactly("type_mismatch");
-    }
-
-    @Test
-    void acceptsLongSizedIntegerStrings() {
-        SkillInputContract contract = new SkillInputContract(
-                SkillInputContract.SkillInputContractKind.JAVA_REFLECTED,
-                new SkillInputSchemaNode(
-                        "object",
-                        Map.of("count", new SkillInputSchemaNode("integer", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
-                        List.of("count"),
-                        Boolean.FALSE,
-                        null,
-                        List.of(),
-                        null,
-                        null,
-                        false, true));
-
-        SkillInputValidationResult result = validator.validate(Map.of("count", "5000000000"), contract);
-
-        assertThat(result.valid()).isTrue();
-        assertThat(result.normalizedInput().get("count")).isEqualTo(5_000_000_000L);
-    }
-
-    @Test
-    void acceptsArraysWithoutItemsSchema() {
-        SkillInputContract contract = new SkillInputContract(
-                SkillInputContract.SkillInputContractKind.JAVA_REFLECTED,
-                new SkillInputSchemaNode(
-                        "object",
-                        Map.of("values", new SkillInputSchemaNode("array", Map.of(), List.of(), null, null, List.of(), null, null, false, true)),
-                        List.of("values"),
-                        Boolean.FALSE,
-                        null,
-                        List.of(),
-                        null,
-                        null,
-                        false, true));
-
-        SkillInputValidationResult result = validator.validate(Map.of("values", List.of("alpha", 2, true)), contract);
-
-        assertThat(result.valid()).isTrue();
-        assertThat(result.normalizedInput().get("values")).isEqualTo(List.of("alpha", 2, true));
-    }
-
-    @Test
-    void validatesFirstPassAttachmentInputShapes() {
-        SkillInputContract contract = new SkillInputContract(
-                SkillInputContract.SkillInputContractKind.YAML_EXPLICIT,
-                new SkillInputSchemaNode(
-                        "object",
-                        Map.of("image", new SkillInputSchemaNode(
-                                "attachment",
-                                Map.of(),
-                                List.of(),
-                                null,
-                                null,
-                                null,
-                                List.of(),
-                                "Ticket image",
-                                null,
-                                false,
-                                true,
-                                "image",
-                                List.of("image/jpeg"), true)),
-                        List.of("image"),
-                        Boolean.FALSE,
-                        null,
-                        List.of(),
-                        null,
-                        null,
-                        false, true));
-
-        Resource resource = new ByteArrayResource(new byte[]{1, 2, 3});
-        assertThat(validator.validate(Map.of("image", "ref://forms/ticket.jpg"), contract).valid()).isTrue();
-        assertThat(validator.validate(Map.of("image", resource), contract).valid()).isTrue();
-
-        List<Object> rejectedValues = List.of(
-                "forms/ticket.jpg",
-                "file:/tmp/ticket.jpg",
-                "classpath:/forms/ticket.jpg",
-                "data:image/jpeg;base64,AAAA",
-                new byte[]{1, 2, 3},
-                new ByteArrayInputStream(new byte[]{1, 2, 3}),
-                42);
-
-        for (Object rejectedValue : rejectedValues) {
-            SkillInputValidationResult result = validator.validate(Map.of("image", rejectedValue), contract);
-            assertThat(result.valid()).as("rejects %s", rejectedValue.getClass().getSimpleName()).isFalse();
-            assertThat(result.issues()).extracting(SkillInputValidationIssue::code).containsExactly("type_mismatch");
+    @Test void invalidMarkedContainersNeverSerializeAdmittedNestedRuntimeHandles() {
+        class NoInspectionResource extends NoReadResource {
+            int inspections;
+            @Override public java.net.URI getURI() {
+                inspections++;
+                throw new AssertionError("must not inspect resource metadata");
+            }
+        }
+        var resource = new NoInspectionResource();
+        // Standard object/array keywords are inapplicable to a string instance, but may
+        // still be present in a valid declaration. Invalid container inputs must remain safe.
+        for (boolean array : List.of(false, true)) {
+            String nested = array ? ",\"items\":" + marked("")
+                    : ",\"properties\":{\"nested\":" + marked("") + "}";
+            var c = contract(root(marked(nested)), StandardSchemaCompiler.Origin.GENERATED);
+            Object container = array ? List.of(resource) : Map.of("nested", resource);
+            var canonical = c.schema().tree();
+            var result = validator.validate(input(container), c);
+            assertThat(result.valid()).isFalse();
+            assertThat(result.issues()).anySatisfy(issue -> {
+                assertThat(issue.path()).isEqualTo("/value");
+                assertThat(issue.code()).isEqualTo("type");
+                assertThat(issue.rejectedValue()).isSameAs(container);
+            });
+            assertThat(c.schema().tree()).isEqualTo(canonical);
+            assertThat(resource.opens).isZero();
+            assertThat(resource.inspections).isZero();
         }
     }
 
-    @Test
-    void acceptsAndPreservesJsonKindsForUnconstrainedValues()
-    {
-        LinkedHashMap<String, Object> values = new LinkedHashMap<>();
-        values.put("nothing", null);
-        values.put("text", "alpha");
-        values.put("flag", true);
-        values.put("integer", 7);
-        values.put("decimal", new java.math.BigDecimal("3.25"));
-        values.put("object", new LinkedHashMap<>(Map.of("nested", List.of("one", 2))));
-        values.put("array", new java.util.ArrayList<>(List.of(false, "two")));
-
-        SkillInputValidationResult result = validator.validate(Map.of("value", values), contractWith(anyNode()));
-
-        assertThat(result.valid()).isTrue();
-        assertThat(result.normalizedInput().get("value")).isEqualTo(values);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> normalized = (Map<String, Object>) result.normalizedInput().get("value");
-        assertThat(normalized.get("integer")).isInstanceOf(Integer.class);
-        assertThat(normalized.get("decimal")).isInstanceOf(java.math.BigDecimal.class);
-        assertThatThrownBy(() -> normalized.put("later", "nope")).isInstanceOf(UnsupportedOperationException.class);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> nested = (Map<String, Object>) normalized.get("object");
-        assertThatThrownBy(() -> nested.put("later", "nope")).isInstanceOf(UnsupportedOperationException.class);
-        @SuppressWarnings("unchecked")
-        List<Object> array = (List<Object>) normalized.get("array");
-        assertThatThrownBy(() -> array.add("nope")).isInstanceOf(UnsupportedOperationException.class);
+    @Test void ordinaryUnconstrainedLeavesDoNotBypassParentChecks() {
+        var c=contract("{\"type\":\"object\",\"required\":[\"value\"],\"additionalProperties\":false,\"properties\":{\"value\":{},\"count\":{\"type\":\"integer\"},\"items\":{\"type\":\"array\",\"minItems\":1,\"maxItems\":2,\"items\":{}}}}");
+        assertThat(validator.validate(input(null),c).valid()).isTrue();
+        for(Map<String,Object> bad:List.of(Map.<String,Object>of(),Map.<String,Object>of("value",true,"count","1"),Map.<String,Object>of("value",true,"extra",1),Map.<String,Object>of("value",true,"items",List.of()),Map.<String,Object>of("value",true,"items",List.of(1,2,3)))) assertThat(validator.validate(bad,c).valid()).isFalse();
     }
 
-    @Test
-    void rejectsNonJsonValuesAndUnknownSchemaKindsExplicitly()
-    {
-        SkillInputValidationResult nonJson = validator.validate(
-                Map.of("value", new Object()), contractWith(anyNode()));
-        SkillInputValidationResult unknown = validator.validate(
-                Map.of("value", "text"), contractWith(node("mystery")));
-
-        assertThat(nonJson.valid()).isFalse();
-        assertThat(nonJson.issues()).extracting(SkillInputValidationIssue::path).containsExactly("value");
-        assertThat(nonJson.issues()).extracting(SkillInputValidationIssue::code).containsExactly("non_json_value");
-        assertThat(unknown.valid()).isFalse();
-        assertThat(unknown.issues()).extracting(SkillInputValidationIssue::path).containsExactly("value");
-        assertThat(unknown.issues()).extracting(SkillInputValidationIssue::code)
-                .containsExactly("unsupported_schema_type");
+    @Test void attachmentFirstPassRemainsSeparateAndNonConsuming() {
+        var resource=new NoReadResource();var stream=new NoReadStream();
+        String leaf="{\"type\":[\"string\",\"null\"],\"x-loomspan-attachment\":{\"media_type\":\"file\",\"allowed_content_types\":[\"text/plain\"]}}";
+        var c=contract(root("{\"type\":\"array\",\"items\":"+leaf+",\"maxItems\":2}"));
+        assertThat(validator.validate(input(Arrays.asList(resource,null)),c).valid()).isTrue();
+        assertThat(validator.validate(input(List.of("ref://files/a")),c).valid()).isTrue();
+        for(Object value:List.of(stream,new byte[]{1},"ordinary","ref://bad trailing")) assertThat(validator.validate(input(List.of(resource,value)),c).valid()).isFalse();
+        assertThat(validator.validate(input(List.of(resource,resource,resource)),c).valid()).isFalse();
+        assertThat(resource.opens).isZero();assertThat(stream.reads).isZero();
     }
 
-    private SkillInputContract contractWith(SkillInputSchemaNode child)
-    {
-        return new SkillInputContract(
-                SkillInputContract.SkillInputContractKind.JAVA_REFLECTED,
-                new SkillInputSchemaNode("object", Map.of("value", child), List.of(), Boolean.FALSE,
-                        null, List.of(), null, null, false, true));
-    }
-
-    private SkillInputSchemaNode anyNode()
-    {
-        return node(SkillInputSchemaNode.ANY_TYPE);
-    }
-
-    private SkillInputSchemaNode node(String type)
-    {
-        return new SkillInputSchemaNode(type, Map.of(), List.of(), null, null, List.of(), null, null, false, true);
+    @Test void genericContractsPreserveSeparateRuntimePermissionsAndExactEntryChecks() {
+        var handle=new NoReadResource();var stream=new NoReadStream();var bytes=new byte[]{1};
+        var values=input(List.of(handle,stream,bytes,"ref://generic"));
+        var result=validator.validate(values,SkillInputContract.genericObject());
+        assertThat(result.valid()).isTrue();assertThat(((List<?>)result.normalizedInput().get("value")).get(2)).isSameAs(bytes);
+        assertThat(handle.opens).isZero();assertThat(stream.reads).isZero();
     }
 }

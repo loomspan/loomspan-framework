@@ -383,6 +383,27 @@ class CapabilityExecutionRouterTest {
         assertThat(received.get()).isEqualTo(input);
     }
 
+    @Test void receivingValidationRejectsInvalidMarkedStringsAndRuntimeSiblingViolationsBeforeCoordinator() {
+        var coordinator=mock(ExecutionCoordinator.class);
+        var router=new CapabilityExecutionRouter(new StaticListableBeanFactory(Map.of("executionCoordinator",coordinator))
+                .getBeanProvider(ExecutionCoordinator.class),new DefaultAccessGuard());
+        var contract=new SkillInputContractResolver().resolveJavaCapability("""
+                {"type":"object","required":["value","count"],"additionalProperties":false,"properties":{
+                  "value":{"type":"array","minItems":1,"maxItems":2,"items":{"type":"string","minLength":12,"x-loomspan-runtime-ref-capable":true}},
+                  "count":{"type":"integer"}}}
+                """);
+        var effects=new java.util.concurrent.atomic.AtomicInteger();
+        var capability=new CapabilityMetadata("java:ingress","default-ingress","ingress",SkillExecutionDescriptor.none(),
+                ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),input->{effects.incrementAndGet();return "unexpected";},
+                SkillKind.JAVA,CapabilityToolDescriptor.generic("default-ingress","ingress"),contract,null);
+        var session=ai.loomspan.internal.core.TestLoomspanSessions.create("ingress","default-ingress",3);
+        var handle=new org.springframework.core.io.AbstractResource(){public String getDescription(){return "unread";}public java.io.InputStream getInputStream(){throw new AssertionError("do not open");}};
+        for(Map<String,Object> input:List.<Map<String,Object>>of(Map.of("value",List.of(handle,"ref://bad"),"count",1),Map.of("value",List.of(handle),"count","1"),Map.of("value",List.of(handle),"count",1,"extra",true),Map.of("value",List.of(handle,handle,handle),"count",1))) {
+            assertThatThrownBy(()->TestExecutionBindings.callWithGeneration(session,ai.loomspan.testkit.TestSkillGenerations.of(capability),
+                    ()->router.execute(capability,input,session,null))).isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
+        }
+        assertThat(effects).hasValue(0);org.mockito.Mockito.verifyNoInteractions(coordinator);
+    }
     private static CapabilityExecutionRouter javaRouter(CapabilityMetadata capability, RefResolver refResolver)
     {
         TestCapabilityRegistry registry = mock(TestCapabilityRegistry.class);
