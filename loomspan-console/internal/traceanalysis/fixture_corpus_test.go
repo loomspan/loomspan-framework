@@ -3,6 +3,7 @@ package traceanalysis
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -85,6 +86,81 @@ type fixtureActivePrefix struct {
 }
 
 const fixtureCompatibilityVersion = "1.0.0-beta.10-SNAPSHOT"
+
+func TestAttachmentFixturesPreserveLogicalDescriptorCollectionsThroughTinyRanges(t *testing.T) {
+	for _, name := range []string{"attachment-descriptors", "chunked-attachment-descriptors"} {
+		t.Run(name, func(t *testing.T) {
+			traceBytes, err := os.ReadFile(filepath.Join(fixtureRoot(t), "traces", name+".ndjson"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := newServiceTestHarnessForVersion(t, "trace-"+name, string(traceBytes), fixtureCompatibilityVersion)
+			page, domain := h.service.QueryRecords(context.Background(), targetEvidence(h.scopeID), RecordQuery{
+				Handle: h.handle, Representation: RecordRepresentationLogical, PageSize: 10,
+				Filter: RecordFilter{Types: []string{"FRAME_METADATA_RECORDED"}},
+			})
+			if domain != nil || len(page.Items) != 1 {
+				t.Fatalf("attachment records=%+v domain=%v", page, domain)
+			}
+			record := page.Items[0]
+			if record.FrameID != "attachment-mission" || record.Content == nil || !record.Content.Available || !record.Content.Complete || record.IsEnvelope != strings.HasPrefix(name, "chunked-") {
+				t.Fatalf("attachment identity/content=%+v", record)
+			}
+			var content []byte
+			cursor := ""
+			ranges := 0
+			for {
+				read, failure := h.service.ReadContentRange(context.Background(), targetEvidence(h.scopeID), RangeRequest{Handle: h.handle, ContentRef: record.Content.ContentRef, ContinueCursor: cursor, MaxBytes: 7})
+				if failure != nil {
+					t.Fatal(failure)
+				}
+				part := read.Content
+				if read.Encoding == RangeEncodingBase64 {
+					part, err = base64.StdEncoding.DecodeString(string(part))
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				content = append(content, part...)
+				ranges++
+				if !read.HasMore {
+					break
+				}
+				if read.NextCursor == "" || read.NextCursor == cursor {
+					t.Fatal("invalid content continuation")
+				}
+				cursor = read.NextCursor
+			}
+			var payload struct {
+				Attachments []map[string]any `json:"attachments"`
+			}
+			if err := json.Unmarshal(content, &payload); err != nil {
+				t.Fatal(err)
+			}
+			if ranges < 2 || len(payload.Attachments) != 2 {
+				t.Fatalf("ranges=%d payload=%s", ranges, content)
+			}
+			first, direct := payload.Attachments[0], payload.Attachments[1]
+			if first["fieldPath"] != "/files/0" || first["name"] != "<img src=x>雪.pdf" || first["sizeBytes"] != float64(0) || first["source"] != "ref://documents/report" || first["sha256"] != "fixture-hash" || first["mediaType"] != "PDF" || first["contentType"] != "application/pdf" || first["attachment"] != true {
+				t.Fatalf("reference descriptor=%+v", first)
+			}
+			metadata := first["metadata"].(map[string]any)
+			notes := "recorded text"
+			if strings.HasPrefix(name, "chunked-") {
+				notes = "雪🧭" + strings.Repeat("x", 5000)
+			}
+			if metadata["Authorization"] != "kept verbatim 雪🧭" || metadata["token"] != "original" || metadata["notes"] != notes || !reflect.DeepEqual(metadata["nested"], map[string]any{"evidence": "kept", "x-loomspan-evidence": "also kept"}) {
+				t.Fatalf("metadata changed=%+v", metadata)
+			}
+			if !reflect.DeepEqual(direct, map[string]any{"attachment": true, "fieldPath": "/nested/a~1b~0c", "name": nil, "contentType": "image/png", "mediaType": "IMAGE", "source": "resource"}) {
+				t.Fatalf("direct descriptor=%+v", direct)
+			}
+			if bytes.Contains(content, []byte("ByteArrayResource")) || bytes.Contains(content, []byte("file bytes")) {
+				t.Fatalf("resource contents serialized: %s", content)
+			}
+		})
+	}
+}
 
 func TestNativeEvaluationFixturePreservesRequestAndChunkedEnvelopeEvidence(t *testing.T) {
 	traceBytes, err := os.ReadFile(filepath.Join(fixtureRoot(t), "traces", "native-evaluation-success.ndjson"))

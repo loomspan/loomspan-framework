@@ -105,6 +105,7 @@ test("skill detail renders sourcePath as plain text and yaml inside pre element"
   expect(pre).not.toBeNull();
   expect(pre?.textContent).toBe(yamlWithHtml);
   expect(pre?.innerHTML).not.toContain("<script>");
+  expect(screen.getByText("Unspecified")).toBeInTheDocument();
 });
 
 test("skill detail renders loading state", () => {

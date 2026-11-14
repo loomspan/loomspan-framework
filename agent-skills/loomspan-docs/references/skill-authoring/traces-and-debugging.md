@@ -69,6 +69,29 @@ derived-journal/observer field-name exception remains confined to that projectio
 `TypeSafeExecutor`, `ConsoleTraceFixtureCorpusTest`, Go corpus/MCP tests, and
 `TraceRecords.model.test.tsx` protect current native evidence consumption.
 
+## Recorded attachments
+
+In a finalized trace's **Records** view, select **Attachments** on the owning
+mission's `FRAME_METADATA_RECORDED` record. Console reads the complete recorded
+`attachments` collection through the existing inline/content-range channel,
+including reconstructed chunked payloads, and displays the original semantic
+JSON as inert text in recorded order. Fields retain their recorded names and values, including
+JSON Pointer associations, reference or `resource` source, MIME/media type,
+available filename, size, hash and arbitrary metadata. A missing optional field
+stays absent; a recorded null stays null.
+
+No collection and an empty collection are distinct from unavailable/incomplete
+capture or malformed content. The latter report a display error instead of
+presenting partial descriptors. **Read raw record** remains available for physical
+record inspection. Inspection does not resolve references, load files, parse
+prompts or establish provider file decoding. Live activity does not carry these
+collections. Current evidence scope and artifact-expiry checks still apply.
+
+`TraceRecords.attachments.test.tsx` covers explicit selection, inert content,
+optional fields, complete Unicode ranges, failures and scope changes.
+`ConsoleTraceFixtureCorpusTest` and Go `fixture_corpus_test.go` protect ordinary
+and chunked descriptor collections through the existing logical content API.
+
 ## Mission input nulls
 
 Ordinary JSON mission-input diagnostics preserve explicit null object values and

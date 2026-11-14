@@ -220,9 +220,12 @@ carry this collection.
 `AttachmentMaterializationContractTest` verifies the actual local validator,
 materializer, immutable containers and descriptor paths with mocked session/catalog
 collaborators. `ExecutionJournalProjectorTest` and `SkillExecutionViewMapperTest`
-verify list/stream projection and mapped observer details. These local checks do not establish complete coordinator, engine or public observer
-invocation, provider file decoding or Console attachment rendering. Consult the
-matching runtime integration tests for those boundaries.
+verify list/stream projection and mapped observer details. Console offers
+[recorded attachment inspection](traces-and-debugging.md#recorded-attachments)
+through its existing logical content channel. Component and Java/Go corpus tests
+cover ordinary/chunked rendering without resource loading. These checks do not
+establish complete coordinator or public observer invocation, or provider file
+decoding. Consult the matching runtime integration tests for those boundaries.
 
 ## Skill document ingestion and diagnostics
 

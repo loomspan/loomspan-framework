@@ -91,6 +91,23 @@ test("shows developer-relevant records by default and can load all records", asy
   expect(toggle).toBeChecked();
 });
 
+test("makes recorded attachments available in the default Records view", async () => {
+  const payload = JSON.stringify({ attachments: [{ fieldPath: "/document", source: "ref://document", name: null }] });
+  api.getTraceRecords.mockImplementationOnce(async (_traceId, _cursor, filter) => ({
+    source: "TARGET", targetScopeId: "scope-1", hasMore: false, nextCursor: null,
+    items: !filter.types || filter.types.includes("FRAME_METADATA_RECORDED") ? [{
+      sequence: 1, type: "FRAME_METADATA_RECORDED", frameId: "f-1", route: "hello", timestampMillis: 1, representation: "LOGICAL",
+      content: { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: payload.length, available: true, complete: true, inlineEligibility: true, contentRef: "p-1", inlineContent: payload },
+    }] : [],
+  }));
+  render(<MemoryRouter initialEntries={["/?view=records"]}><TraceExplorer traceId="trace-1" /></MemoryRouter>);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Attachments" }));
+  expect(await screen.findByRole("region", { name: "Attachments for record 1" })).toHaveTextContent(payload);
+  expect(screen.getByRole("checkbox", { name: "Show all records" })).not.toBeChecked();
+  expect(api.getContentRange).not.toHaveBeenCalled();
+});
+
 test("loads plans lazily, displays assigned frames as text, and synchronizes record selection", async () => {
   api.getTracePlans.mockResolvedValueOnce({ ...plansFixture, source: "TARGET", targetScopeId: "scope-1" });
   const framePage = {

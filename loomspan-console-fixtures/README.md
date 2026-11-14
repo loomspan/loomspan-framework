@@ -21,6 +21,7 @@ Representative diagnostic matrix:
 | Concurrent planning contract | `canonical-concurrent-contract` | Authoritative admission/join facts validated against complete snapshots, accepted-order task IDs, admission concurrency, enabled overlap, disabled/ungrouped serialization, nearest assignment inheritance, union self duration, failed outcomes, and selected live prefixes |
 | Deep/page continuation | Go's deterministic 20,000-frame calculation and browser pages over 100 rows | finite continuations; no semantic hierarchy cap |
 | Large evidence range | `makeLargeChunkedPayloadArtifact` in `web/e2e/artifact-storage.spec.ts` | multi-megabyte content read in deliberate 64-KiB ranges |
+| Recorded attachment descriptors | `attachment-descriptors`, `chunked-attachment-descriptors` | owning mission, ordered JSON Pointer associations, reference/direct Resource sources, null filename, absent optional fields, exact metadata/Unicode and complete logical reconstruction through tiny byte ranges; no Resource handles or file contents |
 | Structural limits | named invalid line/depth/usage/chunk/frame cases | exact bounded parser rejection |
 | Configured-limit strictness | `configured-limits-*` invalid cases | missing, unknown, duplicate, fractional, negative, and overflow rejection |
 

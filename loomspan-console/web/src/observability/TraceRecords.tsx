@@ -231,6 +231,49 @@ function parseJsonObject(raw: string, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function AttachmentDetail({ traceId, record, source, verifyScope, onArtifactUnavailable }: Pick<Props, "traceId" | "verifyScope" | "onArtifactUnavailable"> & { record: TraceRecord; source: TraceSource }) {
+  const [state, setState] = useState<{ json?: string; count?: number; absent?: boolean; error?: string }>({});
+  const content = record.content;
+  useEffect(() => {
+    let active = true;
+    setState({});
+    async function load() {
+      if (!traceId) throw new Error("Trace context is unavailable.");
+      if (!content?.available) throw new Error("Attachment content is unavailable.");
+      if (!content.complete) throw new Error("Attachment content is incomplete.");
+      const raw = content.inlineContent !== undefined ? content.inlineContent
+        : content.contentRef ? await readCompleteContent(traceId, content.contentRef, source, async (response) => {
+            if (!active) throw new Error("Attachment inspection is no longer active.");
+            const verified = verifyScope ? await verifyScope(response) : response;
+            if (!active) throw new Error("Attachment inspection is no longer active.");
+            return verified;
+          })
+          : undefined;
+      if (raw === undefined) throw new Error("Attachment content is unavailable.");
+      const payload = parseJsonObject(raw, "Attachment content");
+      if (!Object.hasOwn(payload, "attachments")) return { absent: true };
+      if (!Array.isArray(payload.attachments) || payload.attachments.some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry))) {
+        throw new Error("Attachment collection must be an array of descriptor objects.");
+      }
+      // Validate display shape, but retain original numeric lexemes and strings.
+      return { json: raw, count: payload.attachments.length };
+    }
+    void load().then((result) => { if (active) setState(result); }).catch((error: unknown) => {
+      if (!active) return;
+      if (error instanceof Error && "code" in error && (error.code === "ARTIFACT_EXPIRED" || error.code === "NOT_FOUND")) onArtifactUnavailable?.(error);
+      setState({ error: error instanceof Error ? `Attachments could not be displayed: ${error.message}` : "Attachments could not be displayed." });
+    });
+    return () => { active = false; };
+  }, [traceId, content, source, verifyScope, onArtifactUnavailable]);
+  return <>
+    {state.error ? <p role="alert">{state.error}</p>
+      : state.absent ? <p>No attachment collection was recorded.</p>
+        : state.json !== undefined ? state.count === 0 ? <p>The recorded attachment collection is empty.</p>
+          : <><h5>Recorded attachment descriptors ({state.count})</h5><pre>{state.json}</pre></>
+          : <p role="status">Loading attachments&hellip;</p>}
+  </>;
+}
+
 function recordData(rawRecord: string): unknown {
   const envelope = parseJsonObject(rawRecord, "Model record");
   if (!("data" in envelope)) throw new Error("Model record did not contain data.");
@@ -927,7 +970,8 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
   useEffect(() => { setExpanded(null); }, [traceId, source, scopeGeneration]);
   useEffect(() => {
     if (expanded?.endsWith(":diff") && !records.some((record) => expanded === `${traceId}:${record.sequence}:diff`)) setExpanded(null);
-  }, [expanded, records, traceId]);
+    if (expanded?.endsWith(":attachments") && !records.some((record) => expanded === `${traceId}:${source}:${scopeGeneration}:${record.sequence}:attachments`)) setExpanded(null);
+  }, [expanded, records, traceId, source, scopeGeneration]);
   const [modelCache, setModelCache] = useState<Record<string, ModelCacheEntry>>({});
   const [rawCache, setRawCache] = useState<Record<string, RawCacheEntry>>({});
   const [stepCache, setStepCache] = useState<Record<string, StepCacheEntry>>({});
@@ -1112,6 +1156,8 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
       const isModelExpanded = expanded === `${key}:model`;
       const isDiffExpanded = expanded === `${key}:diff`;
       const isRawExpanded = expanded === `${key}:raw`;
+      const attachmentKey = `${traceId}:${source}:${scopeGeneration}:${record.sequence}:attachments`;
+      const isAttachmentsExpanded = expanded === attachmentKey;
       const contentRef = record.content?.contentRef;
       const isContentExpanded = activeContentRecordSequence === record.sequence;
       const isAttemptDiagnosticsExpanded = expanded === `${key}:attempt-diagnostics`;
@@ -1156,6 +1202,7 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
               <div className="trace-record-actions">
               <button type="button" aria-expanded={isRawExpanded} aria-controls={`raw-detail-${record.sequence}`} onClick={() => handleToggleRaw(record)}>{isRawExpanded ? "Hide raw record" : "Read raw record"}</button>
               {contentRef && !isModelRecord && !isAttemptFailure && <button type="button" aria-expanded={isContentExpanded} aria-controls={`content-detail-${record.sequence}`} onClick={() => isContentExpanded ? onClearContent() : onContent(contentRef, record.sequence)}>{isContentExpanded ? "Hide content" : "Read content"}</button>}
+              {record.type === "FRAME_METADATA_RECORDED" && <button type="button" aria-expanded={isAttachmentsExpanded} aria-controls={`attachments-detail-${record.sequence}`} onClick={() => setExpanded(isAttachmentsExpanded ? null : attachmentKey)}>{isAttachmentsExpanded ? "Hide attachments" : "Attachments"}</button>}
               {record.resultAssembly && <button type="button" aria-expanded={expanded === key + ":assembly"} aria-controls={"assembly-" + record.sequence} onClick={() => setExpanded(expanded === key + ":assembly" ? null : key + ":assembly")}>{expanded === key + ":assembly" ? "Hide assembly details" : "Assembly details"}</button>}
               {record.resultForwarding && <button type="button" aria-expanded={expanded === key + ":forwarding"} aria-controls={"forwarding-" + record.sequence} onClick={() => setExpanded(expanded === key + ":forwarding" ? null : key + ":forwarding")}>{expanded === key + ":forwarding" ? "Hide forwarding details" : "Forwarding details"}</button>}
               {record.type === "PLAN_UPDATED" && <button type="button" aria-expanded={isDiffExpanded} aria-controls={`plan-diff-${record.sequence}`} onClick={() => setExpanded(isDiffExpanded ? null : `${key}:diff`)}>{isDiffExpanded ? "Hide diff" : "View diff"}</button>}
@@ -1256,6 +1303,15 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
                   {traceId && modelEntry?.loading && <p role="status">Loading {modelLabel.toLowerCase()}&hellip;</p>}
                   {modelEntry?.error && <p role="alert">{modelEntry.error}</p>}
                   {modelEntry?.detail && <ModelDetailView detail={modelEntry.detail} />}
+                </div>
+              </td>
+            </tr>
+          )}
+          {isAttachmentsExpanded && (
+            <tr className="trace-record-detail-row">
+              <td colSpan={5}>
+                <div id={`attachments-detail-${record.sequence}`} className="trace-step-expanded trace-expanded" role="region" aria-label={`Attachments for record ${record.sequence}`}>
+                  <AttachmentDetail key={attachmentKey} traceId={traceId} record={record} source={source} verifyScope={verifyScope} onArtifactUnavailable={onArtifactUnavailable} />
                 </div>
               </td>
             </tr>

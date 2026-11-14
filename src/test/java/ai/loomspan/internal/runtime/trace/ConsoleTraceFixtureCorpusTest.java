@@ -107,6 +107,8 @@ class ConsoleTraceFixtureCorpusTest
             "terminal-unlinked-success",
             "chunked-payload",
             "chunked-json-payload",
+            "attachment-descriptors",
+            "chunked-attachment-descriptors",
             "nested-frame-usage",
             "repeated-skill-invocations",
             "current-plan-semantic-evidence",
@@ -896,6 +898,45 @@ class ConsoleTraceFixtureCorpusTest
         generateInvalid(root);
     }
 
+    @Test
+    @Order(2)
+    void attachmentCorpusPreservesOwningFrameAndExactLogicalDescriptors() throws Exception
+    {
+        for (String name : List.of("attachment-descriptors", "chunked-attachment-descriptors"))
+        {
+            List<JsonNode> records = parseLines(fixtureRoot().resolve("traces/" + name + ".ndjson"));
+            JsonNode metadata = records.stream().filter(node -> "FRAME_METADATA_RECORDED".equals(node.path("recordType").asText())).findFirst().orElseThrow();
+            assertThat(metadata.path("frameId").asText()).isEqualTo("attachment-mission");
+            JsonNode payload = metadata.path("data");
+            if (name.startsWith("chunked-"))
+            {
+                String content = records.stream().filter(node -> "PAYLOAD_CHUNK_APPENDED".equals(node.path("recordType").asText()))
+                        .sorted(Comparator.comparingInt(node -> node.at("/metadata/chunkIndex").asInt()))
+                        .map(node -> node.path("data").asText()).reduce("", String::concat);
+                payload = JSON.readTree(content);
+                assertThat(metadata.at("/metadata/chunkCount").asInt()).isEqualTo(2);
+            }
+            assertThat(payload.path("attachments")).isEqualTo(JSON.valueToTree(attachmentDescriptors(name.startsWith("chunked-"))));
+            assertThat(payload.at("/attachments/0/fieldPath").asText()).isEqualTo("/files/0");
+            assertThat(payload.at("/attachments/0/metadata/Authorization").asText()).isEqualTo("kept verbatim 雪🧭");
+            assertThat(payload.at("/attachments/0/sizeBytes").asLong()).isZero();
+            assertThat(payload.at("/attachments/1/name").isNull()).isTrue();
+            assertThat(payload.at("/attachments/1/sizeBytes").isMissingNode()).isTrue();
+            assertThat(payload.at("/attachments/1/source").asText()).isEqualTo("resource");
+            assertThat(payload.toString()).doesNotContain("file bytes", "ByteArrayResource", "inputStream");
+        }
+    }
+
+    private static List<Map<String, Object>> attachmentDescriptors(boolean chunked)
+    {
+        return List.of(
+                ordered("attachment", true, "fieldPath", "/files/0", "name", "<img src=x>雪.pdf", "contentType", "application/pdf",
+                        "mediaType", "PDF", "source", "ref://documents/report", "sizeBytes", 0, "sha256", "fixture-hash",
+                        "metadata", ordered("Authorization", "kept verbatim 雪🧭", "token", "original", "nested", ordered("evidence", "kept", "x-loomspan-evidence", "also kept"),
+                                "notes", chunked ? "雪🧭" + "x".repeat(5000) : "recorded text")),
+                ordered("attachment", true, "fieldPath", "/nested/a~1b~0c", "name", null, "contentType", "image/png", "mediaType", "IMAGE", "source", "resource"));
+    }
+
     private static void generateValid(Path root, String name) throws Exception
     {
         Path trace = root.resolve("traces").resolve(name + ".ndjson");
@@ -929,6 +970,17 @@ class ConsoleTraceFixtureCorpusTest
 
         switch (name)
         {
+            case "attachment-descriptors", "chunked-attachment-descriptors" ->
+            {
+                ExecutionFrame owner = frame("attachment-mission", null, TraceFrameType.ROOT_MISSION, entrySkill);
+                PhysicalBranchContext branch = new PhysicalBranchContext(session);
+                appendFrame(handle, TraceRecordType.FRAME_OPENED, owner, CLOCK.instant());
+                branch.push(owner);
+                ExecutionBindingScope.runWith(fixtureBinding(session, branch, entrySkill, owner.frameId()), () ->
+                        new DefaultExecutionTraceRecorder(CLOCK).recordAttachments(session, entrySkill, attachmentDescriptors(name.startsWith("chunked-"))));
+                appendFrame(handle, TraceRecordType.FRAME_CLOSED, owner, CLOCK.instant());
+                branch.close(owner);
+            }
             case "single-attempt-success" ->
             {
                 appendAttempt(handle, "retry-1", "attempt-1", 1, 10, 4, "EXACT");
@@ -2801,7 +2853,8 @@ class ConsoleTraceFixtureCorpusTest
                     "usage", Usage.ZERO.asMap(),
                     "usageComplete", false));
             case "missing-response-usage" -> List.of(expectedAttempt(name, "retry-1", "attempt-1", 1));
-            case "java-root-success", "namespace-captured-context", "assembled-input-result", "recoverable-failed-completion", "terminal-wrapper-recorded-cause", "terminal-unlinked-success" -> List.of();
+            case "java-root-success", "namespace-captured-context", "assembled-input-result", "recoverable-failed-completion", "terminal-wrapper-recorded-cause", "terminal-unlinked-success",
+                    "attachment-descriptors", "chunked-attachment-descriptors" -> List.of();
             case "nested-frame-usage" -> List.of(
                     expectedAttempt(name, "retry-framed", "attempt-framed", 1),
                     expectedAttempt(name, "retry-unframed", "attempt-unframed", 1));
@@ -2898,6 +2951,8 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "attachment-descriptors", "chunked-attachment-descriptors" -> List.of(
+                    expectedFrame("attachment-mission", null, "ROOT_MISSION", "default-test_entry", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "assigned-planner-inability" -> List.of(
                     inabilityFrame("inability-root", null, "ROOT_MISSION", "default-test_entry", 0, 1),
                     inabilityFrame("inability-planning", "inability-root", "PLANNING", "default-test_entry#planning", 0, 0),
@@ -3066,6 +3121,7 @@ class ConsoleTraceFixtureCorpusTest
                     expectedPayload(270, "payload-2", "application/json", 257));
             case "chunked-payload" -> List.of(expectedPayload(3, "payload-1", "text/plain", 2));
             case "chunked-json-payload" -> List.of(expectedPayload(3, "payload-1", "application/json", 2));
+            case "chunked-attachment-descriptors" -> List.of(expectedPayload(4, "payload-1", "application/json", 2));
             case "recovered-provider-attempt-diagnostic" ->
                     List.of(expectedPayload(6, "payload-1", "application/json", 3));
             default -> List.of();

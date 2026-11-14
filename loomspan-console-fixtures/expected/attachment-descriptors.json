@@ -1,0 +1,64 @@
+{
+  "case" : "attachment-descriptors",
+  "valid" : true,
+  "traceId" : "trace-attachment-descriptors",
+  "sessionId" : "session-attachment-descriptors",
+  "entrySkill" : "default-test_entry",
+  "generationId" : "trace-attachment-descriptors",
+  "entryNamespace" : "default",
+  "namespaceGenerationIds" : {
+    "default" : "trace-attachment-descriptors"
+  },
+  "outcome" : "SUCCEEDED",
+  "terminalFailureId" : null,
+  "attributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "terminalUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "unattributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "usageComplete" : true,
+  "attempts" : [ ],
+  "retries" : [ ],
+  "validationLinks" : [ ],
+  "frames" : [ {
+    "frameId" : "attachment-mission",
+    "parentFrameId" : null,
+    "frameType" : "ROOT_MISSION",
+    "inclusiveDurationMillis" : 0,
+    "selfDurationMillis" : 0,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "default-test_entry"
+  } ],
+  "unframedAttributedUsage" : {
+    "promptUnits" : 0,
+    "completionUnits" : 0,
+    "totalUnits" : 0
+  },
+  "payloads" : [ ],
+  "gaps" : [ ],
+  "uncertainties" : [ ]
+}
