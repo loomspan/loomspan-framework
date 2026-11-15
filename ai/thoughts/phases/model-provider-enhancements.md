@@ -5,12 +5,17 @@
 Open investigations captured from the provider discussion on November 10, 2026.
 These items request verification and agreement on intended behavior, not a finding
 that current behavior is wrong. Prefer the simplest solution that meets demonstrated
-requirements. The [Spring AI Responses migration roadmap](spring-ai-responses-migration.md)
-records the subsequent direction to reuse Spring AI's Responses adapter for
+requirements. The historical Spring AI Responses migration roadmap (Git commit
+`7eb8ac489dd72a45175e3b9fadd02e7bcd01cc30`, path
+`ai/thoughts/phases/spring-ai-responses-migration.md`) records the subsequent
+direction to reuse Spring AI's Responses adapter for
 OpenAI, Meta, and OpenRouter with stateless history replay. Prerelease dependencies
 and destructive migration changes are acceptable during development; no legacy
 Chat path or compatibility shims are wanted. Detailed reasoning-retention
-semantics remain open; migration implementation has not started.
+semantics below describe the original investigation, not a fresh assessment of
+the completed migration. Consult the [open-blocker register](pr-30-blockers.md)
+for current upstream limitations and downstream acceptance ownership. The
+investigation items below are retained without reclassifying them during cleanup.
 
 ## Verify Anthropic thinking blocks
 
@@ -70,7 +75,8 @@ context growth on representative workloads. Do not assume that retaining more
 reasoning improves results or that removing it is always safe. Preserve opaque
 provider items unchanged whenever retained.
 
-The [Meta compatibility spike](../../../docs/maintainers/meta-compatibility-spike.md)
-contains the initial direct-provider probe. The Spring AI migration roadmap above
-supersedes the initial custom-adapter and protocol-selector proposals; the spike
-remains historical baseline evidence.
+The original discussion referenced a Meta compatibility spike at
+`docs/maintainers/meta-compatibility-spike.md`; that file is absent from the current
+checkout and no history for that path was found during cleanup. Do not treat it as
+available verification evidence. The archived Spring AI migration roadmap above
+supersedes the initial custom-adapter and protocol-selector proposals.

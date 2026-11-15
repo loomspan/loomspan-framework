@@ -1,5 +1,51 @@
 # PR 30 implementation blockers
 
+## Current ownership and historical records
+
+The completed PR 30 migration roadmap, schema research, ticket index, coverage,
+and implementation tickets have been retired from the working tree.
+This register remains the downstream authority for the open B01–B05 requirements,
+approved skips, and closure conditions; the dated verification sections below are
+historical records, not claims of fresh verification or future ticket work.
+Spring AI contribution planning now lives in the private
+[contributions roadmap](https://github.com/loomspan/spring-ai-contributions/blob/main/ai/thoughts/roadmaps/spring-ai-blockers.md).
+
+The original migration decisions, tickets, results and independent review are
+preserved in local Git commit `7eb8ac489dd72a45175e3b9fadd02e7bcd01cc30`.
+Historical paths in this register refer to that commit; it has not been verified
+as published remotely. Retrieve a document without restoring it to the working tree:
+
+```powershell
+git show 7eb8ac489dd72a45175e3b9fadd02e7bcd01cc30:ai/thoughts/phases/spring-ai-responses-migration.md
+git show 7eb8ac489dd72a45175e3b9fadd02e7bcd01cc30:ai/thoughts/plans/2026-11-14-PR-30.4.3-integrated-migration-readiness-results.md
+git show 7eb8ac489dd72a45175e3b9fadd02e7bcd01cc30:ai/thoughts/reviews/2026-11-14-PR-30.4.3-integrated-migration-readiness-review-1.md
+```
+
+### Later deployed and live acceptance
+
+The neighboring [test-suite migration acceptance roadmap](../../../../loomspan-sidecar-test-suite/MIGRATION-ACCEPTANCE-ROADMAP.md)
+retains the agreed implementation sequence, both-host provider-free/business/TypeSafe
+regressions, selected Java-host provider matrix, Sidecar tool-chain cases, coherent
+artifact identities, protected fixtures/manifests, and explicit missing/failed cells.
+It also retains the earlier OpenRouter comparison scope question, request/token/cost
+limits, deadlines, access/pricing preflight, and separate paid-run authorization.
+No deployed/live success is established by this cleanup or the completed Framework work.
+
+Framework continues to own deterministic real factory/advisor/tool-path captures,
+schema/options fidelity, ordered replay, explicit response status and accounting,
+side-effect prevention, Console checks, and supported-public-surface verification.
+Native effort, unchanged total generation caps, request-local defaults, legacy behavior,
+and unsupported-option rejection must remain covered on initial, continuation, planner,
+and model-override paths. Use the suite's manifest as the selected fixture authority.
+An isolated SDK probe or merged upstream PR cannot replace integrated acceptance;
+missing adapter fidelity blocks the affected acceptance cell until corrected.
+
+Retained protocol tests remain in this repository. Only blocker-related isolated
+probes and controls are maintained in the neighboring [contributions workspace](../../../../spring-ai-contributions/probes/README.md),
+verified on Liberica 17.0.19. Obsolete probes, historical captures, and the temporary
+archive were removed at the developer's request. See the [relocation results](../../../../spring-ai-contributions/ai/thoughts/results/2026-11-14-probe-relocation.md).
+No blocker guards or correctness assertions were removed by the documentation cleanup.
+
 This register carries unresolved dependency requirements across the PR 30 ticket
 sequence. On November 13, 2026, the developer authorized tracking the Responses adapter
 defects PR30-B01/B02 here and skipping their failing correctness cases by default so subsequent
@@ -44,9 +90,9 @@ Positive and negative long-exponent cases also lose numeric value.
   Four fractional/exponent invocations are skipped; large-integer and exact `0.5`
   controls remain active. Assertions compare exact numeric values in both
   `text.format.schema` and `tools[].parameters`, retaining strictness checks.
-- **Existing requirements:** [Roadmap decimal fidelity](spring-ai-responses-migration.md#tbd-07-selecting-provider-differences-without-a-capability-registry),
-  [SAI-06 blocker register](standard-json-schema-research.md#spring-ai-implementation-blockers-and-upstream-contribution-handoff),
-  and [retained precision probe](../../../docs/maintainers/probes/responses-schema-precision/README.md).
+- **Existing requirements:** Roadmap decimal fidelity (historical: `ai/thoughts/phases/spring-ai-responses-migration.md` at the archive commit below),
+  SAI-06 blocker register (historical: `ai/thoughts/phases/standard-json-schema-research.md` at the archive commit below),
+  and [retained precision probe](../../../../spring-ai-contributions/probes/responses-schema-precision/README.md).
 - **Closure:** Verify an acceptable upstream artifact preserves numeric values in
   both real Framework wire schemas. Remove the skip guard, run all six numeric
   cases and schema/options/replay controls, and record the artifact and results.
@@ -66,7 +112,7 @@ support for these shapes.
   The `plaintext`, `signed` and `summary-only` invocations retain their original
   outbound-continuation assertions. Encrypted multi-round replay, ordering, IDs,
   commentary phase, isolation and no-duplicate-tool-effect tests remain active.
-- **Existing requirements:** [OpenRouter stateless replay](spring-ai-responses-migration.md#openrouter-compatibility-and-stateless-replay)
+- **Existing requirements:** OpenRouter stateless replay (historical: `ai/thoughts/phases/spring-ai-responses-migration.md` at the archive commit below)
   and the roadmap's known mapper limits and Ollama summary-only limitation.
 - **Closure:** Verify required content, summary, signature, IDs and ordering
   through the shared adapter using actual outbound continuation captures. Remove
@@ -97,7 +143,7 @@ No new provider calls or external submissions are authorized by this register.
 The 32 setup errors from the original full-suite run are **resolved**, not open
 dependency blockers: fixture credential consumers and Boot test security exclusions
 were corrected, with all 43 affected/control tests passing on rerun. See the
-[PR 30.1.2 results](../plans/2026-11-13-pr-30.1.2-shared-responses-results.md)
+PR 30.1.2 results (historical: `ai/thoughts/plans/2026-11-13-pr-30.1.2-shared-responses-results.md` at the archive commit below)
 for original failures, exact commands and verification history.
 
 ## Verification after enabling default skips
