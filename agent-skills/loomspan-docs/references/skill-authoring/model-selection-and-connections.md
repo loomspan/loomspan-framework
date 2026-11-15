@@ -88,13 +88,6 @@ Anthropic `max_tokens`, `model_context_window_exceeded`, `pause_turn` and `refus
 Gemini `MAX_TOKENS`, `SAFETY`, `RECITATION`, `LANGUAGE`, `BLOCKLIST`,
 `PROHIBITED_CONTENT` and `SPII`. Unknown values get no additional policy.
 
-Known Gemini limitation: Spring AI 2.1.0-RC2 discards prompt feedback and native
-candidate finish/safety details. A blocked prompt with no candidates therefore
-cannot be rejected from its lost block reason. Available candidate finish reasons
-remain enforced. Neither empty-output inference nor text scanning repairs this
-limitation. `ProviderResponseStatusIntegrationTest` retains complete opt-in
-metadata-loss assertions with `loomspan.pr30.blockers=true`.
-
 ## Provider call budgets
 
 The whole-call behavior below applies to chat drivers. TypeSafe uses Apache

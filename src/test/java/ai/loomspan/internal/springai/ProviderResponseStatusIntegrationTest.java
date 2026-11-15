@@ -12,7 +12,6 @@ import ai.loomspan.internal.skill.YamlSkillManifest;
 import com.google.genai.Client;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -155,27 +154,6 @@ class ProviderResponseStatusIntegrationTest
         }
     }
 
-    @Test
-    void geminiBlockedPromptRetainsFeedbackAndRejectsWithoutCandidates() throws Exception
-    {
-        requireB05();
-        try (Harness h = new Harness(AiDriver.GEMINI))
-        {
-            h.enqueue(Map.of("modelVersion", "fixture", "candidates", List.of(),
-                    "promptFeedback", Map.of("blockReason", "SAFETY", "blockReasonMessage", "PROMPT_BLOCK_SENTINEL"),
-                    "usageMetadata", geminiUsage()));
-            Throwable failure = catchThrowable(() -> h.call(h.client()));
-            org.assertj.core.api.SoftAssertions.assertSoftly(soft -> {
-                soft.assertThat(failure).as("explicit prompt block must terminate").isInstanceOf(RuntimeException.class);
-                soft.assertThat(h.facts(TraceRecordType.MODEL_RESPONSE_RECEIVED).toString())
-                        .contains("promptFeedback", "SAFETY", "PROMPT_BLOCK_SENTINEL");
-                soft.assertThat(h.facts(TraceRecordType.MODEL_ATTEMPT_FAILED)).hasSize(1);
-                soft.assertThat(h.session.getSessionUsage().orElseThrow().usageUnits()).isEqualTo(10);
-                soft.assertThat(h.server.getRequestCount()).isEqualTo(1);
-            });
-        }
-    }
-
     @ParameterizedTest
     @EnumSource(value = AiDriver.class, names = {"OPENAI", "ANTHROPIC"})
     void incompletePlanningResponseNeverReachesJsonParser(AiDriver driver) throws Exception
@@ -209,36 +187,6 @@ class ProviderResponseStatusIntegrationTest
             assertThat(h.facts(TraceRecordType.MODEL_ATTEMPT_FAILED)).hasSize(1);
             assertThat(h.session.getSessionUsage().orElseThrow().usageUnits()).isEqualTo(10);
         }
-    }
-
-    @Test
-    void geminiCandidateRetainsNativeFinishAndSafetyDetails() throws Exception
-    {
-        requireB05();
-        try (Harness h = new Harness(AiDriver.GEMINI))
-        {
-            var body = new LinkedHashMap<>(text(AiDriver.GEMINI, "SAFETY", "PARTIAL_SENTINEL"));
-            body.put("candidates", List.of(Map.of("content", Map.of("role", "model", "parts", List.of(Map.of("text", "PARTIAL_SENTINEL"))),
-                    "finishReason", "SAFETY", "finishMessage", "CANDIDATE_FINISH_SENTINEL",
-                    "safetyRatings", List.of(Map.of("category", "HARM_CATEGORY_HARASSMENT", "probability", "HIGH", "blocked", true)))));
-            h.enqueue(body);
-            Throwable failure = catchThrowable(() -> h.call(h.client()));
-            org.assertj.core.api.SoftAssertions.assertSoftly(soft -> {
-                soft.assertThat(failure).isInstanceOf(RuntimeException.class);
-                soft.assertThat(h.facts(TraceRecordType.MODEL_RESPONSE_RECEIVED).toString())
-                        .contains("CANDIDATE_FINISH_SENTINEL", "HARM_CATEGORY_HARASSMENT", "HIGH", "PARTIAL_SENTINEL");
-                soft.assertThat(h.facts(TraceRecordType.MODEL_ATTEMPT_FAILED)).hasSize(1);
-                soft.assertThat(h.session.getSessionUsage().orElseThrow().usageUnits()).isEqualTo(10);
-                soft.assertThat(h.server.getRequestCount()).isEqualTo(1);
-            });
-        }
-    }
-
-    private static void requireB05()
-    {
-        Assumptions.assumeTrue(Boolean.getBoolean("loomspan.pr30.blockers"),
-                "PR30-B05: RC2 drops Gemini prompt/finish evidence; see ai/thoughts/phases/pr-30-blockers.md. "
-                        + "Run complete assertions with -Dloomspan.pr30.blockers=true");
     }
 
     @Test

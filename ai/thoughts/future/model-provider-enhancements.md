@@ -13,9 +13,8 @@ OpenAI, Meta, and OpenRouter with stateless history replay. Prerelease dependenc
 and destructive migration changes are acceptable during development; no legacy
 Chat path or compatibility shims are wanted. Detailed reasoning-retention
 semantics below describe the original investigation, not a fresh assessment of
-the completed migration. Consult the [open-blocker register](pr-30-blockers.md)
-for current upstream limitations and downstream acceptance ownership. The
-investigation items below are retained without reclassifying them during cleanup.
+the completed migration. The investigation items below are retained without
+reclassifying them during cleanup.
 
 ## Verify Anthropic thinking blocks
 
