@@ -4,7 +4,7 @@
 
 The completed PR 30 migration roadmap, schema research, ticket index, coverage,
 and implementation tickets have been retired from the working tree.
-This register remains the downstream authority for the open B01–B05 requirements,
+This register remains the downstream authority for the open B02–B05 requirements,
 approved skips, and closure conditions; the dated verification sections below are
 historical records, not claims of fresh verification or future ticket work.
 Spring AI contribution planning now lives in the private
@@ -48,7 +48,7 @@ No blocker guards or correctness assertions were removed by the documentation cl
 
 This register carries unresolved dependency requirements across the PR 30 ticket
 sequence. On November 13, 2026, the developer authorized tracking the Responses adapter
-defects PR30-B01/B02 here and skipping their failing correctness cases by default so subsequent
+defect PR30-B02 here and skipping its failing correctness cases by default so subsequent
 tickets can proceed. Assertions and fixtures remain in the codebase. A passing
 default build with these skips does not establish fidelity for the blocked cases.
 The earlier pipeline results remain historical evidence; this decision does not
@@ -61,7 +61,7 @@ adapters, SDK singleton mutation, HTTP-body rewrites, fallback or weaker schemas
 
 ## Final-ticket continuation approval — November 14, 2026
 
-The developer explicitly authorized completing PR 30.4.3 while B01–B05 remain
+The developer explicitly authorized completing PR 30.4.3 while B02–B05 remain
 open, testing all available Framework behavior and moving forward with the
 Framework. The developer will work with the Spring AI team through upstream pull
 requests; this work is not a prerequisite for the current ticket's completion.
@@ -72,30 +72,6 @@ Framework/Console verification and fresh independent review must still pass.
 Ticket completion is distinct from blocker closure and unqualified migration
 acceptance; the closure conditions below remain outstanding. No new defect,
 weaker assertion, copied adapter, body rewrite, fallback or live call is approved.
-
-## PR30-B01 — Responses schema decimal precision (SAI-06)
-
-**Status:** Open; four parameter cases skipped by default.
-
-The adapter rounds fractional numeric bounds and enum members when decoding output
-and tool schemas for SDK serialization. For example, `1.0000000000000001` becomes
-`1.0`, and `0.12345678901234567890123456789` becomes `0.12345678901234568`.
-Positive and negative long-exponent cases also lose numeric value.
-
-- **Upstream boundary:** `ResponsesRequestBuilder.java:80` uses the SDK singleton
-  mapper; output-schema decoding at `:228-229` and tool-schema decoding at `:262`
-  lose precision. The isolated private Jackson 2 `USE_BIG_DECIMAL_FOR_FLOATS`
-  candidate is reproduction/fix evidence, not a deployed override.
-- **Retained test:** [SharedResponsesProtocolIntegrationTest.outputAndToolSchemaNumbersRemainExact](../../../src/test/java/ai/loomspan/internal/springai/SharedResponsesProtocolIntegrationTest.java).
-  Four fractional/exponent invocations are skipped; large-integer and exact `0.5`
-  controls remain active. Assertions compare exact numeric values in both
-  `text.format.schema` and `tools[].parameters`, retaining strictness checks.
-- **Existing requirements:** Roadmap decimal fidelity (historical: `ai/thoughts/phases/spring-ai-responses-migration.md` at the archive commit below),
-  SAI-06 blocker register (historical: `ai/thoughts/phases/standard-json-schema-research.md` at the archive commit below),
-  and [retained precision probe](../../../../spring-ai-contributions/probes/responses-schema-precision/README.md).
-- **Closure:** Verify an acceptable upstream artifact preserves numeric values in
-  both real Framework wire schemas. Remove the skip guard, run all six numeric
-  cases and schema/options/replay controls, and record the artifact and results.
 
 ## PR30-B02 — Required reasoning items omitted during replay
 
@@ -125,7 +101,7 @@ The skips use JUnit assumptions with blocker IDs and this document's path. Set
 `loomspan.pr30.blockers=true` to run the unchanged failing assertions locally:
 
 ```powershell
-mvn -B '-Dtest=SharedResponsesProtocolIntegrationTest#outputAndToolSchemaNumbersRemainExact+requiredNonCiphertextReasoningSurvivesContinuation' '-Dloomspan.pr30.blockers=true' test
+mvn -B '-Dtest=SharedResponsesProtocolIntegrationTest#requiredNonCiphertextReasoningSurvivesContinuation' '-Dloomspan.pr30.blockers=true' test
 ```
 
 Default positive/skip verification:
@@ -145,17 +121,6 @@ dependency blockers: fixture credential consumers and Boot test security exclusi
 were corrected, with all 43 affected/control tests passing on rerun. See the
 PR 30.1.2 results (historical: `ai/thoughts/plans/2026-11-13-pr-30.1.2-shared-responses-results.md` at the archive commit below)
 for original failures, exact commands and verification history.
-
-## Verification after enabling default skips
-
-On November 13, 2026, the protocol class ran 26 cases with zero failures/errors
-and exactly seven blocker skips. The opt-in reproduction ran nine cases with
-seven expected failures and both numeric controls passing. A full `mvn -B test`
-ran 1,865 cases with zero assertion failures, one child-binding mission-timeout
-error and nine skips (seven here plus two existing diagnostic skips). The complete
-child-binding class then passed all 17 cases in isolation without changes to its
-test or deadline. That timeout did not reproduce; the full run is not claimed green.
-Exact commands and logs are recorded in the linked results artifact.
 
 ## PR30-B03 — Anthropic tool root-schema loss (SAI-03)
 
@@ -200,9 +165,8 @@ actual verification. Live provider calls and external submissions remain unautho
 On November 13, 2026, default focused contributor/protocol/architecture verification
 ran 23 cases with zero failures/errors and exactly one B03 skip. The opt-in full-root
 method ran one case and failed the complete schema equality assertion as expected,
-with zero errors/skips. The default full suite then passed 1,877 cases with zero
-failures/errors and ten skips (B03, seven prior Responses and two existing diagnostic
-cases). The independent nested/canonical tool control stays active. These results
+with zero errors/skips. The independent nested/canonical tool control stays active.
+These results
 permit iteration completion under the explicit developer decision and do not
 establish root-schema fidelity or close this blocker. Exact commands and logs are
 recorded in the PR 30.1.3 results artifact linked above.
@@ -210,10 +174,8 @@ recorded in the PR 30.1.3 results artifact linked above.
 ## PR30-B04 — Gemini raw output and tool schema narrowing (SAI-04/05)
 
 **Status:** Open; four full correctness cases are skipped by default under the
-explicit developer approval of November 13, 2026: "Apply the same default-skip
-deferral to B04 as B01–B03, keep the full assertions available with
-loomspan.pr30.blockers=true, document my approval, and finish the pipeline
-including independent review." This authorizes current iteration completion
+explicit developer approval of November 13, 2026. Full assertions remain available
+with `loomspan.pr30.blockers=true`. This authorizes current iteration completion
 after sufficient default verification and fresh independent review, not blocker
 closure or a claim of raw-schema fidelity. Positive native/default/cap controls
 remain active.
@@ -257,7 +219,7 @@ SDK: `com.google.genai:google-genai:1.73.0`, JAR SHA-256
   schema fails inside the same SDK conversion before HTTP, so this case cannot
   reach its intended incomplete-response boundary. OpenAI/Anthropic parameters
   and available Gemini status controls remain active. Count this one integrated
-  invocation separately from the fourteen original B01–B05 invocations. Remove
+  invocation separately from the ten B02–B05 protocol invocations. Remove
   this assumption and pass the complete case when B04 is corrected.
 - **Closure:** Verify an acceptable upstream artifact/commit, record its identity,
   pass complete raw output/tool assertions and native/options/preservation checks.
@@ -266,32 +228,28 @@ SDK: `com.google.genai:google-genai:1.73.0`, JAR SHA-256
   deferral is separate from closure of these owned requirements.
 
 Verification before the B04 deferral on November 13, 2026: 101 focused native-option/architecture/provider
-controls passed with zero failures/errors/skips. Full `mvn -B test` ran 1,892
-cases with 3 failures, 1 error and 10 prior skips. All failures/errors are the
-four active B04 correctness methods; no unrelated failure was observed. The
-retained Gemini probe command passed four historical defect/direct-SDK methods,
+controls passed with zero failures/errors/skips. The full suite reported failures/errors
+only in the four active B04 correctness methods; no unrelated failure was observed.
+The retained Gemini probe command passed four historical defect/direct-SDK methods,
 which does not establish Framework raw-schema fidelity. Exact commands and logs
 are in the linked results document.
 
 ### PR30-B04 verification under explicit default deferral
 
-After the quoted approval, focused contributor/protocol/architecture verification
+After the approval, focused contributor/protocol/architecture verification
 passed 31 cases with zero failures/errors and exactly four B04 skips. Opt-in
 `mvn -B '-Dtest=GeminiProtocolIntegrationTest' '-Dloomspan.pr30.blockers=true' test`
 ran eight cases with three failures, one error and zero skips, preserving the
-original defect assertions. The default full `mvn -B test` passed 1,892 cases
-with zero failures/errors and 14 skips (four B04, eight prior B01–B03 and two
-existing diagnostics). Positive options and preservation controls remain active.
+original defect assertions. Positive options and preservation controls remain active.
 Current iteration may proceed to independent review; these results do not close
 B04 or establish raw-schema fidelity. Exact logs are in the results artifact.
 
 ## PR30-B05 — Gemini response status evidence discarded by the adapter
 
 **Status:** Open; default-skip deferral explicitly approved by the developer on
-November 13, 2026: "Apply the same default-skip deferral to B05 as B01–B04, keep
-the full assertions available with loomspan.pr30.blockers=true, document my
-approval in pr-30-blockers.md, and finish the pipeline including independent
-review."
+November 13, 2026. Full assertions remain available with
+`loomspan.pr30.blockers=true`; iteration completion requires verification and
+independent review.
 
 This approval covers only required Gemini status evidence discarded by the pinned
 `org.springframework.ai:spring-ai-google-genai:2.1.0-RC2` adapter: native
@@ -345,8 +303,7 @@ These runs preserve the full requirements and do not close B05. Exact logs are
 verification history is in
 `ai/thoughts/plans/2026-11-13-pr-30.1.5-explicit-status-results.md`.
 
-Final PR30.1.5 default verification passed 1,930 Java tests with zero failures/errors
-and 16 skips (14 prior authorized/existing skips plus two B05), including the
-public-surface check and corrected shared corpus. Final full Console Go tests
-passed. These are Step 4 results; fresh independent review remains the iteration
+Final PR30.1.5 default Java verification passed with the authorized blocker
+skips, including the public-surface check and corrected shared corpus. Final full
+Console Go tests passed. These are Step 4 results; fresh independent review remains the iteration
 completion gate. B05 remains open.

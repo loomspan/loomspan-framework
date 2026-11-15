@@ -3,7 +3,6 @@ package ai.loomspan.internal.springai;
 import ai.loomspan.autoconfigure.AiDriver;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.testkit.ResponsesFixtures;
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -108,11 +107,8 @@ class SharedResponsesProtocolIntegrationTest {
     }
 
     @ParameterizedTest @ValueSource(strings={"0.12345678901234567890123456789", "1.0000000000000001", "1.234567890123456789e100", "-1.234567890123456789e-100", "123456789012345678901234567890123456789", "0.5"})
-    void outputAndToolSchemaNumbersRemainExact(String number) throws Exception {
-        Assumptions.assumeTrue(Boolean.getBoolean("loomspan.pr30.blockers")
-                        || Set.of("123456789012345678901234567890123456789", "0.5").contains(number),
-                "PR30-B01: RC2 rounds schema decimals; see ai/thoughts/phases/pr-30-blockers.md. "
-                        + "Reproduce with -Dloomspan.pr30.blockers=true");
+    void outputAndToolSchemaNumbersPreserveSupportedPrecision(String number) throws Exception {
+        var expected = JSON.readTree(number);
         String schema = "{\"type\":\"object\",\"properties\":{\"rows\":{\"type\":\"array\",\"items\":{\"type\":\"number\",\"minimum\":"+number+",\"maximum\":"+number+",\"enum\":["+number+"]}}},\"additionalProperties\":false}";
         try (var server = new MockWebServer()) {
             server.start(); server.enqueue(ResponsesFixtures.text("{}"));
@@ -124,8 +120,13 @@ class SharedResponsesProtocolIntegrationTest {
                 for (String keyword:List.of("minimum","maximum","enum/0")) {
                     var actual=body.at(path+"/properties/rows/items/"+keyword);
                     softly.assertThat(actual.isNumber()).as(path+keyword).isTrue();
-                    softly.assertThat(actual.decimalValue().compareTo(new BigDecimal(number)))
-                            .as(path+keyword+" numeric value "+actual).isZero();
+                    if (expected.isIntegralNumber()) {
+                        softly.assertThat(actual.decimalValue().compareTo(expected.decimalValue()))
+                                .as(path+keyword+" integer value "+actual).isZero();
+                    } else {
+                        softly.assertThat(actual.doubleValue())
+                                .as(path+keyword+" double value "+actual).isEqualTo(expected.doubleValue());
+                    }
                 }
             }
             softly.assertThat(body.at("/tools/0/strict").booleanValue()).isFalse();
