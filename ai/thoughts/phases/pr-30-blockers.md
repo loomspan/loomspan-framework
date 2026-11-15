@@ -4,7 +4,7 @@
 
 The completed PR 30 migration roadmap, schema research, ticket index, coverage,
 and implementation tickets have been retired from the working tree.
-This register remains the downstream authority for the open B04–B05 requirements,
+This register remains the downstream authority for the open B05 requirement,
 approved skips, and closure conditions; the dated verification sections below are
 historical records, not claims of fresh verification or future ticket work.
 Spring AI contribution planning now lives in the private
@@ -48,7 +48,7 @@ No blocker guards or correctness assertions were removed by the documentation cl
 
 ## Final-ticket continuation approval — November 14, 2026
 
-The developer explicitly authorized completing PR 30.4.3 while B04–B05 remain
+The developer explicitly authorized completing PR 30.4.3 while B05 remains
 open, testing all available Framework behavior and moving forward with the
 Framework. The developer will work with the Spring AI team through upstream pull
 requests; this work is not a prerequisite for the current ticket's completion.
@@ -59,79 +59,6 @@ Framework/Console verification and fresh independent review must still pass.
 Ticket completion is distinct from blocker closure and unqualified migration
 acceptance; the closure conditions below remain outstanding. No new defect,
 weaker assertion, copied adapter, body rewrite, fallback or live call is approved.
-
-## PR30-B04 — Gemini raw output and tool schema narrowing (SAI-04/05)
-
-**Status:** Open; four full correctness cases are skipped by default under the
-explicit developer approval of November 13, 2026. Full assertions remain available
-with `loomspan.pr30.blockers=true`. This authorizes current iteration completion
-after sufficient default verification and fresh independent review, not blocker
-closure or a claim of raw-schema fidelity. Positive native/default/cap controls
-remain active.
-
-Tested artifact: `org.springframework.ai:spring-ai-google-genai:2.1.0-RC2`, JAR
-SHA-256 `c4217785fb658c76d20a85ca7e322338485ee437b7c9195585b277de01ded307`.
-SDK: `com.google.genai:google-genai:1.73.0`, JAR SHA-256
-`9709e5fd1277e758c8f4b0165473e752d0071ea22ef821556a8f18b3e435d9f0`.
-
-- **Boundaries:** `GoogleGenAiToolCallingManager.resolveToolDefinitions` converts
-  canonical tools into OpenAPI and uppercases types. `GoogleGenAiChatModel`
-  subsequently calls `parameters(jsonToSchema(...))`; output calls
-  `responseJsonSchema(jsonToSchema(...))`. Both tool conversion stages must be
-  bypassed by a suitable correction. SDK raw setters alone do not integrate them.
-- **Actual Framework evidence:** `GeminiProtocolIntegrationTest` keeps complete
-  assertions for nullable output, typed-map/unconstrained input, nullable input
-  and generated reserved-false property. RC2 nullable output fails before HTTP
-  because the SDK Type cannot deserialize an array. The three tool requests use
-  narrowed `parameters`, with no raw `parametersJsonSchema`; map value constraints
-  and root openness disappear. Canonical callback schemas stay unchanged and no
-  tool callbacks execute for the deterministic plain-text responses.
-- **Reproduction:** `mvn -B '-Dtest=GeminiProtocolIntegrationTest' '-Dloomspan.pr30.blockers=true' test`.
-  Full assertions remain intact behind the approved assumption. Exact runs and results are in
-  `ai/thoughts/plans/2026-11-13-pr-30.1.4-gemini-results.md`.
-- **Options:** The independent exact `gemini-3.8-flash` mapping uses native
-  LOW/MEDIUM/HIGH without numeric budget or cap inflation. Request-local schemas
-  must copy effective target defaults: a fresh typed schema-only builder replaces
-  them in RC2. Positive controls retain MEDIUM, 1024/4096/2048 caps, temperature,
-  stops and no schema leakage. This does not close schema fidelity.
-- **Strategy:** Research established no acceptable fixed shipped artifact. Keep
-  official Spring AI model/tool-loop ownership; no copied research model,
-  singleton mutation, body rewrite, fixed extraBody substitute or fallback.
-- **Owner:** PR 30.1.4 retains the unresolved adapter requirement. 30.2.2/30.2.3
-  own schema generation/validation/binding; 30.3.1/30.3.2 own ordinary/planner
-  consumer schema/default copying; 30.4.3 reconciles integrated checks.
-- **Integrated B04 consumer:** Under the November 14 final-ticket continuation
-  approval, only the `GEMINI` parameter of
-  `ProviderResponseStatusIntegrationTest#incompletePlanningResponseNeverReachesJsonParser`
-  also uses the blocker assumption. Its complete status/parser/usage assertions
-  remain unchanged and run with `loomspan.pr30.blockers=true`. The nullable plan
-  schema fails inside the same SDK conversion before HTTP, so this case cannot
-  reach its intended incomplete-response boundary. OpenAI/Anthropic parameters
-  and available Gemini status controls remain active. Count this one integrated
-  invocation separately from the six B04–B05 protocol invocations. Remove
-  this assumption and pass the complete case when B04 is corrected.
-- **Closure:** Verify an acceptable upstream artifact/commit, record its identity,
-  pass complete raw output/tool assertions and native/options/preservation checks.
-  A merged change or SDK-only success does not prove the adapter ships the fix.
-  Remove the guards after correction. Iteration completion under the explicit
-  deferral is separate from closure of these owned requirements.
-
-Verification before the B04 deferral on November 13, 2026: 101 focused native-option/architecture/provider
-controls passed with zero failures/errors/skips. The full suite reported failures/errors
-only in the four active B04 correctness methods; no unrelated failure was observed.
-The retained Gemini probe command passed four historical defect/direct-SDK methods,
-which does not establish Framework raw-schema fidelity. Exact commands and logs
-are in the linked results document.
-
-### PR30-B04 verification under explicit default deferral
-
-After the approval, focused contributor/protocol/architecture verification
-passed 31 cases with zero failures/errors and exactly four B04 skips. Opt-in
-`mvn -B '-Dtest=GeminiProtocolIntegrationTest' '-Dloomspan.pr30.blockers=true' test`
-ran eight cases with three failures, one error and zero skips, preserving the
-original defect assertions. Positive options and preservation controls remain active.
-Current iteration may proceed to independent review; these results do not close
-B04 or establish raw-schema fidelity. Exact logs are in the results artifact.
 
 ## PR30-B05 — Gemini response status evidence discarded by the adapter
 

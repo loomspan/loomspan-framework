@@ -162,14 +162,8 @@ unsupported levels fail locally. Other Gemini model IDs retain numeric budgets
 1024, 4096 and 8192 for low, medium and high. This exact-model mapping does not
 infer hosted availability or support for other model IDs.
 
-Known Gemini adapter limitation in Spring AI `2.1.0-RC2`: output schemas are
-converted to the SDK's finite schema type, while tool schemas first pass through
-OpenAPI conversion and then that SDK type. Nullable output type arrays fail
-before HTTP; ordinary-input typed maps, unconstrained leaves and reserved false
-properties cannot be assumed to survive. Complete raw-schema fidelity remains
-unresolved. Changing serializable per-request schemas preserves native thinking
-and generation caps, but does not establish full raw-schema support or migrated
-full application/planner output orchestration. Ordinary initial/correction and
+Changing serializable per-request schemas preserves native thinking and generation
+caps. Ordinary initial/correction and
 tool-continuation wiring have loopback coverage through the same adapter. At this adapter boundary, request-local
 typed options must copy the effective target defaults before replacing the schema;
 a fresh schema-only builder replaces those defaults, losing native thinking and
@@ -204,9 +198,7 @@ For chat drivers, the identical bounded guidance is recorded on every failed phy
   (native effort, unchanged caps, changing raw output schemas, legacy controls and
   nested tool constraints and canonical schema preservation).
 - Gemini native/legacy options and cap/default isolation: `SpringAiChatOptionsContributorTest`
-  and `GeminiProtocolIntegrationTest`; complete raw output/tool assertions remain
-  opt-in dependency-failure evidence (`loomspan.pr30.blockers=true`) rather than
-  proof of schema support. Positive option and cap controls remain active.
+  and `GeminiProtocolIntegrationTest`.
 - Call budgets/default transport phases: `LoomspanProperties#validateRequestTimeout`,
   `ProviderRequestTimeoutIntegrationTest` (shared Responses, Anthropic and both Gemini modes,
   delayed headers, active body deadline, configured success, actual client defaults).

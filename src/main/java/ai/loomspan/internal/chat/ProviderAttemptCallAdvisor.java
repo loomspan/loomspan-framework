@@ -215,7 +215,7 @@ public final class ProviderAttemptCallAdvisor implements CallAdvisor
         if (contract instanceof ai.loomspan.internal.schema.CanonicalSchema canonical)
         {
             payload.put("canonicalGenerationSchema", canonical.tree());
-            // This is the prepared native option, not a claim about SDK wire fidelity (PR30-B04).
+            // This is the prepared native option, not a claim about SDK wire fidelity.
             payload.put("preparedNativeSchema", request.context().get(ai.loomspan.internal.springai.NativeOutputContract.PREPARED_SCHEMA_KEY));
         }
         return Collections.unmodifiableMap(payload);

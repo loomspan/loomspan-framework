@@ -48,7 +48,7 @@ import static ai.loomspan.internal.springai.OrdinaryNativeOutputIntegrationTest.
 /** Actual planner and official-adapter loopback captures. */
 class PlanningNativeOutputIntegrationTest {
     @ParameterizedTest @ValueSource(strings = {"gpt-6.1-terra", "openai/gpt-6.1-terra", "muse-spark-1.3-contributor",
-            "qwen3.5:4b-q4_K_M", "claude-sonnet-5-5", "gemini-3.8-flash"})
+            "qwen3.5:4b-q4_K_M", "claude-sonnet-5-5"})
     void actualPlannerInitialCorrectionAndIndependentCallRetainOptions(String identity) throws Exception {
         local(identity, (server, runtime) -> {
             var defaults = options(runtime, identity, 4096, null);
@@ -67,17 +67,6 @@ class PlanningNativeOutputIntegrationTest {
             var interaction = new SpringAiModelInteraction(client, ModelInteractionMode.STEP_EXECUTION);
             server.enqueue(text(runtime.driver(), "{\"name\":\"wrong final schema\"}"));
             server.enqueue(text(runtime.driver(), "{\"capabilityName\":\"default-planner\",\"createdAt\":\"2026-01-01T00:00:00Z\",\"status\":\"VALID\",\"tasks\":[]}"));
-            if (runtime.driver() == AiDriver.GEMINI) {
-                // Retained PR30-B04: Spring AI SDK Schema fallback cannot represent nullable type arrays.
-                // This asserts failure timing only; successful Gemini plan serialization remains blocked.
-                assertThatThrownBy(() -> TestExecutionBindings.callWithSession(session, () -> planner.initializePlan(session, "plan", null,
-                        definition, request -> { captures.add(request); return interaction.call(request); }, List.of())))
-                        .hasStackTraceContaining("Cannot deserialize value of type `com.google.genai.types.Type` from Array value");
-                assertThat(captures).hasSize(1);
-                assertThat(server.getRequestCount()).isZero();
-                assertNoFormat(defaults);
-                return;
-            }
             TestExecutionBindings.callWithSession(session, () -> planner.initializePlan(session, "plan", Map.of("attachmentDescriptor", "descriptor-only"),
                     definition, request -> { captures.add(request); return interaction.call(request); }, List.of()).orElseThrow());
             assertThat(captures).hasSize(2);

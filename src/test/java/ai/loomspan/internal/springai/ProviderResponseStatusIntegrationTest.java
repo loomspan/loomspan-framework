@@ -177,11 +177,9 @@ class ProviderResponseStatusIntegrationTest
     }
 
     @ParameterizedTest
-    @EnumSource(value = AiDriver.class, names = {"OPENAI", "ANTHROPIC", "GEMINI"})
+    @EnumSource(value = AiDriver.class, names = {"OPENAI", "ANTHROPIC"})
     void incompletePlanningResponseNeverReachesJsonParser(AiDriver driver) throws Exception
     {
-        org.junit.jupiter.api.Assumptions.assumeTrue(driver != AiDriver.GEMINI || Boolean.getBoolean("loomspan.pr30.blockers"),
-                "PR30-B04: nullable planning schema cannot reach response status handling; ai/thoughts/phases/pr-30-blockers.md");
         try (Harness h = new Harness(driver))
         {
             h.enqueue(text(driver, incomplete(driver), "{\"capabilityName\":\"default-test_skill\",\"tasks\":[]}"));

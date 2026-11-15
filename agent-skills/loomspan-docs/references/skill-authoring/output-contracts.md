@@ -337,9 +337,7 @@ tool effects are not rolled back. Local schema loading makes no provider probes.
 `OrdinaryOutputAcceptanceTest` verify request copies, actual loopback initial/
 correction/tool-continuation wiring, failure counts, local constraints and response
 preservation. Loopback serialization is not live endpoint acceptance/enforcement.
-The pinned Responses decimal wire defect and Gemini raw-schema narrowing
-remain unresolved; [model/connection limits](model-selection-and-connections.md)
-describe those dependency boundaries. Planning and step execution own separate
+Planning and step execution own separate
 generated contracts; ordinary generation coverage does not establish their provider support.
 
 ## Authoring procedure

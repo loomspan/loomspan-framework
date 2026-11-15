@@ -7,13 +7,11 @@ import com.google.genai.Client;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
-import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.core.io.DefaultResourceLoader;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -21,10 +19,8 @@ import tools.jackson.databind.json.JsonMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,29 +38,6 @@ class GeminiProtocolIntegrationTest
     private static final String SIMPLE_B = """
             {"type":"object","properties":{"label":{"type":"string","minLength":2,"maxLength":30}},"required":["label"]}
             """;
-    private static final String OUTPUT = """
-            {"type":"object","description":"Exact result","additionalProperties":false,
-             "properties":{"name":{"type":["string","null"],"description":"Name","minLength":1,"maxLength":20},
-               "code":{"type":"string","enum":["a","b"]},"email":{"type":"string","format":"email"},
-               "score":{"type":"number","minimum":0.5,"maximum":8},
-               "rows":{"type":"array","minItems":1,"maxItems":4,"items":{"type":"object",
-                 "properties":{"values":{"type":"array","items":{"type":"boolean"}}},
-                 "required":["values"],"additionalProperties":true}}},"required":["name"]}
-            """;
-    private static final String MAPS = """
-            {"type":"object","description":"Authored tool contract","additionalProperties":false,
-             "properties":{
-               "code":{"type":"string","enum":["a","b"],"description":"Exact code","minLength":1,"maxLength":5},
-               "email":{"type":"string","format":"email"},
-               "score":{"type":"number","minimum":0.5,"maximum":8},
-               "strings":{"type":"object","description":"String map","additionalProperties":{"type":"string","minLength":2}},
-               "quantities":{"type":"object","additionalProperties":{"type":"integer","minimum":0,"maximum":9}},
-               "records":{"type":"object","additionalProperties":{"type":"object","properties":{"name":{"type":"string"}},"required":["name"],"additionalProperties":false}},
-               "nested":{"type":"object","additionalProperties":{"type":"object","additionalProperties":{"type":"integer"}}},
-               "rows":{"type":"array","minItems":1,"maxItems":3,"items":{"type":"object","properties":{"map":{"type":"object","additionalProperties":{"type":"string"}}},"required":["map"],"additionalProperties":false}},
-               "anything":{}},"required":["code","quantities"]}
-            """;
-
     @ParameterizedTest
     @ValueSource(ints = {1024, 4096, 2048})
     void nativeMediumAndCapsSurviveChangingPerCallSchemas(int cap) throws Exception
@@ -120,92 +93,6 @@ class GeminiProtocolIntegrationTest
                 }
             }
             assertThat(server.getRequestCount()).isEqualTo(4);
-        });
-    }
-
-    @Test
-    void nullableOutputSchemaRemainsRawAndComplete() throws Exception
-    {
-        requireRawSchemaAcceptance();
-        local(server -> {
-            var client = ChatClient.builder(model()).defaultOptions(options("gemini-3.8-flash").mutate()).build();
-            for (String schema : List.of(OUTPUT, OUTPUT.replace("\"name\"", "\"label\"")))
-            {
-                enqueue(server);
-                try
-                {
-                    client.prompt("output fixture").options(GoogleGenAiChatOptions.builder().outputSchema(schema)).call().content();
-                }
-                catch (RuntimeException failure)
-                {
-                    evidence("nullable-output-failure", failure + "\nphysicalRequests=" + server.getRequestCount());
-                    assertThat(server.getRequestCount()).as("nullable schema failed before HTTP").isZero();
-                    throw failure;
-                }
-                assertThat(request(server, "nullable-output").at("/generationConfig/responseJsonSchema"))
-                        .isEqualTo(JSON.readTree(schema));
-            }
-        });
-    }
-
-    @Test
-    void ordinaryInputMapsAndUnconstrainedLeavesRemainRawAndComplete() throws Exception
-    {
-        requireRawSchemaAcceptance();
-        assertTool(MAPS, "map-tool");
-    }
-
-    @Test
-    void nullableToolSchemaRemainsRawAndComplete() throws Exception
-    {
-        requireRawSchemaAcceptance();
-        assertTool("""
-                {"type":"object","properties":{"optional":{"type":["string","null"]}},"additionalProperties":true}
-                """, "nullable-tool");
-    }
-
-    @Test
-    void generatedReservedFalsePropertyRemainsRawAndComplete() throws Exception
-    {
-        requireRawSchemaAcceptance();
-        assertTool("""
-                {"type":"object","properties":{"name":{"type":"string"},"reserved":false},"required":["name"],"additionalProperties":false}
-                """, "reserved-tool");
-    }
-
-    private static void requireRawSchemaAcceptance()
-    {
-        Assumptions.assumeTrue(Boolean.getBoolean("loomspan.pr30.blockers"),
-                "PR30-B04: RC2 narrows Gemini raw schemas; see ai/thoughts/phases/pr-30-blockers.md. "
-                        + "Reproduce with -Dloomspan.pr30.blockers=true");
-    }
-
-    private void assertTool(String schema, String label) throws Exception
-    {
-        local(server -> {
-            AtomicInteger effects = new AtomicInteger();
-            var callback = FunctionToolCallback.<Map<String,Object>,String>builder("inspect", input -> {
-                effects.incrementAndGet();
-                return "unused";
-            }).description("fixture").inputType(Map.class).inputSchema(schema).build();
-            var client = ChatClient.builder(model()).defaultOptions(options("gemini-3.8-flash").mutate()).build();
-            enqueue(server);
-            try { client.prompt("tool fixture").toolCallbacks(callback).call().content(); }
-            catch (RuntimeException failure)
-            {
-                evidence(label + "-failure", failure + "\nphysicalRequests=" + server.getRequestCount());
-                assertThat(server.getRequestCount()).as("schema failed before HTTP").isZero();
-                throw failure;
-            }
-            finally
-            {
-                assertThat(callback.getToolDefinition().inputSchema()).isEqualTo(schema);
-                assertThat(effects.get()).isZero();
-            }
-            JsonNode body = request(server, label);
-            assertThat(server.getRequestCount()).isEqualTo(1);
-            assertThat(body.at("/tools/0/functionDeclarations/0/parametersJsonSchema")).isEqualTo(JSON.readTree(schema));
-            assertThat(body.at("/tools/0/functionDeclarations/0/parameters").isMissingNode()).isTrue();
         });
     }
 

@@ -344,7 +344,6 @@ class OrdinaryNativeOutputIntegrationTest
 
     static CanonicalSchema contract(AiDriver driver, String name)
     {
-        // Gemini's simple single-string adapter control is distinct from retained PR30-B04 raw schema cases.
         return compile("{\"type\":\"object\",\"properties\":{\"" + name + "\":{\"type\":\"string\",\"minLength\":2}},\"required\":[\"" + name + "\"]"
                 + (driver == AiDriver.GEMINI ? "}" : ",\"additionalProperties\":false}"));
     }
