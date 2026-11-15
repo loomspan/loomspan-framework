@@ -197,12 +197,12 @@ For chat drivers, the identical bounded guidance is recorded on every failed phy
 - Retry ownership: `LoomspanPropertiesTest`, `ProviderRetryDeciderTest`,
   `SpringAiProviderIntegrationTest`, `ConnectionProtocolTest`, and
   `ModelAttemptCallAdvisorIntegrationTest`.
-- Responses acceptance and adapter limits: `SharedResponsesProtocolIntegrationTest` and
-  `SpringAiProviderIntegrationTest`; exact schema/reasoning failures remain explicit.
+- Responses protocol coverage: `SharedResponsesProtocolIntegrationTest` and
+  `SpringAiProviderIntegrationTest`.
 - Request options and tool-loop assembly: `SpringAiChatOptionsContributorTest` and `SpringAiChatClientAssemblerIntegrationTest`.
 - Wire behavior: `ConnectionProtocolTest` and `AnthropicProtocolIntegrationTest`
   (native effort, unchanged caps, changing raw output schemas, legacy controls and
-  active nested/canonical controls and the opt-in blocked full tool-root fidelity assertion).
+  nested tool constraints and canonical schema preservation).
 - Gemini native/legacy options and cap/default isolation: `SpringAiChatOptionsContributorTest`
   and `GeminiProtocolIntegrationTest`; complete raw output/tool assertions remain
   opt-in dependency-failure evidence (`loomspan.pr30.blockers=true`) rather than

@@ -8,7 +8,6 @@ import com.anthropic.models.messages.OutputConfig;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
@@ -144,21 +143,7 @@ class AnthropicProtocolIntegrationTest
     }
 
     @Test
-    void toolInputSchemaPreservesApprovedRootAndNestedConstraints() throws Exception
-    {
-        Assumptions.assumeTrue(Boolean.getBoolean("loomspan.pr30.blockers"),
-                "PR30-B03: RC2 drops Anthropic tool root constraints; see ai/thoughts/phases/pr-30-blockers.md. "
-                        + "Reproduce with -Dloomspan.pr30.blockers=true");
-        assertThat(captureToolSchemaAndVerifyPreservationControls()).isEqualTo(JSON.readTree(TOOL_SCHEMA));
-    }
-
-    @Test
     void toolNestedConstraintsAndCanonicalSchemaRemainUnchanged() throws Exception
-    {
-        captureToolSchemaAndVerifyPreservationControls();
-    }
-
-    private JsonNode captureToolSchemaAndVerifyPreservationControls() throws Exception
     {
         try (var server = new MockWebServer())
         {
@@ -177,7 +162,6 @@ class AnthropicProtocolIntegrationTest
             assertThat(callback.getToolDefinition().inputSchema()).isEqualTo(TOOL_SCHEMA);
             assertThat(server.getRequestCount()).isEqualTo(1);
             assertThat(actual.path("required")).isEqualTo(expected.path("required"));
-            return actual;
         }
     }
 
