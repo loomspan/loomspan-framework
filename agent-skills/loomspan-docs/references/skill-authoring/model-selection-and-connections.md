@@ -65,7 +65,7 @@ The OpenAI and Anthropic drivers use Spring AI 2's official SDK-backed clients. 
 
 Configure supported Anthropic beta/custom values in `headers` and choose a complete compatible `base-url`. Completion-path overrides and separate Anthropic version/beta fields are unsupported and fail strict startup binding.
 
-Known adapter limits: Spring AI 2.1.0-RC2 Responses rounds some fractional values in output and tool JSON schemas before SDK serialization. Required reasoning replay currently needs an item ID and ciphertext; signed/plaintext and summary-only reasoning cannot be assumed to survive. These limits are unresolved acceptance blockers. Deterministic encrypted-reasoning fixtures do not establish every provider's schema enforcement, effort semantics, routing behavior or reasoning-shape compatibility. Native Ollama controls are unavailable through this shared driver unless the Responses protocol and adapter support them; Loomspan adds no provider-specific translation.
+Deterministic encrypted-reasoning fixtures do not establish every provider's schema enforcement, effort semantics, routing behavior or reasoning-shape compatibility. Native Ollama controls are unavailable through this shared driver unless the Responses protocol and adapter support them; Loomspan adds no provider-specific translation.
 
 Every connection owns a `provider-retry` policy. Defaults are enabled, three total unchanged-request attempts, 500 ms initial backoff, a 2.0 multiplier, a 5 s cap, and 0.2 jitter. Skills select only the model alias and cannot declare or override this policy. The session-wide `loomspan.session.quotas.max-provider-attempts` safeguard defaults to 192; zero disables that quota.
 

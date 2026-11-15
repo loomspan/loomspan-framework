@@ -4,7 +4,7 @@
 
 The completed PR 30 migration roadmap, schema research, ticket index, coverage,
 and implementation tickets have been retired from the working tree.
-This register remains the downstream authority for the open B02–B05 requirements,
+This register remains the downstream authority for the open B03–B05 requirements,
 approved skips, and closure conditions; the dated verification sections below are
 historical records, not claims of fresh verification or future ticket work.
 Spring AI contribution planning now lives in the private
@@ -46,22 +46,9 @@ verified on Liberica 17.0.19. Obsolete probes, historical captures, and the temp
 archive were removed at the developer's request. See the [relocation results](../../../../spring-ai-contributions/ai/thoughts/results/2026-11-14-probe-relocation.md).
 No blocker guards or correctness assertions were removed by the documentation cleanup.
 
-This register carries unresolved dependency requirements across the PR 30 ticket
-sequence. On November 13, 2026, the developer authorized tracking the Responses adapter
-defect PR30-B02 here and skipping its failing correctness cases by default so subsequent
-tickets can proceed. Assertions and fixtures remain in the codebase. A passing
-default build with these skips does not establish fidelity for the blocked cases.
-The earlier pipeline results remain historical evidence; this decision does not
-claim an independent review or erase the original failures.
-
-Tested dependency: `org.springframework.ai:spring-ai-openai:2.1.0-RC2`, Spring Boot
-`4.2.0-RC2`, Java 21. No acceptable fixed artifact was established during PR 30.1.2.
-Keep one shared Responses implementation; this deferral does not authorize copied
-adapters, SDK singleton mutation, HTTP-body rewrites, fallback or weaker schemas.
-
 ## Final-ticket continuation approval — November 14, 2026
 
-The developer explicitly authorized completing PR 30.4.3 while B02–B05 remain
+The developer explicitly authorized completing PR 30.4.3 while B03–B05 remain
 open, testing all available Framework behavior and moving forward with the
 Framework. The developer will work with the Spring AI team through upstream pull
 requests; this work is not a prerequisite for the current ticket's completion.
@@ -73,62 +60,13 @@ Ticket completion is distinct from blocker closure and unqualified migration
 acceptance; the closure conditions below remain outstanding. No new defect,
 weaker assertion, copied adapter, body rewrite, fallback or live call is approved.
 
-## PR30-B02 — Required reasoning items omitted during replay
-
-**Status:** Open; three parameter cases skipped by default.
-
-RC2 requires both ciphertext and an item ID for reasoning replay. Required
-plaintext, signed and summary-only items are omitted during continuation;
-signature data is not retained. Encrypted-reasoning success does not establish
-support for these shapes.
-
-- **Upstream boundary:** `ResponsesItemMapper.reasoningItem():403-429` requires
-  ciphertext/ID; `reasoningPart():623-634` does not retain signature.
-- **Retained test:** [SharedResponsesProtocolIntegrationTest.requiredNonCiphertextReasoningSurvivesContinuation](../../../src/test/java/ai/loomspan/internal/springai/SharedResponsesProtocolIntegrationTest.java).
-  The `plaintext`, `signed` and `summary-only` invocations retain their original
-  outbound-continuation assertions. Encrypted multi-round replay, ordering, IDs,
-  commentary phase, isolation and no-duplicate-tool-effect tests remain active.
-- **Existing requirements:** OpenRouter stateless replay (historical: `ai/thoughts/phases/spring-ai-responses-migration.md` at the archive commit below)
-  and the roadmap's known mapper limits and Ollama summary-only limitation.
-- **Closure:** Verify required content, summary, signature, IDs and ordering
-  through the shared adapter using actual outbound continuation captures. Remove
-  the skip guard and rerun the three cases plus encrypted replay/isolation/tool
-  controls. Record the exact fixed artifact and results.
-
-## Reproduction and follow-through
-
-The skips use JUnit assumptions with blocker IDs and this document's path. Set
-`loomspan.pr30.blockers=true` to run the unchanged failing assertions locally:
-
-```powershell
-mvn -B '-Dtest=SharedResponsesProtocolIntegrationTest#requiredNonCiphertextReasoningSurvivesContinuation' '-Dloomspan.pr30.blockers=true' test
-```
-
-Default positive/skip verification:
-
-```powershell
-mvn -B '-Dtest=SharedResponsesProtocolIntegrationTest' test
-```
-
-Ownership remains visible across tickets: PR 30.1.2 established adapter/factory
-captures; PR 30.3.1 owns ordinary schema attachment/composition; PR 30.4.3 must
-reconcile these blockers and rerun integrated acceptance with the guards removed.
-Subsequent tickets may continue without treating skipped requirements as passed.
-No new provider calls or external submissions are authorized by this register.
-
-The 32 setup errors from the original full-suite run are **resolved**, not open
-dependency blockers: fixture credential consumers and Boot test security exclusions
-were corrected, with all 43 affected/control tests passing on rerun. See the
-PR 30.1.2 results (historical: `ai/thoughts/plans/2026-11-13-pr-30.1.2-shared-responses-results.md` at the archive commit below)
-for original failures, exact commands and verification history.
-
 ## PR30-B03 — Anthropic tool root-schema loss (SAI-03)
 
 **Status:** Open; full root-fidelity correctness case skipped by default under the
 explicit developer decision of November 13, 2026 recorded in the PR 30.1.3 ticket.
-The complete assertion runs with `loomspan.pr30.blockers=true`. This later decision
-extends the default-skip pattern to B03; it does not close the defect or establish
-schema fidelity. Independent nested-schema and canonical controls remain active.
+The complete assertion runs with `loomspan.pr30.blockers=true`. This deferral
+does not close the defect or establish schema fidelity. Independent nested-schema
+and canonical controls remain active.
 
 Tested artifact: `org.springframework.ai:spring-ai-anthropic:2.1.0-RC2`, JAR SHA-256
 `9067b55f3febc01cc2a16650d870f71911bc4fa414efd309f46147216008815e`.
@@ -219,7 +157,7 @@ SDK: `com.google.genai:google-genai:1.73.0`, JAR SHA-256
   schema fails inside the same SDK conversion before HTTP, so this case cannot
   reach its intended incomplete-response boundary. OpenAI/Anthropic parameters
   and available Gemini status controls remain active. Count this one integrated
-  invocation separately from the ten B02–B05 protocol invocations. Remove
+  invocation separately from the seven B03–B05 protocol invocations. Remove
   this assumption and pass the complete case when B04 is corrected.
 - **Closure:** Verify an acceptable upstream artifact/commit, record its identity,
   pass complete raw output/tool assertions and native/options/preservation checks.

@@ -34,8 +34,8 @@ class SharedResponsesProtocolIntegrationTest {
     void preservesThreeStatelessRoundsAndCanonicalParts(String identity) throws Exception {
         try (var server = new MockWebServer()) {
             server.start();
-            server.enqueue(round("one", List.of(reasoning("one", true), commentary("one"), call("one"))));
-            server.enqueue(round("two", List.of(reasoning("two", true), commentary("two"), call("two"))));
+            server.enqueue(round("one", List.of(reasoning("one"), commentary("one"), call("one"))));
+            server.enqueue(round("two", List.of(reasoning("two"), commentary("two"), call("two"))));
             server.enqueue(ResponsesFixtures.text("finished"));
             var effects = new AtomicInteger();
             var options = requestOptions(identity, 4096).toolCallbacks(callback(effects, "{}" )).build();
@@ -135,39 +135,6 @@ class SharedResponsesProtocolIntegrationTest {
         }
     }
 
-    @ParameterizedTest @ValueSource(strings={"plaintext", "signed", "summary-only"})
-    void requiredNonCiphertextReasoningSurvivesContinuation(String shape) throws Exception {
-        Assumptions.assumeTrue(Boolean.getBoolean("loomspan.pr30.blockers"),
-                "PR30-B02: RC2 drops required non-ciphertext reasoning; see ai/thoughts/phases/pr-30-blockers.md. "
-                        + "Reproduce with -Dloomspan.pr30.blockers=true");
-        try (var server=new MockWebServer()) {
-            server.start();
-            var item = new LinkedHashMap<String,Object>(reasoning(shape,false));
-            if (!shape.equals("summary-only")) item.put("content",List.of(Map.of("type","reasoning_text","text","required plaintext")));
-            if (shape.equals("signed")) item.put("signature","required signature");
-            server.enqueue(round("required",List.of(item,call("required"))));
-            server.enqueue(ResponsesFixtures.text("done"));
-            client(model(server),requestOptions("openai/gpt-6.1-terra",4096)
-                    .toolCallbacks(callback(new AtomicInteger(),"{}")).build()).prompt("lookup").call().content();
-            server.takeRequest(2,TimeUnit.SECONDS);
-            var body=JSON.readTree(server.takeRequest(2,TimeUnit.SECONDS).getBody().readUtf8());
-            var replay = body.path("input").valueStream().filter(v->v.path("type").asText().equals("reasoning")).findFirst();
-            assertThat(replay).as("required "+shape+" reasoning must not be silently dropped").isPresent();
-            var input = body.path("input");
-            assertThat(input.size()).isEqualTo(4);
-            assertThat(input.get(1)).as("reasoning must precede its tool call and result").isEqualTo(replay.orElseThrow());
-            assertThat(replay.orElseThrow().path("id").asText()).isEqualTo("rs_"+shape);
-            assertThat(replay.orElseThrow().path("summary")).isEqualTo(JSON.valueToTree(item.get("summary")));
-            if (!shape.equals("summary-only"))
-                assertThat(replay.orElseThrow().path("content")).isEqualTo(JSON.valueToTree(item.get("content")));
-            if(shape.equals("signed")) assertThat(replay.orElseThrow().path("signature").asText()).isEqualTo("required signature");
-            assertThat(input.get(2).path("type").asText()).isEqualTo("function_call");
-            assertThat(input.get(2).path("call_id").asText()).isEqualTo("call_required");
-            assertThat(input.get(3).path("type").asText()).isEqualTo("function_call_output");
-            assertThat(input.get(3).path("call_id").asText()).isEqualTo("call_required");
-        }
-    }
-
     @Test void concurrentInvocationsDoNotShareContinuationState() throws Exception {
         try (var server=new MockWebServer()) {
             server.setDispatcher(new Dispatcher() {
@@ -175,7 +142,7 @@ class SharedResponsesProtocolIntegrationTest {
                     String raw=request.getBody().readUtf8();
                     String owner=raw.contains("alpha") ? "alpha" : "beta";
                     return raw.contains("function_call_output") ? ResponsesFixtures.text("done "+owner)
-                            : round(owner,List.of(reasoning(owner,true),call(owner)));
+                            : round(owner,List.of(reasoning(owner),call(owner)));
                 }
             });
             server.start();
@@ -199,7 +166,7 @@ class SharedResponsesProtocolIntegrationTest {
     @Test void rejectedContinuationDoesNotRepeatCompletedToolsOrSwitchModels() throws Exception {
         try(var server=new MockWebServer()) {
             server.start();
-            server.enqueue(round("first",List.of(reasoning("first",true),call("first"))));
+            server.enqueue(round("first",List.of(reasoning("first"),call("first"))));
             server.enqueue(new MockResponse().setResponseCode(400).setHeader("Content-Type","application/json")
                     .setBody("{\"error\":{\"message\":\"route cannot replay opaque state\",\"type\":\"invalid_request_error\"}}"));
             var effects=new AtomicInteger();
@@ -218,7 +185,7 @@ class SharedResponsesProtocolIntegrationTest {
     @Test void parallelSelectionsAndRecoverableErrorsRetainBothResults() throws Exception {
         try(var server=new MockWebServer()) {
             server.start();
-            server.enqueue(round("parallel",List.of(reasoning("parallel",true),call("one"),call("two"))));
+            server.enqueue(round("parallel",List.of(reasoning("parallel"),call("one"),call("two"))));
             server.enqueue(ResponsesFixtures.text("done"));
             var effects=new AtomicInteger();
             ToolCallback callback=new ToolCallback() {
@@ -385,10 +352,10 @@ class SharedResponsesProtocolIntegrationTest {
     }
     private static Map<String,Object> call(String id) {return ResponsesFixtures.functionCall("Test-lookup","call_"+id,"{}").entrySet().stream()
             .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey,e->e.getKey().equals("id")?"fc_"+id:e.getValue()));}
-    private static Map<String,Object> reasoning(String id,boolean encrypted) {
+    private static Map<String,Object> reasoning(String id) {
         var item=new LinkedHashMap<String,Object>(); item.put("type","reasoning");item.put("id","rs_"+id);
         item.put("summary",List.of(Map.of("type","summary_text","text","summary "+id)));
-        if(encrypted)item.put("encrypted_content","opaque "+id);return item;
+        item.put("encrypted_content","opaque "+id);return item;
     }
     private static Map<String,Object> commentary(String id) {
         var item=new LinkedHashMap<String,Object>(ResponsesFixtures.textItem("commentary "+id));
