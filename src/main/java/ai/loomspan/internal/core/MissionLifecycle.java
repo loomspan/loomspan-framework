@@ -44,6 +44,7 @@ public final class MissionLifecycle
     private final Set<Future<?>> physicalFutures = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean frameworkCutOff = new AtomicBoolean();
     private volatile long frameworkDeadlineNanos = Long.MAX_VALUE;
+    private final AtomicReference<ExecutionBudget> executionBudget = new AtomicReference<>();
     private final AtomicReference<Throwable> frameworkCause = new AtomicReference<>();
     private boolean owningStarted;
     private boolean owningReturned;
@@ -97,6 +98,62 @@ public final class MissionLifecycle
         try { return state; }
         finally { lock.unlock(); }
     }
+
+    /** Establish once at the existing timed submission boundary, never at executor entry. */
+    public void beginExecution(Duration timeout)
+    {
+        Objects.requireNonNull(timeout, "timeout must not be null");
+        if (timeout.isNegative()) throw new IllegalArgumentException("timeout must not be negative");
+        // Existing enforcement uses millisecond precision. Saturate conversion rather than overflow.
+        long millis;
+        try { millis = timeout.toMillis(); }
+        catch (ArithmeticException overflow) { millis = Long.MAX_VALUE; }
+        long nanos = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(millis);
+        executionBudget.compareAndSet(null, new ExecutionBudget(nanoTime.getAsLong(), nanos));
+    }
+
+    /** Live read, independent of trace locks and cancellation cleanup grace. */
+    public Optional<Duration> remainingExecutionTime()
+    {
+        Long minimum = null;
+        MissionContext cursor = mission;
+        while (cursor != null)
+        {
+            MissionLifecycle owner = cursor.lifecycle();
+            long now = owner.nanoTime.getAsLong();
+            ExecutionBudget budget = owner.executionBudget.get();
+            if (budget != null)
+            {
+                long elapsed = Math.max(0, now - budget.startedNanos());
+                long remaining = Math.max(0, budget.durationNanos() - elapsed);
+                minimum = minimum == null ? remaining : Math.min(minimum, remaining);
+            }
+            long shutdown = owner.frameworkDeadlineNanos;
+            if (shutdown != Long.MAX_VALUE)
+            {
+                long remaining = shutdown <= now ? 0 : shutdown - now;
+                if (remaining < 0) remaining = Long.MAX_VALUE;
+                minimum = minimum == null ? remaining : Math.min(minimum, remaining);
+            }
+            cursor = cursor.parent().orElse(null);
+        }
+        return minimum == null ? Optional.empty() : Optional.of(Duration.ofNanos(minimum));
+    }
+
+    /** Cancellation authority is distinct from normal logical completion. */
+    public boolean isCancelled()
+    {
+        MissionContext cursor = mission;
+        while (cursor != null)
+        {
+            MissionLifecycle owner = cursor.lifecycle();
+            if (owner.primaryCause.get() != null || owner.frameworkCutOff.get()) return true;
+            cursor = cursor.parent().orElse(null);
+        }
+        return false;
+    }
+
+    private record ExecutionBudget(long startedNanos, long durationNanos) {}
 
     boolean writableWhileLocked() { return state != State.CLOSED && !frameworkCutOff.get(); }
 

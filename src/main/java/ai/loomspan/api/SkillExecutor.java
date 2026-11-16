@@ -7,7 +7,7 @@ import java.lang.annotation.Target;
 
 /**
  * Declares reference-only Java execution behavior on a Spring bean method.
- * Accepts exactly one {@link SkillExecutorInvocation}; it creates no callable skill or input schema.
+ * Accepts exactly one {@link ai.loomspan.api.extensions.v1.SkillExecutorInvocation}; it creates no callable skill or input schema.
  * Namespace and local-name rules are the same as {@link SkillMethod}.
  */
 @Target(ElementType.METHOD)

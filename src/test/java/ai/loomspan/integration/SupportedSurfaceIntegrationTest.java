@@ -1,7 +1,7 @@
 package ai.loomspan.integration;
 
 import ai.loomspan.testkit.FixtureExecutor;
-import ai.loomspan.api.SkillExecutorInvocation;
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillException;
 import ai.loomspan.api.SkillExecutionView;
@@ -58,8 +58,6 @@ class SupportedSurfaceIntegrationTest
             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default-foundationExecutor", Map.of())))
                     .isInstanceOf(SkillException.class);
             assertThat(context.getBean(JavaFoundation.class).executorCalls).hasValue(0);
-            var invocation = new ai.loomspan.api.SkillExecutorInvocation(Map.of(), Map.of(), Map.of(), "sales-create", "generation");
-            assertThat(invocation.skillName()).isEqualTo("sales-create");
         });
     }
 
@@ -72,7 +70,7 @@ class SupportedSurfaceIntegrationTest
             throw new ai.loomspan.api.RecoverableSkillException("correct input");
         }
         @SkillMethod(name="foundationTerminal", description="Terminal failure") public String terminal() { throw new IllegalStateException("terminal"); }
-        @ai.loomspan.api.SkillExecutor(name="foundationExecutor") public String execute(ai.loomspan.api.SkillExecutorInvocation invocation) {
+        @ai.loomspan.api.SkillExecutor(name="foundationExecutor") public String execute(ai.loomspan.api.extensions.v1.SkillExecutorInvocation invocation) {
             executorCalls.incrementAndGet(); return invocation.skillName();
         }
     }

@@ -44,7 +44,8 @@ The allowlist currently contains only:
 - `SkillExecutionEvent`
 - `SkillMethod`
 - `SkillExecutor`
-- `SkillExecutorInvocation`
+- `SkillExecutorInvocation` (v1)
+- `ExecutorDiagnostics` (v1)
 - `RecoverableSkillException`
 - `PlannerInabilityException`
 - `SkillParam`
@@ -53,7 +54,9 @@ The allowlist currently contains only:
 - `SkillInputValidationException`
 - `SkillInputValidationIssue`
 
-All twenty-six are public top-level types in `ai.loomspan.api`. A Java
+The twenty-seven supported types comprise twenty-five in `ai.loomspan.api` and
+exactly `SkillExecutorInvocation` and `ExecutorDiagnostics` in
+`ai.loomspan.api.extensions.v1`. Arbitrary types in that package are not approved. A Java
 `public` modifier does not make any other Loomspan type supported API. Read
 [compatibility-and-boundaries.md](compatibility-and-boundaries.md) before
 advising an application to depend on another Loomspan type.
@@ -95,11 +98,11 @@ Run the complete executor quickstart (`docs/quickstart-executors.md` in the matc
 
 | Topic | Coverage | Notes |
 | --- | --- | --- |
-| Supported public types | Source-verified | Exact twenty-six-type allowlist and package boundaries |
+| Supported public types | Source-verified | Exact twenty-seven-type allowlist, selected v1 types and package boundaries |
 | Catalog and pre-checks | Source-verified | Explicit namespace acquisition, immutable qualified metadata, strict catalog lookup versus local-to-default invoke/validate/handoff resolution (SkillReachableAdmissionTest), malformed/foreign lookup, candidate IDs, active namespace registry and removal; fresh reachable admission and temporary validation are covered by SkillReachableAdmissionTest; shared composed executor entry/filter/dispatch checks are covered by `SharedDeclarativeAuthorizationIntegrationTest` |
 | Two-stage skill updates | Source-verified | Complete skill and execution candidate, environment or host-map credential references, frozen generation, process-local ID, one-shot publication, candidate disposal, safe retirement callback, and application-owned readiness and cleanup. Executor namespace IDs can key application-owned resources through existing retirement listeners; shutdown remains application-owned. |
 | Skill invocation | Source-verified | Local-to-default or explicit-qualified invocation and atomic single-use handoff (SkillReachableAdmissionTest) with captured generation ID, input normalization and validation, result, session, security context, and observer timing |
-| Java declarations and results | Source-verified | Callable/executor discovery shares proxy/security checks; exact string/null/JSON results, constructor copying and designated failures are covered by `SkillExecutorTest`, `SharedJavaDiscoveryInvocationTest` and `SupportedSurfaceIntegrationTest`. Captured YAML executor binding/policy and secured retained execution are covered by `ExecutorDependencyResolutionTest` and `ExecutorGenerationExecutionIntegrationTest`; actual argument advice on root/child mission workers and context restoration for both forms by `SharedDeclarativeAuthorizationIntegrationTest`; designated standard feedback, direct/step termination and exact messages are covered by `ExplicitJavaFailureHandlingIntegrationTest`; no automatic replay or step correction loop. Reflected callable inputs live in `skill-authoring`. `ExecutorApplicationIntegrationTest` adds actual HTTP root/standard-child execution, Config Data, default ref-to-Resource resolution and SQL-shaped domain neutrality; the runnable executor quickstart verifies separate application composition. |
+| Java declarations and results | Source-verified | Callable/executor discovery shares proxy/security checks; exact string/null/JSON results, constructor copying and designated failures are covered by `SkillExecutorTest`, `SharedJavaDiscoveryInvocationTest` and `SupportedSurfaceIntegrationTest`. Captured YAML executor binding/policy and secured retained execution are covered by `ExecutorDependencyResolutionTest` and `ExecutorGenerationExecutionIntegrationTest`; actual argument advice on root/child mission workers and context restoration for both forms by `SharedDeclarativeAuthorizationIntegrationTest`; designated standard feedback, direct/step termination and exact messages are covered by `ExplicitJavaFailureHandlingIntegrationTest`; no automatic replay or step correction loop. Reflected callable inputs live in `skill-authoring`. `ExecutorApplicationIntegrationTest` adds actual HTTP root/standard-child execution, Config Data, default ref-to-Resource resolution and SQL-shaped domain neutrality; the runnable executor quickstart verifies separate application composition. `ExecutorInvocationLifecycleIntegrationTest` and `MissionLifecycleTest` cover live cancellation, original parent budgets, no deadline/expiry and cleanup-grace separation; diagnostics recording is unavailable. |
 | Execution observations | Source-verified | Immutable completed view/event values, canonical namespace identities, entry versus target generation facts, one observer flow and unchanged trust boundary; NamespaceObservationIntegrationTest and ConsoleTraceFixtureCorpusTest |
 | Facade failures | Source-verified | Validation, authorization, safe wrapping, observer failures, and fatal errors |
 | Configuration properties | Not documented here | Public configuration behavior is user-facing but its binding types are not application Java API |

@@ -34,7 +34,8 @@ class LoomspanPublicSurfaceArchitectureTest
             "ai.loomspan.api.SkillExecutionEvent",
             "ai.loomspan.api.SkillMethod",
             "ai.loomspan.api.SkillExecutor",
-            "ai.loomspan.api.SkillExecutorInvocation",
+            "ai.loomspan.api.extensions.v1.SkillExecutorInvocation",
+            "ai.loomspan.api.extensions.v1.ExecutorDiagnostics",
             "ai.loomspan.api.PlannerInabilityException",
             "ai.loomspan.api.RecoverableSkillException",
             "ai.loomspan.api.SkillParam",
@@ -147,6 +148,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.core.CapabilityMetadata", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.CapabilityToolDescriptor", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.DefaultExecutionTraceRecorder", "Public only for Java collaboration between distinct internal subsystem packages."),
+            Map.entry("ai.loomspan.internal.core.ExecutorInvocations", "Internal private-constructor bridge for Framework-created versioned invocations across Java packages."),
             Map.entry("ai.loomspan.internal.core.ExecutionCoordinator", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.core.ExecutionBinding", "Public only for immutable execution identity collaboration between internal runtime packages."),
             Map.entry("ai.loomspan.internal.core.ExecutionBindingScope", "Public only for explicit scoped binding at internal runtime boundaries."),
@@ -331,7 +333,8 @@ class LoomspanPublicSurfaceArchitectureTest
     @Test
     void apiPackageContainsExactlyApprovedPublicTypes()
     {
-        assertThat(publicTopLevelTypesIn("ai.loomspan.api"))
+        assertThat(productionClasses.stream().filter(this::isPublic)
+                .map(JavaClass::getName).filter(name -> name.startsWith("ai.loomspan.api.")).collect(Collectors.toSet()))
                 .containsExactlyInAnyOrderElementsOf(API_TYPES);
     }
 
@@ -558,7 +561,7 @@ class LoomspanPublicSurfaceArchitectureTest
         {
             assertThat(inspected.getPackageName())
                     .as("Public API signature %s leaks Loomspan type %s", owner, inspected.getName())
-                    .isEqualTo("ai.loomspan.api");
+                    .satisfies(packageName -> assertThat(API_TYPES).contains(inspected.getName().split("\\$")[0]));
         }
     }
 }

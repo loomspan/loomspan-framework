@@ -1,5 +1,7 @@
 package ai.loomspan.internal.skill;
 
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
+
 import ai.loomspan.api.*;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.core.*;
@@ -263,7 +265,7 @@ class ExecutorDependencyResolutionTest {
                         if (allowed) {
                             guard.checkAccess(capability,session,null);
                             assertThat(snapshot.executorBinding(capability.name()).registration().invoker().apply(
-                                    new SkillExecutorInvocation(Map.of(),Map.of(),Map.of(),capability.name(),"test")))
+                                    ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(),Map.of(),Map.of(),capability.name(),"test", () -> false, java.util.Optional::empty)))
                                     .isEqualTo(snapshot == retained ? "old" : "new");
                         } else assertThatThrownBy(() -> guard.checkAccess(capability,session,null))
                                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);

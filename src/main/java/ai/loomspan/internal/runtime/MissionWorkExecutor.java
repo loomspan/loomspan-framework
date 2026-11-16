@@ -41,6 +41,9 @@ public final class MissionWorkExecutor
             throw new IllegalArgumentException("Explicit session does not match the current execution binding.");
         PhysicalBranchContext branch = capturedBinding.branch();
         MissionLifecycle lifecycle = capturedBinding.requireMission().lifecycle();
+        Duration executionTimeout = timeout(session);
+        lifecycle.beginExecution(executionTimeout);
+
         Callable<String> missionCall = () -> ExecutionBindingScope.callWith(capturedBinding, () -> {
             lifecycle.markOwningStarted();
             try
@@ -67,12 +70,12 @@ public final class MissionWorkExecutor
         }
         try
         {
-            return mission.get(timeout(session).toMillis(), TimeUnit.MILLISECONDS);
+            return mission.get(lifecycle.remainingExecutionTime().orElseThrow().toNanos(), TimeUnit.NANOSECONDS);
         }
         catch (TimeoutException ex)
         {
             LoomspanMissionTimeoutException failure = new LoomspanMissionTimeoutException(
-                    session.getSessionId(), skillName, timeout(session), ex);
+                    session.getSessionId(), skillName, executionTimeout, ex);
             MissionLifecycle.PrimaryCancellation primary = lifecycle.beginCancellation(capturedBinding, failure,
                     () -> executionStateService.recordFailure(session, failure, Map.of("message", "Mission execution timed out")));
             MissionLifecycle.Cutoff cutoff = lifecycle.awaitCutoff();
@@ -82,7 +85,7 @@ public final class MissionWorkExecutor
         catch (InterruptedException ex)
         {
             LoomspanMissionTimeoutException failure = new LoomspanMissionTimeoutException(
-                    session.getSessionId(), skillName, timeout(session), ex);
+                    session.getSessionId(), skillName, executionTimeout, ex);
             MissionLifecycle.PrimaryCancellation primary = lifecycle.beginCancellation(capturedBinding, failure,
                     () -> executionStateService.recordFailure(session, failure, Map.of("message", "Mission execution interrupted")));
             MissionLifecycle.Cutoff cutoff = lifecycle.awaitCutoff();

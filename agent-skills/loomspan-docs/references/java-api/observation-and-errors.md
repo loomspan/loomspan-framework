@@ -53,7 +53,7 @@ execution, even after current publication changes or removal/recreation. They ar
 same-release diagnostics, not an additional supported Java snapshot API.
 
 `AdmittedSkillInvocation.generationId()` identifies the entry generation;
-`SkillExecutorInvocation.executorConfigGenerationId()` identifies the captured executor namespace generation, which can differ from both the entry generation and the executing YAML leaf's owner. Public skill-call
+The v1 `SkillExecutorInvocation.executorConfigGenerationId()` identifies the captured executor namespace generation, which can differ from both the entry generation and the executing YAML leaf's owner. Public skill-call
 visibility grants neither observation nor configuration access. Host catalog
 metadata remains unfiltered under existing observation authorization, while
 runtime discovery enforces execution permissions.

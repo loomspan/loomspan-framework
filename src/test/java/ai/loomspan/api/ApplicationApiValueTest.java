@@ -1,5 +1,7 @@
 package ai.loomspan.api;
 
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
 
@@ -97,7 +99,7 @@ class ApplicationApiValueTest
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("nested", nested);
 
-        SkillExecutorInvocation invocation = new SkillExecutorInvocation(input, Map.of(), Map.of(), "tax-lookup", "generation-a");
+        SkillExecutorInvocation invocation = ai.loomspan.internal.core.ExecutorInvocations.create(input, Map.of(), Map.of(), "tax-lookup", "generation-a", () -> false, java.util.Optional::empty);
         assertThat(invocation.skillName()).isEqualTo("tax-lookup");
         assertThat(invocation.executorConfigGenerationId()).isEqualTo("generation-a");
         values.add("late");
@@ -117,17 +119,18 @@ class ApplicationApiValueTest
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> ((Map<Object, Object>) copiedNested.get("nonStringKeyed")).put(8, "x"))
                 .isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> new SkillExecutorInvocation(Map.of(), Map.of(), Map.of(), null, "generation-a")).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new SkillExecutorInvocation(null, Map.of(), Map.of(), "tax-lookup", "generation-a")).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new SkillExecutorInvocation(Map.of(), Map.of(), Map.of(), "tax-lookup", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), null, "generation-a", () -> false, java.util.Optional::empty)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(null, Map.of(), Map.of(), "tax-lookup", "generation-a", () -> false, java.util.Optional::empty)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), "tax-lookup", null, () -> false, java.util.Optional::empty)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     void executorInvocationExposesOnlyTheAgreedInvocationData()
     {
-        assertThat(SkillExecutorInvocation.class.getRecordComponents())
-                .extracting(component -> component.getName())
-                .containsExactly("input", "skillConfig", "executorConfig", "skillName", "executorConfigGenerationId");
+        assertThat(SkillExecutorInvocation.class.getDeclaredMethods())
+                .extracting(java.lang.reflect.Method::getName)
+                .containsExactlyInAnyOrder("input", "skillConfig", "executorConfig", "skillName",
+                        "executorConfigGenerationId", "diagnostics", "isCancelled", "remainingTime");
     }
 
     @Test

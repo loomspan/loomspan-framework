@@ -1,5 +1,7 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
+
 import ai.loomspan.api.*;
 import ai.loomspan.internal.schema.*;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
@@ -300,7 +302,7 @@ class JavaInputDeclarationTest {
     @Test void executorRemainsReferenceOnlyAndDoesNotReflectInternalStructures() {
         var bean=new ExecutorBean();factory.addBean("executor",bean);processor.postProcessAfterInitialization(bean,"executor");
         assertThat(processor.capabilities()).isEmpty();assertThat(processor.executors()).hasSize(1);
-        var input=new SkillExecutorInvocation(Map.of("a",1),Map.of("skill",true),Map.of("executor",true),"default-leaf","generation");
+        var input=ai.loomspan.internal.core.ExecutorInvocations.create(Map.of("a",1),Map.of("skill",true),Map.of("executor",true),"default-leaf","generation", () -> false, java.util.Optional::empty);
         assertThat(processor.executors().getFirst().invoker().apply(input)).isEqualTo("done");assertThat(bean.received).isSameAs(input);
     }
     static class ClosingStream extends ByteArrayInputStream {

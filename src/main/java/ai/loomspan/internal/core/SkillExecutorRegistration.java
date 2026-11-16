@@ -1,6 +1,6 @@
 package ai.loomspan.internal.core;
 
-import ai.loomspan.api.SkillExecutorInvocation;
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
 import ai.loomspan.internal.security.SkillAccessPolicy;
 import java.util.function.Function;
 

@@ -1,5 +1,7 @@
 package ai.loomspan.internal.skill;
 
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
+
 import ai.loomspan.api.*;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.core.*;
@@ -226,7 +228,7 @@ class SkillReloaderTest {
                 var capture=manager.capture(new SkillIdentity(namespace,"leaf"));
                 try {
                     var binding=manager.validateAdmission(capture.snapshot()).executorBinding(namespace+"-leaf");
-                    assertThat(binding.registration().invoker().apply(new SkillExecutorInvocation(Map.of(),Map.of(),binding.configuration(),namespace+"-leaf",binding.generationId()))).isEqualTo("ok");
+                    assertThat(binding.registration().invoker().apply(ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(),Map.of(),binding.configuration(),namespace+"-leaf",binding.generationId(), () -> false, java.util.Optional::empty))).isEqualTo("ok");
                 } finally { capture.lease().close(); }
             }
             assertThat(invocations).hasValue(2);

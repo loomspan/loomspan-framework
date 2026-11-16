@@ -40,16 +40,16 @@ part of the same supported API, so subsequent work implements a coherent contrac
 
 ## Acceptance criteria — this ticket only
 
-- [ ] Exact v1 registration succeeds; old/unsupported parameter types are rejected;
+- [x] Exact v1 registration succeeds; old/unsupported parameter types are rejected;
   the old invocation surface is absent and no internal/autoconfigure types leak.
-- [ ] Public invocation tests preserve captured input/configuration and generation
+- [x] Public invocation tests preserve captured input/configuration and generation
   identity, namespace reference/access behavior, direct and child execution.
-- [ ] Live lifecycle tests cover no deadline, zero expiry, cancellation/interruption,
+- [x] Live lifecycle tests cover no deadline, zero expiry, cancellation/interruption,
   parent/shutdown constraints, execution budget versus cleanup grace, and no budget reset
   at executor entry. Existing late-write fencing/resource retention remain intact.
-- [ ] Diagnostic declarations support the Phase 2 semantics without arbitrary DTO or
+- [x] Diagnostic declarations support the Phase 2 semantics without arbitrary DTO or
   provider-shaped API; 31.1.2 is explicitly the recording implementation owner.
-- [ ] The cross-layer removal inventory and README/public API policy are updated.
+- [x] The cross-layer removal inventory and README/public API policy are updated.
   Run `LoomspanPublicSurfaceArchitectureTest` and relevant existing executor/lifecycle
   tests. Record deferred verification with an owner if 31.1.2 compilation temporarily blocks it.
 
@@ -511,3 +511,152 @@ and [transport lifetime](../phases/executor-packs-and-typesafe-extraction-roadma
 - Execute only when this ticket is passed to the pipeline. Creating this file does not
   authorize starting implementation, committing current planning changes, or publishing.
 
+
+## Execution notes — 2026-11-16
+
+### Approved route, scope and declaration handoff
+
+The developer approved the Full 5-Step Pipeline after clean-checkout triage.
+Research and implementation/testing plans are in the same-date PR-31.1.1 files
+under `ai/thoughts/research/` and `ai/thoughts/plans/`. All current changes belong
+to this ticket; there were no unrelated dirty files. No Extensions change is
+needed. Console's buildtool documentation assertion is the only Go change;
+no REST/SSE/NDJSON contract or consoleCompatibilityVersion changed.
+
+The exact supported handoff is final
+`ai.loomspan.api.extensions.v1.SkillExecutorInvocation`, with private construction
+and these public read-only accessors:
+
+```java
+Map<String, Object> input();
+Map<String, Object> skillConfig();
+Map<String, Object> executorConfig();
+String skillName();
+String executorConfigGenerationId();
+ExecutorDiagnostics diagnostics();
+boolean isCancelled();
+Optional<Duration> remainingTime();
+```
+
+The exact colocated `ExecutorDiagnostics` interface declares six void methods:
+`info(String)`, `info(String, Object)`, `warn(String)`, `warn(String, Object)`,
+`error(String)`, and `error(String, Object)`. It is a Framework-supplied capability,
+not an application registration or bean-replacement SPI. No level enum or
+independent diagnostic/presentation version exists. `info`, `warn`, `error`
+select the three fixed developer severities; Framework notices are separate.
+No payload/notice enum or serialized spelling was introduced by this ticket.
+
+Restricted diagnostic data is fixed for 31.1.2: null, exact String/Boolean,
+Byte/Short/Integer/Long, finite Float/Double, BigInteger/BigDecimal; exact HashMap
+and LinkedHashMap plus concrete JDK factory Map.of/Map.ofEntries/Map.copyOf maps
+with String keys; exact ArrayList plus JDK factory List.of/List.copyOf lists;
+reference arrays and primitive boolean/byte/short/int/long/float/double arrays.
+Subclasses/custom collections/Number types, characters/char arrays, DTOs,
+adapters, arbitrary JsonNode subclasses and implicit string conversion are
+unsupported. Future bounded capture must recognize allowed classes before
+traversal and reject cycles within budgets. Business-value leaf semantics remain
+separate and unchanged.
+
+**31.1.2 owns recording:** `diagnostics()` currently throws
+`UnsupportedOperationException("Executor diagnostic recording is not yet available")`.
+This is explicit declaration-only staging; there is no inert recorder, null
+capability, discarded event, or disabled-capture setting. The build is coherent;
+no diagnostic compilation debt is concealed. 31.1.2 must replace this unavailable
+accessor with the actual invocation-scoped recorder and prove bounded Jackson
+capture, sequence/association/closure, notices/budgets/concurrency, fidelity and
+ordinary failure containment (including fallback notices/logging). Caller argument
+evaluation and JVM-wide failures are outside its guarantee. Existing automatic
+observation keeps existing failure semantics. No claim of completed diagnostics
+or its failure-containment implementation is made here.
+
+Private invocation construction is performed by one cached MethodHandle in
+internal `ExecutorInvocations`; public signatures expose no lifecycle suppliers
+or internal/autoconfigure types. Exact v1 registration replaces the old record
+with no alias, adapter or old-constructor shim. The closed API is now 27 types:
+25 direct-package types and precisely these two v1 types; no package-wide SPI.
+
+### Lifecycle implementation handoff
+
+`MissionLifecycle` now establishes one monotonic execution budget at both existing
+bounded submission owners (`MissionWorkExecutor` and
+`StepLoopMissionExecutionEngine`), before submission. Original timeout precision
+remains milliseconds, converted safely/saturating to nanoseconds. The timed wait
+uses that original remaining budget rather than starting a new wait allowance
+after submission. Read-only observations use captured mission ancestry, atomic
+cancellation/budget state and the live volatile shutdown deadline, independent
+of trace locks. Cleanup grace remains a separate field/authority. Expiry is zero;
+no established applicable deadline is empty; normal closure is not cancellation.
+Interruption is observed separately and accessors never clear it. Existing
+cancellation authority, late-write fences and physical generation retention remain.
+No new scheduler, physical cancellation callback, attempt admission or accounting
+API was added. Pack transport/retry behavior remains 31.2.1/31.2.2 acceptance.
+
+### Cross-layer native removal inventory for 31.3.1
+
+
+This is an inventory of the current baseline and the ticket/roadmap's already settled dispositions, not implementation of native removal or a parity requirement. Future execution notes must carry this inventory forward with updated anchors/dispositions.
+
+| Surface | Current source/test evidence | Settled disposition / owning work |
+| --- | --- | --- |
+| Native implementation | `internal/typesafe/TypeSafeClient`, `TypeSafeDeclaration`, `TypeSafeExecutor`; declaration includes whole-value/embedded input substitution and derived descriptive schema. | Retire native Framework implementation in 31.3.1; provider transport/request construction belongs to pack 31.2.1/31.2.2. |
+| Public catalog classification | `api/SkillKind.TYPESAFE`; `SkillGeneration:91`, `SkillGenerationManager:219,249`; `runtime/observation/catalog/RegisteredSkillEntry:29`. | Retire native enum/catalog kind; executor leaves remain JAVA, with YAML declaration provenance and resolved executor metadata. |
+| Manifest, compilation and startup validation | `YamlSkillManifest:23,83–97`, `YamlSkillDefinition:18,111,158–162,237`; `YamlSkillCatalog:328–346,478–493` selects form/driver and compiles native declaration. | Retire native `typesafe:` form, native model/driver checks and generated descriptive output metadata. Framework retains generic structural/input/access validation; pack performs domain/config/request validation before send at invocation. No new publication validator SPI. |
+| Direct and child dispatch | `ExecutionCoordinator:110,155`; `MissionWorkExecutor:131`; TypeSafe integration tests include direct/standard/explicit-step compositions. | Shared executor invocation replaces native dispatch, retaining direct/child input/access/evidence behavior; no automatic replay introduced. 31.1.1 establishes handoff, downstream pack proves behavior. |
+| Provider/configuration wiring | `AiDriver.TYPESAFE`, `LoomspanProperties:221,263–310`, `NamedAiConnectionRegistry:30–39,102`, `ProviderConnectionRuntime:8–16`; native exclusions in `SpringAiProviderIntegration:111`, `SpringAiChatOptionsContributor`, `NativeOutputContract:61`. | Retire native driver/runtime-client branches; pack owns captured endpoints/credentials/settings. Executor config preserves literal values today; it does not inherit native reference/interpolation semantics. |
+| Retry ownership | `TypeSafeExecutor:47–83` reserves Framework provider attempts, translates failures, decides retry and sleeps; client disables automatic retries/redirects. | Pack owns retry/transport behavior; executor diagnostics describe caught failures/attempts without Framework provider-attempt admission/accounting. Cooperative cancellation/interruption/deadline check prevents next send. |
+| Response and decimal fidelity | `TypeSafeExecutor:86–127` records envelope and returns object-valued `answers`; `TypeSafeSkillIntegrationTest:39–90` verifies BigDecimal/exponent request/retry/result/evidence precision; application `JavaSkillInvoker:40–44` has String/null conversion boundary. | Required precise business JSON and complete pack response under settled pack contract; native-only extraction behavior is changed, not preserved via adapters. Downstream consumers test null/String/structured answers; no fabricated success on failure. |
+| Output metadata | `TypeSafeDeclaration.outputSchema`; `YamlSkillDefinition:111`; `SkillDependencyValidator:224–245`; TypeSafe registered inspection tests. | Retire native generated output-schema propagation. Executor leaves reject output_schema; no provider-shaped generated-schema API is added. |
+| Generation/resource retention | `NamedAiConnectionRegistry` creates native client/pool, provider runtime captures it; Framework admitted root tracks physical missions; `ExecutorGenerationExecutionIntegrationTest:46–128`; `FrameworkExecutionLifecycleTest:31–82`. | Retain captured executor configuration/generation and existing resource retirement notification/lifetime rules; pack owns its clients/resources. Native client retirement disappears with native connection machinery. |
+| Physical cancellation and timeout | `TypeSafeClient:84–98` registers request cancellation Future with internal lifecycle; its response/socket timeout is inactivity; `TypeSafeClientTest.responseTimeoutIsInactivityWhileProgressingChunksMayExceedIt`. | Native physical callback parity is explicitly retired. Public v1 offers observations only. Pack owns total request timeout capped by remaining execution time; progressing responses must not evade it. Existing Framework interruption/fencing/resource retention remain. Pack tests belong to 31.2.1/31.2.2. |
+| Authoritative/unavailable usage | `TypeSafeExecutor:130–148` recognizes exact nonnegative integral counts with bounded sum, otherwise UNAVAILABLE; `TypeSafeClientTest:187,204`; integration tests verify attempts/modelCalls/units. | Retire automatic native TypeSafe accounting; pack diagnostics are not authoritative usage/quota admission. Unavailable pack usage must not appear as exact zero. Generic native model accounting still exists. Inspection/accounting projection owner 31.1.3, native deletion owner 31.3.1. |
+| Trace/HTTP/MCP/Console consumers | Framework native MODEL_REQUEST_SENT/RESPONSE_RECEIVED/ATTEMPT_FAILED with `payloadType: evaluation`; `loomspan-console-fixtures/traces/native-evaluation-{success,provider-failure,malformed-response}.ndjson`; application REST `skill-typesafe-detail.json`, `skills-page.json`; Console `internal/observability/service.go:286`, `internal/mcpadapter/output_schemas.go:337`, `web/src/api/contracts.ts:125`; related Go/TS tests. | Update/remove current fixtures, JAVA catalog unions and pack diagnostic presentation coherently. 31.1.3 owns new diagnostic inspection; 31.3.1 retires obsolete native values/fixtures. Preserve content, sequence, failure visibility and exact compatibility checks; do not increment marker or add historical readers. |
+| Dependencies, samples and documentation | POM httpclient5 at `:99`; `src/main/resources` example configuration; native test resources; root README; `docs/setup.md`; bundled native TypeSafe authoring/routing/model/output/trace topics; Console README and agent-skill MCP/debugging topics. | 31.3.1 removes native-only dependency/config/sample references after checking remaining uses, adapts/removes native tests and current fixtures; 31.3.2 owns final release-aligned docs/example index. This ticket updates invocation/lifecycle/API docs only. |
+
+The source search returned 19 production Java files with TypeSafe/SystemOne references and 24 Java test files, plus sample resources and the listed Console/docs/fixture groups. This inventory is grouped by behavior rather than treating every textual mention as a required deletion: generic model usage, retry, schema and observation mechanisms remain Framework functionality.
+
+
+### Documentation and evidence
+
+Updated README, root policy, selected package docs, Java API/authoring topics,
+maintainer routing and executor quickstart for the exact v1 types and real live
+accessors. Used repository-local `agent-skills/loomspan-docs/SKILL.md` after source
+inspection. Drift classification: **aligned** after updating the intentionally
+changed handoff. Guidance explicitly identifies unavailable diagnostics and does
+not claim recording guarantees were tested. Existing YAML/reference/access and
+resource-leaf semantics remain documented unchanged. No pack configuration or
+numeric transport/retry default is established by this ticket.
+
+Tested Framework coordinates: `ai.loomspan:loomspan-spring-boot-starter:1.0.0-beta.10-SNAPSHOT`,
+Java 21, local Maven wrapper; local mock HTTP only, no live provider credentials.
+No publication, push or sync was performed.
+
+### Step 4 verification
+
+- Expected pre-change FAIL: `.\mvnw.cmd "-Dtest=VersionedExecutorInvocationTest" test`
+  failed test compilation because `ai.loomspan.api.extensions.v1` did not exist.
+- PASS: `.\mvnw.cmd "-Dtest=VersionedExecutorInvocationTest,SkillExecutorTest,ApplicationApiValueTest,LoomspanPublicSurfaceArchitectureTest,MissionLifecycleTest" test`
+  — 47 tests, zero failures/errors.
+- PASS: `.\mvnw.cmd "-Dtest=ExecutorInvocationLifecycleIntegrationTest,SkillExecutorTest,ApplicationApiValueTest,SharedJavaDiscoveryInvocationTest,JavaInputDeclarationTest,ExecutorGenerationExecutionTest,SupportedSurfaceIntegrationTest,ExecutorApplicationIntegrationTest,NamespaceStartupIntegrationTest,NamespaceExecutionAuthorityIntegrationTest,SharedDeclarativeAuthorizationIntegrationTest,PublicSkillReloadIntegrationTest,ExplicitJavaFailureHandlingIntegrationTest,SkillReloaderTest" test`
+  — 151 tests, zero failures/errors.
+- PASS: `.\mvnw.cmd "-Dtest=LoomspanPublicSurfaceArchitectureTest,ExecutorDependencyResolutionTest,ExecutorGenerationExecutionIntegrationTest,MissionLifecycleTest,FrameworkExecutionLifecycleTest,ExecutorInvocationLifecycleIntegrationTest,JavaSkillMissionCutoffTest,JavaSkillLifecycleIntegrationTest,StepLoopMissionExecutionEngineTest,VersionedExecutorInvocationTest,SharedJavaDiscoveryInvocationTest" test`
+  — 224 tests, zero failures/errors; includes the ticket's mandatory group.
+- PASS from `loomspan-console`: `go test ./internal/buildtool`.
+- Earlier implementation-only API compile/assertion errors and one explicit-step
+  fixture schema error were corrected before these passing runs; no required
+  test is treated as passing on the basis of an earlier failing run.
+
+Acceptance evidence: exact v1/obsolete absence/closed signatures and registration
+are in architecture/API/shared-discovery tests; captured values, precision,
+Resource identity, generation and namespace/access in supported/executor/reload/
+authorization suites; live no-deadline/zero/ancestry/shutdown/no-reset/cleanup-grace
+in lifecycle and new public invocation tests; existing cutoff/resource-retention
+suites remain passing. The table above and current docs establish the removal/API
+handoff. No optional developer check is required or proposed.
+
+- PASS: `.\mvnw.cmd test` — 2,282 tests, zero failures/errors, two property-gated
+  `Pr18RecordedHandoffDiagnosticTest` skips (`pr18.diagnostic` absent); total Maven
+  time 4m49s.
+- PASS: `git diff --check`.
+- No required verification is deferred. Diagnostic implementation/failure-injection
+  and pack transport/retry checks remain their named downstream tickets' scope,
+  not checks represented as passing here. Step 5 independent review is next.

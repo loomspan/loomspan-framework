@@ -166,8 +166,9 @@ public class ExecutionCoordinator
                                 session, rootCapability.inputContract());
                         if (definition != null && definition.form() == YamlSkillDefinition.Form.EXECUTOR) {
                             var binding = parentBinding.snapshot().executorBinding(skillName);
-                            return binding.registration().invoker().apply(new ai.loomspan.api.SkillExecutorInvocation(
-                                    resolved, definition.config(), binding.configuration(), skillName, binding.generationId()));
+                            return binding.registration().invoker().apply(ExecutorInvocations.create(
+                                    resolved, definition.config(), binding.configuration(), skillName, binding.generationId(),
+                                    mission.lifecycle()::isCancelled, mission.lifecycle()::remainingExecutionTime));
                         }
                         return String.valueOf(rootCapability.invoker().invoke(resolved));
                     }

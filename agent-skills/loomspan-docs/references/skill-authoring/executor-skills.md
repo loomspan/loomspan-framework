@@ -68,6 +68,24 @@ Public catalogs classify these leaves as `JAVA`. Diagnostic catalogs report `kin
 
 Evidence: `DefaultRegisteredSkillCatalogTest`, `ExecutorGenerationExecutionTest`, `ConsoleRestFixtureCorpusTest`, and Console `TestAllCallableFormsPreserveProvenanceAndRejectInvalidContracts` cover classification, source fidelity, same-name roles and Java/Go/MCP agreement.
 
+## Versioned executor handoff
+
+Java methods receive exactly `ai.loomspan.api.extensions.v1.SkillExecutorInvocation`,
+a final class created by Framework with no public constructor. Its business values
+are captured; `isCancelled()` and `remainingTime()` are live read-only observations.
+Remaining time includes parent/shutdown limits, excludes cleanup grace and does
+not restart at executor entry. Empty means no deadline; expiry returns zero.
+Executors SHOULD check these observations and thread interruption before work and
+retry waits, preserve interruption and bound their own I/O. Physical cancellation
+of remote work is not guaranteed. `diagnostics()` currently throws
+`UnsupportedOperationException`; recording is unavailable. Read the complete
+[Java handoff contract](../java-api/java-skills.md#reference-only-executor-declaration)
+for exact accessors, declared JSON values and lifecycle limitations.
+
+Evidence: `ExecutorInvocationLifecycleIntegrationTest` covers direct/standard/
+explicit-child budgets and cross-thread cancellation; `MissionLifecycleTest`
+covers no deadline, expiry, cleanup-grace distinction, ancestry and live shutdown.
+
 ## Evidence and next topics
 
 Run the complete HTTP/SQL-shaped executor application (`docs/quickstart-executors.md` in the matching framework checkout)
@@ -87,5 +105,5 @@ creation, reuse, retirement and shutdown remain application responsibilities.
 - `ExecutorDependencyResolutionTest`: local/qualified roles, visibility, exact paths/maps, executor-only startup, retained binding, distinguishable captured executor policies, target-base publication and root-reachable capture.
 - `ExecutorGenerationExecutionTest` and `ExecutorGenerationExecutionIntegrationTest`: YAML retention, public JAVA classification, captured invocation construction and secured handoff across foreign replacement/removal/recreation.
 - `SkillRoleEvaluatorTest` and `SharedDeclarativeAuthorizationIntegrationTest`: composed YAML/Java policy, metadata-only visibility/validation, dispatch rechecks and actual argument advice on mission workers.
-- [Java skills](../java-api/java-skills.md): annotation discovery, invocation record and application result/failure contracts.
+- [Java skills](../java-api/java-skills.md): annotation discovery, versioned invocation class and application result/failure contracts.
 - [Model selection](model-selection-and-connections.md): separate Framework provider configuration.

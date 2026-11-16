@@ -355,9 +355,15 @@ class FrameworkExecutionLifecycleTest
         var mission = new MissionContext(session, "entry", "frame", null);
         var future = new FutureTask<Void>(() -> null);
         mission.lifecycle().registerOwningFuture(future);
+        var invocation = ExecutorInvocations.create(java.util.Map.of(), java.util.Map.of(), java.util.Map.of(),
+                "default-entry", "generation", mission.lifecycle()::isCancelled, mission.lifecycle()::remainingExecutionTime);
+        assertThat(invocation.remainingTime()).isEmpty();
+        assertThat(invocation.isCancelled()).isFalse();
 
         lifecycle.stop();
 
+        assertThat(invocation.remainingTime()).contains(Duration.ZERO);
+        assertThat(invocation.isCancelled()).isTrue();
         assertThat(future.isCancelled()).isTrue();
         assertThat(mission.lifecycle().primaryCancellation()).get()
                 .extracting(MissionLifecycle.PrimaryCancellation::cause)

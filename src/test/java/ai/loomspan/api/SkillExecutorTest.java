@@ -1,5 +1,7 @@
 package ai.loomspan.api;
 
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
 import java.lang.annotation.ElementType;
@@ -24,11 +26,9 @@ class SkillExecutorTest
         assertThat(SkillExecutor.class.getMethod("config").getDefaultValue()).isEqualTo("");
         assertThat(SkillExecutor.class.getAnnotation(Target.class).value()).containsExactly(ElementType.METHOD);
         assertThat(SkillExecutor.class.getAnnotation(Retention.class).value()).isEqualTo(RetentionPolicy.RUNTIME);
-        assertThat(SkillExecutorInvocation.class.getRecordComponents()).extracting(java.lang.reflect.RecordComponent::getName)
-                .containsExactly("input", "skillConfig", "executorConfig", "skillName", "executorConfigGenerationId");
-        assertThat(SkillExecutorInvocation.class.getConstructors()).hasSize(1);
-        assertThat(SkillExecutorInvocation.class.getConstructors()[0].getParameterTypes())
-                .containsExactly(Map.class, Map.class, Map.class, String.class, String.class);
+        assertThat(SkillExecutorInvocation.class.isRecord()).isFalse();
+        assertThat(java.lang.reflect.Modifier.isFinal(SkillExecutorInvocation.class.getModifiers())).isTrue();
+        assertThat(SkillExecutorInvocation.class.getConstructors()).isEmpty();
     }
 
     @Test void copiesEveryMapAndNestedContainerButPreservesNullsAndLeaves()
@@ -40,7 +40,7 @@ class SkillExecutorTest
         var nested = new LinkedHashMap<Object, Object>(); nested.put(null, null); nested.put("leaf", leaf);
         var list = new ArrayList<>(Arrays.asList(nested, null, resource, array, set));
         var source = new LinkedHashMap<String, Object>(); source.put("list", list); source.put(null, null);
-        var invocation = new SkillExecutorInvocation(source, source, source, "  sales-create  ", " generation ");
+        var invocation = ai.loomspan.internal.core.ExecutorInvocations.create(source, source, source, "  sales-create  ", " generation ", () -> false, java.util.Optional::empty);
         source.clear(); list.clear(); nested.clear();
         assertThat(invocation.skillName()).isEqualTo("  sales-create  ");
         assertThat(invocation.executorConfigGenerationId()).isEqualTo(" generation ");
@@ -67,16 +67,16 @@ class SkillExecutorTest
         for (int index = 0; index < 5; index++)
         {
             int field = index;
-            assertThatThrownBy(() -> new SkillExecutorInvocation(field == 0 ? null : Map.of(),
+            assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(field == 0 ? null : Map.of(),
                     field == 1 ? null : Map.of(), field == 2 ? null : Map.of(),
-                    field == 3 ? null : "sales-create", field == 4 ? null : "generation"))
+                    field == 3 ? null : "sales-create", field == 4 ? null : "generation", () -> false, java.util.Optional::empty))
                     .isInstanceOf(NullPointerException.class);
         }
         for (String blank : List.of("", " \t\n"))
         {
-            assertThatThrownBy(() -> new SkillExecutorInvocation(Map.of(), Map.of(), Map.of(), blank, "g"))
+            assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), blank, "g", () -> false, java.util.Optional::empty))
                     .isInstanceOf(IllegalArgumentException.class);
-            assertThatThrownBy(() -> new SkillExecutorInvocation(Map.of(), Map.of(), Map.of(), "s", blank))
+            assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), "s", blank, () -> false, java.util.Optional::empty))
                     .isInstanceOf(IllegalArgumentException.class);
         }
     }

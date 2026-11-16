@@ -1,5 +1,7 @@
 package ai.loomspan.internal.skill;
 
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
+
 import ai.loomspan.api.*;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.core.*;

@@ -230,6 +230,9 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         MissionContext missionContext = capturedBinding.requireMission();
         MissionLifecycle lifecycle = missionContext.lifecycle();
 
+        Duration executionTimeout = timeout(session);
+        lifecycle.beginExecution(executionTimeout);
+
         Callable<String> missionCall = () -> ExecutionBindingScope.callWith(capturedBinding, () ->
         {
             lifecycle.markOwningStarted();
@@ -292,12 +295,12 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         }
         try
         {
-            return mission.get(timeout(session).toMillis(), TimeUnit.MILLISECONDS);
+            return mission.get(lifecycle.remainingExecutionTime().orElseThrow().toNanos(), TimeUnit.NANOSECONDS);
         }
         catch (TimeoutException ex)
         {
             LoomspanMissionTimeoutException failure = new LoomspanMissionTimeoutException(
-                    session.getSessionId(), skillName, timeout(session), ex);
+                    session.getSessionId(), skillName, executionTimeout, ex);
             MissionLifecycle.PrimaryCancellation primary = lifecycle.beginCancellation(capturedBinding, failure,
                     () -> executionStateService.recordFailure(session, failure, Map.of("message", "Mission execution timed out")));
             cleanupPreservingPrimary(session, missionContext, capturedBinding, lifecycle.awaitCutoff(), primary.cause());
@@ -306,7 +309,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         catch (InterruptedException ex)
         {
             LoomspanMissionTimeoutException failure = new LoomspanMissionTimeoutException(
-                    session.getSessionId(), skillName, timeout(session), ex);
+                    session.getSessionId(), skillName, executionTimeout, ex);
             MissionLifecycle.PrimaryCancellation primary = lifecycle.beginCancellation(capturedBinding, failure,
                     () -> executionStateService.recordFailure(session, failure, Map.of("message", "Mission execution interrupted")));
             cleanupPreservingPrimary(session, missionContext, capturedBinding, lifecycle.awaitCutoff(), primary.cause());

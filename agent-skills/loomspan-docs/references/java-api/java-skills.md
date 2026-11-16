@@ -74,23 +74,69 @@ String namespace() default "default";
 String config() default "";
 ```
 
-An executor method MUST accept exactly one `SkillExecutorInvocation` parameter. It supports the same return values as `@SkillMethod`. Omitted names and namespace normalization follow the callable identity rules above. `config` records an optional configuration path; empty selects no configuration.
+An executor method MUST accept exactly one
+`ai.loomspan.api.extensions.v1.SkillExecutorInvocation` parameter. The Java
+parameter selects v1; no manifest/version switch or application implementation
+is accepted. It supports the same return values as `@SkillMethod`. Omitted names and namespace normalization follow the callable identity rules above. `config` records an optional configuration path; empty selects no configuration.
 
 Loomspan discovers executor methods and preserves Spring proxy invocation. A YAML leaf selects one with `executor:` and executes as `SkillKind.JAVA`, retaining its YAML input contract and operation configuration. Configuration selection and registration ownership come from the captured executor namespace generation. An executor is reference-only: it has no generated callable schema, catalog entry, `allowed_skills` membership or `SkillTemplate` invocation route. Callable and executor names have separate indexes, so both roles may share one qualified identity; duplicates within either role fail. A bean may declare either or both roles.
 
-The public record has exactly five components, in this order:
+The final Framework-created class has these captured read-only accessors:
 
 ```java
-Map<String, Object> input;
-Map<String, Object> skillConfig;
-Map<String, Object> executorConfig;
-String skillName;
-String executorConfigGenerationId;
+Map<String, Object> input();
+Map<String, Object> skillConfig();
+Map<String, Object> executorConfig();
+String skillName();
+String executorConfigGenerationId();
 ```
 
-Framework supplies validated, reference-resolved input; the executing YAML skill's `config` and canonical qualified name; the selected executor configuration map; and the executor namespace's captured generation ID, even when the annotation declares no configuration path. Invocation performs no live registration lookup or configuration rebinding. Domain configuration validation and application resources remain application-owned.
+Framework supplies validated, reference-resolved input(); the executing YAML skill's `config` and canonical qualified name; the selected executor configuration map; and the executor namespace's captured generation ID, even when the annotation declares no configuration path. Invocation performs no live registration lookup or configuration rebinding. Domain configuration validation and application resources remain application-owned.
 
-Its public constructor requires every component to be non-null and both metadata strings to be nonblank; valid strings retain their exact text. All three maps are defensively copied recursively into unmodifiable map/list containers, preserving nulls. Other leaves retain identity, including Spring `Resource` handles, arrays and arbitrary application objects. This does not freeze those objects or copy/freeze resource bytes. There is no builder, authentication field, context bag or internal runtime value in the record.
+There is no public constructor or builder. Captured values are non-null and metadata strings nonblank; valid strings retain their exact text. All three maps are defensively copied recursively into unmodifiable map/list containers, preserving nulls. Other leaves retain identity, including Spring `Resource` handles, arrays and arbitrary application objects. This does not freeze those objects or copy/freeze resource bytes. There is no builder, authentication field, context bag or internal runtime value in the invocation.
+
+### Cooperative lifecycle
+
+`boolean isCancelled()` reads the captured mission's or an ancestor's live
+Framework cancellation state. `Optional<Duration> remainingTime()` reads the
+minimum remaining original execution budget across the mission, ancestors and
+Framework shutdown. Empty means no applicable deadline; expiry returns zero,
+never negative. Cancellation cleanup grace is excluded. Executor entry and retry
+checks do not reset the budget. Reads remain tied to this invocation from another
+thread and never clear the accessing thread's interrupt flag.
+
+Executor code SHOULD check cancellation, `Thread.currentThread().isInterrupted()`
+and remaining time before new work/retries and during retry waits. Preserve
+interruption and cap total I/O time by the remaining budget. These are observations,
+not cancellation controls: physical I/O may outlive logical cancellation, and
+remote work/billing cancellation is not guaranteed. Existing late-write fencing
+and generation/resource lifetime remain in force. Normal completion alone does
+not fabricate cancellation.
+
+### Diagnostic capability declaration
+
+`ExecutorDiagnostics diagnostics()` is declared in v1 but currently throws
+`UnsupportedOperationException`: recording is unavailable. No diagnostic call is
+silently discarded. The capability declares `info`, `warn` and `error`, each with
+`(String message)` and `(String message, Object data)` overloads returning void.
+Applications do not register implementations. Severity never controls result or retry.
+
+The declared data contract accepts null, String, Boolean, exact Byte/Short/Integer/
+Long, finite Float/Double, BigInteger and BigDecimal; exact HashMap/LinkedHashMap
+and JDK factory maps with String keys; exact ArrayList and JDK factory lists;
+reference arrays and primitive boolean/byte/short/int/long/float/double arrays.
+Custom subclasses/collections/Number values, characters/char arrays, DTOs,
+adapters and implicit string conversion are unsupported. Cycles are rejected
+within capture budgets. `Object` does not authorize arbitrary serialization.
+Business input/configuration retain their existing, separate leaf semantics.
+The recording contract contains ordinary failures after diagnostic method entry,
+including fallback reporting; caller expression evaluation and JVM-wide failures
+are outside it. Existing automatic observation retains its own semantics. These
+declarations do not establish implemented bounded recording or failure containment.
+
+Evidence: `VersionedExecutorInvocationTest`, `MissionLifecycleTest` and
+`ExecutorInvocationLifecycleIntegrationTest`; existing cutoff and generation
+suites protect late completion and resource retention.
 
 ## Runnable example and resource ownership
 
@@ -143,7 +189,7 @@ Do not import registries, descriptors, invokers, or discovery components from `a
 
 ## Source anchors
 
-- `SkillMethod`, `SkillParam`, `SkillExecutor`, `SkillExecutorInvocation` and `RecoverableSkillException` define the supported declarations and values; `SkillExecutorTest` protects the new annotation/constructor/copy contracts.
+- `SkillMethod`, `SkillParam`, `SkillExecutor`, `SkillExecutorInvocation` and `RecoverableSkillException` define the supported declarations and values; `SkillExecutorTest` protects the annotation/private-construction/copy contracts.
 - `SharedJavaDiscoveryInvocationTest` covers shared result conversion, actual reflection/JDK/CGLIB wrappers, mixed-role identity indexes, lazy executor discovery, unsafe dispatch and real method security.
 - `SkillMethodBeanPostProcessor` and its tests define shared canonical discovery and callable reflected inputs; `JavaSkillInvoker` owns final managed-proxy invocation and conversion for both roles.
 - `SkillGenerationManager#prepare` finishes all declaration sources and validates child references before a complete immutable generation can activate.

@@ -1,5 +1,7 @@
 package ai.loomspan.integration;
 
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
+
 import ai.loomspan.api.*;
 import ai.loomspan.autoconfigure.*;
 import ai.loomspan.internal.core.ExecutionBindingScope;

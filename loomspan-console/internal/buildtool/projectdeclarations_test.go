@@ -202,7 +202,7 @@ func TestLoomspanDocsSkillIsSelfContained(t *testing.T) {
 		"SkillReloader", "SkillDocument", "SkillValidationResult", "SkillValidationIssue",
 		"ValidatedSkill", "PreparedSkillUpdate", "ExecutionConfiguration", "SkillReloadException",
 		"SkillCatalog", "SkillDescriptor", "SkillKind", "NamespaceVisibility",
-		"twenty-six", "PlannerInabilityException", "LoomspanPublicSurfaceArchitectureTest", "No supported Java SPI",
+		"twenty-seven", "ExecutorDiagnostics", "ai.loomspan.api.extensions.v1", "PlannerInabilityException", "LoomspanPublicSurfaceArchitectureTest", "No supported Java SPI",
 	} {
 		if !strings.Contains(javaAPIIndex, required) {
 			t.Errorf("java-api README does not contain %q", required)

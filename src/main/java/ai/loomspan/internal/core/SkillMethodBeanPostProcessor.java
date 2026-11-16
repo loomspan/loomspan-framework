@@ -6,7 +6,7 @@ import tools.jackson.databind.JavaType;
 import tools.jackson.databind.introspect.BeanPropertyDefinition;
 import ai.loomspan.api.SkillMethod;
 import ai.loomspan.api.SkillExecutor;
-import ai.loomspan.api.SkillExecutorInvocation;
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
 import ai.loomspan.api.SkillParam;
 import ai.loomspan.internal.runtime.input.SkillInputContract;
 import ai.loomspan.internal.schema.CanonicalSchema;

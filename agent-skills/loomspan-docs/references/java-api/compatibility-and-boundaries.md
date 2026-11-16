@@ -9,8 +9,9 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the twenty-six types in the closed
-`ai.loomspan.api` allowlist:
+Application code MAY depend on the twenty-seven types in the closed
+allowlist: twenty-five types in `ai.loomspan.api`, plus exactly the invocation
+and diagnostic capability in `ai.loomspan.api.extensions.v1`:
 
 | Type | Supported purpose |
 | --- | --- |
@@ -32,7 +33,8 @@ Application code MAY depend on the twenty-six types in the closed
 | `SkillExecutionEvent` | Read a current-version diagnostic event |
 | `SkillMethod` | Mark an application bean method as a directly callable Java skill |
 | `SkillExecutor` | Mark a reference-only Java execution method; no callable registration or schema |
-| `SkillExecutorInvocation` | Construct or receive the five-component executor handoff with copied map/list containers |
+| `SkillExecutorInvocation` (v1) | Receive the Framework-created handoff with copied business containers and live lifecycle observations |
+| `ExecutorDiagnostics` (v1) | Declared message/JSON capability; recording currently unavailable |
 | `RecoverableSkillException` | Signal a designated Java failure with exact corrective text and an optional diagnostic cause |
 | `PlannerInabilityException` | Catch unsuccessful invocation completion and read its exact reason through `getMessage()` |
 | `SkillParam` | Describe and declare requiredness for a Java skill parameter |
@@ -104,7 +106,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the `api` package has exactly the twenty-six allowlisted public top-level types;
+- the API packages contain exactly the twenty-seven allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

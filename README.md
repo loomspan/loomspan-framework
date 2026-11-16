@@ -391,10 +391,11 @@ from the same revision as the runtime. The first production release will be `1.0
 | Integrate invocation, validation, and runtime updates | [Java API knowledge set](agent-skills/loomspan-docs/references/java-api/README.md) |
 | Find docs or understand their scope | [Documentation map](docs/README.md) |
 
-The supported Java API is the closed allowlist in `ai.loomspan.api`, summarized
+The supported Java API is the closed allowlist in `ai.loomspan.api` and the exact v1 executor types in
+`ai.loomspan.api.extensions.v1`, summarized
 in the [public API reference](agent-skills/loomspan-docs/references/java-api/compatibility-and-boundaries.md).
-It contains 26 public top-level types, including `SkillExecutor`, the five-component
-`SkillExecutorInvocation` record, `RecoverableSkillException`, and `PlannerInabilityException`. Java callable
+It contains 27 public top-level types, including `SkillExecutor`, the
+Framework-created `SkillExecutorInvocation` class and `ExecutorDiagnostics` declaration, `RecoverableSkillException`, and `PlannerInabilityException`. Java callable
 methods and reference-only executors share discovery and proxy invocation. Successful
 null/void results become empty text, Strings remain exact, and other results become
 JSON; failures propagate. Only designated `RecoverableSkillException` failures become
@@ -402,6 +403,15 @@ failed-call feedback in standard tool calling, after failed recording and with t
 exact application message. Direct invocation and explicit steps still throw;
 ordinary application wrappers remain terminal. Feedback earns no successful-result
 credit and continuation uses existing budgets and the original parent timeout.
+Executor methods accept exactly `ai.loomspan.api.extensions.v1.SkillExecutorInvocation`.
+Its five captured business/configuration accessors retain copied map/list containers
+and generation identity. `isCancelled()` reads live Framework cancellation;
+`remainingTime()` reads the remaining execution budget, capped by ancestors and
+shutdown, with empty for no deadline and zero at expiry. Executors should also
+check thread interruption and bound their own I/O; these observations do not
+abort remote work. `diagnostics()` currently throws `UnsupportedOperationException`;
+diagnostic recording is unavailable. See the [executor API contract](agent-skills/loomspan-docs/references/java-api/java-skills.md#reference-only-executor-declaration).
+
 Canonical diagnostics record classification independently from completion linkage.
 
 A standard model-backed invocation can end unsuccessfully by calling the Framework

@@ -1,5 +1,7 @@
 package ai.loomspan.internal.core;
 
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
+
 import ai.loomspan.api.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -26,8 +28,8 @@ import static org.assertj.core.api.Assertions.*;
 
 class SharedJavaDiscoveryInvocationTest
 {
-    static final SkillExecutorInvocation INPUT = new SkillExecutorInvocation(Map.of("value", "input"),
-            Map.of("value", "skill"), Map.of("value", "executor"), "sales-create", "generation");
+    static final SkillExecutorInvocation INPUT = ai.loomspan.internal.core.ExecutorInvocations.create(Map.of("value", "input"),
+            Map.of("value", "skill"), Map.of("value", "executor"), "sales-create", "generation", () -> false, java.util.Optional::empty);
 
     static SkillMethodBeanPostProcessor process(Object bean)
     {
@@ -196,7 +198,7 @@ class SharedJavaDiscoveryInvocationTest
 
     @Test void rejectsInvalidExecutorArgumentsAndIdentities()
     {
-        for (Object bean : List.of(new NoArguments(), new TooManyArguments(), new WrongArgument(), new VarargsArgument()))
+        for (Object bean : List.of(new NoArguments(), new TooManyArguments(), new WrongArgument(), new ObjectArgument(), new UnsupportedArgument(), new DiagnosticArgument(), new VarargsArgument()))
             assertThatThrownBy(() -> process(bean)).hasMessageContaining("exactly one SkillExecutorInvocation").hasMessageContaining("applicationBean");
         for (Object bean : List.of(new BadName(), new BadNamespace(), new TooLongIdentity()))
             assertThatThrownBy(() -> process(bean)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("SkillExecutor");
@@ -204,6 +206,10 @@ class SharedJavaDiscoveryInvocationTest
     static class NoArguments { @SkillExecutor void execute() {} }
     static class TooManyArguments { @SkillExecutor void execute(SkillExecutorInvocation a, SkillExecutorInvocation b) {} }
     static class WrongArgument { @SkillExecutor void execute(Map<String,Object> value) {} }
+    static class ObjectArgument { @SkillExecutor void execute(Object value) {} }
+    static class UnsupportedInvocation {}
+    static class UnsupportedArgument { @SkillExecutor void execute(UnsupportedInvocation value) {} }
+    static class DiagnosticArgument { @SkillExecutor void execute(ai.loomspan.api.extensions.v1.ExecutorDiagnostics value) {} }
     static class VarargsArgument { @SkillExecutor void execute(SkillExecutorInvocation... value) {} }
     static class BadName { @SkillExecutor(name="bad-name") void execute(SkillExecutorInvocation value) {} }
     static class BadNamespace { @SkillExecutor(namespace="nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn") void execute(SkillExecutorInvocation value) {} }

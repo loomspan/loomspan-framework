@@ -366,6 +366,72 @@ class MissionLifecycleTest
         }
     }
 
+    @Test
+    void executionBudgetIsLiveDoesNotRenewAndExcludesCleanupGrace()
+    {
+        var clock = new java.util.concurrent.atomic.AtomicLong(100);
+        ExecutionBinding binding = binding("budget", null, clock::get);
+        MissionLifecycle lifecycle = binding.requireMission().lifecycle();
+        assertThat(lifecycle.remainingExecutionTime()).isEmpty();
+        lifecycle.beginExecution(java.time.Duration.ofSeconds(2));
+        clock.addAndGet(java.time.Duration.ofMillis(500).toNanos());
+        lifecycle.beginExecution(java.time.Duration.ofSeconds(9));
+        assertThat(lifecycle.remainingExecutionTime()).contains(java.time.Duration.ofMillis(1500));
+        lifecycle.beginCancellation(binding, new IllegalStateException("cancel"), () -> "failure");
+        assertThat(lifecycle.isCancelled()).isTrue();
+        assertThat(lifecycle.remainingExecutionTime()).contains(java.time.Duration.ofMillis(1500));
+        clock.addAndGet(java.time.Duration.ofSeconds(2).toNanos());
+        assertThat(lifecycle.remainingExecutionTime()).contains(java.time.Duration.ZERO);
+        lifecycle.closeNow();
+        assertThat(lifecycle.isCancelled()).isTrue();
+    }
+
+    @Test
+    void ancestorAndLiveShutdownConstraintsWinWithoutRenewingChildBudget()
+    {
+        var clock = new java.util.concurrent.atomic.AtomicLong(0);
+        ExecutionBinding parent = binding("budget-parent", null, clock::get);
+        parent.requireMission().lifecycle().beginExecution(java.time.Duration.ofSeconds(3));
+        clock.set(java.time.Duration.ofSeconds(1).toNanos());
+        ExecutionBinding child = binding("budget-child", parent.requireMission(), clock::get);
+        MissionLifecycle lifecycle = child.requireMission().lifecycle();
+        lifecycle.beginExecution(java.time.Duration.ofSeconds(10));
+        assertThat(lifecycle.remainingExecutionTime()).contains(java.time.Duration.ofSeconds(2));
+        parent.requireMission().lifecycle().frameworkDeadline(clock.get() + 100);
+        assertThat(lifecycle.remainingExecutionTime()).contains(java.time.Duration.ofNanos(100));
+        parent.requireMission().lifecycle().frameworkCutoff(clock.get());
+        assertThat(lifecycle.remainingExecutionTime()).contains(java.time.Duration.ZERO);
+        assertThat(lifecycle.isCancelled()).isTrue();
+    }
+
+    @Test
+    void normalClosureAndUnrelatedThreadInterruptionAreNotFrameworkCancellation()
+    {
+        MissionLifecycle lifecycle = binding("normal-close", null).requireMission().lifecycle();
+        lifecycle.closeNow();
+        Thread.currentThread().interrupt();
+        try
+        {
+            assertThat(lifecycle.isCancelled()).isFalse();
+            assertThat(lifecycle.remainingExecutionTime()).isEmpty();
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        }
+        finally { Thread.interrupted(); }
+    }
+
+    @Test
+    void executionDurationConversionSaturatesAndMonotonicElapsedHandlesClockWrap()
+    {
+        var clock = new java.util.concurrent.atomic.AtomicLong(Long.MAX_VALUE - 10);
+        MissionLifecycle lifecycle = binding("wrap", null, clock::get).requireMission().lifecycle();
+        lifecycle.beginExecution(java.time.Duration.ofMillis(1));
+        clock.addAndGet(20);
+        assertThat(lifecycle.remainingExecutionTime()).contains(java.time.Duration.ofNanos(999980));
+        MissionLifecycle huge = binding("huge", null, clock::get).requireMission().lifecycle();
+        huge.beginExecution(java.time.Duration.ofSeconds(Long.MAX_VALUE));
+        assertThat(huge.remainingExecutionTime()).contains(java.time.Duration.ofNanos(Long.MAX_VALUE));
+    }
+
     private static ExecutionBinding binding(String id, MissionContext parent)
     {
         return binding(id, parent, System::nanoTime);

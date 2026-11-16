@@ -4,7 +4,7 @@ import ai.loomspan.api.PreparedSkillUpdate;
 import ai.loomspan.api.ExecutionConfiguration;
 import ai.loomspan.api.SkillInvocationHandoff;
 import ai.loomspan.testkit.FixtureExecutor;
-import ai.loomspan.api.SkillExecutorInvocation;
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
 import ai.loomspan.api.SkillCatalog;
 import ai.loomspan.api.SkillReloadException;
 import ai.loomspan.api.SkillReloader;

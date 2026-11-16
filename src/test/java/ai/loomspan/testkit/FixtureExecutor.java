@@ -1,7 +1,7 @@
 package ai.loomspan.testkit;
 
 import ai.loomspan.api.SkillExecutor;
-import ai.loomspan.api.SkillExecutorInvocation;
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
 import java.util.function.Function;
 
 /** Real annotated executor for tests whose assertions concern orchestration and input binding. */

@@ -94,7 +94,7 @@ input_schema:
 package example;
 
 import ai.loomspan.api.SkillExecutor;
-import ai.loomspan.api.SkillExecutorInvocation;
+import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
 import ai.loomspan.api.SkillTemplate;
 import com.sun.net.httpserver.HttpServer;
 import org.springframework.boot.ApplicationRunner;

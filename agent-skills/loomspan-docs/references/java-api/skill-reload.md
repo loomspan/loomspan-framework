@@ -176,7 +176,7 @@ retirement callback. There is no historical invocation API.
 An executor bean or a collaborating application resource manager MAY inject
 `SkillReloader` and register this existing listener early, before staging the
 initial resources. Match callback IDs against the
-`SkillExecutorInvocation.executorConfigGenerationId()` used to select those
+v1 `SkillExecutorInvocation.executorConfigGenerationId()` used to select those
 resources. This is the captured executor namespace generation ID even when the
 annotation has no configuration path; it can differ from the YAML skill's or
 entry generation. Retained invocations keep that executor generation alive
