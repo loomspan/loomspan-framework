@@ -7,8 +7,13 @@ Status: completed source review with agreed v1 dispositions; no implementation c
 This review tests the [research design](decisions-executor-pack-research.md) and
 [extraction roadmap](executor-packs-and-typesafe-extraction-roadmap.md) against the
 current native TypeSafe implementation. It inspects local production code and test
-sources; tests and live provider calls were not run. Provider availability and wire
-contracts were not re-researched. Proposed Java names below are not released API.
+sources; the original review ran no tests or live provider calls. The 2026-11-16
+follow-up ran two existing executor test classes (12 passing tests) to verify namespace
+behavior; it did not implement or validate the proposed extraction. Provider availability
+and wire contracts were not re-researched. Proposed Java names below are not released API.
+The five-issue follow-up is resolved; read the roadmap's
+[current handoff](executor-packs-and-typesafe-extraction-roadmap.md#current-handoff-after-the-five-issue-follow-up-review)
+for the confirmed decisions, verification evidence, and next steps.
 
 ## Breaking-change policy
 
@@ -36,8 +41,9 @@ output metadata, and numeric decoding currently depend on Framework internals.
 The implementation prerequisites are the already-planned versioned handoff,
 diagnostics, and cancellation/deadline accessors. The numeric-handling decision is now settled: keep existing executor configuration
 behavior for v1 and document its difference from native TypeSafe. The `api_key` lookup rule and invocation-time pack validation are also settled
-below. Reduced output metadata and runtime binding checks are accepted for v1; output
-validation remains executor-owned.
+below. Reduced output metadata is accepted for v1. Response handling stays pack-owned;
+existing Framework runtime binding checks remain. The TypeSafe executor does not
+enforce provider response schemas or answer semantics.
 
 ## Scope rule for implementation and future tickets
 
@@ -200,7 +206,7 @@ not become `RecoverableSkillException`; that exception has specific correction s
 Sources: [declaration resolver](../../../src/main/java/ai/loomspan/internal/typesafe/TypeSafeDeclaration.java),
 [dependency validation](../../../src/main/java/ai/loomspan/internal/skill/SkillDependencyValidator.java).
 
-### 5. Output validation stays executor-owned — accepted v1 tradeoff
+### 5. Response handling stays pack-owned; Framework runtime binding checks remain
 
 Native `TypeSafeDeclaration` derives a descriptive output schema, exposed through
 catalog inspection and parent forwarding. Executor leaves reject `output_schema`,
@@ -213,8 +219,19 @@ or reshaping it. Conversion from HTTP response bytes to the Java return value is
 implementation detail handled by the HTTP client or existing JSON tooling; do not add
 a second parsing step if the client already supplies that value. No separate JSON
 specification or new Framework capability is required.
-Empty or malformed JSON fails execution; do not retry solely for
-JSON decoding failure. HTTP/transport failures remain failures. Do not enforce provider
+Preserve valid JSON through the actual Java executor return path, including JSON
+null and string responses. JSON `null` is not an empty HTTP body.
+[`JavaSkillInvoker`](../../../src/main/java/ai/loomspan/internal/core/JavaSkillInvoker.java)
+converts Java null to empty output and passes Java strings through as raw text.
+The pack must choose a return representation that preserves JSON values across
+that boundary. This requires no new Framework behavior, parsing contract, or
+provider response-schema enforcement.
+Classify transport failures and HTTP status first; retry eligible failures only under
+the pack's bounded retry and lifecycle policy, otherwise fail execution. Error-body
+diagnostic capture or decoding must not change that classification. For successful
+HTTP responses, decode and return the complete native JSON; empty or malformed JSON
+fails execution without a retry solely for decoding failure. HTTP/transport failures
+are not successful results. Do not enforce provider
 response schemas, answer completeness, confidence ranges, or other answer semantics.
 Applications interpret the result; diagnostic limits never truncate it. Provider-specific
 request validation remains. V1 adds no executor output-schema declaration, metadata hook,
@@ -310,7 +327,7 @@ The pack must not import these internal owners.
 
 Use the roadmap's [settled contract and mandatory ticket handoff](executor-packs-and-typesafe-extraction-roadmap.md#settled-cancellation-contract-and-mandatory-ticket-handoff).
 Relevant tickets/subtickets must include its behavior, code anchors, exclusions,
-and acceptance checks in their bodies, not just a link or broad "finalize semantics"
+and applicable acceptance checks in their bodies, not just a link or broad "finalize semantics"
 task. Verify live/no-deadline/expired reads, execution-budget versus cleanup-grace
 behavior, no budget reset, cancellation/interruption before sends and during waits,
 progressing-response total timeouts, and late completion/resource retention. Reuse
@@ -326,8 +343,11 @@ Multiple YAML skills can reference one executor, with existing namespace visibil
 configuration ownership, reference resolution, and publication rules. No new global
 executor registration, automatic visibility, or extension-specific publication rule
 is part of this work. Namespace placement is ordinary pack/application configuration,
-not a migration roadblock or Framework enhancement. Examples should demonstrate the
-existing rules without prescribing a new namespace relationship.
+not a migration roadblock or Framework enhancement. Extension examples use the
+`default` namespace and focus on installation, configuration, and invocation.
+Namespace concepts and visibility rules belong in `loomspan-framework` documentation;
+do not duplicate that guidance in `loomspan-decisions` or other `loomspan-extensions`
+subprojects. No new namespace relationship is introduced.
 
 The current TypeSafe client constructs an Apache HTTP client and connection pool
 per instance. Reuse that expensive resource at pack/application scope rather than
@@ -360,6 +380,13 @@ Sources: [executor binding](../../../src/main/java/ai/loomspan/internal/skill/Sk
 - Native model-attempt trace events become generic boundary evidence and diagnostic
   records within existing execution frames, not a new frame for each diagnostic call.
   Console/MCP must not reinterpret diagnostic usage as authoritative accounting.
+  The SkillExecutor developer determines diagnostic messages, severity, and supplied
+  JSON; Console displays them as recorded without creating explanatory error messages
+  or interpreting their meaning. Framework execution facts and capture notices remain
+  separate; capture notices have no developer severity. Console displays capture states
+  only when explicitly recorded by Framework and never infers a cause from missing
+  evidence. Notice delivery is best effort; if recording fails and no notice survives,
+  Console has no cause to explain.
   Console reports recorded facts and never synthesizes results or infers execution
   outcomes from severity, message text, payload fields, or timing. Developers interpret
   request/retry messages alongside Framework-recorded outcomes; no typed provider-attempt
@@ -384,10 +411,15 @@ or approved API and not a generalized executor retry rule:
     check cancellation, interruption, remaining time
     emit request diagnostic (plain message + JSON data)
     send using the pack's timeout/deadline policy
-    emit response evidence or a caught-failure/retry diagnostic as useful
-    obtain the complete native JSON response; fail without retry if it cannot be decoded
-    retry only when policy and remaining time permit
-  return the complete native provider JSON response
+    classify transport failures and HTTP status before successful-response decoding
+    on transport failure or unsuccessful HTTP response:
+      emit caught-failure/retry diagnostics as useful
+      error-body capture/decoding does not change retry classification
+      retry only when bounded policy and live lifecycle checks permit; otherwise fail
+    on successful HTTP response:
+      obtain the complete native JSON; empty/malformed JSON fails without decoding-only retry
+      emit response evidence as useful
+      return the complete native provider JSON response
 Framework captures invocation timing, input/output, generation ID, and escaping failures
 ```
 
@@ -444,6 +476,15 @@ when assigning checks below: external-consumer work belongs to Extensions ticket
 generic Framework verification to Framework tickets. Do not reopen this as a shared
 cross-repository acceptance gate for otherwise locally complete Framework work.
 
+Every mandatory ticket handoff distinguishes shared implementation context from
+ticket acceptance. Include applicable contracts, constraints, and exclusions in the
+body, and separately list the ticket's own acceptance checks and explicit dependencies.
+Checks owned by other tickets or repositories remain contextual guidance with their
+ownership identified; copying them into the ticket does not make them completion
+gates. A Framework diagnostic-recording ticket must preserve the MCP contract but
+does not wait for the Extensions consuming example to pass. All checks remain required
+in their owning tickets or the overall delivery checklist.
+
 Settled MCP integration boundary: diagnostic calls and Framework capture-failure/limit
 notices are new record types inside existing frames. Reuse existing trace sequencing,
 frame association, and `LOOMSPAN_query_trace_records` / `LOOMSPAN_read_trace_content`.
@@ -461,10 +502,14 @@ Existing filters and access/content/retention behavior remain unchanged. No new
 summary fields or broad inspection refactor is required. Follow the roadmap's
 [settled reuse contract and source anchors](executor-packs-and-typesafe-extraction-roadmap.md#settled-decision-reuse-existing-mcp-record-inspection).
 Every derived recording/Console/MCP ticket must carry that section's distinctions,
-code anchors, permitted changes, exclusions, and acceptance checks in its own body;
-a link alone is insufficient. Verify mixed records through existing tools, including
-filtering, continuation, fidelity, bounded content reads, explicit capture-state
-visibility, and unchanged execution outcomes. Reopen only for a concrete limitation
+code anchors, permitted changes, exclusions, and applicable acceptance checks in its
+own body; a link alone is insufficient. Separate shared context and checks owned
+elsewhere from this ticket's acceptance checks and explicit dependencies under the
+ownership rules above. Verify mixed records through existing tools, including
+filtering, continuation, fidelity, bounded content reads, explicitly recorded capture-state
+visibility, and unchanged execution outcomes. Verify Console displays authored messages
+and recorded states without generating explanations for missing evidence.
+Reopen only for a concrete limitation
 requiring a separately justified scope decision, not because the record types are new.
 
 1. Document and verify existing executor numeric handling as the accepted v1 behavior;
@@ -472,6 +517,8 @@ requiring a separately justified scope decision, not because the record types ar
 2. Implement and verify the agreed `api_key` precedence, invalid/missing values,
    publication updates, and client handling for distinct effective credentials.
 3. Implement pack-owned request validation and faithful return of the complete native JSON response;
+   include JSON null and string fixtures through the actual invocation return path
+   in the Extensions-owned consumer tests, rather than checking only HTTP decoding;
    verify existing runtime parent bindings without adding output schemas
    or early provider-specific Framework checks.
 4. Apply the agreed full-native-response result migration and `base_url` precedence.
