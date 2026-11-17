@@ -767,3 +767,30 @@ allowlisted enums and numbers: unknown values become `unknown`. Never pass raw
 errors, arbitrary `LogValuer` values, URLs, paths, headers, bodies or trace
 content to a log call. Causes remain available through Go error chains for
 internal inspection, but neither error messages nor nested errors are serialized.
+
+### Executor diagnostic inspection and usage scope
+
+Framework-accounted usage covers native Framework model calls. Executor-managed
+requests/retries do not reserve the native provider-attempt budget, and authored
+usage-shaped diagnostic JSON does not contribute to these totals. Zero means zero
+Framework-accounted usage, not measured zero executor usage. Preserve native usage
+precision: a missing report can produce a heuristic estimate when text is available;
+unavailable evidence remains unavailable. These totals are not total application
+request counts or billing totals.
+
+Select the recorded frame and query `LOOMSPAN_query_trace_records` with
+`filter.types` containing `EXECUTOR_DIAGNOSTIC_RECORDED` and
+`EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED`, plus `filter.frameId` when needed.
+Both selectors apply normally, including for a child `ROOT_MISSION` frame; notices
+do not bypass filters. Continue the unchanged query while `hasMore` is true.
+Read selected DATA descriptors inline when complete, or follow their ordinary
+`contentRef` through `LOOMSPAN_read_trace_content` ranges and continuations.
+LOGICAL omits physical chunk rows. Each sequence remains an individual event.
+
+Console Records exposes **Diagnostic details** for diagnostic and system-notice records with retained message/JSON, explicit capture states and recorded reasons.
+Frame boundaries supply identity/configuration generation, timing and input;
+recorded executor output or ordinary child tool results remain separate facts.
+An authored ERROR, retry text or arbitrary `outcome` field supplies no invocation
+failure or native attempt classification. Notices have no authored severity.
+Missing evidence establishes no capture cause. A complete retained notice does not
+recover discarded content. Use recorded Framework outcome/failure classification.

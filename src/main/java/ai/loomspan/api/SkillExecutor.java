@@ -8,6 +8,9 @@ import java.lang.annotation.Target;
 /**
  * Declares reference-only Java execution behavior on a Spring bean method.
  * Accepts exactly one {@link ai.loomspan.api.extensions.v1.SkillExecutorInvocation}; it creates no callable skill or input schema.
+ * Executor-managed requests and retries do not reserve the native provider-attempt budget.
+ * Framework-accounted usage covers native Framework model calls; executor diagnostic usage
+ * does not contribute. Zero Framework-accounted usage does not measure executor usage.
  * Namespace and local-name rules are the same as {@link SkillMethod}.
  */
 @Target(ElementType.METHOD)

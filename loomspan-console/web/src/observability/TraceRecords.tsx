@@ -3,6 +3,7 @@ import { Focusable, Tooltip, TooltipTrigger } from "react-aria-components";
 import { getContentRange, getRawRecordRange, getTraceRecords } from "../api/client";
 import type { TraceRange, TraceSource } from "../api/contracts";
 import type { TraceFailure, TraceFrame, TraceRecord } from "../api/contracts";
+import { TraceExecutorDetail } from "./TraceExecutorDetail";
 import { TraceEvidenceDetail } from "./TraceEvidenceDetail";
 import { TraceAttemptDiagnostics } from "./TraceAttemptDiagnostics";
 import { formatDuration } from "../duration";
@@ -917,7 +918,7 @@ function RecordDetailView({ detail, onOpenRelated, onSelectFailure }: { detail: 
           <tr><th scope="row">Provider attempts</th><td>{usage.providerAttempts.toLocaleString()}</td></tr>
           <tr><th scope="row">Linter retries</th><td>{usage.linterRetries.toLocaleString()}</td></tr>
         </tbody></table>
-        <table aria-label="Final usage"><caption>Final usage</caption><tbody>
+        <p>Framework native model calls contribute to these totals. Executor-managed requests/retries and authored diagnostic usage do not. Zero does not measure executor usage.</p><table aria-label="Final Framework-accounted usage"><caption>Final Framework-accounted usage</caption><tbody>
           <tr><th scope="row">Prompt units</th><td>{usage.promptUnits.toLocaleString()}</td></tr>
           <tr><th scope="row">Completion units</th><td>{usage.completionUnits.toLocaleString()}</td></tr>
           <tr><th scope="row">Total units</th><td>{usage.totalUnits.toLocaleString()}</td></tr>
@@ -1144,6 +1145,10 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
       const isStepCompleted = record.type === "STEP_COMPLETED";
       const isEvidence = record.type === "EVIDENCE_RECORDED";
       const isCompletion = record.type === "TRACE_COMPLETED";
+      const isExecutorEvidence = ["EXECUTOR_DIAGNOSTIC_RECORDED", "EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED", "FRAME_OPENED", "FRAME_CLOSED", "FRAME_METADATA_RECORDED"].includes(record.type);
+      const executorLabel = record.type.startsWith("EXECUTOR_DIAGNOSTIC") ? "Diagnostic details" : "Frame details";
+      const executorKey = `${traceId}:${source}:${scopeGeneration}:${record.sequence}:executor`;
+      const isExecutorExpanded = expanded === executorKey;
       const hasRecordDetail = isToolInput || isToolResult || isStructuredOutput || isStepCompleted || isEvidence || isCompletion;
       const recordDetailLabel = isToolInput ? "Tool input" : isToolResult ? "Tool result" : isStructuredOutput ? "Validation details" : isEvidence ? "Evidence details" : isCompletion ? "Completion details" : "Step result";
       const stepActionKind: StepActionKind | undefined = record.type === "STEP_ACTION_PROPOSED" ? "proposed"
@@ -1202,6 +1207,7 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
               <div className="trace-record-actions">
               <button type="button" aria-expanded={isRawExpanded} aria-controls={`raw-detail-${record.sequence}`} onClick={() => handleToggleRaw(record)}>{isRawExpanded ? "Hide raw record" : "Read raw record"}</button>
               {contentRef && !isModelRecord && !isAttemptFailure && <button type="button" aria-expanded={isContentExpanded} aria-controls={`content-detail-${record.sequence}`} onClick={() => isContentExpanded ? onClearContent() : onContent(contentRef, record.sequence)}>{isContentExpanded ? "Hide content" : "Read content"}</button>}
+              {isExecutorEvidence && traceId && <button type="button" aria-expanded={isExecutorExpanded} aria-controls={`executor-detail-${record.sequence}`} onClick={() => setExpanded(isExecutorExpanded ? null : executorKey)}>{isExecutorExpanded ? `Hide ${executorLabel.toLowerCase()}` : executorLabel}</button>}
               {record.type === "FRAME_METADATA_RECORDED" && <button type="button" aria-expanded={isAttachmentsExpanded} aria-controls={`attachments-detail-${record.sequence}`} onClick={() => setExpanded(isAttachmentsExpanded ? null : attachmentKey)}>{isAttachmentsExpanded ? "Hide attachments" : "Attachments"}</button>}
               {record.resultAssembly && <button type="button" aria-expanded={expanded === key + ":assembly"} aria-controls={"assembly-" + record.sequence} onClick={() => setExpanded(expanded === key + ":assembly" ? null : key + ":assembly")}>{expanded === key + ":assembly" ? "Hide assembly details" : "Assembly details"}</button>}
               {record.resultForwarding && <button type="button" aria-expanded={expanded === key + ":forwarding"} aria-controls={"forwarding-" + record.sequence} onClick={() => setExpanded(expanded === key + ":forwarding" ? null : key + ":forwarding")}>{expanded === key + ":forwarding" ? "Hide forwarding details" : "Forwarding details"}</button>}
@@ -1307,6 +1313,7 @@ export function TraceRecords({ traceId, source = "TARGET", scopeGeneration = 0, 
               </td>
             </tr>
           )}
+          {isExecutorEvidence && isExecutorExpanded && traceId && <tr className="trace-record-detail-row"><td colSpan={5}><div id={`executor-detail-${record.sequence}`} className="trace-step-expanded trace-expanded" role="region" aria-label={`${executorLabel} for record ${record.sequence}`}><TraceExecutorDetail key={executorKey} traceId={traceId} source={source} record={record} frame={framesById.get(record.frameId)} failures={failures} verifyScope={verifyScope} onArtifactUnavailable={onArtifactUnavailable} onSelectFailure={onSelectFailure} /></div></td></tr>}
           {isAttachmentsExpanded && (
             <tr className="trace-record-detail-row">
               <td colSpan={5}>

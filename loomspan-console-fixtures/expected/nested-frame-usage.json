@@ -101,7 +101,7 @@
     "parentFrameId" : "root",
     "frameType" : "SKILL_EXECUTION",
     "inclusiveDurationMillis" : 4000,
-    "selfDurationMillis" : 4000,
+    "selfDurationMillis" : 3000,
     "directUsage" : {
       "promptUnits" : 4,
       "completionUnits" : 2,
@@ -118,6 +118,28 @@
       "totalUnits" : 6
     },
     "route" : "default-root_skill"
+  }, {
+    "frameId" : "executor-child",
+    "parentFrameId" : "skill",
+    "frameType" : "ROOT_MISSION",
+    "inclusiveDurationMillis" : 1000,
+    "selfDurationMillis" : 1000,
+    "directUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "descendantUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "inclusiveUsage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "route" : "default-applicationRequest"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 1,

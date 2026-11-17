@@ -264,8 +264,29 @@ func fixtureTraceParity(t *testing.T) {
 	if err != nil || recordEnvelope.Result == nil {
 		t.Fatalf("MCP records=%#v err=%v", recordEnvelope, err)
 	}
-	assertAdapterItemsEqual(t, browserPost("/api/console/v1/traces/analysis/records", body)["items"], recordEnvelope.Result.Items, "raw", "facts", "threadName", "isChunk", "isEnvelope", "attempts", "retries", "validations", "failures")
-	coverage := assertIndependentSemanticFacts(t, browserPost, body, options, h.acquired.Handle, frameEnvelope.Result.Items, recordEnvelope.Result.Items)
+	allRecords := append([]recordDTO{}, recordEnvelope.Result.Items...)
+	for recordEnvelope.Result.HasMore {
+		_, recordEnvelope, err = handleQueryTraceRecords(context.Background(), options, queryTraceRecordsInput{TraceID: traceID, PageSize: 64, Continuation: recordEnvelope.Result.Continuation})
+		if err != nil || recordEnvelope.Result == nil {
+			t.Fatalf("MCP continuation=%#v err=%v", recordEnvelope, err)
+		}
+		allRecords = append(allRecords, recordEnvelope.Result.Items...)
+	}
+	browserRecords := []any{}
+	browserRequest := map[string]any{"source": "IMPORTED", "traceId": traceID, "pageSize": 64}
+	for {
+		encoded, _ := json.Marshal(browserRequest)
+		page := browserPost("/api/console/v1/traces/analysis/records", string(encoded))
+		if items, ok := page["items"].([]any); ok {
+			browserRecords = append(browserRecords, items...)
+		}
+		if page["hasMore"] != true {
+			break
+		}
+		browserRequest["cursor"] = page["nextCursor"]
+	}
+	assertAdapterItemsEqual(t, browserRecords, allRecords, "raw", "facts", "threadName", "isChunk", "isEnvelope", "attempts", "retries", "validations", "failures")
+	coverage := assertIndependentSemanticFacts(t, browserPost, body, options, h.acquired.Handle, frameEnvelope.Result.Items, allRecords)
 
 	invalidCursorBody := `{"source":"IMPORTED","traceId":"` + traceID + `","pageSize":64,"cursor":"%%%"}`
 	invalidRouter, invalidSessionID := newSemanticBrowserTransport(t, h)

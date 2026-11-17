@@ -37,6 +37,8 @@ const (
 	RecordStepActionRejected       TraceRecordType = "STEP_ACTION_REJECTED"
 	RecordStepCompleted            TraceRecordType = "STEP_COMPLETED"
 	RecordStepFailed               TraceRecordType = "STEP_FAILED"
+	RecordExecutorDiagnostic       TraceRecordType = "EXECUTOR_DIAGNOSTIC_RECORDED"
+	RecordExecutorDiagnosticNotice TraceRecordType = "EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED"
 	RecordErrorRecorded            TraceRecordType = "ERROR_RECORDED"
 	RecordFrameClosed              TraceRecordType = "FRAME_CLOSED"
 	RecordTraceCompleted           TraceRecordType = "TRACE_COMPLETED"
@@ -55,6 +57,7 @@ func RecordTypeValues() []string {
 		string(RecordEvidenceValidationFailed), string(RecordEvidenceValidationPassed), string(RecordLinterRecorded),
 		string(RecordStructuredOutputRecorded), string(RecordResultForwarded), string(RecordResultAssembled), string(RecordStepStarted), string(RecordStepActionProposed),
 		string(RecordStepActionValidated), string(RecordStepActionRejected), string(RecordStepCompleted), string(RecordStepFailed), string(RecordErrorRecorded),
+		string(RecordExecutorDiagnostic), string(RecordExecutorDiagnosticNotice),
 		string(RecordFrameClosed), string(RecordTraceCompleted),
 	}
 }

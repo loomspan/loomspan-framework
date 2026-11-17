@@ -30,21 +30,21 @@ remain authoritative Framework facts.
 
 ## Acceptance criteria — this ticket only
 
-- [ ] Existing LOOMSPAN_query_trace_records and LOOMSPAN_read_trace_content expose
+- [x] Existing LOOMSPAN_query_trace_records and LOOMSPAN_read_trace_content expose
   mixed normal/diagnostic/system records with faithful message/severity/JSON and
   explicit capture states through existing data/content references.
-- [ ] Type/frame filters, ordering, continuation, bounded inline content and content
+- [x] Type/frame filters, ordering, continuation, bounded inline content and content
   reads work without duplicates/omissions, including concurrent events. Selecting both
   diagnostics and notices uses both record types; no notice filter bypass.
-- [ ] UI shows one chronological item per record and recorded outcome/classification,
+- [x] UI shows one chronological item per record and recorded outcome/classification,
   without deriving execution failures from error diagnostics or synthesizing missing-state explanations.
-- [ ] A successful call, recoverable/terminal failures, caught failure followed by retry,
+- [x] A successful call, recoverable/terminal failures, caught failure followed by retry,
   truncation/unavailability, and a non-AI fixture are represented. No diagnostic-specific
   tools/endpoints/stores, severity filtering or new presentation descriptor system exists.
-- [ ] Mixed-mission totals include only Framework-accounted calls. Unavailable usage,
+- [x] Mixed-mission totals include only Framework-accounted calls. Unavailable usage,
   successful-HTTP decoding failure and Console absence are covered. API/MCP/UI descriptions
   agree; no synthetic zero replaces unreported provider usage in evidence.
-- [ ] Go/UI/build verification and Java fixture corpus pass with unchanged matching
+- [x] Go/UI/build verification and Java fixture corpus pass with unchanged matching
   compatibility markers. Optional Console/presentation failure cannot change business execution.
 
 ## Local verification commands
@@ -387,3 +387,108 @@ Full native accounting/physical-cancellation parity is not a completion gate.
 - Execute only when this ticket is passed to the pipeline. Creating this file does not
   authorize starting implementation, committing current planning changes, or publishing.
 
+
+## Execution notes — 2026-11-16 implementation
+
+- Baseline: `41113b440ae6cb112a46e99ebbd7f8963d3e1bd3`, clean except this
+  pipeline's research and two plan artifacts. All current edits are ticket-owned;
+  no Extensions checkout, external publication, push or sync was used. The
+  orchestrator will make the authorized local commit after fresh Step 5 review.
+- Added the exact existing Java values `EXECUTOR_DIAGNOSTIC_RECORDED` and
+  `EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED` to the Go closed vocabulary. No Java
+  public signatures or diagnostic payloads changed. Existing tools remain
+  `LOOMSPAN_query_trace_records` and `LOOMSPAN_read_trace_content`; existing DATA,
+  frame/type filters, pagination, opaque refs, ranges and access boundaries remain.
+  MCP output record types already use compact strings; no new output enum/field
+  was introduced. Input discovery enums and actual returned types are tested.
+- Console shows individual chronological sequence rows with lazy Diagnostic details
+  and Frame details. Authored severity, explicit capture states and notice reasons
+  remain distinct from Framework failure classification/outcome. Exact retained
+  DATA JSON preserves whitespace/Unicode/number lexemes. Detail display/read is
+  bounded to 1 MiB, with existing Read content ranges available. Source/generation/
+  trace changes suppress stale reads; imported evidence works without a target.
+- Shared Java-written fixtures: java-root-success adds eight joined concurrent
+  events without assuming worker order; nested-frame-usage adds child ROOT_MISSION
+  executor HTTP failure/retry, huge diagnostic usage, misleading outcome and null
+  usage alongside unchanged native 5/3/8 totals and two native attempts.
+  executor-recoverable-failure and executor-terminal-failure use actual Framework
+  failure recording. Derivative invalid fixtures were regenerated; duplicate-close
+  mutation now derives its sequence instead of assuming old fixture length.
+- Generic ExecutorAccountingIntegrationTest uses actual facade, native advisor/tool
+  dispatch and application HTTP: two native sends under quota two remain two despite
+  two executor requests; executor-only calls have zero native usage and retained
+  unknown executor usage; HTTP 200/local JSON decoding failure preserves designated
+  recoverable failure and null usage. Console is absent in these tests. Existing
+  capture/append/notice failure containment and lifecycle tests remain passing.
+- Evidence-backed test arrangement: a missing native usage report with textual
+  prompt/response produces existing HEURISTIC estimates, not UNAVAILABLE. The new
+  runtime test protects that distinction; ModelUsageExtractorTest plus the shared
+  unavailable-usage corpus protect explicit UNAVAILABLE evidence. Native behavior,
+  totals/fields and precision semantics were not modified. Plans record this detail.
+- UI/API/MCP/docs consistently explain Framework-accounted usage: native calls
+  contribute, executor requests/retries and diagnostic usage do not, and zero does
+  not measure executor usage. Same-checkout loomspan-docs metadata matches the build;
+  source-verified capture guidance is aligned and inspection/accounting documentation
+  drift is resolved. Coverage rows and packaged playbook routing are updated.
+- Build coordinates remain
+  `ai.loomspan:loomspan-spring-boot-starter:1.0.0-beta.10-SNAPSHOT` from this
+  baseline plus ticket diff. Framework/Console exact compatibility marker remains
+  `1.0.0-beta.10-SNAPSHOT`; no release/version file changed. Fixture files and root
+  README retain LF. No public Java API allowlist or Spring replacement surface added.
+
+Verification receipts (Framework root unless stated):
+
+- Expected RED before reader edit, from loomspan-console:
+  `go test ./internal/traceanalysis -run '^TestFixtureCorpusMatchesJavaExpectedSemantics/java-root-success$' -count=1`
+  failed `UNSUPPORTED_VALUE`, reproducing 31.1.2's exact reader debt.
+- PASS from loomspan-console:
+  `go test ./internal/traceanalysis ./internal/mcpadapter ./internal/browserapi -count=1`.
+- PASS from loomspan-console/web: `npm run typecheck`;
+  `npm test -- src/observability/TraceRecords.executorDiagnostics.test.tsx src/observability/TraceExplorer.test.tsx src/observability/TraceViews.test.tsx src/observability/TraceRecords.results.test.tsx src/observability/ActiveExecutionDetail.test.tsx`
+  (143 tests, including 20 new diagnostic cases).
+- PASS:
+  `.\mvnw.cmd "-Dtest=ExecutorAccountingIntegrationTest,ExecutorApplicationIntegrationTest,ExecutorDiagnosticsIntegrationTest,ExecutorInvocationLifecycleIntegrationTest,SessionUsageServiceTest,ModelUsageExtractorTest,ModelAttemptCallAdvisorIntegrationTest,ConsoleTraceFixtureCorpusTest,LoomspanPublicSurfaceArchitectureTest" "-Dloomspan.console.fixtures.regenerate=true" "-DfailIfNoTests=false" test`
+  (87 tests; `target/executor-focused.log`).
+- PASS intentional final fixture regeneration:
+  `.\mvnw.cmd "-Dtest=ConsoleTraceFixtureCorpusTest" "-Dloomspan.console.fixtures.regenerate=true" "-DfailIfNoTests=false" test`
+  (19 tests; `target/executor-regenerate.log`).
+- PASS final byte-for-byte validation without regeneration:
+  `.\mvnw.cmd "-Dtest=ConsoleTraceFixtureCorpusTest" "-DfailIfNoTests=false" test`
+  (19 tests; `target/executor-corpus.log`).
+- PASS from loomspan-console: `go run ./internal/buildtool verify` under pinned
+  Node 24.18.0/npm 12.0.2/Go 1.26.5 (`target/executor-buildtool.log`). Includes
+  packaged skill/agent-eval, typecheck, all 608 frontend tests in 49 files, coverage,
+  regenerated frontend assets/manifest, manifest validation and complete Go tests.
+  The system Node is 24.22.1 and was correctly rejected on the first attempt.
+  Repeat the successful task-local setup in PowerShell (no machine setting change):
+  `tar -xzf $env:TEMP\loomspan-pr29.3-node-24.18.0\node-win-x64-24.18.0.tgz -C $env:TEMP\loomspan-pr29.3-node-24.18.0`,
+  then `$env:PATH = "$env:TEMP\loomspan-pr29.3-node-24.18.0\package\bin;" + $env:PATH`,
+  then `go run ./internal/buildtool verify`. The cached npm.cmd uses installed
+  npm 12.0.2; no toolchain declarations were changed.
+- Initial standalone `go test ./...` failed only config's README YAML locator
+  because the first documentation write used CRLF; normalized Console README to LF
+  and buildtool's complete Go phase then passed. Final standalone receipt follows.
+- Initial optional `go test -race ./...` overlapped buildtool asset replacement and
+  failed an embed compile for the removed old bundle. No race was reported; final
+  rerun uses stable generated assets. Do not run buildtool asset mutation alongside
+  Go compilation. Final race receipt follows.
+- PASS `git diff --check`; release/version-file diff inspection and byte-level
+  fixture/root-README LF inspection. Final checks and debt closure follow below.
+
+Final verification and handoff:
+
+- PASS from loomspan-console: `go test ./...` on final LF/assets state
+  (`target/executor-go-final.log`, exit 0).
+- PASS from loomspan-console:
+  `$env:PATH = "C:\msys64\mingw64\bin;" + $env:PATH; $env:CGO_ENABLED = '1'; go test -race ./...`
+  (`target/executor-race-final.log`, exit 0). Environment changes were confined to
+  their command shells. No race report; final generated assets were stable.
+- PASS final `git diff --check`; zero release/version-file changes, LF verified.
+  Buildtool outputs are regenerated using its standard asset pipeline (generated
+  bundles remain managed by existing ignore/build rules).
+- The previous ticket 31.1.2 Go reader/corpus debt is CLOSED by focused current
+  Java-root corpus coverage, complete corpus/module checks and exact Java fixture
+  validation. No required verification debt remains. Optional developer checks: none.
+- Full-profile independent Step 5 review and the authorized local commit remain
+  orchestrator-owned. This implementation is ready for that fresh review; no commit,
+  push or sync was performed by the implementation context.

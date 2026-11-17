@@ -178,8 +178,11 @@ test("timeline and selected-frame usage preserve unknown and incomplete returned
       frame={incomplete}
     />,
   );
-  expect(screen.getByRole("table", { name: "Usage facts" })).toHaveTextContent(
+  expect(screen.getByRole("table", { name: "Framework-accounted usage facts" })).toHaveTextContent(
     "Selected frame direct (incomplete)",
+  );
+  expect(screen.getByText(/Missing native usage reports can produce heuristic estimates when text is available/)).toHaveTextContent(
+    "unavailable evidence remains unavailable",
   );
 });
 test("usage preserves returned values and record-row evidence actions remain deliberate", () => {
@@ -240,7 +243,7 @@ test("usage preserves returned values and record-row evidence actions remain del
       />
     </>,
   );
-  expect(screen.getByRole("table", { name: "Usage facts" })).toHaveTextContent(
+  expect(screen.getByRole("table", { name: "Framework-accounted usage facts" })).toHaveTextContent(
     "3",
   );
   fireEvent.click(screen.getByRole("button", { name: "Read raw record" }));

@@ -111,7 +111,7 @@ test("usage states each observed counter beside its configured limit and proport
   render(<ActiveExecutionDetailView />);
   await vi.waitFor(() => {
     expect(
-      screen.getByRole("table", { name: "Observed usage against configured limits" }),
+      screen.getByRole("table", { name: "Observed Framework-accounted usage against configured limits" }),
     ).toBeInTheDocument();
   });
   expect(screen.getByRole("row", { name: "Skill invocations 1 10 10%" })).toBeInTheDocument();
@@ -126,16 +126,16 @@ test("usage tables adopt the shared data-table presentation and scroll region", 
   vi.mocked(getActiveExecutionDetail).mockResolvedValue(execution);
   render(<ActiveExecutionDetailView />);
   const limits = await vi.waitFor(() =>
-    screen.getByRole("table", { name: "Observed usage against configured limits" }),
+    screen.getByRole("table", { name: "Observed Framework-accounted usage against configured limits" }),
   );
-  const units = screen.getByRole("table", { name: "Observed usage units" });
+  const units = screen.getByRole("table", { name: "Observed Framework-accounted usage units" });
   for (const table of [limits, units]) {
     expect(table).toHaveClass("observability-table");
     expect(table).toHaveClass("usage-table");
     expect(table.closest(".observability-table-region")).not.toBeNull();
   }
-  expect(screen.getByRole("region", { name: "Usage against configured limits" })).toBeInTheDocument();
-  expect(screen.getByRole("region", { name: "Usage unit totals" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Framework-accounted usage against configured limits" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Framework-accounted usage unit totals" })).toBeInTheDocument();
 });
 
 test("usage reports an undefined proportion rather than dividing by a zero limit", async () => {

@@ -39,6 +39,10 @@ import { readTraceExplorerState, setTraceExplorerSelection, type TraceExplorerVi
 const views: TraceExplorerView[] = ["timeline", "plans", "usage", "records"];
 
 const defaultRecordTypes = [
+  "FRAME_OPENED",
+  "FRAME_CLOSED",
+  "EXECUTOR_DIAGNOSTIC_RECORDED",
+  "EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED",
   "FRAME_METADATA_RECORDED",
   "MODEL_REQUEST_SENT",
   "MODEL_RESPONSE_RECEIVED",

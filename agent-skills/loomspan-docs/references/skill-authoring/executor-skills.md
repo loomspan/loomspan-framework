@@ -110,3 +110,20 @@ creation, reuse, retirement and shutdown remain application responsibilities.
 - `SkillRoleEvaluatorTest` and `SharedDeclarativeAuthorizationIntegrationTest`: composed YAML/Java policy, metadata-only visibility/validation, dispatch rechecks and actual argument advice on mission workers.
 - [Java skills](../java-api/java-skills.md): annotation discovery, versioned invocation class and application result/failure contracts.
 - [Model selection](model-selection-and-connections.md): separate Framework provider configuration.
+
+## Framework-accounted usage
+
+Framework-accounted usage covers native Framework model calls. Executor-managed
+requests/retries do not reserve the native provider-attempt budget, and authored
+usage-shaped diagnostic JSON does not contribute to these totals. Zero means zero
+Framework-accounted usage, not measured zero executor usage. Preserve native usage
+precision: a missing report can produce a heuristic estimate when text is available;
+unavailable evidence remains unavailable. These totals are not total application
+request counts or billing totals.
+
+`ExecutorAccountingIntegrationTest` exercises an exact native-attempt quota around
+application HTTP failure/retry, executor-only execution, missing native reported
+usage and HTTP success followed by local decoding failure without Console.
+`ModelUsageExtractorTest` protects the explicit unavailable-usage path. See
+[trace inspection](../skill-authoring/traces-and-debugging.md#bounded-executor-diagnostics)
+for the existing record/content tools.

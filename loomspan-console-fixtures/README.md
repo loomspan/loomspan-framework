@@ -8,6 +8,8 @@ Representative diagnostic matrix:
 
 | Purpose | Fixture or deterministic generator | Bound/workflow evidence |
 | --- | --- | --- |
+| Executor diagnostics | `java-root-success`, `nested-frame-usage` | Producer-written concurrent diagnostics, explicit null/absent/unavailable/truncated content, ordinary notices, child ROOT_MISSION identity, and local HTTP failure/retry alongside unchanged native usage |
+| Executor failure classification | `executor-recoverable-failure`, `executor-terminal-failure` | Authored outcome-shaped JSON stays opaque; actual Framework failure recording supplies classification and terminal linkage |
 | Failed execution | `runtime-terminal-failure` | `WF-FE-*`; runtime-produced terminal failure, direct frame/attempt relationships, and missing response evidence |
 | Aborted execution | `runtime-terminal-abort` | Runtime-produced abort, stable terminal failure linkage, complete frames, and missing response evidence |
 | Expensive execution | `nested-frame-usage`, `unattributed-usage`, `incomplete-frame-duration` | `WF-UE-*`; direct/descendant/inclusive usage without double counting |

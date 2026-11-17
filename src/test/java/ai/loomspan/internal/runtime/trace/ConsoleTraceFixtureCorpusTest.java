@@ -85,6 +85,8 @@ class ConsoleTraceFixtureCorpusTest
             "native-evaluation-provider-failure",
             "single-attempt-success",
             "java-root-success",
+            "executor-recoverable-failure",
+            "executor-terminal-failure",
             "namespace-captured-context",
             "assembled-input-result",
             "assembled-child-result",
@@ -263,7 +265,7 @@ class ConsoleTraceFixtureCorpusTest
         var records = parseLines(fixtureRoot().resolve("traces/java-root-success.ndjson"));
         var authored = records.stream().filter(r -> r.path("recordType").asText().equals("EXECUTOR_DIAGNOSTIC_RECORDED")).toList();
         var notices = records.stream().filter(r -> r.path("recordType").asText().equals("EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED")).toList();
-        assertThat(authored).hasSize(6); assertThat(notices).hasSize(2);
+        assertThat(authored).hasSize(14); assertThat(notices).hasSize(2);
         assertThat(records).noneMatch(r -> r.path("recordType").asText().equals("ERROR_RECORDED"));
         assertThat(authored.stream().map(r -> r.path("frameId").asText()).distinct()).containsExactly("java-root");
         assertThat(authored.getFirst().at("/data/data/Authorization").asText()).isEqualTo("kept verbatim");
@@ -285,7 +287,9 @@ class ConsoleTraceFixtureCorpusTest
             if (data.path("messageState").asText().equals("TRUNCATED"))
                 assertThat(data.path("message").asText()).hasSize(8192);
         }
-        assertThat(authored.getLast().at("/data/dataState").asText()).isEqualTo("UNAVAILABLE");
+        assertThat(authored.get(5).at("/data/dataState").asText()).isEqualTo("UNAVAILABLE");
+        assertThat(authored.stream().skip(6).map(r -> r.at("/data/message").asText())).containsOnly("concurrent event");
+        assertThat(authored.stream().map(r -> r.path("sequence").asLong())).isSorted().doesNotHaveDuplicates();
         assertThat(notices).allSatisfy(r -> assertThat(r.path("data").has("severity")).isFalse());
     }
 
@@ -1055,6 +1059,20 @@ class ConsoleTraceFixtureCorpusTest
                     assertThat(branch.leaf()).isEmpty();
                 });
             }
+            case "executor-recoverable-failure", "executor-terminal-failure" -> {
+                var branch = new PhysicalBranchContext(session);
+                var binding = fixtureBinding(session, branch, entrySkill, "executor-failed");
+                var state = new DefaultExecutionStateService(CLOCK);
+                var failure = name.equals("executor-recoverable-failure") ? designatedFixtureFailure() : fixtureFailure("executor terminal failure");
+                String[] identity = new String[1];
+                ExecutionBindingScope.runWith(binding, () -> {
+                    var owner = state.openMissionFrame(session, entrySkill, Map.of());
+                    ai.loomspan.internal.core.ExecutorDiagnosticTestSupport.failureFixture(binding, owner);
+                    identity[0] = state.recordFailure(session, failure, Map.of("message", "Executor invocation failed"));
+                    state.closeFrame(session, owner, Map.of("status", "FAILED"));
+                });
+                terminalFailureId = identity[0]; outcome = "FAILED";
+            }
             case "runtime-terminal-failure" ->
             {
                 terminalFailureId = executeRuntimeTerminal(session, handle, false);
@@ -1266,6 +1284,13 @@ class ConsoleTraceFixtureCorpusTest
                 appendFrame(handle, TraceRecordType.FRAME_OPENED, skill, CLOCK.instant().plusSeconds(1));
                 appendAttempt(handle, skill, "retry-framed", "attempt-framed", 1, 4, 2, "EXACT");
                 appendAttempt(handle, "retry-unframed", "attempt-unframed", 1, 1, 1, "HEURISTIC");
+                var executorFrame = frame("executor-child", "skill", TraceFrameType.ROOT_MISSION, "default-applicationRequest");
+                appendFrame(handle, TraceRecordType.FRAME_OPENED, executorFrame, CLOCK.instant().plusSeconds(2));
+                var branch = new PhysicalBranchContext(session); branch.push(executorFrame);
+                var binding = fixtureBinding(session, branch, "default-applicationRequest", executorFrame.frameId());
+                ai.loomspan.internal.core.ExecutorDiagnosticTestSupport.accountingFixture(binding, executorFrame);
+                appendFrame(handle, TraceRecordType.FRAME_CLOSED, executorFrame, CLOCK.instant().plusSeconds(3));
+                branch.close(executorFrame);
                 appendFrame(handle, TraceRecordType.FRAME_CLOSED, skill, CLOCK.instant().plusSeconds(5));
                 appendFrame(handle, TraceRecordType.FRAME_CLOSED, rootFrame, CLOCK.instant().plusSeconds(8));
                 attributed = terminal = new Usage(5, 3);
@@ -1336,24 +1361,24 @@ class ConsoleTraceFixtureCorpusTest
         int toolInvocations = name.equals("nested-synthesis-planner-inability") ? 1
                 : (name.equals("forwarded-child-result") || name.equals("assembled-child-result")) ? 2 : name.equals("nested-forwarded-child-result") ? 4
                 : name.equals("planned-tool-success") || name.equals("unplanned-tool-failure") ? 1 : 0;
-        int modelCalls = name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
+        int modelCalls = name.equals("nested-frame-usage") ? 2 : name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
                 : name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
                 : name.equals("recovered-provider-attempt-diagnostic") || name.equals("rejected-provider-response") ? 1 : 0;
-        int providerAttempts = name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
+        int providerAttempts = name.equals("nested-frame-usage") ? 2 : name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
                 : name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
                 : name.equals("recovered-provider-attempt-diagnostic") ? 2
                 : name.equals("terminal-provider-failure-actionable") || name.equals("rejected-provider-response") ? 1 : 0;
-        int exactModelResponses = name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
+        int exactModelResponses = name.equals("nested-frame-usage") ? 1 : name.equals("nested-synthesis-planner-inability") ? 3 : name.equals("assigned-planner-inability") ? 1
                 : name.equals("assembled-child-result") ? 2 : name.equals("forwarded-child-result") ? 1 : name.equals("nested-forwarded-child-result") ? 2
                 : name.equals("recovered-provider-attempt-diagnostic") || name.equals("rejected-provider-response") ? 1 : 0;
         SessionUsageSnapshot usageSnapshot = new SessionUsageSnapshot(
                 0, toolInvocations, 0, modelCalls, providerAttempts,
                 terminal.promptUnits(), terminal.completionUnits(), terminal.totalUnits(),
-                exactModelResponses, 0, 0);
+                exactModelResponses, name.equals("nested-frame-usage") ? 1 : 0, 0);
         Map<String, Object> completionDetails = new LinkedHashMap<>();
         completionDetails.put("outcome", outcome);
         completionDetails.put("sessionUsageSnapshot",
-                toolInvocations > 0 || name.equals("recovered-provider-attempt-diagnostic") || name.equals("rejected-provider-response") || name.equals("assigned-planner-inability")
+                toolInvocations > 0 || name.equals("nested-frame-usage") || name.equals("recovered-provider-attempt-diagnostic") || name.equals("rejected-provider-response") || name.equals("assigned-planner-inability")
                         ? usageSnapshot.toTraceMap()
                         : terminal.asMap());
         session.finalizeTrace(new TraceCompletion(
@@ -1361,7 +1386,7 @@ class ConsoleTraceFixtureCorpusTest
                 usageSnapshot,
                 terminalFailureId,
                 completionDetails));
-        if (name.equals("java-root-success"))
+        if (name.equals("java-root-success") || name.startsWith("executor-"))
         {
             // Runtime Map.of payloads have JVM-dependent key order; preserve values in fixture order.
             List<String> stableLines = new ArrayList<>();
@@ -2407,6 +2432,7 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "executor-recoverable-failure", "executor-terminal-failure" -> "failure-executor";
             case "runtime-terminal-failure" -> "failure-terminal";
             case "runtime-terminal-abort" -> "failure-abort";
             case "validation-exhaustion" -> "failure-validation";
@@ -2887,7 +2913,7 @@ class ConsoleTraceFixtureCorpusTest
                     "usage", Usage.ZERO.asMap(),
                     "usageComplete", false));
             case "missing-response-usage" -> List.of(expectedAttempt(name, "retry-1", "attempt-1", 1));
-            case "java-root-success", "namespace-captured-context", "assembled-input-result", "recoverable-failed-completion", "terminal-wrapper-recorded-cause", "terminal-unlinked-success",
+            case "executor-recoverable-failure", "executor-terminal-failure", "java-root-success", "namespace-captured-context", "assembled-input-result", "recoverable-failed-completion", "terminal-wrapper-recorded-cause", "terminal-unlinked-success",
                     "attachment-descriptors", "chunked-attachment-descriptors" -> List.of();
             case "nested-frame-usage" -> List.of(
                     expectedAttempt(name, "retry-framed", "attempt-framed", 1),
@@ -3027,12 +3053,15 @@ class ConsoleTraceFixtureCorpusTest
             case "namespace-captured-context" -> List.of(
                     expectedFrame("namespace-root", null, "ROOT_MISSION", "orders-search", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO),
                     expectedFrame("namespace-target", "namespace-root", "TOOL_INVOCATION", "tax-search", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
+            case "executor-recoverable-failure", "executor-terminal-failure" -> List.of(
+                    expectedFrame("executor-failed", null, "ROOT_MISSION", "default-test_entry", 0, 0, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "java-root-success" -> List.of(
                     expectedFrame("java-root", null, "ROOT_MISSION", "default-javaLookup", 0, 0,
                             Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "nested-frame-usage" -> List.of(
                     expectedFrame("root", null, "ROOT_MISSION", "default-root_skill", 8000, 4000, Usage.ZERO, new Usage(4, 2), new Usage(4, 2)),
-                    expectedFrame("skill", "root", "SKILL_EXECUTION", "default-root_skill", 4000, 4000, new Usage(4, 2), Usage.ZERO, new Usage(4, 2)));
+                    expectedFrame("skill", "root", "SKILL_EXECUTION", "default-root_skill", 4000, 3000, new Usage(4, 2), Usage.ZERO, new Usage(4, 2)),
+                    expectedFrame("executor-child", "skill", "ROOT_MISSION", "default-applicationRequest", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
             case "runtime-terminal-failure", "runtime-terminal-abort" -> List.of(
                     expectedFrame("root", null, "ROOT_MISSION", "default-root_skill", 3000, 2000, Usage.ZERO, Usage.ZERO, Usage.ZERO),
                     expectedFrame("model", "root", "MODEL_CALL", "default-root_skill#mission-model", 1000, 1000, Usage.ZERO, Usage.ZERO, Usage.ZERO));
@@ -3391,7 +3420,7 @@ class ConsoleTraceFixtureCorpusTest
         replaceFirstLineContaining(duplicateClose, "\"recordType\":\"FRAME_CLOSED\",\"frameId\":\"root\"",
                 duplicateClose.stream().filter(line -> line.contains("\"recordType\":\"FRAME_CLOSED\",\"frameId\":\"root\""))
                         .findFirst().orElseThrow(),
-                skillClose.replace("\"sequence\":9", "\"sequence\":10"));
+                skillClose.replace("\"sequence\":" + JSON.readTree(skillClose).path("sequence").asLong(), "\"sequence\":" + (JSON.readTree(skillClose).path("sequence").asLong() + 1)));
         writeInvalid(root, "duplicate-frame-close", duplicateClose);
 
         List<String> terminalFailure = Files.readAllLines(root.resolve("traces/runtime-terminal-failure.ndjson"), StandardCharsets.UTF_8);

@@ -36,7 +36,7 @@ export function TraceFailureFocus({ summary, failure, frame, onView, traceId, so
       <div><dt>Retry sequence</dt><dd><code>{failure?.retrySequenceId || frame?.retrySequenceIds?.join(", ") || "unavailable"}</code></dd></div>
       <div><dt>Validation</dt><dd>{failure?.validationStatus || frame?.validationStatuses?.join(", ") || "unavailable"}</dd></div>
       <div><dt>Frame duration</dt><dd>{frame?.inclusiveDurationMillis == null ? "unavailable or incomplete" : formatDuration(frame.inclusiveDurationMillis)}</dd></div>
-      <div><dt>Frame usage</dt><dd>{frame?.inclusiveUsage ? `${frame.inclusiveUsage.totalUnits} total units${frame.inclusiveUsageComplete ? "" : " (incomplete)"}` : "unavailable"}</dd></div>
+      <div><dt>Frame Framework-accounted usage</dt><dd>{frame?.inclusiveUsage ? `${frame.inclusiveUsage.totalUnits} total units${frame.inclusiveUsageComplete ? "" : " (incomplete)"}` : "unavailable"}</dd></div>
       <div><dt>Evidence gaps</dt><dd>{summary.gapCount} gaps; {summary.uncertaintyCount} uncertainties</dd></div>
     </dl>
     <p>This view relates directly recorded evidence. It does not identify root cause.</p>

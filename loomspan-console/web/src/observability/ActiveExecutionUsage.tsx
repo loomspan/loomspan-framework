@@ -23,17 +23,17 @@ export function ActiveExecutionUsage({ usage, limits }: { usage: Usage; limits: 
 
   return (
     <section className="view-subsection" aria-labelledby="active-execution-usage-title">
-      <h3 id="active-execution-usage-title">Usage</h3>
+      <h3 id="active-execution-usage-title">Framework-accounted usage</h3>
       <p className="observability-note">
-        Observed counters against the limits configured at run start.
+        Framework native model calls contribute to these totals. Executor-managed requests/retries and authored diagnostic usage do not. Zero does not measure executor usage. Observed counters use the limits configured at run start.
       </p>
       <div
         className="observability-table-region"
         role="region"
-        aria-label="Usage against configured limits"
+        aria-label="Framework-accounted usage against configured limits"
         tabIndex={0}
       >
-        <table className="observability-table usage-table" aria-label="Observed usage against configured limits">
+        <table className="observability-table usage-table" aria-label="Observed Framework-accounted usage against configured limits">
           <thead>
             <tr>
               <th scope="col">Counter</th>
@@ -57,10 +57,10 @@ export function ActiveExecutionUsage({ usage, limits }: { usage: Usage; limits: 
       <div
         className="observability-table-region"
         role="region"
-        aria-label="Usage unit totals"
+        aria-label="Framework-accounted usage unit totals"
         tabIndex={0}
       >
-        <table className="observability-table usage-table" aria-label="Observed usage units">
+        <table className="observability-table usage-table" aria-label="Observed Framework-accounted usage units">
           <thead>
             <tr>
               <th scope="col">Units</th>

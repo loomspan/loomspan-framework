@@ -58,7 +58,7 @@ test("loads timeline and deliberately reads inert evidence", async () => {
   expect(screen.getByRole("button", { name: "Hide content" })).toHaveAttribute("aria-expanded", "true");
   expect(screen.queryByRole("link", { name: "x" })).toBeNull();
   fireEvent.click(screen.getByRole("tab", { name: "Usage" }));
-  await screen.findByLabelText("Usage facts");
+  await screen.findByLabelText("Framework-accounted usage facts");
 });
 
 test("uses compact frame duration in records", async () => {
@@ -79,7 +79,10 @@ test("shows developer-relevant records by default and can load all records", asy
   expect(initialFilter.types).toContain("MODEL_REQUEST_SENT");
   expect(initialFilter.types).toContain("TOOL_CALL_FAILED");
   expect(initialFilter.types).toContain("TRACE_COMPLETED");
-  expect(initialFilter.types).not.toContain("FRAME_OPENED");
+  expect(initialFilter.types).toContain("FRAME_OPENED");
+  expect(initialFilter.types).toContain("FRAME_CLOSED");
+  expect(initialFilter.types).toContain("EXECUTOR_DIAGNOSTIC_RECORDED");
+  expect(initialFilter.types).toContain("EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED");
   expect(initialFilter.types).not.toContain("STEP_ACTION_VALIDATED");
 
   const toggle = screen.getByRole("checkbox", { name: "Show all records" });
@@ -388,7 +391,7 @@ test("continues record and literal-search pages with their returned cursors", as
   const recordFilter = api.getTraceRecords.mock.calls.at(-1)?.[2];
   expect(api.getTraceRecords).toHaveBeenLastCalledWith("trace-1", "records-next", recordFilter, "TARGET");
   expect(recordFilter.types).toContain("MODEL_RESPONSE_RECEIVED");
-  expect(recordFilter.types).not.toContain("FRAME_CLOSED");
+  expect(recordFilter.types).toContain("FRAME_CLOSED");
   fireEvent.change(screen.getByLabelText("Literal search"), { target: { value: "needle" } });
   fireEvent.click(screen.getByRole("button", { name: "Search" }));
   await screen.findByRole("button", { name: "Load more matches" });

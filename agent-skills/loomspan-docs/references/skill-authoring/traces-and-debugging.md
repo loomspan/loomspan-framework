@@ -746,3 +746,37 @@ Read the [Java capture contract](../java-api/java-skills.md#bounded-executor-dia
 for exact supported types, limits, concurrency and containment boundaries.
 `ExecutorDiagnosticsIntegrationTest` and the mixed `java-root-success` corpus prove
 message/JSON fidelity, existing frame association and explicit states.
+
+Select the recorded execution frame, then query
+`LOOMSPAN_query_trace_records` with `filter.types` containing
+`EXECUTOR_DIAGNOSTIC_RECORDED` and `EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED`.
+Add `filter.frameId` for that exact frame, including child frames whose type is
+`ROOT_MISSION`. Both selectors apply normally; notices do not bypass filters.
+Continue the unchanged query while `hasMore` is true. Each sequence remains an
+individual chronological record. Inspect the selected DATA descriptor inline when
+complete, or read its opaque `contentRef` with `LOOMSPAN_read_trace_content` and
+ordinary byte ranges/continuations. LOGICAL omits chunk rows; PHYSICAL includes
+them. A complete retained notice does not recover discarded diagnostic content.
+
+In Console Records, expand **Diagnostic details** for a diagnostic or notice
+for authored message/JSON, explicit capture states and recorded reasons. Boundary
+records and the selected frame supply timing, executor identity/configuration
+generation, input, recorded output and linked Framework failure facts. Child output
+uses its ordinary tool result. An authored ERROR, retry text or arbitrary `outcome`
+field supplies no invocation failure, native attempt or retry classification.
+Notices have no authored severity. Missing evidence establishes no capture cause;
+use recorded completion/failure classification for execution outcomes.
+
+Framework-accounted usage covers native Framework model calls. Executor-managed
+requests/retries do not reserve the native provider-attempt budget, and authored
+usage-shaped diagnostic JSON does not contribute to these totals. Zero means zero
+Framework-accounted usage, not measured zero executor usage. Preserve native usage
+precision: a missing report can produce a heuristic estimate when text is available;
+unavailable evidence remains unavailable. These totals are not total application
+request counts or billing totals.
+
+Evidence: `ConsoleTraceFixtureCorpusTest` produces `java-root-success` concurrent
+diagnostics, `nested-frame-usage` native/executor evidence, and
+`executor-recoverable-failure` / `executor-terminal-failure` classifications.
+Go `executor_diagnostics_test.go` and real MCP/browser semantic tests cover bounded
+traversal; `TraceRecords.executorDiagnostics.test.tsx` covers lazy inert details.

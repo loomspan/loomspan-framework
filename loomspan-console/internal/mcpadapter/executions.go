@@ -35,7 +35,7 @@ func addExecutionTools(server *mcp.Server, options ServerOptions) {
 	})
 	addValidatedTool(server, &mcp.Tool{
 		Name:        GetExecutionToolName,
-		Description: "Return every active branch for one session ID.",
+		Description: "Return every active branch and Framework-accounted usage for a session. Only native calls count; executor usage is unmeasured.",
 		Annotations: readOnlyAnnotations, InputSchema: nonblankInputSchema[getExecutionInput]("sessionId"),
 	}, executionDetailOutputSchema(), func(ctx context.Context, _ *mcp.CallToolRequest, input getExecutionInput) (*mcp.CallToolResult, toolEnvelope[executionDetailResult], error) {
 		return handleGetExecution(ctx, options, input)

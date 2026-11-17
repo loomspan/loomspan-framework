@@ -58,6 +58,41 @@ public final class ExecutorDiagnosticTestSupport
         diagnostics.info("chunked JSON", Map.of("payload", "x".repeat(5000)));
         diagnostics.info("m".repeat(9000));
         diagnostics.warn("unsupported supplied JSON", new Object());
+        try (var workers = java.util.concurrent.Executors.newFixedThreadPool(4)) {
+            var futures = new ArrayList<java.util.concurrent.Future<?>>();
+            for (int index = 0; index < 8; index++)
+                futures.add(workers.submit(() -> diagnostics.info("concurrent event", Map.of("workerEvidence", "retained"))));
+            for (var future : futures) future.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception ex) { throw new IllegalStateException(ex); }
+        diagnostics.close();
+    }
+
+    public static void accountingFixture(ExecutionBinding binding, ExecutionFrame frame) {
+        var diagnostics = new DefaultExecutorDiagnostics(binding, frame);
+        try (var server = new okhttp3.mockwebserver.MockWebServer()) {
+            server.enqueue(new okhttp3.mockwebserver.MockResponse().setResponseCode(503));
+            server.enqueue(new okhttp3.mockwebserver.MockResponse().setBody("approved")); server.start();
+            try (var client = java.net.http.HttpClient.newHttpClient()) {
+                var request = java.net.http.HttpRequest.newBuilder(server.url("/operation").uri()).GET().build();
+                var first = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+                var failedEvidence = new java.util.LinkedHashMap<String,Object>();
+                failedEvidence.put("httpStatus", first.statusCode()); failedEvidence.put("usage", Map.of("totalUnits", 999999)); failedEvidence.put("outcome", "FAILED");
+                diagnostics.error("caught request failure; retry", failedEvidence);
+                var second = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+                var evidence = new java.util.LinkedHashMap<String,Object>();
+                evidence.put("httpStatus", second.statusCode()); evidence.put("usage", null); evidence.put("retry", true);
+                diagnostics.info("request succeeded", evidence);
+                diagnostics.warn("unavailable supplied JSON", new Object());
+                if (server.getRequestCount() != 2) throw new AssertionError("Executor HTTP request inventory");
+            }
+        } catch (Exception ex) { throw new IllegalStateException(ex); }
+        diagnostics.close();
+    }
+
+    public static void failureFixture(ExecutionBinding binding, ExecutionFrame frame) {
+        var diagnostics = new DefaultExecutorDiagnostics(binding, frame);
+        var evidence = new java.util.LinkedHashMap<String,Object>(); evidence.put("outcome", "SUCCEEDED"); evidence.put("usage", 999999);
+        diagnostics.info("before designated failure", evidence);
         diagnostics.close();
     }
 }

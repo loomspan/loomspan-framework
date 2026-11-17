@@ -65,6 +65,7 @@ references required by the interpretation:
 | Did planned tasks run concurrently? | `LOOMSPAN_query_trace_plans` for `parallelGroup`, `effectiveConcurrency`, transitions, and nullable `observedOverlap`; use `DETAILED` frames for exact open/close intervals. |
 | Where was time or usage spent? | `DETAILED` frames, using duration or usage order when useful; preserve direct, descendant, inclusive, and unknown values. |
 | What model, tool, or structured content was recorded? | Descriptor-first `LOOMSPAN_query_trace_records` narrowed to the relevant types, then read only selected `contentRef` values. Captured thought is not automatically the final output. |
+| What did an executor report? | Query both executor diagnostic record types in the selected frame, then read selected DATA content; see [executor playbook](references/debugging-playbooks.md#wf-executor-diagnostics). |
 | Why does this nested skill path exist? | Frame hierarchy first, then only the exact registered skill YAML needed to explain the selected path. |
 | What TypeSafe skill is registered, and what did it evaluate? | `LOOMSPAN_list_skills` / `LOOMSPAN_get_skill` for `TYPESAFE` source, unchanged YAML, locations and generated schema; then native evaluation record descriptors and selected content reads. See [TypeSafe inspection](references/debugging-playbooks.md#wf-typesafe-evaluation). |
 
@@ -109,6 +110,14 @@ Distinguish:
 - **Calculation** — deterministic Console arithmetic over those facts.
 - **Context** — developer-supplied or repository information.
 - **Inference** — a restrained interpretation that may need confirmation.
+
+Framework-accounted usage covers native Framework model calls. Executor-managed
+requests/retries do not reserve the native provider-attempt budget, and authored
+usage-shaped diagnostic JSON does not contribute to these totals. Zero means zero
+Framework-accounted usage, not measured zero executor usage. Preserve native usage
+precision: a missing report can produce a heuristic estimate when text is available;
+unavailable evidence remains unavailable. These totals are not total application
+request counts or billing totals.
 
 For live evidence, include observation time and latest sequence and call the
 conclusion provisional. Missing usage is unknown, not zero. Parent and child

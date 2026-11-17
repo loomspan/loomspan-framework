@@ -194,7 +194,7 @@ test("shows the authoritative successful completion receipt", async () => {
   expect(detail).toHaveTextContent("resolveSupportCase");
   expect(detail).toHaveTextContent("Remaining open frames");
   expect(within(detail).getByRole("table", { name: "Final execution counters" })).toHaveTextContent("15");
-  expect(within(detail).getByRole("table", { name: "Final usage" })).toHaveTextContent("41,216");
+  expect(within(detail).getByRole("table", { name: "Final Framework-accounted usage" })).toHaveTextContent("41,216");
   expect(within(detail).getByRole("table", { name: "Usage precision" })).toHaveTextContent("Exact responses15");
   expect(detail).toHaveTextContent("does not make a broader claim about every cleanup operation");
   expect(detail).not.toHaveTextContent("one or more failure");
