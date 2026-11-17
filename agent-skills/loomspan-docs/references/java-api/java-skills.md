@@ -113,15 +113,13 @@ remote work/billing cancellation is not guaranteed. Existing late-write fencing
 and generation/resource lifetime remain in force. Normal completion alone does
 not fabricate cancellation.
 
-### Diagnostic capability declaration
+### Bounded executor diagnostics
 
-`ExecutorDiagnostics diagnostics()` is declared in v1 but currently throws
-`UnsupportedOperationException`: recording is unavailable. No diagnostic call is
-silently discarded. The capability declares `info`, `warn` and `error`, each with
+`ExecutorDiagnostics diagnostics()` supplies `info`, `warn` and `error`, each with
 `(String message)` and `(String message, Object data)` overloads returning void.
 Applications do not register implementations. Severity never controls result or retry.
 
-The declared data contract accepts null, String, Boolean, exact Byte/Short/Integer/
+The data contract accepts null, String, Boolean, exact Byte/Short/Integer/
 Long, finite Float/Double, BigInteger and BigDecimal; exact HashMap/LinkedHashMap
 and JDK factory maps with String keys; exact ArrayList and JDK factory lists;
 reference arrays and primitive boolean/byte/short/int/long/float/double arrays.
@@ -131,12 +129,57 @@ within capture budgets. `Object` does not authorize arbitrary serialization.
 Business input/configuration retain their existing, separate leaf semantics.
 The recording contract contains ordinary failures after diagnostic method entry,
 including fallback reporting; caller expression evaluation and JVM-wide failures
-are outside it. Existing automatic observation retains its own semantics. These
-declarations do not establish implemented bounded recording or failure containment.
+are outside it. Existing automatic observation retains its own semantics. The
+methods preserve successful results and original executor exceptions.
 
-Evidence: `VersionedExecutorInvocationTest`, `MissionLifecycleTest` and
-`ExecutorInvocationLifecycleIntegrationTest`; existing cutoff and generation
-suites protect late completion and resource retention.
+```java
+invocation.diagnostics().info("Sending request", Map.of("provider", "typesafe"));
+invocation.diagnostics().warn("Provider returned a warning", responseJsonData);
+```
+
+Values are snapshotted during the call; mutation after return cannot alter retained
+content. Concurrent mutation of supplied containers is unsupported; ordinary traversal
+failures are contained. Concurrent handle calls serialize capture/append and use
+canonical trace sequence order. Calls after executor return/failure or lifecycle
+cutoff are ignored before payload inspection. A call admitted before normal closure
+finishes first; lifecycle cutoff can suppress its append. There is no additional
+diagnostic frame or sequence.
+
+| Resource | Fixed limit |
+| --- | ---: |
+| UTF-8 message | 8 KiB |
+| JSON data / developer envelope | 32 KiB / 48 KiB |
+| Nesting / visited values and object keys | 32 / 4,096 |
+| BigInteger/unscaled BigDecimal bits / absolute decimal scale | 4,096 / 4,096 |
+| Attempts / developer envelope bytes per invocation | 128 / 256 KiB |
+| Ordinary notices / separately reserved invocation-limit notice | 4 / 1 |
+| Bytes per notice / fallback warning attempts | 2 KiB / 4 |
+
+Attempts include rejected captures; attempted bytes remain charged when appending
+fails. Event/aggregate exhaustion attempts the reserved notice, then suppresses later
+calls. Oversized messages retain a Unicode-boundary prefix with an explicit state,
+without an invented suffix. Data must fit completely: rejected JSON is unavailable,
+never a repaired partial object. No sensitivity classification or masking is performed.
+
+A captured call becomes one `EXECUTOR_DIAGNOSTIC_RECORDED` record in the existing
+execution frame, with Framework timestamp and sequence. Its ordinary `data` content
+contains `severity` (INFO/WARN/ERROR), optional `message`, `messageState`
+(COMPLETE/TRUNCATED/UNAVAILABLE), `dataState` (ABSENT/COMPLETE/UNAVAILABLE/CAPTURE_FAILED),
+optional `data` only when COMPLETE, and `reason` for incomplete capture. The message-only
+overload yields ABSENT; explicit null yields COMPLETE with data:null. Severity does
+not affect result, status, accounting or retries.
+
+`EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED` is separate, has no severity, and carries
+`reason`, a fixed message and optional bounded `originalMessage` with its state.
+Reasons distinguish unsupported values, cycles, message/data/depth/traversal/number
+limits, capture/recording failures and invocation event/byte exhaustion. Notices and
+standard Java warnings are bounded and best effort. They never revisit rejected data;
+absence proves no failure condition, and complete notices cannot restore discarded data.
+Arbitrary DTO serialization, operation handles and nested spans are unsupported.
+
+Evidence: `BoundedExecutorDiagnosticCaptureTest`, `DefaultExecutorDiagnosticsTest`,
+`ExecutorDiagnosticsIntegrationTest`, `ExecutorInvocationLifecycleIntegrationTest`
+and the mixed `java-root-success` trace in `ConsoleTraceFixtureCorpusTest`.
 
 ## Runnable example and resource ownership
 

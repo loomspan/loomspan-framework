@@ -258,6 +258,39 @@ class ConsoleTraceFixtureCorpusTest
 
     @Test
     @Order(2)
+    void executorDiagnosticsAreMixedLogicalDataRecordsWithExplicitStates() throws Exception
+    {
+        var records = parseLines(fixtureRoot().resolve("traces/java-root-success.ndjson"));
+        var authored = records.stream().filter(r -> r.path("recordType").asText().equals("EXECUTOR_DIAGNOSTIC_RECORDED")).toList();
+        var notices = records.stream().filter(r -> r.path("recordType").asText().equals("EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED")).toList();
+        assertThat(authored).hasSize(6); assertThat(notices).hasSize(2);
+        assertThat(records).noneMatch(r -> r.path("recordType").asText().equals("ERROR_RECORDED"));
+        assertThat(authored.stream().map(r -> r.path("frameId").asText()).distinct()).containsExactly("java-root");
+        assertThat(authored.getFirst().at("/data/data/Authorization").asText()).isEqualTo("kept verbatim");
+        assertThat(authored.get(1).at("/data/data").isNull()).isTrue();
+        assertThat(authored.get(2).at("/data/severity").asText()).isEqualTo("ERROR");
+        for (var record : authored)
+        {
+            JsonNode data = record.path("data");
+            if (record.at("/metadata/payloadChunked").asBoolean())
+            {
+                String id = record.at("/metadata/payloadId").asText();
+                String content = records.stream().filter(r -> r.path("recordType").asText().equals("PAYLOAD_CHUNK_APPENDED")
+                        && id.equals(r.at("/metadata/payloadId").asText()))
+                        .sorted(Comparator.comparingInt(r -> r.at("/metadata/chunkIndex").asInt()))
+                        .map(r -> r.path("data").asText()).collect(java.util.stream.Collectors.joining());
+                data = JSON.readTree(content);
+            }
+            assertThat(data.path("severity").asText()).isIn("INFO", "WARN", "ERROR");
+            if (data.path("messageState").asText().equals("TRUNCATED"))
+                assertThat(data.path("message").asText()).hasSize(8192);
+        }
+        assertThat(authored.getLast().at("/data/dataState").asText()).isEqualTo("UNAVAILABLE");
+        assertThat(notices).allSatisfy(r -> assertThat(r.path("data").has("severity")).isFalse());
+    }
+
+    @Test
+    @Order(2)
     void forwardingCorpusRecordsExactDecisionAfterAllWorkAndBeforeMissionClosure() throws Exception
     {
         for (String name : List.of("forwarded-child-result", "nested-forwarded-child-result")) {
@@ -1017,6 +1050,7 @@ class ConsoleTraceFixtureCorpusTest
                 var state = new DefaultExecutionStateService(CLOCK);
                 ExecutionBindingScope.runWith(binding, () -> {
                     var frame = state.openMissionFrame(session, entrySkill, Map.of());
+                    ai.loomspan.internal.core.ExecutorDiagnosticTestSupport.mixedFixture(binding, frame);
                     state.closeFrame(session, frame, Map.of("status", "SUCCEEDED"));
                     assertThat(branch.leaf()).isEmpty();
                 });
@@ -3115,6 +3149,8 @@ class ConsoleTraceFixtureCorpusTest
     {
         return switch (name)
         {
+            case "java-root-success" -> List.of(expectedPayload(7, "payload-1", "application/json", 2),
+                    expectedPayload(10, "payload-2", "application/json", 3));
             case "native-evaluation-success" -> List.of(expectedPayload(4, "payload-1", "application/json", 2));
             case "assigned-planner-inability" -> List.of(
                     expectedPayload(11, "payload-1", "application/json", 257),

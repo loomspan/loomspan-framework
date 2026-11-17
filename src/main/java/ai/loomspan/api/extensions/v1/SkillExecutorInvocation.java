@@ -21,12 +21,13 @@ public final class SkillExecutorInvocation
     private final Map<String, Object> executorConfig;
     private final String skillName;
     private final String executorConfigGenerationId;
+    private final ExecutorDiagnostics diagnostics;
     private final BooleanSupplier cancelled;
     private final Supplier<Optional<Duration>> remaining;
 
     private SkillExecutorInvocation(Map<String, Object> input, Map<String, Object> skillConfig,
             Map<String, Object> executorConfig, String skillName, String executorConfigGenerationId,
-            BooleanSupplier cancelled, Supplier<Optional<Duration>> remaining)
+            BooleanSupplier cancelled, Supplier<Optional<Duration>> remaining, ExecutorDiagnostics diagnostics)
     {
         Objects.requireNonNull(input, "input must not be null");
         Objects.requireNonNull(skillConfig, "skillConfig must not be null");
@@ -40,6 +41,7 @@ public final class SkillExecutorInvocation
         this.executorConfig = ImmutableContainers.copyMap(executorConfig);
         this.skillName = skillName;
         this.executorConfigGenerationId = executorConfigGenerationId;
+        this.diagnostics = Objects.requireNonNull(diagnostics);
         this.cancelled = Objects.requireNonNull(cancelled);
         this.remaining = Objects.requireNonNull(remaining);
     }
@@ -50,10 +52,10 @@ public final class SkillExecutorInvocation
     public String skillName() { return skillName; }
     public String executorConfigGenerationId() { return executorConfigGenerationId; }
 
-    /** Declared capability; diagnostic recording is currently unavailable. */
+    /** Invocation-scoped bounded developer diagnostics; retained handles close with executor work. */
     public ExecutorDiagnostics diagnostics()
     {
-        throw new UnsupportedOperationException("Executor diagnostic recording is not yet available");
+        return diagnostics;
     }
 
     /** Live Framework cancellation of this execution or an ancestor; does not clear interruption. */

@@ -140,6 +140,12 @@ public class ExecutionCoordinator
 
         LinkedHashMap<String, Object> frameParameters = new LinkedHashMap<>();
         frameParameters.put("objective", objective);
+        if (definition != null && definition.form() == YamlSkillDefinition.Form.EXECUTOR)
+        {
+            var executor = parentBinding.snapshot().executorBinding(skillName);
+            frameParameters.put("executorName", executor.registration().name());
+            frameParameters.put("executorConfigGenerationId", executor.generationId());
+        }
 
         if (missionInput != null && !missionInput.isEmpty())
         {
@@ -166,9 +172,27 @@ public class ExecutionCoordinator
                                 session, rootCapability.inputContract());
                         if (definition != null && definition.form() == YamlSkillDefinition.Form.EXECUTOR) {
                             var binding = parentBinding.snapshot().executorBinding(skillName);
-                            return binding.registration().invoker().apply(ExecutorInvocations.create(
-                                    resolved, definition.config(), binding.configuration(), skillName, binding.generationId(),
-                                    mission.lifecycle()::isCancelled, mission.lifecycle()::remainingExecutionTime));
+                            var capturedBinding = ExecutionBindingScope.requireCurrent();
+                            var diagnostics = new DefaultExecutorDiagnostics(capturedBinding, frame);
+                            String result;
+                            try
+                            {
+                                result = binding.registration().invoker().apply(ExecutorInvocations.create(
+                                        resolved, definition.config(), binding.configuration(), skillName, binding.generationId(),
+                                        mission.lifecycle()::isCancelled, mission.lifecycle()::remainingExecutionTime, diagnostics));
+                            }
+                            finally { diagnostics.close(); }
+                            if (topLevelInvocation)
+                            {
+                                try
+                                {
+                                    capturedBinding.runIfWritable(() -> session.appendTraceRecord(
+                                            TraceRecordType.FRAME_METADATA_RECORDED, frame, Map.of(),
+                                            Map.of("executorOutput", result)));
+                                }
+                                catch (RuntimeException ignoredFailure) { /* New evidence is best effort. */ }
+                            }
+                            return result;
                         }
                         return String.valueOf(rootCapability.invoker().invoke(resolved));
                     }

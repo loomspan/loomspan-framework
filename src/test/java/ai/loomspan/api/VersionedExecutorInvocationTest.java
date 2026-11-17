@@ -36,7 +36,7 @@ class VersionedExecutorInvocationTest
         var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
         var remaining = new java.util.concurrent.atomic.AtomicReference<Optional<Duration>>(Optional.empty());
         var call = ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), "default-leaf", "generation",
-                cancelled::get, remaining::get);
+                cancelled::get, remaining::get, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class));
         assertThat(call.isCancelled()).isFalse();
         assertThat(call.remainingTime()).isEmpty();
         cancelled.set(true); remaining.set(Optional.of(Duration.ZERO));
@@ -46,8 +46,7 @@ class VersionedExecutorInvocationTest
             assertThat(call.isCancelled()).isTrue();
             assertThat(call.remainingTime()).contains(Duration.ZERO);
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
-            assertThatThrownBy(call::diagnostics).isInstanceOf(UnsupportedOperationException.class)
-                    .hasMessageContaining("not yet available");
+            assertThat(call.diagnostics()).isNotNull();
         }
         finally { Thread.interrupted(); }
     }

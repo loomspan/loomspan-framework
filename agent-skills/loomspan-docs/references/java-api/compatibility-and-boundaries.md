@@ -34,7 +34,7 @@ and diagnostic capability in `ai.loomspan.api.extensions.v1`:
 | `SkillMethod` | Mark an application bean method as a directly callable Java skill |
 | `SkillExecutor` | Mark a reference-only Java execution method; no callable registration or schema |
 | `SkillExecutorInvocation` (v1) | Receive the Framework-created handoff with copied business containers and live lifecycle observations |
-| `ExecutorDiagnostics` (v1) | Declared message/JSON capability; recording currently unavailable |
+| `ExecutorDiagnostics` (v1) | Invocation-scoped bounded message/JSON snapshots; ordinary diagnostic failures are contained |
 | `RecoverableSkillException` | Signal a designated Java failure with exact corrective text and an optional diagnostic cause |
 | `PlannerInabilityException` | Catch unsuccessful invocation completion and read its exact reason through `getMessage()` |
 | `SkillParam` | Describe and declare requiredness for a Java skill parameter |

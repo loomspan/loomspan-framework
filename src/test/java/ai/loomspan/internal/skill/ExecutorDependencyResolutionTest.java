@@ -265,7 +265,7 @@ class ExecutorDependencyResolutionTest {
                         if (allowed) {
                             guard.checkAccess(capability,session,null);
                             assertThat(snapshot.executorBinding(capability.name()).registration().invoker().apply(
-                                    ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(),Map.of(),Map.of(),capability.name(),"test", () -> false, java.util.Optional::empty)))
+                                    ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(),Map.of(),Map.of(),capability.name(),"test", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class))))
                                     .isEqualTo(snapshot == retained ? "old" : "new");
                         } else assertThatThrownBy(() -> guard.checkAccess(capability,session,null))
                                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);

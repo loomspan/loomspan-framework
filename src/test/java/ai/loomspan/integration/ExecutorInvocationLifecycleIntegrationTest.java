@@ -29,7 +29,7 @@ class ExecutorInvocationLifecycleIntegrationTest
                 LoomspanAutoConfiguration.class, LoomspanAiAutoConfiguration.class))
                 .withBean(Decisions.class, () -> executor)
                 .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml",
-                        "loomspan.session.mission-timeout=5s", "loomspan.shutdown.timeout=400ms");
+                        "loomspan.session.mission-timeout=5s", "loomspan.execution-trace.persistence=always", "loomspan.shutdown.timeout=400ms");
     }
 
     private void leaf() throws Exception
@@ -52,7 +52,7 @@ class ExecutorInvocationLifecycleIntegrationTest
             assertThat(bean.call.executorConfigGenerationId()).isEqualTo(context.getBean(SkillReloader.class).snapshot("default").generationId());
             assertThat(bean.entryRemaining).isPositive().isLessThanOrEqualTo(Duration.ofSeconds(5));
             assertThat(bean.call.isCancelled()).isFalse();
-            assertThatThrownBy(bean.call::diagnostics).isInstanceOf(UnsupportedOperationException.class);
+            assertThat(bean.call.diagnostics()).isNotNull();
         });
     }
 
@@ -89,6 +89,17 @@ class ExecutorInvocationLifecycleIntegrationTest
                 // Child gets its own five-second budget; the already-spent parent budget must win.
                 assertThat(bean.entryRemaining).isPositive().isLessThan(Duration.ofMillis(4500));
                 assertThat(bean.call.skillName()).isEqualTo("default-leaf");
+                var records = ai.loomspan.internal.core.ExecutorDiagnosticTestSupport.logicalRecords(bean.session);
+                var diagnostics = records.stream().filter(r -> r.recordType() == ai.loomspan.internal.core.TraceRecordType.EXECUTOR_DIAGNOSTIC_RECORDED).toList();
+                assertThat(diagnostics).hasSize(1);
+                assertThat(diagnostics.getFirst().route()).isEqualTo("default-leaf");
+                assertThat(records).anySatisfy(r -> {
+                    assertThat(r.recordType()).isEqualTo(ai.loomspan.internal.core.TraceRecordType.FRAME_OPENED);
+                    assertThat(r.frameId()).isEqualTo(diagnostics.getFirst().frameId());
+                    assertThat(r.route()).isEqualTo("default-leaf");
+                });
+                assertThat(records.stream().filter(r -> r.recordType() == ai.loomspan.internal.core.TraceRecordType.TOOL_CALL_STARTED)).hasSize(1);
+                assertThat(records.stream().filter(r -> r.recordType() == ai.loomspan.internal.core.TraceRecordType.TOOL_CALL_COMPLETED)).hasSize(1);
             });
         }
     }
@@ -114,6 +125,7 @@ class ExecutorInvocationLifecycleIntegrationTest
                 assertThat(bean.stopped.await(5, TimeUnit.SECONDS)).isTrue();
                 caller.join(5000);
                 assertThat(bean.call.isCancelled()).isTrue();
+                assertLateDiagnosticsIgnored(bean);
                 assertThat(bean.call.remainingTime().orElseThrow()).isLessThanOrEqualTo(first);
                 assertThat(bean.interrupted).isTrue();
                 assertThat(bean.operations).hasValue(1);
@@ -148,6 +160,7 @@ class ExecutorInvocationLifecycleIntegrationTest
                 assertThat(failure.get()).isInstanceOf(SkillException.class);
                 assertThat(bean.call.remainingTime()).contains(Duration.ZERO);
                 assertThat(bean.call.isCancelled()).isTrue();
+                assertLateDiagnosticsIgnored(bean);
                 // Logical completion has fenced the result while physical application work remains.
                 assertThat(bean.stopped.getCount()).isEqualTo(1);
             }
@@ -161,9 +174,19 @@ class ExecutorInvocationLifecycleIntegrationTest
         });
     }
 
+    private static void assertLateDiagnosticsIgnored(Decisions bean)
+    {
+        var before = ai.loomspan.internal.core.ExecutorDiagnosticTestSupport.logicalRecords(bean.session);
+        bean.call.diagnostics().warn("after cutoff", new Object());
+        var after = ai.loomspan.internal.core.ExecutorDiagnosticTestSupport.logicalRecords(bean.session);
+        assertThat(after.stream().filter(r -> r.recordType() == ai.loomspan.internal.core.TraceRecordType.EXECUTOR_DIAGNOSTIC_RECORDED).count())
+                .isEqualTo(before.stream().filter(r -> r.recordType() == ai.loomspan.internal.core.TraceRecordType.EXECUTOR_DIAGNOSTIC_RECORDED).count());
+    }
+
     public static class Decisions
     {
         volatile SkillExecutorInvocation call;
+        volatile ai.loomspan.internal.core.LoomspanSession session;
         volatile Duration entryRemaining;
         volatile boolean block;
         volatile boolean ignoreCancellation;
@@ -173,6 +196,8 @@ class ExecutorInvocationLifecycleIntegrationTest
         @SkillExecutor(name = "decide") public String decide(SkillExecutorInvocation invocation)
         {
             call = invocation;
+            session = ai.loomspan.internal.core.ExecutionBindingScope.requireCurrent().session();
+            invocation.diagnostics().info("executor entered");
             entryRemaining = invocation.remainingTime().orElseThrow();
             operations.incrementAndGet(); entered.countDown();
             if (block)

@@ -356,7 +356,7 @@ class FrameworkExecutionLifecycleTest
         var future = new FutureTask<Void>(() -> null);
         mission.lifecycle().registerOwningFuture(future);
         var invocation = ExecutorInvocations.create(java.util.Map.of(), java.util.Map.of(), java.util.Map.of(),
-                "default-entry", "generation", mission.lifecycle()::isCancelled, mission.lifecycle()::remainingExecutionTime);
+                "default-entry", "generation", mission.lifecycle()::isCancelled, mission.lifecycle()::remainingExecutionTime, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class));
         assertThat(invocation.remainingTime()).isEmpty();
         assertThat(invocation.isCancelled()).isFalse();
 

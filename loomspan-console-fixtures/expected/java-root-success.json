@@ -58,7 +58,17 @@
     "completionUnits" : 0,
     "totalUnits" : 0
   },
-  "payloads" : [ ],
+  "payloads" : [ {
+    "logicalRecordSequence" : 7,
+    "payloadId" : "payload-1",
+    "contentType" : "application/json",
+    "chunkCount" : 2
+  }, {
+    "logicalRecordSequence" : 10,
+    "payloadId" : "payload-2",
+    "contentType" : "application/json",
+    "chunkCount" : 3
+  } ],
   "gaps" : [ ],
   "uncertainties" : [ ]
 }

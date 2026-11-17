@@ -730,3 +730,19 @@ cross-version application contracts.
 `RESULT_ASSEMBLED` is recorded at the owning mission after complete output validation succeeds and before mission closure. Metadata contains `skillName`, `owningMissionFrameId`, optional `planId`, `modelContributionRequired` and `outputBindings`. Each provenance entry contains `destination`, `sourceKind`, `sourcePath`, `parentMissionFrameId`, and exact `sourceTaskId`/`sourceSkill` for child results. Provenance identifies sources without duplicating their selected values. `modelContributionRequired: false` authoritatively identifies skipped final synthesis.
 
 The normal payload channel contains the validated assembled JSON. Console projects `resultAssembly` alongside ordinary content descriptors and byte-range access. Original model responses and accepted child records remain separate and unchanged. Live activity carries bounded identity previews and the contribution decision. Declaration, plan/source selection, model override and complete output-validation failures occur before successful assembly; source failures never cause model fallback. `ConsoleTraceFixtureCorpusTest`, `ConsoleSseFixtureCorpusTest` and `LiveActivityProjectorTest` cover the current diagnostic vocabulary.
+
+## Bounded executor diagnostics
+
+Executor messages are canonical records within their existing execution frame,
+not new frames or execution failures. `EXECUTOR_DIAGNOSTIC_RECORDED` places authored
+severity/message/JSON and explicit capture states in ordinary record data.
+`EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED` contains Framework conditions without
+developer severity. Existing frame/timestamp/sequence and content chunking apply.
+An authored ERROR does not fail execution. A notice may describe unavailable or
+truncated capture; a complete notice does not make discarded data recoverable.
+Delivery is best effort, and absence establishes no capture-failure cause.
+
+Read the [Java capture contract](../java-api/java-skills.md#bounded-executor-diagnostics)
+for exact supported types, limits, concurrency and containment boundaries.
+`ExecutorDiagnosticsIntegrationTest` and the mixed `java-root-success` corpus prove
+message/JSON fidelity, existing frame association and explicit states.

@@ -395,7 +395,7 @@ The supported Java API is the closed allowlist in `ai.loomspan.api` and the exac
 `ai.loomspan.api.extensions.v1`, summarized
 in the [public API reference](agent-skills/loomspan-docs/references/java-api/compatibility-and-boundaries.md).
 It contains 27 public top-level types, including `SkillExecutor`, the
-Framework-created `SkillExecutorInvocation` class and `ExecutorDiagnostics` declaration, `RecoverableSkillException`, and `PlannerInabilityException`. Java callable
+Framework-created `SkillExecutorInvocation` class and `ExecutorDiagnostics` capability, `RecoverableSkillException`, and `PlannerInabilityException`. Java callable
 methods and reference-only executors share discovery and proxy invocation. Successful
 null/void results become empty text, Strings remain exact, and other results become
 JSON; failures propagate. Only designated `RecoverableSkillException` failures become
@@ -409,8 +409,13 @@ and generation identity. `isCancelled()` reads live Framework cancellation;
 `remainingTime()` reads the remaining execution budget, capped by ancestors and
 shutdown, with empty for no deadline and zero at expiry. Executors should also
 check thread interruption and bound their own I/O; these observations do not
-abort remote work. `diagnostics()` currently throws `UnsupportedOperationException`;
-diagnostic recording is unavailable. See the [executor API contract](agent-skills/loomspan-docs/references/java-api/java-skills.md#reference-only-executor-declaration).
+abort remote work. `diagnostics()` supplies bounded invocation-scoped `info`, `warn`
+and `error` message/JSON capture. Supported JSON is snapshotted during the call;
+concurrent calls use existing trace ordering and retained handles stop recording
+when executor work ends or its lifecycle is cut off. Ordinary diagnostic failures
+are contained; caller argument evaluation and JVM-wide failures are excluded.
+System notices are separate and best effort; severity never changes execution.
+See the [executor API contract](agent-skills/loomspan-docs/references/java-api/java-skills.md#bounded-executor-diagnostics).
 
 Canonical diagnostics record classification independently from completion linkage.
 

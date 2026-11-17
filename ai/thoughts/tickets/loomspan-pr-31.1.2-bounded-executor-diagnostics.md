@@ -34,24 +34,24 @@ system notices. Ordinary failures in the new diagnostic path cannot change execu
 
 ## Acceptance criteria — this ticket only
 
-- [ ] Public invocation tests prove snapshots, invocation isolation, concurrent
+- [x] Public invocation tests prove snapshots, invocation isolation, concurrent
   ordering, closure/late-write behavior, fidelity and explicit bounded truncation.
-- [ ] Unsupported/cyclic values, oversized messages/data, nesting/traversal/event/total
+- [x] Unsupported/cyclic values, oversized messages/data, nesting/traversal/event/total
   limits never trigger arbitrary adapters, collection code, Number conversions or toString.
   Capture work is bounded before building an unlimited representation.
-- [ ] Injected ordinary capture/recording/fallback/fallback-logging failures preserve
+- [x] Injected ordinary capture/recording/fallback/fallback-logging failures preserve
   successful results and original executor exceptions. Caller expression failures and
   JVM-wide failures are correctly outside this guarantee.
-- [ ] One captured diagnostic becomes one record; system notices have no developer
+- [x] One captured diagnostic becomes one record; system notices have no developer
   severity. Limit-notice capacity is reserved, warning floods are bounded/coalesced,
   and reporting never recursively serializes rejected payloads.
-- [ ] Boundary input/output, timing, outcome, identity, generation and failure evidence
+- [x] Boundary input/output, timing, outcome, identity, generation and failure evidence
   retain existing semantics. RecoverableSkillException behavior and no fabricated
   successful output are verified; Console absence does not affect execution.
-- [ ] Java fixtures contain mixed existing records, diagnostics and notices in the
+- [x] Java fixtures contain mixed existing records, diagnostics and notices in the
   same trace; payload data supports the existing content descriptors/retrieval path.
   Diagnostics never create ERROR_RECORDED failure semantics or alter accounting.
-- [ ] Public-surface checks and relevant Framework tests pass, including checks
+- [x] Public-surface checks and relevant Framework tests pass, including checks
   blocked by 31.1.1; any Console fixture failures are explicitly handed to 31.1.3.
 
 ## Local verification commands
@@ -462,3 +462,152 @@ Disposition: [complete response and Java return boundary](../phases/executor-pac
 - Execute only when this ticket is passed to the pipeline. Creating this file does not
   authorize starting implementation, committing current planning changes, or publishing.
 
+
+
+## Execution notes — bounded diagnostics implementation (2026-11-16)
+
+Route: developer approved **Full 5-Step Pipeline** after Step 0. Initial checkout
+was clean. Research and both plans are in the corresponding `2026-11-16-PR-31.1.2-bounded-executor-diagnostics*`
+artifacts under `research/` and `plans/`. All current changes are ticket-owned;
+no sibling Extensions or Console production code was changed. Commit follows fresh
+independent review; no push/sync/publication is authorized or performed.
+
+### Established contract and implementation decisions
+
+- Public signatures remain the existing v1 Framework-created invocation and six
+  `ExecutorDiagnostics` void methods: info/warn/error(String), each also with
+  (String,Object). No supported type/method/constructor was added. The private
+  construction bridge now supplies the handle. The prior ticket's handoff and
+  current source had no outstanding compilation debt; the unavailable accessor
+  and staging assertions have been replaced.
+- Exact supported concrete JSON types remain those selected by 31.1.1. Capture
+  uses a private instance-local Jackson streaming walker, bounded output sink,
+  explicit class checks before traversal/conversion, active-identity cycle checks,
+  and guarded numeric representation. It never uses the application mapper,
+  arbitrary adapters/getters/collection subclasses/Number subclasses/toString.
+  Successful trees are immutable snapshots of the observed traversal; concurrent
+  external container mutation is unsupported and ordinary failures are contained.
+- Fixed limits: 8 KiB UTF-8 message, 32 KiB supplied JSON, 48 KiB developer envelope,
+  container depth 32, 4,096 values plus keys, numeric bit length 4,096 and absolute
+  BigDecimal scale 4,096. Per invocation: 128 attempts (including rejection),
+  256 KiB attempted developer envelope bytes, four ordinary 2 KiB notices, one
+  separate reserved 2 KiB invocation-limit notice, four fallback warning attempts.
+  Failed appends do not refund attempts/bytes. Limit exhaustion attempts the
+  reserved notice once and suppresses later calls before payload inspection.
+- Record types: `EXECUTOR_DIAGNOSTIC_RECORDED` and
+  `EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED`. They are records within the existing
+  executor mission frame, never new frames. Existing identity, timestamp, canonical
+  sequence and content/chunk machinery apply. No separate store/sequence or
+  provider-attempt abstraction exists. Current `openMissionFrame` uses ROOT_MISSION
+  even for child executor missions; tests match actual frame identity/route rather
+  than changing established frame classification.
+- Developer data: severity INFO/WARN/ERROR; optional message; messageState
+  COMPLETE/TRUNCATED/UNAVAILABLE; dataState ABSENT/COMPLETE/UNAVAILABLE/CAPTURE_FAILED;
+  data only for COMPLETE (including explicit JSON null); reason for incomplete
+  capture. Message-only overloads use ABSENT. Truncated messages retain a Unicode
+  boundary prefix without an invented suffix; incomplete structured JSON is
+  discarded, never repaired. Reasons: UNSUPPORTED_VALUE, CYCLE, MESSAGE_LIMIT,
+  DATA_LIMIT, DEPTH_LIMIT, TRAVERSAL_LIMIT, NUMBER_LIMIT, CAPTURE_FAILURE,
+  RECORDING_FAILURE, INVOCATION_EVENT_LIMIT, INVOCATION_BYTE_LIMIT.
+- System data: reason, fixed explanatory message, optional bounded originalMessage,
+  originalMessageState. No developer severity, rejected data or throwable rendering.
+  Notice and standard Java warning paths are independent best effort, bounded and
+  nonrecursive. Missing delivery establishes no cause; a complete notice cannot
+  recover discarded evidence. Caller argument evaluation and JVM-wide failures
+  are outside containment; existing automatic observation retains its semantics.
+- Capture/append/close serialize on the handle. A retained captured binding checks
+  lifecycle ancestry before capture and again at append; worker-thread ThreadLocal
+  identity is not used for later calls. Normal executor return/failure closes the
+  handle in finally before escaping. Synchronous callback reentry is suppressed.
+- Existing frame open data gains captured executorName and
+  executorConfigGenerationId. Existing tool start/completion/failure and failure
+  classification remain authoritative. Root successful already-converted output
+  uses FRAME_METADATA_RECORDED.executorOutput as best-effort evidence; children
+  reuse TOOL_CALL_COMPLETED. Failures have no fabricated successful output.
+  No severity affects execution, accounting or retry. Resource input handling and
+  the derived-journal/observer redaction exception are unchanged.
+- Documentation drift classification: **aligned** after updating README, v1
+  Javadocs, Java handoff/boundary guidance and authoring executor/trace coverage.
+  Product documentation describes current behavior without delivery-ticket prose.
+
+### Downstream 31.1.3 handoff
+
+The compatibility marker stays unchanged. The existing `java-root-success` corpus
+now contains six developer diagnostics and two system notices mixed with existing
+records in one frame, including physical JSON chunks, absent/explicit-null data,
+message truncation and unsupported-data unavailability. Java retains ordinary
+`TraceRecord.data` content; message/severity are not stranded only in metadata.
+
+From `loomspan-console`, `go test ./internal/traceanalysis -run Corpus -count=1`
+**failed** on `TestFixtureCorpusMatchesJavaExpectedSemantics/java-root-success`:
+`expected valid artifact for java-root-success, got error: The trace artifact could
+not be validated. (category=UNSUPPORTED_VALUE)`. The fixture's first new record at
+sequence 4 is EXECUTOR_DIAGNOSTIC_RECORDED; subsequent notices use
+EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED. The current Go closed vocabulary does
+not include either. **Restoration owner: 31.1.3**. This is expected downstream debt,
+not a pass or an additional implementation gate here.
+
+31.1.3 consumes these spellings, payload fields and fixed bounds. Relevant anchors:
+Java `TraceRecordType.java`/`TraceRecord.java`; Go `internal/traceanalysis/enums.go`,
+`parser.go`, `query_records.go`; MCP `internal/mcpadapter/traces.go`,
+`trace_contracts.go`, `output_schemas.go`. Reuse existing
+`LOOMSPAN_query_trace_records` and `LOOMSPAN_read_trace_content`: type/frame filters,
+ordering, bounded pages and continuation, ordinary descriptors/inline limits/content
+references and bounded ranged reads. Verify no duplicates/omissions, exact authored
+message/severity/JSON/states, inert UI presentation and no inferred explanation for
+missing evidence. Request both types to select diagnostics plus notices. No new
+MCP tool, endpoint/index/store/query service, cursor/sequence, severity filter,
+filter bypass, summary fields or content retrieval protocol is authorized.
+
+### Step 4 verification
+
+Build tested: `ai.loomspan:loomspan-spring-boot-starter:1.0.0-beta.10-SNAPSHOT`,
+Java 21.0.2, modified checkout based on ec624ef75b9b25fb8e94a2600b301a5496d019dc.
+No install/publication was needed for this Framework-local acceptance.
+
+- Expected red before production: `./mvnw.cmd "-Dtest=ExecutorDiagnosticsIntegrationTest#publicInvocationRecordsSupportedDiagnosticAndKeepsResult" test`
+  failed with the original unavailable-accessor UnsupportedOperationException.
+- PASS: `./mvnw.cmd "-Dtest=BoundedExecutorDiagnosticCaptureTest,DefaultExecutorDiagnosticsTest,ExecutorDiagnosticsIntegrationTest" test`
+  (23 tests at that checkpoint; later public cases are included below).
+- Initial regression command: `./mvnw.cmd "-Dtest=LoomspanPublicSurfaceArchitectureTest,VersionedExecutorInvocationTest,SkillExecutorTest,ApplicationApiValueTest,ExecutorInvocationLifecycleIntegrationTest,SupportedSurfaceIntegrationTest,ExecutorGenerationExecutionTest,ExecutorGenerationExecutionIntegrationTest,ExecutorDependencyResolutionTest,ExecutorApplicationIntegrationTest,ExplicitJavaFailureHandlingIntegrationTest,SharedDeclarativeAuthorizationIntegrationTest,MissionLifecycleTest,JavaSkillMissionCutoffTest,FrameworkExecutionLifecycleTest,TraceRecordJsonTest,ExecutionTraceHandleTest,ExecutionTraceContractTest,ExecutionJournalProjectorTest,ExecutionJournalProjectionContractTest,DefaultExecutionObservationHandleTest,ExecutionObservationConcurrencyTest" test`
+  ran 184 tests; two new child-frame assertions incorrectly assumed SKILL_EXECUTION.
+  Corrected them to verify the actual existing frame/route; the full suite and
+  final focused lifecycle tests pass those corrected assertions.
+- PASS: `./mvnw.cmd "-Dtest=ConsoleTraceFixtureCorpusTest" "-DfailIfNoTests=false" "-Dloomspan.console.fixtures.regenerate=true" test`
+  (19 tests). Added explicit chunk-envelope inventory expectations. A later fresh
+  JVM replay exposed Map.of iteration-order nondeterminism in fixture input;
+  changed only the fixture input to ordered LinkedHashMap and regenerated below.
+- PASS: `./mvnw.cmd test`: 2,307 tests, zero failures/errors, two existing skips
+  (`Pr18RecordedHandoffDiagnosticTest`, optional `pr18.diagnostic` property absent),
+  BUILD SUCCESS. This covers all supported-surface, executor, generation, Resource,
+  recoverable failure, lifecycle, trace/projector/observation and corpus suites.
+- PASS on latest scalar hardening and deterministic fixture input:
+  `./mvnw.cmd "-Dtest=BoundedExecutorDiagnosticCaptureTest,DefaultExecutorDiagnosticsTest,ExecutorDiagnosticsIntegrationTest,ExecutorInvocationLifecycleIntegrationTest,ConsoleTraceFixtureCorpusTest" "-DfailIfNoTests=false" "-Dloomspan.console.fixtures.regenerate=true" test`
+  (50 tests, zero failures/errors/skips). This includes the added exact BigDecimal
+  guard against an arbitrary unscaled BigInteger subclass. No broader behavior
+  changed after the full-suite run; the final narrow run covers that added guard.
+- PASS: `./mvnw.cmd "-Dtest=LoomspanPublicSurfaceArchitectureTest" test`
+  (8 tests) on latest production types.
+- PASS: `./mvnw.cmd "-Dtest=ConsoleTraceFixtureCorpusTest" "-DfailIfNoTests=false" test`
+  (19 tests), fresh-JVM byte-for-byte replay after deterministic fixture input correction.
+- Expected downstream FAIL (restoration owner 31.1.3): from `loomspan-console`,
+  `go test ./internal/traceanalysis -run Corpus -count=1`, and final fixture-specific
+  `go test ./internal/traceanalysis -run "^TestFixtureCorpusMatchesJavaExpectedSemantics/java-root-success$" -count=1`.
+  Both reject the new fixture with UNSUPPORTED_VALUE as documented above.
+- PASS: `git diff --check`. No compatibility marker, production Go/TS, journal
+  projector, new bean, public type or public method change was introduced.
+
+### Acceptance evidence map
+
+| Acceptance | Implementation and verification |
+| --- | --- |
+| Snapshot/isolation/concurrent order/closure/fidelity/truncation through public invocation | ExecutorDiagnosticsIntegrationTest proves snapshots, unique canonical ordering on one captured frame, invocation budget isolation, closure, authored error neutrality and marked truncation without Console; ExecutorInvocationLifecycleIntegrationTest covers child routes and late cutoff writes. |
+| Approved exact JSON and all finite budgets without arbitrary code | BoundedExecutorDiagnosticCaptureTest covers permitted containers/scalars/arrays, hostile subclasses/DTO rendering, non-string keys, cycles/aliases, message/data/depth/work/number limits and Unicode; DefaultExecutorDiagnosticsTest covers event/aggregate limits and reserves. Private mapper and class gates avoid custom adapters. |
+| Ordinary failure containment | Public successful/original-recoverable/original-terminal scenarios inject capture, append, notice serialization and Java-warning failures; unit tests combine failures and synchronous reentry. Caller-expression test and documented JVM exclusion preserve the agreed boundary. |
+| One captured call/one record; separate notices; bounded warnings | Public tests assert exact counts; DefaultExecutorDiagnosticsTest checks 128 rejected attempts, four ordinary notices/warnings, one reserved notice, attempted-byte charging and no recursive reporting. Corpus has six authored records/two notices with no severity on notices. |
+| Automatic boundary evidence retains semantics | Coordinator enriches existing frame open data and root successful output metadata; public identity/output tests plus unchanged generation, Resource, failure and standard/explicit suites pass in full run. Child lifecycle tests assert exactly one existing tool start/completion; failed execution produces no executorOutput. |
+| Mixed canonical content/fixtures, outcome/accounting neutrality | ConsoleTraceFixtureCorpusTest reconstructs physical chunks into ordinary data, asserts authored fields/states and unchanged successful outcome; public authored-error case produces no ERROR_RECORDED; usage/observation suites pass. |
+| Supported surface and required Framework verification | Closed architecture checks and complete Framework suite pass; final targeted suite verifies latest numeric guard. Exact Go unknown-vocabulary debt is assigned to 31.1.3 without a marker increment. |
+
+No optional developer checks are required. Independent Step 5 remains the pipeline
+completion gate; this section reports Step 4 evidence only.

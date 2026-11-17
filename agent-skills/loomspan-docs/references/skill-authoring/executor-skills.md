@@ -77,10 +77,13 @@ Remaining time includes parent/shutdown limits, excludes cleanup grace and does
 not restart at executor entry. Empty means no deadline; expiry returns zero.
 Executors SHOULD check these observations and thread interruption before work and
 retry waits, preserve interruption and bound their own I/O. Physical cancellation
-of remote work is not guaranteed. `diagnostics()` currently throws
-`UnsupportedOperationException`; recording is unavailable. Read the complete
+of remote work is not guaranteed. `diagnostics()` supplies bounded message/JSON
+snapshots through `info`, `warn` and `error`; severity never changes execution.
+Retained handles close with executor work or lifecycle cutoff. System notices
+are bounded and best effort; their absence establishes no capture condition.
+Read the complete
 [Java handoff contract](../java-api/java-skills.md#reference-only-executor-declaration)
-for exact accessors, declared JSON values and lifecycle limitations.
+for exact accessors, supported JSON values, fixed limits and lifecycle limitations.
 
 Evidence: `ExecutorInvocationLifecycleIntegrationTest` covers direct/standard/
 explicit-child budgets and cross-thread cancellation; `MissionLifecycleTest`
