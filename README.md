@@ -1,7 +1,7 @@
 # Loomspan Framework
 
 Loomspan brings AI reasoning into applications through reusable **skills**. A skill
-can reason with a language model, evaluate TypeSafe primitives, call an annotated
+can reason with a language model, call an annotated
 Java service, or execute a YAML-configured operation through an application-owned
 Java executor. Compose those capabilities into a
 hierarchy so a model can break down a task while your application controls which
@@ -14,7 +14,7 @@ duplicate.
 ## Why Loomspan?
 
 - **Combine reasoning with application code.** Use model-backed YAML skills,
-  TypeSafe Choice/Noul/Score evaluations and annotated Java methods in the same skill tree.
+  executor-backed operations and annotated Java methods in the same skill tree.
 - **Let the model plan within explicit boundaries.** Declare allowed child
   skills, validate inputs and structured outputs, and apply authorization policies.
 - **Bound execution.** Configure mission deadlines, nesting limits, and usage
@@ -345,19 +345,17 @@ or historical readability guarantee.
 
 ## Choose your integration
 
-TypeSafe Choice, Noul, and Score can be registered as leaf skills and invoked
-through the same `SkillTemplate` or composed as children of chat skills. The
-`typesafe` driver supports direct TypeSafe and OpenRouter System One accounts.
-Leaves validate the resolved request and return the entire named `answers`
-object as JSON text. Their generated output schema is descriptive metadata;
-answers are preserved without validation or repair. See the [complete TypeSafe
-setup, route switching, fixed/dynamic mixed batches, direct invocation, selected
-answer bindings and forwarding parents](agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md).
-Model IDs are sent verbatim and credentials belong to connections. Existing
-Console catalog/details and MCP expose `TYPESAFE` source identity, original YAML,
-source locations and generated schemas; native request/response/failure content
-uses the existing JSON/text trace views. Capture availability and distribution
-confidence do not establish judgment correctness or live parity between routes.
+TypeSafe Choice, Noul, and Score are available through the independently versioned
+[Loomspan Decisions pack](../loomspan-extensions/extensions/decisions/README.md).
+The local unpublished artifact is `ai.loomspan:loomspan-decisions:0.1.0-SNAPSHOT`.
+It registers reference-only `default-typesafe`; applications declare ordinary
+`executor: typesafe` YAML skills and supply resolved credentials in captured maps.
+These leaves execute as `JAVA` and return complete provider JSON. Bind answers
+through `/answers/...`. Domain validation occurs at invocation, and no generated
+output schema or early provider-domain checks are supplied. Pack requests/retries
+are outside Framework provider-attempt quotas and Framework-accounted usage;
+cancellation is cooperative. See the [TypeSafe pack reference](agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md)
+for a declaration, configuration and the accepted numeric/lifecycle limits.
 
 - **Embedded Java:** add the Spring Boot starter and invoke skills in your
   application. This revision targets Java 21+, Spring Boot 4.2.0-RC2, and Spring AI 2.1.0-RC2;
@@ -372,7 +370,7 @@ Model-backed skills need a named connection using the `openai`, `anthropic`, or 
 The `openai` driver uses stateless Responses for OpenAI, Meta, OpenRouter and Ollama.
 Services must support `/responses`. For local Ollama, use an explicit root such as
 `http://127.0.0.1:11434/v1` and `api-key: ollama`; authenticated deployments use
-their actual credentials. Native TypeSafe leaves require the `typesafe` driver. Java leaves can execute without a framework model call.
+their actual credentials. Java and executor leaves can execute without a Framework model call.
 
 Loomspan is **in development**, with no deployments. Supported Java APIs and
 documented configuration can change, including breaking changes. Use documentation
@@ -441,10 +439,9 @@ a validated candidate; caller security contexts restore after success or failure
 See [Java declarations and results](agent-skills/loomspan-docs/references/java-api/java-skills.md).
 
 The catalog descriptor is `SkillDescriptor(name, description, kind, inputSchema,
-outputSchema)`; `SkillKind` includes `YAML`, `JAVA`, and `TYPESAFE`.
+outputSchema)`; `SkillKind` includes `YAML` and `JAVA`.
 Nullable `outputSchema` describes effective output shape, including
-forwarding chains and native descriptive schemas, without adding parent,
-TypeSafe, or Java/executor output validation. The descriptor
+forwarding chains, without adding parent or Java/executor output validation. The descriptor
 has a five-argument constructor. Loomspan exposes no supported Java SPI. Types under `internal` and
 `autoconfigure` are not application extension APIs; Loomspan does not expose an
 internal bean-replacement contract.

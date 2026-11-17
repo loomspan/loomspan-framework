@@ -23,23 +23,23 @@ class DefaultSkillCatalogTest
                 metadata("default-beta", SkillKind.JAVA, "{\"type\":\"object\"}", SkillAccessPolicy.unrestricted()),
                 metadata("default-Alpha", SkillKind.YAML, yamlSchema, SkillAccessPolicy.yamlRoles(java.util.Set.of("ADMIN"))),
                 metadata("default-zExecutorLeaf", SkillKind.JAVA, executorSchema, SkillAccessPolicy.denied()),
-                metadata("default-nativeLeaf", SkillKind.TYPESAFE, yamlSchema, SkillAccessPolicy.unrestricted()));
+                metadata("default-modelLeaf", SkillKind.YAML, yamlSchema, SkillAccessPolicy.unrestricted()));
 
         DefaultSkillCatalog catalog = new DefaultSkillCatalog("default", "test-generation", capabilities);
 
         assertThat(catalog.generationId()).isEqualTo("test-generation");
 
         assertThat(catalog.skills()).extracting(descriptor -> descriptor.name())
-                .containsExactly("default-Alpha", "default-beta", "default-nativeLeaf", "default-zExecutorLeaf");
+                .containsExactly("default-Alpha", "default-beta", "default-modelLeaf", "default-zExecutorLeaf");
         assertThat(catalog.skills()).extracting(descriptor -> descriptor.kind())
-                .containsExactly(SkillKind.YAML, SkillKind.JAVA, SkillKind.TYPESAFE, SkillKind.JAVA);
+                .containsExactly(SkillKind.YAML, SkillKind.JAVA, SkillKind.YAML, SkillKind.JAVA);
         assertThat(catalog.skill("default-Alpha")).get().extracting(descriptor -> descriptor.inputSchema())
                 .isEqualTo(yamlSchema);
         assertThat(catalog.skill("default-zExecutorLeaf")).get().extracting(descriptor -> descriptor.inputSchema())
                 .isEqualTo(executorSchema);
-        assertThat(catalog.skill("default-nativeLeaf")).get().extracting(descriptor -> descriptor.inputSchema())
+        assertThat(catalog.skill("default-modelLeaf")).get().extracting(descriptor -> descriptor.inputSchema())
                 .isEqualTo(yamlSchema);
-        assertThat(catalog.skill("default-nativeLeaf")).get().extracting(descriptor -> descriptor.outputSchema())
+        assertThat(catalog.skill("default-modelLeaf")).get().extracting(descriptor -> descriptor.outputSchema())
                 .isEqualTo(yamlSchema);
         assertThat(catalog.skill("default-missing")).isEmpty();
         assertThatThrownBy(() -> catalog.skills().clear()).isInstanceOf(UnsupportedOperationException.class);
@@ -87,6 +87,6 @@ class DefaultSkillCatalogTest
     {
         return new CapabilityMetadata("test:" + name + ":" + kind, name, "Description " + name,
                 SkillExecutionDescriptor.none(), accessPolicy, arguments -> "ok", kind,
-                new CapabilityToolDescriptor(name, "Description " + name, schema, kind == SkillKind.TYPESAFE ? schema : null), null);
+                new CapabilityToolDescriptor(name, "Description " + name, schema, kind == SkillKind.YAML ? schema : null), null);
     }
 }

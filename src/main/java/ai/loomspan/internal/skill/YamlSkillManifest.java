@@ -20,7 +20,6 @@ public class YamlSkillManifest
     {
         EXECUTOR("executor"),
         CONFIG("config"),
-        TYPESAFE("typesafe"),
         MODEL("model"),
         THINKING_LEVEL("thinking_level"),
         PROMPT("prompt"),
@@ -80,22 +79,6 @@ public class YamlSkillManifest
     private YamlSkillDefinition.Form declarationForm;
     void declarationForm(YamlSkillDefinition.Form form) { declarationForm = form; }
     YamlSkillDefinition.Form declarationForm() { return declarationForm; }
-    private tools.jackson.databind.JsonNode typesafe;
-    @JsonIgnore
-    private ai.loomspan.internal.typesafe.TypeSafeDeclaration compiledTypesafe;
-    @JsonIgnore
-    public ai.loomspan.internal.typesafe.TypeSafeDeclaration compiledTypesafe() { return compiledTypesafe; }
-
-    public tools.jackson.databind.JsonNode getTypesafe() { return typesafe == null ? null : typesafe.deepCopy(); }
-    public void setTypesafe(tools.jackson.databind.JsonNode value) { declaredFields.add(Field.TYPESAFE); typesafe = value == null ? null : value.deepCopy(); compiledTypesafe = value == null || value.isNull() ? null : ai.loomspan.internal.typesafe.TypeSafeDeclaration.compile(value); }
-    void copyTypesafeFrom(YamlSkillManifest source)
-    {
-        typesafe = source.typesafe == null ? null : source.typesafe.deepCopy();
-        compiledTypesafe = source.compiledTypesafe;
-    }
-    @JsonIgnore
-    public boolean isTypesafeDeclared() { return isDeclared(Field.TYPESAFE); }
-
     @JsonProperty("thinking_level")
     private String thinkingLevel;
 

@@ -88,7 +88,6 @@ public final class SkillGeneration implements AutoCloseable
             CapabilityMetadata metadata = this.capabilities.get(entry.getKey());
             var definition = entry.getValue();
             var expectedKind = definition.form() == YamlSkillDefinition.Form.EXECUTOR ? ai.loomspan.api.SkillKind.JAVA
-                    : definition.typesafe() ? ai.loomspan.api.SkillKind.TYPESAFE
                     : ai.loomspan.api.SkillKind.YAML;
             if (metadata == null || metadata.kind() != expectedKind)
                 throw new IllegalArgumentException("definition must have matching " + expectedKind + " capability '"

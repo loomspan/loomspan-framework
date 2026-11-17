@@ -26,14 +26,14 @@ public record RegisteredSkillEntry(String registeredName, String kind, String de
     public static void validateLocation(String name, String kind, String declaration, String path, String executor, String bean, String method)
     {
         requireNonBlank(name, "registeredName");
-        if (!"YAML".equals(kind) && !"TYPESAFE".equals(kind) && !"JAVA".equals(kind))
-            throw new IllegalArgumentException("kind must be YAML, TYPESAFE or JAVA");
+        if (!"YAML".equals(kind) && !"JAVA".equals(kind))
+            throw new IllegalArgumentException("kind must be YAML or JAVA");
         if ("YAML".equals(declaration))
         {
             requireNonBlank(path, "sourcePath");
             if ("JAVA".equals(kind)) requireNonBlank(executor, "executorName");
             else if (executor != null || bean != null || method != null)
-                throw new IllegalArgumentException("Model and TypeSafe declarations must not contain Java locations");
+                throw new IllegalArgumentException("Model declarations must not contain Java locations");
         }
         else if ("SKILL_METHOD".equals(declaration))
         {

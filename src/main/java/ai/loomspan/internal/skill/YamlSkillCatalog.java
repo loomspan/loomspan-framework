@@ -325,15 +325,6 @@ public class YamlSkillCatalog implements InitializingBean
         if (form == YamlSkillDefinition.Form.EXECUTOR)
             return new YamlSkillDefinition(form, namespace, resource, manifest, null, EvidenceContract.empty(), source, List.of());
 
-        if (form == YamlSkillDefinition.Form.TYPESAFE) {
-            if (manifest.getInputSchema() == null) throw invalidNamedSkill(resource, manifest, "input_schema", "is required for TypeSafe skills");
-            rejectTypeSafeAttachments(resource, manifest, manifest.getInputSchema(), "input_schema");
-            if (!StringUtils.hasText(manifest.getModel())) throw invalidNamedSkill(resource, manifest, "model", "required field is missing or blank");
-            var model = resolveModelCatalogEntry(resource, manifest);
-            var connection = modelsProperties.getConnections().get(model.getConnection());
-            if (connection == null || !"TYPESAFE".equals(connection.getDriver().name())) throw invalidNamedSkill(resource, manifest, "model", "TypeSafe skill requires a typesafe driver connection");
-            return new YamlSkillDefinition(form, namespace, resource, manifest, new EffectiveSkillExecutionConfiguration(manifest.getModel(), model.getConnection(), connection.getDriver(), model.getProviderModel(), null), EvidenceContract.empty(), source, List.of());
-        }
         if (!StringUtils.hasText(manifest.getModel()))
         {
             throw invalidNamedSkill(resource, manifest, "model", "required field is missing or blank; declare a configured model");
@@ -343,7 +334,6 @@ public class YamlSkillCatalog implements InitializingBean
         validateLinter(resource, manifest);
 
         LoomspanProperties.ModelCatalogEntry catalogEntry = resolveModelCatalogEntry(resource, manifest);
-        if ("TYPESAFE".equals(modelsProperties.getConnections().get(catalogEntry.getConnection()).getDriver().name())) throw invalidNamedSkill(resource, manifest, "model", "chat YAML skill cannot use a typesafe driver connection");
         String effectiveThinkingLevel = resolveEffectiveThinkingLevel(manifest, catalogEntry);
 
         if (!catalogEntry.supportsThinkingLevel(effectiveThinkingLevel))
@@ -475,9 +465,9 @@ public class YamlSkillCatalog implements InitializingBean
     /** The sole owner of authored declaration applicability, including field presence. */
     private YamlSkillDefinition.Form validateDeclarationForm(Resource resource, JsonNode root, String skillName) {
         var form = root.has("executor") ? YamlSkillDefinition.Form.EXECUTOR
-                : root.has("typesafe") ? YamlSkillDefinition.Form.TYPESAFE : YamlSkillDefinition.Form.MODEL;
+                : YamlSkillDefinition.Form.MODEL;
         if (form == YamlSkillDefinition.Form.EXECUTOR) {
-            for (String field : List.of("typesafe", "model", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
+            for (String field : List.of("model", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
                 if (root.has(field)) throw invalidNamedSkill(resource, skillName, field, "field is not allowed for executor leaves; remove it");
             JsonNode executor = root.get("executor");
             if (!executor.isString()) throw invalidNamedSkill(resource, skillName, "executor", "must be a nonblank textual reference");
@@ -486,24 +476,9 @@ public class YamlSkillCatalog implements InitializingBean
                 throw invalidNamedSkill(resource, skillName, "config", "must be a non-null map");
         } else {
             if (root.has("config")) throw invalidNamedSkill(resource, skillName, "config", "is permitted only on executor leaves");
-            if (form == YamlSkillDefinition.Form.TYPESAFE) {
-                for (String field : List.of("prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
-                    if (root.has(field)) throw invalidNamedSkill(resource, skillName, field, "field is not allowed for TypeSafe skills; remove it");
-                try { ai.loomspan.internal.typesafe.TypeSafeDeclaration.compile(root.get("typesafe")); }
-                catch (ai.loomspan.internal.typesafe.TypeSafeDeclaration.ValidationException ex) { throw invalidNamedSkill(resource, skillName, ex.path(), ex.detail()); }
-            } else validateRawConcurrency(resource, root, skillName);
+            validateRawConcurrency(resource, root, skillName);
         }
         return form;
-    }
-
-    private void rejectTypeSafeAttachments(Resource resource, YamlSkillManifest manifest, JsonNode schema, String path) {
-        if (schema.has("x-loomspan-attachment"))
-            throw invalidNamedSkill(resource, manifest, path + ".x-loomspan-attachment", "attachments are not supported for TypeSafe skills");
-        schema.path("properties").properties().forEach(entry ->
-                rejectTypeSafeAttachments(resource, manifest, entry.getValue(), path + ".properties." + entry.getKey()));
-        if (schema.has("items")) rejectTypeSafeAttachments(resource, manifest, schema.get("items"), path + ".items");
-        if (schema.path("additionalProperties").isObject())
-            rejectTypeSafeAttachments(resource, manifest, schema.get("additionalProperties"), path + ".additionalProperties");
     }
 
     private void validateRawOutputFrom(Resource resource, JsonNode root, String skillName)

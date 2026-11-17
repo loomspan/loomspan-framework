@@ -283,7 +283,7 @@ func validateSkillSummary(skill SkillSummary) error {
 	if strings.TrimSpace(skill.RegisteredName) == "" {
 		return errors.New("skill identity is missing")
 	}
-	if skill.Kind != "YAML" && skill.Kind != "TYPESAFE" && skill.Kind != "JAVA" {
+	if skill.Kind != "YAML" && skill.Kind != "JAVA" {
 		return errors.New("invalid skill kind")
 	}
 	switch skill.Declaration {

@@ -13,10 +13,8 @@ public final class PublicationFixtures {
                 loomspan:
                   connections:
                     connection: {driver: openai, api-key-ref: fixture.key, base-url: 'http://localhost:11434/v1'}
-                    native: {driver: typesafe, api-key-ref: fixture.key}
                   models:
                     model: {connection: connection, provider-model: provider-model, thinking-levels: [medium]}
-                    native: {connection: native, provider-model: jev}
                     gpt-5: {connection: connection, provider-model: provider-model}
                 """);
     }

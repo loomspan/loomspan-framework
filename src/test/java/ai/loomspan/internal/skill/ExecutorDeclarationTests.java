@@ -12,6 +12,16 @@ class ExecutorDeclarationTests {
     private YamlSkillCatalog.CheckedDocuments check(String yaml) {
         return new YamlSkillCatalog(new LoomspanProperties()).checkedSupplied(List.of(new SkillDocument("executor-fixture.yml", yaml)), false);
     }
+    @Test void nativeDeclarationIsUnknownForEveryValueAndForm() {
+        for (String value : List.of("null", "{}", "{state: fixed, questions: {q: {type: noul, instructions: decide}}}"))
+            for (String form : List.of("", "model: chat\n", "executor: sql\n")) {
+                var checked = check("name: lookup\ndescription: lookup\n" + form + "typesafe: " + value);
+                assertThat(checked.definitions()).isEmpty();
+                assertThat(checked.issues()).singleElement().satisfies(issue ->
+                        assertThat(issue.toString()).contains("typesafe", "unknown field"));
+            }
+        assertThat(check(BASE + "config: {typesafe: {state: literal}, model: provider}").issues()).isEmpty();
+    }
     @Test void executorLeafHasExplicitFormAndImmutableData() {
         var checked = check(BASE + """
                 rbac_roles: [reader]
@@ -40,7 +50,7 @@ class ExecutorDeclarationTests {
         assertThat(definition.manifest().getConfig()).isEqualTo(definition.config());
     }
     @Test void executorRejectsForbiddenPresenceWithoutFormPrecedence() {
-        for (String field : List.of("typesafe", "model", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
+        for (String field : List.of("model", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
             for (String value : List.of("null", "{}", "[]", "true", "''")) {
                 var checked = check(BASE + field + ": " + value);
                 assertThat(checked.definitions()).as(field + "=" + value).isEmpty();
@@ -65,7 +75,7 @@ class ExecutorDeclarationTests {
             assertThat(check(BASE + "config: " + value).issues()).singleElement().satisfies(issue -> assertThat(issue.fieldPath()).isEqualTo("config"));
         }
         for (String value : List.of("null", "{}"))
-            for (String form : List.of("model: chat\n", "typesafe: null\nmodel: native\n"))
+            for (String form : List.of("model: chat\n"))
                 assertThat(check("name: lookup\ndescription: lookup\n" + form + "config: " + value).issues()).singleElement()
                         .satisfies(issue -> assertThat(issue.fieldPath()).isEqualTo("config"));
         for (String suffix : List.of("", "config: {}")) {

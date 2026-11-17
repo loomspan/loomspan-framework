@@ -34,24 +34,27 @@ import static org.mockito.Mockito.when;
 class SkillGenerationManagerTest
 {
     @Test
-    void nativeSchemasEnterExistingBindingCompatibilityAndCapturedCatalogs(@TempDir Path directory) {
+    void modelSchemasEnterExistingBindingCompatibilityAndCapturedCatalogs(@TempDir Path directory) {
         var properties = loadingProperties(directory);
-        var connection = new LoomspanProperties.ConnectionProperties(); connection.setDriver(AiDriver.TYPESAFE); connection.setApiKey("fixture");
-        properties.getConnections().put("native", connection);
-        var model = new LoomspanProperties.ModelCatalogEntry(); model.setConnection("native"); model.setProviderModel("jev"); properties.getModels().put("native", model);
         var javaSkills = mock(SkillMethodBeanPostProcessor.class); when(javaSkills.capabilities()).thenReturn(List.of());
         var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties), new SkillInputContractResolver());
         manager.afterSingletonsInstantiated();
         String leaf = """
                 name: producer
                 description: Evaluate
-                model: native
-                input_schema: {type: object}
-                typesafe:
-                  state: ${/input}
-                  questions:
-                    category: {type: choice, criteria: {A: null, B: null}}
-                    severity: {type: score, criteria: [low, high]}
+                model: model
+                output_schema:
+                  type: object
+                  properties:
+                    category:
+                      type: object
+                      properties:
+                        choice: {type: string, enum: [A, B]}
+                        type: {type: string, enum: [choice]}
+                    severity:
+                      type: object
+                      properties:
+                        score: {type: number}
                 """;
         String parent = """
                 name: parent
@@ -68,13 +71,13 @@ class SkillGenerationManagerTest
                 output_bindings:
                   /result: {from: child_result, skill: default-producer, path: /category/choice}
                 """;
-        var producer = new SkillDocument("opaque native label", leaf);
+        var producer = new SkillDocument("opaque model label", leaf);
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), producer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
         var generation = manager.prepare(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), producer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"));
         var schema = generation.capability("default-producer").tool().outputSchema();
         assertThat(generation.skillCatalog().skill("default-producer").orElseThrow().outputSchema()).isEqualTo(schema);
         assertThat(generation.registeredSkillCatalog().find("default-producer").orElseThrow().outputSchema()).isEqualTo(schema);
-        assertThat(generation.registeredSkillCatalog().find("default-producer").orElseThrow().sourcePath()).isEqualTo("opaque native label");
+        assertThat(generation.registeredSkillCatalog().find("default-producer").orElseThrow().sourcePath()).isEqualTo("opaque model label");
         assertThat(generation.registeredSkillCatalog().find("default-producer").orElseThrow().yaml()).isEqualTo(leaf);
         for (String invalid : List.of(parent.replace("enum: [A, Z]", "enum: [Z]"),
                 parent.replace("enum: [A, Z]", "enum: [score]").replace("path: /category/choice", "path: /category/type"),
@@ -82,8 +85,7 @@ class SkillGenerationManagerTest
             assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", invalid), producer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).issues())
                     .anyMatch(issue -> issue.fieldPath().equals("output_bindings"));
         }
-        var dynamic = new SkillDocument("dynamic", leaf.replace("criteria: {A: null, B: null}", "criteria: '${/input/options}'"));
-        assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent.replace("enum: [A, Z]", "enum: [Z]")), dynamic), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
+
     }
 
     @Test

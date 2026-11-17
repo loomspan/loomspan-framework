@@ -240,7 +240,7 @@ class OrdinaryFinalOutputRepairLifecycleTest {
 
     private static ChatClient.Builder builder(ProviderConnectionRuntime runtime, DefaultExecutionStateService state,
             DefaultSessionUsageService usage, OpenAiResponsesChatOptions options) {
-        return OrdinaryRepairTestClients.builder(runtime.requireChatModel()).defaultOptions(options.mutate())
+        return OrdinaryRepairTestClients.builder(runtime.chatModel()).defaultOptions(options.mutate())
                 .defaultAdvisors(new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), usage));
     }
 

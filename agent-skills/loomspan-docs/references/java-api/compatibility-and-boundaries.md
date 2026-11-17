@@ -15,7 +15,7 @@ and diagnostic capability in `ai.loomspan.api.extensions.v1`:
 
 | Type | Supported purpose |
 | --- | --- |
-| `SkillTemplate` | Validate or invoke a named Java, TypeSafe, or model-backed YAML skill |
+| `SkillTemplate` | Validate or invoke a named Java, executor-backed YAML, or model-backed YAML skill |
 | `SkillInvocationHandoff` | Atomically transfer a prepared root invocation to framework ownership |
 | `AdmittedSkillInvocation` | Read the captured generation ID, execute once, or release an already-admitted root invocation |
 | `SkillReloader` | Validate, prepare, publish, snapshot or remove a complete namespace generation |
@@ -28,7 +28,7 @@ and diagnostic capability in `ai.loomspan.api.extensions.v1`:
 | `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog and close it if unused |
 | `SkillCatalog` | Discover an immutable immutable namespace generation catalog, acquired explicitly or from a prepared candidate |
 | `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
-| `SkillKind` | Distinguish YAML, Java, and TYPESAFE registrations |
+| `SkillKind` | Distinguish YAML and JAVA registrations |
 | `SkillExecutionView` | Observe the completed invocation session |
 | `SkillExecutionEvent` | Read a current-version diagnostic event |
 | `SkillMethod` | Mark an application bean method as a directly callable Java skill |
@@ -54,8 +54,8 @@ supported surface in the bundled revision.
 
 - [Java declarations](java-skills.md) define callable methods, reference-only
   executors, exact String/null/JSON results and designated failures.
-- [TypeSafe authoring](../skill-authoring/typesafe-skills.md) describes native
-  evaluation leaves, classified as `SkillKind.TYPESAFE`.
+- [TypeSafe pack authoring](../skill-authoring/typesafe-skills.md) describes ordinary
+  executor-backed leaves, classified as `SkillKind.JAVA`.
 - [Namespace publication](skill-reload.md) defines complete candidates, explicit
   visibility, configuration defaults, captured generation IDs and retirement.
 - [Catalog and validation](catalog-and-validation.md) defines candidate metadata,

@@ -334,7 +334,7 @@ func skillSourceSchema(detail bool) *jsonschema.Schema {
 		minimum := 1
 		return &jsonschema.Schema{Type: "string", MinLength: &minimum}
 	}
-	props := map[string]*jsonschema.Schema{"registeredName": nonblank(), "kind": {Enum: []any{"YAML", "JAVA", "TYPESAFE"}}, "declaration": {Enum: []any{"YAML", "SKILL_METHOD"}}, "sourcePath": nonblank(), "executorName": nonblank(), "beanName": nonblank(), "method": nonblank()}
+	props := map[string]*jsonschema.Schema{"registeredName": nonblank(), "kind": {Enum: []any{"YAML", "JAVA"}}, "declaration": {Enum: []any{"YAML", "SKILL_METHOD"}}, "sourcePath": nonblank(), "executorName": nonblank(), "beanName": nonblank(), "method": nonblank()}
 	required := []string{"registeredName", "kind", "declaration"}
 	yamlRequired := []string{"sourcePath"}
 	if detail {

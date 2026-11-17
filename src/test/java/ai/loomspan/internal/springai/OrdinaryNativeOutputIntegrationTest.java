@@ -276,7 +276,7 @@ class OrdinaryNativeOutputIntegrationTest
     static ChatClient client(ProviderConnectionRuntime runtime, ChatOptions options, CanonicalSchema schema, int retries,
             ExecutionStateService state)
     {
-        var builder = ChatClient.builder(runtime.requireChatModel(), io.micrometer.observation.ObservationRegistry.NOOP, null, null,
+        var builder = ChatClient.builder(runtime.chatModel(), io.micrometer.observation.ObservationRegistry.NOOP, null, null,
                 ToolCallingAdvisor.builder().toolCallingManager(new CanonicalToolCallingManager(ToolCallingManager.builder().build())))
                 .defaultOptions(options.mutate())
                 .defaultAdvisors(new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), mock(SessionUsageService.class)));
@@ -327,7 +327,7 @@ class OrdinaryNativeOutputIntegrationTest
     {
         var configured = new SpringAiChatOptionsContributor().createOptions(new EffectiveSkillExecutionConfiguration(
                 "fixture", "loopback", runtime.driver(), identity, identity.startsWith("qwen") ? null : "medium"));
-        var options = runtime.requireChatModel().getDefaultOptions().mutate().combineWith(configured).maxTokens(cap);
+        var options = runtime.chatModel().getDefaultOptions().mutate().combineWith(configured).maxTokens(cap);
         if (options instanceof OpenAiResponsesChatOptions.Builder typed) {
             if (identity.startsWith("qwen")) typed.extraBody(Map.of("think", true));
             if (identity.startsWith("openai/")) typed.extraBody(Map.of("provider", Map.of("only", List.of("openai"), "allow_fallbacks", false, "require_parameters", true)));

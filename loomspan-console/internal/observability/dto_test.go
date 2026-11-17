@@ -20,7 +20,7 @@ func TestInstanceStatusDecodesFromFixture(t *testing.T) {
 	if !status.LiveMonitoringAvailable {
 		t.Fatal("expected liveMonitoringAvailable=true")
 	}
-	if status.RegisteredSkillCount != 4 {
+	if status.RegisteredSkillCount != 3 {
 		t.Fatalf("unexpected registeredSkillCount: %d", status.RegisteredSkillCount)
 	}
 }
@@ -31,17 +31,14 @@ func TestSkillPageDecodesFromFixture(t *testing.T) {
 	if err := json.Unmarshal(body, &page); err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Items) != 4 {
-		t.Fatalf("expected 4 items, got %d", len(page.Items))
+	if len(page.Items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(page.Items))
 	}
 	if page.Items[1].Kind != "JAVA" || page.Items[1].SourcePath == "" {
 		t.Fatalf("missing executor summary: %#v", page.Items[1])
 	}
 	if page.Items[2].Kind != "JAVA" || page.Items[2].BeanName != "dnsSkills" {
 		t.Fatalf("missing Java summary: %#v", page.Items[2])
-	}
-	if page.Items[3].Kind != "TYPESAFE" || page.Items[3].SourcePath == "" {
-		t.Fatalf("missing TYPESAFE summary: %#v", page.Items[3])
 	}
 	if page.Items[0].RegisteredName != "default-CheckDns" {
 		t.Fatalf("unexpected registeredName: %s", page.Items[0].RegisteredName)
@@ -63,19 +60,6 @@ func TestExecutorSkillDetailDecodesFromFixture(t *testing.T) {
 		t.Fatalf("unexpected executor detail: %#v", detail)
 	}
 	if err := validateSkillDetail(detail, "default-FetchDns"); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestTypeSafeSkillDetailDecodesFromFixture(t *testing.T) {
-	var detail SkillDetail
-	if err := json.Unmarshal(readFixture(t, "skill-typesafe-detail.json"), &detail); err != nil {
-		t.Fatal(err)
-	}
-	if detail.Kind != "TYPESAFE" || detail.SourcePath != "opaque label" || !strings.Contains(detail.Yaml, "typesafe:") || detail.OutputSchema == nil {
-		t.Fatalf("unexpected TypeSafe detail: %#v", detail)
-	}
-	if err := validateSkillDetail(detail, detail.RegisteredName); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -379,11 +363,11 @@ func TestSkillSourceVariantsRejectMalformedDetails(t *testing.T) {
 	for _, detail := range []SkillDetail{
 		{RegisteredName: "skill", SourcePath: "skill.yaml", Yaml: "name: skill"},
 		{RegisteredName: "skill", Kind: "UNKNOWN", Declaration: "YAML"},
+		{RegisteredName: "skill", Kind: "TYPESAFE", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill"},
 		{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", Yaml: "name: skill"},
 		{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill", BeanName: "bean"},
-		{RegisteredName: "skill", Kind: "TYPESAFE", Declaration: "YAML", Yaml: "name: skill"},
-		{RegisteredName: "skill", Kind: "TYPESAFE", Declaration: "YAML", SourcePath: "skill.yaml"},
-		{RegisteredName: "skill", Kind: "TYPESAFE", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill", Method: "lookup()"},
+		{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml"},
+		{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill", Method: "lookup()"},
 		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean"},
 		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", Method: "lookup()"},
 		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean", Method: "lookup()", SourcePath: "skill.yaml"},
@@ -401,8 +385,6 @@ func TestSkillDecodersRejectInapplicableFieldsByPresence(t *testing.T) {
 		`{"registeredName":"javaSkill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","yaml":null}`,
 		`{"registeredName":"modelSkill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
 		`{"registeredName":"modelSkill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","method":""}`,
-		`{"registeredName":"nativeSkill","kind":"TYPESAFE","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
-		`{"registeredName":"nativeSkill","kind":"TYPESAFE","declaration":"YAML","sourcePath":"skill.yaml","method":""}`,
 	} {
 		var detail SkillDetail
 		if err := json.Unmarshal([]byte(body), &detail); err == nil {
@@ -413,7 +395,6 @@ func TestSkillDecodersRejectInapplicableFieldsByPresence(t *testing.T) {
 	for _, body := range []string{
 		`{"registeredName":"javaSkill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","sourcePath":null}`,
 		`{"registeredName":"modelSkill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
-		`{"registeredName":"nativeSkill","kind":"TYPESAFE","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
 	} {
 		var summary SkillSummary
 		if err := json.Unmarshal([]byte(body), &summary); err == nil {

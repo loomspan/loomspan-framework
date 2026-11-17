@@ -33,7 +33,7 @@ class ApplicationApiValueTest
     @Test
     void publicCatalogAndValidationExposeOnlyTheTicketedShape() throws Exception
     {
-        assertThat(SkillKind.values()).containsExactly(SkillKind.YAML, SkillKind.JAVA, SkillKind.TYPESAFE);
+        assertThat(SkillKind.values()).containsExactly(SkillKind.YAML, SkillKind.JAVA);
         assertThat(SkillDescriptor.class.getRecordComponents())
                 .extracting(component -> List.of(component.getName(), component.getType()))
                 .containsExactly(

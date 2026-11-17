@@ -39,18 +39,18 @@ the replacement rather than preserving the retired contracts.
 
 ## Acceptance criteria — this ticket only
 
-- [ ] Production no longer accepts/dispatches native TypeSafe declarations or native
+- [x] Production no longer accepts/dispatches native TypeSafe declarations or native
   driver/model configuration, and no native TypeSafe implementation/dependency/resource
   coupling remains. Ordinary generic executor JAVA leaves continue to work.
-- [ ] Obsolete public/internal values and old unversioned invocation surfaces are absent;
+- [x] Obsolete public/internal values and old unversioned invocation surfaces are absent;
   supported-surface policy/allowlists and all current consumers match the final API.
-- [ ] Fixtures/tests assert the new contracts without requiring old API/config/wire shapes.
+- [x] Fixtures/tests assert the new contracts without requiring old API/config/wire shapes.
   Current parser/config errors do not silently translate old declarations.
-- [ ] Generic direct/child invocation, binding, namespace visibility/auth, captured config,
+- [x] Generic direct/child invocation, binding, namespace visibility/auth, captured config,
   generation lifetime, cancellation and Framework-accounted usage behavior remain covered.
-- [ ] Current docs/examples use pack declarations and complete-response paths and explain
+- [x] Current docs/examples use pack declarations and complete-response paths and explain
   all explicitly accepted reductions. No unsupported internal types are recommended to consumers.
-- [ ] Applicable Framework and Console tests, public-surface checks and Java/Go fixture
+- [x] Applicable Framework and Console tests, public-surface checks and Java/Go fixture
   corpus pass with existing matching version markers. Extensions consumer rerun is owned
   by 31.3.2, not a completion gate here; record the new local Framework build identity.
 
@@ -679,3 +679,61 @@ and [transport lifetime](../phases/executor-packs-and-typesafe-extraction-roadma
 - Execute only when this ticket is passed to the pipeline. Creating this file does not
   authorize starting implementation, committing current planning changes, or publishing.
 
+
+## Execution notes — 2026-11-16
+
+### Selected route, scope and decisions
+
+- User selected **Full 5-Step Pipeline** with “proceed.” Initial Framework checkout was clean at `83b7dadc2adee9fa3f6ccd90d43925d18f952456` on `main`; no unrelated changes were identified. Research and both plans are ticket-owned. Step 4 is implemented and verified; independent Step 5 and the root-owned commit follow. No push, sync or publication was performed.
+- Removed the native declaration/compiler/client/executor, TYPESAFE form/kind/driver, dispatch and registry resource coupling, direct Apache dependency, native-only tests and evaluation corpus/renderer. Generic `NativeOutputContract` and provider retry/cleanup machinery remain. `SkillKind` now contains exactly `YAML, JAVA`.
+- Generic binding and forwarding tests use real annotated `FixtureExecutor` registrations and complete envelopes with `/answers/...` consuming pointers. The retained foreign connection test uses an ordinary OpenAI leaf and proves old endpoint/credential/model capture after replacement. Ordinary authored schema tests retain early generic compatibility/catalog checks; executors retain absent output metadata. Generic JSON-bound numeric/schema tests replace obsolete declaration examples; the actual ordinary executor config decoder is unchanged.
+- Ordinary provider cleanup now explicitly covers DisposableBean/AutoCloseable, suppressed failures and idempotent destruction. Namespace/reference-only visibility, auth, captured configuration/publication/retirement, lifecycle and Framework-only accounting remain unchanged and covered.
+- Current Java/Go/TypeScript/MCP contracts and fixtures were updated together. `consoleCompatibilityVersion` and artifact version remain `1.0.0-beta.10-SNAPSHOT`; exact-version checks remain. No legacy readers, translators, aliases or shims were added.
+- Current docs use the external pack and describe all seven accepted limits: invocation-time validation; complete response; absent generated metadata/early provider checks; ordinary config decimals; application-resolved captured credentials; non-native attempt/usage accounting; cooperative physical cancellation. Bundled-skill self-containment checks reject sibling Markdown links, so owning sibling pack references are explicit code paths rather than links escaping the installed skill. Historical planning evidence remains intact. Drift classification after edits: **aligned**.
+
+### Final contract handoff
+
+No new public signature or provider setting was introduced. Exact registration remains `ai.loomspan.api.extensions.v1.SkillExecutorInvocation`, with `input()`, `skillConfig()`, `executorConfig()`, `skillName()`, `executorConfigGenerationId()`, `diagnostics()`, `boolean isCancelled()` and `Optional<Duration> remainingTime()`. The only supported versioned types remain that class and `ExecutorDiagnostics`. The unversioned invocation is absent.
+
+Diagnostics retain `EXECUTOR_DIAGNOSTIC_RECORDED` and `EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED` as records in existing frames, using the existing `data` content path. No record payload/default/retrieval changes were made here. Existing `LOOMSPAN_query_trace_records` / `LOOMSPAN_read_trace_content`, bounds, fidelity, notices and failure/accounting distinction remain covered by the existing corpus and Console suites.
+
+Pack declarations/defaults are the owning earlier tickets' established contract: local unpublished `ai.loomspan:loomspan-decisions:0.1.0-SNAPSHOT`, reference-only `default-typesafe`, `executor: typesafe`, `config.request` and RFC 6901 `config.bindings`, and complete `/answers/...` results. Captured `api_key` / `base_url` override by key presence; no Framework credential alias resolution. Provider default base URL remains `https://api.typesafe.ai`. No pack transport/retry defaults were changed. Extensions remains at the previously identified source `4a52c70`; no Extensions file was changed or consumer suite rerun by this ticket. Advanced consumer qualification belongs to **31.3.2**.
+
+### Verification actually performed in Step 4
+
+- Expected RED — `./mvnw.cmd '-Dtest=ExecutorDeclarationTests#nativeDeclarationIsUnknownForEveryValueAndForm,ExecutionConfigurationParserTest#rejectsRemovedTypeSafeDriver' test`: 2 failures before removal. The native driver was accepted, and the declaration used native validation (`must be an object`) rather than unknown-field rejection. Post-removal cases cover null, empty and populated native declarations across forms, plus accepted arbitrary nested executor domain keys.
+- PASS — `./mvnw.cmd clean '-Dtest=ExecutorDeclarationTests,ExecutionConfigurationParserTest,LoomspanPublicSurfaceArchitectureTest,NamedAiConnectionRegistryTests,SkillDocumentValuesTest,DeclaredChildInputBindingsIntegrationTest,DeclaredOutputBindingsPlanningIntegrationTest,DesignatedChildResultIntegrationTest,NamespaceExecutionAuthorityIntegrationTest,SkillGenerationManagerTest,LoomspanPropertiesTest,ConfigurationMetadataTest,DefaultSkillCatalogTest,YamlSkillCatalogTests,ConsoleTraceFixtureCorpusTest,ConsoleRestFixtureCorpusTest' test`: **338 tests**, no failures/errors/skips. Log: `$env:TEMP/loomspan-31.3.1-focused.log`.
+- PASS — `./mvnw.cmd test`: **2226 tests, 0 failures, 0 errors, 2 skipped**. The two unchanged `Pr18RecordedHandoffDiagnosticTest` opt-in cases require `pr18.diagnostic`; they are not ticket acceptance gates. Log: `$env:TEMP/loomspan-31.3.1-full.log`.
+- PASS — `./mvnw.cmd '-Dtest=LoomspanPublicSurfaceArchitectureTest,RegisteredSkillEntryTest' test`: 9 tests, including final retired catalog-kind rejection. Log: `$env:TEMP/loomspan-31.3.1-boundary-final.log`.
+- PASS — `./mvnw.cmd -Dtest=LoomspanPublicSurfaceArchitectureTest test`: 8 tests. Log: `$env:TEMP/loomspan-31.3.1-architecture.log`.
+- PASS — `./mvnw.cmd -Dtest=ConsoleTraceFixtureCorpusTest -DfailIfNoTests=false test`: 18 tests; unchanged-corpus Java/Go comparison, no regeneration. Log: `$env:TEMP/loomspan-31.3.1-corpus.log`. REST fixture corpus also passes (2 tests) within full/focused runs.
+- PASS, from Console — `go test ./...`. Log: `$env:TEMP/31-console-all-clean.log`.
+- PASS, from Console — `$env:PATH = "$env:TEMP\loomspan-pr29.3-node-24.18.0\package\bin;" + $env:PATH; go run ./internal/buildtool verify`: pinned Node **24.18.0**, npm **12.0.2**; frontend **604/604 tests**, typecheck/coverage/assets, skill checks and all Go checks. Log: `$env:TEMP/31-console-verify-final.log`.
+- PASS — `./mvnw.cmd -DskipTests install`: packaged and installed the local native-free snapshot after the passing suites. Tests are intentionally skipped for this packaging command, not claimed as additional test evidence. Log: `$env:TEMP/loomspan-31.3.1-install.log`.
+- PASS — JAR inspection: no `internal/typesafe/*.class` or old unversioned invocation; exact v1 invocation and diagnostics classes present. Empty directory entries are not implementation classes.
+- PASS — `git diff --check`, scoped current-native-reference inventory, current doc link checks and bundled skill self-containment checks. Remaining native names are negative tests, current external-pack usage or historical planning evidence.
+- NOT RUN — Go race detector: no concurrent Go production behavior changed; enum/schema and fixture updates do not trigger the conditional race requirement.
+- NOT RUN — Extensions consumer qualification: explicitly owned by 31.3.2, not a Framework-local gate. No live inference or remote publication was run.
+
+Transient implementation failures were corrected before completion: an initial test compilation retained two catalog helper references, a first clean attempt hit a Windows target deletion lock (retry succeeded), converted schema/count/UI expectations needed updates, global Node 24.22 was rejected by pinned tooling, and sibling Markdown links violated bundled skill containment. One unchanged `TraceRecords.results.test.tsx` assertion observed `Loading details…`; an unchanged focused rerun (45 tests) and final full Console rerun passed. No unrelated UI implementation was changed to hide it. No unresolved required check or ticket-owned build/test debt remains.
+
+### Acceptance evidence
+
+| Ticket criterion | Evidence |
+| --- | --- |
+| Native production/dependency/resource path absent; JAVA executor works | Source inventory, JAR inspection, rejection tests; executor direct/child integration; ordinary provider cleanup |
+| Obsolete API/internal values absent; supported boundary current | Exact enum assertions, architecture checks, current reader/schema tests; v1 JAR inspection |
+| Fixtures/current errors match final shapes without translation | Both corpus suites, startup/publication driver rejection, generic unknown-field tests, Console retired-kind rejection |
+| Generic behavior retained | Full suite includes input/output bindings, namespace auth/publication, captured generations, executor lifecycle/cancellation, mission lifecycle and accounting/diagnostics |
+| Current docs/examples and accepted reductions | Updated Framework/Console routed topics and coverage; source/test links, bundled-skill checks and pack-owned contract references |
+| Local Framework/Console verification and identity | Full/explicit suites above; installed coordinates and hashes below; Extensions rerun separately assigned |
+
+### Local Framework build identity for 31.3.2
+
+- Coordinates: `ai.loomspan:loomspan-spring-boot-starter:1.0.0-beta.10-SNAPSHOT`.
+- Built/installed on 2026-11-16 with Java 21.0.2 and Maven wrapper 3.9.11.
+- Source base commit: `83b7dadc2adee9fa3f6ccd90d43925d18f952456`; ticket production diff SHA-256: `8fdff76947db1b673b2f009c8ded9396f7292b2bcbd42ebe009405ef942f4d42`. Reproduce the source fingerprint by SHA-256 hashing the raw bytes from `git diff --binary 83b7dadc2adee9fa3f6ccd90d43925d18f952456 -- pom.xml src/main`. The final ticket commit is supplied by the pipeline orchestrator after a clean independent review, avoiding a circular self-reference here.
+- JAR: `target/loomspan-spring-boot-starter-1.0.0-beta.10-SNAPSHOT.jar`, **1139218 bytes**, SHA-256 `3f4bd57de312f65012d717ba987dcfa8dba4fc9902206c4949413bc6e7fe52eb`.
+- Installed at `C:/Users/mgiacomi/.m2/repository/ai/loomspan/loomspan-spring-boot-starter/1.0.0-beta.10-SNAPSHOT/`.
+- Repeat build: `./mvnw.cmd test`, explicit architecture/corpus commands above, then `./mvnw.cmd -DskipTests install`; inspect with `Get-FileHash target/loomspan-spring-boot-starter-1.0.0-beta.10-SNAPSHOT.jar -Algorithm SHA256`.
+- If independent review changes production code, rebuild/install and refresh this identity before 31.3.2 consumes it. No optional developer-only checks are necessary for Framework-local completion.

@@ -20,27 +20,27 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import static org.assertj.core.api.Assertions.*;
 
 class NamespaceExecutionAuthorityIntegrationTest {
-    @Test void foreignTypeSafeLeafUsesItsRetainedNativeConnection(@TempDir Path directory) throws Exception {
-        try (var chat = new MockWebServer(); var nativeServer = new MockWebServer(); var replacement = new MockWebServer()) {
+    @Test void foreignModelLeafUsesItsRetainedConnection(@TempDir Path directory) throws Exception {
+        try (var chat = new MockWebServer(); var providerServer = new MockWebServer(); var replacement = new MockWebServer()) {
             chat.enqueue(tool("Risk-judge")); chat.enqueue(text("done"));
-            nativeServer.enqueue(new MockResponse().setHeader("Content-Type","application/json").setBody("{\"answers\":{}}"));
+            providerServer.enqueue(text("evaluated"));
             context(directory).run(context -> {
                 var reload = context.getBean(SkillReloader.class);
-                var leaf = new SkillDocument("judge","name: judge\ndescription: judgment\nmodel: selected\ninput_schema: {type: object, additionalProperties: true}\ntypesafe:\n  state: fixed\n  questions: {q: {type: noul, instructions: decide}}\n");
-                var nativeConfiguration = new ExecutionConfiguration(config(nativeServer,"native",1,"never").yaml().replace("driver: openai","driver: typesafe"));
-                var old = reload.prepare("risk",List.of(leaf),nativeConfiguration,NamespaceVisibility.PUBLIC,Map.of("key","native-old"));
+                var leaf = new SkillDocument("judge","name: judge\ndescription: judgment\nmodel: selected\nprompt: Evaluate evidence\ninput_schema: {type: object, additionalProperties: true}\n");
+                var providerConfiguration = new ExecutionConfiguration(config(providerServer,"captured",1,"never").yaml());
+                var old = reload.prepare("risk",List.of(leaf),providerConfiguration,NamespaceVisibility.PUBLIC,Map.of("key","captured-old"));
                 reload.publish(old);
                 reload.publish(reload.prepare("orders",List.of(model("root","risk-judge")),config(chat,"orders",20,"always"),Map.of("key","chat")));
                 var pending = context.getBean(SkillInvocationHandoff.class).handoff("orders-root",Map.of());
-                var nextConfiguration = new ExecutionConfiguration(config(replacement,"replacement",1,"never").yaml().replace("driver: openai","driver: typesafe"));
-                reload.publish(reload.prepare("risk",List.of(leaf),nextConfiguration,NamespaceVisibility.PUBLIC,Map.of("key","native-new")));
+                var nextConfiguration = new ExecutionConfiguration(config(replacement,"replacement",1,"never").yaml());
+                reload.publish(reload.prepare("risk",List.of(leaf),nextConfiguration,NamespaceVisibility.PUBLIC,Map.of("key","captured-new")));
                 assertThat(pending.invoke()).isEqualTo("done");
             });
-            assertThat(nativeServer.getRequestCount()).isEqualTo(1);
+            assertThat(providerServer.getRequestCount()).isEqualTo(1);
             assertThat(replacement.getRequestCount()).isZero();
-            var request = nativeServer.takeRequest();
-            assertThat(request.getHeader("Authorization")).isEqualTo("Bearer native-old");
-            assertThat(request.getBody().readUtf8()).contains("native-provider");
+            var request = providerServer.takeRequest();
+            assertThat(request.getHeader("Authorization")).isEqualTo("Bearer captured-old");
+            assertThat(request.getBody().readUtf8()).contains("captured-provider");
         }
     }
     @Test void publicChildCannotEnableEntryTracePersistence(@TempDir Path directory) throws Exception {

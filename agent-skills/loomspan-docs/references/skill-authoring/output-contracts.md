@@ -18,10 +18,11 @@ correction, forwarding and effective metadata use canonical standard schemas.
 Local integration tests exercise public invocation and native loopback requests;
 they do not establish live provider enforcement or remove SDK limitations.
 
-[TypeSafe leaves](typesafe-skills.md) have a generated descriptive output schema
-and return the complete provider answers without answer validation or repair.
-The authored `output_schema` rules below apply to ordinary chat skills. A parent
-can bind from or forward a TypeSafe child's result under the existing rules.
+[TypeSafe pack leaves](typesafe-skills.md) return complete provider JSON through
+the ordinary Java executor route. They have no generated output schema or answer
+validation/repair. The authored `output_schema` rules below apply to model-backed
+skills. A parent can bind `/answers/...` or forward an executor result under the
+existing runtime rules.
 
 Use this topic to choose final synthesis, declared output assembly with `output_bindings`, or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract describes the intended structured result and supplies a local standard validator; runtime guidance and bounded semantic correction use the same canonical contract. Java skills have no YAML `output_schema`; their null/void results become empty text, Strings remain exact, and other results become JSON. See [Java results](../java-api/java-skills.md#inputs-results-and-lifecycle).
 
@@ -213,18 +214,13 @@ retains the Java assembly authority fixture for Console readers.
 
 ## Effective output metadata
 
-TypeSafe producers expose a declaration-derived schema, inherited unchanged by
-forwarding chains. Fixed criteria supply fixed Choice/probability keys; dynamic
-criteria keep maps open without specializing catalog metadata per call. Native
-answers, including empty/extended objects, are not validated against that schema.
-Parent output-binding registration uses the same partial compatibility checks;
-actual selected values remain subject to the destination's runtime contract.
-
-`DeclaredOutputBindingsPlanningIntegrationTest#nativePassthroughIsEnforcedOnlyByConsumingBindingContract`
-protects fixed and dynamic Choice receiver enums, accepted singleton `type`
-bindings, and exact missing/cased probability lookup. Dynamic values register
-against open metadata and fail at the receiving runtime contract when incompatible;
-fully bound success and failure require no final synthesis or repair request.
+Executor producers, including TypeSafe pack leaves, expose no generated output
+schema. Parent output bindings retain generic runtime destination checks, but
+cannot rely on provider-derived early path/type compatibility checks. Forwarding
+preserves the complete returned text, including the response envelope.
+`DeclaredOutputBindingsPlanningIntegrationTest` covers runtime selected-result
+checks; `DesignatedChildResultIntegrationTest` covers unchanged forwarding without
+final synthesis.
 
 Public `SkillDescriptor.outputSchema()`, registered catalogs, observability DTOs
 and Console skill detail expose the same captured effective structural metadata.

@@ -28,7 +28,7 @@ test("shows bounded native provider diagnostics with truthful truncation and ver
   const text = "Authorization=kept token=kept verbatim " + "x".repeat(25);
   const nativePayload = JSON.stringify({ diagnostics: [{ kind: "PROVIDER_ERROR", contentType: "text/plain; charset=utf-8", text, truncated: true, captureLimitBytes: 64 }] });
   vi.mocked(api.getContentRange).mockResolvedValueOnce(range(nativePayload, 0, new TextEncoder().encode(nativePayload).length));
-  render(<TraceAttemptDiagnostics traceId="trace-native-evaluation-provider-failure" recordSequence={3} contentRef="native-provider-diagnostic" />);
+  render(<TraceAttemptDiagnostics traceId="trace-provider-failure" recordSequence={3} contentRef="provider-diagnostic" />);
   expect(await screen.findByText(text)).toBeInTheDocument();
   expect(screen.getByText("Text diagnostic (PROVIDER_ERROR)")).toBeInTheDocument();
   expect(screen.getByText("Yes")).toBeInTheDocument();

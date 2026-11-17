@@ -164,36 +164,20 @@ test.each([
   expect(await screen.findByText(expected)).toBeVisible();
 });
 
-test.each([
-  ["MODEL_REQUEST_SENT", "Request", "request", { request: { model: "jev-latest", state: { token: "keep verbatim" }, questions: { ready: { type: "noul" } } } }],
-  ["MODEL_RESPONSE_RECEIVED", "Response", "response", { envelope: { answers: {}, model: "jev-2", usage: { input_tokens: 0, output_tokens: 0 }, extension: "keep verbatim" }, servedModel: "jev-2" }],
-  ["MODEL_RESPONSE_RECEIVED", "Response", "response", { rawBody: "<broken>\nprovider body" }],
-] as const)("renders native evaluation %s evidence without chat fields", async (type, button, kind, native) => {
-  const payload = { payloadType: "evaluation", endpoint: "https://openrouter.ai/api/v1/systemone", requestedModel: "typesafe/jev-latest", ...native };
-  const value = record(61, type);
-  value.content = { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: 1, available: true, complete: true, inlineEligibility: true, inlineContent: JSON.stringify(payload) };
-  renderRecords([value]);
-  fireEvent.click(screen.getByRole("button", { name: button }));
-  const detail = await screen.findByRole("region", { name: `Model ${kind} for record 61` });
-  const output = within(detail).getByText((_, element) => element?.tagName === "PRE");
-  expect(output.textContent).toBe(JSON.stringify(payload, null, 2));
-  expect(within(detail).queryByRole("heading", { name: "user" })).toBeNull();
-});
-
-test("reconstructs chunked native evaluation content", async () => {
-  const payload = JSON.stringify({ payloadType: "evaluation", envelope: { answers: { extra: { description: "🧭" } } } });
+test("reconstructs chunked model response Unicode content", async () => {
+  const payload = JSON.stringify({ generations: [{ messageType: "ASSISTANT", text: "🧭", toolCalls: [] }] });
   const split = 40;
   getContentRangeMock
     .mockResolvedValueOnce(range(payload.slice(0, split), { actualEnd: split, totalLength: payload.length, hasMore: true, nextCursor: "next" }))
     .mockResolvedValueOnce(range(payload.slice(split), { actualStart: split, actualEnd: payload.length, totalLength: payload.length }));
-  renderRecords([record(62, "MODEL_RESPONSE_RECEIVED", "native-payload")]);
+  renderRecords([record(62, "MODEL_RESPONSE_RECEIVED", "model-payload")]);
   fireEvent.click(screen.getByRole("button", { name: "Response" }));
   const detail = await screen.findByRole("region", { name: "Model response for record 62" });
   expect(detail).toHaveTextContent("🧭");
   expect(getContentRangeMock).toHaveBeenCalledTimes(2);
 });
 
-test("keeps absent native response evidence unavailable", async () => {
+test("keeps absent model response evidence unavailable", async () => {
   // Reader-state evidence: absence does not imply a producer capture setting.
   renderRecords([record(63, "MODEL_RESPONSE_RECEIVED")]);
   fireEvent.click(screen.getByRole("button", { name: "Response" }));
@@ -203,14 +187,14 @@ test("keeps absent native response evidence unavailable", async () => {
   expect(screen.queryByRole("heading", { name: "user" })).toBeNull();
 });
 
-test("does not display partial native response evidence when continuation fails", async () => {
-  const payload = JSON.stringify({ payloadType: "evaluation", rawBody: "<broken> Authorization=kept token=kept verbatim" });
+test("does not display partial model response evidence when continuation fails", async () => {
+  const payload = JSON.stringify({ generations: [{ messageType: "ASSISTANT", text: "Authorization=kept token=kept verbatim", toolCalls: [] }] });
   getContentRangeMock
     .mockResolvedValueOnce(range(payload.slice(0, 50), { actualEnd: 50, totalLength: payload.length, hasMore: true, nextCursor: "next" }))
-    .mockRejectedValueOnce(new Error("native continuation unavailable"));
-  renderRecords([record(64, "MODEL_RESPONSE_RECEIVED", "incomplete-native")]);
+    .mockRejectedValueOnce(new Error("model continuation unavailable"));
+  renderRecords([record(64, "MODEL_RESPONSE_RECEIVED", "incomplete-model")]);
   fireEvent.click(screen.getByRole("button", { name: "Response" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("native continuation unavailable");
+  expect(await screen.findByRole("alert")).toHaveTextContent("model continuation unavailable");
   expect(screen.queryByText(/Authorization=kept/)).toBeNull();
   expect(screen.queryByRole("heading", { name: "user" })).toBeNull();
   expect(getContentRangeMock).toHaveBeenCalledTimes(2);

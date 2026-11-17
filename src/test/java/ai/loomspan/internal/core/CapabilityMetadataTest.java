@@ -14,7 +14,7 @@ class CapabilityMetadataTest
     void exposesExactlyThreeExecutionKinds()
     {
         assertThat(SkillKind.values()).containsExactly(
-                SkillKind.YAML, SkillKind.JAVA, SkillKind.TYPESAFE);
+                SkillKind.YAML, SkillKind.JAVA);
     }
 
     @Test

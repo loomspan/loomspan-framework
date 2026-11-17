@@ -218,20 +218,6 @@ public class LoomspanProperties implements InitializingBean
         switch (driver)
         {
             case OPENAI, ANTHROPIC -> requireText(connection.getApiKey(), path + ".api-key", driver);
-            case TYPESAFE -> {
-                requireText(connection.getApiKey(), path + ".api-key", driver);
-                if (connection.getBaseUrl() != null) {
-                    try {
-                        java.net.URI uri = java.net.URI.create(connection.getBaseUrl());
-                        if (!uri.isAbsolute() || uri.getHost() == null
-                                || !("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-                                || uri.getRawQuery() != null || uri.getRawFragment() != null)
-                            throw new IllegalArgumentException();
-                    } catch (IllegalArgumentException ex) {
-                        throw invalid(path + ".base-url", "must be an absolute HTTP(S) URL without query or fragment");
-                    }
-                }
-            }
             case GEMINI -> validateGeminiMode(path, connection);
         }
     }
@@ -260,14 +246,12 @@ public class LoomspanProperties implements InitializingBean
 
     private void validateHeaders(String path, ConnectionProperties connection, AiDriver driver)
     {
-        if (!connection.getHeaders().isEmpty() && driver != AiDriver.OPENAI && driver != AiDriver.ANTHROPIC && driver != AiDriver.TYPESAFE)
+        if (!connection.getHeaders().isEmpty() && driver != AiDriver.OPENAI && driver != AiDriver.ANTHROPIC)
         {
-            throw invalid(path + ".headers", "is only supported for drivers OPENAI, ANTHROPIC and TYPESAFE");
+            throw invalid(path + ".headers", "is only supported for drivers OPENAI and ANTHROPIC");
         }
         for (Map.Entry<String, String> header : connection.getHeaders().entrySet())
         {
-            if (driver == AiDriver.TYPESAFE && "Authorization".equalsIgnoreCase(header.getKey()))
-                throw invalid(path + ".headers", "Authorization is owned by the configured API key");
             if (!StringUtils.hasText(header.getKey()) || !HTTP_TOKEN.matcher(header.getKey()).matches())
             {
                 throw invalid(path + ".headers", "contains an invalid HTTP header name");
@@ -306,8 +290,6 @@ public class LoomspanProperties implements InitializingBean
             {
                 throw invalid(path + ".provider-model", "is required");
             }
-            if (connections.get(model.getConnection()).getDriver() == AiDriver.TYPESAFE && model.supportsThinking())
-                throw invalid(path + ".thinking-levels", "is not supported for driver TYPESAFE");
         }
     }
 

@@ -107,7 +107,7 @@ class GeminiProtocolIntegrationTest
         var properties = new LoomspanProperties.ConnectionProperties();
         properties.setDriver(AiDriver.GEMINI);
         properties.setApiKey("local-fake-key");
-        return new SpringAiProviderIntegration(new DefaultResourceLoader()).create("test", properties).requireChatModel();
+        return new SpringAiProviderIntegration(new DefaultResourceLoader()).create("test", properties).chatModel();
     }
 
     private static void local(LocalCase action) throws Exception

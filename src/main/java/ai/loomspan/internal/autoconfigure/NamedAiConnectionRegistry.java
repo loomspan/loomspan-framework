@@ -3,7 +3,6 @@ package ai.loomspan.internal.autoconfigure;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.provider.ProviderConnectionRuntime;
 import ai.loomspan.internal.springai.SpringAiProviderIntegration;
-import ai.loomspan.internal.typesafe.TypeSafeClient;
 import org.springframework.beans.factory.DisposableBean;
 
 import java.util.LinkedHashMap;
@@ -27,18 +26,9 @@ public final class NamedAiConnectionRegistry
             String name = entry.getKey();
             LoomspanProperties.ConnectionProperties properties = entry.getValue();
             ProviderConnectionRuntime runtime = null;
-            TypeSafeClient nativeClient = null;
             try
             {
-                if (properties.getDriver() == ai.loomspan.autoconfigure.AiDriver.TYPESAFE)
-                {
-                    var retryPolicy = ai.loomspan.internal.provider.ProviderRetryPolicy.from(properties.getProviderRetry());
-                    nativeClient = new TypeSafeClient(properties);
-                    runtime = new ProviderConnectionRuntime(null, nativeClient, properties.getDriver(),
-                            ai.loomspan.internal.provider.AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
-                            retryPolicy, TypeSafeClient::translate);
-                }
-                else runtime = integration.create(name, properties);
+                runtime = integration.create(name, properties);
                 if (runtime.attemptOwnership() != ai.loomspan.internal.provider.AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP
                         && properties.getProviderRetry().isEnabled())
                 {
@@ -49,7 +39,7 @@ public final class NamedAiConnectionRegistry
             }
             catch (SafeAiConnectionConfigurationException ex)
             {
-                closeUnregistered(runtime, nativeClient, ex);
+                closeUnregistered(runtime, ex);
                 cleanupAfterConstructionFailure(built, ex);
                 throw ex;
             }
@@ -58,7 +48,7 @@ public final class NamedAiConnectionRegistry
                 IllegalStateException failure = new IllegalStateException(
                         "Failed to construct AI connection '" + name + "' for driver " + properties.getDriver()
                                 + "; check " + constructionSettings(name, properties), ex);
-                closeUnregistered(runtime, nativeClient, failure);
+                closeUnregistered(runtime, failure);
                 cleanupAfterConstructionFailure(built, failure);
                 throw failure;
             }
@@ -99,18 +89,13 @@ public final class NamedAiConnectionRegistry
         if (cleanup != null && cleanup != failure) failure.addSuppressed(cleanup);
     }
 
-    private static void closeUnregistered(ProviderConnectionRuntime runtime, TypeSafeClient nativeClient,
+    private static void closeUnregistered(ProviderConnectionRuntime runtime,
             RuntimeException failure)
     {
         if (runtime != null)
         {
             Exception cleanup = destroyModels(Map.of("unregistered", runtime));
             if (cleanup != null && cleanup != failure) failure.addSuppressed(cleanup);
-        }
-        else if (nativeClient != null)
-        {
-            try { nativeClient.close(); }
-            catch (Exception cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
         }
     }
 
@@ -119,7 +104,7 @@ public final class NamedAiConnectionRegistry
         Exception failure = null;
         for (ProviderConnectionRuntime runtime : models.values())
         {
-            Object model = runtime.nativeClient() != null ? runtime.nativeClient() : runtime.chatModel();
+            Object model = runtime.chatModel();
             try
             {
                 if (model instanceof DisposableBean disposableBean) disposableBean.destroy();

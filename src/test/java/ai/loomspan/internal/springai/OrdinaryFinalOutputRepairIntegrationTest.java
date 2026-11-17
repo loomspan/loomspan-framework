@@ -125,7 +125,7 @@ class OrdinaryFinalOutputRepairIntegrationTest {
     }
 
     static ProviderConnectionRuntime modelDefaults(ProviderConnectionRuntime runtime, ToolCallback callback) {
-        var options = ((org.springframework.ai.model.tool.ToolCallingChatOptions) runtime.requireChatModel().getDefaultOptions())
+        var options = ((org.springframework.ai.model.tool.ToolCallingChatOptions) runtime.chatModel().getDefaultOptions())
                 .mutate().toolCallbacks(callback).build();
         org.springframework.ai.chat.model.ChatModel model;
         if (options instanceof org.springframework.ai.openai.responses.OpenAiResponsesChatOptions typed)
@@ -148,7 +148,7 @@ class OrdinaryFinalOutputRepairIntegrationTest {
                 .description("fixture").inputType(Map.class).inputSchema("{\"type\":\"object\"}").build();
     }
     static ChatClient repairClient(ProviderConnectionRuntime runtime, String identity, CanonicalSchema schema, String mode, ToolCallback callback, int retries) {
-        var builder = ChatClient.builder(runtime.requireChatModel(), io.micrometer.observation.ObservationRegistry.NOOP, null, null,
+        var builder = ChatClient.builder(runtime.chatModel(), io.micrometer.observation.ObservationRegistry.NOOP, null, null,
                 ToolCallingAdvisor.builder().toolCallingManager(new CanonicalToolCallingManager(ToolCallingManager.builder().build())))
                 .defaultOptions(options(runtime, identity, 2048, callback).mutate())
                 .defaultAdvisors(new ProviderAttemptCallAdvisor(runtime, mock(ExecutionStateService.class), new ModelUsageExtractor(), mock(SessionUsageService.class)));

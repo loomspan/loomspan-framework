@@ -49,25 +49,21 @@ reader-compatibility fact only: it does not authenticate the producer, verify
 integrity, or establish provenance. Continue to treat the serialized shape as
 an internal diagnostic format rather than an application dependency.
 
-## Native TypeSafe evaluations
+## Executor-pack provider evidence
 
-[TypeSafe leaves](typesafe-skills.md) retain native evidence instead of fabricated
-chat messages. Model request/response payloads use `payloadType: evaluation` with
-the resolved request, complete provider envelope or malformed `rawBody`, endpoint,
-requested model, and available served model. Existing Console JSON/content views
-read inline and reconstructed chunks; MCP follows the same descriptor/content
-paths. Driver/connection/model and physical attempt/retry identities remain the
-captured execution facts. Capture-disabled or truncated content remains explicitly
-unavailable/incomplete rather than a successful complete reconstruction.
+[TypeSafe pack leaves](typesafe-skills.md) execute as JAVA. Their requests, complete
+responses, failures and retry messages use bounded executor diagnostic records
+within the existing execution frame, not Framework model-attempt records or
+fabricated chat messages. Read their `data` content through the existing record
+query/content tools; see [bounded executor diagnostics](#bounded-executor-diagnostics).
+Developer severity does not create an automatic execution failure. Capture states
+and system notices describe retained evidence; absence alone establishes no cause,
+and a retained notice cannot recover discarded content.
 
-Usable integral native input/output token counts yield EXACT, including zero/zero;
-otherwise usage is UNAVAILABLE and native metadata remains evidence. No heuristic
-estimate is made. Successful HTTP responses account once while writable even if
-answers extraction subsequently fails; HTTP error-body usage is not ingested.
-Canonical content is preserved under existing capture controls. The established
-derived-journal/observer field-name exception remains confined to that projection.
-`TypeSafeExecutor`, `ConsoleTraceFixtureCorpusTest`, Go corpus/MCP tests, and
-`TraceRecords.model.test.tsx` protect current native evidence consumption.
+Provider usage remains in returned JSON and recorded diagnostics; it does not
+contribute to Framework-accounted totals. Zero Framework-accounted usage is not
+measured zero executor usage. Physical I/O cancellation is cooperative and does
+not promise immediate remote inference or billing cancellation.
 
 ## Recorded attachments
 
@@ -165,7 +161,7 @@ Executable anchors: `StepLoopMissionExecutionEngineTest`,
 `DeclaredChildInputBindingsIntegrationTest`, `ConsoleTraceFixtureCorpusTest`,
 and Console `TraceRecords.step.test.tsx` / `TraceRecords.stepAction.test.tsx`.
 
-`entrySkill` is the exact registered name of the top-level Java, TypeSafe, or model-backed YAML skill whose invocation owns the session. Loomspan records it before execution begins, keeps it unchanged across nested skill invocations, and exposes it in Trace Catalog and Trace Detail without requiring artifact acquisition. It is a recorded fact: it does not prove that the skill is still registered or that it is more important than nested work.
+`entrySkill` is the exact registered name of the top-level Java, executor-backed YAML, or model-backed YAML skill whose invocation owns the session. Loomspan records it before execution begins, keeps it unchanged across nested skill invocations, and exposes it in Trace Catalog and Trace Detail without requiring artifact acquisition. It is a recorded fact: it does not prove that the skill is still registered or that it is more important than nested work.
 
 `TRACE_STARTED.metadata.generationId` records the entry namespace's skill and execution-configuration generation captured by the root, not a target namespace generation. Live execution and finalized trace diagnostics carry the same process-local ID, including when old work finishes after a newer publication. Its trace persistence and run-start limit snapshot come from that captured generation. Use the ID to distinguish which complete version a current execution used, not as a durable content hash, chronological ordering, or historical catalog key. See [the application reload contract](../java-api/skill-reload.md).
 
@@ -334,7 +330,7 @@ cause, rank importance, or turn returned content into another operation.
 | Find notable record kinds | Read the complete nonzero physical `recordCountsByType` histogram from trace summary. Omitted known keys mean zero and values sum to `recordCount`. Query selected types for all details; do not derive terminal outcome, logical failures, gaps, uncertainties, or usage completeness from the histogram. |
 | Find record-local validation outcomes | Call `LOOMSPAN_query_trace_records` with the relevant `types` and lowercase `filter.validationStatus`: `retrying`, `passed`, or `exhausted`. A returned record's optional `validationStatus` uses that lowercase vocabulary even when an exact raw Java record retains uppercase enum-name metadata. This scalar comes from the selected record itself; advisor-owned validation links remain separate relationship facts. |
 | Read model/tools/output | Query logical records for descriptors after plan/frame orientation. Explicit `inlineContent` selects complete values in record order under 8 KiB/value and 32 KiB/page source-byte limits with typed omissions. Follow a descriptor's `contentRef` for an exact read; omit both cursor controls for offset zero. |
-| Read a provider-attempt failure | Query `MODEL_ATTEMPT_FAILED` by frame, attempt, or retry sequence. Read its normalized classification, category, retry decision, and delay first. Its ordinary `contentRef` selects an ordered diagnostics array: bounded `JAVA_STACK_TRACE` first, followed by chat-only `LOOMSPAN_PROVIDER_GUIDANCE` when supplied, then available provider diagnostics. Native TypeSafe provider diagnostics follow the stack directly. Traverse exact ranges when the value exceeds an inline limit and render every diagnostic as inert text. |
+| Read a provider-attempt failure | Query `MODEL_ATTEMPT_FAILED` by frame, attempt, or retry sequence. Read its normalized classification, category, retry decision, and delay first. Its ordinary `contentRef` selects an ordered diagnostics array: bounded `JAVA_STACK_TRACE` first, followed by chat-only `LOOMSPAN_PROVIDER_GUIDANCE` when supplied, then available provider diagnostics. Traverse exact ranges when the value exceeds an inline limit and render every diagnostic as inert text. |
 | Search literal evidence | Use `filter.literalText`; preserve exact case behavior, searched fields, logical coverage, work completion, and limitations. Join a match's page-local `contentId` to that page's `contentDescriptors`, then pass the resulting opaque `contentRef` to the read tool. Never pass `contentId` itself. An unfinished zero-match page is not a negative result. |
 | Investigate exact storage/parser behavior | Use `LOOMSPAN_read_trace_artifact` deliberately and read exact continuable source-byte ranges. Raw bytes are not the ordinary semantic view. |
 
@@ -554,8 +550,8 @@ inspectable in its returned generation even without text or a follow-up request.
 When provider decoding fails before Spring AI produces a response, inspect the
 provider-attempt failure.
 
-These are Framework trace payloads. See [TypeSafe leaves](typesafe-skills.md) for
-the separate evaluation protocol. The Java observer receives a derived journal.
+These are Framework chat trace payloads. Executor packs use bounded diagnostic
+records. The Java observer receives a derived journal.
 `ExecutionTraceContractTest` and `SpringAiChatClientAssemblerIntegrationTest`
 verify the chat payload and rejection evidence.
 
@@ -563,7 +559,7 @@ verify the chat payload and rejection evidence.
 
 The final trace record carries one outcome: `SUCCEEDED`, `FAILED`, or `ABORTED`, plus the authoritative terminal session-usage snapshot. A failed or aborted completion has a `terminalFailureId` that links to the corresponding `ERROR_RECORDED` fact. Success has no terminal failure ID. Earlier nonterminal errors can coexist with a successful outcome.
 
-A recovered provider failure remains an attempt fact and does not create an `ERROR_RECORDED` fact. Its attempt-local stack and available provider evidence remain available even after the execution succeeds, but it produces no terminal WARN. Chat attempts additionally retain framework diagnostic guidance; native TypeSafe attempts retain their classification and retry metadata with available provider-error content. When a permanent or exhausted provider failure becomes terminal, the canonical error links to the final failed `attemptId` and `retrySequenceId`; Console validates that link and exposes the linked attempt content directly in terminal failure details. The error's own stack diagnostic may repeat the final attempt evidence, which is intentional at the two distinct observation boundaries. Console does not classify the provider failure itself.
+A recovered provider failure remains an attempt fact and does not create an `ERROR_RECORDED` fact. Its attempt-local stack and available provider evidence remain available even after the execution succeeds, but it produces no terminal WARN. Chat attempts additionally retain Framework diagnostic guidance and available provider-error content. When a permanent or exhausted provider failure becomes terminal, the canonical error links to the final failed `attemptId` and `retrySequenceId`; Console validates that link and exposes the linked attempt content directly in terminal failure details. The error's own stack diagnostic may repeat the final attempt evidence, which is intentional at the two distinct observation boundaries. Console does not classify the provider failure itself.
 
 If finalization itself cannot append a completion record, do not infer one. A missing completion means the artifact is incomplete, not implicitly failed or successful.
 

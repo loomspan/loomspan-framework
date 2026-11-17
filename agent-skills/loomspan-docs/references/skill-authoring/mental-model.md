@@ -13,10 +13,10 @@ Use this document to establish shared vocabulary and choose the broad shape of a
 
 ## Core Model
 
-Loomspan combines model-driven YAML skills, native TypeSafe evaluation leaves, and deterministic Java `@SkillMethod` skills. Each declaration is one callable capability. An LLM-backed skill reasons about its mission and can invoke only the direct child skills exposed to it.
+Loomspan combines model-driven YAML skills, executor-backed YAML leaves, and deterministic Java `@SkillMethod` skills. Each declaration is one callable capability. An LLM-backed skill reasons about its mission and can invoke only the direct child skills exposed to it.
 
 ```text
-Application code -> Java, TypeSafe, or model-backed YAML entry skill
+Application code -> Java, executor-backed YAML, or model-backed YAML entry skill
 YAML planner -> YAML specialist -> Java @SkillMethod
 ```
 
@@ -89,19 +89,18 @@ Bean names, YAML source labels, and declared method signatures are diagnostic lo
 
 ## Capability types
 
-### TypeSafe evaluation leaf
+### Executor-backed YAML leaf
 
-A [TypeSafe leaf](typesafe-skills.md) declares fixed Choice, Noul, or Score
-questions and a native model alias. It evaluates the validated input without chat
-planning/tools, returns the full named provider answers as JSON text, and exposes
-generated descriptive output metadata. It can be an entry or a normal parent's
-child. It has no authored output validator or repair loop; applications own the
-meaning and use of the judgments. Existing mission, authorization, quota, and
-captured-generation boundaries still apply.
+An [executor leaf](executor-skills.md) supplies input, roles and configuration to
+registered Java execution behavior. The callable YAML skill can be an entry or a
+parent's child and is classified as `JAVA`. The reference-only executor itself is
+not callable. Provider packs such as [TypeSafe](typesafe-skills.md) use this route;
+applications own the callable declarations and policy. Results follow the Java
+String/null/JSON boundary; no generated output schema is supplied.
 
 ### Entry skill
 
-An entry is any registered Java, TypeSafe, or model-backed YAML skill invoked through `SkillTemplate`. The facade accepts a map or an object convertible to a map, validates its effective input contract, and creates a fresh session. Callers SHOULD understand the entry contract without understanding the tree below it.
+An entry is any registered Java, executor-backed YAML, or model-backed YAML skill invoked through `SkillTemplate`. The facade accepts a map or an object convertible to a map, validates its effective input contract, and creates a fresh session. Callers SHOULD understand the entry contract without understanding the tree below it.
 
 ### Model-backed YAML skill
 
@@ -128,7 +127,7 @@ Optional primitive parameters are invalid because omission binds null; use refer
 
 Java roots and children participate in the common skill mission lifecycle. Java executes without a framework model request and shares bounded mission timeout, interruption, and late-write cutoff handling. A successful child contributes its exact name at the parent tool boundary; a denial or failure contributes no success. The parent mission resumes on every exit.
 
-Public execution kinds are `YAML`, `TYPESAFE`, and `JAVA`. Executor-backed YAML executes as Java while retaining its YAML definition. Framework and Console diagnostics use declaration ownership for original source presentation and retain the resolved executor identity and Java implementation alongside it; see [skill diagnostics](observability-http.md#skill-classification-and-declaration). Pagination and links use only the registered name.
+Public execution kinds are `YAML` and `JAVA`. Executor-backed YAML executes as Java while retaining its YAML definition. Framework and Console diagnostics use declaration ownership for original source presentation and retain the resolved executor identity and Java implementation alongside it; see [skill diagnostics](observability-http.md#skill-classification-and-declaration). Pagination and links use only the registered name.
 
 ## Root, Planner, Specialist, and Leaf Are Roles
 
@@ -144,7 +143,7 @@ A YAML skill can be a root in one tree and a nested specialist in another if its
 
 ## Visibility Is Local
 
-`allowed_skills` defines the candidate child Java, TypeSafe, or model-backed YAML skills for one LLM-backed skill. It is not transitive.
+`allowed_skills` defines the candidate child Java, executor-backed YAML, or model-backed YAML skills for one LLM-backed skill. It is not transitive.
 
 If a root allows `network-investigate`, and that skill allows `network-checkDns`, the root sees `network-investigate`; it does not automatically see `network-checkDns`.
 

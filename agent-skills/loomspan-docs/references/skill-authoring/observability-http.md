@@ -47,7 +47,6 @@ not application APIs.
 | Form | kind | declaration | Locations |
 | --- | --- | --- | --- |
 | Model manifest | YAML | YAML | sourcePath |
-| TypeSafe manifest | TYPESAFE | YAML | sourcePath |
 | Executor manifest | JAVA | YAML | sourcePath, executorName, beanName, method |
 | Annotated method | JAVA | SKILL_METHOD | beanName, method |
 

@@ -108,7 +108,6 @@ public final class SpringAiProviderIntegration
             case OPENAI -> openAi(properties);
             case ANTHROPIC -> anthropic(properties);
             case GEMINI -> gemini(connectionName, properties);
-            case TYPESAFE -> throw new IllegalArgumentException("Native evaluations do not construct a ChatModel");
         }, properties.getDriver(), AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP, retry, this::translate);
     }
 

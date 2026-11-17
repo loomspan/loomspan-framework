@@ -58,7 +58,6 @@ public final class NativeOutputContract
                 if (!(options instanceof GoogleGenAiChatOptions typed)) throw missingOptions(driver, trace);
                 yield typed.mutate().outputSchema(JSON.writeValueAsString(prepared)).build();
             }
-            case TYPESAFE -> throw new IllegalArgumentException("Native evaluations do not accept chat output schemas");
         };
         return request.mutate().prompt(request.prompt().mutate().chatOptions(formatted).build())
                 .context(PREPARED_SCHEMA_KEY, prepared).build();

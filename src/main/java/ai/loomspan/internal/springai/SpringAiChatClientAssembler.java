@@ -115,7 +115,7 @@ final class SpringAiChatClientAssembler
                 ? chatModelResolver.resolve(skillName, executionConfiguration)
                 : captured.connection(executionConfiguration.connection());
         if (runtime == null) throw new IllegalStateException("No connection for skill '" + skillName + "'");
-        ChatModel chatModel = runtime.requireChatModel();
+        ChatModel chatModel = runtime.chatModel();
         List<Advisor> advisors = resolvedAdvisors(skillAdvisorResolver.resolve(definition), includeFinalResponseValidators,
                 new ProviderAttemptCallAdvisor(runtime, executionStateService, modelUsageExtractor, sessionUsageService));
         ChatClient.Builder builder = chatClientBuilderFactory.create(chatModel);

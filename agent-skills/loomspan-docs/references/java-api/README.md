@@ -78,7 +78,7 @@ when exact source inspection is required.
 | Developer need | Read first | Then read |
 | --- | --- | --- |
 | Determine whether a Loomspan type or extension point is supported | [compatibility-and-boundaries.md](compatibility-and-boundaries.md) | The relevant API topic below |
-| Invoke or atomically hand off a Java, TypeSafe, or model-backed YAML skill from application code | [invocation.md](invocation.md) | [observation-and-errors.md](observation-and-errors.md) when observing or handling failures |
+| Invoke or atomically hand off a Java, executor-backed YAML, or model-backed YAML skill from application code | [invocation.md](invocation.md) | [observation-and-errors.md](observation-and-errors.md) when observing or handling failures |
 | Discover skills or pre-check a root request | [catalog-and-validation.md](catalog-and-validation.md) | [invocation.md](invocation.md) for execution-time guarantees |
 | Validate a proposed complete skill set and inspect candidate names/kinds | [skill-reload.md](skill-reload.md) | [draft validation workflow](../skill-authoring/validation-workflow.md) for authoring feedback |
 | Prepare, publish, and retire complete skill and execution generations from complete application-supplied documents and configuration | [skill-reload.md](skill-reload.md) | [executor configuration](../skill-authoring/executor-skills.md) for namespace data rules |

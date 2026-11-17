@@ -25,10 +25,12 @@ OpenRouter and Ollama. For local Ollama, use `http://127.0.0.1:11434/v1` with
 Services must accept Responses; Chat Completions-only endpoints are unsupported.
 Loomspan does not inherit `spring.ai.*` settings.
 
-Native TypeSafe Choice, Noul, and Score leaves use the separate `typesafe` driver
-with direct TypeSafe or OpenRouter System One access. Use the
-[TypeSafe reference](../agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md)
-for their declarations and connections; chat driver settings do not configure them.
+TypeSafe Choice, Noul, and Score use the independently versioned Decisions pack
+through ordinary `executor: typesafe` YAML leaves. Supply resolved credentials
+and endpoint values through captured executor/skill maps; Framework model aliases
+and connections do not configure the pack. Read the
+[TypeSafe pack reference](../agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md)
+for its local artifact, declaration and invocation-time limitations.
 
 The quickstart shows one chat connection. For additional providers, gateways, retry
 policies, and timeouts, use the authoritative

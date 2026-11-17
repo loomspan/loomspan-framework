@@ -152,12 +152,11 @@ class ConsoleRestFixtureCorpusTest
 
         result.put("instance-status.json", new ObservabilityDtos.InstanceStatus(
                 "11111111-1111-4111-8111-111111111111", "1.0.0-beta.10-SNAPSHOT", OBSERVED, true,
-                4, 1, 1, TracePersistencePolicy.ONERROR, Duration.ofMinutes(15), Duration.ofHours(24)));
+                3, 1, 1, TracePersistencePolicy.ONERROR, Duration.ofMinutes(15), Duration.ofHours(24)));
         result.put("skills-page.json", new ObservabilityDtos.Page<>(List.of(skill,
                 new ObservabilityDtos.SkillSummary("default-FetchDns", "JAVA", "YAML", "classpath:/skills/fetch-dns.yaml", "default-fetchDns",
                         "dnsSkills", "example.DnsSkills.fetch()", "skills/default-FetchDns"), new ObservabilityDtos.SkillSummary(
-                "default-LookupDns", "JAVA", "SKILL_METHOD", null, null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", "skills/default-LookupDns"),
-                new ObservabilityDtos.SkillSummary("default-EvaluateDns", "TYPESAFE", "YAML", "opaque label", null, null, null, "skills/default-EvaluateDns")), false, null, OBSERVED));
+                "default-LookupDns", "JAVA", "SKILL_METHOD", null, null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", "skills/default-LookupDns")), false, null, OBSERVED));
         result.put("skill-detail.json", new ObservabilityDtos.SkillDetail(
                 "default-CheckDns", "YAML", "YAML", "classpath:/skills/check-dns.yaml", null, null, null, "# DNS check\r\nname: CheckDns\r\n", null));
         result.put("skill-java-detail.json", new ObservabilityDtos.SkillDetail(
@@ -165,16 +164,6 @@ class ConsoleRestFixtureCorpusTest
         result.put("skill-executor-detail.json", new ObservabilityDtos.SkillDetail(
                 "default-FetchDns", "JAVA", "YAML", "opaque label", "default-fetchDns", "dnsSkills", "example.DnsSkills.fetch()",
                 "# Executor DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application executor\r\nexecutor: fetchDns\r\n", null));
-        String nativeYaml = "name: EvaluateDns\ndescription: Evaluate DNS evidence\nmodel: evaluation\ninput_schema: {type: object}\n"
-                + "typesafe:\n  state: '${/input}'\n  questions:\n    healthy: {type: noul, instructions: 'Is DNS healthy?'}\n";
-        var nativeDeclaration = ai.loomspan.internal.typesafe.TypeSafeDeclaration.compile(
-                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().skillYaml().readTree(nativeYaml).get("typesafe"));
-        var nativeSchema = nativeDeclaration.outputSchema();
-        // The same schema metadata representation used by generation tool/catalog publication.
-        var manifest = new ai.loomspan.internal.skill.YamlSkillManifest();
-        manifest.setName("default-EvaluateDns"); manifest.setDescription("Evaluate DNS evidence");
-        result.put("skill-typesafe-detail.json", new ObservabilityDtos.SkillDetail("default-EvaluateDns", "TYPESAFE", "YAML", "opaque label", null, null, null,
-                nativeYaml, JSON.writeValueAsString(schemaMetadata(nativeSchema))));
         result.put("forwarding-skill-detail.json", new ObservabilityDtos.SkillDetail(
                 "default-prepareReport", "YAML", "YAML", "opaque forwarding label", null, null, null,
                 "name: prepareReport\nmodel: local\ndescription: Prepare report\nplanning_mode: true\n"
@@ -193,9 +182,6 @@ class ConsoleRestFixtureCorpusTest
         return result;
     }
 
-    private static tools.jackson.databind.JsonNode schemaMetadata(ai.loomspan.internal.schema.CanonicalSchema schema) {
-        return schema.structuralTree();
-    }
 
     private static void activeExecutionContracts(Map<String, Object> result,
             ObservabilityDtos.Usage usage, ObservabilityDtos.QuotaLimits limits) throws Exception

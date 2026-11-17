@@ -20,14 +20,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class DeclaredOutputBindingsPlanningIntegrationTest {
     @ParameterizedTest @ValueSource(strings={"allowed", "disallowed", "missing-probability", "case-source", "dynamic-allowed", "dynamic-disallowed", "dynamic-missing-probability", "singleton"})
-    void nativePassthroughIsEnforcedOnlyByConsumingBindingContract(String scenario) throws Exception {
+    void executorPassthroughIsEnforcedOnlyByConsumingBindingContract(String scenario) throws Exception {
         boolean dynamic = scenario.startsWith("dynamic-");
         boolean probability = scenario.contains("probability") || scenario.equals("case-source");
-        String pointer = probability ? "/category/probabilities/" + (scenario.equals("case-source") ? "KeepCase" : dynamic ? "RuntimeKey" : "A") : scenario.equals("singleton") ? "/category/type" : "/category/choice";
+        String pointer = probability ? "/answers/category/probabilities/" + (scenario.equals("case-source") ? "KeepCase" : dynamic ? "RuntimeKey" : "A") : scenario.equals("singleton") ? "/answers/category/type" : "/answers/category/choice";
         String output = probability ? "type: number" : scenario.equals("singleton") ? "type: string, enum: [choice]" : "type: string, enum: [A, Z]";
         Files.writeString(directory.resolve("root.yaml"), """
                 name: root
-                description: Assemble one named native answer
+                description: Assemble one named executor answer
                 model: local
                 planning_mode: true
                 max_steps: 1
@@ -53,45 +53,38 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                 """.formatted(output, pointer));
         Files.writeString(directory.resolve("evaluation.yaml"), """
                 name: evaluation
-                description: Native producer
-                model: native
+                description: Executor producer
+                executor: fixture
                 input_schema: {type: object, properties: {options: {type: object, additionalProperties: true}}, required: [options], additionalProperties: false}
-                typesafe:
-                  state: ${/input}
-                  questions:
-                    category: {type: choice, criteria: %s}
-                """.formatted(dynamic ? "'${/input/options}'" : scenario.equals("case-source") ? "{KeepCase: null}" : "{A: null, B: null}"));
+                """);
+        String answer = scenario.endsWith("allowed") && !scenario.endsWith("disallowed") ? "{\"choice\":\"A\"}" : scenario.endsWith("disallowed") ? "{\"choice\":\"B\"}"
+                : scenario.equals("singleton") ? "{\"type\":\"choice\"}" : scenario.equals("case-source") ? "{\"probabilities\":{\"keepcase\":0.8}}" : "{\"probabilities\":{}}";
         var calls = new AtomicInteger();
         try (var server = new MockWebServer()) {
             server.setDispatcher(new Dispatcher() {
                 @Override public MockResponse dispatch(RecordedRequest request) {
                     calls.incrementAndGet();
-                    if (request.getPath().equals("/api/v1/systemone")) {
-                        String answer = scenario.endsWith("allowed") && !scenario.endsWith("disallowed") ? "{\"choice\":\"A\"}" : scenario.endsWith("disallowed") ? "{\"choice\":\"B\"}"
-                                : scenario.equals("singleton") ? "{\"type\":\"choice\"}" : scenario.equals("case-source") ? "{\"probabilities\":{\"keepcase\":0.8}}" : "{\"probabilities\":{}}";
-                        return new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"answers\":{\"category\":"+answer+"}}");
-                    }
                     return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-10T00:00:00Z", "status", "VALID", "tasks", List.of(task("evaluation")))));
                 }
             }); server.start();
-            new ApplicationContextRunner().withUserConfiguration(App.class).withPropertyValues(
+            new ApplicationContextRunner().withUserConfiguration(App.class)
+                    .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> "{\"answers\":{\"category\":" + answer + "}}"))
+                    .withPropertyValues(
                     "spring.main.web-application-type=none", "loomspan.skills.locations=" + directory.toUri() + "*.yaml",
                     "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=" + server.url("/v1"),
-                    "loomspan.connections.local.api-key=fixture", "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=planner",
-                    "loomspan.connections.native.driver=typesafe", "loomspan.connections.native.base-url=" + server.url("/api"),
-                    "loomspan.connections.native.api-key=fixture", "loomspan.models.native.connection=native", "loomspan.models.native.provider-model=jev"
+                    "loomspan.connections.local.api-key=fixture", "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=planner"
             ).run(context -> {
                 assertThat(context).hasNotFailed(); var template = context.getBean(SkillTemplate.class);
                 var input = Map.<String,Object>of("options", scenario.equals("dynamic-missing-probability") ? Map.of("RuntimeKey", "first") : Map.of("A", "first", "B", "second"));
                 String registeredSchema = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skill("default-evaluation").orElseThrow().outputSchema();
-                if (dynamic) assertThat(JSON.readTree(registeredSchema).at("/properties/category/properties/choice").has("enum")).isFalse();
+                assertThat(registeredSchema).isNull();
                 if (scenario.endsWith("allowed") && !scenario.endsWith("disallowed") || scenario.equals("singleton"))
                     assertThat(JSON.readTree(template.invoke("default-root", input)).path("selected").asText()).isEqualTo(scenario.equals("singleton") ? "choice" : "A");
                 else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", input))
                         .hasStackTraceContaining(probability ? "binding_source_unavailable" : "binding_output_validation");
                 assertThat(context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skill("default-evaluation").orElseThrow().outputSchema()).isEqualTo(registeredSchema);
             });
-            assertThat(calls).hasValue(2);
+            assertThat(calls).hasValue(1);
         }
     }
 

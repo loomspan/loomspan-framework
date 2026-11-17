@@ -45,7 +45,7 @@ output_schema:
 | Nested object property | No |
 | Array `items` or a property below an item | No |
 
-Each annotation MUST be one nonblank YAML string. Null, Boolean, numeric, list, and object values are rejected without coercion. A root property without `x-loomspan-evidence` has no inferred evidence requirement, regardless of its name, description, requiredness, siblings, or the declaring skill's children. Java skills do not declare `output_schema`; evidence declarations belong to a model-backed YAML parent. Exact direct child names may identify Java, TypeSafe, or model-backed YAML skills.
+Each annotation MUST be one nonblank YAML string. Null, Boolean, numeric, list, and object values are rejected without coercion. A root property without `x-loomspan-evidence` has no inferred evidence requirement, regardless of its name, description, requiredness, siblings, or the declaring skill's children. Java skills do not declare `output_schema`; evidence declarations belong to a model-backed YAML parent. Exact direct child names may identify Java, executor-backed YAML, or model-backed YAML skills.
 
 Claim property names are exact: `Result`, `result`, ` result` and `result ` are
 independent names. Lookup never trims whitespace or folds case. An absent optional

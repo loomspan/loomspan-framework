@@ -25,8 +25,8 @@ func TestBrowserAndMCPPreserveSameSkillFacts(t *testing.T) {
 	schema := "{ \"type\": \"object\", \"description\": \"<schema>\" }"
 	browserFact := observability.SkillDetail{
 		OutputSchema:   &schema,
-		RegisteredName: "skill-☃", Kind: "TYPESAFE", Declaration: "YAML", SourcePath: `opaque <label>`,
-		Yaml: "name: skill-☃\ntypesafe:\n  state: preserved\n  questions:\n    ready: {type: noul, instructions: Ready?}\n",
+		RegisteredName: "skill-☃", Kind: "YAML", Declaration: "YAML", SourcePath: `opaque <label>`,
+		Yaml: "name: skill-☃\nmodel: planner\ninstructions: Preserved\n",
 	}
 	body, err := json.Marshal(browserFact)
 	if err != nil {
@@ -46,8 +46,8 @@ func TestBrowserAndMCPPreserveSameSkillFacts(t *testing.T) {
 	}
 }
 
-func TestBrowserAndMCPPreserveNativeSummaryFacts(t *testing.T) {
-	body := []byte(`{"items":[{"registeredName":"native","kind":"TYPESAFE","declaration":"YAML","sourcePath":" opaque ../ Native: <label> "}],"hasMore":false,"nextCursor":null,"observedAt":"2026-10-11T00:00:00Z"}`)
+func TestBrowserAndMCPPreserveModelSummaryFacts(t *testing.T) {
+	body := []byte(`{"items":[{"registeredName":"model","kind":"YAML","declaration":"YAML","sourcePath":" opaque ../ Model: <label> "}],"hasMore":false,"nextCursor":null,"observedAt":"2026-10-11T00:00:00Z"}`)
 	options := newMCPTestOptions(t, func(string) ([]byte, error) { return body, nil })
 	_, envelope, err := handleListSkills(context.Background(), options, listSkillsInput{})
 	if err != nil || envelope.Result == nil {
@@ -57,7 +57,7 @@ func TestBrowserAndMCPPreserveNativeSummaryFacts(t *testing.T) {
 		t.Fatalf("unexpected items: %#v", envelope.Result.Items)
 	}
 	item := envelope.Result.Items[0]
-	if item.Kind != "TYPESAFE" || item.RegisteredName != "native" || item.SourcePath != " opaque ../ Native: <label> " {
+	if item.Kind != "YAML" || item.RegisteredName != "model" || item.SourcePath != " opaque ../ Model: <label> " {
 		t.Fatalf("summary changed: %#v", item)
 	}
 	encoded, err := json.Marshal(item)
@@ -73,7 +73,7 @@ func TestBrowserAndMCPPreserveNativeSummaryFacts(t *testing.T) {
 			t.Fatalf("summary contains %s: %s", name, encoded)
 		}
 	}
-	validateTypedEnvelope(t, "typesafe-list", skillListOutputSchema(), *envelope.Result)
+	validateTypedEnvelope(t, "model-list", skillListOutputSchema(), *envelope.Result)
 }
 
 // WF-SE-R2/WF-SE-R6/WF-SE-R9/WF-SE-R10: compare every bounded active
@@ -189,7 +189,7 @@ func TestBrowserAndMCPPreserveJavaSkillFixture(t *testing.T) {
 }
 
 func TestAllCallableFormsPreserveProvenanceAndRejectInvalidContracts(t *testing.T) {
-	for _, fixture := range []string{"skill-detail.json", "skill-typesafe-detail.json", "skill-java-detail.json", "skill-executor-detail.json"} {
+	for _, fixture := range []string{"skill-detail.json", "skill-java-detail.json", "skill-executor-detail.json"} {
 		t.Run(fixture, func(t *testing.T) {
 			body, err := os.ReadFile(filepath.Join("..", "..", "..", "loomspan-console-fixtures", "application-rest", fixture))
 			if err != nil {

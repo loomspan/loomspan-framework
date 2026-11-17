@@ -2,7 +2,6 @@ package observability
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -76,7 +75,7 @@ func TestObservabilityServiceReturnsSkillPageFromFixture(t *testing.T) {
 	if domain != nil {
 		t.Fatal(domain)
 	}
-	if len(page.Items) != 4 || page.Items[0].RegisteredName != "default-CheckDns" || page.Items[1].Kind != "JAVA" || page.Items[3].Kind != "TYPESAFE" {
+	if len(page.Items) != 3 || page.Items[0].RegisteredName != "default-CheckDns" || page.Items[1].Kind != "JAVA" {
 		t.Fatalf("unexpected page: %#v", page)
 	}
 	if page.HasMore {
@@ -106,7 +105,7 @@ func TestObservabilityServiceReturnsInstanceStatusFromFixture(t *testing.T) {
 	if status.InstanceID != "11111111-1111-4111-8111-111111111111" {
 		t.Fatalf("unexpected instance ID: %s", status.InstanceID)
 	}
-	if status.RegisteredSkillCount != 4 {
+	if status.RegisteredSkillCount != 3 {
 		t.Fatalf("unexpected skill count: %d", status.RegisteredSkillCount)
 	}
 	if status.TargetScopeID != "scope-1" {
@@ -294,30 +293,6 @@ func TestObservabilityServiceReturnsSkillDetailFromFixture(t *testing.T) {
 	}
 }
 
-func TestObservabilityServicePreservesNativeDetailFixture(t *testing.T) {
-	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "loomspan-console-fixtures", "application-rest", "skill-typesafe-detail.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var expected SkillDetail
-	if err := json.Unmarshal(fixture, &expected); err != nil {
-		t.Fatal(err)
-	}
-	client := &fakeGetClient{body: fixture, instanceID: "11111111-1111-4111-8111-111111111111"}
-	targetContext := setupTargetWithCredential(t, client)
-	scope, domain := targetContext.Capture()
-	if domain != nil {
-		t.Fatal(domain)
-	}
-	detail, domain := New().GetSkill(context.Background(), scope, expected.RegisteredName)
-	if domain != nil {
-		t.Fatal(domain)
-	}
-	if detail.Kind != "TYPESAFE" || detail.SourcePath != expected.SourcePath || detail.Yaml != expected.Yaml || detail.OutputSchema == nil || *detail.OutputSchema != *expected.OutputSchema {
-		t.Fatalf("expected=%#v actual=%#v", expected, detail)
-	}
-}
-
 func TestObservabilityServiceReturnsActiveExecutionDetailFromFixture(t *testing.T) {
 	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "loomspan-console-fixtures", "application-rest", "active-execution-detail.json"))
 	if err != nil {
@@ -396,7 +371,7 @@ func TestObservabilityServiceAgainstHTTPTestServer(t *testing.T) {
 	if domain != nil {
 		t.Fatal(domain)
 	}
-	if len(page.Items) != 4 {
+	if len(page.Items) != 3 {
 		t.Fatalf("expected 4 items, got %d", len(page.Items))
 	}
 }

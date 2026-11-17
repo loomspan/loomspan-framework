@@ -2,25 +2,25 @@
 
 These playbooks define goals and stopping conditions, not exact tool sequences.
 
-## WF-TYPESAFE-EVALUATION
+## WF-EXECUTOR-INSPECTION
 
-Discover the registered leaf through `LOOMSPAN_list_skills`, then inspect its
-`LOOMSPAN_get_skill` detail for `kind: TYPESAFE` and `declaration: YAML`, original YAML, location and
-descriptive output schema. Opaque supplied source labels are not filesystem
-provenance; TypeSafe entries have no Java bean/method location.
-Resolve the execution's trace and frame, then query request/response/failure
-record descriptors. Native `payloadType: evaluation` content contains resolved
-state/questions, endpoint and requested model, complete provider envelope with
-available served model, or malformed `rawBody`; it does not contain chat messages.
-Read selected content references through the ordinary JSON/text content path.
-Follow chunks/ranges and preserve explicit truncation, disabled capture and
-unavailable/incomplete evidence. Acceptance of an answer does not imply complete
-diagnostic capture. Distinguish HTTP success from terminal answer extraction
-failure, recovered attempts from terminal failures, and exact token usage from
-unavailable usage. Response-based model-call counts are not billing totals.
-Stop when captured evaluation and failure mechanics are explained. Distribution
-confidence is not correctness, and Noul reports probability of yes. Do not infer
-identical route judgments or live provider accuracy from deterministic fixtures.
+Discover the callable skill through `LOOMSPAN_list_skills`, then inspect its
+`LOOMSPAN_get_skill` detail for `kind: JAVA`, `declaration: YAML`, original YAML,
+source label and qualified executor bean/method locations. Reference-only
+executors are not callable catalog entries; supplied source labels are opaque.
+Executor leaves have no generated output schema.
+Resolve the execution's trace and frame, then use `LOOMSPAN_query_trace_records`
+for `EXECUTOR_DIAGNOSTIC_RECORDED` and
+`EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED` with the selected frame filter.
+These are records within existing execution frames, not native model attempts.
+Read their existing `data` content through bounded inline content or
+`LOOMSPAN_read_trace_content`, following ordinary ranges and continuation.
+Keep authored severity, JSON and explicit capture states intact. An authored
+error diagnostic is not an execution failure. Absence of a diagnostic or notice
+establishes no cause; a retained truncation notice cannot recover discarded data.
+Executor provider usage and retries do not contribute to Framework-accounted
+usage or native attempt budgets. Stop when the retained authored evidence and
+execution facts answer the question, or state what the evidence cannot establish.
 
 ## WF-FAILED-EXECUTION
 

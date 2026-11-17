@@ -262,10 +262,10 @@ class YamlSkillCatalogTests {
         var cases = Map.of(
                 "1: value\n'1': other", "",
                 "input_schema: {type: object, properties: {true: {type: string}}}", "/input_schema/properties",
-                "typesafe: {state: [{false: value}]}", "/typesafe/state/0",
+                "output_schema: {properties: [{false: value}]}", "/output_schema/properties/0",
                 "input_schema: {type: object, properties: {x: {type: number, minimum: .inf}}}", "/input_schema/properties/x/minimum",
-                "typesafe: {state: {value: .nan}}", "/typesafe/state/value",
-                "typesafe: {state: {value: -.inf}}", "/typesafe/state/value");
+                "output_schema: {properties: {value: .nan}}", "/output_schema/properties/value",
+                "output_schema: {properties: {value: -.inf}}", "/output_schema/properties/value");
         cases.forEach((body, path) -> {
             var checked = new YamlSkillCatalog(new LoomspanProperties()).checkedSupplied(
                     List.of(new SkillDocument("json-ingress.yaml", "name: bad\ndescription: test\n" + body)), false);

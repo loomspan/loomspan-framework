@@ -195,8 +195,6 @@ func TestCompactSchemasRetainDecisionAndNavigationFields(t *testing.T) {
 		{"runtime", runtimeOutputSchema(), map[string]any{"observedAt": "2026-08-19T00:00:00Z", "targetSelection": "NONE", "targetConnection": "DISCONNECTED", "targetAuthentication": "UNKNOWN", "javaGoCompatibility": "UNKNOWN", "runtimeIdentity": "UNKNOWN", "liveMonitoring": "UNAVAILABLE"}},
 		{"skills-list", skillListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"registeredName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml"}}, "hasMore": false}}},
 		{"skill-detail", skillDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": map[string]any{"registeredName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml", "yaml": "name: skill", "outputSchema": nil}}}},
-		{"typesafe-list", skillListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"registeredName": "skill", "kind": "TYPESAFE", "declaration": "YAML", "sourcePath": "opaque label"}}, "hasMore": false}}},
-		{"typesafe-detail", skillDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": map[string]any{"registeredName": "skill", "kind": "TYPESAFE", "declaration": "YAML", "sourcePath": "opaque label", "yaml": "name: skill\ntypesafe: {}", "outputSchema": "{\"type\":\"object\"}"}}}},
 		{"executions-list", executionListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"sessionId": "s", "traceId": "t", "status": "RUNNING", "phase": "STEP", "updatedAt": "2026-08-19T00:00:00Z", "activeBranchCount": 0}}, "hasMore": false}}},
 		{"execution-detail", executionDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "execution": map[string]any{"sessionId": "s", "traceId": "t", "status": "RUNNING", "phase": "STEP", "activeBranches": []any{}, "usage": map[string]any{}, "configuredLimits": map[string]any{}}}}},
 		{"activity", activityOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"cursor": "c", "sessionId": "s", "traceId": "t", "timestamp": "2026-08-19T00:00:00Z", "kind": "STEP_COMPLETED", "facts": map[string]any{}}}, "hasMore": false, "coverage": map[string]any{}}}},
@@ -306,4 +304,18 @@ func TestTraceSummaryHistogramSchemaRejectsUnknownAndInvalidCounts(t *testing.T)
 
 func compactEvidenceInstance() map[string]any {
 	return map[string]any{"traceId": "trace", "sessionId": "session", "observedAt": "2026-08-19T00:00:00Z"}
+}
+
+func TestSkillSchemasRejectRetiredKind(t *testing.T) {
+	summary := map[string]any{"registeredName": "skill", "kind": "TYPESAFE", "declaration": "YAML", "sourcePath": "skill.yaml"}
+	list := map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{summary}, "hasMore": false}}
+	if err := validateCompactInstance(t, skillListOutputSchema(), list); err == nil {
+		t.Fatal("retired skill kind accepted in list")
+	}
+	summary["yaml"] = "name: skill"
+	summary["outputSchema"] = nil
+	detail := map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": summary}}
+	if err := validateCompactInstance(t, skillDetailOutputSchema(), detail); err == nil {
+		t.Fatal("retired skill kind accepted in detail")
+	}
 }

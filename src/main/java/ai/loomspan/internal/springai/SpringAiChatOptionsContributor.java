@@ -21,7 +21,6 @@ public final class SpringAiChatOptionsContributor
             case OPENAI -> openAi(configuration);
             case ANTHROPIC -> anthropic(configuration);
             case GEMINI -> gemini(configuration);
-            case TYPESAFE -> throw new IllegalArgumentException("Native evaluations do not accept chat options");
         };
     }
 

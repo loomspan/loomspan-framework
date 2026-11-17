@@ -14,13 +14,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ExecutionConfigurationParserTest
 {
+    @Test void rejectsRemovedTypeSafeDriver() {
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
+                CANDIDATE.replace("driver: openai", "driver: typesafe")), new StandardEnvironment(), false))
+                .hasMessageContaining("loomspan.connections.primary.driver");
+    }
+
     @Test
-    void nativeCandidateCapturesAccountReferencesAndProtocolOptions() {
-        String yaml = CANDIDATE.replace("driver: openai", "driver: typesafe\n      base-url: https://openrouter.ai/api/\n      request-timeout: 240ms");
+    void candidateCapturesAccountReferencesAndProtocolOptions() {
+        String yaml = CANDIDATE.replace("driver: openai", "driver: openai\n      base-url: https://openrouter.ai/api/\n      request-timeout: 240ms");
         var parsed = ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(yaml),
                 Map.of("provider.key", "fixture-native-key", "tenant.header", "fixture-header"));
         var connection = parsed.properties().getConnections().get("primary");
-        assertThat(connection.getDriver()).isEqualTo(ai.loomspan.autoconfigure.AiDriver.TYPESAFE);
+        assertThat(connection.getDriver()).isEqualTo(ai.loomspan.autoconfigure.AiDriver.OPENAI);
         assertThat(connection.getBaseUrl()).isEqualTo("https://openrouter.ai/api/");
         assertThat(connection.getRequestTimeout()).isEqualTo(java.time.Duration.ofMillis(240));
         assertThat(connection.getApiKey()).isEqualTo("fixture-native-key");

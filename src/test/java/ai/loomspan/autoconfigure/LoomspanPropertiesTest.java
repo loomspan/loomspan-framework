@@ -12,6 +12,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LoomspanPropertiesTest {
 
+    @Test void startupRejectsRemovedTypeSafeDriver() {
+        new ApplicationContextRunner().withUserConfiguration(TimeoutBinding.class)
+                .withPropertyValues("loomspan.connections.named.driver=typesafe", "loomspan.connections.named.api-key=fixture")
+                .run(context -> assertThat(context.getStartupFailure()).isNotNull()
+                        .hasStackTraceContaining("loomspan.connections.named.driver"));
+    }
+
     @Test
     void requestTimeoutBindsAcrossSupportedDriversAndPreservesOmission()
     {
@@ -292,7 +299,7 @@ class LoomspanPropertiesTest {
             properties.setConnections(java.util.Map.of(driver.name().toLowerCase(), connection));
             assertThatThrownBy(properties::afterPropertiesSet)
                     .hasMessageContaining(".headers")
-                    .hasMessageContaining("only supported for drivers OPENAI, ANTHROPIC and TYPESAFE");
+                    .hasMessageContaining("only supported for drivers OPENAI and ANTHROPIC");
         }
     }
 

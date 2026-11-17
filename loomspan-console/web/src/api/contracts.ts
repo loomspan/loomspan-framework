@@ -122,7 +122,7 @@ export type InstanceStatus = {
 };
 
 type SkillLocation =
-  | { kind: "YAML" | "TYPESAFE"; declaration: "YAML"; sourcePath: string; executorName?: never; beanName?: never; method?: never }
+  | { kind: "YAML"; declaration: "YAML"; sourcePath: string; executorName?: never; beanName?: never; method?: never }
   | { kind: "JAVA"; declaration: "YAML"; sourcePath: string; executorName: string; beanName: string; method: string }
   | { kind: "JAVA"; declaration: "SKILL_METHOD"; sourcePath?: never; executorName?: never; beanName: string; method: string };
 

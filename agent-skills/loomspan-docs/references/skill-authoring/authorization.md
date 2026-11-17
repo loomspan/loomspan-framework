@@ -54,13 +54,13 @@ A YAML skill can declare the equivalent role policy:
 rbac_roles: [FINANCE, ADMIN]
 ```
 
-All skill kinds use Spring's authority evaluation. The default prefix is `ROLE_`, so `FINANCE` requires authority `ROLE_FINANCE`. `GrantedAuthorityDefaults` configures a custom or empty prefix, and a configured `RoleHierarchy` applies to Java, TypeSafe, and model-backed YAML skills. Role names are not raw authorities: writing `ROLE_FINANCE` with the default prefix requires `ROLE_ROLE_FINANCE`; Loomspan does not strip prefixes. Omitted or empty YAML roles are unrestricted.
+All skill kinds use Spring's authority evaluation. The default prefix is `ROLE_`, so `FINANCE` requires authority `ROLE_FINANCE`. `GrantedAuthorityDefaults` configures a custom or empty prefix, and a configured `RoleHierarchy` applies to Java, executor-backed YAML, and model-backed YAML skills. Role names are not raw authorities: writing `ROLE_FINANCE` with the default prefix requires `ROLE_ROLE_FINANCE`; Loomspan does not strip prefixes. Omitted or empty YAML roles are unrestricted.
 
 Use Spring's documented `GrantedAuthorityDefaults` bean configuration when the application uses a different prefix. Do not encode prefix handling in skill names, prompts, or business inputs.
 
 ## Compose executor declaration boundaries
 
-An annotation-only `@SkillMethod` uses its captured Java declarative policy. Model and TypeSafe YAML skills use their YAML policy. An executor YAML leaf MUST satisfy **both** its YAML `rbac_roles` policy **and** the Java policy on its captured executor registration, against the same trusted caller.
+An annotation-only `@SkillMethod` uses its captured Java declarative policy. Model-backed YAML skills use their YAML policy. An executor YAML leaf MUST satisfy **both** its YAML `rbac_roles` policy **and** the Java policy on its captured executor registration, against the same trusted caller.
 
 Alternatives stay inside each declaration. For example, YAML `rbac_roles: [SALES, SUPPORT]` and executor `@RolesAllowed("DATABASE_WRITE")` mean `(SALES OR SUPPORT) AND DATABASE_WRITE`. A caller with only SALES or only DATABASE_WRITE is denied. Unrestricted/`@PermitAll` on one side never overrides a restrictive other side; `@DenyAll` denies the conjunction. Prefix and hierarchy rules apply to both constituents.
 
@@ -72,7 +72,7 @@ Evidence: `SkillRoleEvaluatorTest`, `DefaultAccessGuardTest#usesOneResolvedCalle
 
 ## Local visibility and caller scope
 
-A YAML parent's `allowed_skills` names the only candidate children. Java, TypeSafe, and model-backed YAML children are resolved by exact name after startup registration finishes. Missing references fail startup. Authorization then filters this local set for each invocation; `@PermitAll` never makes an undeclared child visible. A denied required child can make a planning or evidence requirement unsatisfiable.
+A YAML parent's `allowed_skills` names the only candidate children. Java, executor-backed YAML, and model-backed YAML children are resolved by exact name after startup registration finishes. Missing references fail startup. Authorization then filters this local set for each invocation; `@PermitAll` never makes an undeclared child visible. A denied required child can make a planning or evidence requirement unsatisfiable.
 
 At runtime every ordinary, planned and bound dispatch independently checks the actual
 executing source before switching context. A call MUST be declared directly by that

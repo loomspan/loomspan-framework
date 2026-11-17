@@ -28,12 +28,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Actual supported facade/dispatch with local provider responses. */
 class DeclaredChildInputBindingsIntegrationTest {
     @org.junit.jupiter.api.Test
-    void nativeLeafReceivesDynamicBindingsWithExactReceiverAndDirectValidation() throws Exception {
-        Path skills = Files.createDirectory(directory.resolve("native-binding"));
-        String nativeLeaf = """
+    void executorLeafReceivesDynamicBindingsWithExactReceiverAndDirectValidation() throws Exception {
+        Path skills = Files.createDirectory(directory.resolve("executor-binding"));
+        String executorLeaf = """
                 name: evaluation
                 description: Evaluate exact evidence
-                model: native
+                executor: fixture
                 input_schema:
                   type: object
                   properties:
@@ -41,17 +41,11 @@ class DeclaredChildInputBindingsIntegrationTest {
                     candidates: {type: object, additionalProperties: true}
                   required: [amount, candidates]
                   additionalProperties: false
-                typesafe:
-                  state: ${/input}
-                  questions:
-                    category: {type: choice, criteria: '${/input/candidates}'}
-                    severity: {type: score, criteria: [null]}
-                    yes: {type: noul, instructions: 'Evaluate amount ${/input/amount}'}
                 """;
-        Files.writeString(skills.resolve("evaluation.yaml"), nativeLeaf);
+        Files.writeString(skills.resolve("evaluation.yaml"), executorLeaf);
         Files.writeString(skills.resolve("root.yaml"), """
                 name: root
-                description: Bind native business input
+                description: Bind executor business input
                 model: local
                 planning_mode: true
                 max_steps: 1
@@ -65,41 +59,38 @@ class DeclaredChildInputBindingsIntegrationTest {
                       /candidates: {from: input, path: /candidates}
                 output_from: {skill: default-evaluation}
                 """);
-        var nativeBodies = new ArrayList<String>();
+        var receivedInputs = new ArrayList<Map<String, Object>>();
         try (var server = new MockWebServer()) {
             server.setDispatcher(new Dispatcher() {
                 @Override public MockResponse dispatch(RecordedRequest request) {
-                    if (request.getPath().equals("/api/v1/systemone")) {
-                        nativeBodies.add(request.getBody().readUtf8());
-                        return new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"answers\":{}}");
-                    }
                     return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-10T00:00:00Z",
                             "status", "VALID", "tasks", List.of(task("evaluation", List.of())))));
                 }
             });
             server.start();
-            new ApplicationContextRunner().withUserConfiguration(App.class).withPropertyValues(
+            new ApplicationContextRunner().withUserConfiguration(App.class)
+                    .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
+                        receivedInputs.add(invocation.input()); return "{\"answers\":{}}";
+                    })).withPropertyValues(
                     "spring.main.web-application-type=none", "loomspan.skills.locations=" + skills.toUri() + "*.yaml",
                     "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url=" + server.url("/v1"),
-                    "loomspan.connections.local.api-key=fixture", "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=planner",
-                    "loomspan.connections.native.driver=typesafe", "loomspan.connections.native.base-url=" + server.url("/api"),
-                    "loomspan.connections.native.api-key=fixture", "loomspan.models.native.connection=native", "loomspan.models.native.provider-model=jev"
+                    "loomspan.connections.local.api-key=fixture", "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=planner"
             ).run(context -> {
                 assertThat(context).hasNotFailed();
                 var template = context.getBean(SkillTemplate.class);
                 var candidates = Map.of("KeepCase", Map.of("description", "original"));
                 org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-evaluation", Map.of("amount", "4", "candidates", candidates)))
                         .isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
-                assertThat(nativeBodies).isEmpty();
-                assertThat(template.invoke("default-evaluation", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{}");
-                assertThat(template.invoke("default-root", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{}");
+                assertThat(receivedInputs).isEmpty();
+                assertThat(template.invoke("default-evaluation", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{\"answers\":{}}");
+                assertThat(template.invoke("default-root", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{\"answers\":{}}");
                 org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", Map.of("amount", "4", "candidates", candidates)))
                         .hasStackTraceContaining("binding_assembled_input_invalid");
-                assertThat(nativeBodies).hasSize(2);
-                assertThat(JSON.readTree(nativeBodies.getFirst())).isEqualTo(JSON.readTree(nativeBodies.getLast()));
-                assertThat(JSON.readTree(nativeBodies.getFirst()).at("/questions/category/criteria/KeepCase/description").asText()).isEqualTo("original");
+                assertThat(receivedInputs).hasSize(2);
+                assertThat(receivedInputs.getFirst()).isEqualTo(receivedInputs.getLast());
+                assertThat(receivedInputs.getFirst()).containsEntry("candidates", candidates);
             });
-            assertThat(server.getRequestCount()).isEqualTo(4);
+            assertThat(server.getRequestCount()).isEqualTo(2);
         }
     }
 

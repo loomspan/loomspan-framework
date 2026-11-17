@@ -33,7 +33,7 @@ class CanonicalProviderNamesTest {
             } else {
                 var properties = new LoomspanProperties.ConnectionProperties(); properties.setDriver(driver);
                 properties.setApiKey("test-key"); properties.setBaseUrl(server.url("/").toString());
-                model = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("test",properties).requireChatModel();
+                model = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("test",properties).chatModel();
             }
             var names = List.of("a_b-c_d","n".repeat(32)+"-"+"x".repeat(31));
             var callbacks = names.stream().map(name -> FunctionToolCallback.<String,String>builder(name,input -> input)

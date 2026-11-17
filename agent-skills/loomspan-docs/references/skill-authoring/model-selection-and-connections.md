@@ -19,7 +19,7 @@ The author-facing chain is:
 
 - An LLM-backed skill MUST set `model` to a configured framework model alias.
 - A model alias MUST set `connection` and `provider-model`.
-- The connection MUST exist and MUST choose exactly one built-in driver: `openai`, `anthropic`, `gemini`, or `typesafe`. TypeSafe leaves require `typesafe`; ordinary chat YAML requires a chat driver.
+- The connection MUST exist and MUST choose exactly one built-in driver: `openai`, `anthropic`, or `gemini`. Executor packs have separate captured configuration; see [TypeSafe pack leaves](typesafe-skills.md).
 - Connection names and framework model names are application-owned and case-sensitive map keys.
 - Multiple connections MAY use the same driver. Use separate names when endpoints, accounts, credentials, headers, or protocol options differ.
 - `default-model` has no special fallback behavior; it is an ordinary alias.
@@ -56,10 +56,9 @@ The connection table below describes ordinary embedded `application.yml`. In an 
 | --- | --- | --- |
 | `openai` | `api-key` | `base-url`, `request-timeout`, static `headers`, `openai.organization-id`, `openai.project-id` |
 | `anthropic` | `api-key` | `base-url`, `request-timeout`, static `headers` |
-| `typesafe` | `api-key` | Service-prefix `base-url`, response/socket-inactivity `request-timeout`, static `headers` except Authorization; see [TypeSafe skills](typesafe-skills.md) |
 | `gemini` | Exactly one of API-key mode or Vertex AI mode | `request-timeout` in either mode; API-key mode uses `api-key`; Vertex mode uses `gemini.vertex-ai: true`, `project-id`, `location`, and optional `credentials-uri` |
 
-Static `headers` are accepted by OpenAI, Anthropic, and TypeSafe. TypeSafe rejects any capitalization of Authorization and does not accept chat provider option blocks or thinking levels. Provider-specific option blocks MUST match their driver. Unknown `loomspan.*` fields are rejected at startup. Loomspan does not read, merge, or inherit `spring.ai.*` configuration.
+Static `headers` are accepted by OpenAI and Anthropic. Provider-specific option blocks MUST match their driver. Unknown `loomspan.*` fields are rejected at startup. Loomspan does not read, merge, or inherit `spring.ai.*` configuration.
 
 The OpenAI and Anthropic drivers use Spring AI 2's official SDK-backed clients. A configured `base-url` is the SDK service root, not a completion-path override. OpenAI Responses appends `/responses`, so a compatible service that uses the conventional versioned route should provide a root ending in `/v1`. Anthropic appends `/v1/messages` and supplies its required version header through the official client. Put supported Anthropic beta values and other custom headers in the common `headers` map. Compatibility is a service contract, not inferred by Loomspan. The `openai` driver serves OpenAI, Meta, OpenRouter and Ollama through stateless Responses (`store: false`, without `previous_response_id`). Services that only support Chat Completions are unsupported. The local examples use `api-key: ollama`; authenticated deployments require their actual credentials. No native Ollama driver, protocol fallback or compatibility profile exists.
 
@@ -71,7 +70,7 @@ Every connection owns a `provider-retry` policy. Defaults are enabled, three tot
 
 One Loomspan model interaction is one semantic request from mission, planning, or step execution. The single Spring AI tool loop may require multiple model turns inside that interaction. A semantic validator retry starts another semantic attempt; a provider retry repeats one unchanged model turn. Every actual downstream send is one physical provider attempt, is counted against quota once, and is owned by Loomspan because provider-native retries are disabled.
 
-Credentials SHOULD come from environment placeholders or an external secret source and MUST NOT be committed. Connection diagnostics, traces, and metrics identify framework model, connection, and driver; connection-construction diagnostics do not expose API keys, header values, base URLs, or credential contents. Native TypeSafe request evidence records its actual endpoint under existing capture controls. Authored YAML retains reference names, not resolved values. Environment-variable changes require restart. For rotation, publish a replacement, allow old work to finish, then revoke the old key; external revocation can break a captured execution.
+Credentials SHOULD come from environment placeholders or an external secret source and MUST NOT be committed. Connection diagnostics, traces, and metrics identify framework model, connection, and driver; connection-construction diagnostics do not expose API keys, header values, base URLs, or credential contents. Authored YAML retains reference names, not resolved values. Environment-variable changes require restart. For rotation, publish a replacement, allow old work to finish, then revoke the old key; external revocation can break a captured execution.
 
 ## Explicit response status
 
@@ -90,12 +89,6 @@ Gemini `MAX_TOKENS`, `SAFETY`, `RECITATION`, `LANGUAGE`, `BLOCKLIST`,
 
 ## Provider call budgets
 
-The whole-call behavior below applies to chat drivers. TypeSafe uses Apache
-response/socket inactivity timeouts: progressing body chunks may keep a response
-alive beyond `request-timeout`. Omission retains Apache defaults; connect and
-connection-lease defaults remain unchanged. Mission cancellation and deadlines
-remain authoritative. See [native transport](typesafe-skills.md#transport-usage-and-observation).
-
 For chat drivers, `loomspan.connections.<name>.request-timeout` MAY bound one physical HTTP call through complete response consumption, including header wait. Headers, whitespace keepalives and continuing body chunks do not reset the whole-call deadline. It is not a connect or read-inactivity setting and cannot be overridden by a skill/model or emitted as request JSON. Existing connect behavior is preserved. The current OpenAI/Anthropic SDK transports also derive their read/write inactivity limits from this duration, so raising the budget raises those inherited limits. This setting does not override provider/server/proxy limits.
 
 | Driver | Omitted `request-timeout` | Explicit value |
@@ -103,7 +96,6 @@ For chat drivers, `loomspan.connections.<name>.request-timeout` MAY bound one ph
 | OpenAI, Meta, OpenRouter and Ollama through `openai` | 60-second whole-call limit | Configured whole-call budget |
 | Anthropic | 60-second whole-call limit | Configured whole-call budget |
 | Gemini API key and Vertex AI | Client-call limit unset | Configured whole-call budget |
-| TypeSafe (both account routes) | Apache defaults | Response/socket inactivity timeout; no added elapsed whole-call deadline |
 
 An authored value MUST be an exact whole-millisecond duration from `1ms` through `2147483647ms` inclusive (24 days, 20 hours, 31 minutes, 23.647 seconds). Spring duration units and exact ISO-8601 syntax are accepted. Zero, negatives, malformed text, sub-millisecond or fractional-millisecond durations, and larger values fail safely with the full property path; values are never clamped or converted to unlimited.
 
@@ -127,8 +119,7 @@ For `ExecutionConfiguration`, use the same key and replace `api-key` with `api-k
 
 ## Thinking levels
 
-TypeSafe model aliases and leaves MUST omit thinking levels and `thinking_level`.
-The following thinking rules apply to chat models.
+The following thinking rules apply to Framework chat models.
 
 A model alias MAY declare `thinking-levels`. A skill's `thinking_level` MUST be one of those configured values. If the alias has no configured levels, the skill MUST omit `thinking_level`. Thinking options are adapted to the selected driver at request time; the connection remains reusable across model aliases.
 
@@ -174,7 +165,7 @@ Startup errors include the complete property path for missing, unknown, or drive
 
 For chat drivers, terminal provider failures emit one framework-owned WARN after retry policy decides that the request will escape. The warning identifies the framework model, connection, driver, and provider model and names the settings to investigate. Authentication points to the connection credential setting without claiming it is missing. Connectivity points to network reachability and the driver's applicable connection settings—`loomspan.connections.<name>.base-url` for OpenAI and Anthropic, or Gemini's `api-key`/`gemini.vertex-ai` mode plus `gemini.project-id` and `gemini.location`—without proving that the configured endpoint is wrong. Invalid-request and HTTP 404 guidance points to those driver-applicable connection settings and `loomspan.models.<framework-model>.provider-model` because endpoint, model, and access failures can be ambiguous. A retry that later recovers emits no terminal WARN.
 
-For chat drivers, the identical bounded guidance is recorded on every failed physical attempt, including recovered attempts, so diagnosis can continue in Console alongside the original provider evidence. TypeSafe records native attempt classification, retry decisions, stack evidence, and available provider-error content in canonical traces; inspect those facts for native failures. Provider evidence remains untrusted diagnostic content and may contain sensitive values; Loomspan does not generally scrub it. Follow [traces-and-debugging.md](traces-and-debugging.md) for the exact failure-to-attempt inspection path.
+For chat drivers, the identical bounded guidance is recorded on every failed physical attempt, including recovered attempts, so diagnosis can continue in Console alongside the original provider evidence. Provider evidence remains untrusted diagnostic content and may contain sensitive values; Loomspan does not generally scrub it. Follow [traces-and-debugging.md](traces-and-debugging.md) for the exact failure-to-attempt inspection path.
 
 ## Source verification anchors
 

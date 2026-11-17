@@ -216,7 +216,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         for (YamlSkillDefinition definition : checked.definitions())
             skills.add(new ValidatedSkill(definition.identity().toString(),
                     definition.form() == YamlSkillDefinition.Form.EXECUTOR ? SkillKind.JAVA
-                            : definition.typesafe() ? SkillKind.TYPESAFE : SkillKind.YAML));
+                            : SkillKind.YAML));
         skills.sort(Comparator.comparing(ValidatedSkill::name));
         return new SkillValidationResult(issues, skills);
     }
@@ -246,7 +246,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
                     SkillAccessPolicy.yamlRoles(definition.rbacRoles()),
                     arguments -> { throw new IllegalStateException("YAML skills require model execution"); },
                     definition.form() == YamlSkillDefinition.Form.EXECUTOR ? SkillKind.JAVA
-                            : definition.typesafe() ? SkillKind.TYPESAFE : SkillKind.YAML,
+                            : SkillKind.YAML,
                     new CapabilityToolDescriptor(name, description, inputs.toJsonSchema(contract), checked.outputSchemas().get(name)),
                     contract, diagnosticSource(definition, checked));
             putCapability(capabilities, metadata);

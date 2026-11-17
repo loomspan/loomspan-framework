@@ -46,12 +46,12 @@ beforeEach(() => {
   route.navigate.mockReset();
 });
 
-test("TypeSafe detail retains source label, original declaration and descriptive schema", async () => {
-  const yaml = "name: CheckDns\ntypesafe:\n  state: ${/input}\n  questions:\n    ready: {type: noul, instructions: Ready?}\n";
+test("Model detail retains source label, original declaration and descriptive schema", async () => {
+  const yaml = "name: CheckDns\nmodel: planner\ninstructions: Ready?\n";
   const schema = '{"type":"object","properties":{"ready":{"type":"object"}}}';
-  vi.mocked(getSkillDetail).mockResolvedValue({ targetScopeId: "scope-1", registeredName: "default-CheckDns", kind: "TYPESAFE", declaration: "YAML", sourcePath: "opaque <label>", yaml, outputSchema: schema });
+  vi.mocked(getSkillDetail).mockResolvedValue({ targetScopeId: "scope-1", registeredName: "default-CheckDns", kind: "YAML", declaration: "YAML", sourcePath: "opaque <label>", yaml, outputSchema: schema });
   render(<SkillDetailView />);
-  expect(await screen.findByText("TYPESAFE")).toBeInTheDocument();
+  expect(await screen.findAllByText("YAML")).toHaveLength(2);
   expect(screen.getByText("opaque <label>")).toBeInTheDocument();
   expect(screen.getByLabelText("Skill YAML source").textContent).toBe(yaml);
   expect(document.querySelector('pre[aria-label="Effective output schema"]')?.textContent).toBe(schema);
@@ -59,7 +59,7 @@ test("TypeSafe detail retains source label, original declaration and descriptive
   expect(screen.queryByText("Method")).toBeNull();
 });
 
-test.each(["YAML", "TYPESAFE"] as const)("rich effective %s schema remains inert text beside exact source", async (kind) => {
+test.each(["YAML"] as const)("rich effective %s schema remains inert text beside exact source", async (kind) => {
   const yaml = "# exact original\r\nname: CheckDns\r\noutput_from: {skill: producer}\r\n";
   const schema = JSON.stringify({type: "object", description: "<script>execute()</script>", additionalProperties: false,
     properties: {evidence: {type: ["string", "null"], minLength: 1, maxLength: 20},

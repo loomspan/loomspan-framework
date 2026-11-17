@@ -4,6 +4,5 @@ public enum AiDriver
 {
     OPENAI,
     ANTHROPIC,
-    GEMINI,
-    TYPESAFE
+    GEMINI
 }

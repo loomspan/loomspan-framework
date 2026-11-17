@@ -2,23 +2,23 @@
 audience: loomspan-skill-builder
 status: development
 applies_to: bundled-loomspan-revision
-coverage: canonical-bindings-and-focused-native-dispatch
+coverage: canonical-bindings-and-focused-executor-dispatch
 ---
 
 # Declared Child Input Bindings
 
 Use `input_bindings` on a structured `allowed_skills` entry of an explicit
 `planning_mode: true` parent to transfer authoritative values into a direct child.
-Model, TypeSafe, annotation-only Java, and executor YAML children use the same feature. The complete
+Model, annotation-only Java, and executor YAML children use the same feature. The complete
 receiving input contract remains authoritative; the calling model generates only
 unbound arguments under a separate projected contract. Binding grants no access
 and does not change invocation limits or the captured configuration generation.
 
 Canonical projection, declaration checks, source assembly, exact receiving validation
-and generated prompt guidance have focused coverage. A connected native TypeSafe
-case exercises direct and bound-child invocation through `SkillTemplate`, including
-rejection before native sends. The complete example below is validated as one
-generation; it illustrates dataflow rather than uniform native-provider execution.
+and generated prompt guidance have focused coverage. A connected executor case
+exercises direct and bound-child invocation through `SkillTemplate`, including
+input rejection before executor dispatch. The complete example below is validated
+as one generation; it illustrates dataflow rather than provider fidelity.
 
 Authored child references and binding producers MAY be local to the containing skill's namespace or explicitly qualified; local `search` in `sales` compiles to `sales-search`. Mixed spellings compare canonically and never search other namespaces. Runtime/model names remain qualified. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and boundary rules. Declarations keep local `name` components.
 
@@ -234,14 +234,12 @@ before a consumer. See [planning concurrency](planning-concurrency.md).
 
 ## Exact values and failures
 
-For a [TypeSafe child](typesafe-skills.md), bindings assemble and validate the same
-receiving input before native request substitution. Ordinary and bound JSON inputs
-use exact names and types without numeric/Boolean string coercion or date rewriting.
-Native state/instructions/criteria references can traverse arrays, but
-parent binding pointers retain the object-only rules above. Returned named answers
-are the result root: select `/department/choice` without an `/answers` prefix.
-Fixed descriptive output metadata helps existing registration checks; dynamic
-criteria and actual destination values retain runtime checks.
+For an [executor child](executor-skills.md), bindings assemble and validate the
+same receiving input before invocation. Ordinary and bound JSON inputs use exact
+names and types without numeric/Boolean string coercion or date rewriting.
+The [TypeSafe pack](typesafe-skills.md) returns a complete envelope: select
+`/answers/department/choice`, including the `/answers` prefix. Executor output
+metadata is absent; selected values retain the destination's runtime checks.
 
 Sources come from immutable owning-parent input and accepted pre-unit results.
 Corrections retain their assignment and snapshot. Nested and concurrent parents

@@ -22,7 +22,6 @@ type ModelMessage = {
 );
 
 type ModelDetail =
-  | { kind: "evaluation"; content: string }
   | { kind: "request"; messages: ModelMessage[] }
   | { kind: "response"; generations: (ModelMessage | null)[] };
 
@@ -337,9 +336,6 @@ function parseModelMessage(value: unknown, label: string): ModelMessage {
 
 function parseModelDetail(kind: "request" | "response", value: unknown): ModelDetail {
   const fields = modelObject(value, `Model ${kind} data`);
-  if (fields.payloadType === "evaluation") {
-    return { kind: "evaluation", content: JSON.stringify(fields, null, 2) };
-  }
   if (kind === "request") {
     if (!Array.isArray(fields.messages)) throw new Error("Model request data did not contain messages.");
     return { kind, messages: fields.messages.map((message, index) => parseModelMessage(message, `Model request message ${index + 1}`)) };
@@ -520,7 +516,6 @@ function ModelMessageView({ message }: { message: ModelMessage }) {
 }
 
 function ModelDetailView({ detail }: { detail: ModelDetail }) {
-  if (detail.kind === "evaluation") return <pre>{detail.content}</pre>;
   if (detail.kind === "request") {
     return <div className="trace-model-messages">{detail.messages.map((message, index) => <ModelMessageView key={index} message={message} />)}</div>;
   }

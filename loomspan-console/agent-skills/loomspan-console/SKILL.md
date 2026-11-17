@@ -67,7 +67,7 @@ references required by the interpretation:
 | What model, tool, or structured content was recorded? | Descriptor-first `LOOMSPAN_query_trace_records` narrowed to the relevant types, then read only selected `contentRef` values. Captured thought is not automatically the final output. |
 | What did an executor report? | Query both executor diagnostic record types in the selected frame, then read selected DATA content; see [executor playbook](references/debugging-playbooks.md#wf-executor-diagnostics). |
 | Why does this nested skill path exist? | Frame hierarchy first, then only the exact registered skill YAML needed to explain the selected path. |
-| What TypeSafe skill is registered, and what did it evaluate? | `LOOMSPAN_list_skills` / `LOOMSPAN_get_skill` for `TYPESAFE` source, unchanged YAML, locations and generated schema; then native evaluation record descriptors and selected content reads. See [TypeSafe inspection](references/debugging-playbooks.md#wf-typesafe-evaluation). |
+| What executor skill is registered, and what evidence did it record? | `LOOMSPAN_list_skills` / `LOOMSPAN_get_skill` for `JAVA` execution with YAML provenance and executor locations; then existing diagnostic record descriptors and selected content reads. See [Executor inspection](references/debugging-playbooks.md#wf-executor-inspection). |
 
 Tool arguments are exact. Use `pageSize`, not `limit`; trace outcome filtering
 uses the `outcomes` array, not `status`; record selectors belong under

@@ -8,7 +8,7 @@ coverage: source-verified
 # Executor leaf declarations and configuration
 
 For an independently versioned provider pack using these generic contracts, see
-the sibling [Loomspan Decisions pack](../../../../../loomspan-extensions/extensions/decisions/README.md)
+the sibling Loomspan Decisions pack (`../../../../../loomspan-extensions/extensions/decisions/README.md` in the sibling checkout)
 and its release-aligned executor configuration and runnable support-triage recipe.
 Installation registers reference-only behavior; applications still declare their
 own callable executor YAML skills. Pack syntax and capabilities belong to the
@@ -32,7 +32,7 @@ rbac_roles: [ACCOUNT_READER]
 
 `input_schema` and `rbac_roles` are optional. Authored input schemas use the [standard declaration rules](standard-schemas.md). Without an input schema, the existing generic object contract applies. Business input is never inherited from a parent.
 
-Executor leaves MUST omit `typesafe`, `model`, `thinking_level`, `prompt`, `planning_mode`, `concurrency`, `max_steps`, `allowed_skills`, `linter`, `output_schema`, `output_schema_max_retries`, `output_from`, and `output_bindings`. Presence fails even for null, false, empty maps, empty lists or empty strings. The forms do not select precedence. `rest` is unsupported manifest syntax; every value fails unknown-field validation.
+Executor leaves MUST omit `model`, `thinking_level`, `prompt`, `planning_mode`, `concurrency`, `max_steps`, `allowed_skills`, `linter`, `output_schema`, `output_schema_max_retries`, `output_from`, and `output_bindings`. Presence fails even for null, false, empty maps, empty lists or empty strings. The forms do not select precedence. `typesafe` and `rest` are unsupported top-level manifest syntax; every value fails unknown-field validation. The name `typesafe` remains valid inside executor-owned `config` data.
 
 `config` is permitted only on executor leaves. Omission and `{}` yield an empty immutable map. Explicit null, a bare field, a scalar or a list fail. Nested nulls, maps, lists, empty containers, scalar types and exact data keys are preserved. `config` is executor-owned domain data, not a Framework schema. It is decoded separately with the existing Java numeric kinds; lossless JSON-bound skill decoding applies to the rest of the document, not this actual top-level subtree.
 
@@ -111,7 +111,7 @@ For generation-keyed pools or clients, follow the existing public
 The executor generation ID is supplied even with no configuration path; resource
 creation, reuse, retirement and shutdown remain application responsibilities.
 
-- `ExecutorDeclarationTests`, `YamlSkillCatalogTests`, `YamlSkillDefinitionTest` and `TypeSafeDeclarationTests`: explicit forms, presence checks, ordinary input schemas and immutable copies.
+- `ExecutorDeclarationTests`, `YamlSkillCatalogTests` and `YamlSkillDefinitionTest`: explicit forms, presence checks, ordinary input schemas and immutable copies.
 - `ExecutorConfigurationTests`, `ExecutionConfigurationParserTest` and `ExecutorConfigurationStartupTests`: namespace structure, target enforcement, complete replacement, real Config Data loading, exact values and ordinary Spring behavior.
 - `ExecutorDependencyResolutionTest`: local/qualified roles, visibility, exact paths/maps, executor-only startup, retained binding, distinguishable captured executor policies, target-base publication and root-reachable capture.
 - `ExecutorGenerationExecutionTest` and `ExecutorGenerationExecutionIntegrationTest`: YAML retention, public JAVA classification, captured invocation construction and secured handoff across foreign replacement/removal/recreation.

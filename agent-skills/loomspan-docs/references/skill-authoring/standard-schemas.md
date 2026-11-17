@@ -15,7 +15,7 @@ PLANNING role. These declarations use the supported subset of JSON Schema Draft
 2020-12 described here; arbitrary Draft 2020-12 schemas are not accepted.
 
 The declaration compiler, JSON-bound skill decoder, generated Java contracts,
-input admission, binding projection/composition, native TypeSafe consumers and
+input admission, binding projection/composition and
 effective catalogs use canonical trees and shared local validation. Effective
 catalog/display metadata retains supported standard assertions and descriptions,
 removing only recognized execution annotations at schema-node locations. Provider
@@ -233,8 +233,7 @@ All skill YAML outside the actual top-level executor `config` subtree MUST have
 string object keys and JSON-compatible values. Numeric/boolean/null keys,
 non-finite numbers (`.nan`, `.inf`, `-.inf`) and unsupported YAML scalar/container
 kinds fail before Jackson conversion. Quoted keys and quoted non-finite-looking
-strings remain exact strings. Literal TypeSafe state, instructions and criteria
-follow this same JSON-bound rule; it is not restricted to schema fields.
+strings remain exact strings. This JSON-bound rule is not restricted to schema fields.
 
 Executor `config` remains separately decoded domain data with its existing Java
 numeric kinds. Ordinary configuration YAML uses its existing construction policy.
@@ -322,13 +321,12 @@ is permitted. No coercion, case folding, defaults or null insertion occurs.
 Malformed JSON and completed schema violations use the existing bounded output
 correction budget; operational validation failures escape as failures.
 `OutputSchemaValidatorTest`, `OrdinaryOutputAcceptanceTest` and
-`NativeOutputContractTest` exercise this boundary. TypeSafe and direct/forwarded structural metadata are additionally covered by
-`TypeSafeSkillIntegrationTest` and `SkillDependencyValidatorTest`.
+`NativeOutputContractTest` exercise this boundary. Direct/forwarded structural
+metadata is additionally covered by `SkillDependencyValidatorTest`.
 
 
 ## Planning and step acceptance
 
 Planning owns a separate generated native contract and accepts raw JSON only. Its all-required nullable shape is a deliberate Framework generation choice, not a conversion of user schemas. Parser, canonical, conversion and semantic failures share the existing single planning correction. See [generated planning contract](planning-concurrency.md#generated-task-contract).
 
-Actual planner and engine tests cover canonical semantics, bindings/evidence, exact model-origin decimal values, explicit-null argument-root rejection, omission/nested-null controls, bounded correction, required work and final-phase tool prohibition. Loopback planner initial/correction requests retain 4096 total-generation caps and accepted route options for direct Responses, OpenRouter, Meta, Ollama and Anthropic. Independent calls preserve formatting isolation. These local tests do not establish hosted enforcement or full application/public invocation. TypeSafe/catalog boundaries have their own integration checks; hosted enforcement
-remains separate.
+Actual planner and engine tests cover canonical semantics, bindings/evidence, exact model-origin decimal values, explicit-null argument-root rejection, omission/nested-null controls, bounded correction, required work and final-phase tool prohibition. Loopback planner initial/correction requests retain 4096 total-generation caps and accepted route options for direct Responses, OpenRouter, Meta, Ollama and Anthropic. Independent calls preserve formatting isolation. These local tests do not establish hosted enforcement or full application/public invocation. Catalog boundaries have their own integration checks; hosted enforcement remains separate.

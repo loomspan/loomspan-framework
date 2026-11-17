@@ -178,7 +178,7 @@ class AnthropicProtocolIntegrationTest
         properties.setDriver(AiDriver.ANTHROPIC);
         properties.setApiKey("fixture");
         properties.setBaseUrl(server.url("/").toString());
-        return new SpringAiProviderIntegration(new DefaultResourceLoader()).create("test", properties).requireChatModel();
+        return new SpringAiProviderIntegration(new DefaultResourceLoader()).create("test", properties).chatModel();
     }
 
     private static Map<String,Object> schema(String json)

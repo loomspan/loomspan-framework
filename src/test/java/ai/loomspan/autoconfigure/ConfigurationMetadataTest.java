@@ -56,8 +56,8 @@ class ConfigurationMetadataTest {
             assertThat(descriptions.get("loomspan.connections.*.base-url")).isEqualTo(
                     "Optional driver service-root override. OpenAI Responses appends /responses to the configured root, so include /v1 in the root when required by the service, including Ollama. Anthropic appends /v1/messages. Values are not emitted in Loomspan diagnostics.");
             assertThat(descriptions.get("loomspan.connections.*.headers")).isEqualTo(
-                    "Static headers supported for the OpenAI, Anthropic and TypeSafe drivers; use them "
-                            + "for provider-specific headers such as anthropic-beta. TypeSafe Authorization is owned by api-key.");
+                    "Static headers supported for the OpenAI and Anthropic drivers; use them "
+                            + "for provider-specific headers such as anthropic-beta.");
             assertThat(metadata)
                     .contains("loomspan.connections.*.driver")
                     .contains("loomspan.connections.*.gemini.credentials-uri")

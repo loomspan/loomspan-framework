@@ -23,7 +23,7 @@ void validate(String skillName, Object input);
 void validate(String skillName, Map<String, Object> input);
 ```
 
-`skillName` MUST identify a registered Java, TypeSafe, or model-backed YAML skill by its exact name.
+`skillName` MUST identify a registered Java, executor-backed YAML, or model-backed YAML skill by its exact name.
 For Java, combine its owning annotation namespace with the local annotation name (or canonical method name when omitted). Pass a catalog descriptor name unchanged. Every invoke/validate/observer overload and both handoff forms accept local `search` as `default-search`, always independent of any ambient namespace. Explicit `tax-search` stays tax-scoped. Resolution happens before capture with no fallback or namespace search: namespace case normalizes, local-name case remains exact, namespace length is at most 32 and total identity length at most 64. Missing namespaces fail without creation.
 Bean names and method signatures are diagnostics, never invocation aliases.
 
@@ -51,11 +51,11 @@ SHOULD give the producing model YAML skill an `output_schema` and then parse the
 according to the application's own boundary policy. Java null/void results become empty text, Strings remain exact, and other values
 use Jackson JSON. Java methods have no YAML output schema; see [Java results](java-skills.md#inputs-results-and-lifecycle).
 
-[TypeSafe leaves](../skill-authoring/typesafe-skills.md) use the same String facade:
-the complete named `answers` object becomes JSON text without a provider-envelope
-wrapper. Their generated schema is descriptive and does not validate or repair
-answers. Root pre-checks validate reachable dependencies, input and entry access; native substitution and
-resolved-request checks run during invocation before any provider attempt.
+[TypeSafe pack leaves](../skill-authoring/typesafe-skills.md) use the same String
+facade and return complete provider JSON, including its envelope, JSON null and
+quoted strings. There is no generated output schema or provider-answer validation
+or repair. Generic root dependency/input/access checks still apply; pack-domain
+validation runs at each invocation before send. Consumer bindings use `/answers/...`.
 
 An explicit planning `output_from` parent returns its designated accepted direct
 child task's existing String unchanged after every accepted task succeeds. It

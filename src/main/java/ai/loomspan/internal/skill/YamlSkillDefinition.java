@@ -15,7 +15,7 @@ import java.util.List;
  */
 public final class YamlSkillDefinition
 {
-    public enum Form { MODEL, TYPESAFE, EXECUTOR }
+    public enum Form { MODEL, EXECUTOR }
     private final Form form;
     public Form form() { return form; }
     public String executor() { return manifest.getExecutor(); }
@@ -54,7 +54,7 @@ public final class YamlSkillDefinition
         this.form = java.util.Objects.requireNonNull(form, "form must not be null");
         if (form == Form.EXECUTOR) java.util.Objects.requireNonNull(manifest.getExecutor(), "executor reference must not be null");
         if ((form == Form.EXECUTOR) == (executionConfiguration != null))
-            throw new IllegalArgumentException("executor definitions require absent model execution configuration; model/TypeSafe definitions require execution configuration");
+            throw new IllegalArgumentException("executor definitions require absent model execution configuration; model definitions require execution configuration");
         this.resource = java.util.Objects.requireNonNull(resource);
         this.manifest = manifest;
         this.executionConfiguration = executionConfiguration;
@@ -108,7 +108,7 @@ public final class YamlSkillDefinition
 
     public ai.loomspan.internal.schema.CanonicalSchema outputSchema()
     {
-        return typesafe() ? typeSafeDeclaration().outputSchema() : manifest.compiledOutputSchema();
+        return manifest.compiledOutputSchema();
     }
 
     /** Exact direct child selected for runtime result forwarding, or null for synthesis. */
@@ -153,13 +153,6 @@ public final class YamlSkillDefinition
     public boolean hasGenericInputContract()
     {
         return !hasDeclaredInputSchema();
-    }
-
-    public boolean typesafe() { return form == Form.TYPESAFE; }
-
-    public ai.loomspan.internal.typesafe.TypeSafeDeclaration typeSafeDeclaration() {
-        if (!typesafe()) throw new IllegalStateException("Skill has no TypeSafe declaration");
-        return manifest.compiledTypesafe();
     }
 
     public int outputSchemaMaxRetries()
@@ -233,8 +226,7 @@ public final class YamlSkillDefinition
                 bindings.put(name, copyValue(value, YamlSkillManifest.InputBindingManifest.class)));
         copy.setOutputBindings(bindings);
         copy.setOutputSchemaMaxRetries(source.getOutputSchemaMaxRetries());
-        // Share the immutable compiled declaration while detaching its mutable authored JSON.
-        copy.copyTypesafeFrom(source);
+        // Share immutable compiled schemas while detaching their authored JSON.
         copy.copySchemasFrom(source);
         if (source.isDeclared(YamlSkillManifest.Field.CONFIG)) copy.setConfig(source.getConfig());
         copy.declarationForm(source.declarationForm());

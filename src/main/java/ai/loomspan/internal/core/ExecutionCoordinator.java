@@ -101,7 +101,7 @@ public class ExecutionCoordinator
                     + "' does not belong to the current skill generation");
         accessGuard.checkAccess(rootCapability, session, authentication);
         YamlSkillDefinition definition = targetGeneration.definition(rootCapability.name());
-        if ((rootCapability.kind() == SkillKind.YAML || rootCapability.kind() == SkillKind.TYPESAFE) && definition == null)
+        if (rootCapability.kind() == SkillKind.YAML && definition == null)
             throw new IllegalArgumentException("Unknown captured YAML skill '" + rootCapability.name() + "'");
         MissionContext parentMission = baseBinding.mission();
         boolean topLevelInvocation = parentMission == null;
@@ -160,8 +160,6 @@ public class ExecutionCoordinator
 
         try
         {
-            if (rootCapability.kind() == SkillKind.TYPESAFE)
-                return missionWorkExecutor.executeEvaluation(session, definition, missionInput == null ? Map.of() : missionInput);
             if (rootCapability.kind() == SkillKind.JAVA)
             {
                 Authentication caller = accessGuard.resolveAuthentication(authentication, session);

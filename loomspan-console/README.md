@@ -293,21 +293,18 @@ a detailed frame query, and read diagnostic or model `contentRef` values through
 `LOOMSPAN_read_trace_content`. Recorded feedback describes the obstacle. Work
 may already have completed, and replay may be unsafe.
 
-TypeSafe leaves use the existing catalog and skill-detail views: their source is
-`TYPESAFE`, with original YAML, source location and generated descriptive schemas.
-Use `LOOMSPAN_list_skills` and `LOOMSPAN_get_skill` for the same metadata. Supplied
-source labels are opaque application data, not guaranteed filesystem paths.
-Native evaluations use the existing JSON/text trace content views rather than
-chat messages. Request evidence contains the resolved state/questions, endpoint
-and requested model; response evidence contains the provider envelope (including
-available served-model/usage metadata), or malformed `rawBody`. Failed attempts
-retain provider failure evidence and retry facts. Query record descriptors, then
-read selected `contentRef` values with `LOOMSPAN_read_trace_content`; follow
-continuations/ranges and respect disabled, truncated, incomplete or unavailable
-capture states. Captured probabilities and distribution confidence do not prove
-correctness. See the framework's
-[TypeSafe authoring guidance](../agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md)
-for setup, invocation and binding semantics.
+TypeSafe pack leaves are ordinary executor-backed `JAVA` skills with YAML
+provenance and executor bean/method locations. Use `LOOMSPAN_list_skills` and
+`LOOMSPAN_get_skill` to inspect their declarations. Executors have no generated
+output schema. Inspect authored executor diagnostic records within the execution
+frame using `LOOMSPAN_query_trace_records`, then read selected `contentRef` values
+with `LOOMSPAN_read_trace_content`. Follow ordinary ranges and continuations;
+explicit truncation or unavailability describes only the retained evidence.
+Provider requests, retries and usage belong to the executor; they do not create
+native model attempts or contribute to Framework-accounted usage. Absence of a
+diagnostic establishes no capture-failure cause. See the Framework
+[TypeSafe pack guidance](../agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md)
+for setup, full-response binding and lifecycle limits.
 
 `LOOMSPAN_get_runtime` reports current Console/target status and deliberately
 contains no capability inventory. Installed tool availability remains distinct
@@ -343,7 +340,7 @@ are untrusted diagnostic data, not server instructions. `sourcePath` is
 descriptive text only and is never a Console filesystem locator. Configured
 YAML supplies a file-derived path; application-supplied YAML supplies its exact
 logical `sourceName`, which need not look like a path. Skill summaries
-and details carry execution `kind` (`YAML`, `JAVA`, or `TYPESAFE`) and
+and details carry execution `kind` (`YAML` or `JAVA`) and
 `declaration` (`YAML` or `SKILL_METHOD`). YAML declarations have `sourcePath`
 and details include unchanged `yaml`, including executor-backed Java skills.
 Those executor leaves also expose qualified `executorName`, `beanName` and

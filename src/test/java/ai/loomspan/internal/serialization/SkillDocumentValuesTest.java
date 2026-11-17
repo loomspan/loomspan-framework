@@ -41,7 +41,7 @@ class SkillDocumentValuesTest {
 
     @Test void preservesLiteralDecimalAndExponentPrecision() {
         JsonNode root = decode("""
-                typesafe:
+                output_schema:
                   data:
                     - large: 9007199254740993.0
                       fraction: 0.123456789012345678901234567890123456789
@@ -51,7 +51,7 @@ class SkillDocumentValuesTest {
                       quoted: '9007199254740993.0'
                       bool: true
                       nil: null
-                """).root().path("typesafe").path("data").path(0);
+                """).root().path("output_schema").path("data").path(0);
         assertEquals(0, new BigDecimal("9007199254740993.0").compareTo(root.path("large").decimalValue()));
         assertEquals(new BigDecimal("0.123456789012345678901234567890123456789"), root.path("fraction").decimalValue());
         assertEquals(0, new BigDecimal("1.234567890123456789e-30").compareTo(root.path("negativeExponent").decimalValue()));
@@ -64,14 +64,14 @@ class SkillDocumentValuesTest {
 
     @Test void rejectsNonStringKeysBeforeTreeConversion() {
         for (String yaml : List.of("1: value\n'1': other", "true: value", "null: value", "input_schema: {properties: {1: {}, '1': {}}}",
-                "typesafe: {data: [{false: value}]}", "typesafe: {data: {config: {1: value}}}")) {
+                "output_schema: {data: [{false: value}]}", "output_schema: {data: {config: {1: value}}}")) {
             var failure = assertThrows(IllegalArgumentException.class, () -> decode(yaml));
             assertTrue(failure.getMessage().contains("literal-skill.yaml"), failure.getMessage());
             assertTrue(failure.getMessage().contains("map keys must be textual"), failure.getMessage());
         }
-        var failure = assertThrows(SkillDocumentValues.InvalidDocumentException.class, () -> decode("typesafe: {data: [{false: value}]}"));
-        assertTrue(failure.getMessage().contains("/typesafe/data/0"));
-        assertEquals("/typesafe/data/0", failure.path());
+        var failure = assertThrows(SkillDocumentValues.InvalidDocumentException.class, () -> decode("output_schema: {data: [{false: value}]}"));
+        assertTrue(failure.getMessage().contains("/output_schema/data/0"));
+        assertEquals("/output_schema/data/0", failure.path());
         assertEquals("map keys must be textual; found false", failure.detail());
         JsonNode root = decode("'1': one\n'01': zeroOne\n'false': string\nName: upper\nname: lower\n' a/b~c ': exact").root();
         assertEquals(6, root.size());
@@ -81,7 +81,7 @@ class SkillDocumentValuesTest {
     @Test void rejectsNonfiniteValuesOnlyAtJsonBoundaryWithPaths() {
         for (String scalar : List.of(".nan", ".inf", "-.inf", "+.Inf")) {
             for (String template : List.of("input_schema: {properties: {x: {enum: [%s]}}}",
-                    "input_schema: {properties: {x: {minimum: %s}}}", "typesafe: {data: [%s]}")) {
+                    "input_schema: {properties: {x: {minimum: %s}}}", "output_schema: {data: [%s]}")) {
                 var failure = assertThrows(IllegalArgumentException.class, () -> decode(template.formatted(scalar)));
                 assertTrue(failure.getMessage().contains("literal-skill.yaml at /"));
                 assertTrue(failure.getMessage().contains("not JSON-compatible"));
@@ -121,14 +121,14 @@ class SkillDocumentValuesTest {
             assertEquals(((Map<?, ?>) YamlValues.read("value: " + literal)).get("value"),
                     ((Map<?, ?>) decoded.executorConfig()).get("value"));
             var failure = assertThrows(SkillDocumentValues.InvalidDocumentException.class,
-                    () -> decode("typesafe: {state: {value: " + literal + "}}"));
-            assertEquals("/typesafe/state/value", failure.path());
+                    () -> decode("output_schema: {state: {value: " + literal + "}}"));
+            assertEquals("/output_schema/state/value", failure.path());
             assertTrue(failure.getMessage().contains(literal));
         }
     }
 
     @Test void byteIngressRetainsBomEncodingAndRejectsMalformedUtf8() throws Exception {
-        String yaml = "name: café\nconfig: {value: 1.25}\ntypesafe: {state: 0.1234567890123456789}";
+        String yaml = "name: café\nconfig: {value: 1.25}\noutput_schema: {state: 0.1234567890123456789}";
         for (String encoding : List.of("UTF-8", "UTF-16", "UTF-32")) {
             byte[] bytes = yaml.getBytes(java.nio.charset.Charset.forName(encoding));
             if (encoding.equals("UTF-32")) {
