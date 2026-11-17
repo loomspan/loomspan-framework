@@ -47,24 +47,24 @@ pack-owned retries and total deadlines without native Framework provider service
 
 ## Acceptance criteria — this ticket only
 
-- [ ] Independently buildable pack module contains TypeSafe-focused reusable transport
+- [x] Independently buildable pack module contains TypeSafe-focused reusable transport
   with bean/shutdown cleanup and no unsupported Framework dependencies or manifests.
   Keep one artifact; add modules only for a concrete dependency-weight or maintenance need.
-- [ ] Stub tests verify api_key/base_url presence-based overrides, invalid present values,
+- [x] Stub tests verify api_key/base_url presence-based overrides, invalid present values,
   defaults, prefixed endpoints and exact selected header values. Concurrent different
   endpoints/keys do not cross-contaminate; captured old settings remain stable.
-- [ ] Cancellation/interruption/zero remaining time prevents a next send/retry; retry waits
+- [x] Cancellation/interruption/zero remaining time prevents a next send/retry; retry waits
   cooperate and preserve interruption. Total timeout is capped by live remaining time,
   and a progressing response cannot escape it. Physical work/resource lifetime is bounded
   and cleanup verified without promising remote billing cancellation.
-- [ ] Explicit retry cardinality/SDK settings and identical body bytes are verified;
+- [x] Explicit retry cardinality/SDK settings and identical body bytes are verified;
   malformed/HTML retryable error bodies do not change classification. Successful malformed
   or empty JSON fails without a decoding-only retry.
-- [ ] Redirect tests show the target receives no request or credentials and the caller
+- [x] Redirect tests show the target receives no request or credentials and the caller
   fails through the ordinary failure path. The same check is assigned to 31.2.2's actual consumer.
-- [ ] Diagnostic faults respect containment and preserve original business results/failures.
+- [x] Diagnostic faults respect containment and preserve original business results/failures.
   Provider usage is evidence only and never contributes to native totals/attempt budgets.
-- [ ] Provider documentation/fixture refresh and exact tested dependency builds are recorded;
+- [x] Provider documentation/fixture refresh and exact tested dependency builds are recorded;
   pack unit/transport integration checks pass, with no live inference requirement.
 
 ## Local verification commands
@@ -668,4 +668,113 @@ and [transport lifetime](../phases/executor-packs-and-typesafe-extraction-roadma
   Keep repository-owned artifacts there; separate ticket creation/pipeline execution is unnecessary.
 - Execute only when this ticket is passed to the pipeline. Creating this file does not
   authorize starting implementation, committing current planning changes, or publishing.
+
+## Execution notes — 2026-11-16
+
+Developer approved the Full 5-Step Pipeline with “proceed”. Both checkouts were
+clean at triage. Changes are ticket-owned: Extensions production/tests/docs/POM;
+Framework contains this handoff and research/plans/reviews only. No Framework
+production, Console contract or compatibility marker changed. Commit after clean
+fresh review in each affected repository; do not push/sync/publish.
+
+### Implemented handoff
+
+- Unpublished pack `ai.loomspan:loomspan-decisions:0.1.0-SNAPSHOT`, independent POM.
+  Internal reusable entry is
+  `ai.loomspan.decisions.internal.typesafe.TypeSafeTransport.send(byte[], SkillExecutorInvocation): Object`.
+  Its no-arg constructor is Spring construction machinery, not supported public
+  customization API. `DecisionsAutoConfiguration` is registered through Boot's
+  `AutoConfiguration.imports` and closes the single transport on context shutdown.
+- Exact supported Framework dependency is
+  `ai.loomspan:loomspan-spring-boot-starter:1.0.0-beta.10-SNAPSHOT`, source
+  `81bd1d14196bfab4d954a3ff4abcb9f6798369c3`. Extension starting source was
+  `99d3b5438086abece0a6d42b3b9f6a8a5f446aa5`. Consume v1 invocation and diagnostics
+  only; no internal/autoconfigure imports or native accounting services.
+- The two presence-based setting rules are implemented exactly as embedded.
+  Default base is `https://api.typesafe.ai`; append `/v1/systemone` preserving
+  prefixes. Invalid present settings fail with their selected config path. Header
+  characters must be valid ASCII without controls; selected valid values remain
+  verbatim, including nonblank leading/internal/trailing spaces. No interpolation,
+  environment lookup or credential references. Settings/body are captured once.
+- One Apache synchronous client/pool (100 total, 20 per route) and one pack
+  watchdog. No background I/O workers, per-generation pool or retirement callback.
+  Per physical attempt: total 60s, inactivity 30s, acquisition 5s, connect 10s.
+  Total includes all HTTP stages and is capped by live remaining execution time;
+  earlier observed deadlines cannot be extended. Watchdog/wait slices <=25ms.
+  Interruption/cancellation/exhaustion stop sends/retries and preserve interruption.
+  Close cancels physical sockets, removes tasks and terminates the timer.
+- Maximum three sends, backoff 250/500ms; Retry-After nonnegative seconds or
+  RFC-1123 date overrides up to 5s. Retry IO/request timeout and statuses
+  408/429/500/502/503/504/529 only while execution remains live. Apache retries
+  and redirects are disabled explicitly; no provider SDK exists. Status precedes
+  error capture; 64KiB UTF-8 error prefix plus `truncated`/`unavailable` evidence.
+  Slow/malformed/unreadable errors do not change known status classification.
+- Successful JSON is decoded once with strict trailing-token rejection, complete
+  envelope/unknown fields/null/strings/arrays/refusals/usage and BigInteger/BigDecimal
+  numbers. Empty/malformed success never receives a decoding-only retry. There is
+  no response schema or native usage/attempt contribution. Business success is not
+  truncated to diagnostic/error limits.
+- Existing invocation info/warn diagnostics carry request body string, endpoint,
+  attempt, complete decoded response, caught failure and retry evidence using
+  supported maps/scalars. Diagnostic-only preparation/recording RuntimeExceptions
+  are contained. Business work, caller evaluation before entry, JVM Errors and
+  automatic observation retain the settled boundary. No new trace enum/payload
+  contract is introduced; existing diagnostic record/content paths are reused.
+- Primary TypeSafe/OpenRouter source refresh dated 2026-11-16 is recorded in
+  `../loomspan-extensions/extensions/decisions/docs/provider-contract.md`, with
+  synthetic text/JSON mixed Choice/Noul/Score and complete native/OpenRouter
+  fixtures in `src/test/resources/typesafe`. No live provider requests were made.
+- Framework skill-authoring documentation assessment remains **aligned / no
+  semantic impact**. Pack docs describe current transport-only behavior. Actual
+  annotated executor/request binding, JSON return representation and supported
+  consumer proof (including redirects) remain **31.2.2**; advanced consumer
+  lifecycle/fencing/concurrency/accounting/Console proof remains **31.3.2**.
+
+### Verification and acceptance mapping (Step 4)
+
+Tested Java 21.0.2 (JetBrains), Maven 3.9.6 / Framework wrapper 3.9.11, Boot
+4.2.0-RC2, HttpClient 5.6.5, Jackson 3.1.8, JUnit Jupiter 6.1.3 and MockWebServer
+4.12.0. Exact resolved dependency tree was generated locally under pack target.
+
+| Acceptance | Executable evidence |
+| --- | --- |
+| Independent pack and managed lifetime/boundaries | `DecisionsAutoConfigurationTest`, module verify, JAR registration/content inspection; no unsupported imports/SPI/manifest |
+| Captured settings, defaults/prefixes/headers/isolation | `TypeSafeSettingsTest` (23 cases); `preservesPreparedRequestsAndCompleteEnvelopes`, `retriesKnownStatusesRegardlessOfMalformedErrorBody`, `onePoolIsolatesConcurrentKeysEndpointsAndBodies` |
+| Live lifecycle/deadlines/physical cleanup | `TypeSafeTransportLifecycleTest` (13 cases), including original budget, progressing body, retry wait, live changes, task removal and close/admission race; existing Framework lifecycle suite |
+| Retry cardinality/bytes/status/decode behavior | `TypeSafeTransportTest` status matrix, exactly-three-send, Retry-After wait and caller mutation, disconnect, slow/unreadable errors, JSON shape/malformed/empty/trailing-token cases |
+| Redirect isolation | 302/307 two-server tests assert one primary request, zero target requests; consumer repetition explicitly remains 31.2.2 |
+| Diagnostic containment/result/failure fidelity and evidence-only usage | `TypeSafeTransportDiagnosticsTest`, large complete response and import boundary tests; existing real Framework diagnostic suite |
+| Refreshed docs/build identities/local checks | Provider contract/fixtures, pack README tested combination; commands below |
+
+Passed from Framework:
+
+```powershell
+./mvnw.cmd -B "-Dtest=LoomspanPublicSurfaceArchitectureTest,VersionedExecutorInvocationTest,ExecutorInvocationLifecycleIntegrationTest,ExecutorDiagnosticsIntegrationTest,DefaultExecutorDiagnosticsTest,BoundedExecutorDiagnosticCaptureTest,MissionLifecycleTest" test
+./mvnw.cmd -DskipTests install
+```
+
+The focused suite ran 66 tests with no failures/errors/skips. Installation passed
+after those tests. From Extensions:
+
+```powershell
+mvn -B validate
+mvn -B -f extensions/decisions/pom.xml verify
+mvn -B -f extensions/decisions/pom.xml dependency:tree "-DoutputFile=target/dependency-tree.txt"
+git diff --check
+```
+
+Module verify ran 72 tests with no failures/errors/skips and produced the JAR.
+JAR inspected with PowerShell `System.IO.Compression.ZipFile`: expected
+auto-configuration imports/class and only pack-owned classes; no Framework copies
+or custom manifest. Source architecture test checks only exact supported imports.
+
+Resolved implementation-time failures: early pack compile overlapped local install
+and resolved a stale Framework JAR without v1 (rerun after install passed); first
+test compile had AssertJ wildcard-map generic errors; first full suite had nested
+Mockito stubbing errors and a MockWebServer 5s throttle teardown race (fixed, final
+72 cases pass). Unquoted PowerShell dependency-tree output property was split as
+a lifecycle phase (quoted command above passed). The runtime has no `jar.exe` in
+JAVA_HOME, so equivalent .NET ZIP inspection succeeded. No required verification
+debt remains. Optional developer checks: none. Independent Step 5 still governs
+final pipeline completion; transport-helper tests do not replace consumer proof.
 
