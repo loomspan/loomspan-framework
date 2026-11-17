@@ -140,5 +140,14 @@ Framework behavior is grounded in `ExecutorDeclarationTests`,
 `ExecutorAccountingIntegrationTest`, `DeclaredChildInputBindingsIntegrationTest`,
 `DeclaredOutputBindingsPlanningIntegrationTest` and `DesignatedChildResultIntegrationTest`.
 Provider behavior and installed-JAR consumer evidence belong to the matching pack's
-`TypeSafeConsumerTest` and `CompositionConsumerTest`. Deterministic local tests
-establish integration, not live model quality, calibration, latency, cost or access.
+`TypeSafeConsumerTest` and `CompositionConsumerTest`, extended by
+`PublicationConsumerTest`, `LifecycleConsumerTest`, `AccountingConsumerTest` and
+`DiagnosticFaultConsumerTest` for captured concurrent settings, real lifecycle,
+physical-return/resource retention, native-only accounting and pack diagnostic
+faults. `ConsoleConsumerTest` starts the actual same-version Console process,
+imports those generated traces and verifies existing browser/MCP record queries,
+pagination and content reads. Explicit test probes delegate to the installed pack;
+they create no application customization API. Exact build identities, commands and
+instrumentation boundaries are in the pack's `docs/tested-builds.md`.
+Deterministic local tests establish integration, not live model quality,
+calibration, latency, cost or access.

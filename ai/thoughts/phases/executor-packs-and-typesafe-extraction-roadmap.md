@@ -315,14 +315,38 @@ after the repository/structure, native TypeSafe removal, and one solid completed
 TypeSafe example are in place. They impose no implementation or acceptance requirements
 on v1; no further provider contracts are settled here.
 
-- [ ] Implement the agreed generic Framework capabilities and remove native TypeSafe support.
-- [ ] Provide the separate Decisions Maven artifact with the TypeSafe executor.
-- [ ] In `loomspan-extensions`, verify the artifact through its small consuming example
+- [x] Implement the agreed generic Framework capabilities and remove native TypeSafe support.
+- [x] Provide the separate Decisions Maven artifact with the TypeSafe executor.
+- [x] In `loomspan-extensions`, verify the artifact through its small consuming example
   against identified Framework/Console builds, using a local stub HTTP provider and
   deterministic mocked responses without real API keys or live provider access.
-- [ ] Verify Console/MCP inspection of recorded evidence and execution without Console.
-- [ ] Provide one runnable recipe and current documentation matching those tested builds.
-- [ ] Pass required tests, including public-surface and Framework/Console compatibility checks.
+- [x] Verify Console/MCP inspection of recorded evidence and execution without Console.
+- [x] Provide one runnable recipe and current documentation matching those tested builds.
+- [x] Pass required tests, including public-surface and Framework/Console compatibility checks.
+
+### Final local qualification evidence
+
+Implementation checks above and in Phases 1–6 are complete against native-free
+Framework/Console production source `fa1ca190d393b63314846e604a6bbd8157ed8eab`
+and Decisions production source `4a52c709080ecff70ca363aacad9a02ee707666f`, with
+Extensions-owned advanced qualification added by PR 31.3.2. The unchanged marker is
+`1.0.0-beta.10-SNAPSHOT`. No push, sync, publication or live inference is included.
+
+| Roadmap items | Named final evidence |
+| --- | --- |
+| Phase 1: exact invocation/API and removal inventory | Framework full suite (2,226 tests; two unchanged opt-in skips), `LoomspanPublicSurfaceArchitectureTest`, `VersionedExecutorInvocationTest`, `ExecutorGenerationExecutionIntegrationTest`; 31.3.1 removal inventory and current JAR inspection |
+| Phase 2: bounded diagnostics and contained faults | `BoundedExecutorDiagnosticCaptureTest`, `DefaultExecutorDiagnosticsTest`, `ExecutorDiagnosticsIntegrationTest`; actual pack `DiagnosticFaultConsumerTest` |
+| Phase 3: current record vocabulary/Console/MCP, factual states and totals | Java trace corpus (18 cases), canonical Console build (604 frontend tests and full Go checks); actual imported pack traces in `ConsoleConsumerTest` |
+| Phase 4: live budget/cancellation, physical retention and accounting reductions | Framework lifecycle/accounting suites; installed-pack `LifecycleConsumerTest`, `PublicationConsumerTest`, `AccountingConsumerTest` |
+| Phase 5: separate artifact, supported questions/bindings/response/transport, recipe/index | Pack verify (77 tests), complete installed-JAR consumer (18 tests with Console), executed `TriageApplication`, pack README/config/transport/tested-build references |
+| Phase 6: removal and coherent current consumers | 31.3.1 execution evidence plus final full Framework/corpora/Console checks and post-removal packaged consumer; no obsolete native classes in installed JAR |
+
+Exact commands, artifact SHA-256 values, qualification source fingerprint, instrumented
+probe boundaries and prior-debt closure are recorded in the
+[delivery ticket execution notes](../tickets/loomspan-pr-31.3.2-executor-pack-delivery-closure.md#execution-notes--2026-11-16)
+and the owning sibling `loomspan-extensions/extensions/decisions/docs/tested-builds.md`.
+Fresh pipeline review and local commits follow Step 4 qualification; this evidence
+records implementation verification rather than claiming that review has already run.
 
 Track artifact publication and product releases separately from this implementation gate.
 No simultaneous release, automated cross-repository pipeline, or public Maven publication
@@ -333,35 +357,35 @@ tested builds. Do not describe a dependency as publicly available until it is pu
 
 - [x] Review the current TypeSafe implementation and agree dispositions for all eight
   findings. Evidence is in the source review; no implementation/test completion is implied.
-- [ ] Complete the cross-layer removal inventory using the finished source review;
+- [x] Complete the cross-layer removal inventory using the finished source review;
   check native TypeSafe coupling across Framework, Console, MCP, fixtures,
   documentation, configuration, dependency management, and public catalog values.
-- [ ] Carry the scope rule above into future implementation tickets. Tie each
+- [x] Carry the scope rule above into future implementation tickets. Tie each
   Framework API change to an explicitly listed generic roadmap enhancement; keep
   TypeSafe-specific checks and provider behavior in the pack.
-- [ ] Carry the already-agreed required/changed/retired behavior into the removal
+- [x] Carry the already-agreed required/changed/retired behavior into the removal
   inventory and acceptance checks. Include direct/child invocation, answer fidelity, retry ownership,
   physical cancellation, generation retention, and exact/unavailable usage.
-- [ ] Finalize diagnostic declarations under the Phase 2 contract.
-- [ ] Define the versioned package contract, provisionally
+- [x] Finalize diagnostic declarations under the Phase 2 contract.
+- [x] Define the versioned package contract, provisionally
   `ai.loomspan.api.extensions.v1.SkillExecutorInvocation`, and colocate its public
   capability types. Recognize exact supported parameter types at registration;
   reject unsupported types. The Java parameter selects the invocation contract;
   no separate pack manifest or manifest validation is required.
   No separate version annotation or per-call version switch is needed.
-- [ ] Implement exact v1 contract recognition without future-version adapters or
+- [x] Implement exact v1 contract recognition without future-version adapters or
   legacy support. Retain existing `@SkillExecutor` annotation-based registration
   and use shared internal execution machinery.
-- [ ] Exercise the design against decisions and a non-AI example, such as an HTTP
+- [x] Exercise the design against decisions and a non-AI example, such as an HTTP
   request or document conversion. Avoid provider-shaped generic abstractions.
-- [ ] Design a Framework-owned invocation class with stable read-only accessors,
+- [x] Design a Framework-owned invocation class with stable read-only accessors,
   rather than an expanding public record. Retain captured input, skill configuration,
   executor configuration, skill name, and executor configuration generation ID; add
   diagnostics and the Phase 4 live accessors. Captured values and live lifecycle reads
   are distinct. Settle construction without exposing mutable/internal lifecycle state.
-- [ ] Replace the existing unversioned invocation record and registration path.
+- [x] Replace the existing unversioned invocation record and registration path.
   Update every construction/use site and test; add no old-constructor shim or adapter.
-- [ ] Explicitly update public-surface policy and architecture allowlists for the
+- [x] Explicitly update public-surface policy and architecture allowlists for the
   selected versioned packages: current policy only permits allowlisted top-level
   types directly in `ai.loomspan.api`. Add README and supported-surface tests;
   arbitrary classes in a versioned package do not become supported API.
@@ -405,14 +429,14 @@ observation. Revisit only for an explicit scope change or concrete implementatio
 evidence that violates this boundary. Remaining diagnostic signature, limit, and
 concurrency choices do not reopen it.
 
-- [ ] Reuse existing observation boundaries without duplicate records; executors
+- [x] Reuse existing observation boundaries without duplicate records; executors
   need not log their own start/stop, input/output, or escaping failure.
-- [ ] Automatically capture executor start/stop, elapsed time, outcome, invocation/
+- [x] Automatically capture executor start/stop, elapsed time, outcome, invocation/
   skill/executor identity, and executor configuration generation ID.
-- [ ] Capture input/output through existing evidence paths and controls, including
+- [x] Capture input/output through existing evidence paths and controls, including
   existing handling of resource-valued inputs; do not add arbitrary object traversal
   or eager reads of arbitrary resources.
-- [ ] Capture escaping failure type, message, diagnostic cause, and existing failure
+- [x] Capture escaping failure type, message, diagnostic cause, and existing failure
   classification. Preserve `RecoverableSkillException` semantics: corrective feedback
   in standard tool calling, propagation on direct invocation, and termination in
   explicit step planning. It never automatically replays work. Other application
@@ -421,7 +445,7 @@ concurrency choices do not reopen it.
   Keep existing automatic failure recording/classification; do not map escaping
   exceptions to diagnostic levels or add duplicate `warn`/`error` diagnostic calls.
   A failed execution has no fabricated successful output.
-- [ ] Record one diagnostic record per captured call within the existing execution
+- [x] Record one diagnostic record per captured call within the existing execution
   frame, with plain message, optional
   structured JSON data, Framework-supplied timestamp, invocation association, and
   existing trace sequence. Snapshot data at capture time; define concurrent capture and writes after
@@ -432,7 +456,7 @@ concurrency choices do not reopen it.
   Framework capture-failure and limit notices are separate system notices without
   these levels; standard Java fallback logging remains separate. Diagnostic severity
   must not change the execution outcome or trigger retries.
-- [ ] Define supported JSON containers/scalars: objects with string keys,
+- [x] Define supported JSON containers/scalars: objects with string keys,
   arrays/lists, strings, numbers, booleans, and nulls. Do not invoke arbitrary custom
   collection implementations, arbitrary `Number` subclasses, custom adapters, or
   implicit `toString()`.
@@ -440,34 +464,34 @@ concurrency choices do not reopen it.
   the [serialization research](decisions-executor-pack-research.md#follow-up-research-bounded-java-object-serialization).
   Validate/snapshot within budgets rather than building an unlimited tree/string
   and truncating afterward. Jackson alone is not an object-execution sandbox.
-- [ ] Bound message/data bytes, nesting, collection traversal, event counts, and total
+- [x] Bound message/data bytes, nesting, collection traversal, event counts, and total
   capture per invocation. Detect cycles/unsupported values without implicit conversion.
   Keep valid JSON and explicit unavailable/truncated/capture-failure states.
-- [ ] Use Jackson for bounded JSON capture. Contain ordinary validation, serialization,
+- [x] Use Jackson for bounded JSON capture. Contain ordinary validation, serialization,
   recording, and limit failures so diagnostics never change the business result.
-- [ ] On capture failure, emit a small Framework notice with the reason and original
+- [x] On capture failure, emit a small Framework notice with the reason and original
   message when it fits, plus a bounded warning through standard Java logging.
   Reasons include unsupported values, serialization failures, and per-event size
   limits; distinguish partial truncation from no capture. Use a
   separate fixed fallback envelope; stop processing the rejected payload and return
   normally after best-effort reporting. Never recursively serialize or stringify
   rejected data. Contain ordinary failures in both fallback reporting paths.
-- [ ] Reserve bounded capacity for one invocation-limit notice, then suppress further
+- [x] Reserve bounded capacity for one invocation-limit notice, then suppress further
   diagnostics. Coalesce/rate-limit repeated warnings.
   Framework notices distinguish known capture conditions when
   recorded; delivery remains best effort, and Console does not infer missing states.
-- [ ] Document best-effort notice delivery when recording fails, and the limits of the
+- [x] Document best-effort notice delivery when recording fails, and the limits of the
   guarantee: caller argument evaluation and JVM-wide failures are outside it. Defer
   arbitrary DTO serialization, extension-managed operation handles, and nested spans
   beyond v1; richer capabilities require demonstrated need. Future arbitrary-object
   support also needs explicit acceptance limits.
-- [ ] Preserve content fidelity. Do not add sensitivity classification or automatic
+- [x] Preserve content fidelity. Do not add sensitivity classification or automatic
   masking. Authentication, authorization, capture controls, and resource limits
   remain the boundaries. Retain the existing `ExecutionJournalProjector` exception
   only for the derived journal and observer callback; do not broaden it.
-- [ ] Test isolation between invocations, concurrent operations, closure/failure,
+- [x] Test isolation between invocations, concurrent operations, closure/failure,
   fidelity, and explicit truncation using public invocation.
-- [ ] Verify the new diagnostics preserve successful executor results and original
+- [x] Verify the new diagnostics preserve successful executor results and original
   executor failures despite ordinary diagnostic serialization, recording, fallback,
   and fallback-logging failures. Retain existing automatic-observation semantics;
   do not require a broader observability rewrite. Test diagnostic-budget exhaustion, bounded notices,
@@ -497,41 +521,41 @@ required from the pack.
 The factual-presentation boundary follows the
 [Framework feature design lens](../framework-feature-design-lens.md#12-keep-semantic-authority-at-the-owning-boundary).
 
-- [ ] Walk through successful execution, recoverable/terminal failures, and a caught
+- [x] Walk through successful execution, recoverable/terminal failures, and a caught
   provider failure followed by retry using the simple diagnostic records.
-- [ ] Carry operations and evidence through trace serialization, authenticated
+- [x] Carry operations and evidence through trace serialization, authenticated
   inspection routes, and existing MCP/Console readers where applicable.
-- [ ] Integrate new diagnostic record types and content into the existing
+- [x] Integrate new diagnostic record types and content into the existing
   `LOOMSPAN_query_trace_records` and `LOOMSPAN_read_trace_content` tools, following
   the settled contract below. Reuse existing summaries and retrieval behavior;
   do not add diagnostic-specific tools, severity filters, or pagination machinery.
-- [ ] Display automatic timing, generation ID, input/output, and failure evidence
+- [x] Display automatic timing, generation ID, input/output, and failure evidence
   alongside individual chronological diagnostic records with expandable JSON, grouped
   beneath the existing execution frame. Bound rendering work; grouping must not merge records.
-- [ ] Console reports recorded facts; it never synthesizes results or infers execution
+- [x] Console reports recorded facts; it never synthesizes results or infers execution
   outcomes from diagnostic levels, message text, arbitrary payload fields, or timing.
   Display Framework-recorded invocation outcome/classification and executor-authored
   messages/JSON as recorded. Developers use that evidence to distinguish a caught
   request failure/retry from an invocation failure or a negative business decision.
   No typed provider-attempt tracking or provider-specific interpretation is needed in v1.
   Grouping, filtering, and factual aggregates do not create new semantic outcomes.
-- [ ] Display executor-authored diagnostic messages, severity, and JSON as recorded;
+- [x] Display executor-authored diagnostic messages, severity, and JSON as recorded;
   the SkillExecutor developer determines their content and meaning. Display Framework
   execution facts and capture notices separately; capture notices have no developer
   severity. Console does not generate explanatory error messages or infer capture
   state from missing evidence. Display unavailable, truncated, or failed
   capture only when explicitly recorded by Framework. Notice delivery is best effort:
   if recording fails and no notice survives, Console has no cause to explain.
-- [ ] Apply the accounting descriptions specified in Phase 4.
-- [ ] Keep the Framework-to-Console compatibility version unchanged and update
+- [x] Apply the accounting descriptions specified in Phase 4.
+- [x] Keep the Framework-to-Console compatibility version unchanged and update
   Java/Go/TypeScript transport, MCP readers, Console, and fixtures together. Remove
   obsolete shapes under the breaking-change policy. Console currently uses its exact
   release string for `consoleCompatibilityVersion`; use actual repository release/version
   machinery rather than inventing independent negotiation.
-- [ ] Verify Console absence or presentation failure cannot affect execution/results.
+- [x] Verify Console absence or presentation failure cannot affect execution/results.
   Defer display hints, custom layouts, and extension-specific renderers beyond v1.
-- [ ] Add representative fixtures and reader/UI tests, including a non-AI executor.
-- [ ] Verify existing MCP type/frame filtering, pagination, inline content, and content
+- [x] Add representative fixtures and reader/UI tests, including a non-AI executor.
+- [x] Verify existing MCP type/frame filtering, pagination, inline content, and content
   retrieval work for the new records and system notices, including concurrent events.
   Follow the acceptance checks and mandatory ticket handoff below.
 
@@ -698,17 +722,17 @@ not measured zero executor usage. Preserve native usage when captured; do not
 substitute zero for unreported usage. No completeness indicator, diagnostic usage
 aggregation, or executor usage-reporting API is part of v1.
 
-- [ ] Implement the accessors and verify the settled cancellation acceptance checks above.
-- [ ] Verify late physical return, fencing, and resource lifetime. Keep work within
+- [x] Implement the accessors and verify the settled cancellation acceptance checks above.
+- [x] Verify late physical return, fencing, and resource lifetime. Keep work within
   the invocation until physically complete, or explicitly manage retained client
   resources; untracked background I/O may outlive generation retention.
-- [ ] In Extensions, verify bounded retries, SDK retry configuration, and cooperative
+- [x] In Extensions, verify bounded retries, SDK retry configuration, and cooperative
   cancellation through the consuming example; apply Phase 5 transport requirements.
-- [ ] Verify a mixed mission: only Framework-accounted model calls contribute to
+- [x] Verify a mixed mission: only Framework-accounted model calls contribute to
   totals; executor-managed requests/retries do not reserve native attempt budget,
   and diagnostic usage does not affect totals. Check Console/API/MCP scope descriptions.
   Include unavailable usage, successful-HTTP decoding failure, and Console absence.
-- [ ] Document accepted lifecycle/accounting reductions and removals in current
+- [x] Document accepted lifecycle/accounting reductions and removals in current
   usage docs/release notes under the breaking-change policy.
 
 Exit: minimal lifecycle facilities and the explicitly reduced guarantees are verified.
@@ -952,32 +976,32 @@ Extensions owns the following checks through its small consuming example, using 
 packaged artifact against identified builds and deterministic local HTTP stubs with
 test credentials. Apply the repository-local ownership and completion rules above.
 
-- [ ] Verify registration and supported-API-only consumption, direct invocation,
+- [x] Verify registration and supported-API-only consumption, direct invocation,
   child composition, valid/invalid parent bindings, and Console-free execution.
   Verify source-preserving pack diagnostics and Console/MCP inspection of those same
   recorded diagnostics against the identified builds.
-- [ ] Verify wire mappings, question identity, received numeric fidelity and accepted
+- [x] Verify wire mappings, question identity, received numeric fidelity and accepted
   config conversion, score ordering, selected binding syntax/null/omission behavior,
   and unsupported capabilities/local validation before sends.
-- [ ] Exercise Choice, Noul, and Score individually and in a single mixed-question
+- [x] Exercise Choice, Noul, and Score individually and in a single mixed-question
   request through the actual consuming application and packaged executor. Use
   deterministic local HTTP fixtures to verify text/JSON state, instructions, and
   criteria in the native forms supported by each question type, request question
   identity and score ordering, and complete response preservation through invocation.
   Verify unsupported image and Box localization requests fail before any provider send.
-- [ ] Verify complete response preservation through actual invocation, including
+- [x] Verify complete response preservation through actual invocation, including
   unknown fields, refusals, JSON null/string values, malformed/empty successful
   responses, and no decoding-only retries. Do not check only HTTP decoding.
-- [ ] Verify retry cardinality/limits and identical retry bodies, including a retryable
+- [x] Verify retry cardinality/limits and identical retry bodies, including a retryable
   HTTP failure with HTML/malformed JSON; error capture must not change retry eligibility.
-- [ ] Pass the [automatic-redirect acceptance test](#automatic-redirects).
-- [ ] Verify key/endpoint precedence, invalid present overrides, defaults and prefixed
+- [x] Pass the [automatic-redirect acceptance test](#automatic-redirects).
+- [x] Verify key/endpoint precedence, invalid present overrides, defaults and prefixed
   routes, captured request headers, concurrent distinct endpoints/keys, publication
   during requests, stable old-work settings, and updated new-work settings.
-- [ ] Verify transport cleanup and the Phase 4 lifecycle/accounting checks, including
+- [x] Verify transport cleanup and the Phase 4 lifecycle/accounting checks, including
   slow progressing responses and resource lifetime. Verify diagnostic failures under
   Phase 2's containment boundary without changing existing automatic observation semantics.
-- [ ] Provide the runnable recipe, current release-aligned docs, and small index.
+- [x] Provide the runnable recipe, current release-aligned docs, and small index.
   Verify the pre-implementation provider-contract refresh and representative fixtures,
   including model availability and route-specific behavior. Mocked integration is
   not evidence of accuracy, calibration, latency, or cost.
@@ -988,17 +1012,17 @@ publication and product release are separate from implementation completion.
 
 ## Phase 6 — Remove native TypeSafe implementation from core
 
-- [ ] Delete native `typesafe:` declarations/parser branches, connection driver/model
+- [x] Delete native `typesafe:` declarations/parser branches, connection driver/model
   configuration support, dispatch, clients, resource coupling, and dependencies used
   exclusively by native TypeSafe. Reimplement provider behavior in the pack.
-- [ ] Keep executor-backed leaves on existing `JAVA` classification.
-- [ ] Remove `SkillKind.TYPESAFE` and other obsolete public/internal surfaces; update
+- [x] Keep executor-backed leaves on existing `JAVA` classification.
+- [x] Remove `SkillKind.TYPESAFE` and other obsolete public/internal surfaces; update
   all usages and allowlists. No deprecated aliases, translators, or compatibility shims.
-- [ ] Replace old examples and consumer docs with current executor-pack usage. Remove
+- [x] Replace old examples and consumer docs with current executor-pack usage. Remove
   obsolete TypeSafe-specific Console/MCP handling and historical shape assumptions.
-- [ ] Apply the mandatory ticket policy across the coordinated Framework/Console/MCP
+- [x] Apply the mandatory ticket policy across the coordinated Framework/Console/MCP
   changes, keeping the compatibility version unchanged and updating matching fixtures.
-- [ ] Update fixtures and supported-surface tests to describe the final design.
+- [x] Update fixtures and supported-surface tests to describe the final design.
   Run `LoomspanPublicSurfaceArchitectureTest` after production type changes, plus
   focused executor, lifecycle, usage, binding, and Console checks.
 

@@ -87,23 +87,23 @@ The final ticket closes the overall checklist using these owners and final build
 
 ## Acceptance criteria — this ticket only
 
-- [ ] Current docs/index/recipe cover every item in the embedded recipe checklist with
+- [x] Current docs/index/recipe cover every item in the embedded recipe checklist with
   actual commands, supported API, no placeholders and consistent exact tested builds.
   Manual Maven installation is complete; publication and live evaluation are not claimed.
-- [ ] Final Framework public-surface/executor/lifecycle/usage/binding and applicable
+- [x] Final Framework public-surface/executor/lifecycle/usage/binding and applicable
   Console/fixture checks pass. Every previously deferred/blocked check has a recorded
   passing result or is shown inapplicable because its obsolete behavior was deliberately removed.
-- [ ] Independently packaged Decisions artifact passes its complete deterministic consumer
+- [x] Independently packaged Decisions artifact passes its complete deterministic consumer
   suite against the native-free Framework: minimum question set/mixed requests, config
   publication, fidelity/null/string, redirects/retries, lifecycle/resource lifetime and
   accounting. Newly added advanced tests prove concurrent distinct settings, stable
   old-work/new-work publication, total deadline despite progressing bodies, late physical
   completion/resource ownership, and diagnostic-fault containment. Recorded pack evidence
   is inspected through existing Console/MCP tools; Console-free invocation also passes.
-- [ ] The updated roadmap agrees with unchanged compatibility version, commits without
+- [x] The updated roadmap agrees with unchanged compatibility version, commits without
   syncing, permissible intermediate breaks and centrally managed tickets with extension-owned code.
   Existing source research is treated as evidence, not reopened design.
-- [ ] All overall v1 completion items are backed by named evidence and exact builds.
+- [x] All overall v1 completion items are backed by named evidence and exact builds.
   Sidecar-suite work, live quality/latency/cost evaluation, public publication and Gemini/OpenAI
   remain separate future work. No compatibility/shim or historical-link preservation work is added.
 
@@ -750,3 +750,138 @@ design merely because diagnostics are a new record type.
 - Execute only when this ticket is passed to the pipeline. Creating this file does not
   authorize starting implementation, committing current planning changes, or publishing.
 
+
+## Execution notes — 2026-11-16
+
+### Route, scope and implementation decisions
+
+User approved **Full 5-Step Pipeline** with “proceed.” Initial Framework source
+was `fa1ca190d393b63314846e604a6bbd8157ed8eab`, Extensions source was
+`4a52c709080ecff70ca363aacad9a02ee707666f`; both working trees were clean. Research,
+both plans, code and documentation below are ticket-owned. Step 4 changes only
+Extensions tests/POM/documentation and Framework documentation/planning artifacts.
+No production correction, API addition, configuration/wire contract change, marker
+increment, compatibility shim, push, sync or publication was needed. Fresh Step 5
+review and root-owned local commits follow this implementation evidence.
+
+- Extended the existing independent installed-JAR `support-triage` consumer. Observer
+  views are thread-safe, concurrent traces select a particular session, and worker
+  authentication is explicit. Startup limits are configurable; publishable mission/
+  quota settings use the existing nested `session` map. Shutdown remains startup-only.
+- `PublicationConsumerTest` interlocks an old active request with new admissions on
+  distinct endpoints/keys, separately tests both configuration owners, preserves old
+  retry bytes/settings, and observes the same transport bean across publication.
+- `LifecycleConsumerTest` proves real cancellation/interruption before first send
+  and during retry waits, no second send after expiry, original parent budget despite
+  delayed planning/progressing body, zero remaining time, late-result/diagnostic
+  fencing, generation retention until physical return and application-shutdown cleanup.
+  The supported retirement callback establishes retention; no Framework internal
+  imports or bean replacement contract were introduced.
+- `ConsumerProbe` discovers the installed executor's annotated method with ordinary
+  Spring/Java reflection and delegates to the real transport. For late physical return
+  it holds a real completed pack result until released. This proves local retained
+  work, not remote inference cancellation. Normal live/config accessors remain real.
+  Mockito instrumentation only forwards the real invocation while targeting diagnostic
+  faults or forwarding diagnostics with a retry-entry signal. It establishes no
+  consumer customization API. The pack uses INFO/WARN; Framework's existing tests
+  cover ERROR/recorder/notice/fallback containment. Caller/business serialization and
+  existing automatic observation keep their exact original boundary.
+- Framework cleanup grace is fixed at 250ms, not a configurable larger test setting.
+  The consumer directly observes zero budget while physical work is retained and
+  generic `MissionLifecycleTest` establishes grace separation. No synthetic lifecycle
+  value substitutes for actual cancellation or deadline acceptance.
+- `AccountingConsumerTest` uses a real native parent with exact two-attempt quota,
+  actual packaged leaf retries, reported/heuristic native usage, complete unknown
+  provider usage, missing provider usage and successful-HTTP decoding failure.
+  Only native model calls contribute; canonical `totalUnits` is authoritative.
+- `ConsoleConsumerTest` runs the canonical stamped executable under the explicit
+  `console` Maven profile/property, normal cookie/Origin/tab/CSRF pairing and MCP
+  Bearer access. It imports the same unmodified actual pack traces, checks all thirteen
+  tools and scope descriptions, logical/physical mixed type/frame filters, bounded
+  page/range continuation without loss/duplicates, browser/MCP parity and retained
+  data fidelity. Real Unicode message truncation and oversized response unavailability
+  produce explicit notices without severity; authored ERROR alone creates no failure.
+- Windows Console ownership requires a user-owned temporary parent rather than
+  shared checkout inherited Modify ACLs. The helper uses OS `TEMP` for isolated
+  profile/workspace, retains process logs in example `target/`, and closes process/
+  client ownership after use. Security checks remain enforced without bypass.
+- Matching repository-local `loomspan-docs` routes were consulted after executable
+  inventory. Pre-removal build references and incomplete qualification language were
+  documentation drift; updated pack/current Framework topics are now **aligned**.
+  No source/doc semantic conflict or new product decision remained.
+
+### Exact final builds and verification
+
+Coordinates/versions, source fingerprint and recipe commands are owned by sibling
+`extensions/decisions/docs/tested-builds.md`. Production source remains at the two
+exact commits above. Artifact SHA-256 values actually consumed:
+
+| Build | SHA-256 |
+| --- | --- |
+| Native-free Framework starter JAR | `3f4bd57de312f65012d717ba987dcfa8dba4fc9902206c4949413bc6e7fe52eb` |
+| Installed Decisions JAR | `5b93cbf94ca0daca7d4ce0cb767dd5993d96f66ceb7bf17f64b5d9900490be6e` |
+| Canonically rebuilt Windows Console | `2c897cc1fb76379daf0268ae5de773fefa73362b6a61f0c13d49da3e64dfa68c` |
+| Consumer POM plus 15 source/resource files, algorithm in tested-builds | `f677b1d099275c0cbb98a55a99d0102f9e399a418d56d3b5625b0c836f09cc89` |
+
+Runtime: JetBrains Java 21.0.2, Boot 4.2.0-RC2, Windows 11 amd64; Maven 3.9.6,
+Framework wrapper 3.9.11; Console Go 1.26.5, Node 24.18.0, npm 12.0.2.
+The final commit IDs are reported after root commits; no circular commit hash is
+invented in these files. Exact production bytes/source and consumer fingerprint
+identify the tested pre-commit tree.
+
+PASS receipts (exit 0 unless the explicitly expected negative case):
+
+| Working directory / exact command | Result / log |
+| --- | --- |
+| Framework `./mvnw.cmd test` | 2,226 tests, 0 failures/errors, two unchanged opt-in `Pr18RecordedHandoffDiagnosticTest` skips; `$env:TEMP/loomspan-framework-3132.log` |
+| Framework `./mvnw.cmd -DskipTests install` | Native-free build locally installed; packaging intentionally skips tests; `$env:TEMP/loomspan-framework-3132-install.log` |
+| Framework `./mvnw.cmd -Dtest=ConsoleTraceFixtureCorpusTest -DfailIfNoTests=false test` | 18 cases, no failures/errors/skips; `$env:TEMP/loomspan-corpus-3132.log` |
+| Console `$env:PATH = "$env:TEMP\loomspan-pr29.3-node-24.18.0\package\bin;" + $env:PATH; go run ./internal/buildtool build` | Verified exact toolchain; typecheck, 604 frontend tests/coverage, asset/skill checks and `go test ./...`, then versioned binary; `$env:TEMP/loomspan-console-build-3132.log` |
+| Extensions `mvn -B validate` | Descriptor validation; `$env:TEMP/loomspan-extensions-3132-validate.log` |
+| Extensions `mvn -B -f extensions/decisions/pom.xml verify` | 77 tests, no failures/errors/skips; `$env:TEMP/loomspan-pack-3132-verify.log` |
+| Extensions `mvn -B -f extensions/decisions/pom.xml -DskipTests install` | Independent pack installed; prior verify supplies tests; `$env:TEMP/loomspan-pack-3132-install.log` |
+| Extensions `mvn -B -f extensions/decisions/examples/support-triage/pom.xml verify` | 17 executed passing cases, one explicit Console opt-in exclusion; `$env:TEMP/loomspan-consumer-3132.log` |
+| Extensions `mvn -B -f extensions/decisions/examples/support-triage/pom.xml -Pconsole "-Dloomspan.console.executable=$((Resolve-Path ../loomspan-framework/loomspan-console/build/loomspan-console.exe).Path)" verify` | Final installed native-free build: all 18 tests, no failures/errors/skips; `$env:TEMP/loomspan-final-consumer-3132.log` |
+| Extensions `mvn -B -f extensions/decisions/examples/support-triage/pom.xml -DskipTests compile exec:java` | Complete native fixture and expected illustrative routing policy; no Console/real credentials; `$env:TEMP/loomspan-recipe-3132.log` |
+| Extensions `mvn -B -f extensions/decisions/examples/support-triage/pom.xml -Pconsole -Dtest=ConsoleConsumerTest test` without executable | Expected exit 1, clear required-property assertion, zero skips; proves explicit qualification cannot silently skip; `$env:TEMP/loomspan-console-required-3132.log` |
+| Current doc local links/anchors and `git diff --check` in both checkouts | 118 links/anchors across seven current docs valid; no whitespace errors; final expanded link check includes roadmap execution-note link |
+
+The canonical Console build executes the same verify checks and full Go suite.
+Separate identical `go test ./...` and buildtool `verify` reruns were not performed
+merely to make another log; this is the ticket/plan's permitted exact-source reuse.
+No Go concurrency production change requires race detection. No live inference,
+sidecar suite or public release was run or claimed.
+
+Initial targeted harness iterations had compile/nested-config/expected-field
+assertion errors, all corrected before the passing complete suites. The initial
+Console shared-checkout profile hit Windows ownership protection; the user-temp
+fixture resolved that without any production/security change. No production bug
+or unresolved required failure remains.
+
+### Prior debt closure
+
+| Prior handoff | Final disposition |
+| --- | --- |
+| 31.1.1 temporary diagnostic/API compilation gates | Restored in 31.1.2, current full suite includes exact v1/surface/executor/lifecycle checks |
+| 31.1.2 Go corpus `UNSUPPORTED_VALUE` from new diagnostics | Restored by 31.1.3; current canonical Console full Go checks and 18-case Java/Go corpus pass without marker rewriting |
+| Earlier native TypeSafe tests/fixtures/contracts | Deliberately removed by 31.3.1; no requirement to restore obsolete native declarations, generated metadata, readers or direct client tests. Current executor/binding/corpus and native-rejection checks pass |
+| 31.2.1 helper transport checks | Current packaged artifact verify passes all 77 cases; advanced real consumer cases additionally pass |
+| 31.2.2 advanced qualification and Console deferred here | Publication/lifecycle/accounting/fault tests and actual Console browser/MCP process pass; functional suite rerun on final native-free installed build |
+| 31.3.1 post-removal Extensions qualification not run | Final 18-case installed consumer and executed recipe now pass against identified final source/JAR |
+| Opt-in Pr18 diagnostics, Go race, sidecar/live/provider publication | Two unchanged diagnostic opt-ins are unrelated to acceptance; no Go production concurrency delta; sidecar/live evaluation/publication are explicitly separate future work |
+
+### Acceptance mapping
+
+| Ticket criterion | Concrete evidence |
+| --- | --- |
+| Current docs/index/recipe and complete manual Maven install | Pack README routing, focused executor/transport/provider/tested-build docs, recipe full YAML/Java and executed install/recipe commands; maintainer/support/unpublished scope explicit |
+| Generic Framework/supported surface/lifecycle/usage/binding and Console/fixture checks | Current 2,226-case Framework run, architecture test in full suite, 18-case corpus and canonical Console build/Go/604 frontend checks; prior debt table above |
+| Independently packaged complete consumer and same recorded evidence inspected | Installed-JAR assertion plus `TypeSafeConsumerTest`, `CompositionConsumerTest`, `PublicationConsumerTest`, `LifecycleConsumerTest`, `AccountingConsumerTest`, `DiagnosticFaultConsumerTest`, `ConsoleConsumerTest`; final all-18 command above and Console-free suite |
+| Roadmap coherent with current policy | Phases 1–6/checklist updated with named evidence; unchanged marker and central tickets/owning-repo code, local commits without sync, permitted historical intermediate breaks preserved |
+| Overall v1 named evidence/exact builds, bounded future work | Tested-build identity/evidence matrix plus roadmap mapping; no compatibility work, public publication, live provider evaluation, sidecar suite or later-provider feature added |
+
+All seven recipe items are covered: exact dependency/build table; local stub/test key
+and separate optional live setup; linked complete YAML/Java in `default`; concrete
+input and labeled illustrative output; full `/answers/...`/composition paths and
+capability limits; expected Console evidence/troubleshooting; executed repeatable
+commands with matching source/version. No optional developer check is needed.

@@ -357,6 +357,12 @@ are outside Framework provider-attempt quotas and Framework-accounted usage;
 cancellation is cooperative. See the [TypeSafe pack reference](agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md)
 for a declaration, configuration and the accepted numeric/lifecycle limits.
 
+The pack's [tested-build reference](../loomspan-extensions/extensions/decisions/docs/tested-builds.md)
+records native-free installed-artifact qualification, concurrent publication,
+cooperative lifecycle/resource ownership, accounting and actual Console/MCP trace
+inspection. Its [runnable recipe](../loomspan-extensions/extensions/decisions/examples/support-triage/README.md)
+includes local installation and deterministic verification without real credentials.
+
 - **Embedded Java:** add the Spring Boot starter and invoke skills in your
   application. This revision targets Java 21+, Spring Boot 4.2.0-RC2, and Spring AI 2.1.0-RC2;
   building with Maven requires 3.9+.
