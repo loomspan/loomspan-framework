@@ -7,6 +7,14 @@ coverage: source-verified
 
 # Executor leaf declarations and configuration
 
+For an independently versioned provider pack using these generic contracts, see
+the sibling [Loomspan Decisions pack](../../../../../loomspan-extensions/extensions/decisions/README.md)
+and its release-aligned executor configuration and runnable support-triage recipe.
+Installation registers reference-only behavior; applications still declare their
+own callable executor YAML skills. Pack syntax and capabilities belong to the
+pack's documentation. Its installed-JAR consumer covers direct/child execution,
+runtime bindings, complete JSON results and normal canonical diagnostics.
+
 An executor leaf declares an operation owned by application Java code, with YAML supplying its input contract, roles and operation configuration. Loomspan prepares and executes these leaves through the shared Java route, classifies them as `SkillKind.JAVA`, and retains their YAML declarations and exact configuration. The example below shows accepted declaration syntax. The shared [standard schema topic](standard-schemas.md) defines input validation; the application example below exercises root and standard-tool child execution.
 
 ```yaml

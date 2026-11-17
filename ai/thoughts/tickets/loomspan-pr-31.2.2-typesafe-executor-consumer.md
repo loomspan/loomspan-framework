@@ -57,23 +57,23 @@ publication and MCP qualification is assigned to 31.3.2 to keep implementation f
 
 ## Acceptance criteria — this ticket only
 
-- [ ] Ordinary dependency installation registers a reference-only executor. A consumer
+- [x] Ordinary dependency installation registers a reference-only executor. A consumer
   using only supported API runs direct calls, child composition, valid/invalid parent bindings,
   default-namespace config and Console-free execution.
-- [ ] Local stub tests exercise each Choice/Noul/Score type and one mixed request, native
+- [x] Local stub tests exercise each Choice/Noul/Score type and one mixed request, native
   text/JSON forms, score order, numeric fidelity as received, accepted config conversion,
   binding null/omission and pre-send invalid/unsupported-capability rejection.
-- [ ] Actual invocation preserves complete response structure, unknown fields, refusals,
+- [x] Actual invocation preserves complete response structure, unknown fields, refusals,
   usage, JSON null and strings. Malformed/empty success fails without decoding-only retry.
   Result fidelity is independent of diagnostic truncation; no schema enforcement is added.
-- [ ] Consumer tests verify transport retry count/body identity, HTML/malformed retryable
+- [x] Consumer tests verify transport retry count/body identity, HTML/malformed retryable
   errors, redirects never reaching a second endpoint, exact auth/endpoint precedence,
   invalid overrides and prefix preservation. Concurrent distinct-setting consumer
   qualification belongs to 31.3.2; transport isolation tests already belong to 31.2.1.
-- [ ] Actual pack invocation records useful request/response/caught retry evidence;
+- [x] Actual pack invocation records useful request/response/caught retry evidence;
   Console-free execution and normal diagnostic fidelity are verified. Advanced
   fault-injection, accounting and Console/MCP consumer checks are assigned to 31.3.2.
-- [ ] Recipe includes complete YAML/needed app Java, stub setup/test credentials, optional
+- [x] Recipe includes complete YAML/needed app Java, stub setup/test credentials, optional
   live service setup, inputs/illustrative outputs, result paths, composition, expected evidence,
   capability limits, exact versions and repeatable verification. This ticket's functional
   acceptance suite passes; advanced qualification remains explicitly assigned to 31.3.2.
@@ -911,4 +911,128 @@ and [transport lifetime](../phases/executor-packs-and-typesafe-extraction-roadma
   Keep repository-owned artifacts there; separate ticket creation/pipeline execution is unnecessary.
 - Execute only when this ticket is passed to the pipeline. Creating this file does not
   authorize starting implementation, committing current planning changes, or publishing.
+
+## Execution notes — approved full pipeline, 2026-11-16
+
+The developer approved Full 5-Step Pipeline with “proceed”. Framework and Extensions
+were clean at triage. Research and implementation/testing plans named below are
+pipeline-owned. Implementation/code/tests/example/product docs belong to Extensions;
+Framework changed only this handoff, process artifacts and concise skill-authoring
+pack routing/coverage. No Framework production/API, compatibility marker or Console
+change was made. Commits are deferred until fresh Step 5 review; no push/publication.
+
+### Selected contract and implementation
+
+- Boot auto-configuration creates a `TypeSafeExecutor` bean alongside the existing
+  shared transport. Its method is `@SkillExecutor(name="typesafe", config="typesafe")`
+  with exactly the supported v1 `SkillExecutorInvocation` parameter and String JSON
+  return. Reference identity is `default-typesafe`; no callable skill is installed.
+  Pack internal/autoconfigure classes remain construction details, not supported API.
+- `loomspan.executor-config.default.typesafe` supplies the selected namespace map.
+  Skill config accepts native `request`, optional `bindings`, `api_key`, `base_url`;
+  executor config accepts `api_key`, `base_url`. Existing transport presence-based
+  precedence/defaults/retry/deadline/redirect behavior is unchanged. Applications
+  supply resolved literal values; no environment/native credential resolution.
+- `request` contains explicit native model/state/questions. Bindings map request
+  target RFC 6901 pointers to input-source pointers. Empty source selects all input;
+  present null stays null; missing source omits an object field. Array replacement
+  preserves order; missing-source array omission, overlaps and invalid target paths
+  fail. Detached construction, validation and JSON serialization run once before
+  transport retries. Finite received numbers remain unchanged; config YAML precision
+  loss is documented. Local byte-array/classpath/filesystem/path Resources become
+  UTF-8 text once during construction; other Resources fail without opening.
+- Choice has 1–255 option-keyed criteria, Score 1–10 ordered levels, Noul optional
+  true/false criteria and descriptive content. Instructions and criteria use native
+  structured forms. Images/assets/Box and unknown domain fields fail before send;
+  arbitrary authored data keys are not scanned as capabilities. Construction rejects
+  cycles, unsupported Java values, non-finite numbers, depth over 128, body over 32 MiB.
+- Complete decoded native JSON is serialized to text for existing Java String
+  passthrough. This preserves null/string/envelope/unknown/refusal/usage values with
+  no second decode, wrapping, answer extraction or schema/confidence enforcement.
+- Application-owned support-triage supplies real YAML, role/input policy, criteria,
+  refusal/error handling and illustrative thresholds. Its independent Maven POM
+  consumes the installed JAR. Normal Boot discovery and supported APIs run without
+  Console. Its parent composes two real children, binds `/answers/repeat/noul` and
+  forwards a complete result; missing/type-invalid native source bindings fail before
+  the consuming child sends. The runnable main starts an ephemeral local JDK stub.
+- Native parent connection publication uses `api-key-ref` plus the public supplied
+  credential-map overload; pack config continues to receive resolved literal maps.
+  Startup executor maps use real YAML Config Data, preserving raw key spelling.
+  Flattened default-properties map entries do not establish this raw-map contract.
+- Existing transport diagnostics remain records within existing frames with current
+  `EXECUTOR_DIAGNOSTIC_RECORDED` and `EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED`
+  vocabulary/content paths. No new tools, retrieval, frame, accounting or lifecycle
+  API. Source fidelity is checked in canonical files, distinct from the retained
+  derived-journal exception. Large diagnostic capture leaves complete result intact.
+
+### Builds, commands and evidence from Step 4
+
+Tested Framework source `d992449e8eba0734c466de9a1f05526c840ba608`;
+Extensions baseline `0a5aadb7a0cff8bf1bdab988ee16a5b196e8d55c` plus this ticket's
+uncommitted implementation. Coordinates remain Framework
+`ai.loomspan:loomspan-spring-boot-starter:1.0.0-beta.10-SNAPSHOT`, pack
+`ai.loomspan:loomspan-decisions:0.1.0-SNAPSHOT`, example
+`ai.loomspan.examples:support-triage:0.1.0-SNAPSHOT`. Java 21.0.2, Boot 4.2.0-RC2,
+HttpClient 5.6.5, Jackson 3.1.8, Maven 3.9.6 (Framework wrapper 3.9.11).
+
+Framework working directory:
+
+- PASS `./mvnw.cmd -DskipTests install` — installs the tested Framework dependency.
+- PASS `./mvnw.cmd -Dtest=LoomspanPublicSurfaceArchitectureTest test` — 8 tests;
+  log `target/pr-31.2.2-architecture.log`.
+
+Extensions working directory:
+
+- Expected baseline FAIL `mvn -B -f extensions/decisions/pom.xml -Dtest=DecisionsAutoConfigurationTest test`
+  — new assertion proved no `typeSafeExecutor` bean existed before registration.
+- PASS `mvn -B -f extensions/decisions/pom.xml install` — 77 tests, installed pack
+  JAR; final log `extensions/decisions/target/pr-31.2.2-install.log`.
+- PASS `mvn -B -f extensions/decisions/pom.xml verify` — 77 tests;
+  `extensions/decisions/target/pr-31.2.2-verify.log`.
+- PASS `mvn -B -f extensions/decisions/examples/support-triage/pom.xml verify`
+  — 7 consumer test groups, actual installed-JAR assertion and normal Boot discovery;
+  `extensions/decisions/target/pr-31.2.2-consumer.log`.
+- PASS `mvn -B -f extensions/decisions/examples/support-triage/pom.xml -DskipTests compile exec:java`
+  — ephemeral stub receives the full mixed request, native result printed intact,
+  action `route to returns; priority review`;
+  `extensions/decisions/target/pr-31.2.2-recipe.log`.
+- PASS `git diff --check` in both repositories.
+
+Initial development test runs caught and resolved test compilation/parser setup,
+raw-map startup and native credential publication setup. Those transient failures
+are not passes; the final commands above passed against the corrected implementation.
+No unresolved ticket-required build/test debt. Live inference, external publication
+and advanced qualification were not run and are not acceptance gates here.
+
+Normal canonical evidence is retained beneath the example's `target/traces`.
+One request/response/retry trace is
+`cb8cea0b-7e1d-4b08-83c5-394c05d5d0b8.a0f8857e-1f78-4f1d-80fb-4a56144141d1.execution-trace.ndjson`.
+Records include source `token`/`password` content verbatim, existing-frame identity,
+ordered unique sequence, INFO/WARN and COMPLETE capture states. The large-response
+case records explicit unavailable diagnostic data/system notice while returning the
+full native result. Canonical files and logs are generated local evidence, not
+checked-in fixtures. The standalone main prints its session ID and uses JVM temp.
+
+### Acceptance mapping and later handoff
+
+| Local acceptance group | Step 4 evidence |
+| --- | --- |
+| Installation/reference-only/supported API/direct/child/default namespace/no Console | Auto-configuration test; consumer dependency/JAR/discovery and composition tests; real app main |
+| Choice/Noul/Score/mixed/native forms/numbers/binding/pre-send rejection | TypeSafeRequestTest and nativePrimitivesMixedFormsPrecisionAndBindingsThroughInvocation; localInvalidConfigCapabilitiesAndPresentOverridesNeverSend |
+| Complete results/null/string/refusal/usage/unknown/malformed/diagnostic limits | completeNativeResultsAndSuccessfulDecodeFailures and real parent forwarding |
+| Retry count/body/status/auth/endpoint/redirect/prefix | retriesBodiesSettingsRedirectAndCanonicalEvidence plus retained settings default tests |
+| Actual request/response/caught-retry diagnostics and source fidelity | Canonical file assertions using existing data envelopes, sequence and frame identity |
+| Runnable recipe/versions/docs/repeatable commands | Independent POM, main/resources/application policy, matching README/executor docs and commands above |
+
+Documentation drift classification: **aligned**. Framework executable generic
+behavior is unchanged; pack docs and minimal routing/coverage match implemented
+source and consumer checks. No native TypeSafe guidance was removed prematurely.
+
+31.3.1 owns native removal. 31.3.2 extends the same `ConsumerHarness` (real Boot
+context, stub queues/captured requests, public prepare/publish/invoke/observer and
+canonical file reader) for concurrent settings/publication, lifecycle/resource,
+accounting/diagnostic-fault and actual Console/MCP scenarios. It must reuse the
+transport and runnable application. These are downstream scope, not unfinished
+local acceptance. No optional developer check is required. Fresh Step 5 review
+and the scoped per-repository commits remain before pipeline completion.
 
