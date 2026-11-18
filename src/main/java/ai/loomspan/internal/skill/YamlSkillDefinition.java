@@ -9,6 +9,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Stable typed catalog entry for a YAML skill manifest and its resolved execution configuration.
@@ -20,6 +21,30 @@ public final class YamlSkillDefinition
     public Form form() { return form; }
     public String executor() { return manifest.getExecutor(); }
     public java.util.Map<String, Object> config() { return manifest.getConfig(); }
+    public boolean hasInputTransform() { return manifest.compiledInputTransform() != null; }
+
+    public void validateTransformInput(Map<String, Object> input) {
+        if (!hasInputTransform()) return;
+        try {
+            ExecutorInputTransform.requireJsonInput(input);
+        } catch (IllegalArgumentException ex) {
+            throw invalidExecutorInput(ex);
+        }
+    }
+
+    public Map<String, Object> executorInput(Map<String, Object> resolvedInput) {
+        var transform = manifest.compiledInputTransform();
+        if (transform == null) return resolvedInput;
+        try {
+            return transform.apply(resolvedInput);
+        } catch (RuntimeException ex) {
+            throw invalidExecutorInput(ex);
+        }
+    }
+
+    private IllegalArgumentException invalidExecutorInput(RuntimeException cause) {
+        return new IllegalArgumentException("Skill '" + identity + "' input_transform failed: " + cause.getMessage(), cause);
+    }
     private final Resource resource;
     private final YamlSkillManifest manifest;
     private final EffectiveSkillExecutionConfiguration executionConfiguration;
@@ -229,6 +254,9 @@ public final class YamlSkillDefinition
         // Share immutable compiled schemas while detaching their authored JSON.
         copy.copySchemasFrom(source);
         if (source.isDeclared(YamlSkillManifest.Field.CONFIG)) copy.setConfig(source.getConfig());
+        if (source.isDeclared(YamlSkillManifest.Field.INPUT_TRANSFORM)) {
+            copy.inputTransform(source.inputTransform(), source.compiledInputTransform());
+        }
         copy.declarationForm(source.declarationForm());
         copy.restoreDeclaredFields(source.declaredFields());
         return copy;

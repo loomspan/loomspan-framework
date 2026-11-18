@@ -12,6 +12,73 @@ class ExecutorDeclarationTests {
     private YamlSkillCatalog.CheckedDocuments check(String yaml) {
         return new YamlSkillCatalog(new LoomspanProperties()).checkedSupplied(List.of(new SkillDocument("executor-fixture.yml", yaml)), false);
     }
+    @Test void executorInputTransformLoads() {
+        var checked = check(BASE + """
+                input_transform: {language: jslt, expression: '{"answer": .value}'}
+                """);
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions()).singleElement().satisfies(definition ->
+                assertThat(definition.executorInput(Map.of("value", "case-17"))).isEqualTo(Map.of("answer", "case-17")));
+    }
+    @Test void executorInputTransformRejectsInvalidDeclarationAndCompilation() {
+        for (String value : List.of("", "null", "1", "true", "literal", "[]", "{}",
+                "{language: jslt, expression: '.'}")) {
+            assertTransformIssue("name: lookup\ndescription: lookup\nmodel: chat\ninput_transform: " + value,
+                    "input_transform", "only on executor leaves");
+        }
+        for (String value : List.of("", "null", "1", "true", "literal", "[]")) {
+            assertTransformIssue(BASE + "input_transform: " + value, "input_transform", "must be an object");
+        }
+        for (String value : List.of("null", "1", "true", "{}", "[]", "''", "JSLT", "'jslt '")) {
+            assertTransformIssue(BASE + "input_transform: {language: " + value + ", expression: '.'}",
+                    "input_transform.language", "must be the string 'jslt'");
+        }
+        assertTransformIssue(BASE + "input_transform: {}", "input_transform.language", "must be the string 'jslt'");
+        assertTransformIssue(BASE + "input_transform: {expression: '.'}", "input_transform.language", "must be the string 'jslt'");
+        assertTransformIssue(BASE + "input_transform: {language: jslt}", "input_transform.expression", "must be a nonblank string");
+        for (String value : List.of("null", "3", "true", "{}", "[]", "''", "' '")) {
+            assertTransformIssue(BASE + "input_transform: {language: jslt, expression: " + value + "}",
+                    "input_transform.expression", "must be a nonblank string");
+        }
+        assertTransformIssue(BASE + "input_transform: {language: jslt, expression: '.', extra: 1}",
+                "input_transform.extra", "unknown field");
+        assertTransformIssue(BASE + "input_transform: {language: jslt, expression: '{'}",
+                "input_transform.expression", "Parse error");
+        assertTransformIssue(BASE + "input_transform: {language: jslt, expression: '9999999999999999999999999'}",
+                "input_transform.expression", "9999999999999999999999999");
+        assertTransformIssue(BASE + """
+                input_transform:
+                  language: jslt
+                  expression: |
+                    import "missing-executor-transform-module.jslt" as missing
+                    {"value": missing:value(.)}
+                """, "input_transform.expression", "missing-executor-transform-module.jslt");
+    }
+
+    @Test void executorInputTransformSupportsBlockSyntaxAndClasspathImports() {
+        var checked = check(BASE + """
+                input_transform:
+                  language: jslt
+                  expression: |
+                    import "executor-transform/module.jslt" as fixture
+                    {"answer": fixture:value(.value)}
+                """);
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions()).singleElement().satisfies(definition ->
+                assertThat(definition.executorInput(Map.of("value", 17))).containsExactlyEntriesOf(Map.of("answer", "17")));
+        assertThat(check(BASE).definitions().getFirst().manifest().isDeclared(YamlSkillManifest.Field.INPUT_TRANSFORM)).isFalse();
+    }
+
+    private void assertTransformIssue(String yaml, String path, String message) {
+        var checked = check(yaml);
+        assertThat(checked.definitions()).isEmpty();
+        assertThat(checked.issues()).singleElement().satisfies(issue -> {
+            assertThat(issue.fieldPath()).isEqualTo(path);
+            assertThat(issue.sourceName()).isEqualTo("executor-fixture.yml");
+            assertThat(issue.skillName()).isEqualTo("default-lookup");
+            assertThat(issue.message()).contains(message);
+        });
+    }
     @Test void nativeDeclarationIsUnknownForEveryValueAndForm() {
         for (String value : List.of("null", "{}", "{state: fixed, questions: {q: {type: noul, instructions: decide}}}"))
             for (String form : List.of("", "model: chat\n", "executor: sql\n")) {

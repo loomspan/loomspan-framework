@@ -234,8 +234,10 @@ before a consumer. See [planning concurrency](planning-concurrency.md).
 
 ## Exact values and failures
 
-For an [executor child](executor-skills.md), bindings assemble and validate the
-same receiving input before invocation. Ordinary and bound JSON inputs use exact
+For an executor child, binding destinations address its ordinary `input_schema`.
+Bindings assemble the complete receiving input and validate it before the leaf
+applies any [executor input transform](executor-skills.md#transform-executor-input).
+Ordinary and bound JSON inputs use exact
 names and types without numeric/Boolean string coercion or date rewriting.
 The [TypeSafe pack](typesafe-skills.md) returns a complete envelope: select
 `/answers/department/choice`, including the `/answers` prefix. Executor output

@@ -219,7 +219,10 @@ with no inheritance of models, connections or previous settings. Publishable key
 `loomspan.execution-trace.persistence`; host and unknown settings fail validation.
 Credential references resolve through Environment or a copied explicit map.
 
-Executor leaf declarations use `executor:` and optional map-valued `config:`;
+Executor leaf declarations use `executor:` and optional map-valued `config:`.
+An optional `input_transform:` uses JSLT to produce the complete Java input object
+after ordinary input binding, validation and reference resolution. Callers and
+planners continue to use the leaf's `input_schema`.
 `rest:` is unsupported syntax. `loomspan.executor-config` contains namespace-owned
 maps: startup YAML can contain multiple namespaces, while a publication accepts
 only its target namespace. Omission is empty with no inheritance. Nested nulls,
@@ -365,7 +368,9 @@ includes local installation and deterministic verification without real credenti
 
 - **Embedded Java:** add the Spring Boot starter and invoke skills in your
   application. This revision targets Java 21+, Spring Boot 4.2.0-RC2, and Spring AI 2.1.0-RC2;
-  building with Maven requires 3.9+.
+  building with Maven requires 3.9+. Install the pinned JSLT artifact into the local
+  Maven repository before building this checkout or a consuming project.
+  [Build the JSLT dependency](docs/building-jslt.md)
 - **[Sidecar](https://github.com/loomspan/loomspan-sidecar):** use the separate
   Loomspan HTTP service from applications in other languages or when you want a
   separate runtime. Its repository covers setup, versions, and integration guidance.

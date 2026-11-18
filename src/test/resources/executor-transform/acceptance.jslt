@@ -1,0 +1,26 @@
+{
+  "model": "jev-1.13.0",
+  "state": {
+    "contact": .context,
+    "slash": .context."a/b",
+    "tilde": .context."a~b",
+    "literal": "${/input/notResolved}",
+    "note": "Repeat=" + string(.context.repeat) + "; count=" + string(.context.count)
+  },
+  "questions": {
+    "department": {
+      "type": "choice",
+      "instructions": {
+        "question": "Which team should review " + .context.message + "?",
+        "policy": .policy
+      },
+      "criteria": .candidates
+    },
+    "repeat": {
+      "type": "noul",
+      "instructions": ["Check contact history.", .context.history[0]],
+      "criteria": { "true": null }
+    },
+    "impact": { "type": "score", "criteria": .parameters.levels }
+  }
+}

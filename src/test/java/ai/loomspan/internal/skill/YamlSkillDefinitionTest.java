@@ -18,6 +18,27 @@ class YamlSkillDefinitionTest
             new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
 
     @Test
+    void executorTransformRemainsPreparedAcrossDefensiveManifestCopies() {
+        var manifest = manifest("transformed");
+        manifest.setExecutor("default-sql");
+        var declaration = new YamlSkillManifest.InputTransformDeclaration("jslt", "{\"answer\": .question}");
+        var compiled = ExecutorInputTransform.compile(declaration.expression(), "copy fixture");
+        manifest.inputTransform(declaration, compiled);
+        var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.EXECUTOR, "default", resource(), manifest, null);
+        var replacement = new YamlSkillManifest.InputTransformDeclaration("jslt", "{}");
+        var replacementCompiled = ExecutorInputTransform.compile(replacement.expression(), "replacement fixture");
+        manifest.inputTransform(replacement, replacementCompiled);
+
+        var copy = definition.manifest();
+        assertThat(copy.isDeclared(YamlSkillManifest.Field.INPUT_TRANSFORM)).isTrue();
+        assertThat(copy.inputTransform()).isEqualTo(declaration);
+        assertThat(copy.compiledInputTransform()).isSameAs(compiled);
+        copy.inputTransform(replacement, replacementCompiled);
+        assertThat(definition.manifest().inputTransform()).isEqualTo(declaration);
+        assertThat(definition.executorInput(Map.of("question", "case"))).isEqualTo(Map.of("answer", "case"));
+    }
+
+    @Test
     void executorConfigCopiesContainersWithoutSerializingScalarLeaves() {
         Object scalar = new Object();
         var nested = new java.util.LinkedHashMap<String, Object>();

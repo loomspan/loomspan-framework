@@ -91,7 +91,16 @@ String skillName();
 String executorConfigGenerationId();
 ```
 
-Framework supplies validated, reference-resolved input(); the executing YAML skill's `config` and canonical qualified name; the selected executor configuration map; and the executor namespace's captured generation ID, even when the annotation declares no configuration path. Invocation performs no live registration lookup or configuration rebinding. Domain configuration validation and application resources remain application-owned.
+Framework supplies the executing YAML skill's `config` and canonical qualified name,
+the selected executor configuration map, and the executor namespace's captured
+generation ID, even when the annotation declares no configuration path.
+`input()` supplies validated, reference-resolved business input by default.
+When the executing leaf declares `input_transform`, `input()` supplies the
+complete resulting JSON object. Executor Java code continues to use this v1
+invocation class. Invocation performs no live registration lookup or
+configuration rebinding. Domain configuration validation and application resources
+remain application-owned.
+[Executor input transform](../skill-authoring/executor-skills.md#transform-executor-input)
 
 There is no public constructor or builder. Captured values are non-null and metadata strings nonblank; valid strings retain their exact text. All three maps are defensively copied recursively into unmodifiable map/list containers, preserving nulls. Other leaves retain identity, including Spring `Resource` handles, arrays and arbitrary application objects. This does not freeze those objects or copy/freeze resource bytes. There is no builder, authentication field, context bag or internal runtime value in the invocation.
 

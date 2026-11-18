@@ -3,6 +3,9 @@ package ai.loomspan.integration;
 import ai.loomspan.api.*;
 import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
 import ai.loomspan.autoconfigure.*;
+import ai.loomspan.internal.core.SkillIdentity;
+import ai.loomspan.internal.skill.SkillGenerationManager;
+import com.schibsted.spt.data.jslt.Expression;
 import okhttp3.mockwebserver.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -11,12 +14,17 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.JsonNode;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ExecutorInvocationLifecycleIntegrationTest
 {
@@ -107,6 +115,7 @@ class ExecutorInvocationLifecycleIntegrationTest
     @Test void capturedInvocationObservesCallerCancellationAcrossThreadsWithoutClearingInterrupt() throws Exception
     {
         leaf();
+        addTransform();
         var bean = new Decisions(); bean.block = true;
         runner(bean).run(context -> {
             assertThat(context).hasNotFailed();
@@ -119,6 +128,7 @@ class ExecutorInvocationLifecycleIntegrationTest
             try
             {
                 caller.start(); assertThat(bean.entered.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(bean.call.input()).isEqualTo(Map.of("transformed", true));
                 assertThat(bean.call.isCancelled()).isFalse();
                 Duration first = bean.call.remainingTime().orElseThrow();
                 caller.interrupt();
@@ -135,6 +145,77 @@ class ExecutorInvocationLifecycleIntegrationTest
             catch (InterruptedException ex) { throw new AssertionError(ex); }
             finally { bean.release.countDown(); }
         });
+    }
+
+    private void addTransform() throws Exception
+    {
+        Files.writeString(directory.resolve("leaf.yaml"), """
+                input_transform:
+                  language: jslt
+                  expression: '{"transformed": true}'
+                """, StandardOpenOption.APPEND);
+    }
+
+    @Test void cancellationDuringEvaluationPreventsExecutorEntry() throws Exception
+    {
+        leaf();
+        addTransform();
+        var bean = new Decisions();
+        var evaluationEntered = new CountDownLatch(1);
+        var evaluationInterrupted = new CountDownLatch(1);
+        var releaseEvaluation = new CountDownLatch(1);
+        var invocationFailure = new AtomicReference<Throwable>();
+        try (var worker = Executors.newSingleThreadExecutor())
+        {
+            runner(bean).withInitializer(application -> application.addBeanFactoryPostProcessor(factory ->
+                    factory.registerSingleton("LoomspanMissionExecutor", worker))).run(context -> {
+                assertThat(context).hasNotFailed();
+                var manager = context.getBean(SkillGenerationManager.class);
+                var capture = manager.capture(SkillIdentity.parse("default-leaf"));
+                try (var lease = capture.lease())
+                {
+                    var definition = capture.snapshot().generation("default").definition("default-leaf");
+                    Object manifest = ReflectionTestUtils.getField(definition, "manifest");
+                    Object transform = ReflectionTestUtils.getField(manifest, "compiledInputTransform");
+                    var prepared = (Expression) ReflectionTestUtils.getField(transform, "expression");
+                    var delayed = mock(Expression.class);
+                    when(delayed.apply(any(JsonNode.class))).thenAnswer(call -> {
+                        evaluationEntered.countDown();
+                        boolean released = false;
+                        while (!released)
+                        {
+                            try { released = releaseEvaluation.await(5, TimeUnit.SECONDS); }
+                            catch (InterruptedException ignored) { evaluationInterrupted.countDown(); }
+                        }
+                        return prepared.apply(call.getArgument(0));
+                    });
+                    ReflectionTestUtils.setField(transform, "expression", delayed);
+                }
+                var template = context.getBean(SkillTemplate.class);
+                Thread caller = Thread.ofPlatform().start(() -> {
+                    try { template.invoke("default-leaf", Map.of()); }
+                    catch (Throwable thrown) { invocationFailure.set(thrown); }
+                });
+                try
+                {
+                    assertThat(evaluationEntered.await(5, TimeUnit.SECONDS)).isTrue();
+                    caller.interrupt();
+                    assertThat(evaluationInterrupted.await(5, TimeUnit.SECONDS)).isTrue();
+                    releaseEvaluation.countDown();
+                    caller.join(5000);
+                    assertThat(caller.isAlive()).isFalse();
+                    worker.submit(() -> {}).get(5, TimeUnit.SECONDS);
+                    assertThat(invocationFailure.get()).isInstanceOf(SkillException.class)
+                            .hasStackTraceContaining("LoomspanMissionTimeoutException");
+                    assertThat(bean.operations).hasValue(0);
+                }
+                finally
+                {
+                    releaseEvaluation.countDown();
+                    if (caller.isAlive()) caller.interrupt();
+                }
+            });
+        }
     }
 
     @ParameterizedTest @ValueSource(booleans = {false, true})

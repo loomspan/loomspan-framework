@@ -52,6 +52,37 @@ class SharedDeclarativeAuthorizationIntegrationTest {
         assertThat(worker.submit(SecurityContextHolder::getContext).get(5,TimeUnit.SECONDS)).isSameAs(sentinel);
         assertThat(SecurityContextHolder.getContext()).isSameAs(caller);
     }
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void composedRoleDenialPrecedesTransformEvaluation(boolean jdk, @TempDir Path directory) {
+        try (var worker = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            context(directory, jdk, worker).run(context -> {
+                assertThat(context).hasNotFailed();
+                var base = leaf("transformed", "SALES");
+                publish(context.getBean(SkillReloader.class), List.of(new SkillDocument(base.sourceName(), base.yaml() + """
+                        input_transform:
+                          language: jslt
+                          expression: 'error("transform evaluated")'
+                        """)));
+                var template = context.getBean(SkillTemplate.class);
+                var prior = SecurityContextHolder.getContext();
+                var caller = SecurityContextHolder.createEmptyContext();
+                SecurityContextHolder.setContext(caller);
+                try {
+                    for (var unauthorized : List.of(auth("ROLE_SALES"), auth("ROLE_DATABASE_WRITE"))) {
+                        caller.setAuthentication(unauthorized);
+                        assertThatThrownBy(() -> template.invoke("transformed", Map.of()))
+                                .isInstanceOf(AccessDeniedException.class).hasMessageNotContaining("transform evaluated");
+                    }
+                    caller.setAuthentication(auth("ROLE_SALES", "ROLE_DATABASE_WRITE"));
+                    assertThatThrownBy(() -> template.invoke("transformed", Map.of()))
+                            .isInstanceOf(SkillException.class).hasStackTraceContaining("transform evaluated");
+                    assertThat(context.getBean(State.class).calls).isZero();
+                } finally {
+                    SecurityContextHolder.setContext(prior);
+                }
+            });
+        }
+    }
     @ParameterizedTest @ValueSource(booleans={false,true})
     void actualArgumentAdviceAndWorkerCallerScopesApplyToBothJavaForms(boolean jdk, @TempDir Path directory) throws Exception {
         try (var worker = java.util.concurrent.Executors.newSingleThreadExecutor()) {

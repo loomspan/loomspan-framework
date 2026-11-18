@@ -36,6 +36,58 @@ Executor leaves MUST omit `model`, `thinking_level`, `prompt`, `planning_mode`, 
 
 `config` is permitted only on executor leaves. Omission and `{}` yield an empty immutable map. Explicit null, a bare field, a scalar or a list fail. Nested nulls, maps, lists, empty containers, scalar types and exact data keys are preserved. `config` is executor-owned domain data, not a Framework schema. It is decoded separately with the existing Java numeric kinds; lossless JSON-bound skill decoding applies to the rest of the document, not this actual top-level subtree.
 
+## Transform executor input
+
+Only executor leaves can declare root `input_transform`. Supply an object
+containing exactly `language: jslt` and a nonblank string `expression`. Loomspan
+compiles the expression at startup or namespace preparation. Malformed syntax
+and unresolved classpath imports fail at that boundary. Invalid preparation
+leaves the active generation in place. Retained invocations use the expression of
+the captured YAML leaf generation.
+
+```yaml
+name: lookup
+description: Look up one value
+executor: infrastructure-sql
+input_schema:
+  type: object
+  properties:
+    value: {type: string}
+  required: [value]
+  additionalProperties: false
+input_transform:
+  language: jslt
+  expression: '{"answer": .value}'
+```
+
+With an application registration for `infrastructure-sql`, caller input
+`{"value":"case-17"}` delivers `{"answer":"case-17"}` in Java's `invocation.input()`.
+The leaf's ordinary `input_schema` defines caller and planner input. Parent
+bindings target that schema. On every direct or child execution, the leaf
+validates the assembled business input and resolves references before evaluating
+JSLT once. JSLT `.` sees that business input object. The expression result is the
+complete Java input object. Both configuration maps remain available in their
+own [v1 invocation accessors](../java-api/java-skills.md#reference-only-executor-declaration).
+
+Use objects with string keys, arrays, strings, booleans, nulls, and finite
+numbers. JSLT object construction preserves explicit null members, empty
+objects and arrays, exact keys, and literal strings such as
+`${/input/notResolved}` when quoted in the expression. An empty result object
+succeeds. Input containing a runtime handle such as a resolved Resource, an
+InputStream, or a byte array fails JSON admission. Evaluation errors and results
+whose root is a scalar, array or null fail before executor entry. After
+evaluation, Loomspan checks the mission lifecycle before starting the Java
+handler. Omitting `input_transform` delivers the ordinary reference-resolved input, including
+supported handles. Diagnostic metadata retains the original business input
+and schema and the authored YAML.
+
+Evidence: `ExecutorDeclarationTests` and `ExecutorInputTransformTest` cover
+declaration validation, compilation, JSON fidelity and execution failures.
+`ExecutorInputTransformIntegrationTest` covers connected direct/child execution,
+configuration separation, retained expressions, failed preparation and diagnostic
+fidelity. `SharedDeclarativeAuthorizationIntegrationTest` and
+`ExecutorInvocationLifecycleIntegrationTest` cover authorization and cancellation.
+
 ## Namespace executor data
 
 Startup YAML may supply multiple namespaces:
@@ -68,7 +120,7 @@ Each namespace generation owns its fixed executor registrations and immutable co
 
 Preparation overlays the complete candidate namespace on captured foreign metadata, invokes no application code and retains no foreign runtime lease. Foreign changes after preparation do not invalidate target-base publication; each fresh admission validates the graph it captures. Admission follows only root-reachable callable edges and their executor dependencies, selecting one coherent generation per needed namespace. Retaining an executor namespace does not traverse unrelated skills or grant authority to call them.
 
-The invocation receives validated/reference-resolved input, the executing YAML leaf's `config` and qualified name, the selected executor configuration map, and the executor namespace generation ID even when no config path is declared. Retained execution uses only that captured registration and map across replacement, removal and recreation. Both Java forms share mission execution, caller authentication scope, observation, timeout and cancellation behavior. The leaf requires its YAML role policy AND its captured executor's Java declarative policy, evaluated against the same caller at root validation, planner filtering and execution. Role alternatives remain within each declaration; unrestricted/PermitAll cannot override the other constituent, and DenyAll denies. See [authorization](authorization.md#compose-executor-declaration-boundaries) for the composition rule and examples. Captured executor policy is rechecked with the trusted execution caller; retaining a generation never freezes an earlier authorization grant.
+The invocation receives the executor input object, the executing YAML leaf's `config` and qualified name, the selected executor configuration map, and the executor namespace generation ID even when no config path is declared. Retained execution uses only that captured registration and map across replacement, removal and recreation. Both Java forms share mission execution, caller authentication scope, observation, timeout and cancellation behavior. The leaf requires its YAML role policy AND its captured executor's Java declarative policy, evaluated against the same caller at root validation, planner filtering and execution. Role alternatives remain within each declaration; unrestricted/PermitAll cannot override the other constituent, and DenyAll denies. See [authorization](authorization.md#compose-executor-declaration-boundaries) for the composition rule and examples. Captured executor policy is rechecked with the trusted execution caller; retaining a generation never freezes an earlier authorization grant.
 
 Validation and discovery execute no application code or argument-dependent advice. Invocation still runs the final Spring proxy with actual arguments, so application advice may reject a leaf that passed declarative validation. Catalog visibility is unchanged.
 

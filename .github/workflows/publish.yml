@@ -45,6 +45,9 @@ jobs:
           if os.environ["GITHUB_REF"] != f"refs/tags/v{version}":
               raise SystemExit("Release tag must match the committed Maven version")
           PY
+      - name: Build and install pinned JSLT
+        shell: pwsh
+        run: ./ai/scripts/install-jslt.ps1
       - name: Verify the starter, including API architecture
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
       - name: Verify release sources and Javadoc without signing or uploading

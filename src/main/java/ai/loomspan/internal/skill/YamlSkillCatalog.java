@@ -413,6 +413,7 @@ public class YamlSkillCatalog implements InitializingBean
                         "mapping is no longer supported; declare the Java skill once with @SkillMethod and remove its YAML wrapper");
             }
             var form = validateDeclarationForm(resource, root, skillName);
+            var inputTransform = readInputTransform(resource, root, skillName);
             validateRawOutputBindings(resource, root, skillName);
             validateRawOutputFrom(resource, root, skillName);
             validateRawAllowedSkills(resource, root, skillName);
@@ -420,6 +421,7 @@ public class YamlSkillCatalog implements InitializingBean
             try
             {
                 if (configPresent) ((tools.jackson.databind.node.ObjectNode)root).remove("config");
+                if (inputTransform != null) ((tools.jackson.databind.node.ObjectNode)root).remove("input_transform");
                 YamlSkillManifest manifest = yamlObjectMapper.treeToValue(root, YamlSkillManifest.class);
                 if (configPresent) {
                     var data = new java.util.LinkedHashMap<String, Object>();
@@ -432,6 +434,14 @@ public class YamlSkillCatalog implements InitializingBean
                 }
                 manifest.declarationForm(form);
                 if (form == YamlSkillDefinition.Form.EXECUTOR) manifest.setExecutor(reference(resource, skillName, "executor", manifest.getExecutor()).toString());
+                if (inputTransform != null) {
+                    try {
+                        manifest.inputTransform(inputTransform,
+                                ExecutorInputTransform.compile(inputTransform.expression(), diagnosticSource(resource)));
+                    } catch (RuntimeException ex) {
+                        throw invalidNamedSkill(resource, skillName, "input_transform.expression", ex.getMessage());
+                    }
+                }
                 prepareReferences(manifest);
                 return manifest;
             }
@@ -476,9 +486,29 @@ public class YamlSkillCatalog implements InitializingBean
                 throw invalidNamedSkill(resource, skillName, "config", "must be a non-null map");
         } else {
             if (root.has("config")) throw invalidNamedSkill(resource, skillName, "config", "is permitted only on executor leaves");
+            if (root.has("input_transform"))
+                throw invalidNamedSkill(resource, skillName, "input_transform", "is permitted only on executor leaves");
             validateRawConcurrency(resource, root, skillName);
         }
         return form;
+    }
+
+    private YamlSkillManifest.InputTransformDeclaration readInputTransform(Resource resource, JsonNode root, String skillName) {
+        JsonNode declaration = root.get("input_transform");
+        if (declaration == null) return null;
+        if (!declaration.isObject())
+            throw invalidNamedSkill(resource, skillName, "input_transform", "must be an object");
+        for (String field : declaration.propertyNames()) {
+            if (!field.equals("language") && !field.equals("expression"))
+                throw invalidNamedSkill(resource, skillName, "input_transform." + field, "unknown field");
+        }
+        JsonNode language = declaration.path("language");
+        if (!language.isString() || !language.textValue().equals("jslt"))
+            throw invalidNamedSkill(resource, skillName, "input_transform.language", "must be the string 'jslt'");
+        JsonNode expression = declaration.path("expression");
+        if (!expression.isString() || expression.textValue().isBlank())
+            throw invalidNamedSkill(resource, skillName, "input_transform.expression", "must be a nonblank string");
+        return new YamlSkillManifest.InputTransformDeclaration(language.textValue(), expression.textValue());
     }
 
     private void validateRawOutputFrom(Resource resource, JsonNode root, String skillName)

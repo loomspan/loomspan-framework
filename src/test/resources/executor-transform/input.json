@@ -1,0 +1,13 @@
+{
+  "context": {
+    "a/b": "slash value",
+    "a~b": {"KeepCase": "tilde value"},
+    "message": "Acme",
+    "repeat": true,
+    "count": 3,
+    "history": ["First history item", "Second history item"]
+  },
+  "policy": {"requireReview": true, "nullable": null},
+  "candidates": {"sales": {"description": "Sales team"}},
+  "parameters": {"levels": {"low": 0, "high": 10}}
+}

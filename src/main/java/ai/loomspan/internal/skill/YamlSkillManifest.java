@@ -20,6 +20,7 @@ public class YamlSkillManifest
     {
         EXECUTOR("executor"),
         CONFIG("config"),
+        INPUT_TRANSFORM("input_transform"),
         MODEL("model"),
         THINKING_LEVEL("thinking_level"),
         PROMPT("prompt"),
@@ -73,6 +74,23 @@ public class YamlSkillManifest
     private String model;
     private String prompt;
     private String executor;
+    @JsonIgnore
+    private InputTransformDeclaration inputTransform;
+    @JsonIgnore
+    private ExecutorInputTransform compiledInputTransform;
+
+    record InputTransformDeclaration(String language, String expression) {}
+
+    InputTransformDeclaration inputTransform() { return inputTransform; }
+
+    void inputTransform(InputTransformDeclaration declaration, ExecutorInputTransform compiled) {
+        declaredFields.add(Field.INPUT_TRANSFORM);
+        inputTransform = declaration;
+        compiledInputTransform = compiled;
+    }
+
+    ExecutorInputTransform compiledInputTransform() { return compiledInputTransform; }
+
     @JsonIgnore
     private Map<String, Object> config = Map.of();
     @JsonIgnore

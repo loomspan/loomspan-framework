@@ -149,6 +149,9 @@ public class ExecutionCoordinator
 
         if (missionInput != null && !missionInput.isEmpty())
         {
+            // Trace recording serializes the original input before reference resolution.
+            if (definition != null && definition.form() == YamlSkillDefinition.Form.EXECUTOR)
+                definition.validateTransformInput(missionInput);
             frameParameters.put("missionInput", definition == null
                     ? traceSafeJavaInput(missionInput)
                     : traceSafeMissionInput(definition, missionInput));
@@ -169,14 +172,16 @@ public class ExecutionCoordinator
                         var resolved = refResolver.resolveArguments(missionInput == null ? Map.of() : missionInput,
                                 session, rootCapability.inputContract());
                         if (definition != null && definition.form() == YamlSkillDefinition.Form.EXECUTOR) {
-                            var binding = parentBinding.snapshot().executorBinding(skillName);
+                            var executorInput = definition.executorInput(resolved);
                             var capturedBinding = ExecutionBindingScope.requireCurrent();
+                            if (definition.hasInputTransform()) mission.lifecycle().requireOpenForNewWork(capturedBinding);
+                            var binding = parentBinding.snapshot().executorBinding(skillName);
                             var diagnostics = new DefaultExecutorDiagnostics(capturedBinding, frame);
                             String result;
                             try
                             {
                                 result = binding.registration().invoker().apply(ExecutorInvocations.create(
-                                        resolved, definition.config(), binding.configuration(), skillName, binding.generationId(),
+                                        executorInput, definition.config(), binding.configuration(), skillName, binding.generationId(),
                                         mission.lifecycle()::isCancelled, mission.lifecycle()::remainingExecutionTime, diagnostics));
                             }
                             finally { diagnostics.close(); }

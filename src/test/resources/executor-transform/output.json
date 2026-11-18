@@ -1,0 +1,33 @@
+{
+  "model": "jev-1.13.0",
+  "state": {
+    "contact": {
+      "a/b": "slash value",
+      "a~b": {"KeepCase": "tilde value"},
+      "message": "Acme",
+      "repeat": true,
+      "count": 3,
+      "history": ["First history item", "Second history item"]
+    },
+    "slash": "slash value",
+    "tilde": {"KeepCase": "tilde value"},
+    "literal": "${/input/notResolved}",
+    "note": "Repeat=true; count=3"
+  },
+  "questions": {
+    "department": {
+      "type": "choice",
+      "instructions": {
+        "question": "Which team should review Acme?",
+        "policy": {"requireReview": true, "nullable": null}
+      },
+      "criteria": {"sales": {"description": "Sales team"}}
+    },
+    "repeat": {
+      "type": "noul",
+      "instructions": ["Check contact history.", "First history item"],
+      "criteria": {"true": null}
+    },
+    "impact": {"type": "score", "criteria": {"low": 0, "high": 10}}
+  }
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>ai.loomspan.thirdparty</groupId>
+  <artifactId>jslt</artifactId>
+  <version>0.1.15-jackson3-cf30e6d</version>
+  <name>JSLT (local Jackson 3 build)</name>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+    </license>
+  </licenses>
+  <scm>
+    <url>https://github.com/schibsted/jslt</url>
+    <tag>cf30e6d9be247d489dac6bf53bf930322c8fd663</tag>
+  </scm>
+  <dependencies>
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>3.2.2</version>
+    </dependency>
+  </dependencies>
+</project>
