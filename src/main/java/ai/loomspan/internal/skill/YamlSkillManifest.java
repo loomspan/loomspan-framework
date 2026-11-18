@@ -21,6 +21,7 @@ public class YamlSkillManifest
         EXECUTOR("executor"),
         CONFIG("config"),
         INPUT_TRANSFORM("input_transform"),
+        OUTPUT_TRANSFORM("output_transform"),
         MODEL("model"),
         THINKING_LEVEL("thinking_level"),
         PROMPT("prompt"),
@@ -75,21 +76,35 @@ public class YamlSkillManifest
     private String prompt;
     private String executor;
     @JsonIgnore
-    private InputTransformDeclaration inputTransform;
+    private TransformDeclaration inputTransform;
     @JsonIgnore
-    private ExecutorInputTransform compiledInputTransform;
+    private ExecutorTransform compiledInputTransform;
+    @JsonIgnore
+    private TransformDeclaration outputTransform;
+    @JsonIgnore
+    private ExecutorTransform compiledOutputTransform;
 
-    record InputTransformDeclaration(String language, String expression) {}
+    record TransformDeclaration(String language, String expression) {}
 
-    InputTransformDeclaration inputTransform() { return inputTransform; }
+    TransformDeclaration inputTransform() { return inputTransform; }
 
-    void inputTransform(InputTransformDeclaration declaration, ExecutorInputTransform compiled) {
+    void inputTransform(TransformDeclaration declaration, ExecutorTransform compiled) {
         declaredFields.add(Field.INPUT_TRANSFORM);
         inputTransform = declaration;
         compiledInputTransform = compiled;
     }
 
-    ExecutorInputTransform compiledInputTransform() { return compiledInputTransform; }
+    ExecutorTransform compiledInputTransform() { return compiledInputTransform; }
+
+    TransformDeclaration outputTransform() { return outputTransform; }
+
+    void outputTransform(TransformDeclaration declaration, ExecutorTransform compiled) {
+        declaredFields.add(Field.OUTPUT_TRANSFORM);
+        outputTransform = declaration;
+        compiledOutputTransform = compiled;
+    }
+
+    ExecutorTransform compiledOutputTransform() { return compiledOutputTransform; }
 
     @JsonIgnore
     private Map<String, Object> config = Map.of();

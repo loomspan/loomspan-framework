@@ -177,25 +177,15 @@ public class ExecutionCoordinator
                             if (definition.hasInputTransform()) mission.lifecycle().requireOpenForNewWork(capturedBinding);
                             var binding = parentBinding.snapshot().executorBinding(skillName);
                             var diagnostics = new DefaultExecutorDiagnostics(capturedBinding, frame);
-                            String result;
+                            String rawResult;
                             try
                             {
-                                result = binding.registration().invoker().apply(ExecutorInvocations.create(
+                                rawResult = binding.registration().invoker().apply(ExecutorInvocations.create(
                                         executorInput, definition.config(), binding.configuration(), skillName, binding.generationId(),
                                         mission.lifecycle()::isCancelled, mission.lifecycle()::remainingExecutionTime, diagnostics));
                             }
                             finally { diagnostics.close(); }
-                            if (topLevelInvocation)
-                            {
-                                try
-                                {
-                                    capturedBinding.runIfWritable(() -> session.appendTraceRecord(
-                                            TraceRecordType.FRAME_METADATA_RECORDED, frame, Map.of(),
-                                            Map.of("executorOutput", result)));
-                                }
-                                catch (RuntimeException ignoredFailure) { /* New evidence is best effort. */ }
-                            }
-                            return result;
+                            return publishExecutorResult(definition, capturedBinding, frame, rawResult, topLevelInvocation);
                         }
                         return String.valueOf(rootCapability.invoker().invoke(resolved));
                     }
@@ -347,6 +337,41 @@ public class ExecutionCoordinator
                 }
             }
         }
+    }
+
+    private String publishExecutorResult(YamlSkillDefinition definition, ExecutionBinding binding,
+            ExecutionFrame frame, String rawResult, boolean topLevelInvocation)
+    {
+        if (!definition.hasOutputTransform())
+        {
+            if (topLevelInvocation) recordExecutorCompletion(binding, frame, Map.of("executorOutput", rawResult));
+            return rawResult;
+        }
+
+        String published;
+        try
+        {
+            published = definition.executorOutput(rawResult);
+        }
+        catch (RuntimeException ex)
+        {
+            recordExecutorCompletion(binding, frame, Map.of("executorOutput", rawResult,
+                    "outputTransformStatus", "failed", "outputTransformFailure", ex.getMessage()));
+            throw ex;
+        }
+        recordExecutorCompletion(binding, frame, Map.of("executorOutput", rawResult,
+                "outputTransformStatus", "succeeded", "skillOutput", published));
+        return published;
+    }
+
+    private void recordExecutorCompletion(ExecutionBinding binding, ExecutionFrame frame, Map<String, Object> data)
+    {
+        try
+        {
+            binding.runIfWritable(() -> binding.session().appendTraceRecord(
+                    TraceRecordType.FRAME_METADATA_RECORDED, frame, Map.of(), data));
+        }
+        catch (RuntimeException ignoredFailure) { /* Completion evidence is best effort. */ }
     }
 
     private TraceOutcome terminalOutcome(@Nullable Throwable failure, @Nullable Throwable cleanupFailure)

@@ -5,7 +5,7 @@ applies_to: bundled-loomspan-revision
 coverage: source-verified
 ---
 
-# Executor leaf declarations and configuration
+# Executor leaf declarations, transforms and configuration
 
 For an independently versioned provider pack using these generic contracts, see
 the sibling Loomspan Decisions pack (`../../../../../loomspan-extensions/extensions/decisions/README.md` in the sibling checkout)
@@ -87,6 +87,57 @@ declaration validation, compilation, JSON fidelity and execution failures.
 configuration separation, retained expressions, failed preparation and diagnostic
 fidelity. `SharedDeclarativeAuthorizationIntegrationTest` and
 `ExecutorInvocationLifecycleIntegrationTest` cover authorization and cancellation.
+
+## Publish a transformed executor result
+
+Only executor leaves can declare root `output_transform`. It may appear alone or
+alongside `input_transform`. Each transform requires an object containing exactly
+`language: jslt` and a nonblank string `expression`. Loomspan compiles both at
+startup or namespace preparation. Failed preparation leaves the active generation
+in place, and retained invocations use the captured leaf expressions.
+
+This fragment publishes three business fields from a support-triage response.
+
+```yaml
+output_transform:
+  language: jslt
+  expression: |
+    {
+      "assignedTeam": .answers.team.choice,
+      "repeatContactProbability": .answers.repeat.noul,
+      "impactScore": .answers.impact.score
+    }
+```
+
+After the executor succeeds, its ordinary result text MUST contain exactly one
+complete JSON value. Loomspan binds JSLT's `.` to that value and evaluates once.
+The author chooses which fields to expect. A missing-field lookup on an object
+produces JSON null. Objects, arrays, strings, finite numbers, booleans and null
+are valid at the root. The published result is JSON text, so a string such as `"returns"`
+keeps its quotes and escaping, and null publishes as `null`. JSLT object
+construction preserves explicit null fields and empty objects and arrays.
+
+Direct callers and ordinary parent tool calls receive that published text.
+[Child-result bindings](input-bindings.md) select from the published shape,
+and [`output_from`](output-contracts.md#forwarding-declaration-and-completion) forwards the
+whole published text unchanged. When the declaration is omitted, the ordinary
+executor result text passes through exactly, including empty or non-JSON text.
+Executor leaves still omit `output_schema`.
+
+Invalid JSON or a transform error fails the leaf after successful executor
+work. The executor may already have performed side effects. Loomspan neither
+repeats the executor call nor publishes its raw text as a successful fallback.
+Executor failures skip the transform.
+
+Under existing trace access and size limits, the leaf's canonical completion
+metadata records raw `executorOutput`, published `skillOutput` on success, and
+`outputTransformStatus` with `succeeded` or `failed`. A failed transform includes
+`outputTransformFailure` for diagnosis.
+
+Evidence comes from `ExecutorDeclarationTests`, `ExecutorOutputTransformTest`
+and `ExecutorOutputTransformIntegrationTest`. `YamlSkillCatalog` prepares the
+expression, `YamlSkillDefinition` retains it and `ExecutionCoordinator` publishes
+the result on the leaf execution path.
 
 ## Namespace executor data
 

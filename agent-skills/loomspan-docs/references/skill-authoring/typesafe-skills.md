@@ -91,11 +91,14 @@ the same bytes across retries. See the owning executor reference
 (`../../../../../loomspan-extensions/extensions/decisions/docs/executor.md` in the sibling checkout)
 for question forms, JSON limits and supported local Resource inputs.
 
-The result is complete provider JSON as text: envelope, unknown fields, refusals,
-usage, arrays/scalars, JSON null and quoted strings remain intact. For a named
-Noul answer use `/answers/repeat/noul` from the complete response root.
-A parent may bind selected values or forward the entire text unchanged. Empty or
-malformed successful HTTP content fails; a decoding-only failure causes no retry.
+The executor returns complete provider JSON as text. With `output_transform`
+omitted, the leaf publishes that text with its envelope, unknown fields, refusals,
+usage, arrays and scalars, JSON null and quoted strings. In that shape, a named
+Noul answer is at `/answers/repeat/noul`. Use the
+[executor output transform](executor-skills.md#publish-a-transformed-executor-result)
+to publish a skill-owned shape. Parent bindings use the published shape and
+`output_from` forwards the whole published text. Empty or malformed successful
+HTTP content fails in the pack. A decoding-only failure causes no retry.
 Diagnostic resource limits never truncate the business result.
 
 ## Framework boundaries and accepted limits

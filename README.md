@@ -355,8 +355,11 @@ It registers reference-only `default-typesafe`. Applications declare ordinary
 `executor: typesafe` YAML leaves and pass a native request directly or build it
 with JSLT. They supply resolved connection settings in the captured executor
 namespace map.
-These leaves execute as `JAVA` and return complete provider JSON. Bind answers
-through `/answers/...`. Domain validation occurs at invocation, and no generated
+These leaves execute as `JAVA`. With `output_transform` omitted, they publish
+the complete provider JSON and parents can bind answers through `/answers/...`.
+To publish a skill-owned JSON shape, use the
+[executor output transform](agent-skills/loomspan-docs/references/skill-authoring/executor-skills.md#publish-a-transformed-executor-result).
+Domain validation occurs at invocation, and no generated
 output schema or early provider-domain checks are supplied. Pack requests/retries
 are outside Framework provider-attempt quotas and Framework-accounted usage;
 cancellation is cooperative. See the [TypeSafe pack reference](agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md)

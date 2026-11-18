@@ -18,11 +18,13 @@ correction, forwarding and effective metadata use canonical standard schemas.
 Local integration tests exercise public invocation and native loopback requests;
 they do not establish live provider enforcement or remove SDK limitations.
 
-[TypeSafe pack leaves](typesafe-skills.md) return complete provider JSON through
-the ordinary Java executor route. They have no generated output schema or answer
-validation/repair. The authored `output_schema` rules below apply to model-backed
-skills. A parent can bind `/answers/...` or forward an executor result under the
-existing runtime rules.
+[Executor leaves](executor-skills.md#publish-a-transformed-executor-result) can
+publish a purpose-specific JSON result with `output_transform`. Parent bindings
+select from the published shape. A [TypeSafe pack leaf](typesafe-skills.md) that
+omits the transform publishes the complete provider response, so a parent can
+bind paths under `/answers/...`. Framework supplies no generated or authored
+output schema or answer validation and repair for executor producers. The
+authored `output_schema` rules below apply to model-backed skills.
 
 Use this topic to choose final synthesis, declared output assembly with `output_bindings`, or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract describes the intended structured result and supplies a local standard validator; runtime guidance and bounded semantic correction use the same canonical contract. Java skills have no YAML `output_schema`; their null/void results become empty text, Strings remain exact, and other results become JSON. See [Java results](../java-api/java-skills.md#inputs-results-and-lifecycle).
 
@@ -216,11 +218,14 @@ retains the Java assembly authority fixture for Console readers.
 
 Executor producers, including TypeSafe pack leaves, expose no generated output
 schema. Parent output bindings retain generic runtime destination checks, but
-cannot rely on provider-derived early path/type compatibility checks. Forwarding
-preserves the complete returned text, including the response envelope.
+cannot rely on provider-derived early path/type compatibility checks.
+`output_from` forwards its selected child's whole published String unchanged.
+For an executor leaf omitting `output_transform`, that String is the ordinary
+executor result, including any response envelope.
 `DeclaredOutputBindingsPlanningIntegrationTest` covers runtime selected-result
 checks; `DesignatedChildResultIntegrationTest` covers unchanged forwarding without
-final synthesis.
+final synthesis. `ExecutorOutputTransformIntegrationTest` covers forwarding and
+binding the published executor result.
 
 Public `SkillDescriptor.outputSchema()`, registered catalogs, observability DTOs
 and Console skill detail expose the same captured effective structural metadata.

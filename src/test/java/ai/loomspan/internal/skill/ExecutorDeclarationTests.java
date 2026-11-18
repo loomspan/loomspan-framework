@@ -3,6 +3,8 @@ package ai.loomspan.internal.skill;
 import ai.loomspan.api.SkillDocument;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import java.util.List;
 import java.util.Map;
 import static org.assertj.core.api.Assertions.*;
@@ -20,39 +22,69 @@ class ExecutorDeclarationTests {
         assertThat(checked.definitions()).singleElement().satisfies(definition ->
                 assertThat(definition.executorInput(Map.of("value", "case-17"))).isEqualTo(Map.of("answer", "case-17")));
     }
-    @Test void executorInputTransformRejectsInvalidDeclarationAndCompilation() {
+
+    @Test void executorOutputTransformLoads() {
+        var checked = check(BASE + "output_transform: {language: jslt, expression: '.'}");
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions()).hasSize(1);
+    }
+
+    @Test void executorInputAndOutputTransformsPrepareIndependently() {
+        String yaml = BASE + """
+                input_transform: {language: jslt, expression: '{"answer": .value}'}
+                output_transform:
+                  language: jslt
+                  expression: |
+                    import "executor-transform/module.jslt" as fixture
+                    fixture:value(.result)
+                """;
+        var checked = check(yaml);
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions()).singleElement().satisfies(definition -> {
+            assertThat(definition.executorInput(Map.of("value", 42))).isEqualTo(Map.of("answer", 42));
+            assertThat(definition.executorOutput("{\"result\":17}")).isEqualTo("\"17\"");
+            assertThat(definition.source().bytes()).isEqualTo(yaml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        });
+        assertThat(check(BASE).definitions()).singleElement().satisfies(definition -> {
+            assertThat(definition.hasInputTransform()).isFalse();
+            assertThat(definition.hasOutputTransform()).isFalse();
+        });
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"input_transform", "output_transform"})
+    void rejectsInvalidTransformDeclarationAndCompilation(String field) {
+        String executor = BASE + field + ": ";
         for (String value : List.of("", "null", "1", "true", "literal", "[]", "{}",
                 "{language: jslt, expression: '.'}")) {
-            assertTransformIssue("name: lookup\ndescription: lookup\nmodel: chat\ninput_transform: " + value,
-                    "input_transform", "only on executor leaves");
+            assertTransformIssue("name: lookup\ndescription: lookup\nmodel: chat\n" + field + ": " + value,
+                    field, "only on executor leaves");
         }
         for (String value : List.of("", "null", "1", "true", "literal", "[]")) {
-            assertTransformIssue(BASE + "input_transform: " + value, "input_transform", "must be an object");
+            assertTransformIssue(executor + value, field, "must be an object");
         }
         for (String value : List.of("null", "1", "true", "{}", "[]", "''", "JSLT", "'jslt '")) {
-            assertTransformIssue(BASE + "input_transform: {language: " + value + ", expression: '.'}",
-                    "input_transform.language", "must be the string 'jslt'");
+            assertTransformIssue(executor + "{language: " + value + ", expression: '.'}",
+                    field + ".language", "must be the string 'jslt'");
         }
-        assertTransformIssue(BASE + "input_transform: {}", "input_transform.language", "must be the string 'jslt'");
-        assertTransformIssue(BASE + "input_transform: {expression: '.'}", "input_transform.language", "must be the string 'jslt'");
-        assertTransformIssue(BASE + "input_transform: {language: jslt}", "input_transform.expression", "must be a nonblank string");
+        assertTransformIssue(executor + "{}", field + ".language", "must be the string 'jslt'");
+        assertTransformIssue(executor + "{expression: '.'}", field + ".language", "must be the string 'jslt'");
+        assertTransformIssue(executor + "{language: jslt}", field + ".expression", "must be a nonblank string");
         for (String value : List.of("null", "3", "true", "{}", "[]", "''", "' '")) {
-            assertTransformIssue(BASE + "input_transform: {language: jslt, expression: " + value + "}",
-                    "input_transform.expression", "must be a nonblank string");
+            assertTransformIssue(executor + "{language: jslt, expression: " + value + "}",
+                    field + ".expression", "must be a nonblank string");
         }
-        assertTransformIssue(BASE + "input_transform: {language: jslt, expression: '.', extra: 1}",
-                "input_transform.extra", "unknown field");
-        assertTransformIssue(BASE + "input_transform: {language: jslt, expression: '{'}",
-                "input_transform.expression", "Parse error");
-        assertTransformIssue(BASE + "input_transform: {language: jslt, expression: '9999999999999999999999999'}",
-                "input_transform.expression", "9999999999999999999999999");
-        assertTransformIssue(BASE + """
-                input_transform:
+        assertTransformIssue(executor + "{language: jslt, expression: '.', extra: 1}",
+                field + ".extra", "unknown field");
+        assertTransformIssue(executor + "{language: jslt, expression: '{'}",
+                field + ".expression", "Parse error");
+        assertTransformIssue(executor + "{language: jslt, expression: '9999999999999999999999999'}",
+                field + ".expression", "9999999999999999999999999");
+        assertTransformIssue(BASE + field + ":\n" + """
                   language: jslt
                   expression: |
                     import "missing-executor-transform-module.jslt" as missing
                     {"value": missing:value(.)}
-                """, "input_transform.expression", "missing-executor-transform-module.jslt");
+                """.indent(2), field + ".expression", "missing-executor-transform-module.jslt");
     }
 
     @Test void executorInputTransformSupportsBlockSyntaxAndClasspathImports() {

@@ -3,8 +3,11 @@ package ai.loomspan.internal.skill;
 import ai.loomspan.internal.serialization.LoomspanJacksonCodecs;
 import com.schibsted.spt.data.jslt.Expression;
 import com.schibsted.spt.data.jslt.Parser;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.io.StringReader;
@@ -16,28 +19,53 @@ import java.util.List;
 import java.util.Map;
 
 /** A prepared JSLT expression and its JSON-only executor handoff. */
-final class ExecutorInputTransform {
+final class ExecutorTransform {
     private static final ObjectMapper JSON = LoomspanJacksonCodecs.defaults().schemaTree();
+    private static final ObjectReader OUTPUT_JSON = JSON.reader().with(
+            DeserializationFeature.FAIL_ON_TRAILING_TOKENS, DeserializationFeature.USE_BIG_INTEGER_FOR_INTS,
+            DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
     private final Expression expression;
 
-    private ExecutorInputTransform(Expression expression) {
+    private ExecutorTransform(Expression expression) {
         this.expression = expression;
     }
 
-    static ExecutorInputTransform compile(String sourceText, String sourceName) {
-        return new ExecutorInputTransform(new Parser(new StringReader(sourceText))
+    static ExecutorTransform compile(String sourceText, String sourceName) {
+        return new ExecutorTransform(new Parser(new StringReader(sourceText))
                 .withSource(sourceName)
                 .withObjectFilter("true")
                 .compile());
     }
 
-    Map<String, Object> apply(Map<String, Object> input) {
+    Map<String, Object> applyToInput(Map<String, Object> input) {
         requireJsonInput(input);
         JsonNode output = expression.apply(JSON.valueToTree(input));
         if (!(output instanceof ObjectNode object)) {
             throw new IllegalArgumentException("JSLT result must be a JSON object; found " + output.getNodeType());
         }
         return readObject(object, "");
+    }
+
+    String applyToOutput(String rawText) {
+        JsonNode input = readExecutorResult(rawText);
+        return JSON.writeValueAsString(fromJson(expression.apply(input), ""));
+    }
+
+    private static JsonNode readExecutorResult(String rawText) {
+        String requirement = "Executor result must contain exactly one JSON value";
+        if (rawText == null || rawText.isBlank()) {
+            throw new IllegalArgumentException(requirement);
+        }
+        JsonNode input;
+        try {
+            input = OUTPUT_JSON.readTree(rawText);
+        } catch (JacksonException ex) {
+            throw new IllegalArgumentException(requirement + ": " + ex.getOriginalMessage(), ex);
+        }
+        if (input == null || input.isMissingNode()) {
+            throw new IllegalArgumentException(requirement);
+        }
+        return input;
     }
 
     static void requireJsonInput(Map<String, Object> input) {

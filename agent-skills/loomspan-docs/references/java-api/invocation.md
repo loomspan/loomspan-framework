@@ -52,15 +52,20 @@ according to the application's own boundary policy. Java null/void results becom
 use Jackson JSON. Java methods have no YAML output schema; see [Java results](java-skills.md#inputs-results-and-lifecycle).
 
 [TypeSafe pack leaves](../skill-authoring/typesafe-skills.md) use the same String
-facade and return complete provider JSON, including its envelope, JSON null and
-quoted strings. There is no generated output schema or provider-answer validation
-or repair. Generic root dependency/input/access checks still apply; pack-domain
-validation runs at each invocation before send. Consumer bindings use `/answers/...`.
+facade. With `output_transform` omitted, they publish the complete provider JSON,
+including its envelope, JSON null and quoted strings. In that shape, consumer
+bindings can use `/answers/...`. An
+[executor output transform](../skill-authoring/executor-skills.md#publish-a-transformed-executor-result)
+publishes the skill's chosen JSON shape. Generic root dependency, input and
+access checks still apply. Pack-domain validation runs at each invocation before
+send. Framework supplies no generated output schema or provider-answer
+validation and repair for executor leaves.
 
 An explicit planning `output_from` parent returns its designated accepted direct
 child task's existing String unchanged after every accepted task succeeds. It
 makes no final model request or duplicate parent validation. Java Strings remain exact, null/void becomes empty text, and other Java results
-use JSON. Executor YAML leaves share this Java result contract. Effective catalog schema is metadata,
+use JSON. Executor YAML leaves apply this Java conversion before any declared
+output transform. Effective catalog schema is metadata,
 not a new Java/executor validation guarantee. Read [output contracts](../skill-authoring/output-contracts.md).
 
 ## Choose an Input Overload

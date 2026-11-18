@@ -58,6 +58,10 @@ Successful Java values use one conversion contract for both declaration roles:
 | Non-null `String`, including empty or whitespace-only text | Exact original String, without JSON quoting |
 | Any other non-null value | JSON using the application Jackson mapper |
 
+An executor YAML leaf with
+[`output_transform`](../skill-authoring/executor-skills.md#publish-a-transformed-executor-result)
+uses that text as the transform's JSON input and publishes the transformed JSON.
+
 Serialization failures and application exceptions propagate as failures. There is no exception-to-successful-text adapter. Java callable declarations do not have a YAML output schema, prompt, model, or planning configuration. A method may implement application-owned I/O; Loomspan makes no model request merely to execute it.
 
 Java roots and children use the common mission lifecycle. Root observers receive available completed history after success or post-session failure. Java children retain the enclosing tool boundary, and only successful completion contributes their exact direct name to task/evidence accounting. Parent mission state resumes after return or failure.

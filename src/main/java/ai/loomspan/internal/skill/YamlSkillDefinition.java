@@ -22,11 +22,12 @@ public final class YamlSkillDefinition
     public String executor() { return manifest.getExecutor(); }
     public java.util.Map<String, Object> config() { return manifest.getConfig(); }
     public boolean hasInputTransform() { return manifest.compiledInputTransform() != null; }
+    public boolean hasOutputTransform() { return manifest.compiledOutputTransform() != null; }
 
     public void validateTransformInput(Map<String, Object> input) {
         if (!hasInputTransform()) return;
         try {
-            ExecutorInputTransform.requireJsonInput(input);
+            ExecutorTransform.requireJsonInput(input);
         } catch (IllegalArgumentException ex) {
             throw invalidExecutorInput(ex);
         }
@@ -36,7 +37,7 @@ public final class YamlSkillDefinition
         var transform = manifest.compiledInputTransform();
         if (transform == null) return resolvedInput;
         try {
-            return transform.apply(resolvedInput);
+            return transform.applyToInput(resolvedInput);
         } catch (RuntimeException ex) {
             throw invalidExecutorInput(ex);
         }
@@ -44,6 +45,16 @@ public final class YamlSkillDefinition
 
     private IllegalArgumentException invalidExecutorInput(RuntimeException cause) {
         return new IllegalArgumentException("Skill '" + identity + "' input_transform failed: " + cause.getMessage(), cause);
+    }
+
+    public String executorOutput(String rawText) {
+        var transform = manifest.compiledOutputTransform();
+        if (transform == null) return rawText;
+        try {
+            return transform.applyToOutput(rawText);
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Skill '" + identity + "' output_transform failed: " + ex.getMessage(), ex);
+        }
     }
     private final Resource resource;
     private final YamlSkillManifest manifest;
@@ -256,6 +267,9 @@ public final class YamlSkillDefinition
         if (source.isDeclared(YamlSkillManifest.Field.CONFIG)) copy.setConfig(source.getConfig());
         if (source.isDeclared(YamlSkillManifest.Field.INPUT_TRANSFORM)) {
             copy.inputTransform(source.inputTransform(), source.compiledInputTransform());
+        }
+        if (source.isDeclared(YamlSkillManifest.Field.OUTPUT_TRANSFORM)) {
+            copy.outputTransform(source.outputTransform(), source.compiledOutputTransform());
         }
         copy.declarationForm(source.declarationForm());
         copy.restoreDeclaredFields(source.declaredFields());

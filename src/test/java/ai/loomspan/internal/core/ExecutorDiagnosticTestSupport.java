@@ -2,10 +2,16 @@ package ai.loomspan.internal.core;
 
 import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
 import org.springframework.test.util.ReflectionTestUtils;
+import java.io.IOException;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Comparator;
+
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 
 /** Test-only seams; production exposes no replacement or construction SPI. */
 public final class ExecutorDiagnosticTestSupport
@@ -45,6 +51,19 @@ public final class ExecutorDiagnosticTestSupport
                 (t,d) -> { throw new IllegalStateException("injected recording failure"); });
         if (seam == 3 || seam == 4) ReflectionTestUtils.setField(handle, "warning", (java.util.function.Consumer<String>)
                 r -> { throw new IllegalStateException("injected logging failure"); });
+    }
+
+    public static void failExecutorCompletionRecord(LoomspanSession session) {
+        var real = (ExecutionTraceHandle) ReflectionTestUtils.getField(session, "executionTraceHandle");
+        var handle = mock(ExecutionTraceHandle.class, delegatesTo(real));
+        try {
+            doThrow(new IOException("injected completion write failure")).when(handle).append(
+                    eq(TraceRecordType.FRAME_METADATA_RECORDED), any(), any(), anyMap(),
+                    argThat(data -> data instanceof Map<?, ?> map && map.containsKey("executorOutput")));
+        } catch (IOException ex) {
+            throw new AssertionError("failed to install completion write failure", ex);
+        }
+        ReflectionTestUtils.setField(session, "executionTraceHandle", handle);
     }
 
     public static void mixedFixture(ExecutionBinding binding, ExecutionFrame frame)

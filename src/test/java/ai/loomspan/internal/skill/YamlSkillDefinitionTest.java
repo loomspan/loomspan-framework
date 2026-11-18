@@ -18,24 +18,34 @@ class YamlSkillDefinitionTest
             new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium");
 
     @Test
-    void executorTransformRemainsPreparedAcrossDefensiveManifestCopies() {
+    void executorTransformsRemainPreparedAcrossDefensiveManifestCopies() {
         var manifest = manifest("transformed");
         manifest.setExecutor("default-sql");
-        var declaration = new YamlSkillManifest.InputTransformDeclaration("jslt", "{\"answer\": .question}");
-        var compiled = ExecutorInputTransform.compile(declaration.expression(), "copy fixture");
+        var declaration = new YamlSkillManifest.TransformDeclaration("jslt", "{\"answer\": .question}");
+        var compiled = ExecutorTransform.compile(declaration.expression(), "copy fixture");
         manifest.inputTransform(declaration, compiled);
+        var outputDeclaration = new YamlSkillManifest.TransformDeclaration("jslt", ".answer");
+        var compiledOutput = ExecutorTransform.compile(outputDeclaration.expression(), "copy fixture");
+        manifest.outputTransform(outputDeclaration, compiledOutput);
         var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.EXECUTOR, "default", resource(), manifest, null);
-        var replacement = new YamlSkillManifest.InputTransformDeclaration("jslt", "{}");
-        var replacementCompiled = ExecutorInputTransform.compile(replacement.expression(), "replacement fixture");
+        var replacement = new YamlSkillManifest.TransformDeclaration("jslt", "{}");
+        var replacementCompiled = ExecutorTransform.compile(replacement.expression(), "replacement fixture");
         manifest.inputTransform(replacement, replacementCompiled);
+        manifest.outputTransform(replacement, replacementCompiled);
 
         var copy = definition.manifest();
         assertThat(copy.isDeclared(YamlSkillManifest.Field.INPUT_TRANSFORM)).isTrue();
         assertThat(copy.inputTransform()).isEqualTo(declaration);
         assertThat(copy.compiledInputTransform()).isSameAs(compiled);
+        assertThat(copy.isDeclared(YamlSkillManifest.Field.OUTPUT_TRANSFORM)).isTrue();
+        assertThat(copy.outputTransform()).isEqualTo(outputDeclaration);
+        assertThat(copy.compiledOutputTransform()).isSameAs(compiledOutput);
         copy.inputTransform(replacement, replacementCompiled);
+        copy.outputTransform(replacement, replacementCompiled);
         assertThat(definition.manifest().inputTransform()).isEqualTo(declaration);
+        assertThat(definition.manifest().outputTransform()).isEqualTo(outputDeclaration);
         assertThat(definition.executorInput(Map.of("question", "case"))).isEqualTo(Map.of("answer", "case"));
+        assertThat(definition.executorOutput("{\"answer\":\"case\"}")).isEqualTo("\"case\"");
     }
 
     @Test
