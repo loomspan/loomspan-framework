@@ -351,8 +351,10 @@ or historical readability guarantee.
 TypeSafe Choice, Noul, and Score are available through the independently versioned
 [Loomspan Decisions pack](../loomspan-extensions/extensions/decisions/README.md).
 The local unpublished artifact is `ai.loomspan:loomspan-decisions:0.1.0-SNAPSHOT`.
-It registers reference-only `default-typesafe`; applications declare ordinary
-`executor: typesafe` YAML skills and supply resolved credentials in captured maps.
+It registers reference-only `default-typesafe`. Applications declare ordinary
+`executor: typesafe` YAML leaves and pass a native request directly or build it
+with JSLT. They supply resolved connection settings in the captured executor
+namespace map.
 These leaves execute as `JAVA` and return complete provider JSON. Bind answers
 through `/answers/...`. Domain validation occurs at invocation, and no generated
 output schema or early provider-domain checks are supplied. Pack requests/retries
@@ -361,9 +363,9 @@ cancellation is cooperative. See the [TypeSafe pack reference](agent-skills/loom
 for a declaration, configuration and the accepted numeric/lifecycle limits.
 
 The pack's [tested-build reference](../loomspan-extensions/extensions/decisions/docs/tested-builds.md)
-records native-free installed-artifact qualification, concurrent publication,
-cooperative lifecycle/resource ownership, accounting and actual Console/MCP trace
-inspection. Its [runnable recipe](../loomspan-extensions/extensions/decisions/examples/support-triage/README.md)
+describes installed-artifact checks for concurrent publication, cooperative
+lifecycle, resource ownership, accounting and optional Console/MCP trace inspection.
+Its [runnable recipe](../loomspan-extensions/extensions/decisions/examples/support-triage/README.md)
 includes local installation and deterministic verification without real credentials.
 
 - **Embedded Java:** add the Spring Boot starter and invoke skills in your

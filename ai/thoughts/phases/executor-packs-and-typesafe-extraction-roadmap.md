@@ -344,7 +344,8 @@ Extensions-owned advanced qualification added by PR 31.3.2. The unchanged marker
 Exact commands, artifact SHA-256 values, qualification source fingerprint, instrumented
 probe boundaries and prior-debt closure are recorded in the
 [delivery ticket execution notes](../tickets/loomspan-pr-31.3.2-executor-pack-delivery-closure.md#execution-notes--2026-11-16)
-and the owning sibling `loomspan-extensions/extensions/decisions/docs/tested-builds.md`.
+and the sibling Extensions historical reference at
+`77e7e29:extensions/decisions/docs/tested-builds.md`.
 Fresh pipeline review and local commits follow Step 4 qualification; this evidence
 records implementation verification rather than claiming that review has already run.
 

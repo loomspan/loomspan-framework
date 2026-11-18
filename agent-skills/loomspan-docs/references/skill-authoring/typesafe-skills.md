@@ -47,42 +47,49 @@ input_schema:
     ticket:
       type: string
   required: [ticket]
-config:
-  request:
-    model: jev-latest
-    state: null
-    questions:
-      repeat:
-        type: noul
-        instructions: Has this customer contacted support more than once?
-  bindings:
-    /state: /ticket
+  additionalProperties: false
+input_transform:
+  language: jslt
+  expression: |
+    {
+      "model": "jev-latest",
+      "state": .ticket,
+      "questions": {
+        "repeat": {
+          "type": "noul",
+          "instructions": "Has this customer contacted support more than once?"
+        }
+      }
+    }
 ```
 
 Invoke `repeatContact` through `SkillTemplate` or expose it as an ordinary direct
 child. It executes as `JAVA`, with YAML declaration provenance. Existing local
-and qualified executor references, namespace visibility, authorization,
-configuration ownership, publication and retirement rules apply unchanged;
-see [executor leaves](executor-skills.md).
+and qualified executor references follow the visibility, authorization,
+configuration, publication and retirement rules for [executor leaves](executor-skills.md).
 
-## Configuration and result contract
+## Native input, settings and results
 
-`config.request` contains the provider-native `model`, `state` and `questions`.
-The model is a provider ID, not a Framework model alias. `config.bindings` maps
-request-target RFC 6901 JSON Pointers to input-source pointers; an empty source
-pointer selects the whole input. The pack preserves present null, removes object
-targets for missing sources and rejects missing-source array omission. It builds,
-validates and serializes once before sending and reuses the same retry bytes.
-Read the owning executor reference (`../../../../../loomspan-extensions/extensions/decisions/docs/executor.md` in the sibling checkout)
-for exact question forms, pointers, limits and resource handling.
+The pack receives a complete native object with exactly `model`, `state` and
+`questions`. `model` is a nonblank provider model ID. `state` takes text, an object
+or an array. `questions` maps names to native Choice, Noul or Score definitions.
+For direct native input, omit `input_transform` and send that object as the ordinary
+skill input. For business input, use `input_transform` to produce the same native
+object after Framework validates the leaf's ordinary input schema. Parent
+`input_bindings` supply ordinary child input or select values from child results.
 
-For `api_key` and `base_url`, a present skill `config` value wins over the selected
-executor namespace map. Present null, blank or non-string values fail rather than
-falling back. Missing credentials fail; absent base URL defaults to
-`https://api.typesafe.ai`. Valid selected credentials remain unchanged. A configured
-base URL prefix remains when `/v1/systemone` is appended. Alternate routes require
-protocol compatibility and appropriate account/model access; configuration alone
-does not establish availability. Other settings do not inherit these override rules.
+Omit `config` or leave it empty. The pack rejects every key in the leaf's `config`
+at invocation. Supply required `api_key` and optional `base_url` in the captured
+namespace executor map. Both values must be nonblank strings when present.
+Absent `base_url` defaults to `https://api.typesafe.ai`. A configured path prefix stays
+in place when `/v1/systemone` is appended. The resolved key is used verbatim.
+Alternate routes require protocol compatibility and appropriate account/model
+access.
+
+The pack validates and serializes native input once before sending and reuses
+the same bytes across retries. See the owning executor reference
+(`../../../../../loomspan-extensions/extensions/decisions/docs/executor.md` in the sibling checkout)
+for question forms, JSON limits and supported local Resource inputs.
 
 The result is complete provider JSON as text: envelope, unknown fields, refusals,
 usage, arrays/scalars, JSON null and quoted strings remain intact. For a named
@@ -100,12 +107,12 @@ Diagnostic resource limits never truncate the business result.
   early binding path/type checks cannot use provider-derived metadata. Generic
   runtime binding/destination checks remain. There is no executor `output_schema`,
   answer-schema, completeness or confidence enforcement, or answer repair.
-- Ordinary executor `config` numeric decoding is unchanged. Precise declaration
-  decimals may already have rounded before pack execution; the pack cannot
-  recover digits and adds no precision mode, rounding or string conversion.
-- Applications supply resolved credentials and endpoints in captured maps.
-  Updating a skill map or executor map requires publication by its owning namespace;
-  admitted work retains captured values, and new work receives the replacement.
+- Native finite input and response numbers preserve their received values.
+  Framework's JSLT transform accepts JSON values. See
+  [executor input transforms](executor-skills.md#transform-executor-input) for
+  the supported input and result types.
+- Executor settings belong to the executor namespace. Admitted work retains its
+  captured settings across publication, and new work receives the replacement.
 - Pack requests/retries do not reserve Framework-native provider-attempt quota.
   Provider usage remains in results and captured diagnostics without contributing
   to Framework-accounted totals. Zero Framework-accounted usage does not mean
@@ -139,12 +146,14 @@ Framework behavior is grounded in `ExecutorDeclarationTests`,
 `ExecutorGenerationExecutionIntegrationTest`, `ExecutorInvocationLifecycleIntegrationTest`,
 `ExecutorAccountingIntegrationTest`, `DeclaredChildInputBindingsIntegrationTest`,
 `DeclaredOutputBindingsPlanningIntegrationTest` and `DesignatedChildResultIntegrationTest`.
-Provider behavior and installed-JAR consumer evidence belong to the matching pack's
+Framework handoff is exercised by `ExecutorInputTransformIntegrationTest`.
+Provider validation and captured setting rules are exercised by the pack's
+`TypeSafeRequestTest` and `TypeSafeSettingsTest`. Installed-JAR evidence belongs to its
 `TypeSafeConsumerTest` and `CompositionConsumerTest`, extended by
 `PublicationConsumerTest`, `LifecycleConsumerTest`, `AccountingConsumerTest` and
 `DiagnosticFaultConsumerTest` for captured concurrent settings, real lifecycle,
 physical-return/resource retention, native-only accounting and pack diagnostic
-faults. `ConsoleConsumerTest` starts the actual same-version Console process,
+faults. `ConsoleConsumerTest` can start a matching Console process,
 imports those generated traces and verifies existing browser/MCP record queries,
 pagination and content reads. Explicit test probes delegate to the installed pack;
 they create no application customization API. Exact build identities, commands and
