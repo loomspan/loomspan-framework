@@ -81,7 +81,17 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                 if (scenario.endsWith("allowed") && !scenario.endsWith("disallowed") || scenario.equals("singleton"))
                     assertThat(JSON.readTree(template.invoke("default-root", input)).path("selected").asText()).isEqualTo(scenario.equals("singleton") ? "choice" : "A");
                 else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", input))
-                        .hasStackTraceContaining(probability ? "binding_source_unavailable" : "binding_output_validation");
+                        .hasStackTraceContaining(probability ? "binding_source_unavailable" : "binding_output_validation")
+                        .satisfies(failure -> {
+                            var diagnosis = ((ai.loomspan.api.SkillException) failure).getFailureDiagnosis();
+                            if (probability) assertThat(diagnosis).isEmpty();
+                            else assertThat(diagnosis).hasValueSatisfying(detail -> {
+                                assertThat(detail.skillName()).isEqualTo("default-root");
+                                assertThat(detail.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA);
+                                assertThat(detail.issues().getFirst().path()).isEqualTo("/selected");
+                                assertThat(detail.issues().getFirst().code()).isEqualTo("enum");
+                            });
+                        });
                 assertThat(context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skill("default-evaluation").orElseThrow().outputSchema()).isEqualTo(registeredSchema);
             });
             assertThat(calls).hasValue(1);

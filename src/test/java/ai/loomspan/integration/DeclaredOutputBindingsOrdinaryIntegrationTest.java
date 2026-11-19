@@ -160,7 +160,13 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                 """,List.of(),body->{throw new AssertionError("Unexpected model fallback");},(template,calls)-> {
             var events=new ArrayList<ai.loomspan.api.SkillExecutionEvent>();
             assertThatThrownBy(()->template.invoke("default-comparison",Map.of("assessment",Map.of("count","uncoerced")),view->events.addAll(view.events())))
-                    .hasStackTraceContaining("binding_output_validation");
+                    .hasStackTraceContaining("binding_output_validation")
+                    .satisfies(failure -> assertThat(((ai.loomspan.api.SkillException) failure).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                        assertThat(diagnosis.skillName()).isEqualTo("default-comparison");
+                        assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA);
+                        assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/count");
+                        assertThat(diagnosis.issues().getFirst().code()).isEqualTo("type");
+                    }));
             assertThat(calls.get()).isZero();
             assertThat(events).isNotEmpty().noneMatch(event->event.type().equalsIgnoreCase("RESULT_ASSEMBLED"));
         });

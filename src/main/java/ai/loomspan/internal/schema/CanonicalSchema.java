@@ -23,6 +23,14 @@ public final class CanonicalSchema {
         if (node.has("items")) strip(node.get("items"));
         if (node.has("additionalProperties")) strip(node.get("additionalProperties"));
     }
+    /** RFC 6901 pointer from original tokens, without diagnostic string escaping. */
+    public static String instancePointer(com.networknt.schema.path.NodePath location) {
+        var tokens = new java.util.ArrayDeque<String>();
+        for (var current = location; current != null && current.getParent() != null; current = current.getParent())
+            tokens.addFirst(current.getName(-1).replace("~", "~0").replace("/", "~1"));
+        return tokens.isEmpty() ? "" : "/" + String.join("/", tokens);
+    }
+
     /** Completed verdict only: operational failures propagate without conversion to validation errors. */
     public List<com.networknt.schema.Error> validate(JsonNode instance) {
         Objects.requireNonNull(instance, "instance must not be null");

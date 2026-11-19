@@ -58,6 +58,18 @@ class SupportedSurfaceIntegrationTest
             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default-foundationExecutor", Map.of())))
                     .isInstanceOf(SkillException.class);
             assertThat(context.getBean(JavaFoundation.class).executorCalls).hasValue(0);
+            for (Throwable failure : List.of(
+                    org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default-foundationInput", Map.of("count", "bad"))),
+                    org.assertj.core.api.Assertions.catchThrowable(() -> context.getBean(SkillInvocationHandoff.class)
+                            .handoff("default-foundationInput", Map.of("count", "bad"))))) {
+                assertThat(failure).isInstanceOf(SkillInputValidationException.class);
+                assertThat(((SkillException) failure).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                    assertThat(diagnosis.skillName()).isEqualTo("default-foundationInput");
+                    assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_SCHEMA);
+                    assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/count");
+                    assertThat(diagnosis.issues().getFirst().code()).isEqualTo("type");
+                });
+            }
         });
     }
 
@@ -65,6 +77,7 @@ class SupportedSurfaceIntegrationTest
     {
         final AtomicInteger executorCalls = new AtomicInteger();
         @SkillMethod(name="foundationText", description="Exact text") public String text() { return "  exact text\n"; }
+        @SkillMethod(name="foundationInput", description="Generated input") public String input(@SkillParam(description="Count") int count) { return "count " + count; }
         @SkillMethod(name="foundationNull", description="Empty text") public void empty() {}
         @SkillMethod(name="foundationRecoverable", description="Designated failure") public String recoverable() {
             throw new ai.loomspan.api.RecoverableSkillException("correct input");
@@ -218,7 +231,12 @@ class SupportedSurfaceIntegrationTest
                             AtomicInteger preSessionObserverCalls = new AtomicInteger();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
                                     "default-supportedExecutorLeaf", Map.of(), ignored -> preSessionObserverCalls.incrementAndGet())))
-                                    .isInstanceOf(SkillInputValidationException.class);
+                                    .isInstanceOf(SkillInputValidationException.class)
+                                    .satisfies(error -> assertThat(((SkillException) error).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                                        assertThat(diagnosis.skillName()).isEqualTo("default-supportedExecutorLeaf");
+                                        assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_SCHEMA);
+                                        assertThat(diagnosis.issues()).isNotEmpty();
+                                    }));
                             assertThat(preSessionObserverCalls).hasValue(0);
 
                             AtomicReference<SkillExecutionView> failedView = new AtomicReference<>();

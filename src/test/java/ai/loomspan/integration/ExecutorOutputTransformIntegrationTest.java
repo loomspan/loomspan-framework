@@ -185,8 +185,15 @@ class ExecutorOutputTransformIntegrationTest {
             withProvider(runner(executor), provider).run(context -> {
                 assertThat(context).hasNotFailed();
                 var events = new ArrayList<SkillExecutionView>();
-                var failure = assertThatThrownBy(() -> context.getBean(SkillTemplate.class)
-                        .invoke(entry, plannedChild ? CASE : Map.of(), events::add))
+                Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> context.getBean(SkillTemplate.class)
+                        .invoke(entry, plannedChild ? CASE : Map.of(), events::add));
+                assertThat(((SkillException) thrown).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                    assertThat(diagnosis.skillName()).isEqualTo("default-triage");
+                    assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.OUTPUT_TRANSFORM);
+                    assertThat(diagnosis.message()).contains(detail);
+                    assertThat(diagnosis.issues()).isEmpty();
+                });
+                var failure = assertThat(thrown)
                         .isInstanceOf(SkillException.class)
                         .hasStackTraceContaining("default-triage' output_transform failed")
                         .hasStackTraceContaining(detail);

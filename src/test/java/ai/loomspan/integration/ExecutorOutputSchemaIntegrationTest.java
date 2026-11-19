@@ -107,6 +107,11 @@ class ExecutorOutputSchemaIntegrationTest {
             assertThat(context).hasNotFailed();
             var failure = catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default-triage", Map.of()));
             assertThat(failure).isInstanceOf(SkillException.class).hasStackTraceContaining("default-triage");
+            assertThat(((SkillException) failure).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                assertThat(diagnosis.skillName()).isEqualTo("default-triage");
+                assertThat(diagnosis.stage()).isEqualTo(SkillContractStage.OUTPUT_SCHEMA);
+                assertThat(diagnosis.issues()).anySatisfy(issue -> assertThat(issue.code()).isEqualTo(constraint));
+            });
             var validation = schemaFailure(failure);
             assertThat(validation.getRawOutput()).isEqualTo(raw == null ? "" : raw);
             assertThat(validation.getValidationIssues()).anySatisfy(issue -> {
@@ -138,6 +143,204 @@ class ExecutorOutputSchemaIntegrationTest {
             assertThat(metadata.data().path("outputTransformStatus").textValue()).isEqualTo("succeeded");
             assertThat(observed.records()).noneMatch(record -> record.data() != null && record.data().has("skillOutput"));
         });
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void admittedParentExposesSelectedChildDiagnosisWithoutObserver(boolean retained) throws Exception {
+        write("triage", executor("triage") + transform(TRANSFORM) + SCHEMA);
+        write("observe", executor("observe"));
+        write("parent", planned("parent", 2) + children(true) + "output_from: {skill: default-observe}\n");
+        var observed = new ObservedExecutor(call -> "{}");
+        try (var provider = new MockWebServer()) {
+            provider.enqueue(plan("parent", task("triage"), task("observe", "triage")));
+            provider.start();
+            withProvider(runner(observed), provider)
+                    .withPropertyValues("loomspan.execution-trace.persistence=" + (retained ? "always" : "never"))
+                    .run(context -> {
+                assertThat(context).hasNotFailed();
+                var admitted = context.getBean(SkillInvocationHandoff.class).handoff("default-parent", Map.of());
+                try {
+                    var failure = catchThrowable(admitted::invoke);
+                    assertThat(failure).isInstanceOf(SkillException.class);
+                    assertThat(((SkillException) failure).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                        assertThat(diagnosis.skillName()).isEqualTo("default-triage");
+                        assertThat(diagnosis.stage()).isEqualTo(SkillContractStage.OUTPUT_SCHEMA);
+                        assertThat(diagnosis.issues()).singleElement().satisfies(issue -> {
+                            assertThat(issue.path()).isEqualTo("/repeatContactProbability");
+                            assertThat(issue.code()).isEqualTo("type");
+                            assertThat(issue.message()).isNotBlank();
+                        });
+                    });
+                    assertThat(observed.calls).extracting(SkillExecutorInvocation::skillName).containsExactly("default-triage");
+                    if (retained) {
+                        var records = observed.records();
+                        String terminal = (String) records.getLast().metadata().get("terminalFailureId");
+                        assertThat(records).anySatisfy(record -> {
+                            assertThat(record.recordType()).isEqualTo(TraceRecordType.ERROR_RECORDED);
+                            assertThat(record.metadata()).containsEntry("failureId", terminal);
+                            assertThat(record.route()).isEqualTo("default-triage");
+                        });
+                    }
+                } finally { admitted.release(); }
+            });
+        }
+    }
+
+    @Test void rootInputDiagnosisIsAvailableFromDirectAndHandoffPreparation() throws Exception {
+        write("receiver", executor("receiver") + "input_schema: {type: object, properties: {value: {type: number}}, required: [value]}\n");
+        var observed = new ObservedExecutor(call -> "unexpected");
+        runner(observed).withPropertyValues("loomspan.execution-trace.persistence=never").run(context -> {
+            assertThat(context).hasNotFailed();
+            var skills = context.getBean(SkillTemplate.class);
+            var handoff = context.getBean(SkillInvocationHandoff.class);
+            for (Throwable failure : List.of(catchThrowable(() -> skills.invoke("default-receiver", Map.of("value", "bad"))),
+                    catchThrowable(() -> handoff.handoff("default-receiver", Map.of("value", "bad"))))) {
+                assertThat(failure).isInstanceOf(SkillInputValidationException.class);
+                var inputFailure = (SkillInputValidationException) failure;
+                assertThat(inputFailure.getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                    assertThat(diagnosis.skillName()).isEqualTo("default-receiver");
+                    assertThat(diagnosis.stage()).isEqualTo(SkillContractStage.INPUT_SCHEMA);
+                    assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/value");
+                    assertThat(diagnosis.issues().getFirst().code()).isEqualTo("type");
+                    assertThat(diagnosis.issues().getFirst().message()).isEqualTo(inputFailure.getIssues().getFirst().message());
+                });
+            }
+            assertThat(observed.calls).isEmpty();
+        });
+    }
+
+    @Test void publicFailureSnapshotsIgnoreReusedOrApplicationSuppliedDiagnosis() throws Exception {
+        write("triage", executor("triage") + SCHEMA);
+        write("reuse", executor("reuse"));
+        var reused = new java.util.concurrent.atomic.AtomicReference<SkillException>();
+        var observed = new ObservedExecutor(call -> {
+            if (call.skillName().equals("default-reuse")) throw reused.get();
+            return "{}";
+        });
+        runner(observed).withPropertyValues("loomspan.execution-trace.persistence=never").run(context -> {
+            assertThat(context).hasNotFailed();
+            var skills = context.getBean(SkillTemplate.class);
+            var original = (SkillException) catchThrowable(() -> skills.invoke("default-triage", Map.of()));
+            var diagnosis = original.getFailureDiagnosis().orElseThrow();
+            for (SkillException shared : List.of(original, new SkillException("application supplied", null, diagnosis))) {
+                reused.set(shared);
+                try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+                    var one = executor.submit(() -> catchThrowable(() -> skills.invoke("default-reuse", Map.of())));
+                    var two = executor.submit(() -> catchThrowable(() -> skills.invoke("default-reuse", Map.of())));
+                    var actualContract = executor.submit(() -> catchThrowable(() -> skills.invoke("default-triage", Map.of())));
+                    for (var result : List.of(one, two)) {
+                        try {
+                            assertThat(result.get(10, TimeUnit.SECONDS)).isInstanceOf(SkillException.class).hasCause(shared)
+                                    .satisfies(failure -> assertThat(((SkillException) failure).getFailureDiagnosis()).isEmpty());
+                        } catch (Exception ex) { throw new AssertionError(ex); }
+                    }
+                    try { assertThat(((SkillException) actualContract.get(10, TimeUnit.SECONDS)).getFailureDiagnosis()).contains(diagnosis); }
+                    catch (Exception ex) { throw new AssertionError(ex); }
+                }
+                assertThat(shared.getFailureDiagnosis()).contains(diagnosis);
+            }
+        });
+    }
+
+    @Test void selectedCancellationKeepsDiagnosisAbsentAfterSchemaFailureEvidence() throws Exception {
+        write("triage", executor("triage") + SCHEMA);
+        var cancellation = new IllegalStateException("selected cancellation");
+        var observed = new ObservedExecutor(call -> {
+            var binding = ExecutionBindingScope.requireCurrent();
+            var session = binding.session();
+            var verdict = new ai.loomspan.internal.outputschema.OutputSchemaValidator().validate("{}",
+                    binding.snapshot().entryGeneration().definition("default-triage").outputSchema());
+            var schema = new LoomspanOutputSchemaValidationException("default-triage", "{}", verdict, 1, 0, verdict.failureMode());
+            session.recordFailure(schema, Map.of("message", "schema rejected"), binding.branch().leaf().orElse(null));
+            binding.requireMission().lifecycle().beginCancellation(binding, cancellation,
+                    () -> session.recordFailure(cancellation, Map.of("message", "cancelled"), binding.branch().leaf().orElse(null)), false);
+            throw schema;
+        });
+        runner(observed).run(context -> {
+            assertThat(context).hasNotFailed();
+            var failure = (SkillException) catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default-triage", Map.of()));
+            assertThat(failure.getFailureDiagnosis()).isEmpty();
+            var records = observed.records();
+            assertThat(records).anySatisfy(record -> {
+                assertThat(record.recordType()).isEqualTo(TraceRecordType.ERROR_RECORDED);
+                assertThat(record.data().path("exceptionMessage").asString()).contains("Output schema validation failed");
+            });
+            String terminal = (String) records.getLast().metadata().get("terminalFailureId");
+            assertThat(records).anySatisfy(record -> {
+                assertThat(record.recordType()).isEqualTo(TraceRecordType.ERROR_RECORDED);
+                assertThat(record.metadata()).containsEntry("failureId", terminal);
+                assertThat(record.data().path("exceptionMessage").asString()).isEqualTo(cancellation.getMessage());
+            });
+        });
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void publicParallelDiagnosisMatchesAcceptedOrderDespiteReverseFailureRecording(boolean unrelatedFirst) throws Exception {
+        String emptyInput = "input_schema: {type: object, additionalProperties: false}\n";
+        write("first", executor("first") + emptyInput + SCHEMA);
+        write("second", executor("second") + emptyInput + SCHEMA);
+        write("parent", planned("parent", 2) + "allowed_skills: [{name: default-first, required: true, max_tasks: 1}, {name: default-second, required: true, max_tasks: 1}]\noutput_from: {skill: default-first}\n");
+        var installed = new java.util.concurrent.CountDownLatch(1);
+        var secondRecorded = new java.util.concurrent.CountDownLatch(1);
+        var observed = new ObservedExecutor(call -> {
+            try {
+                if (call.skillName().equals("default-first")) {
+                    ExecutorDiagnosticTestSupport.afterRecordedFailure(ExecutionBindingScope.requireCurrent().session(), route -> {
+                        if (route.equals("default-second")) secondRecorded.countDown();
+                    });
+                    installed.countDown();
+                    assertThat(secondRecorded.await(5, TimeUnit.SECONDS)).isTrue();
+                    if (unrelatedFirst) throw new IllegalStateException("unrelated first failure");
+                } else assertThat(installed.await(5, TimeUnit.SECONDS)).isTrue();
+            } catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
+            return "{\"repeatContactProbability\":null}";
+        });
+        var first = new LinkedHashMap<String, Object>(task("first")); first.put("parallelGroup", "batch");
+        var second = new LinkedHashMap<String, Object>(task("second")); second.put("parallelGroup", "batch");
+        try (var provider = new MockWebServer()) {
+            provider.enqueue(plan("parent", first, second)); provider.start();
+            withProvider(runner(observed), provider).run(context -> {
+                assertThat(context).hasNotFailed();
+                var failure = (SkillException) catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default-parent", Map.of()));
+                if (unrelatedFirst) assertThat(failure.getFailureDiagnosis()).isEmpty();
+                else assertThat(failure.getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                    assertThat(diagnosis.skillName()).isEqualTo("default-first");
+                    assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/repeatContactProbability");
+                    assertThat(diagnosis.issues().getFirst().code()).isEqualTo("type");
+                });
+                var records = observed.records();
+                var errors = records.stream().filter(record -> record.recordType() == TraceRecordType.ERROR_RECORDED).toList();
+                assertThat(errors).extracting(TraceRecord::route).containsExactly("default-second", "default-first");
+                assertThat(records.getLast().metadata()).containsEntry("terminalFailureId", errors.getLast().metadata().get("failureId"));
+            });
+        }
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void ordinaryModelPublishesOnlyTheTerminalSchemaVerdict(boolean corrected) throws Exception {
+        write("model", "name: model\ndescription: Validate model result\nmodel: local\noutput_schema_max_retries: 1\n" + SCHEMA);
+        var observed = new ObservedExecutor(call -> { throw new AssertionError("No executor expected"); });
+        try (var provider = new MockWebServer()) {
+            provider.enqueue(ResponsesFixtures.text("{\"repeatContactProbability\":null}"));
+            provider.enqueue(ResponsesFixtures.text(corrected ? PUBLISHED : "{\"repeatContactProbability\":null}"));
+            provider.start();
+            withProvider(runner(observed), provider).withPropertyValues("loomspan.execution-trace.persistence=never").run(context -> {
+                assertThat(context).hasNotFailed();
+                var skills = context.getBean(SkillTemplate.class);
+                if (corrected) assertThat(skills.invoke("default-model", Map.of())).isEqualTo(PUBLISHED);
+                else {
+                    var failure = (SkillException) catchThrowable(() -> skills.invoke("default-model", Map.of()));
+                    assertThat(failure.getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                        assertThat(diagnosis.skillName()).isEqualTo("default-model");
+                        assertThat(diagnosis.stage()).isEqualTo(SkillContractStage.OUTPUT_SCHEMA);
+                        assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/repeatContactProbability");
+                        assertThat(diagnosis.issues().getFirst().code()).isEqualTo("type");
+                    });
+                }
+                assertThat(observed.calls).isEmpty();
+            });
+            assertThat(provider.getRequestCount()).isEqualTo(2);
+        }
     }
 
     @Test void omittedPublishedKeyFailsRequired() throws Exception {

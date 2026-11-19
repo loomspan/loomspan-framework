@@ -20,7 +20,7 @@ public final class OutputBindingComposition {
     private MissionContext mission;
     private ai.loomspan.internal.core.ExecutionPlan capturedPlan;
     public OutputBindingComposition(YamlSkillDefinition definition, MissionContext mission, ObjectMapper mapper) {
-        this(definition.outputSchema(), definition.outputBindings(), mission.input(), mission.completedTaskResults(), mission.missionFrameId(), mapper);
+        this(definition.identity().toString(), definition.outputSchema(), definition.outputBindings(), mission.input(), mission.completedTaskResults(), mission.missionFrameId(), mapper);
         if (!definition.identity().toString().equals(mission.skillName())) throw new IllegalArgumentException("binding_source_unavailable: Output owner differs from invocation.");
         this.mission = mission;
         capturedPlan = mission.currentPlan().orElse(null);
@@ -37,7 +37,7 @@ public final class OutputBindingComposition {
             for (var result : mission.completedTaskResults()) if (capturedPlan.tasks().stream().noneMatch(t -> t.taskId().equals(result.taskId()))) throw new IllegalArgumentException("binding_source_unavailable: Result is outside accepted plan: " + result.taskId());
         }
     }
-    public OutputBindingComposition(CanonicalSchema schema, List<ChildInputBinding> bindings, Map<String,Object> input,
+    public OutputBindingComposition(String skillName, CanonicalSchema schema, List<ChildInputBinding> bindings, Map<String,Object> input,
             List<MissionContext.CompletedTaskResult> results, String ownerFrame, ObjectMapper mapper) {
         this.original = schema;
         this.projection = new OutputBindingProjection(original, bindings);
@@ -52,8 +52,17 @@ public final class OutputBindingComposition {
                 var contract = new StandardSchemaCompiler().compile(wrapper, StandardSchemaCompiler.Role.OUTPUT, StandardSchemaCompiler.Origin.GENERATED);
                 Map<String,Object> instance = new LinkedHashMap<>(); instance.put("value", value.value());
                 var validation = validate(mapper.writeValueAsString(instance), contract);
-                if (!validation.valid()) throw new IllegalArgumentException("binding_output_validation: Destination "
-                        + binding.destination().pointer()+": "+validation.issues());
+                if (!validation.valid()) {
+                    var issues = validation.contractIssues().stream().map(issue -> {
+                        String suffix = issue.path().startsWith("/value") ? issue.path().substring(6) : issue.path();
+                        return new ai.loomspan.api.SkillContractIssue(binding.destination().pointer() + suffix,
+                                issue.code(), issue.message());
+                    }).toList();
+                    String message = "binding_output_validation: Destination " + binding.destination().pointer() + ": " + validation.issues();
+                    throw new ai.loomspan.internal.core.ContractFailures.Terminal(
+                            ai.loomspan.internal.core.ContractFailures.currentSessionId(), message,
+                            new ai.loomspan.api.SkillFailureDiagnosis(skillName, ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA, message, issues));
+                }
             }
         }
     }
@@ -71,7 +80,7 @@ public final class OutputBindingComposition {
         Object decoded = new AcceptedResultDecoder().decode(candidate);
         if (!(decoded instanceof Map<?,?> object)) {
             var invalid = validate(candidate, projection.schema());
-            return new Result(candidate,provenance(),invalid.valid() ? OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED, List.of(new OutputSchemaValidationIssue("$","Model contribution must be an object.",null,"binding_model_override",null,null,null,null,null,null,null))) : invalid);
+            return new Result(candidate,provenance(),invalid.valid() ? OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED, List.of(new OutputSchemaValidationIssue("$","Model contribution must be an object.",null,"binding_model_override",null,null,null,null,null,null,null)), List.of()) : invalid);
         }
         Map<String,Object> contribution = (Map<String,Object>) object;
         var overrides = projection.validateModelContribution(contribution);
@@ -99,7 +108,7 @@ public final class OutputBindingComposition {
     }
     private Result failed(String candidate,String code,String message) {
         return new Result(candidate,provenance(),OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED,
-                List.of(new OutputSchemaValidationIssue("$",message,null,code,null,null,null,null,null,null,null))));
+                List.of(new OutputSchemaValidationIssue("$",message,null,code,null,null,null,null,null,null,null)), List.of()));
     }
     private record ObjectSchemaValue(Object value,JsonNode schema) { }
     private static ObjectSchemaValue destination(Object value,JsonNode schema,List<String> tokens) {

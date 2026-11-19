@@ -3119,6 +3119,84 @@ class StepLoopMissionExecutionEngineTest {
                 .containsExactly(PlanTaskStatus.FAILED, PlanTaskStatus.FAILED, PlanTaskStatus.PENDING);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"schema", "wrapped", "unrelated"})
+    void parallelContractDiagnosisUsesAcceptedOrderAndCausalWrapper(String mode) {
+        var secondReturned = new CountDownLatch(1);
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var session = TestLoomspanSessions.create(3, "default-rootVisibleSkill");
+        var definition = definitionWithConcurrency(true);
+        var plan = groupedPlan("diagnosis-order", false);
+        var model = new TaskAddressedModel(Map.of("t-1", "default-invoiceParser", "t-2", "default-invoiceParser"), new AtomicReference<>());
+        var capability = new BoundCapability(tool("default-invoiceParser", "unused").metadata(), List.of(),
+                (arguments, taskId, sources) -> {
+                    if (taskId.equals("t-1")) awaitProbe(secondReturned);
+                    if (taskId.equals("t-1") && mode.equals("unrelated")) throw new IllegalStateException("ordinary terminal failure");
+                    var diagnosis = new ai.loomspan.api.SkillFailureDiagnosis("default-" + taskId,
+                            ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA, "Invalid " + taskId,
+                            List.of(new ai.loomspan.api.SkillContractIssue("/" + taskId, "type", "Expected number")));
+                    var failure = new ai.loomspan.internal.core.ContractFailures.Terminal(session.getSessionId(), taskId, diagnosis);
+                    if (taskId.equals("t-1") && mode.equals("wrapped")) {
+                        state.recordFailure(session, failure, Map.of("message", "origin"));
+                        throw new IllegalStateException("causal wrapper", failure);
+                    }
+                    throw failure;
+                });
+        Throwable selected;
+        try (var executor = new ThreadPoolExecutor(3, 3, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>()) {
+            @Override protected void afterExecute(Runnable task, Throwable failure) { secondReturned.countDown(); }
+        }) {
+            selected = org.assertj.core.api.Assertions.catchThrowable(() -> executeMission(
+                    engine(state, new InitializingPlanningService(state, plan), executor, definition),
+                    session, definition, model, List.of(capability)));
+        }
+        assertThat(selected).isNotNull();
+        var errors = readRecords(session).stream().filter(record -> record.recordType() == TraceRecordType.ERROR_RECORDED).toList();
+        assertThat(errors.getFirst().data().path("exceptionMessage").asString()).isEqualTo("t-2");
+        String terminalId = session.recordFailure(selected, Map.of("message", "terminal"), null);
+        session.finalizeTrace(new ai.loomspan.internal.core.TraceCompletion(ai.loomspan.internal.core.TraceOutcome.FAILED,
+                ai.loomspan.internal.runtime.usage.SessionUsageSnapshot.empty(), terminalId, Map.of()));
+        if (mode.equals("unrelated")) assertThat(session.terminalDiagnosis()).isEmpty();
+        else assertThat(session.terminalDiagnosis()).hasValueSatisfying(diagnosis -> {
+            assertThat(diagnosis.skillName()).isEqualTo("default-t-1");
+            assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/t-1");
+        });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"exhaust", "correct", "unrelated"})
+    void assignedChildSchemaDiagnosisBelongsOnlyToTheTerminalVerdict(String mode) {
+        var state = new DefaultExecutionStateService(FIXED_CLOCK);
+        var session = TestLoomspanSessions.create(3, "default-rootVisibleSkill");
+        var calls = new AtomicInteger();
+        String schema = "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"number\"}},\"required\":[\"value\"],\"additionalProperties\":false}";
+        var callback = new BoundCapability(toolWithSchema("default-invoiceParser", schema, "unused").metadata(), List.of(),
+                (args, task, results) -> { calls.incrementAndGet(); return "done"; });
+        String invalid = "{\"stepAction\":\"CALL_TOOL\",\"taskId\":\"t-1\",\"toolName\":\"default-invoiceParser\",\"toolArguments\":{\"value\":null}}";
+        String next = mode.equals("correct") ? invalid.replace("null", "1") : mode.equals("unrelated") ? "{broken" : invalid;
+        var sequence = new SequenceChatClient(invalid, next, next, next,
+                "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"done\"}");
+        if (mode.equals("correct")) sequence = new SequenceChatClient(invalid, next,
+                "{\"stepAction\":\"FINAL_RESPONSE\",\"finalResponse\":\"done\"}");
+        var model = sequence;
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var engine = engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor);
+            if (mode.equals("correct")) assertThat(executeMission(engine, session, definition(), model, List.of(callback))).isEqualTo("done");
+            else {
+                Throwable failure = org.assertj.core.api.Assertions.catchThrowable(() -> executeMission(engine, session, definition(), model, List.of(callback)));
+                assertThat(failure).isNotNull();
+                if (mode.equals("exhaust")) {
+                    assertThat(failure).isInstanceOf(ai.loomspan.internal.core.ContractFailures.Owned.class);
+                    var diagnosis = ((ai.loomspan.internal.core.ContractFailures.Owned) failure).diagnosis();
+                    assertThat(diagnosis.skillName()).isEqualTo("default-invoiceParser");
+                    assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_SCHEMA);
+                    assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/value");
+                } else assertThat(failure).isNotInstanceOf(ai.loomspan.internal.core.ContractFailures.Owned.class);
+            }
+        }
+        assertThat(calls).hasValue(mode.equals("correct") ? 1 : 0);
+    }
+
     @Test
     void cancellationAfterValidProposalPreventsInabilityAcceptance() {
         var cancelled = new IllegalStateException("authoritative cancellation");
@@ -3614,7 +3692,12 @@ class StepLoopMissionExecutionEngineTest {
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var engine = engine(state, new InitializingPlanningService(state, singleTaskPlan()), executor);
             if (exhaust) assertThatThrownBy(() -> executeMission(engine, session, definition, sequence, List.of(callback)))
-                    .hasMessageContaining("validation exhausted");
+                    .hasMessageContaining("validation exhausted")
+                    .satisfies(error -> {
+                        var diagnosis = ((ai.loomspan.internal.core.ContractFailures.Owned) error).diagnosis();
+                        assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA);
+                        assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/value");
+                    });
             else assertThat(LoomspanJacksonCodecs.defaults().schemaTree().readTree(executeMission(engine, session, definition, sequence, List.of(callback)))
                     .path("value").decimalValue()).isEqualByComparingTo(limit);
         }

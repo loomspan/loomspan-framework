@@ -54,6 +54,10 @@ public final class LoomspanSession
     @JsonIgnore
     private RuntimeException failureRecordingFailure;
     @JsonIgnore
+    private ai.loomspan.api.SkillFailureDiagnosis terminalDiagnosis;
+    @JsonIgnore
+    private boolean terminalDiagnosisSelected;
+    @JsonIgnore
     private final @Nullable ExecutionTraceHandle executionTraceHandle;
     @JsonIgnore
     private final ExecutionObservationHandle executionObservationHandle;
@@ -167,12 +171,19 @@ public final class LoomspanSession
             Throwable current = failure;
             ProviderAttemptLink attemptLink = null;
             String causedByFailureId = null;
+            ai.loomspan.api.SkillFailureDiagnosis diagnosis = null;
             Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
             for (int depth = 0; current != null && depth < 64 && visited.add(current); depth++, current = current.getCause())
             {
                 if (attemptLink == null) attemptLink = providerAttemptsByThrowable.get(current);
                 RecordedFailure recordedCause = failuresByThrowable.get(SkillFailurePolicy.unwrapInvocationFailure(current));
-                if (causedByFailureId == null && recordedCause != null) causedByFailureId = recordedCause.failureId();
+                if (causedByFailureId == null && recordedCause != null)
+                {
+                    causedByFailureId = recordedCause.failureId();
+                    if (diagnosis == null) diagnosis = recordedCause.diagnosis();
+                }
+                if (diagnosis == null && causedByFailureId == null && current instanceof ContractFailures.Owned owned
+                        && sessionId.equals(owned.sessionId())) diagnosis = owned.diagnosis();
             }
 
             String failureId;
@@ -197,7 +208,7 @@ public final class LoomspanSession
             payload.put("exceptionMessage", effective.getMessage());
             TraceDiagnostic stack = BoundedStackTraceCapture.capture(failure);
             payload.put("diagnostics", additionalDiagnostic == null ? List.of(stack) : List.of(stack, additionalDiagnostic));
-            RecordedFailure recorded = new RecordedFailure(failureId, origin == null ? null : origin.frameId(), attemptLink);
+            RecordedFailure recorded = new RecordedFailure(failureId, origin == null ? null : origin.frameId(), attemptLink, diagnosis);
             failuresByThrowable.put(effective, recorded);
             failuresByThrowable.put(failure, recorded);
             try
@@ -244,7 +255,7 @@ public final class LoomspanSession
     }
 
     private record ProviderAttemptLink(String attemptId, String retrySequenceId) {}
-    private record RecordedFailure(String failureId, @Nullable String originFrameId, @Nullable ProviderAttemptLink attemptLink) {}
+    private record RecordedFailure(String failureId, @Nullable String originFrameId, @Nullable ProviderAttemptLink attemptLink, @Nullable ai.loomspan.api.SkillFailureDiagnosis diagnosis) {}
 
     boolean hasFailureRecordingFailure()
     {
@@ -579,6 +590,29 @@ public final class LoomspanSession
         }
     }
 
+    @JsonIgnore
+    public Optional<ai.loomspan.api.SkillFailureDiagnosis> terminalDiagnosis()
+    {
+        lock.lock();
+        try { return Optional.ofNullable(terminalDiagnosis); }
+        finally { lock.unlock(); }
+    }
+
+    /** Snapshot the coordinator's existing terminal decision before optional diagnostic work. */
+    public void selectTerminalFailure(@Nullable String failureId)
+    {
+        lock.lock();
+        try
+        {
+            if (terminalDiagnosisSelected) return;
+            terminalDiagnosis = failuresByThrowable.values().stream()
+                    .filter(recorded -> recorded.failureId().equals(failureId))
+                    .map(RecordedFailure::diagnosis).filter(Objects::nonNull).findFirst().orElse(null);
+            terminalDiagnosisSelected = true;
+        }
+        finally { lock.unlock(); }
+    }
+
     public void finalizeTrace(TraceCompletion completion)
     {
         Objects.requireNonNull(completion, "completion must not be null");
@@ -593,6 +627,7 @@ public final class LoomspanSession
 
         try
         {
+            selectTerminalFailure(completion.terminalFailureId());
             ExecutionTraceHandle handle = requireExecutionTraceHandle();
             if (failureRecordingFailure != null)
             {

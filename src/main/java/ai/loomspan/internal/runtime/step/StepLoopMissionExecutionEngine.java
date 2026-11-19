@@ -514,7 +514,9 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         OutputBindingComposition composition = hasOutputBindings ? mission.getOrCreateOutputComposition(() -> new OutputBindingComposition(definition, mission, objectMapper)) : null;
         if (composition != null && !contributionRequired) {
             OutputBindingComposition.Result assembled = composition.composeEmpty();
-            if (!assembled.validation().valid()) throw new IllegalArgumentException("binding_output_contract: " + assembled.validation().issues());
+            if (!assembled.validation().valid()) throw new ai.loomspan.internal.core.ContractFailures.Terminal(
+                    session.getSessionId(), "binding_output_contract: " + assembled.validation().issues(),
+                    ai.loomspan.internal.core.ContractFailures.output(skillName, "Assembled output violates output schema.", assembled.validation()));
             requireCompleteOutputPolicies(session, definition, assembled.content());
             executionStateService.recordResultAssembled(session, skillName, completedPlan.planId(), false, assembled.provenance(), assembled.content());
             return assembled.content();
@@ -573,7 +575,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
     private void requireCompleteOutputPolicies(LoomspanSession session, YamlSkillDefinition definition, String content) {
         FinalResponseValidationOutcome outcome = validateFinalResponseForSkill(session,
                 content, objectMapper.readTree(content), definition, 1, 1, 1);
-        if (!outcome.validation().valid()) throw new IllegalArgumentException("binding_output_contract: " + outcome.validation().rejectionReason());
+        if (!outcome.validation().valid()) throw new ai.loomspan.internal.core.ContractFailures.Terminal(
+                session.getSessionId(), "binding_output_contract: " + outcome.validation().rejectionReason(), outcome.validation().diagnosis());
     }
 
     private FinalResponseValidationOutcome validateContributionFailure(LoomspanSession session, YamlSkillDefinition definition,
@@ -582,7 +585,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
         boolean exhausted = OutputValidationPolicy.exhausted(schemaAttempt, maxRetries);
         executionStateService.recordOutputSchemaOutcome(session, OutputValidationPolicy.schemaOutcome(definition.identity().toString(), schemaAttempt, maxRetries, false, result.failureMode(), result.issues(), Integer.MAX_VALUE));
         return new FinalResponseValidationOutcome(StepValidationResult.rejected("Final model contribution violates output bindings: "
-                + OutputValidationFeedback.planningSchemaSummary(result.issues())), linterAttempt, schemaAttempt + 1, evidenceAttempt, exhausted);
+                + OutputValidationFeedback.planningSchemaSummary(result.issues()),
+                ai.loomspan.internal.core.ContractFailures.output(definition.identity().toString(), "Model contribution violates output schema.", result)), linterAttempt, schemaAttempt + 1, evidenceAttempt, exhausted);
     }
 
     private void preflightUnit(LoomspanSession session,
@@ -1012,8 +1016,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                         executionStateService.recordStepEvent(session, stepFrame, TraceRecordType.STEP_ACTION_REJECTED,
                                 mergeMetadata(trustedIdentity, Map.of("reason", validation.rejectionReason(), "exhausted", true)),
                                 Map.of("stepAction", actionName(action)));
-                        IllegalStateException failure = new IllegalStateException("Final response validation exhausted at step %d for skill '%s': %s"
-                                .formatted(stepNumber, skillName, validation.rejectionReason()));
+                        IllegalStateException failure = new ai.loomspan.internal.core.ContractFailures.Terminal(session.getSessionId(), "Final response validation exhausted at step %d for skill '%s': %s"
+                                .formatted(stepNumber, skillName, validation.rejectionReason()), validation.diagnosis());
                         throw failure;
                     }
                 }
@@ -1025,8 +1029,8 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                     log.debug("Step {} action rejected (retry {}): {}", stepNumber, invalidActionRetryCount, validation.rejectionReason());
                     if (!skillValidationRejected && invalidActionRetryCount >= MAX_INVALID_ACTION_RETRIES)
                     {
-                        IllegalStateException failure = new IllegalStateException("Step action validation exhausted at step %d for skill '%s': %s"
-                                .formatted(stepNumber, skillName, validation.rejectionReason()));
+                        IllegalStateException failure = new ai.loomspan.internal.core.ContractFailures.Terminal(session.getSessionId(), "Step action validation exhausted at step %d for skill '%s': %s"
+                                .formatted(stepNumber, skillName, validation.rejectionReason()), validation.diagnosis());
                         throw failure;
                     }
                     invalidActionFeedback = new StepActionCorrection.Failure(
@@ -1424,10 +1428,10 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
             return ValidatorAttemptOutcome.passed(attempt);
         }
 
-        return ValidatorAttemptOutcome.failed(
+        return new ValidatorAttemptOutcome(StepValidationResult.rejected(
                 "Final response violates output_schema: " + OutputValidationFeedback.planningSchemaSummary(result.issues()),
-                attempt + 1,
-                outcome.status() == OutputSchemaOutcomeStatus.EXHAUSTED);
+                ai.loomspan.internal.core.ContractFailures.output(skillDefinition.identity().toString(), "Final response violates output schema.", result)),
+                attempt + 1, outcome.status() == OutputSchemaOutcomeStatus.EXHAUSTED);
     }
 
     private ValidatorAttemptOutcome validateEvidence(LoomspanSession session,

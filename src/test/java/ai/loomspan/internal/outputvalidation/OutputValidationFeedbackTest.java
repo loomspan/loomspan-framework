@@ -9,7 +9,7 @@ class OutputValidationFeedbackTest {
     @Test
     void preservesWholeAndContributionCorrectionFormatsExactly() {
         var issue = new OutputSchemaValidationIssue("$.amount", "wrong type", "amount", "wrong", "number", "string", null, null, null, null, null);
-        var result = OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED, List.of(issue));
+        var result = OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED, List.of(issue), List.of());
         String common = "The previous response is valid JSON but does not satisfy the configured output_schema.\nIssues:\n"
                 + "- Path \"$.amount\": expected \"number\", received \"string\".\n"
                 + "Preserve all already-valid structure and values visible in the previous assistant response.\n"
@@ -24,7 +24,7 @@ class OutputValidationFeedbackTest {
     void preservesParserEscapingLocationsAndSeparateSummaryFormats() {
         var issue = new OutputSchemaValidationIssue("$", "bad", "canonical", OutputSchemaValidator.INVALID_JSON, null, null,
                 "Unexpected \"quote\"", 1, 2, 3L, "\\quoted\"");
-        var result = OutputSchemaValidationResult.failed(OutputSchemaFailureMode.INVALID_JSON, List.of(issue));
+        var result = OutputSchemaValidationResult.failed(OutputSchemaFailureMode.INVALID_JSON, List.of(issue), List.of());
         assertThat(OutputValidationFeedback.ordinarySchemaCorrection(result, false)).startsWith(
                 "The previous response could not be parsed as JSON.\nIssues:\n- Path \"$\": invalid JSON. Parser reason: \"Unexpected \\\"quote\\\"\". Location: line 1, column 2, character offset 3. Nearby fragment (escaped JSON string): \"\\\\quoted\\\"\".\n");
         assertThat(OutputValidationFeedback.ordinarySchemaSummary(List.of(issue), 4)).isEqualTo("$: invalid JSON");
@@ -36,7 +36,7 @@ class OutputValidationFeedbackTest {
     @Test
     void preservesIssueLimitsAndUnicodeResourceBound() {
         var issue = new OutputSchemaValidationIssue("$.field", "😀".repeat(512), null, "wrong", null, null, null, null, null, null, null);
-        var result = OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED, List.of(issue, issue, issue, issue, issue, issue));
+        var result = OutputSchemaValidationResult.failed(OutputSchemaFailureMode.SCHEMA_VALIDATION_FAILED, List.of(issue, issue, issue, issue, issue, issue), List.of());
         var rendered = OutputValidationFeedback.ordinarySchemaCorrection(result, false);
         assertThat(rendered.codePointCount(0, rendered.length())).isLessThanOrEqualTo(2048);
         assertThat(rendered).contains("additional issue(s) omitted.").endsWith("Return one complete corrected JSON object only, with no explanation, markdown, or code fences.");

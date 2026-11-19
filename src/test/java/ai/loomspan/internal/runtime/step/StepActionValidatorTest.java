@@ -206,6 +206,9 @@ class StepActionValidatorTest {
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason()).contains("required");
             assertThat(result.rejectionReason()).contains("rawText");
+            assertThat(result.diagnosis().skillName()).isEqualTo("default-invoiceParser");
+            assertThat(result.diagnosis().stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_SCHEMA);
+            assertThat(result.diagnosis().issues()).anySatisfy(issue -> assertThat(issue.code()).isEqualTo("required"));
         }
 
         @Test
@@ -318,6 +321,9 @@ class StepActionValidatorTest {
             assertThat(result.valid()).isFalse();
             assertThat(result.rejectionReason()).contains("required");
             assertThat(result.rejectionReason()).contains("rawText");
+            assertThat(result.diagnosis().skillName()).isEqualTo("default-invoiceParser");
+            assertThat(result.diagnosis().stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_SCHEMA);
+            assertThat(result.diagnosis().issues()).anySatisfy(issue -> assertThat(issue.code()).isEqualTo("required"));
         }
 
         @Test

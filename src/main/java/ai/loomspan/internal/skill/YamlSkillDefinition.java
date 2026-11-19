@@ -44,7 +44,9 @@ public final class YamlSkillDefinition
     }
 
     private IllegalArgumentException invalidExecutorInput(RuntimeException cause) {
-        return new IllegalArgumentException("Skill '" + identity + "' input_transform failed: " + cause.getMessage(), cause);
+        return new ai.loomspan.internal.core.ContractFailures.Transform(null, identity.toString(),
+                ai.loomspan.api.SkillContractStage.INPUT_TRANSFORM,
+                "Skill '" + identity + "' input_transform failed: " + cause.getMessage(), cause);
     }
 
     public String executorOutput(String rawText) {
@@ -53,7 +55,9 @@ public final class YamlSkillDefinition
         try {
             return transform.applyToOutput(rawText);
         } catch (RuntimeException ex) {
-            throw new IllegalArgumentException("Skill '" + identity + "' output_transform failed: " + ex.getMessage(), ex);
+            throw new ai.loomspan.internal.core.ContractFailures.Transform(null, identity.toString(),
+                    ai.loomspan.api.SkillContractStage.OUTPUT_TRANSFORM,
+                    "Skill '" + identity + "' output_transform failed: " + ex.getMessage(), ex);
         }
     }
     private final Resource resource;

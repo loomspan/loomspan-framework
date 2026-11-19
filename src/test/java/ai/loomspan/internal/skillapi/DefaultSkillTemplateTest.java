@@ -608,7 +608,12 @@ class DefaultSkillTemplateTest {
         AtomicBoolean observerCalled = new AtomicBoolean(false);
 
         assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of(), view -> observerCalled.set(true)))
-                .isInstanceOf(SkillInputValidationException.class);
+                .isInstanceOf(SkillInputValidationException.class)
+                .satisfies(error -> assertThat(((SkillInputValidationException) error).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                    assertThat(diagnosis.skillName()).isEqualTo("default-invoiceParser");
+                    assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_SCHEMA);
+                    assertThat(diagnosis.issues()).isNotEmpty();
+                }));
 
         assertThat(observerCalled.get()).isFalse();
         verify(router, never()).execute(eq(yamlSkill), eq(Map.of()), any(), eq(null));

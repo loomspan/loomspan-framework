@@ -3,9 +3,11 @@ package ai.loomspan.internal.outputschema;
 import java.util.List;
 import java.util.Objects;
 
-public final class LoomspanOutputSchemaValidationException extends RuntimeException
+public final class LoomspanOutputSchemaValidationException extends RuntimeException implements ai.loomspan.internal.core.ContractFailures.Owned
 {
     private final String skillName;
+    private final String sessionId;
+    private final ai.loomspan.api.SkillFailureDiagnosis diagnosis;
     private final String rawOutput;
     private final List<OutputSchemaValidationIssue> validationIssues;
     private final int attemptCount;
@@ -14,19 +16,24 @@ public final class LoomspanOutputSchemaValidationException extends RuntimeExcept
 
     public LoomspanOutputSchemaValidationException(String skillName,
             String rawOutput,
-            List<OutputSchemaValidationIssue> validationIssues,
+            OutputSchemaValidationResult result,
             int attemptCount,
             int maxRetries,
             OutputSchemaFailureMode failureMode)
     {
-        super(buildMessage(skillName, failureMode, attemptCount, maxRetries, validationIssues));
+        super(buildMessage(skillName, failureMode, attemptCount, maxRetries, result.issues()));
+        this.sessionId = ai.loomspan.internal.core.ContractFailures.currentSessionId();
+        this.diagnosis = ai.loomspan.internal.core.ContractFailures.output(skillName, getMessage(), result);
         this.skillName = Objects.requireNonNull(skillName, "skillName must not be null");
         this.rawOutput = rawOutput;
-        this.validationIssues = validationIssues == null ? List.of() : List.copyOf(validationIssues);
+        this.validationIssues = result.issues();
         this.attemptCount = attemptCount;
         this.maxRetries = maxRetries;
         this.failureMode = Objects.requireNonNull(failureMode, "failureMode must not be null");
     }
+
+    public String sessionId() { return sessionId; }
+    public ai.loomspan.api.SkillFailureDiagnosis diagnosis() { return diagnosis; }
 
     public String getSkillName()
     {

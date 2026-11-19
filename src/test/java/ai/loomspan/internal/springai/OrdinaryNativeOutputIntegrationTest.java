@@ -255,7 +255,7 @@ class OrdinaryNativeOutputIntegrationTest
                     ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/bound", false),
                     ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT,
                     ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/source", true), null);
-            var composition = new OutputBindingComposition(original, List.of(binding), Map.of("source", "framework exact value"),
+            var composition = new OutputBindingComposition("default-root", original, List.of(binding), Map.of("source", "framework exact value"),
                     List.of(), "owner", ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree());
             CanonicalSchema projected = composition.projection().schema();
             server.enqueue(text(runtime.driver(), "{\"label\":\"okay\"}"));

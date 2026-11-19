@@ -132,8 +132,11 @@ application callback.
 | Mapping or observer throws after execution failure | The original execution failure remains primary; the later failure is suppressed |
 | JVM `Error` | Not caught by the facade |
 
-`SkillException` extends `RuntimeException` and supports a message or a message
-plus cause.
+`SkillException` extends `RuntimeException`. Its existing message and message/cause
+constructors remain available. The additive three-argument constructor accepts a
+`SkillFailureDiagnosis`, and `getFailureDiagnosis()` returns an `Optional`.
+`SkillInputValidationException` also accepts an optional diagnosis alongside its
+message and original issues.
 
 `SkillInputValidationException` extends `SkillException`. Its `getIssues()`
 method returns an immutable defensive copy; a null issue list normalizes to an
@@ -175,6 +178,39 @@ remains primary and the observer exception is suppressed on it.
 Canonical error facts and their observer projection carry `classification` (`RECOVERABLE` or `TERMINAL`) and exact nullable `exceptionMessage` separately from contextual `message`. `causedByFailureId`, when present, links a distinct application wrapper to an already-recorded cause. Transparent propagation reuses identity; application wrappers retain their own terminal identity. Classification says whether standard feedback is permitted, never whether correction happened. Completion linkage is independent: a recoverable failure can terminate direct or explicit-step execution.
 
 Standard tool feedback happens after failed tool/skill recording and cannot become successful output or successful-result binding evidence. Observer history therefore retains the failure even when the standard parent ultimately succeeds. `ExplicitJavaFailureHandlingIntegrationTest` and `LoomspanSessionTest` exercise these boundaries.
+
+## Terminal contract diagnosis
+
+Catch `SkillException` and read `getFailureDiagnosis()` for the contract failure
+selected as the invocation's terminal cause. This works through direct invocation,
+handoff preparation and admitted execution, with diagnostics set to `NEVER` and
+without an observer. Keep the requested root name in application context. The
+diagnosis's `skillName()` identifies the canonical receiving or publishing skill.
+
+`SkillFailureDiagnosis(skillName, stage, message, issues)` is immutable. Its stages
+are `INPUT_SCHEMA`, `INPUT_TRANSFORM`, `OUTPUT_TRANSFORM` and `OUTPUT_SCHEMA`.
+Schema issues are `SkillContractIssue(path, code, message)` values from the actual
+validator verdict. `path` uses JSON Pointer semantics, with `""` at the root and
+`~0`/`~1` escaping for literal tildes/slashes. Paths and explanations retain exact
+text. Transform failures retain Framework/JSLT explanations, including authored
+`error(...)` text, and have an empty issue list. Explicit null input rejected
+before a validator verdict also has empty issues. Existing input `getIssues()`
+remains available.
+
+Absence means the selected terminal cause has no diagnosis for these four stages.
+Corrected attempts, suppressed failures and losing branches do not supply it.
+Canonical cause links and primary cancellation precedence govern selection.
+Ordinary handler failures, authorization, missing binding sources, declaration
+loading and transform compilation have no contract diagnosis. An application
+exception carrying a diagnosis cannot supply a Framework verdict in another run.
+
+`ExecutorOutputSchemaIntegrationTest` covers admitted nested failures with
+`NEVER`, exact issues, skipped dependents and concurrent exception reuse.
+`SupportedSurfaceIntegrationTest` covers generated Java admission and supported
+signatures. `StepLoopMissionExecutionEngineTest` covers planner rejection,
+correction and accepted-order selection. `LoomspanSessionTest` covers causal,
+suppressed, unrelated and foreign-session failures. `OutputSchemaValidatorTest`
+protects exact root, escaped and control-containing paths.
 
 ## Source Anchors
 

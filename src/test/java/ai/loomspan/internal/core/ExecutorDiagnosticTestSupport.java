@@ -40,6 +40,21 @@ public final class ExecutorDiagnosticTestSupport
         }
         return result;
     }
+    public static void afterRecordedFailure(LoomspanSession session, java.util.function.Consumer<String> observer)
+    {
+        var real = (ExecutionTraceHandle) ReflectionTestUtils.getField(session, "executionTraceHandle");
+        var handle = mock(ExecutionTraceHandle.class, delegatesTo(real));
+        try {
+            org.mockito.Mockito.doAnswer(invocation -> {
+                TraceRecord record = real.append(invocation.getArgument(0), invocation.getArgument(1),
+                        invocation.getArgument(2), invocation.getArgument(3), invocation.getArgument(4));
+                observer.accept(record.route());
+                return record;
+            }).when(handle).append(eq(TraceRecordType.ERROR_RECORDED), any(), any(), anyMap(), any());
+        } catch (IOException ex) { throw new AssertionError(ex); }
+        ReflectionTestUtils.setField(session, "executionTraceHandle", handle);
+    }
+
     public static void fail(SkillExecutorInvocation invocation, int seam)
     {
         Object handle = invocation.diagnostics();

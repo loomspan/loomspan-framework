@@ -85,7 +85,15 @@ class DeclaredChildInputBindingsIntegrationTest {
                 assertThat(template.invoke("default-evaluation", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{\"answers\":{}}");
                 assertThat(template.invoke("default-root", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{\"answers\":{}}");
                 org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", Map.of("amount", "4", "candidates", candidates)))
-                        .hasStackTraceContaining("binding_assembled_input_invalid");
+                        .hasStackTraceContaining("binding_assembled_input_invalid")
+                        .satisfies(error -> assertThat(((ai.loomspan.api.SkillException) error).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                            assertThat(diagnosis.skillName()).isEqualTo("default-evaluation");
+                            assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_SCHEMA);
+                            assertThat(diagnosis.issues()).anySatisfy(issue -> {
+                                assertThat(issue.path()).isEqualTo("/amount");
+                                assertThat(issue.code()).isEqualTo("type");
+                            });
+                        }));
                 assertThat(receivedInputs).hasSize(2);
                 assertThat(receivedInputs.getFirst()).isEqualTo(receivedInputs.getLast());
                 assertThat(receivedInputs.getFirst()).containsEntry("candidates", candidates);

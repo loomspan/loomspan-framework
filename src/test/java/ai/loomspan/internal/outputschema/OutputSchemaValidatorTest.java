@@ -14,6 +14,26 @@ class OutputSchemaValidatorTest {
     private final OutputSchemaValidator validator = new OutputSchemaValidator();
 
     @Test
+    void publicIssuesPreserveRootEscapingAndLongControlContainingPropertyNames() {
+        String key = " a/b~c\n" + "x".repeat(300) + " ";
+        var contract = JsonMapper.builder().build().createObjectNode();
+        contract.put("type", "object");
+        contract.putObject("properties").putObject(key).put("type", "number");
+        var value = JsonMapper.builder().build().createObjectNode();
+        value.putNull(key);
+        var result = validator.validate(value.toString(), new StandardSchemaCompiler().compile(contract,
+                StandardSchemaCompiler.Role.OUTPUT, StandardSchemaCompiler.Origin.GENERATED));
+        assertThat(result.contractIssues()).singleElement().satisfies(issue -> {
+            assertThat(issue.path()).isEqualTo("/" + key.replace("~", "~0").replace("/", "~1"));
+            assertThat(issue.code()).isEqualTo("type");
+            assertThat(issue.message()).isNotBlank();
+        });
+        assertThat(validator.validate("[]", schema("{\"type\":\"object\"}")).contractIssues().getFirst().path()).isEmpty();
+        assertThat(validator.validate("{broken", schema("{\"type\":\"object\"}")).contractIssues().getFirst())
+                .satisfies(issue -> { assertThat(issue.path()).isEmpty(); assertThat(issue.code()).isEqualTo("invalid_json"); });
+    }
+
+    @Test
     void reportsBoundedParserFactsForMalformedJson() {
         String candidate = "{\"estimatedTotal\":49 + 0,\n\"note\":\"🚀\\nline\"} // comment";
         var issue = validator.validate(candidate, schema("{\"type\":\"object\"}")).issues().getFirst();

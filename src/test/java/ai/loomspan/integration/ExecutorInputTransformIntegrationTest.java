@@ -193,7 +193,12 @@ class ExecutorInputTransformIntegrationTest {
                         .isInstanceOf(SkillException.class)
                         .hasStackTraceContaining("Input at /file must be a JSON value; found org.springframework.core.io.ByteArrayResource");
                 assertThatThrownBy(() -> template.invoke("scalar", Map.of()))
-                        .isInstanceOf(SkillException.class).hasStackTraceContaining("result must be a JSON object");
+                        .isInstanceOf(SkillException.class).hasStackTraceContaining("result must be a JSON object")
+                        .satisfies(error -> assertThat(((SkillException) error).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
+                            assertThat(diagnosis.skillName()).isEqualTo("default-scalar");
+                            assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_TRANSFORM);
+                            assertThat(diagnosis.issues()).isEmpty();
+                        }));
                 var events = new ArrayList<SkillExecutionView>();
                 assertThatThrownBy(() -> template.invoke("failure", Map.of(), events::add))
                         .isInstanceOf(SkillException.class).hasRootCauseInstanceOf(JsltException.class)

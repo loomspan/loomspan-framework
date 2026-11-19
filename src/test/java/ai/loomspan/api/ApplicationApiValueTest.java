@@ -199,13 +199,43 @@ class ApplicationApiValueTest
     }
 
     @Test
-    void skillExceptionHasOnlyMessageAndMessageCauseConstructors()
+    void skillExceptionPreservesLegacyConstructorsAndAddsDiagnosis()
     {
         assertThat(SkillException.class.getDeclaredConstructors())
                 .extracting(constructor -> List.of(constructor.getParameterTypes()))
                 .containsExactlyInAnyOrder(
                         List.of(String.class),
-                        List.of(String.class, Throwable.class));
+                        List.of(String.class, Throwable.class),
+                        List.of(String.class, Throwable.class, SkillFailureDiagnosis.class));
+    }
+
+    @Test
+    void diagnosisIsAnImmutableExactValueAndLegacyExceptionsHaveNoDiagnosis()
+    {
+        var issue = new SkillContractIssue("/a~1b~0c", "type", "  exact\nexplanation  ");
+        var issues = new ArrayList<SkillContractIssue>();
+        issues.add(issue);
+        var diagnosis = new SkillFailureDiagnosis("default-child", SkillContractStage.OUTPUT_SCHEMA, "Failed contract", issues);
+        issues.clear();
+        assertThat(diagnosis.issues()).containsExactly(issue);
+        assertThatThrownBy(() -> diagnosis.issues().clear()).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(new SkillContractIssue("", "type", "root").path()).isEmpty();
+        assertThat(new SkillException("legacy", null).getFailureDiagnosis()).isEmpty();
+        assertThat(new SkillInputValidationException("legacy", List.of()).getFailureDiagnosis()).isEmpty();
+        assertThat(new SkillException("failure", null, diagnosis).getFailureDiagnosis()).contains(diagnosis);
+        assertThat(issue.message()).isEqualTo("  exact\nexplanation  ");
+    }
+
+    @Test
+    void legacyMessageConstructorsRetainThrowableCauseInitialization()
+    {
+        var cause = new IllegalStateException("later cause");
+        var failure = new SkillException("message");
+        var input = new SkillInputValidationException("message", List.of());
+        assertThat(failure.initCause(cause)).isSameAs(failure);
+        assertThat(input.initCause(cause)).isSameAs(input);
+        assertThat(failure.getCause()).isSameAs(cause);
+        assertThat(input.getCause()).isSameAs(cause);
     }
 
     private SkillExecutionEvent event(Map<String, Object> details)

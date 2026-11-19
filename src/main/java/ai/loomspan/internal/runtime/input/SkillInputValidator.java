@@ -129,7 +129,7 @@ public class SkillInputValidator
             JsonNode instance = LoomspanJacksonCodecs.defaults().schemaTree().valueToTree(view);
             for (var error : validator.validate(instance))
             {
-                String location = error.getInstanceLocation().toString();
+                String location = CanonicalSchema.instancePointer(error.getInstanceLocation());
                 if (wrapped) location = location.equals("/value") ? "" : location.replaceFirst("^/value/", "/");
                 Object rejected = at(original, location);
                 // NetworkNT messages may render the private view; report only assertion and original path.

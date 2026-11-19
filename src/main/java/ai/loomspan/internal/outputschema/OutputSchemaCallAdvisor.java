@@ -165,7 +165,7 @@ public final class OutputSchemaCallAdvisor implements CallAdvisor
                 throw new LoomspanOutputSchemaValidationException(
                         skillName,
                         candidate,
-                        result.issues(),
+                        result,
                         attempt,
                         maxRetries,
                         result.failureMode());

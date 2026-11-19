@@ -156,7 +156,8 @@ public class ExecutionCoordinator
         {
             // Trace recording serializes the original input before reference resolution.
             if (definition != null && definition.form() == YamlSkillDefinition.Form.EXECUTOR)
-                definition.validateTransformInput(missionInput);
+                try { definition.validateTransformInput(missionInput); }
+                catch (ContractFailures.Transform ex) { throw ex.ownedBy(session.getSessionId()); }
             frameParameters.put("missionInput", definition == null
                     ? traceSafeJavaInput(missionInput)
                     : traceSafeMissionInput(definition, missionInput));
@@ -177,7 +178,9 @@ public class ExecutionCoordinator
                         var resolved = refResolver.resolveArguments(missionInput == null ? Map.of() : missionInput,
                                 session, rootCapability.inputContract());
                         if (definition != null && definition.form() == YamlSkillDefinition.Form.EXECUTOR) {
-                            var executorInput = definition.executorInput(resolved);
+                            Map<String, Object> executorInput;
+                            try { executorInput = definition.executorInput(resolved); }
+                            catch (ContractFailures.Transform ex) { throw ex.ownedBy(session.getSessionId()); }
                             var capturedBinding = ExecutionBindingScope.requireCurrent();
                             if (definition.hasInputTransform()) mission.lifecycle().requireOpenForNewWork(capturedBinding);
                             var binding = parentBinding.snapshot().executorBinding(skillName);
@@ -283,6 +286,8 @@ public class ExecutionCoordinator
             }
             if (topLevelInvocation)
             {
+                var primary = mission.lifecycle().primaryCancellation();
+                session.selectTerminalFailure(primary.isPresent() ? primary.orElseThrow().failureId() : terminalFailureId);
                 session.replaceRetainedRootState(
                         mission.currentPlan().orElse(null),
                         mission.lastLinterOutcome().orElse(null),
@@ -361,6 +366,7 @@ public class ExecutionCoordinator
                 completion.put("outputTransformStatus", "failed");
                 completion.put("outputTransformFailure", ex.getMessage());
                 recordExecutorCompletion(binding, frame, completion);
+                if (ex instanceof ContractFailures.Transform transform) throw transform.ownedBy(binding.session().getSessionId());
                 throw ex;
             }
             completion.put("outputTransformStatus", "succeeded");
@@ -378,7 +384,7 @@ public class ExecutionCoordinator
             catch (RuntimeException ignoredFailure) { /* Schema acceptance does not depend on diagnostic writes. */ }
             if (!result.valid())
                 throw new LoomspanOutputSchemaValidationException(definition.identity().toString(), published,
-                        result.issues(), 1, 0, result.failureMode());
+                        result, 1, 0, result.failureMode());
             recordExecutorCompletion(binding, frame, Map.of("skillOutput", published));
         }
         else if (definition.hasOutputTransform())

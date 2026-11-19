@@ -9,8 +9,8 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the twenty-seven types in the closed
-allowlist: twenty-five types in `ai.loomspan.api`, plus exactly the invocation
+Application code MAY depend on the thirty types in the closed
+allowlist: twenty-eight types in `ai.loomspan.api`, plus exactly the invocation
 and diagnostic capability in `ai.loomspan.api.extensions.v1`:
 
 | Type | Supported purpose |
@@ -42,6 +42,9 @@ and diagnostic capability in `ai.loomspan.api.extensions.v1`:
 | `SkillReloadException` | Catch an operational preparation or publication failure |
 | `SkillInputValidationException` | Distinguish invalid caller input |
 | `SkillInputValidationIssue` | Inspect structured validation issues |
+| `SkillFailureDiagnosis` | Identify the canonical skill and terminal contract stage |
+| `SkillContractStage` | Distinguish input schema, input transform, output transform and output schema |
+| `SkillContractIssue` | Read an exact JSON Pointer, validator code and explanation |
 
 Changes to these types are compatibility-sensitive. Application code SHOULD
 still use the narrowest type needed: inject or mock `SkillTemplate`, use the
@@ -106,7 +109,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the API packages contain exactly the twenty-seven allowlisted public top-level types;
+- the API packages contain exactly the thirty allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

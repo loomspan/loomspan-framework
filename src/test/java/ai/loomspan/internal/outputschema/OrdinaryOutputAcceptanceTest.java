@@ -133,7 +133,7 @@ class OrdinaryOutputAcceptanceTest {
                 """);
         var binding = new ChildInputBinding(ObjectFieldPath.parse("/bound", false), ChildInputBinding.SourceKind.INPUT,
                 ObjectFieldPath.parse("/source", true), null);
-        var composition = new OutputBindingComposition(contract, List.of(binding), Map.of("source", "exact bound value"), List.of(),
+        var composition = new OutputBindingComposition("default-root", contract, List.of(binding), Map.of("source", "exact bound value"), List.of(),
                 "owner", LoomspanJacksonCodecs.defaults().schemaTree());
         var opaque = new OpaquePayload("fixture", "signature", " exact\r\n雪 ");
         var thought = new ReasoningPart("thought", "summary", opaque, Map.of("id", "reasoning-id"));

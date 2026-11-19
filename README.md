@@ -412,8 +412,8 @@ from the same revision as the runtime. The first production release will be `1.0
 The supported Java API is the closed allowlist in `ai.loomspan.api` and the exact v1 executor types in
 `ai.loomspan.api.extensions.v1`, summarized
 in the [public API reference](agent-skills/loomspan-docs/references/java-api/compatibility-and-boundaries.md).
-It contains 27 public top-level types, including `SkillExecutor`, the
-Framework-created `SkillExecutorInvocation` class and `ExecutorDiagnostics` capability, `RecoverableSkillException`, and `PlannerInabilityException`. Java callable
+It contains 30 public top-level types, including `SkillExecutor`, the
+Framework-created `SkillExecutorInvocation` class and `ExecutorDiagnostics` capability, `RecoverableSkillException`, `PlannerInabilityException`, `SkillFailureDiagnosis`, `SkillContractStage`, and `SkillContractIssue`. Java callable
 methods and reference-only executors share discovery and proxy invocation. Successful
 null/void results become empty text, Strings remain exact, and other results become
 JSON; failures propagate. Only designated `RecoverableSkillException` failures become
@@ -434,6 +434,35 @@ when executor work ends or its lifecycle is cut off. Ordinary diagnostic failure
 are contained; caller argument evaluation and JVM-wide failures are excluded.
 System notices are separate and best effort; severity never changes execution.
 See the [executor API contract](agent-skills/loomspan-docs/references/java-api/java-skills.md#bounded-executor-diagnostics).
+
+Failed direct and admitted invocations expose optional terminal contract detail
+through `SkillException.getFailureDiagnosis()`, including input rejection during
+handoff preparation. This works with diagnostics set to `NEVER` and without an
+observer. Keep the requested root name separately from the diagnosis's canonical
+receiving or publishing `skillName()`.
+
+```java
+try {
+    return skills.invoke(requestedSkill, input);
+} catch (SkillException failure) {
+    failure.getFailureDiagnosis().ifPresent(diagnosis -> {
+        logger.warn("Skill {} failed at {} with {}", diagnosis.skillName(),
+                diagnosis.stage(), diagnosis.message());
+    });
+    throw failure;
+}
+```
+
+The four stages are `INPUT_SCHEMA`, `INPUT_TRANSFORM`, `OUTPUT_TRANSFORM` and
+`OUTPUT_SCHEMA`. Immutable schema issues expose `path`, `code` and `message`
+from the rejecting validator. Paths are JSON Pointers, with `""` for the root
+and `~0`/`~1` for literal tildes/slashes. Transform failures retain authored JSLT
+errors and have empty issues. Existing `SkillInputValidationException` catches
+and `getIssues()` remain usable. Absence means the selected terminal cause has
+no diagnosis for these four stages. Corrected attempts, suppressed failures and
+losing parallel branches cannot provide it. Cancellation and causal wrappers
+follow canonical completion selection. Read the
+[diagnosis contract](agent-skills/loomspan-docs/references/java-api/observation-and-errors.md#terminal-contract-diagnosis).
 
 Canonical diagnostics record classification independently from completion linkage.
 
@@ -461,7 +490,9 @@ See [Java declarations and results](agent-skills/loomspan-docs/references/java-a
 The catalog descriptor is `SkillDescriptor(name, description, kind, inputSchema,
 outputSchema)`; `SkillKind` includes `YAML` and `JAVA`.
 Nullable `outputSchema` describes effective output shape, including
-forwarding chains, without adding parent or Java/executor output validation. The descriptor
+forwarding chains. Executor YAML leaves validate their declared output schema at
+publication, and forwarding parents use the accepted result. Annotation-only Java
+methods have no YAML output schema. The descriptor
 has a five-argument constructor. Loomspan exposes no supported Java SPI. Types under `internal` and
 `autoconfigure` are not application extension APIs; Loomspan does not expose an
 internal bean-replacement contract.

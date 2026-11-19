@@ -2,8 +2,6 @@ package ai.loomspan.internal.core;
 
 import ai.loomspan.internal.runtime.input.SkillInputValidationResult;
 import ai.loomspan.internal.runtime.input.SkillInputValidator;
-import ai.loomspan.api.SkillInputValidationException;
-import ai.loomspan.api.SkillInputValidationIssue;
 import ai.loomspan.internal.security.AccessGuard;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.lang.Nullable;
@@ -63,11 +61,9 @@ public class CapabilityExecutionRouter
 
         if (!validation.valid())
         {
-            throw new SkillInputValidationException(
+            throw new ContractFailures.Input(session.getSessionId(), capability.name(),
                     (exactPaths.isEmpty() ? "Invalid input for capability '" : "binding_assembled_input_invalid: Invalid input for capability '") + capability.name() + "'",
-                    validation.issues().stream()
-                            .map(issue -> new SkillInputValidationIssue(issue.path(), issue.code(), issue.message()))
-                            .toList());
+                    validation);
         }
 
         Map<String, Object> normalizedInput = validation.normalizedInput();

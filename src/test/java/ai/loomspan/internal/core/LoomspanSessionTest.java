@@ -38,6 +38,56 @@ import static org.mockito.Mockito.when;
 class LoomspanSessionTest {
 
     @Test
+    void selectedDiagnosisSurvivesDiagnosticFinalizationFailure() throws Exception {
+        var handle = failingProjectionHandle();
+        var session = TestLoomspanSessions.withTraceHandle("diagnosed-projection", "default-root", Clock.systemUTC(), handle, () -> "failure");
+        var diagnosis = new ai.loomspan.api.SkillFailureDiagnosis("default-child", ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA,
+                "Invalid value", List.of(new ai.loomspan.api.SkillContractIssue("/value", "type", "Expected number")));
+        String id = recordFailure(session, new ContractFailures.Terminal(session.getSessionId(), "schema", diagnosis), Map.of());
+        assertThatThrownBy(() -> session.finalizeTrace(new TraceCompletion(TraceOutcome.FAILED,
+                ai.loomspan.internal.runtime.usage.SessionUsageSnapshot.empty(), id, Map.of())))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(session.terminalDiagnosis()).contains(diagnosis);
+    }
+
+    @Test
+    void primaryCancellationWithoutIdentityPreventsIncidentalSchemaDiagnosis() {
+        var session = TestLoomspanSessions.create(8, "default-root");
+        var diagnosis = new ai.loomspan.api.SkillFailureDiagnosis("default-child", ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA,
+                "Invalid value", List.of(new ai.loomspan.api.SkillContractIssue("/value", "type", "Expected number")));
+        var schema = new ContractFailures.Terminal(session.getSessionId(), "schema", diagnosis);
+        String incidentalId = recordFailure(session, schema, Map.of());
+        session.selectTerminalFailure(null);
+        session.finalizeTrace(new TraceCompletion(TraceOutcome.FAILED,
+                ai.loomspan.internal.runtime.usage.SessionUsageSnapshot.empty(), incidentalId, Map.of()));
+        assertThat(session.terminalDiagnosis()).isEmpty();
+    }
+
+    @Test
+    void selectedDiagnosisFollowsOwnedCauseAndIgnoresSuppressedUnrelatedAndForeignFailures() {
+        for (String selected : List.of("schema", "wrapper", "unrelated", "suppressed", "foreign", "public")) {
+            var session = TestLoomspanSessions.create(8, "default-root");
+            var diagnosis = new ai.loomspan.api.SkillFailureDiagnosis("default-child", ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA,
+                    "Invalid published value", List.of(new ai.loomspan.api.SkillContractIssue("/value", "type", "Expected number")));
+            var schema = new ContractFailures.Terminal(session.getSessionId(), "schema", diagnosis);
+            recordFailure(session, schema, Map.of());
+            Throwable terminal = switch (selected) {
+                case "schema" -> new java.util.concurrent.CompletionException(schema);
+                case "wrapper" -> new IllegalStateException("causal wrapper", schema);
+                case "foreign" -> new ContractFailures.Terminal("another-session", "reused", diagnosis);
+                case "public" -> new ai.loomspan.api.SkillException("application-created", null, diagnosis);
+                default -> new IllegalStateException("unrelated");
+            };
+            if (selected.equals("suppressed")) terminal.addSuppressed(schema);
+            String failureId = recordFailure(session, terminal, Map.of());
+            session.finalizeTrace(new TraceCompletion(TraceOutcome.FAILED,
+                    ai.loomspan.internal.runtime.usage.SessionUsageSnapshot.empty(), failureId, Map.of()));
+            if (selected.equals("schema") || selected.equals("wrapper")) assertThat(session.terminalDiagnosis()).contains(diagnosis);
+            else assertThat(session.terminalDiagnosis()).isEmpty();
+        }
+    }
+
+    @Test
     void rejectsNullTraceMetadataValues() {
         LoomspanSession session = TestLoomspanSessions.withId("null-trace-metadata", "default-test_entry", 3);
         Map<String, Object> metadata = new LinkedHashMap<>();

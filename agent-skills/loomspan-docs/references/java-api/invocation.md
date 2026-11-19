@@ -65,8 +65,16 @@ An explicit planning `output_from` parent returns its designated accepted direct
 child task's existing String unchanged after every accepted task succeeds. It
 makes no final model request or duplicate parent validation. Java Strings remain exact, null/void becomes empty text, and other Java results
 use JSON. Executor YAML leaves apply this Java conversion before any declared
-output transform. Effective catalog schema is metadata,
-not a new Java/executor validation guarantee. Read [output contracts](../skill-authoring/output-contracts.md).
+output transform. Executor YAML leaves enforce their declared `output_schema`
+once against the published value. A forwarding parent returns that accepted child
+text without adding parent validation. Effective catalog schema describes this
+shape; annotation-only Java methods have no YAML output schema. Read [output contracts](../skill-authoring/output-contracts.md).
+
+A failed direct or admitted invocation exposes optional terminal contract detail
+through `SkillException.getFailureDiagnosis()`. Input rejection during handoff
+preparation exposes it on `SkillInputValidationException`. Availability is
+independent of observers and diagnostic retention. Read the
+[diagnosis contract](observation-and-errors.md#terminal-contract-diagnosis).
 
 ## Choose an Input Overload
 

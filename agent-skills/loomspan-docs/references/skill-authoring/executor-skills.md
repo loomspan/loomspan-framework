@@ -88,6 +88,20 @@ configuration separation, retained expressions, failed preparation and diagnosti
 fidelity. `SharedDeclarativeAuthorizationIntegrationTest` and
 `ExecutorInvocationLifecycleIntegrationTest` cover authorization and cancellation.
 
+## Terminal contract diagnosis
+
+Java callers can read `SkillException.getFailureDiagnosis()` through direct and
+admitted invocation even with diagnostics set to `NEVER`. It identifies the
+canonical skill and input schema, input transform, output transform or output
+schema stage, with exact validator issues or the authored transform explanation.
+Selection follows the canonical terminal cause. A corrected attempt or losing
+parallel branch can leave diagnostic evidence while the public diagnosis is
+absent. Read the [public diagnosis contract](../java-api/observation-and-errors.md#terminal-contract-diagnosis).
+
+`ExecutorOutputSchemaIntegrationTest`, `ExecutorInputTransformIntegrationTest`,
+`ExecutorOutputTransformIntegrationTest`, `StepLoopMissionExecutionEngineTest`
+and `LoomspanSessionTest` verify these boundaries.
+
 ## Publish a transformed executor result
 
 Only executor leaves can declare root `output_transform`. It may appear alone or

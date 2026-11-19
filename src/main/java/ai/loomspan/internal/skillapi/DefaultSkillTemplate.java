@@ -119,7 +119,9 @@ public class DefaultSkillTemplate implements SkillTemplate
         try
         {
             if (input == null)
-                throw new SkillInputValidationException("Skill input must not be null.", List.of());
+                throw new SkillInputValidationException("Skill input must not be null.", List.of(),
+                        new ai.loomspan.api.SkillFailureDiagnosis(captured.snapshot().entry().toString(),
+                                ai.loomspan.api.SkillContractStage.INPUT_SCHEMA, "Skill input must not be null.", List.of()));
             return prepareMap(captured, captured.snapshot().entry().toString(), objectMapper.convertValue(input, MAP_TYPE));
         }
         catch (AccessDeniedException | SkillException ex)
@@ -162,13 +164,14 @@ public class DefaultSkillTemplate implements SkillTemplate
             SkillGeneration generation = captured.snapshot().entryGeneration();
             CapabilityMetadata capability = requireSkill(generation, skillName);
             SkillInputContract contract = capability.inputContract();
-            SkillInputValidationResult validation = inputValidator.validate(normalizeNullInput(input, contract), contract);
+            SkillInputValidationResult validation = inputValidator.validate(normalizeNullInput(input, contract, skillName), contract);
             if (!validation.valid())
             {
                 List<SkillInputValidationIssue> issues = validation.issues().stream()
                         .map(issue -> new SkillInputValidationIssue(issue.path(), issue.code(), issue.message()))
                         .toList();
-                throw new SkillInputValidationException(buildValidationMessage(skillName, validation), issues);
+                throw new SkillInputValidationException(buildValidationMessage(skillName, validation), issues,
+                        ai.loomspan.internal.core.ContractFailures.input(skillName, buildValidationMessage(skillName, validation), validation));
             }
             var admitted = generationManager.validateAdmission(captured.snapshot());
             return new PreparedInput(admitted, capability, validation, captured.lease());
@@ -244,11 +247,13 @@ public class DefaultSkillTemplate implements SkillTemplate
             @Nullable Authentication authentication,
             @Nullable ai.loomspan.internal.core.FrameworkExecutionLifecycle.AdmittedRoot admittedRoot)
     {
+        var selected = new java.util.concurrent.atomic.AtomicReference<ai.loomspan.api.SkillFailureDiagnosis>();
         try
         {
             java.util.function.Function<LoomspanSession, String> action =
                     session -> executeValidated(prepared.capability(), prepared.validation(), session);
             LoomspanSessionRunner.RootCompletion<String, String> completion = (result, session, failure) -> {
+                selected.set(session.terminalDiagnosis().orElse(null));
                 if (observer != null) observer.accept(executionViewMapper.map(session));
                 return result;
             };
@@ -263,13 +268,16 @@ public class DefaultSkillTemplate implements SkillTemplate
         {
             throw ex.original();
         }
-        catch (AccessDeniedException | SkillException ex)
+        catch (AccessDeniedException ex)
         {
             throw ex;
         }
         catch (RuntimeException ex)
         {
-            throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+            if (ex instanceof SkillException skillFailure
+                    && java.util.Objects.equals(skillFailure.getFailureDiagnosis().orElse(null), selected.get()))
+                throw skillFailure;
+            throw new SkillException("Skill '" + skillName + "' execution failed.", ex, selected.get());
         }
     }
 
@@ -307,7 +315,7 @@ public class DefaultSkillTemplate implements SkillTemplate
         return capability;
     }
 
-    private Map<String, Object> normalizeNullInput(Map<String, Object> input, SkillInputContract contract)
+    private Map<String, Object> normalizeNullInput(Map<String, Object> input, SkillInputContract contract, String skillName)
     {
         if (input != null)
         {
@@ -318,7 +326,9 @@ public class DefaultSkillTemplate implements SkillTemplate
             return Map.of();
         }
 
-        throw new SkillInputValidationException("Skill input must not be null for contract-backed skills.", List.of());
+        throw new SkillInputValidationException("Skill input must not be null for contract-backed skills.", List.of(),
+                new ai.loomspan.api.SkillFailureDiagnosis(skillName, ai.loomspan.api.SkillContractStage.INPUT_SCHEMA,
+                        "Skill input must not be null for contract-backed skills.", List.of()));
     }
 
     private String buildValidationMessage(String skillName, SkillInputValidationResult validation)

@@ -43,7 +43,10 @@ public final class OutputSchemaValidator
                 errors.stream().map(error -> new OutputSchemaValidationIssue(
                         error.getInstanceLocation().toString().isEmpty() ? "$" : error.getInstanceLocation().toString(),
                         error + " (schema " + error.getSchemaLocation() + ")", null, error.getKeyword(), null, null,
-                        null, null, null, null, null)).toList());
+                        null, null, null, null, null)).toList(),
+                errors.stream().map(error -> new ai.loomspan.api.SkillContractIssue(
+                        CanonicalSchema.instancePointer(error.getInstanceLocation()), error.getKeyword(),
+                        error + " (schema " + error.getSchemaLocation() + ")")).toList());
     }
 
     private OutputSchemaValidationResult invalid(JacksonException exception, String rawOutput)
@@ -55,7 +58,9 @@ public final class OutputSchemaValidator
                         null, INVALID_JSON, "valid JSON", "unparseable JSON", reason,
                         location == null ? null : location.getLineNr(), location == null ? null : location.getColumnNr(),
                         location == null ? null : location.getCharOffset(),
-                        extractEscapedFragment(rawOutput, location == null ? null : location.getCharOffset()))));
+                        extractEscapedFragment(rawOutput, location == null ? null : location.getCharOffset()))),
+                List.of(new ai.loomspan.api.SkillContractIssue("", INVALID_JSON,
+                        exception == null ? "Response is not valid JSON." : exception.getOriginalMessage())));
     }
 
     private String extractEscapedFragment(String rawOutput, Long rawOffset)

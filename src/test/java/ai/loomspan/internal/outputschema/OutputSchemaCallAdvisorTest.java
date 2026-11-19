@@ -447,6 +447,9 @@ class OutputSchemaCallAdvisorTest {
                     assertThat(failure.getMaxRetries()).isEqualTo(1);
                     assertThat(failure.getFailureMode()).isEqualTo(OutputSchemaFailureMode.INVALID_JSON);
                     assertThat(failure.getValidationIssues()).isNotEmpty();
+                    assertThat(failure.diagnosis().stage()).isEqualTo(ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA);
+                    assertThat(failure.diagnosis().issues().getFirst().code()).isEqualTo("invalid_json");
+                    assertThat(failure.diagnosis().issues().getFirst().path()).isEmpty();
                 });
     }
 

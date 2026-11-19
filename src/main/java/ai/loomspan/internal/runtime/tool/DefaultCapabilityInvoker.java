@@ -121,10 +121,9 @@ public class DefaultCapabilityInvoker implements CapabilityBindingFactory
                         owner.input(), sourceResults, owner.missionFrameId());
                 var receiving = new ai.loomspan.internal.runtime.input.SkillInputValidator()
                         .validateExact(assembly.arguments(), capability.inputContract(), assembly.exactPaths());
-                if (!receiving.valid()) throw new ai.loomspan.api.SkillInputValidationException(
+                if (!receiving.valid()) throw new ai.loomspan.internal.core.ContractFailures.Input(session.getSessionId(), capability.name(),
                         "binding_assembled_input_invalid: Invalid assembled input for '" + capability.name() + "'",
-                        receiving.issues().stream().map(issue -> new ai.loomspan.api.SkillInputValidationIssue(
-                                issue.path(), issue.code(), issue.message())).toList());
+                        receiving);
                 assembly = new ChildInputBindingAssembler.Assembly(receiving.normalizedInput(),
                         assembly.exactPaths(), assembly.provenance());
             }
