@@ -91,8 +91,8 @@ the same bytes across retries. See the owning executor reference
 (`../../../../../loomspan-extensions/extensions/decisions/docs/executor.md` in the sibling checkout)
 for question forms, JSON limits and supported local Resource inputs.
 
-The executor returns complete provider JSON as text. With `output_transform`
-omitted, the leaf publishes that text with its envelope, unknown fields, refusals,
+The executor returns complete provider JSON as text. With `output_transform` and
+`output_schema` omitted, the leaf publishes that text with its envelope, unknown fields, refusals,
 usage, arrays and scalars, JSON null and quoted strings. In that shape, a named
 Noul answer is at `/answers/repeat/noul`. Use the
 [executor output transform](executor-skills.md#publish-a-transformed-executor-result)
@@ -106,10 +106,12 @@ Diagnostic resource limits never truncate the business result.
 - Pack configuration and resolved requests are validated at every invocation
   before send. Successful Framework startup, validation or publication does not
   certify provider-domain configuration. There is no provider validation hook.
-- Executor leaves publish no generated output schema, so catalog forwarding and
-  early binding path/type checks cannot use provider-derived metadata. Generic
-  runtime binding/destination checks remain. There is no executor `output_schema`,
-  answer-schema, completeness or confidence enforcement, or answer repair.
+- A leaf MAY declare its own `output_schema` for terminal validation of the raw
+  or transformed published object. Its declared structure enters ordinary
+  forwarding metadata and binding checks. See
+  [executor result validation](executor-skills.md#validate-the-published-executor-result).
+  Framework supplies no provider-derived schema or answer repair. Structural
+  validation does not establish factual completeness or confidence calibration.
 - Native finite input and response numbers preserve their received values.
   Framework's JSLT transform accepts JSON values. See
   [executor input transforms](executor-skills.md#transform-executor-input) for

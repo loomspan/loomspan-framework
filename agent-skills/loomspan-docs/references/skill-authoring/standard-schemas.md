@@ -31,6 +31,12 @@ in [output contracts](output-contracts.md#native-output-mapping). All assertions
 remain in local acceptance. SDK wire fidelity and hosted enforcement are separate
 from canonical validity and local acceptance.
 
+YAML executor leaves MAY use `output_schema` for one local validation of their
+published raw or transformed result. They require the same object-root OUTPUT
+profile and prohibit `output_schema_max_retries` and `x-loomspan-evidence`.
+See [executor result validation](executor-skills.md#validate-the-published-executor-result)
+for declaration combinations and the terminal failure boundary.
+
 ## Required shape and vocabulary
 
 A complete contract MUST be an object schema with exact `type: object`. Root
@@ -141,7 +147,7 @@ deliverable, factually correct, or safe for an application operation.
 | Annotation | Placement and shape |
 | --- | --- |
 | `x-loomspan-attachment` | INPUT string leaf, including a nullable string; exact object fields `media_type` and `allowed_content_types` |
-| `x-loomspan-evidence` | One nonblank string on an immediate root OUTPUT property only |
+| `x-loomspan-evidence` | One nonblank string on an immediate root model OUTPUT property only; executor schemas reject it during preparation |
 | `x-loomspan-runtime-ref-capable` | Boolean on GENERATED INPUT string leaves only; authored declarations are rejected |
 
 An attachment's `media_type` MUST be one of `image`, `pdf`, `audio`, `video`,

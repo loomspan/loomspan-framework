@@ -66,6 +66,18 @@ public final class ExecutorDiagnosticTestSupport
         ReflectionTestUtils.setField(session, "executionTraceHandle", handle);
     }
 
+    public static void failOutputSchemaOutcomeRecord(LoomspanSession session) {
+        var real = (ExecutionTraceHandle) ReflectionTestUtils.getField(session, "executionTraceHandle");
+        var handle = mock(ExecutionTraceHandle.class, delegatesTo(real));
+        try {
+            doThrow(new IOException("injected schema outcome write failure")).when(handle).append(
+                    eq(TraceRecordType.STRUCTURED_OUTPUT_RECORDED), any(), any(), anyMap(), any());
+        } catch (IOException ex) {
+            throw new AssertionError("failed to install schema outcome write failure", ex);
+        }
+        ReflectionTestUtils.setField(session, "executionTraceHandle", handle);
+    }
+
     public static void mixedFixture(ExecutionBinding binding, ExecutionFrame frame)
     {
         var diagnostics = new DefaultExecutorDiagnostics(binding, frame);

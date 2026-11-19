@@ -241,7 +241,7 @@ public final class SkillDependencyValidator {
             if (target != null) schema = resolveOutputSchema(target, definitions, names, schemas,
                     resolved, visiting, issues, unknownFailedName, failedNames);
         }
-        else if (definition.form() != YamlSkillDefinition.Form.EXECUTOR && definition.outputSchema() != null) {
+        else if (definition.outputSchema() != null) {
             var mapper = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().applicationConversion();
             schema = mapper.writeValueAsString(definition.outputSchema().structuralTree());
         }

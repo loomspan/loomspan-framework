@@ -440,7 +440,7 @@ class YamlSkillCatalogTests {
                 Map.entry("model", "''"), Map.entry("prompt", "''"), Map.entry("thinking_level", "''"),
                 Map.entry("allowed_skills", "[]"), Map.entry("planning_mode", "false"),
                 Map.entry("concurrency", "false"), Map.entry("max_steps", "0"), Map.entry("linter", "{}"),
-                Map.entry("output_schema", "{}"), Map.entry("output_schema_max_retries", "0"));
+                Map.entry("output_schema_max_retries", "0"));
         for (Map.Entry<String, String> field : emptyValues.entrySet()) {
             for (String value : List.of("null", field.getValue())) {
                 tests.add(DynamicTest.dynamicTest("forbidden " + field.getKey() + "=" + value, () -> {

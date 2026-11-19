@@ -4,6 +4,9 @@ import ai.loomspan.api.SkillKind;
 import ai.loomspan.internal.model.ModelInteraction;
 import ai.loomspan.internal.model.ModelInteractionFactory;
 import ai.loomspan.internal.model.ModelInteractionMode;
+import ai.loomspan.internal.outputschema.LoomspanOutputSchemaValidationException;
+import ai.loomspan.internal.outputschema.OutputSchemaValidator;
+import ai.loomspan.internal.outputvalidation.OutputValidationPolicy;
 import ai.loomspan.internal.runtime.LoomspanMissionTimeoutException;
 import ai.loomspan.internal.runtime.MissionExecutionEngine;
 import ai.loomspan.internal.runtime.MissionWorkExecutor;
@@ -39,6 +42,8 @@ public class ExecutionCoordinator
     private final MissionWorkExecutor missionWorkExecutor;
     private final ai.loomspan.internal.vfs.RefResolver refResolver;
     private final ai.loomspan.internal.security.ScopedAuthentication scopedAuthentication;
+    private final OutputSchemaValidator outputSchemaValidator = new OutputSchemaValidator(
+            ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree());
 
     public ExecutionCoordinator(ModelInteractionFactory modelInteractionFactory,
             ToolSurfaceService toolSurfaceService,
@@ -342,25 +347,46 @@ public class ExecutionCoordinator
     private String publishExecutorResult(YamlSkillDefinition definition, ExecutionBinding binding,
             ExecutionFrame frame, String rawResult, boolean topLevelInvocation)
     {
-        if (!definition.hasOutputTransform())
+        String published = rawResult;
+        var completion = new LinkedHashMap<String, Object>();
+        completion.put("executorOutput", rawResult);
+        if (definition.hasOutputTransform())
         {
-            if (topLevelInvocation) recordExecutorCompletion(binding, frame, Map.of("executorOutput", rawResult));
-            return rawResult;
+            try
+            {
+                published = definition.executorOutput(rawResult);
+            }
+            catch (RuntimeException ex)
+            {
+                completion.put("outputTransformStatus", "failed");
+                completion.put("outputTransformFailure", ex.getMessage());
+                recordExecutorCompletion(binding, frame, completion);
+                throw ex;
+            }
+            completion.put("outputTransformStatus", "succeeded");
         }
-
-        String published;
-        try
+        if (definition.outputSchema() != null)
         {
-            published = definition.executorOutput(rawResult);
+            recordExecutorCompletion(binding, frame, completion);
+            var result = outputSchemaValidator.validate(published, definition.outputSchema());
+            var outcome = OutputValidationPolicy.schemaOutcome(definition.identity().toString(),
+                    1, 0, result.valid(), result.failureMode(), result.issues(), 4);
+            try
+            {
+                executionStateService.recordOutputSchemaOutcome(binding.session(), outcome);
+            }
+            catch (RuntimeException ignoredFailure) { /* Schema acceptance does not depend on diagnostic writes. */ }
+            if (!result.valid())
+                throw new LoomspanOutputSchemaValidationException(definition.identity().toString(), published,
+                        result.issues(), 1, 0, result.failureMode());
+            recordExecutorCompletion(binding, frame, Map.of("skillOutput", published));
         }
-        catch (RuntimeException ex)
+        else if (definition.hasOutputTransform())
         {
-            recordExecutorCompletion(binding, frame, Map.of("executorOutput", rawResult,
-                    "outputTransformStatus", "failed", "outputTransformFailure", ex.getMessage()));
-            throw ex;
+            completion.put("skillOutput", published);
+            recordExecutorCompletion(binding, frame, completion);
         }
-        recordExecutorCompletion(binding, frame, Map.of("executorOutput", rawResult,
-                "outputTransformStatus", "succeeded", "skillOutput", published));
+        else if (topLevelInvocation) recordExecutorCompletion(binding, frame, completion);
         return published;
     }
 

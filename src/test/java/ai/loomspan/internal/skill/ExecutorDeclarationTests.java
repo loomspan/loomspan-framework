@@ -29,6 +29,53 @@ class ExecutorDeclarationTests {
         assertThat(checked.definitions()).hasSize(1);
     }
 
+    @Test void acceptsExecutorOutputSchemaWithoutRetries() {
+        var checked = check(BASE + """
+                output_schema:
+                  type: object
+                  properties:
+                    repeatContactProbability: {type: number, minimum: 0, maximum: 1}
+                  required: [repeatContactProbability]
+                  additionalProperties: false
+                """);
+        assertThat(checked.issues()).isEmpty();
+        assertThat(checked.definitions()).singleElement().satisfies(definition -> {
+            assertThat(definition.outputSchema()).isNotNull();
+            assertThat(definition.outputSchemaMaxRetries()).isZero();
+            definition.manifest().setOutputSchema(null);
+            assertThat(definition.outputSchema()).isNotNull();
+        });
+    }
+
+    @Test void executorOutputSchemaUsesTheAuthoredObjectProfile() {
+        for (String schema : List.of("{type: string}", "{type: array, items: {type: string}}",
+                "{type: [object, 'null']}", "{}", "{type: object, unknown: true}",
+                "{type: object, properties: {value: {type: number, minimum: wrong}}}")) {
+            var checked = check(BASE + "output_schema: " + schema);
+            assertThat(checked.definitions()).isEmpty();
+            assertThat(checked.issues()).singleElement().satisfies(issue -> {
+                assertThat(issue.fieldPath()).startsWith("output_schema");
+                assertThat(issue.toString()).contains("executor-fixture.yml", "lookup");
+            });
+        }
+    }
+
+    @Test void executorOutputSchemaRejectsEvidenceAndExplicitRetries() {
+        for (String schema : List.of(
+                "{type: object, properties: {value: {type: number, x-loomspan-evidence: child}}}",
+                "{type: object, properties: {value: {type: number, x-loomspan-evidence: '['}}}",
+                "{type: object, properties: {nested: {type: object, properties: {value: {type: number, x-loomspan-evidence: child}}}}}")) {
+            assertThat(check(BASE + "output_schema: " + schema).issues()).singleElement()
+                    .satisfies(issue -> assertThat(issue.toString()).contains("output_schema", "x-loomspan-evidence"));
+        }
+        for (String schema : List.of("", "output_schema: {type: object}\n"))
+            for (String retries : List.of("null", "0", "1"))
+                assertTransformIssue(BASE + schema + "output_schema_max_retries: " + retries,
+                        "output_schema_max_retries", "not allowed for executor");
+        assertThat(check(BASE + "output_schema: {type: object, properties: {x-loomspan-evidence: {type: string}}}")
+                .issues()).isEmpty();
+    }
+
     @Test void executorInputAndOutputTransformsPrepareIndependently() {
         String yaml = BASE + """
                 input_transform: {language: jslt, expression: '{"answer": .value}'}
@@ -149,7 +196,7 @@ class ExecutorDeclarationTests {
         assertThat(definition.manifest().getConfig()).isEqualTo(definition.config());
     }
     @Test void executorRejectsForbiddenPresenceWithoutFormPrecedence() {
-        for (String field : List.of("model", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
+        for (String field : List.of("model", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema_max_retries", "output_from", "output_bindings"))
             for (String value : List.of("null", "{}", "[]", "true", "''")) {
                 var checked = check(BASE + field + ": " + value);
                 assertThat(checked.definitions()).as(field + "=" + value).isEmpty();

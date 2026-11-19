@@ -258,6 +258,7 @@ class ExecutorOutputTransformIntegrationTest {
         runner(executor).run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(SkillTemplate.class).invoke("default-triage", Map.of())).isEqualTo(raw);
+            assertThat(executor.sessions.getLast().getLastOutputSchemaOutcome()).isEmpty();
             var metadata = completion(executor.records(), "default-triage");
             assertThat(metadata.data().path("executorOutput").textValue()).isEqualTo(raw);
             assertThat(metadata.data().has("skillOutput")).isFalse();

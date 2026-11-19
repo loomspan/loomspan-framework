@@ -190,6 +190,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.linter.LinterOutcome", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.linter.LinterOutcomeRecorder", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.linter.LinterOutcomeStatus", "Public only for Java collaboration between distinct internal subsystem packages."),
+            Map.entry("ai.loomspan.internal.outputschema.LoomspanOutputSchemaValidationException", "Public only to share terminal output-schema failure between internal model and executor execution packages."),
             Map.entry("ai.loomspan.internal.outputschema.OutputSchemaCallAdvisor", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.outputschema.OutputSchemaFailureMode", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.outputschema.OutputSchemaOutcome", "Public only for Java collaboration between distinct internal subsystem packages."),

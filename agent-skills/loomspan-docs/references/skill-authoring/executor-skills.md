@@ -32,7 +32,7 @@ rbac_roles: [ACCOUNT_READER]
 
 `input_schema` and `rbac_roles` are optional. Authored input schemas use the [standard declaration rules](standard-schemas.md). Without an input schema, the existing generic object contract applies. Business input is never inherited from a parent.
 
-Executor leaves MUST omit `model`, `thinking_level`, `prompt`, `planning_mode`, `concurrency`, `max_steps`, `allowed_skills`, `linter`, `output_schema`, `output_schema_max_retries`, `output_from`, and `output_bindings`. Presence fails even for null, false, empty maps, empty lists or empty strings. The forms do not select precedence. `typesafe` and `rest` are unsupported top-level manifest keys. For the `executor: typesafe` declaration and its pack-owned input contract, see the [TypeSafe topic](typesafe-skills.md).
+Executor leaves MUST omit `model`, `thinking_level`, `prompt`, `planning_mode`, `concurrency`, `max_steps`, `allowed_skills`, `linter`, `output_schema_max_retries`, `output_from`, and `output_bindings`. Presence fails even for null, false, empty maps, empty lists or empty strings. The forms do not select precedence. `typesafe` and `rest` are unsupported top-level manifest keys. For the `executor: typesafe` declaration and its pack-owned input contract, see the [TypeSafe topic](typesafe-skills.md).
 
 `config` is permitted only on executor leaves. Omission and `{}` yield an empty immutable map. Explicit null, a bare field, a scalar or a list fail. Nested nulls, maps, lists, empty containers, scalar types and exact data keys are preserved. `config` is executor-owned domain data, not a Framework schema. It is decoded separately with the existing Java numeric kinds; lossless JSON-bound skill decoding applies to the rest of the document, not this actual top-level subtree.
 
@@ -120,9 +120,9 @@ construction preserves explicit null fields and empty objects and arrays.
 Direct callers and ordinary parent tool calls receive that published text.
 [Child-result bindings](input-bindings.md) select from the published shape,
 and [`output_from`](output-contracts.md#forwarding-declaration-and-completion) forwards the
-whole published text unchanged. When the declaration is omitted, the ordinary
-executor result text passes through exactly, including empty or non-JSON text.
-Executor leaves still omit `output_schema`.
+whole published text unchanged. When both `output_transform` and `output_schema`
+are omitted, the ordinary executor result text passes through exactly, including
+empty or non-JSON text.
 
 Invalid JSON or a transform error fails the leaf after successful executor
 work. The executor may already have performed side effects. Loomspan neither
@@ -138,6 +138,74 @@ Evidence comes from `ExecutorDeclarationTests`, `ExecutorOutputTransformTest`
 and `ExecutorOutputTransformIntegrationTest`. `YamlSkillCatalog` prepares the
 expression, `YamlSkillDefinition` retains it and `ExecutionCoordinator` publishes
 the result on the leaf execution path.
+
+## Validate the published executor result
+
+An executor leaf MAY declare root `output_schema`. Each skill owns its contract,
+including when several skills share one executor. The schema uses the existing
+[object-root standard profile](standard-schemas.md). It compiles during startup
+or namespace preparation. Invalid preparation preserves the active generation,
+and an admitted invocation uses its captured leaf schema.
+
+| Declared fields | Successful publication |
+| --- | --- |
+| Neither | Exact ordinary executor text, including empty or non-JSON text |
+| `output_schema` | Original text after strict complete-JSON and schema validation |
+| `output_transform` | Serialized JSLT result with any JSON root |
+| Both | Serialized JSLT result after schema validation of that transformed object |
+
+This schema-only fragment validates an executor that already returns the intended
+object. Numeric 0 and 1 both satisfy its inclusive bounds.
+
+```yaml
+output_schema:
+  type: object
+  properties:
+    repeatContactProbability: {type: number, minimum: 0, maximum: 1}
+  required: [repeatContactProbability]
+  additionalProperties: false
+```
+
+For an executor returning a response envelope, add this fragment alongside the
+same schema. Validation applies to the projected object.
+
+```yaml
+output_transform:
+  language: jslt
+  expression: |
+    {"repeatContactProbability": .answers.repeat.noul}
+```
+
+The missing projection becomes a present null and fails `type: number`. A string
+such as `"high"` fails `type`, and an out-of-range number fails `minimum` or
+`maximum`. Omitting or misspelling the published key fails `required`. Schema-only
+blank, malformed, non-JSON, multiple-value, scalar, array or null results fail.
+Successful validation preserves the same candidate text, formatting and JSON
+types. A transform alone can publish bare `0.95` or null. Probability validation
+uses an object such as `{"repeatContactProbability":0.95}`.
+
+Validation runs once after successful executor work and optional transformation,
+before direct, tool, forwarding or downstream binding consumers accept the result.
+A mismatch is terminal. Diagnostics identify the producing skill, offending
+location and constraint. On mismatch, no additional executor or model call follows,
+and a dependent child does not execute. Executor work may already have produced
+side effects. Executor and transform failures retain their existing failure paths.
+Executor leaves MUST omit `output_schema_max_retries` and MUST NOT use
+`x-loomspan-evidence` annotations on their output schema because they have no
+declared child work.
+
+Under ordinary trace access and size limits, raw `executorOutput` remains evidence.
+A successful transform retains `outputTransformStatus: succeeded` even if schema
+validation fails. `skillOutput` records successful publication only. The existing
+schema outcome reports one attempt and zero retries. Effective structural schema
+metadata is exposed for the leaf and its forwarding parents through the
+[ordinary metadata and binding rules](output-contracts.md#effective-output-metadata).
+
+Evidence comes from `ExecutorDeclarationTests`,
+`ExecutorOutputSchemaIntegrationTest` and `SkillGenerationManagerTest`.
+`YamlSkillCatalog` prepares the authored contract, `ExecutionCoordinator` invokes
+`OutputSchemaValidator` at publication, and `SkillDependencyValidator` resolves
+effective structural metadata.
 
 ## Namespace executor data
 

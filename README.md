@@ -223,6 +223,10 @@ Executor leaf declarations use `executor:` and optional map-valued `config:`.
 An optional `input_transform:` uses JSLT to produce the complete Java input object
 after ordinary input binding, validation and reference resolution. Callers and
 planners continue to use the leaf's `input_schema`.
+An optional `output_schema` validates the raw result or the result of an
+`output_transform` once before publication. Each leaf owns its object contract.
+Schema mismatch fails the leaf after executor work, with zero validation retries.
+See [executor result contracts](agent-skills/loomspan-docs/references/skill-authoring/executor-skills.md#validate-the-published-executor-result).
 `rest:` is unsupported syntax. `loomspan.executor-config` contains namespace-owned
 maps: startup YAML can contain multiple namespaces, while a publication accepts
 only its target namespace. Omission is empty with no inheritance. Nested nulls,

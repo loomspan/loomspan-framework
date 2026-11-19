@@ -3,7 +3,7 @@ package ai.loomspan.internal.outputschema;
 import java.util.List;
 import java.util.Objects;
 
-final class LoomspanOutputSchemaValidationException extends RuntimeException
+public final class LoomspanOutputSchemaValidationException extends RuntimeException
 {
     private final String skillName;
     private final String rawOutput;

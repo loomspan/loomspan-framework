@@ -22,9 +22,12 @@ they do not establish live provider enforcement or remove SDK limitations.
 publish a purpose-specific JSON result with `output_transform`. Parent bindings
 select from the published shape. A [TypeSafe pack leaf](typesafe-skills.md) that
 omits the transform publishes the complete provider response, so a parent can
-bind paths under `/answers/...`. Framework supplies no generated or authored
-output schema or answer validation and repair for executor producers. The
-authored `output_schema` rules below apply to model-backed skills.
+bind paths under `/answers/...`. Framework supplies no generated
+output schema for executor producers. A leaf MAY declare its own optional
+`output_schema`, validated once against the raw or transformed published result.
+See [executor result validation](executor-skills.md#validate-the-published-executor-result)
+for examples, terminal failures and the four declaration combinations. Guidance
+and correction below apply to model-backed skills.
 
 Use this topic to choose final synthesis, declared output assembly with `output_bindings`, or exact designated-child completion with `output_from` for a model-backed YAML skill. An output contract describes the intended structured result and supplies a local standard validator; runtime guidance and bounded semantic correction use the same canonical contract. Java skills have no YAML `output_schema`; their null/void results become empty text, Strings remain exact, and other results become JSON. See [Java results](../java-api/java-skills.md#inputs-results-and-lifecycle).
 
@@ -57,7 +60,7 @@ Forwarding retains model planning, input preparation, explicit unbound child arg
 
 The selected `allowed_skills` entry MUST explicitly declare `required: true` and `max_tasks: 1`. `min_tasks: 1` alone is insufficient. Existing bounds validation still applies. The complete generation MUST resolve the child; self and multi-skill forwarding cycles are rejected. Ordinary recursive child visibility without forwarding edges is not a forwarding cycle.
 
-A forwarding parent MUST NOT declare `output_schema`, `output_schema_max_retries`, or `linter`, including explicit null declarations. Put final-output schema, evidence, linting, and correction policies on the actual producing model child, or use an ordinary synthesis parent.
+A forwarding parent MUST NOT declare `output_schema`, `output_schema_max_retries`, or `linter`, including explicit null declarations. Put the schema on the producing model or executor child. Evidence, linting and correction policies apply to model children.
 
 The plan MUST contain exactly one task bound to the designated child. Required-child visibility, plan validation and its single combined correction remain applicable. Runtime retains that accepted task ID and executes every accepted task, including optional work and work ordered after the selected task. Full joins, authorization, limits, failure and cancellation remain enforced. Missing, ambiguous, failed, stale, or mismatched selection fails without fallback synthesis.
 
@@ -216,16 +219,19 @@ retains the Java assembly authority fixture for Console readers.
 
 ## Effective output metadata
 
-Executor producers, including TypeSafe pack leaves, expose no generated output
-schema. Parent output bindings retain generic runtime destination checks, but
-cannot rely on provider-derived early path/type compatibility checks.
+Executor producers, including TypeSafe pack leaves, expose their optional authored
+structural output schema. Without one, their metadata is null. Framework supplies
+no provider-derived output schema. Existing parent binding checks use a declared
+executor contract under their ordinary bounded structural rules.
 `output_from` forwards its selected child's whole published String unchanged.
 For an executor leaf omitting `output_transform`, that String is the ordinary
 executor result, including any response envelope.
 `DeclaredOutputBindingsPlanningIntegrationTest` covers runtime selected-result
 checks; `DesignatedChildResultIntegrationTest` covers unchanged forwarding without
 final synthesis. `ExecutorOutputTransformIntegrationTest` covers forwarding and
-binding the published executor result.
+binding the published executor result. `ExecutorOutputSchemaIntegrationTest` and
+`SkillGenerationManagerTest` cover executor validation, structural metadata,
+binding checks and fresh admission after forwarded contract changes.
 
 Public `SkillDescriptor.outputSchema()`, registered catalogs, observability DTOs
 and Console skill detail expose the same captured effective structural metadata.
@@ -237,7 +243,7 @@ separate. Forwarding a producer's structure never inherits its execution evidenc
 requirements. Provider-specific schema omissions affect detached request copies
 only; Console renders the structural schema as inert text.
 
-Java and model producers without a schema leave this metadata null, never a fabricated `{}`. Derived metadata is immutable and does not become a parent's authored validator, evidence requirement, linter, or retry policy. The actual model producer retains its own validation and correction; Java/executor do not gain output-validation guarantees. Metadata and structured validation do not establish factual correctness.
+Producers without a schema leave this metadata null. Derived metadata is immutable and does not become a parent's authored validator, evidence requirement, linter, or retry policy. The producing model child retains its validation and correction. An executor child validates its own declared schema once before publication. Metadata and structured validation do not establish factual correctness.
 
 ### Prepared contracts and fresh admission
 
@@ -271,7 +277,7 @@ Legacy `nullable` and schema-node `evidence` are rejected. Use
 
 ## Guidance, validation, and retries
 
-### Ordinary final-output correction
+### Ordinary model final-output correction
 
 Ordinary schema, linter and evidence correction carries the original instructions
 and input/media, completed tool exchanges, and the latest raw provider reply.
@@ -348,7 +354,7 @@ generated contracts; ordinary generation coverage does not establish their provi
 3. Define object children and array items recursively; use `required` only on the owning object.
 4. Prefer closed objects. Set `additionalProperties: true` only where intentionally heterogeneous fields are accepted.
 5. Use scalar `enum` and supported `format` for local assertions; use `description` for meaning rather than business validation.
-6. Add immediate-root evidence separately when supportability must be enforced; do not duplicate evidence grammar here.
+6. On model skills, add immediate-root evidence when supportability must be enforced. Executor schemas prohibit evidence annotations.
 7. Test missing, null, wrong-type, unknown-property, array-item, and enum cases, plus any domain recovery policy.
 
 ## Known limitations

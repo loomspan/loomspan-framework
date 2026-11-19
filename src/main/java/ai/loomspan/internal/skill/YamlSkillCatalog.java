@@ -323,7 +323,11 @@ public class YamlSkillCatalog implements InitializingBean
         var form = manifest.declarationForm();
         validateInputSchema(resource, manifest);
         if (form == YamlSkillDefinition.Form.EXECUTOR)
-            return new YamlSkillDefinition(form, namespace, resource, manifest, null, EvidenceContract.empty(), source, List.of());
+        {
+            validateOutputSchema(resource, manifest);
+            return new YamlSkillDefinition(form, namespace, resource, manifest, null,
+                    compileEvidenceContract(resource, manifest), source, List.of());
+        }
 
         if (!StringUtils.hasText(manifest.getModel()))
         {
@@ -477,7 +481,7 @@ public class YamlSkillCatalog implements InitializingBean
         var form = root.has("executor") ? YamlSkillDefinition.Form.EXECUTOR
                 : YamlSkillDefinition.Form.MODEL;
         if (form == YamlSkillDefinition.Form.EXECUTOR) {
-            for (String field : List.of("model", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema", "output_schema_max_retries", "output_from", "output_bindings"))
+            for (String field : List.of("model", "prompt", "thinking_level", "planning_mode", "concurrency", "max_steps", "allowed_skills", "linter", "output_schema_max_retries", "output_from", "output_bindings"))
                 if (root.has(field)) throw invalidNamedSkill(resource, skillName, field, "field is not allowed for executor leaves; remove it");
             JsonNode executor = root.get("executor");
             if (!executor.isString()) throw invalidNamedSkill(resource, skillName, "executor", "must be a nonblank textual reference");
@@ -825,8 +829,9 @@ public class YamlSkillCatalog implements InitializingBean
 
         if (maxRetries == null)
         {
-            manifest.setOutputSchemaMaxRetries(DEFAULT_OUTPUT_SCHEMA_RETRIES);
-            maxRetries = DEFAULT_OUTPUT_SCHEMA_RETRIES;
+            maxRetries = manifest.declarationForm() == YamlSkillDefinition.Form.EXECUTOR
+                    ? 0 : DEFAULT_OUTPUT_SCHEMA_RETRIES;
+            manifest.setOutputSchemaMaxRetries(maxRetries);
         }
         if (maxRetries < 0 || maxRetries > MAX_OUTPUT_SCHEMA_RETRIES)
         {
