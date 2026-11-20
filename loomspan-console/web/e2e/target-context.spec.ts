@@ -55,6 +55,7 @@ const test = consoleTest.extend<{
             tracePersistencePolicy: "PERSISTENT",
             completionGraceTtl: "PT2M",
             traceCatalogMetadataTtl: "PT168H",
+            namespaces: [],
           }),
         );
         return;

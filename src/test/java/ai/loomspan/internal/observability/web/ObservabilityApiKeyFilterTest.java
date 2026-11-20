@@ -181,7 +181,7 @@ class ObservabilityApiKeyFilterTest
                 mock(ActiveExecutionRegistry.class),
                 mock(ActivityReplayBuffer.class),
                 new LiveMonitoringAvailability(),
-                () -> mock(RegisteredSkillCatalog.class),
+                () -> mock(RegisteredSkillCatalog.class), java.util.List::of,
                 mock(FinalizedTraceCatalog.class),
                 configuration,
                 new LoomspanProperties.Session.Quotas(),

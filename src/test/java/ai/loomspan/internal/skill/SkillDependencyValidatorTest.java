@@ -104,7 +104,7 @@ class SkillDependencyValidatorTest {
         f.reloader.remove("dep",dep.generationId());
         verify(registries.get(1),times(1)).destroy();
         f.reloader.publish(f.reloader.prepare("dep",List.of(producer("leaf","integer")),MODEL));
-        var built=f.manager.prepare(captured,List.of(forward("root","dep-leaf")),MODEL,NamespaceVisibility.PRIVATE,null);
+        var built=f.manager.prepare(captured,List.of(forward("root","dep-leaf")),MODEL,NamespaceVisibility.PRIVATE,null, null);
         assertThat(built.skillCatalog().skill("a-root").orElseThrow().outputSchema()).contains("string");
         built.close();
         assertThat(f.reloader.validate("a",List.of(forward("root","dep-leaf")),MODEL).issues()).anyMatch(i->i.message().contains("Private"));
@@ -126,7 +126,7 @@ class SkillDependencyValidatorTest {
                 var result=f.manager.validate(view,List.of(forward("root","dep-leaf")),MODEL,NamespaceVisibility.PRIVATE);
                 assertThat(result.valid()).isEqualTo(view.namespaces().containsKey("dep"));
                 if(result.valid()) {
-                    var prepared=f.manager.prepare(view,List.of(forward("root","dep-leaf")),MODEL,NamespaceVisibility.PRIVATE,null);
+                    var prepared=f.manager.prepare(view,List.of(forward("root","dep-leaf")),MODEL,NamespaceVisibility.PRIVATE,null, null);
                     String expected=view.namespaces().get("dep").id().equals(dep.generationId())?"string":"integer";
                     assertThat(prepared.skillCatalog().skill("a-root").orElseThrow().outputSchema()).contains(expected);
                     prepared.close();

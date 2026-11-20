@@ -68,8 +68,27 @@ metadata, including Private and role-restricted skills, under the existing
 observation key. Names and lookups use complete canonical `namespace-localName`
 identities; equal local names in different namespaces remain distinct. Runtime
 discovery is independently execution-permission filtered. `PUBLIC` permits
-cross-namespace skill calls, not observation or configuration access. No namespace
-filter, enumeration route or additional observer role is supplied.
+cross-namespace skill calls. Observation and configuration use independent access boundaries.
+
+`GET /_loomspan/observability/v1/instance` returns the current process `instanceId`
+and a required `namespaces` array, sorted by namespace. Every installed namespace,
+including Private and empty namespaces, has one row with required `namespace`,
+`generationId` and `publicationVersion`. The version is the exact supplied string
+or JSON null when omitted. A supplied empty string is distinct from null. The array
+is empty when every namespace has been removed.
+
+The host labels a complete documents-and-configuration publication at preparation
+and defines its meaning across engines. Active ID and label come from one immutable
+generation and become visible together after successful publication. Prepared or
+abandoned updates leave active reads unchanged. Each replacement supplies its own
+optional label. Restart requires host reinstallation and label supply and produces
+new process/generation identities.
+
+Current reads work before any invocation and use the existing observation key.
+Console MCP clients call `LOOMSPAN_get_instance` for the selected target. Operators
+use the namespace table in Instance Overview, where null displays as “Not supplied”.
+Fresh connections, refresh, reconnect and reopening read current state. Current
+publication metadata is independent of captured invocation metadata.
 
 Active and finalized trace metadata retain `entryNamespace` and the captured
 `namespaceGenerationIds` map; `generationId` remains entry-scoped. These values
@@ -108,7 +127,8 @@ download filenames never expose or derive from the internal artifact path.
 ## Verification anchors
 
 Namespace metadata and semantic agreement are exercised by
-`NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest`.
+`NamespaceObservationIntegrationTest`, `NamespacePublicationObservationIntegrationTest`,
+`ConsoleRestFixtureCorpusTest` and `ConsoleTraceFixtureCorpusTest`.
 The preserved contracts are exercised by `ObservabilityArtifactIntegrationTest`,
 `ObservabilityRestIntegrationTest`, and `ObservabilityHostSecurityIntegrationTest`.
 Use matching source when diagnosing an exact protocol edge case. Live branch

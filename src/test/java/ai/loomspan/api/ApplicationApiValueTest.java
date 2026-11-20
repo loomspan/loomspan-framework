@@ -46,7 +46,11 @@ class ApplicationApiValueTest
         assertThat(SkillDescriptor.class.getConstructors()[0].getParameterCount()).isEqualTo(5);
         assertThat(SkillCatalog.class.getDeclaredMethods())
                 .extracting(java.lang.reflect.Method::getName)
-                .containsExactlyInAnyOrder("namespace", "generationId", "skills", "skill");
+                .containsExactlyInAnyOrder("namespace", "generationId", "publicationVersion", "skills", "skill");
+        var publicationMethod = SkillCatalog.class.getMethod("publicationVersion");
+        assertThat(publicationMethod.getParameterTypes()).isEmpty();
+        assertThat(publicationMethod.getGenericReturnType().getTypeName())
+                .isEqualTo("java.util.Optional<java.lang.String>");
         var skillsMethod = SkillCatalog.class.getMethod("skills");
         assertThat(skillsMethod.getParameterTypes()).isEmpty();
         assertThat(skillsMethod.getReturnType()).isEqualTo(List.class);

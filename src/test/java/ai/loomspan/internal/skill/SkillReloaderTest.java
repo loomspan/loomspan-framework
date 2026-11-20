@@ -25,6 +25,77 @@ class SkillReloaderTest {
               models: {model: {connection: local, provider-model: fixture}}
             """);
 
+    @Test void publicationLabelsBelongToTheImmutableWinningGeneration() {
+        var fixture = new Fixture(null);
+        var p7 = fixture.reloader.prepare("empty", "P7", List.of(), EMPTY, NamespaceVisibility.PRIVATE);
+        assertThat(p7.snapshot().publicationVersion()).contains("P7");
+        fixture.reloader.publish(p7);
+        var retained = fixture.reloader.snapshot("empty");
+        var p8 = fixture.reloader.prepare("empty", "P8", List.of(), EMPTY, NamespaceVisibility.PUBLIC, Map.of());
+        assertThat(p8.snapshot().generationId()).isNotEqualTo(retained.generationId());
+        assertThat(p8.snapshot().publicationVersion()).contains("P8");
+        assertThat(fixture.reloader.snapshot("empty")).isSameAs(retained);
+        var abandoned = fixture.reloader.prepare("empty", "abandoned", List.of(), EMPTY, NamespaceVisibility.PRIVATE);
+        abandoned.close();
+        assertThatThrownBy(() -> fixture.reloader.publish(abandoned)).hasMessageContaining("closed");
+        assertThat(fixture.reloader.snapshot("empty")).isSameAs(retained);
+        fixture.reloader.publish(p8);
+        assertThat(retained.publicationVersion()).contains("P7");
+        assertThat(fixture.reloader.snapshot("empty").publicationVersion()).contains("P8");
+        assertThat(fixture.reloader.snapshot("empty").generationId()).isEqualTo(p8.generationId());
+        var stale = fixture.reloader.prepare("empty", "stale", List.of(), EMPTY, NamespaceVisibility.PRIVATE);
+        var unlabeled = fixture.reloader.prepare("empty", List.of(), EMPTY);
+        fixture.reloader.publish(unlabeled);
+        assertThatThrownBy(() -> fixture.reloader.publish(stale)).hasMessageContaining("stale");
+        assertThat(fixture.reloader.snapshot("empty").generationId()).isEqualTo(unlabeled.generationId());
+        assertThat(fixture.reloader.snapshot("empty").publicationVersion()).isEmpty();
+        assertThat(fixture.manager.active("empty").visibility()).isEqualTo(NamespaceVisibility.PRIVATE);
+        fixture.manager.destroy(); fixture.lifecycle.destroy();
+    }
+
+    @Test void exactLabelsAndCredentialModesSurvivePreparation() {
+        var fixture = new Fixture(null);
+        for (String label : List.of("", " \t\n", " P7\n\"<tag>☃")) {
+            try (var candidate = fixture.reloader.prepare("exact", label, List.of(), EMPTY, NamespaceVisibility.PRIVATE)) {
+                assertThat(candidate.snapshot().publicationVersion()).contains(label);
+            }
+        }
+        var environment = fixture.reloader.prepare("env", "P7", List.of(model("leaf")), MODEL, NamespaceVisibility.PRIVATE);
+        fixture.reloader.publish(environment);
+        assertThat(fixture.manager.active("env").runtime().properties().getConnections().get("local").getApiKey()).isEqualTo("ollama");
+        var credentials = new HashMap<>(Map.of("fixture.key", "explicit"));
+        var explicit = fixture.reloader.prepare("explicit", "P7", List.of(model("leaf")), MODEL, NamespaceVisibility.PUBLIC, credentials);
+        credentials.put("fixture.key", "changed");
+        fixture.reloader.publish(explicit);
+        assertThat(fixture.manager.active("explicit").runtime().properties().getConnections().get("local").getApiKey()).isEqualTo("explicit");
+        assertThatThrownBy(() -> fixture.reloader.prepare("missing", "P8", List.of(model("leaf")), MODEL,
+                NamespaceVisibility.PRIVATE, Map.of())).isInstanceOf(SkillReloadException.class);
+        assertThatThrownBy(() -> fixture.reloader.prepare("null", "P8", List.of(), EMPTY,
+                NamespaceVisibility.PRIVATE, null)).isInstanceOf(NullPointerException.class);
+        fixture.manager.destroy(); fixture.lifecycle.destroy();
+    }
+
+    @Test void namespaceInventoryKeepsIdsAndLabelsTogetherAcrossConcurrentPublication() throws Exception {
+        var fixture = new Fixture(null);
+        var initial = fixture.reloader.prepare("empty", "P7", List.of(), EMPTY, NamespaceVisibility.PRIVATE);
+        fixture.reloader.publish(initial);
+        var first = fixture.reloader.prepare("empty", "P8", List.of(), EMPTY, NamespaceVisibility.PRIVATE);
+        var second = fixture.reloader.prepare("empty", "P9", List.of(), EMPTY, NamespaceVisibility.PRIVATE);
+        var labels = Map.of(initial.generationId(), "P7", first.generationId(), "P8", second.generationId(), "P9");
+        var start = new CountDownLatch(1);
+        try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
+            var a = workers.submit(() -> publishAfter(start, fixture.reloader, first));
+            var b = workers.submit(() -> publishAfter(start, fixture.reloader, second));
+            start.countDown();
+            for (int index = 0; index < 100; index++) {
+                var catalog = fixture.manager.namespaceCatalogs().stream().filter(item -> item.namespace().equals("empty")).findFirst().orElseThrow();
+                assertThat(catalog.publicationVersion()).contains(labels.get(catalog.generationId()));
+            }
+            assertThat(List.of(a.get(5, TimeUnit.SECONDS), b.get(5, TimeUnit.SECONDS))).containsExactlyInAnyOrder(true, false);
+        }
+        fixture.manager.destroy(); fixture.lifecycle.destroy();
+    }
+
     @Test void targetOnlyReplacementResetsVisibilityConfigurationAndOmittedSkills() {
         var fixture = new Fixture(null);
         var a = fixture.reloader.prepare("A", List.of(model("old"), model("keep")), new ExecutionConfiguration(MODEL.yaml()+"  session: {max-depth: 100}\n"), NamespaceVisibility.PUBLIC);

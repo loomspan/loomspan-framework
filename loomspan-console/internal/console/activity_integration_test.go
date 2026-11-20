@@ -33,7 +33,7 @@ func TestActivitySSEEndToEndRelay(t *testing.T) {
 		}
 		response.Header().Set(applicationclient.InstanceIDHeader, instanceID)
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 	}))
 	defer server.Close()
 
@@ -126,7 +126,7 @@ func TestActivitySSEStreamEndToEndWithTabHeader(t *testing.T) {
 		}
 		response.Header().Set(applicationclient.InstanceIDHeader, instanceID)
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 	}))
 	defer server.Close()
 
@@ -286,7 +286,7 @@ func TestActivitySSEStreamDoesNotTreatLifetimeThroughputAsBackpressure(t *testin
 		}
 		response.Header().Set(applicationclient.InstanceIDHeader, instanceID)
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 	}))
 	defer server.Close()
 

@@ -16,6 +16,9 @@ public interface SkillCatalog
     /** Opaque process-local identity of this immutable generation. */
     String generationId();
 
+    /** Host-defined label supplied for this generation, preserved exactly when present. */
+    Optional<String> publicationVersion();
+
     List<SkillDescriptor> skills();
 
     /** Qualified lookup within this catalog; malformed references fail, absent/foreign identities return empty. */

@@ -22,6 +22,13 @@ public interface SkillReloader
     PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration,
             NamespaceVisibility visibility, Map<String, String> credentialValues);
 
+    /** Prepares a labeled complete replacement using Environment credential resolution. Null omits the label. */
+    PreparedSkillUpdate prepare(String namespace, String publicationVersion, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration, NamespaceVisibility visibility);
+    /** Prepares a labeled replacement using a copied credential map without Environment fallback. */
+    PreparedSkillUpdate prepare(String namespace, String publicationVersion, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration, NamespaceVisibility visibility, Map<String, String> credentialValues);
+
     /** Withdraws exactly the expected active generation without waiting for retained work. */
     void remove(String namespace, String expectedGenerationId);
 

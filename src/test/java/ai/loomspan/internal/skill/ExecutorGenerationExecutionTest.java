@@ -31,7 +31,7 @@ class ExecutorGenerationExecutionTest {
         String yaml = "name: leaf\ndescription: executor leaf\nexecutor: run\nconfig: {operation: echo}\n";
         var candidate = manager.prepare(manager.capturePreparation("default"),
                 List.of(new SkillDocument("leaf.yml", yaml)), new ExecutionConfiguration("loomspan: {}"),
-                NamespaceVisibility.PRIVATE, null);
+                NamespaceVisibility.PRIVATE, null, null);
         assertThat(candidate.capability("default-leaf").kind().toString()).contains("JAVA");
         assertThat(candidate.definition("default-leaf").config()).containsEntry("operation", "echo");
         assertThat(candidate.definition("default-leaf").source().bytes()).isEqualTo(yaml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -47,7 +47,7 @@ class ExecutorGenerationExecutionTest {
         assertThat(candidate.registeredSkillCatalog().find("default-run")).isEmpty();
         var sameName = manager.prepare(manager.capturePreparation("default"),
                 List.of(new SkillDocument("opaque label", "# authored\r\nname: run\r\ndescription: leaf\r\nexecutor: default-run\r\n")),
-                new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE, null);
+                new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE, null, null);
         assertThat(sameName.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("default-run");
         assertThat(sameName.registeredSkillCatalog().registeredSkillCount()).isOne();
         var sameDetail = sameName.registeredSkillCatalog().find("default-run").orElseThrow();
@@ -69,7 +69,7 @@ class ExecutorGenerationExecutionTest {
         manager.initializeStartup();
         var view = manager.capturePreparation("default");
         var generation = manager.prepare(view, List.of(new SkillDocument("leaf", "name: leaf\ndescription: leaf\nexecutor: run\nconfig: {operation: echo}\n")),
-                new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE, null);
+                new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE, null, null);
         SkillGenerationManager.dispatch(manager.publish(generation, view.baseId()));
         var captured = manager.capture(SkillIdentity.parse("default-leaf"));
         var admitted = manager.validateAdmission(captured.snapshot());

@@ -135,6 +135,13 @@ describe("ActivityProvider", () => {
     } as RecentActivityResponse);
   });
 
+  it("loads current instance metadata on mount before any stream connection or execution", async () => {
+    withProvider(<Consumer />);
+    await waitFor(() => expect(observabilityView.loadInstance).toHaveBeenCalledOnce());
+    expect(screen.getByTestId("connected")).toHaveTextContent("false");
+    expect(screen.getByTestId("activity-count")).toHaveTextContent("0");
+  });
+
   it("opens stream when target is connected and session is paired", () => {
     withProvider(<Consumer />);
     expect(mockOpenActivityStream).toHaveBeenCalledTimes(1);

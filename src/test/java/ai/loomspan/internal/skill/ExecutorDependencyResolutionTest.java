@@ -39,12 +39,12 @@ class ExecutorDependencyResolutionTest {
     }
     static SkillGeneration prepare(SkillGenerationManager manager, String namespace, List<SkillDocument> docs,
             String config, NamespaceVisibility visibility) {
-        return manager.prepare(manager.capturePreparation(namespace), docs, new ExecutionConfiguration(config), visibility, null);
+        return manager.prepare(manager.capturePreparation(namespace), docs, new ExecutionConfiguration(config), visibility, null, null);
     }
     static SkillGeneration publish(SkillGenerationManager manager, String namespace, List<SkillDocument> docs,
             String config, NamespaceVisibility visibility) {
         var view = manager.capturePreparation(namespace);
-        var generation = manager.prepare(view, docs, new ExecutionConfiguration(config), visibility, null);
+        var generation = manager.prepare(view, docs, new ExecutionConfiguration(config), visibility, null, null);
         SkillGenerationManager.dispatch(manager.publish(generation, view.baseId()));
         return generation;
     }
@@ -112,7 +112,7 @@ class ExecutorDependencyResolutionTest {
             var capture = manager.capture(SkillIdentity.parse("caller-leaf"));
             var retained = manager.validateAdmission(capture.snapshot());
             var view = manager.capturePreparation("caller");
-            var candidate = manager.prepare(view, List.of(leaf("leaf", "infra-run")), new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE, null);
+            var candidate = manager.prepare(view, List.of(leaf("leaf", "infra-run")), new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE, null, null);
             var provenance = candidate.registeredSkillCatalog().find("caller-leaf").orElseThrow();
             assertThat(provenance.kind()).isEqualTo("JAVA");
             assertThat(provenance.declaration()).isEqualTo("YAML");
@@ -239,7 +239,7 @@ class ExecutorDependencyResolutionTest {
                 var retained = admit(manager,"caller-root");
                 var callerGeneration = retained.entryGeneration();
                 var replacement = new SkillGeneration("infra","new-owner",Map.of(),Map.of(),null,null,null,
-                        NamespaceVisibility.PUBLIC,Map.of("infra-run",newRegistration),Map.of("version","new"));
+                        NamespaceVisibility.PUBLIC,Map.of("infra-run",newRegistration),Map.of("version","new"), null);
                 var validator = new SkillDependencyValidator(new SkillInputContractResolver(),List.of());
                 var fresh = validator.checkAdmission(new SkillAdmissionSnapshot(retained.entry(),
                         Map.of("caller",callerGeneration,"infra",replacement)));

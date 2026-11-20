@@ -57,7 +57,7 @@ func (client *fixtureObservabilityClient) Get(_ context.Context, endpoint string
 	var body string
 	switch {
 	case strings.HasSuffix(endpoint, "/instance"):
-		body = `{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-27T00:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":1,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`
+		body = `{"instanceId":"` + instanceID + `","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-27T00:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":1,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`
 	case strings.Contains(endpoint, "/skills/"):
 		body = `{"registeredName":"default-CheckDns","kind":"YAML","declaration":"YAML", "sourcePath":"classpath:/skills/check-dns.yaml","yaml":"name: CheckDns"}`
 	case strings.Contains(endpoint, "/skills"):

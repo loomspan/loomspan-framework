@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func TestEvaluationServerUsesProductionAdapterAndThirteenTools(t *testing.T) {
+func TestEvaluationServerUsesProductionAdapterAndFourteenTools(t *testing.T) {
 	cases, err := LoadCases()
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +47,7 @@ func TestEvaluationServerUsesProductionAdapterAndThirteenTools(t *testing.T) {
 	post(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"eval-test","version":"1"}}}`)
 	listed := post(`{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`)
 	tools := listed["result"].(map[string]any)["tools"].([]any)
-	if len(tools) != 13 {
+	if len(tools) != 14 {
 		t.Fatalf("tools=%d", len(tools))
 	}
 	found := false

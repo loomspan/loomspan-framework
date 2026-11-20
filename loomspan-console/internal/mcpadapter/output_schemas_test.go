@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/loomspan/loomspan-framework/loomspan-console/internal/consolecore"
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/observability"
 )
 
 func validateCompactInstance(t *testing.T, schema *jsonschema.Schema, instance any) error {
@@ -104,6 +105,9 @@ func TestEveryInstalledToolRepresentativeOutputsValidateAgainstBothSchemas(t *te
 		{"skills-list", func(t *testing.T) {
 			validateTypedEnvelope(t, "skills-list", skillListOutputSchema(), skillListResult{ObservedAt: now, Items: []skillSummaryDTO{}})
 		}},
+		{"instance", func(t *testing.T) {
+			validateTypedEnvelope(t, "instance", instanceOutputSchema(), instanceResult{ObservedAt: now, InstanceID: "instance", Namespaces: []observability.NamespacePublication{}})
+		}},
 		{"skill-detail", func(t *testing.T) {
 			validateTypedEnvelope(t, "skill-detail", skillDetailOutputSchema(), skillDetailResult{ObservedAt: now, Skill: skillDetailDTO{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", YAML: "name: skill"}})
 		}},
@@ -142,7 +146,7 @@ func TestEveryInstalledToolRepresentativeOutputsValidateAgainstBothSchemas(t *te
 			validateTypedEnvelope(t, "artifact-range", rangeOutputSchema(), rangeResult{Evidence: evidence, ContentType: "application/x-ndjson", Encoding: "TEXT", Content: "{}"})
 		}},
 	}
-	if len(tests) != 13 {
+	if len(tests) != 14 {
 		t.Fatalf("tool fixtures=%d", len(tests))
 	}
 	for _, test := range tests {
@@ -193,6 +197,7 @@ func TestCompactSchemasRetainDecisionAndNavigationFields(t *testing.T) {
 		instance any
 	}{
 		{"runtime", runtimeOutputSchema(), map[string]any{"observedAt": "2026-08-19T00:00:00Z", "targetSelection": "NONE", "targetConnection": "DISCONNECTED", "targetAuthentication": "UNKNOWN", "javaGoCompatibility": "UNKNOWN", "runtimeIdentity": "UNKNOWN", "liveMonitoring": "UNAVAILABLE"}},
+		{"instance", instanceOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "instanceId": "instance", "namespaces": []any{map[string]any{"namespace": "empty", "generationId": "g7", "publicationVersion": nil}}}}},
 		{"skills-list", skillListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"registeredName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml"}}, "hasMore": false}}},
 		{"skill-detail", skillDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": map[string]any{"registeredName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml", "yaml": "name: skill", "outputSchema": nil}}}},
 		{"executions-list", executionListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"sessionId": "s", "traceId": "t", "status": "RUNNING", "phase": "STEP", "updatedAt": "2026-08-19T00:00:00Z", "activeBranchCount": 0}}, "hasMore": false}}},

@@ -2,6 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
+import type { InstanceStatus } from "../api/contracts";
 import { MemoryRouter } from "react-router";
 
 const targetView = vi.hoisted(() => ({
@@ -127,6 +128,7 @@ test("provider fetches instance status when consumer requests it on mount", asyn
     tracePersistencePolicy: "PERSISTENT",
     completionGraceTtl: "PT2M",
     traceCatalogMetadataTtl: "PT168H",
+    namespaces: [],
   });
   render(
     <ObservabilityProvider>
@@ -165,6 +167,7 @@ test("scopeGeneration change resets state", async () => {
     tracePersistencePolicy: "PERSISTENT",
     completionGraceTtl: "PT2M",
     traceCatalogMetadataTtl: "PT168H",
+    namespaces: [],
   });
   const { rerender } = render(
     <ObservabilityProvider>
@@ -198,6 +201,7 @@ test("manual refresh calls loadInstance again", async () => {
     tracePersistencePolicy: "PERSISTENT",
     completionGraceTtl: "PT2M",
     traceCatalogMetadataTtl: "PT168H",
+    namespaces: [],
   });
   render(
     <ObservabilityProvider>
@@ -211,6 +215,36 @@ test("manual refresh calls loadInstance again", async () => {
   await vi.waitFor(() => {
     expect(getObservabilityInstance).toHaveBeenCalledTimes(2);
   });
+});
+
+test("a late instance response cannot overwrite the newly refreshed generation and label", async () => {
+  let resolveOld: (value: Awaited<ReturnType<typeof getObservabilityInstance>>) => void = () => {};
+  const current = {
+    targetScopeId: "scope-1", instanceId: "test-id", consoleCompatibilityVersion: "1.0.0-beta.10-SNAPSHOT",
+    observedAt: "2026-07-27T00:00:00Z", liveMonitoringAvailable: false,
+    registeredSkillCount: 0, activeExecutionCount: 0, catalogedTraceCount: 0,
+    tracePersistencePolicy: "PERSISTENT", completionGraceTtl: "PT2M", traceCatalogMetadataTtl: "PT168H",
+    namespaces: [{ namespace: "empty", generationId: "east-8", publicationVersion: "P8" }],
+  };
+  vi.mocked(getObservabilityInstance)
+    .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }))
+    .mockResolvedValueOnce(current);
+  function Publications() {
+    const { instance, loadInstance } = useObservability();
+    const status = instance?.status as InstanceStatus | undefined;
+    return <>
+      <button onClick={() => void loadInstance()}>read</button>
+      <output>{status?.namespaces.map((namespace) => `${namespace.generationId} ${namespace.publicationVersion}`).join(",")}</output>
+    </>;
+  }
+  render(<ObservabilityProvider><Publications /></ObservabilityProvider>);
+  await act(async () => { screen.getByText("read").click(); });
+  await act(async () => { screen.getByText("read").click(); });
+  expect(screen.getByRole("status")).toHaveTextContent("east-8 P8");
+  await act(async () => {
+    resolveOld({ ...current, namespaces: [{ namespace: "empty", generationId: "east-7", publicationVersion: "P7" }] });
+  });
+  expect(screen.getByRole("status")).toHaveTextContent("east-8 P8");
 });
 
 test("successful empty collection loads only once", async () => {

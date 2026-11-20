@@ -3,21 +3,71 @@ package observability
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/loomspan/loomspan-framework/loomspan-console/internal/skillidentity"
 )
 
 type InstanceStatus struct {
-	TargetScopeID               string    `json:"targetScopeId"`
-	InstanceID                  string    `json:"instanceId"`
-	ConsoleCompatibilityVersion string    `json:"consoleCompatibilityVersion"`
-	ObservedAt                  time.Time `json:"observedAt"`
-	LiveMonitoringAvailable     bool      `json:"liveMonitoringAvailable"`
-	RegisteredSkillCount        int       `json:"registeredSkillCount"`
-	ActiveExecutionCount        int       `json:"activeExecutionCount"`
-	CatalogedTraceCount         int       `json:"catalogedTraceCount"`
-	TracePersistencePolicy      string    `json:"tracePersistencePolicy"`
-	CompletionGraceTtl          string    `json:"completionGraceTtl"`
-	TraceCatalogMetadataTtl     string    `json:"traceCatalogMetadataTtl"`
+	TargetScopeID               string                 `json:"targetScopeId"`
+	InstanceID                  string                 `json:"instanceId"`
+	ConsoleCompatibilityVersion string                 `json:"consoleCompatibilityVersion"`
+	ObservedAt                  time.Time              `json:"observedAt"`
+	LiveMonitoringAvailable     bool                   `json:"liveMonitoringAvailable"`
+	RegisteredSkillCount        int                    `json:"registeredSkillCount"`
+	ActiveExecutionCount        int                    `json:"activeExecutionCount"`
+	CatalogedTraceCount         int                    `json:"catalogedTraceCount"`
+	TracePersistencePolicy      string                 `json:"tracePersistencePolicy"`
+	CompletionGraceTtl          string                 `json:"completionGraceTtl"`
+	TraceCatalogMetadataTtl     string                 `json:"traceCatalogMetadataTtl"`
+	Namespaces                  []NamespacePublication `json:"namespaces"`
+}
+
+type NamespacePublication struct {
+	Namespace          string  `json:"namespace"`
+	GenerationID       string  `json:"generationId"`
+	PublicationVersion *string `json:"publicationVersion"`
+}
+
+func (status *InstanceStatus) UnmarshalJSON(data []byte) error {
+	type wire InstanceStatus
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if decoded.Namespaces == nil {
+		return fmt.Errorf("namespaces must be an array")
+	}
+	seen := make(map[string]bool, len(decoded.Namespaces))
+	for _, namespace := range decoded.Namespaces {
+		if seen[namespace.Namespace] {
+			return fmt.Errorf("duplicate namespace %q", namespace.Namespace)
+		}
+		seen[namespace.Namespace] = true
+	}
+	*status = InstanceStatus(decoded)
+	return nil
+}
+
+func (namespace *NamespacePublication) UnmarshalJSON(data []byte) error {
+	type wire NamespacePublication
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	if _, present := fields["publicationVersion"]; !present {
+		return fmt.Errorf("publicationVersion is required")
+	}
+	if !skillidentity.ValidNamespace(decoded.Namespace) || strings.TrimSpace(decoded.GenerationID) == "" {
+		return fmt.Errorf("namespace or generation ID is invalid")
+	}
+	*namespace = NamespacePublication(decoded)
+	return nil
 }
 
 type SkillSummary struct {

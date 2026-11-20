@@ -20,7 +20,7 @@ record ExecutorPolicyFixture(CapabilityMetadata capability, SkillAdmissionSnapsh
         var caller = new SkillGeneration("caller", "caller-generation", Map.of(capability.name(), capability),
                 Map.of(capability.name(), definition));
         var owner = new SkillGeneration("infra", "owner-generation", Map.of(), Map.of(), null, null, null,
-                ai.loomspan.api.NamespaceVisibility.PUBLIC, Map.of(registration.name(), registration), Map.of());
+                ai.loomspan.api.NamespaceVisibility.PUBLIC, Map.of(registration.name(), registration), Map.of(), null);
         return new ExecutorPolicyFixture(capability, new SkillAdmissionSnapshot(capability.identity(),
                 Map.of("caller", caller, "infra", owner), Map.of(capability.name(),
                 new SkillAdmissionSnapshot.ExecutorBinding(registration, Map.of(), owner.id()))));

@@ -254,3 +254,22 @@ func TestAllCallableFormsPreserveProvenanceAndRejectInvalidContracts(t *testing.
 		})
 	}
 }
+
+func TestBrowserAndMCPPreserveSameNamespacePublicationFacts(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "loomspan-console-fixtures", "application-rest", "instance-status.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var browserFact observability.InstanceStatus
+	if err := json.Unmarshal(fixture, &browserFact); err != nil {
+		t.Fatal(err)
+	}
+	options := newMCPTestOptions(t, func(string) ([]byte, error) { return fixture, nil })
+	_, envelope, err := handleGetInstance(context.Background(), options)
+	if err != nil || envelope.Result == nil {
+		t.Fatalf("envelope=%#v err=%v", envelope, err)
+	}
+	if envelope.Result.InstanceID != browserFact.InstanceID || !envelope.Result.ObservedAt.Equal(browserFact.ObservedAt) || !reflect.DeepEqual(envelope.Result.Namespaces, browserFact.Namespaces) {
+		t.Fatalf("browser=%#v MCP=%#v", browserFact, envelope.Result)
+	}
+}

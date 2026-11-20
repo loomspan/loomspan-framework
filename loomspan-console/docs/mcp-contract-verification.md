@@ -2,7 +2,7 @@
 
 Loomspan Console exposes stateless Streamable HTTP at exact `/mcp`, with MCP
 `2026-07-28` and compatible `2025-11-25` negotiation. It requires an exact
-loopback Host and one bearer key. The installed surface contains thirteen
+loopback Host and one bearer key. The installed surface contains fourteen
 read-only tools and no resources or resource templates. Ordinary MCP
 `tools/list` is the sole installed-surface inventory; runtime status contains
 only target connection, authentication, compatibility, runtime identity, and
@@ -16,7 +16,7 @@ framing at 1, 4, and 16 MiB, concurrent clients, and explicit rejection of the
 
 Checked-in tests measure complete HTTP responses, including the JSON-RPC
 response envelope, structured content, and deterministic text fallback. They
-enforce a 25 KiB ceiling for `tools/list`, a 32 KiB ceiling for ordinary
+enforce a 26 KiB ceiling for `tools/list`, a 32 KiB ceiling for ordinary
 complete navigation results, and a 48 KiB ceiling for default range results.
 The tests retain and report exact current measurements so that size drift below
 those ceilings remains visible during review; this document records the stable

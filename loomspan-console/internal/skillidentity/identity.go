@@ -9,6 +9,9 @@ import (
 var namespacePattern = regexp.MustCompile(`^[a-z_][a-z0-9_]{0,31}$`)
 var skillPattern = regexp.MustCompile(`^[a-z_][a-z0-9_]*-[A-Za-z_][A-Za-z0-9_]*$`)
 
+// ValidNamespace checks the canonical namespace identity used by the engine.
+func ValidNamespace(namespace string) bool { return namespacePattern.MatchString(namespace) }
+
 // ValidCapture checks the entry-scoped ID against its captured namespace map.
 func ValidCapture(skill, namespace, generation string, generations map[string]string) bool {
 	if len(skill) > 64 || !skillPattern.MatchString(skill) || !namespacePattern.MatchString(namespace) || !strings.HasPrefix(skill, namespace+"-") || strings.TrimSpace(generation) == "" || len(generations) == 0 || generations[namespace] != generation {

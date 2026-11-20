@@ -63,7 +63,9 @@ public final class ObservabilityRestController
                 skills.registeredSkillCount(), runtime.activeExecutions().activeCount(),
                 runtime.traces().catalogedTraceCount(), runtime.tracePersistencePolicy(),
                 runtime.configuration().getCompletionGraceTtl(),
-                runtime.configuration().getTraceCatalogMetadataTtl())));
+                runtime.configuration().getTraceCatalogMetadataTtl(), runtime.namespaces().stream()
+                        .map(catalog -> new ObservabilityDtos.NamespaceStatus(catalog.namespace(), catalog.generationId(),
+                                catalog.publicationVersion().orElse(null))).toList())));
     }
 
     public ResponseEntity<byte[]> skills(HttpServletRequest request)

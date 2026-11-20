@@ -17,7 +17,7 @@ in native Console archives; installation and MCP configuration remain manual
 and client-owned.
 
 Live use requires an already configured local Console MCP connection. Ordinary
-MCP `tools/list` discovers the exact thirteen installed read-only tools;
+MCP `tools/list` discovers the exact fourteen installed read-only tools;
 `LOOMSPAN_get_runtime` reports current runtime and target status and does not
 contain a capability inventory. If an installed tool is unavailable, the skill
 names and stops only dependent work. Parsed debugging continues without
@@ -717,7 +717,7 @@ cross-version application contracts.
   `mcpadapter/trace_joined_adapters_test.go` and MCP server discovery tests
   protect trace-ID resolution, target-free imports,
   ambiguity/completeness, opaque-reference recovery, joined browser/MCP
-  lifecycle behavior, bounded exact traversal, thirteen tools, authoritative
+  lifecycle behavior, bounded exact traversal, fourteen tools, authoritative
   plan querying, and zero custom
   resources.
 - `TraceRecords.failure.test.tsx` and `TraceRecords.raw.test.tsx` protect

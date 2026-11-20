@@ -1,8 +1,18 @@
 # MCP tool guide
 
 Discover the installed MCP tools, then use `LOOMSPAN_get_runtime` for current
-runtime and target status. The installed surface contains exactly thirteen
+runtime and target status. The installed surface contains exactly fourteen
 read-only tools and zero custom resources.
+
+For current namespace publications, call `LOOMSPAN_get_instance` with `{}`.
+It reads the selected authenticated target on every call and returns `instanceId`,
+upstream `observedAt`, and every installed namespace's `namespace`, `generationId`
+and nullable `publicationVersion`, including empty namespaces before execution.
+The host owns label meaning. Preserve exact strings. Null means omitted for that
+replacement, and a supplied empty string is distinct. A candidate becomes visible
+only after successful publication. Fresh sessions and reconnects can discover the
+active publication after a missed publish acknowledgment. A complete inventory
+that exceeds the response limit returns `LIMIT_EXCEEDED`.
 
 Target skill evidence:
 

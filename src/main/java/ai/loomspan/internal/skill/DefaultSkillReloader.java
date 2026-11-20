@@ -50,11 +50,11 @@ public final class DefaultSkillReloader implements SkillReloader
 
     @Override public PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents,
             ExecutionConfiguration configuration) {
-        return prepareInternal(namespace, documents, configuration, NamespaceVisibility.PRIVATE, null);
+        return prepareInternal(namespace, null, documents, configuration, NamespaceVisibility.PRIVATE, null);
     }
     @Override public PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents,
             ExecutionConfiguration configuration, NamespaceVisibility visibility) {
-        return prepareInternal(namespace, documents, configuration, visibility, null);
+        return prepareInternal(namespace, null, documents, configuration, visibility, null);
     }
     @Override public PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents,
             ExecutionConfiguration configuration, Map<String, String> credentialValues) {
@@ -62,11 +62,21 @@ public final class DefaultSkillReloader implements SkillReloader
     }
     @Override public PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents,
             ExecutionConfiguration configuration, NamespaceVisibility visibility, Map<String, String> credentialValues) {
-        return prepareInternal(namespace, documents, configuration, visibility,
+        return prepareInternal(namespace, null, documents, configuration, visibility,
                 new LinkedHashMap<>(Objects.requireNonNull(credentialValues, "credentialValues must not be null")));
     }
 
-    private PreparedSkillUpdate prepareInternal(String namespace, Collection<SkillDocument> documents,
+    @Override public PreparedSkillUpdate prepare(String namespace, String publicationVersion, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration, NamespaceVisibility visibility) {
+        return prepareInternal(namespace, publicationVersion, documents, configuration, visibility, null);
+    }
+    @Override public PreparedSkillUpdate prepare(String namespace, String publicationVersion, Collection<SkillDocument> documents,
+            ExecutionConfiguration configuration, NamespaceVisibility visibility, Map<String, String> credentialValues) {
+        return prepareInternal(namespace, publicationVersion, documents, configuration, visibility,
+                new LinkedHashMap<>(Objects.requireNonNull(credentialValues, "credentialValues must not be null")));
+    }
+
+    private PreparedSkillUpdate prepareInternal(String namespace, String publicationVersion, Collection<SkillDocument> documents,
             ExecutionConfiguration configuration, NamespaceVisibility visibility, Map<String, String> credentials) {
         String target = SkillIdentity.normalizeNamespace(namespace);
         Objects.requireNonNull(configuration, "configuration must not be null");
@@ -74,7 +84,7 @@ public final class DefaultSkillReloader implements SkillReloader
         var supplied = new ArrayList<>(Objects.requireNonNull(documents, "documents must not be null"));
         var view = readWhileOpen(target);
         final SkillGeneration candidate;
-        try { candidate = generations.prepare(view, supplied, configuration, visibility, credentials); }
+        try { candidate = generations.prepare(view, supplied, configuration, visibility, credentials, publicationVersion); }
         catch (RuntimeException ex) { throw new SkillReloadException("Failed to prepare skill generation: " + ex.getMessage(), ex); }
         try { checkOpen(); }
         catch (RuntimeException | Error ex) {

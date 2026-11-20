@@ -29,7 +29,11 @@ public final class ObservabilityDtos
             int catalogedTraceCount,
             TracePersistencePolicy tracePersistencePolicy,
             Duration completionGraceTtl,
-            Duration traceCatalogMetadataTtl) {}
+            Duration traceCatalogMetadataTtl,
+            List<NamespaceStatus> namespaces) {}
+
+    public record NamespaceStatus(String namespace, String generationId,
+            @JsonInclude(JsonInclude.Include.ALWAYS) String publicationVersion) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record SkillSummary(String registeredName, String kind, String declaration, String sourcePath, String executorName, String beanName, String method, String href)

@@ -20,7 +20,7 @@ import (
 const CaseSchemaVersion = 1
 
 var CurrentTools = []string{
-	mcpadapter.RuntimeToolName, mcpadapter.ListSkillsToolName, mcpadapter.GetSkillToolName,
+	mcpadapter.RuntimeToolName, mcpadapter.GetInstanceToolName, mcpadapter.ListSkillsToolName, mcpadapter.GetSkillToolName,
 	mcpadapter.ListExecutionsToolName, mcpadapter.GetExecutionToolName, mcpadapter.GetExecutionActivityToolName,
 	mcpadapter.ListTracesToolName, mcpadapter.GetTraceToolName, mcpadapter.QueryTracePlansToolName,
 	mcpadapter.QueryTraceFramesToolName, mcpadapter.QueryTraceRecordsToolName,

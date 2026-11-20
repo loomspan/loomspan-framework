@@ -2250,6 +2250,11 @@ input[type="file"]::file-selector-button {
   font-size: 0.8125rem;
 }
 
+.publication-version {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .observability-table-region {
   max-width: 100%;
   overflow-x: auto;

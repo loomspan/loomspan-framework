@@ -160,7 +160,7 @@ func TestReleaseAndAuthoringDocumentationReferenceCanonicalSkillContract(t *test
 			t.Errorf("authoring README does not contain %q", required)
 		}
 	}
-	for _, required := range []string{"loomspan", "thirteen", "LOOMSPAN_query_trace_plans", "tools/list", "defense in depth", "Omitted `pageSize` defaults to 64", "omits duration, assignment, usage, identity detail, and outcome"} {
+	for _, required := range []string{"loomspan", "fourteen", "LOOMSPAN_query_trace_plans", "tools/list", "defense in depth", "Omitted `pageSize` defaults to 64", "omits duration, assignment, usage, identity detail, and outcome"} {
 		if !strings.Contains(authoringTopic, required) {
 			t.Errorf("authoring debugging topic does not contain %q", required)
 		}
@@ -202,7 +202,7 @@ func TestLoomspanDocsSkillIsSelfContained(t *testing.T) {
 		"SkillReloader", "SkillDocument", "SkillValidationResult", "SkillValidationIssue",
 		"ValidatedSkill", "PreparedSkillUpdate", "ExecutionConfiguration", "SkillReloadException",
 		"SkillCatalog", "SkillDescriptor", "SkillKind", "NamespaceVisibility",
-		"twenty-seven", "ExecutorDiagnostics", "ai.loomspan.api.extensions.v1", "PlannerInabilityException", "LoomspanPublicSurfaceArchitectureTest", "No supported Java SPI",
+		"thirty", "ExecutorDiagnostics", "ai.loomspan.api.extensions.v1", "PlannerInabilityException", "LoomspanPublicSurfaceArchitectureTest", "No supported Java SPI",
 	} {
 		if !strings.Contains(javaAPIIndex, required) {
 			t.Errorf("java-api README does not contain %q", required)

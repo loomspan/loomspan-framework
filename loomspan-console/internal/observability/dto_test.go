@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -22,6 +23,15 @@ func TestInstanceStatusDecodesFromFixture(t *testing.T) {
 	}
 	if status.RegisteredSkillCount != 3 {
 		t.Fatalf("unexpected registeredSkillCount: %d", status.RegisteredSkillCount)
+	}
+	label := "P7"
+	want := []NamespacePublication{
+		{Namespace: "default", GenerationID: "generation-fixture"},
+		{Namespace: "empty", GenerationID: "generation-empty", PublicationVersion: &label},
+		{Namespace: "unlabeled", GenerationID: "generation-unlabeled"},
+	}
+	if !reflect.DeepEqual(status.Namespaces, want) {
+		t.Fatalf("namespace publications disagree with Java fixture: %#v", status.Namespaces)
 	}
 }
 
@@ -399,6 +409,37 @@ func TestSkillDecodersRejectInapplicableFieldsByPresence(t *testing.T) {
 		var summary SkillSummary
 		if err := json.Unmarshal([]byte(body), &summary); err == nil {
 			t.Fatalf("accepted inapplicable summary field: %s", body)
+		}
+	}
+}
+
+func TestInstanceNamespaceWireValidation(t *testing.T) {
+	valid := []string{`[]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":null}]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":""}]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":"  P7 ☃\n<b>  "}]`}
+	for _, namespaces := range valid {
+		var status InstanceStatus
+		if err := json.Unmarshal([]byte(`{"namespaces":`+namespaces+`}`), &status); err != nil {
+			t.Fatalf("valid %s: %v", namespaces, err)
+		}
+		encoded, err := json.Marshal(status)
+		var roundtrip InstanceStatus
+		if err != nil || json.Unmarshal(encoded, &roundtrip) != nil || !reflect.DeepEqual(roundtrip.Namespaces, status.Namespaces) {
+			t.Fatalf("round trip: %s, %v", encoded, err)
+		}
+	}
+	invalid := []string{
+		`{}`, `{"namespaces":null}`, `{"namespaces":{}}`,
+		`{"namespaces":[null]}`, `{"namespaces":[{}]}`,
+		`{"namespaces":[{"namespace":"bad-name","generationId":"g","publicationVersion":null}]}`,
+		`{"namespaces":[{"namespace":"empty","generationId":" ","publicationVersion":null}]}`,
+		`{"namespaces":[{"namespace":"empty","publicationVersion":null}]}`,
+		`{"namespaces":[{"namespace":"empty","generationId":"g"}]}`,
+		`{"namespaces":[{"namespace":"empty","generationId":"g","publicationVersion":7}]}`,
+		`{"namespaces":[{"namespace":"empty","generationId":"g","publicationVersion":null},{"namespace":"empty","generationId":"h","publicationVersion":"P8"}]}`,
+	}
+	for _, wire := range invalid {
+		var status InstanceStatus
+		if err := json.Unmarshal([]byte(wire), &status); err == nil {
+			t.Fatalf("accepted invalid %s", wire)
 		}
 	}
 }

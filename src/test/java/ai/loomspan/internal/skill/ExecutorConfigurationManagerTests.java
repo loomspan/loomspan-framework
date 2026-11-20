@@ -37,14 +37,14 @@ class ExecutorConfigurationManagerTests {
         var config = new ExecutionConfiguration("loomspan: {executor-config: {sales: {sql: arbitrary, api-key-ref: unknown}}}");
         assertThat(manager.validate(view, List.of(), config, NamespaceVisibility.PRIVATE).valid()).isTrue();
         assertThat(captured).hasSize(startupCalls);
-        manager.prepare(view, List.of(), config, NamespaceVisibility.PRIVATE, null).close();
-        manager.prepare(view, List.of(), config, NamespaceVisibility.PRIVATE, Map.of()).close();
+        manager.prepare(view, List.of(), config, NamespaceVisibility.PRIVATE, null, null).close();
+        manager.prepare(view, List.of(), config, NamespaceVisibility.PRIVATE, Map.of(), null).close();
         assertThat(captured.subList(startupCalls, captured.size())).allSatisfy(value ->
                 assertThat(value.namespaces().get("sales")).containsEntry("sql", "arbitrary").containsEntry("api-key-ref", "unknown"));
         var foreign = new ExecutionConfiguration("loomspan: {executor-config: {foreign: {}}}");
         assertThat(manager.validate(view, List.of(), foreign, NamespaceVisibility.PRIVATE).valid()).isFalse();
-        assertThatThrownBy(() -> manager.prepare(view, List.of(), foreign, NamespaceVisibility.PRIVATE, null)).hasMessageContaining("target");
-        assertThatThrownBy(() -> manager.prepare(view, List.of(), foreign, NamespaceVisibility.PRIVATE, Map.of())).hasMessageContaining("target");
+        assertThatThrownBy(() -> manager.prepare(view, List.of(), foreign, NamespaceVisibility.PRIVATE, null, null)).hasMessageContaining("target");
+        assertThatThrownBy(() -> manager.prepare(view, List.of(), foreign, NamespaceVisibility.PRIVATE, Map.of(), null)).hasMessageContaining("target");
         assertThat(invocations).hasValue(0);
     }
 }

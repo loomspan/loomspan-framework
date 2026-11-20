@@ -19,7 +19,7 @@ root cause.
 ## Start with runtime and tool discovery
 
 Use the client's installed MCP tool list as the surface inventory. The current
-Loomspan Console exposes thirteen tools; `LOOMSPAN_get_runtime` is one of them
+Loomspan Console exposes fourteen tools; `LOOMSPAN_get_runtime` is one of them
 and reports only current Console, target, authentication, compatibility, and
 live-monitoring status. It does not advertise a capability list.
 
@@ -59,6 +59,7 @@ references required by the interpretation:
 
 | Question | Primary evidence path |
 | --- | --- |
+| Which namespace publication is this instance serving? | `LOOMSPAN_get_instance` for process identity and current namespace generation IDs and optional host labels, including empty namespaces before execution. |
 | What is running now? | `LOOMSPAN_list_executions`, then selected `LOOMSPAN_get_execution` and bounded activity. |
 | Why did this trace fail? | Use `LOOMSPAN_get_trace` for the outcome and `terminalFailureId`. Query records by that `failureId` and inspect the recorded `frameId`. Keep earlier failures separate. |
 | Where did planner inability occur, and what feedback reached the parent? | Query the selected failure and detailed origin frame, then read its accepted-signal diagnostic and the parent request's tool response when present. A successful root can contain a child inability. |

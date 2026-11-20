@@ -160,7 +160,7 @@ func TestArtifactServiceAcquiresAndUsesThroughTargetScope(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1") {
@@ -317,7 +317,7 @@ func TestArtifactScopeRotationDuringMetadataFetchReturnsTargetChanged(t *testing
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1") && !strings.HasSuffix(request.URL.Path, "/artifact") {
@@ -411,7 +411,7 @@ func TestArtifactScopeRotationDuringMetadataFetchReturnsTargetChanged(t *testing
 	<-traceLoaded
 	server2 := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "22222222-2222-4222-8222-222222222222")
-		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 	}))
 	defer server2.Close()
 	if err := targetContext.Select(server2.URL); err != nil {
@@ -448,7 +448,7 @@ func TestArtifactScopeRotationDuringLeaseUseReturnsTargetChanged(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1") && !strings.HasSuffix(request.URL.Path, "/artifact") {
@@ -538,7 +538,7 @@ func TestArtifactScopeRotationDuringLeaseUseReturnsTargetChanged(t *testing.T) {
 	// Rotate the scope.
 	server2 := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "22222222-2222-4222-8222-222222222222")
-		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 	}))
 	defer server2.Close()
 	if err := targetContext.Select(server2.URL); err != nil {
@@ -563,7 +563,7 @@ func TestArtifactRawPassThroughDuringScopeRotationReturnsTargetChanged(t *testin
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-1/artifact") {
@@ -600,7 +600,7 @@ func TestArtifactRawPassThroughDuringScopeRotationReturnsTargetChanged(t *testin
 	// Rotate the scope before the raw pass-through.
 	server2 := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set(applicationclient.InstanceIDHeader, "22222222-2222-4222-8222-222222222222")
-		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+		_, _ = response.Write([]byte(`{"instanceId":"22222222-2222-4222-8222-222222222222","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":1,"activeExecutionCount":0,"catalogedTraceCount":0,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 	}))
 	defer server2.Close()
 	if err := targetContext.Select(server2.URL); err != nil {

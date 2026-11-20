@@ -31,7 +31,7 @@ type authTransport struct {
 func TestCompatible2025ProtocolInitializesListsAndCallsRealRuntimeTool(t *testing.T) {
 	const (
 		prePR28ToolsListResponseBytes  = 34371
-		expectedToolsListResponseBytes = 25541
+		expectedToolsListResponseBytes = 26512
 	)
 	credentials := fakeCredentials{state: mcpcredential.Snapshot{State: mcpcredential.Enabled, Generation: 4}, key: "secret"}
 	options := newMCPTestOptions(t, func(endpoint string) ([]byte, error) {
@@ -108,7 +108,7 @@ func TestCompatible2025ProtocolInitializesListsAndCallsRealRuntimeTool(t *testin
 		t.Fatalf("tools/list response does not match %s", snapshotPath)
 	}
 	tools := listed["result"].(map[string]any)["tools"].([]any)
-	if len(tools) != 13 || !rawToolNamesContain(tools, RuntimeToolName, ListSkillsToolName, GetSkillToolName, ListExecutionsToolName, GetExecutionToolName, GetExecutionActivityToolName, ListTracesToolName, GetTraceToolName, QueryTracePlansToolName, QueryTraceFramesToolName, QueryTraceRecordsToolName, ReadTraceContentToolName, ReadTraceArtifactToolName) {
+	if len(tools) != 14 || !rawToolNamesContain(tools, RuntimeToolName, GetInstanceToolName, ListSkillsToolName, GetSkillToolName, ListExecutionsToolName, GetExecutionToolName, GetExecutionActivityToolName, ListTracesToolName, GetTraceToolName, QueryTracePlansToolName, QueryTraceFramesToolName, QueryTraceRecordsToolName, ReadTraceContentToolName, ReadTraceArtifactToolName) {
 		t.Fatalf("tools = %+v", tools)
 	}
 	called := post(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"LOOMSPAN_get_runtime","arguments":{}}}`)
@@ -184,7 +184,7 @@ func TestStatelessStreamableHTTPInitializesListsAndCallsRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 13 || !toolNamesContain(tools.Tools, RuntimeToolName, ListSkillsToolName, GetSkillToolName, ListExecutionsToolName, GetExecutionToolName, GetExecutionActivityToolName, ListTracesToolName, GetTraceToolName, QueryTracePlansToolName, QueryTraceFramesToolName, QueryTraceRecordsToolName, ReadTraceContentToolName, ReadTraceArtifactToolName) {
+	if len(tools.Tools) != 14 || !toolNamesContain(tools.Tools, RuntimeToolName, GetInstanceToolName, ListSkillsToolName, GetSkillToolName, ListExecutionsToolName, GetExecutionToolName, GetExecutionActivityToolName, ListTracesToolName, GetTraceToolName, QueryTracePlansToolName, QueryTraceFramesToolName, QueryTraceRecordsToolName, ReadTraceContentToolName, ReadTraceArtifactToolName) {
 		t.Fatalf("tools = %+v", tools.Tools)
 	}
 	for _, tool := range tools.Tools {

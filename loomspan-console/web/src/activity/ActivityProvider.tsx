@@ -232,6 +232,7 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
       }
       return;
     }
+    queueAuthoritativeRefresh({ instance: true });
     openStream();
     return () => {
       if (closeStreamRef.current) {
@@ -239,7 +240,7 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
         closeStreamRef.current = null;
       }
     };
-  }, [connected, targetScopeID, scopeGeneration, tabId, csrfToken, openStream]);
+  }, [connected, targetScopeID, scopeGeneration, tabId, csrfToken, openStream, queueAuthoritativeRefresh]);
 
   useEffect(() => {
     if (state.reconnectAttempt <= 0 || !connected || !tabId || !csrfToken) return;

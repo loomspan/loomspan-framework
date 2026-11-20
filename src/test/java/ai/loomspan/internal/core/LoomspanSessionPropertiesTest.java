@@ -44,7 +44,7 @@ class LoomspanSessionPropertiesTest {
             var manager = context.getBean(ai.loomspan.internal.skill.SkillGenerationManager.class);
             context.getBean(LoomspanProperties.class).getSession().setMaxDepth(99);
             assertThat(manager.active("default").runtime().properties().getSession().getMaxDepth()).isEqualTo(32);
-            var skillOnly = manager.prepare(manager.capturePreparation("default"), java.util.List.of(), new ExecutionConfiguration("loomspan: {}"), ai.loomspan.api.NamespaceVisibility.PRIVATE, null);
+            var skillOnly = manager.prepare(manager.capturePreparation("default"), java.util.List.of(), new ExecutionConfiguration("loomspan: {}"), ai.loomspan.api.NamespaceVisibility.PRIVATE, null, null);
             assertThat(skillOnly.runtime().properties().getSession().getMaxDepth()).isEqualTo(32);
             skillOnly.close();
         });

@@ -37,6 +37,42 @@ and assigned fixed Java methods; qualified catalog lookup never searches elsewhe
 Empty supplied declarations are valid when ordinary validation permits them, and
 an empty published namespace still has its namespace and generation ID.
 
+## Publication labels and current discovery
+
+Supply the host's label with either labeled preparation overload. Visibility is explicit.
+
+```java
+try (PreparedSkillUpdate update = reloader.prepare(
+        "department", "P7", documents, configuration, NamespaceVisibility.PUBLIC)) {
+    SkillCatalog candidate = update.snapshot();
+    candidate.publicationVersion(); // Optional.of("P7")
+    reloader.publish(update);
+}
+SkillCatalog active = reloader.snapshot("department");
+```
+
+`prepare(namespace, publicationVersion, documents, configuration, visibility)` uses
+Environment credentials. Add `credentialValues` as the last argument to use a copied
+explicit map with the existing reference rules. Null omits the label. Every supplied
+string remains exact, including empty strings, whitespace and line breaks. The host
+defines its meaning and whether equal labels identify equal complete content across engines.
+
+The immutable candidate snapshot identifies its generation and label before publication.
+The active snapshot changes both together only on successful publication. Abandonment,
+failure and stale rejection leave the winning generation's pair intact. Every replacement
+supplies its own optional label. Existing preparation methods omit it, so an unlabeled
+replacement clears the prior label. Startup generations omit it. Reinstallation after
+restart supplies it again and gets a new process-local ID. `generationId` continues to
+control publication, stale checks, removal and retirement.
+
+The authenticated engine `GET /_loomspan/observability/v1/instance` includes a
+`namespaces` array with each installed namespace's current `namespace`, `generationId`
+and nullable `publicationVersion`, including empty and Private namespaces before any
+invocation. Console's selected-target `LOOMSPAN_get_instance` MCP tool and Instance
+Overview show those facts on initial reads, refresh and reconnect. The UI marks null
+as “Not supplied”. Observation uses its existing credentials independently of call
+visibility. See [HTTP observation](../skill-authoring/observability-http.md).
+
 ## Complete configuration and credentials
 
 Only `loomspan.connections`, `loomspan.models`, `loomspan.session`, `loomspan.executor-config`, and
@@ -198,7 +234,8 @@ retained work, retirement notifications and preserved bean ownership.
 
 ## Evidence
 
-- `SkillReloaderTest`: complete replacement, base/absence, state/lifecycle, deterministic concurrent preparation/publication, disposal and retirement.
+- `SkillReloaderTest`: exact immutable labels, credential modes, concurrent ID/label pairing, complete replacement, base/absence, state/lifecycle, deterministic concurrent preparation/publication, disposal and retirement.
+- `NamespacePublicationObservationIntegrationTest`: independent engines, before-invocation reads, candidate/active separation, exact labels, omission, stale rejection, removal and restart installation.
 - `SkillDependencyValidatorTest`: candidate overlay, transitive contracts/visibility, captured metadata retirement and coherent capture races.
 - `NamespaceStartupIntegrationTest`: actual embedded and file-free managed caller execution, explicit Public sharing, prospective visibility changes, departmental complete replacement retaining fixed Java, removal/recreation and Private restart.
 - `SkillDependencyValidatorTest#transitiveReturnUsesCandidateDeclarationsContractsAndVisibility`: staged ordinary cycles with candidate return paths and unchanged forwarding-cycle rejection.

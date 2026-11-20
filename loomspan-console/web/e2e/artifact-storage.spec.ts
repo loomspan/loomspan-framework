@@ -117,6 +117,7 @@ function makeTargetServer(initial: TargetState) {
           tracePersistencePolicy: "PERSISTENT",
           completionGraceTtl: "PT2M",
           traceCatalogMetadataTtl: "PT168H",
+          namespaces: [],
         }),
       );
       return;
@@ -414,7 +415,7 @@ test("WF-EXPENSIVE-EXECUTION explores returned expandable timeline and frame usa
   const child = page.locator('button[data-frame="skill"]');
   await root.focus();
   await page.keyboard.press("End");
-  await expect(child).toBeFocused();
+  await expect(page.locator('button[data-frame="executor-child"]')).toBeFocused();
   await page.keyboard.press("Home");
   await expect(root).toBeFocused();
   await page.keyboard.press("ArrowLeft");

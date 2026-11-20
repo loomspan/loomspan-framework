@@ -11,6 +11,11 @@ Acquire a catalog with `SkillCatalog catalog = reloader.snapshot("default")` fro
 an injected `SkillReloader`. There is no injected startup `SkillCatalog` bean and
 no no-argument snapshot alias. `namespace()` is the canonical lowercase owner,
 including for an empty catalog; `generationId()` is its opaque generation ID.
+`publicationVersion()` is an `Optional<String>` containing the exact host-supplied
+label. It is empty when omitted for this generation. Empty and whitespace strings
+are present values. A prepared snapshot describes its candidate, while
+`snapshot(namespace)` describes the successfully published active generation. The
+host defines label meaning and supplies it on each replacement or restart installation.
 Acquisition selects the current namespace generation once; a missing namespace fails.
 
 `skills()` is immutable, unfiltered and deterministically sorted by qualified name.
@@ -64,6 +69,9 @@ validation, invocation or handoff. Each operation captures the then-current acti
   protects session-free calling-authentication authorization.
 - `LoomspanPublicSurfaceArchitectureTest`
   protects the closed public surface.
+- `SkillReloaderTest#publicationLabelsBelongToTheImmutableWinningGeneration` and
+  `NamespacePublicationObservationIntegrationTest` protect candidate/active labels,
+  empty namespace discovery and restart installation.
 
 ## Namespace publication boundary
 

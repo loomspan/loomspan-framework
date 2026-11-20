@@ -63,7 +63,7 @@ public final class TestSkillGenerations
     {
         String id = UUID.randomUUID().toString();
         return new SkillGeneration("default", id, capabilities, definitions,
-                new DefaultSkillCatalog("default", id, capabilities.values().stream().toList()),
+                new DefaultSkillCatalog("default", id, null, capabilities.values().stream().toList()),
                 new DefaultRegisteredSkillCatalog(java.util.List.of(), Map.of()));
     }
 }

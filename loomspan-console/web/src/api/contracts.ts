@@ -119,6 +119,13 @@ export type InstanceStatus = {
   tracePersistencePolicy: string;
   completionGraceTtl: string;
   traceCatalogMetadataTtl: string;
+  namespaces: NamespacePublication[];
+};
+
+export type NamespacePublication = {
+  namespace: string;
+  generationId: string;
+  publicationVersion: string | null;
 };
 
 type SkillLocation =

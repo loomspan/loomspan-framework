@@ -152,7 +152,10 @@ class ConsoleRestFixtureCorpusTest
 
         result.put("instance-status.json", new ObservabilityDtos.InstanceStatus(
                 "11111111-1111-4111-8111-111111111111", "1.0.0-beta.10-SNAPSHOT", OBSERVED, true,
-                3, 1, 1, TracePersistencePolicy.ONERROR, Duration.ofMinutes(15), Duration.ofHours(24)));
+                3, 1, 1, TracePersistencePolicy.ONERROR, Duration.ofMinutes(15), Duration.ofHours(24), List.of(
+                        new ObservabilityDtos.NamespaceStatus("default", "generation-fixture", null),
+                        new ObservabilityDtos.NamespaceStatus("empty", "generation-empty", "P7"),
+                        new ObservabilityDtos.NamespaceStatus("unlabeled", "generation-unlabeled", null))));
         result.put("skills-page.json", new ObservabilityDtos.Page<>(List.of(skill,
                 new ObservabilityDtos.SkillSummary("default-FetchDns", "JAVA", "YAML", "classpath:/skills/fetch-dns.yaml", "default-fetchDns",
                         "dnsSkills", "example.DnsSkills.fetch()", "skills/default-FetchDns"), new ObservabilityDtos.SkillSummary(

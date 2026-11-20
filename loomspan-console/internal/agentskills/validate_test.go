@@ -47,7 +47,7 @@ func TestRuntimeDebuggingSkillMatchesInstalledPR52Contract(t *testing.T) {
 		all += "\n" + string(content)
 	}
 	required := []string{
-		"thirteen", "LOOMSPAN_get_runtime", "LOOMSPAN_list_skills", "LOOMSPAN_get_skill",
+		"fourteen", "LOOMSPAN_get_runtime", "LOOMSPAN_get_instance", "LOOMSPAN_list_skills", "LOOMSPAN_get_skill",
 		"LOOMSPAN_list_executions", "LOOMSPAN_get_execution", "LOOMSPAN_get_execution_activity",
 		"LOOMSPAN_list_traces", "LOOMSPAN_get_trace", "LOOMSPAN_query_trace_plans",
 		"LOOMSPAN_query_trace_frames", "LOOMSPAN_query_trace_records",

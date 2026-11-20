@@ -93,24 +93,28 @@ class SupportedSurfaceIntegrationTest
             var reloader=context.getBean(ai.loomspan.api.SkillReloader.class);
             var configuration=new ai.loomspan.api.ExecutionConfiguration("loomspan: {}");
             assertThat(reloader.validate("EMPTY", List.of(), configuration).valid()).isTrue();
-            try(var candidate=reloader.prepare("EMPTY", List.of(), configuration,
+            try(var candidate=reloader.prepare("EMPTY", "P7", List.of(), configuration,
                     ai.loomspan.api.NamespaceVisibility.PUBLIC, Map.of())) {
                 reloader.publish(candidate);
                 var catalog=reloader.snapshot("empty");
                 assertThat(catalog.namespace()).isEqualTo("empty");
                 assertThat(catalog.generationId()).isEqualTo(candidate.generationId());
+                assertThat(catalog.publicationVersion()).contains("P7");
                 assertThat(catalog.skills()).isEmpty();
                 reloader.remove("Empty", catalog.generationId());
             }
             try(var recreated=reloader.prepare("empty", List.of(), configuration)) {
                 reloader.publish(recreated);
                 assertThat(reloader.snapshot("empty").generationId()).isEqualTo(recreated.generationId());
+                assertThat(reloader.snapshot("empty").publicationVersion()).isEmpty();
             }
         });
         assertThat(java.util.Arrays.stream(ai.loomspan.api.SkillReloader.class.getMethods())
                 .filter(method -> method.getName().equals("prepare") || method.getName().equals("validate")))
                 .allMatch(method -> method.getParameterCount() >= 3 && method.getParameterTypes()[0] == String.class
-                        && method.getParameterTypes()[2] == ai.loomspan.api.ExecutionConfiguration.class);
+                        && (method.getParameterTypes()[2] == ai.loomspan.api.ExecutionConfiguration.class
+                            || (method.getParameterTypes()[1] == String.class
+                                && method.getParameterTypes()[3] == ai.loomspan.api.ExecutionConfiguration.class)));
         assertThat(java.util.Arrays.stream(ai.loomspan.api.PreparedSkillUpdate.class.getMethods()).map(java.lang.reflect.Method::getName))
                 .doesNotContain("baseId", "baseGenerationId");
     }

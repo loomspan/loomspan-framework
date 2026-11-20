@@ -257,6 +257,8 @@ origins, wrong ports, OAuth discovery, and cross-realm credentials are rejected.
 The read-only tool surface is:
 
 - `LOOMSPAN_get_runtime` for side-effect-free Console/target status;
+- `LOOMSPAN_get_instance` for the selected process identity and every installed
+  namespace's active generation ID and optional host publication version;
 - `LOOMSPAN_list_skills` and `LOOMSPAN_get_skill` for registered skill
   metadata and unchanged YAML;
 - `LOOMSPAN_list_executions` and `LOOMSPAN_get_execution` for bounded,
@@ -274,7 +276,29 @@ The read-only tool surface is:
 - `LOOMSPAN_read_trace_content` for exact bounded selected semantic values; and
 - `LOOMSPAN_read_trace_artifact` for optional exact raw NDJSON forensics.
 
-Ordinary MCP `tools/list` is the inventory for these thirteen tools.
+Ordinary MCP `tools/list` is the inventory for these fourteen tools.
+
+Call `LOOMSPAN_get_instance` with `{}` to read current namespace publications
+before any skill executes, including empty and Private namespaces. Each row
+contains `namespace`, `generationId` and nullable `publicationVersion`, alongside
+the upstream `instanceId` and `observedAt`. Every call reads the selected target
+through its authenticated observation connection. Fresh sessions and reconnects
+read the current installed publication.
+
+The host defines publication labels and whether equal labels identify equal
+content across engines. Supplied strings are preserved exactly. Null means the
+host omitted the label for that replacement. Framework generation IDs remain
+process-local identities. After restart the host supplies the label again when
+reinstalling the namespace.
+
+Instance Overview shows the same namespace inventory for the selected target.
+Use **Refresh** for a current read. Reopening the page and reconnecting also read
+the active inventory. **Not supplied** indicates null, and **Empty string**
+indicates a supplied empty label. The table includes empty namespaces.
+
+An embedding service can read the engine directly through authenticated
+`GET /_loomspan/observability/v1/instance` with its observation API key. Its
+`namespaces` array contains the same active generation and publication facts.
 
 To inspect planner inability, select the error in **Records** or its originating
 frame in **Timeline**. The failure remains inspectable even after a successful
@@ -462,7 +486,7 @@ configuration, or publish a client-specific fork.
 
 The skill never contains the MCP endpoint or key. Live inspection requires the
 separately configured protected local MCP connection described above. It uses
-ordinary MCP tool discovery for the thirteen-tool inventory, then
+ordinary MCP tool discovery for the fourteen-tool inventory, then
 `LOOMSPAN_get_runtime` for current status. Missing a tool stops only dependent
 work and is distinct from protocol, target compatibility, authentication,
 evidence, and scope errors. Missing raw inspection removes only exact

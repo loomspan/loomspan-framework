@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { ReactNode } from "react";
 import type { InstanceStatus, SkillSummary } from "../api/contracts";
@@ -82,6 +82,7 @@ const instanceStatus: InstanceStatus = {
   tracePersistencePolicy: "PERSISTENT",
   completionGraceTtl: "PT2M",
   traceCatalogMetadataTtl: "PT168H",
+  namespaces: [],
 };
 
 beforeEach(() => {
@@ -175,4 +176,33 @@ test("overview renders loading state when instance is loading", () => {
   observabilityView.current.instance = { status: undefined, error: undefined, loading: true } as never;
   render(<ObservabilityOverview />);
   expect(screen.getByText("Loading instance overview…")).toBeInTheDocument();
+});
+
+test("overview lists every installed namespace and preserves exact publication labels", () => {
+  observabilityView.current.instance.status = {
+    ...instanceStatus,
+    registeredSkillCount: 0,
+    namespaces: [
+      { namespace: "empty", generationId: "east-7", publicationVersion: "P7" },
+      { namespace: "omitted", generationId: "east-8", publicationVersion: null },
+      { namespace: "blank", generationId: "east-9", publicationVersion: "" },
+      { namespace: "exact", generationId: "east-10", publicationVersion: "  <b>P8</b>\n " },
+    ],
+  };
+  render(<ObservabilityOverview />);
+  const table = screen.getByRole("region", { name: "Installed namespaces table" });
+  expect(within(table).getByRole("row", { name: "empty east-7 P7" })).toBeVisible();
+  expect(within(table).getByRole("row", { name: "omitted east-8 Not supplied" })).toBeVisible();
+  expect(within(table).getByRole("row", { name: "blank east-9 Empty string" })).toBeVisible();
+  const exact = within(table).getByRole("row", { name: /exact east-10/ });
+  expect(exact.querySelector("code")?.textContent).toBe("  <b>P8</b>\n ");
+  expect(exact.querySelector("b")).toBeNull();
+});
+
+test("overview shows an explicit empty namespace inventory and refreshes on demand", () => {
+  observabilityView.current.instance.status = instanceStatus;
+  render(<ObservabilityOverview />);
+  expect(screen.getByText("No namespaces are installed.")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  expect(observabilityView.current.loadInstance).toHaveBeenCalledOnce();
 });

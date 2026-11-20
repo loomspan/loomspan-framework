@@ -88,6 +88,7 @@ function makeTargetServer(initialState: TargetState) {
           tracePersistencePolicy: "PERSISTENT",
           completionGraceTtl: "PT2M",
           traceCatalogMetadataTtl: "PT168H",
+          namespaces: [],
         }),
       );
       return;

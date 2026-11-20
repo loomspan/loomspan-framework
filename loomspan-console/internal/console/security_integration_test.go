@@ -198,7 +198,7 @@ func TestLiveConsoleArtifactRoutesDoNotLeakPathsOrCredentials(t *testing.T) {
 		response.Header().Set("X-loomspan-Instance-Id", "11111111-1111-4111-8111-111111111111")
 		if strings.HasSuffix(request.URL.Path, "/instance") {
 			response.Header().Set("Content-Type", "application/json")
-			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"development","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`))
+			_, _ = response.Write([]byte(`{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"development","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`))
 			return
 		}
 		if strings.HasSuffix(request.URL.Path, "/traces/trace-security") && !strings.HasSuffix(request.URL.Path, "/artifact") {

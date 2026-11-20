@@ -65,6 +65,38 @@ export function ObservabilityOverview() {
             <p className="observability-note">Live monitoring is unavailable for this instance.</p>
           )}
 
+          <section aria-labelledby="namespace-publications-title">
+            <h3 id="namespace-publications-title">Installed namespaces</h3>
+            {status.namespaces.length === 0 ? (
+              <p className="observability-note">No namespaces are installed.</p>
+            ) : (
+              <div className="observability-table-region" role="region" aria-label="Installed namespaces table" tabIndex={0}>
+                <table className="observability-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Namespace</th>
+                      <th scope="col">Active generation</th>
+                      <th scope="col">Publication version</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {status.namespaces.map((namespace) => (
+                      <tr key={namespace.namespace}>
+                        <th scope="row">{namespace.namespace}</th>
+                        <td>{namespace.generationId}</td>
+                        <td>
+                          {namespace.publicationVersion === null ? "Not supplied" :
+                            namespace.publicationVersion === "" ? "Empty string" :
+                              <code className="publication-version">{namespace.publicationVersion}</code>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
           <details className="fact-disclosure">
             <summary>Instance configuration</summary>
             <dl className="status-grid" aria-label="Instance configuration">

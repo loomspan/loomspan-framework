@@ -34,7 +34,7 @@ func TestExecutorDiagnosticDiscoveryAndActualMCPBrowserTraversal(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(tools.Tools) != 13 {
+			if len(tools.Tools) != 14 {
 				t.Fatalf("unexpected new tool: %d", len(tools.Tools))
 			}
 			for _, tool := range tools.Tools {

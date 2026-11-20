@@ -54,6 +54,20 @@ class ObservabilityRestIntegrationTest
     private static final String KEY = "0123456789abcdef0123456789abcdef";
     private final MockMvc mvc;
     private final ObservabilityActivationCoordinator activation;
+    @Autowired private ai.loomspan.api.SkillReloader reloader;
+
+    @Test
+    void instanceDiscoversEmptyNamespaceBeforeInvocation() throws Exception
+    {
+        var update = reloader.prepare("empty", List.of(), new ai.loomspan.api.ExecutionConfiguration("loomspan: {}"));
+        reloader.publish(update);
+        try {
+            mvc.perform(get(ObservabilityApiPaths.INSTANCE).header(ObservabilityApiKeyFilter.API_KEY_HEADER, KEY))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.namespaces[?(@.namespace == 'empty')].generationId")
+                            .value(org.hamcrest.Matchers.contains(update.generationId())));
+        } finally { reloader.remove("empty", update.generationId()); }
+    }
 
     @Autowired
     ObservabilityRestIntegrationTest(MockMvc mvc, ObservabilityActivationCoordinator activation)

@@ -96,12 +96,12 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             YamlSkillCatalog catalog = Objects.requireNonNull(yamlCatalogFactory.get(), "yamlCatalogFactory returned null");
             var configured = catalog.checkedConfigured(true);
             built.add(prepareCatalog(check("default", configured, NamespaceVisibility.PRIVATE, Map.of(), properties.getExecutorConfig()), properties,
-                    properties.getExecutionTrace().getPersistence(), NamespaceVisibility.PRIVATE));
+                    properties.getExecutionTrace().getPersistence(), NamespaceVisibility.PRIVATE, null));
             for (String namespace : java.util.stream.Stream.concat(fixedJavaCapabilities.stream().map(cap -> cap.identity().namespace()),
                     fixedExecutors.stream().map(registration -> registration.identity().namespace())).distinct().toList()) {
                 if (namespace.equals("default")) continue;
                 built.add(prepareCatalog(check(namespace, new YamlSkillCatalog(properties).checkedSupplied(namespace, List.of(), true),
-                        NamespaceVisibility.PRIVATE, Map.of(), properties.getExecutorConfig()), properties, properties.getExecutionTrace().getPersistence(), NamespaceVisibility.PRIVATE));
+                        NamespaceVisibility.PRIVATE, Map.of(), properties.getExecutorConfig()), properties, properties.getExecutionTrace().getPersistence(), NamespaceVisibility.PRIVATE, null));
             }
             synchronized (generationMonitor) {
                 if (destroyed) throw new IllegalStateException("Framework has shut down");
@@ -137,6 +137,16 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         return new ai.loomspan.internal.runtime.observation.catalog.DefaultRegisteredSkillCatalog(catalogs);
     }
 
+    /** Current immutable namespace metadata, including installed empty namespaces. */
+    public List<ai.loomspan.api.SkillCatalog> namespaceCatalogs()
+    {
+        List<ai.loomspan.api.SkillCatalog> catalogs;
+        synchronized (generationMonitor) {
+            catalogs = active.values().stream().map(SkillGeneration::skillCatalog).toList();
+        }
+        return catalogs.stream().sorted(Comparator.comparing(ai.loomspan.api.SkillCatalog::namespace)).toList();
+    }
+
     /** Immutable independently usable metadata; no runtime/client/invoker is read during validation. */
     public record PreparationView(String namespace, String baseId, Map<String, SkillGeneration> namespaces) {}
 
@@ -150,7 +160,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     }
 
     public SkillGeneration prepare(PreparationView view, List<SkillDocument> documents, ExecutionConfiguration configuration,
-            NamespaceVisibility visibility, Map<String, String> credentialValues) {
+            NamespaceVisibility visibility, Map<String, String> credentialValues, String publicationVersion) {
         requireInitialized();
         Objects.requireNonNull(visibility, "visibility must not be null");
         var parsed = ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, false);
@@ -159,7 +169,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         checked.requireValid();
         parsed = credentialValues == null ? ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, true)
                 : ExecutionConfigurationParser.parse(view.namespace(), configuration, credentialValues);
-        return prepareCatalog(checked, parsed.properties(), parsed.tracePersistence(), visibility);
+        return prepareCatalog(checked, parsed.properties(), parsed.tracePersistence(), visibility, publicationVersion);
     }
 
     public SkillValidationResult validate(PreparationView view, List<SkillDocument> documents,
@@ -201,8 +211,11 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     }
 
     public TracePersistencePolicy activeTracePersistence() {
-        var generation = active("default");
-        return generation.runtime() == null ? TracePersistencePolicy.ONERROR : generation.runtime().tracePersistence();
+        synchronized (generationMonitor) {
+            var generation = active.get("default");
+            return generation == null || generation.runtime() == null
+                    ? TracePersistencePolicy.ONERROR : generation.runtime().tracePersistence();
+        }
     }
 
     private SkillValidationResult validationResult(SkillDependencyValidator.CheckedSet checked)
@@ -221,7 +234,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         return new SkillValidationResult(issues, skills);
     }
 
-    private SkillGeneration prepareCatalog(SkillDependencyValidator.CheckedSet checked, LoomspanProperties properties, TracePersistencePolicy policy, NamespaceVisibility visibility)
+    private SkillGeneration prepareCatalog(SkillDependencyValidator.CheckedSet checked, LoomspanProperties properties, TracePersistencePolicy policy, NamespaceVisibility visibility, String publicationVersion)
     {
         checked.requireValid();
         long ordinal = issuedGenerationIds.incrementAndGet();
@@ -255,7 +268,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         try { return new SkillGeneration(checked.namespace(), generationId, capabilities, definitionsByName, null, null, runtime, visibility,
                 fixedExecutors.stream().filter(registration -> registration.identity().namespace().equals(checked.namespace()))
                         .collect(java.util.stream.Collectors.toMap(ai.loomspan.internal.core.SkillExecutorRegistration::name, registration -> registration)),
-                properties.getExecutorConfig().namespaces().getOrDefault(checked.namespace(), Map.of())); }
+                properties.getExecutorConfig().namespaces().getOrDefault(checked.namespace(), Map.of()), publicationVersion); }
         catch (RuntimeException | Error ex) { if (runtime != null) runtime.close(); throw ex; }
     }
 

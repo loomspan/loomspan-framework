@@ -160,6 +160,7 @@ Runtime keys, model tool/plan selections, executor handoffs and observations rem
 Inject `SkillReloader` and acquire `SkillCatalog catalog = reloader.snapshot("default")`.
 There is no injected startup catalog or no-argument acquisition. `namespace()` and
 `generationId()` identify the catalog's owner and opaque generation, even when empty.
+`publicationVersion()` returns its optional host-supplied publication label.
 Descriptors and validation feedback carry qualified names. `SkillCatalog.skill(...)` requires qualification and rejects local or malformed
 references and returns empty for valid unknown or foreign identities. Retained
 catalogs are immutable, sorted, unfiltered metadata with no resource lease or
@@ -210,6 +211,36 @@ try (PreparedSkillUpdate candidate = reloader.prepare(
 SkillCatalog current = reloader.snapshot("department");
 reloader.remove("department", current.generationId());
 ```
+
+The labeled preparation overload accepts the host's `publicationVersion` next to
+the namespace and requires explicit visibility. Add a credential map after visibility
+to use explicit credentials.
+
+```java
+try (PreparedSkillUpdate candidate = reloader.prepare(
+        "department", "P7", completeDocuments, config, NamespaceVisibility.PUBLIC)) {
+    candidate.snapshot().publicationVersion(); // Optional.of("P7") on the candidate
+    reloader.publish(candidate);
+}
+SkillCatalog active = reloader.snapshot("department");
+```
+
+The host defines the label's meaning, including whether equal labels identify equal
+complete content across engines. Every supplied string remains exact, including empty
+and whitespace-only values. The immutable candidate snapshot describes it immediately.
+Active snapshots expose the new generation ID and label together after successful
+publication. Each replacement supplies its own optional label. A null label or an
+existing preparation signature omits it, including when replacing a labeled generation.
+`generationId` continues to control publication, stale checks, removal and retirement.
+After restart, the host reinstalls the namespace and supplies its label again.
+
+Authenticated `GET /_loomspan/observability/v1/instance` returns every installed
+namespace in `namespaces`, including empty and Private namespaces, with `namespace`,
+`generationId` and nullable `publicationVersion` before any invocation. Console MCP
+clients use `LOOMSPAN_get_instance` for the selected target. Operators see these rows
+in Instance Overview on connection, refresh, reconnect and reopening. The UI displays
+“Not supplied” for omission. See [HTTP observation](agent-skills/loomspan-docs/references/skill-authoring/observability-http.md)
+for authentication and the current response shape.
 
 `NamespaceVisibility` is the supported `PRIVATE`/`PUBLIC` enum. Omitting visibility
 always selects Private, including replacement. Each publication has complete supplied

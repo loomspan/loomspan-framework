@@ -17,12 +17,14 @@ public final class DefaultSkillCatalog implements SkillCatalog
 {
     private final String namespace;
     private final String generationId;
+    private final String publicationVersion;
     private final NavigableMap<String, SkillDescriptor> entries;
     private final List<SkillDescriptor> skills;
 
-    public DefaultSkillCatalog(String namespace, String generationId, List<CapabilityMetadata> capabilities)
+    public DefaultSkillCatalog(String namespace, String generationId, String publicationVersion, List<CapabilityMetadata> capabilities)
     {
         this.namespace = SkillIdentity.normalizeNamespace(namespace);
+        this.publicationVersion = publicationVersion;
         this.generationId = Objects.requireNonNull(generationId, "generationId must not be null");
         if (generationId.isBlank()) throw new IllegalArgumentException("generationId must not be blank");
         Objects.requireNonNull(capabilities, "capabilities must not be null");
@@ -46,6 +48,8 @@ public final class DefaultSkillCatalog implements SkillCatalog
 
     @Override
     public String generationId() { return generationId; }
+
+    @Override public Optional<String> publicationVersion() { return Optional.ofNullable(publicationVersion); }
 
     @Override
     public List<SkillDescriptor> skills()

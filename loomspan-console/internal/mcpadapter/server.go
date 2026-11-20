@@ -59,6 +59,7 @@ func NewServer(options ServerOptions) *Server {
 	}
 	sdk := mcp.NewServer(&mcp.Implementation{Name: "loomspan-console", Version: release.ProductVersion()}, nil)
 	addRuntimeTool(sdk, options.Status, options.Credentials)
+	addInstanceTool(sdk, options)
 	addSkillTools(sdk, options)
 	addExecutionTools(sdk, options)
 	addActivityTool(sdk, options)

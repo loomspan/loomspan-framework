@@ -1,5 +1,13 @@
 # Runtime evidence model
 
+`LOOMSPAN_get_instance` reads current installed namespaces independently of
+execution history. Keep its process `instanceId`, each namespace's process-local
+`generationId`, and its optional host-owned `publicationVersion` together. The
+host defines whether equal labels mean equal content across engines. Labels are
+exact strings, with null indicating omission on that replacement. Reinstallation
+after restart supplies the label again. Instance Overview presents the same facts
+for the selected target and identifies omitted labels as **Not supplied**.
+
 Keep identities distinct: an application instance contains execution sessions;
 a session records one trace; frames represent nested execution structure; and
 records are ordered facts. Failure, model-attempt, retry-sequence, tool-call,

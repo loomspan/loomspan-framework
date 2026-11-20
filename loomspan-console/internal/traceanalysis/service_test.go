@@ -44,7 +44,7 @@ type serviceTestHarness struct {
 // consoleCompatibilityVersion "1.0.0-beta.10-SNAPSHOT" emits. Reused from the console
 // integration tests so the scope's compatibility gate is established exactly
 // as in production.
-const javaCompatibleInstanceJSON = `{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H"}`
+const javaCompatibleInstanceJSON = `{"instanceId":"11111111-1111-4111-8111-111111111111","consoleCompatibilityVersion":"1.0.0-beta.10-SNAPSHOT","observedAt":"2026-07-25T12:00:00Z","liveMonitoringAvailable":true,"registeredSkillCount":0,"activeExecutionCount":0,"catalogedTraceCount":1,"tracePersistencePolicy":"PERSISTENT","completionGraceTtl":"PT2M","traceCatalogMetadataTtl":"PT168H","namespaces":[]}`
 
 // deriveSessionID returns the session ID that matches the NDJSON content for
 // the given trace ID. Test traces use different conventions:

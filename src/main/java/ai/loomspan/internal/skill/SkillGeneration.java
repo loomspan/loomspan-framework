@@ -55,7 +55,7 @@ public final class SkillGeneration implements AutoCloseable
             ai.loomspan.api.NamespaceVisibility visibility)
     {
         this(namespace, id, capabilities, definitions, skillCatalog, registeredSkillCatalog, runtime, visibility,
-                Map.of(), Map.of());
+                Map.of(), Map.of(), null);
     }
 
     public SkillGeneration(String namespace, String id, Map<String, CapabilityMetadata> capabilities,
@@ -63,7 +63,7 @@ public final class SkillGeneration implements AutoCloseable
             RegisteredSkillCatalog registeredSkillCatalog, ExecutionRuntime runtime,
             ai.loomspan.api.NamespaceVisibility visibility,
             Map<String, ai.loomspan.internal.core.SkillExecutorRegistration> executors,
-            Map<String, Object> executorConfiguration)
+            Map<String, Object> executorConfiguration, String publicationVersion)
     {
         this.visibility = Objects.requireNonNull(visibility, "visibility must not be null");
         this.namespace = SkillIdentity.normalizeNamespace(namespace);
@@ -95,7 +95,7 @@ public final class SkillGeneration implements AutoCloseable
         }
         List<CapabilityMetadata> ordered = this.capabilities.values().stream()
                 .sorted(java.util.Comparator.comparing(CapabilityMetadata::name)).toList();
-        this.skillCatalog = skillCatalog == null ? new DefaultSkillCatalog(this.namespace, id, ordered) : skillCatalog;
+        this.skillCatalog = skillCatalog == null ? new DefaultSkillCatalog(this.namespace, id, publicationVersion, ordered) : skillCatalog;
         if (!this.namespace.equals(this.skillCatalog.namespace()) || !id.equals(this.skillCatalog.generationId()))
             throw new IllegalArgumentException("catalog must match generation namespace and ID");
         this.registeredSkillCatalog = registeredSkillCatalog == null

@@ -31,6 +31,7 @@ public final class ObservabilityRuntime implements AutoCloseable
     private final ActivityReplayBuffer replayBuffer;
     private final LiveMonitoringAvailability liveMonitoring;
     private final Supplier<RegisteredSkillCatalog> skills;
+    private final Supplier<java.util.List<ai.loomspan.api.SkillCatalog>> namespaces;
     private final FinalizedTraceCatalog traces;
     private final LoomspanProperties.Observability configuration;
     private final LoomspanProperties.Session.Quotas quotas;
@@ -49,13 +50,14 @@ public final class ObservabilityRuntime implements AutoCloseable
             ActivityReplayBuffer replayBuffer,
             LiveMonitoringAvailability liveMonitoring,
             Supplier<RegisteredSkillCatalog> skills,
+            Supplier<java.util.List<ai.loomspan.api.SkillCatalog>> namespaces,
             FinalizedTraceCatalog traces,
             LoomspanProperties.Observability configuration,
             LoomspanProperties.Session.Quotas quotas,
             TracePersistencePolicy tracePersistencePolicy)
     {
         this(instanceId, clock, observationFactory, activityDelivery, artifactDelivery,
-                completionRetention, activeExecutions, replayBuffer, liveMonitoring, skills,
+                completionRetention, activeExecutions, replayBuffer, liveMonitoring, skills, namespaces,
                 traces, configuration, quotas, tracePersistencePolicy,
                 ignored -> quotas, () -> tracePersistencePolicy);
     }
@@ -71,6 +73,7 @@ public final class ObservabilityRuntime implements AutoCloseable
             ActivityReplayBuffer replayBuffer,
             LiveMonitoringAvailability liveMonitoring,
             Supplier<RegisteredSkillCatalog> skills,
+            Supplier<java.util.List<ai.loomspan.api.SkillCatalog>> namespaces,
             FinalizedTraceCatalog traces,
             LoomspanProperties.Observability configuration,
             LoomspanProperties.Session.Quotas quotas,
@@ -89,6 +92,7 @@ public final class ObservabilityRuntime implements AutoCloseable
         this.replayBuffer = Objects.requireNonNull(replayBuffer, "replayBuffer must not be null");
         this.liveMonitoring = Objects.requireNonNull(liveMonitoring, "liveMonitoring must not be null");
         this.skills = Objects.requireNonNull(skills, "skills must not be null");
+        this.namespaces = Objects.requireNonNull(namespaces, "namespaces must not be null");
         this.traces = Objects.requireNonNull(traces, "traces must not be null");
         this.configuration = Objects.requireNonNull(configuration, "configuration must not be null");
         this.quotas = Objects.requireNonNull(quotas, "quotas must not be null");
@@ -107,6 +111,7 @@ public final class ObservabilityRuntime implements AutoCloseable
     public ActivityReplayBuffer replayBuffer() { return replayBuffer; }
     public LiveMonitoringAvailability liveMonitoring() { return liveMonitoring; }
     public RegisteredSkillCatalog skills() { return skills.get(); }
+    public java.util.List<ai.loomspan.api.SkillCatalog> namespaces() { return namespaces.get(); }
     public FinalizedTraceCatalog traces() { return traces; }
     public LoomspanProperties.Observability configuration() { return configuration; }
     public LoomspanProperties.Session.Quotas quotas() { return quotas; }
