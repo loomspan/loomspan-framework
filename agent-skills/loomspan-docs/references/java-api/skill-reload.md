@@ -241,3 +241,29 @@ retained work, retirement notifications and preserved bean ownership.
 - `SkillDependencyValidatorTest#transitiveReturnUsesCandidateDeclarationsContractsAndVisibility`: staged ordinary cycles with candidate return paths and unchanged forwarding-cycle rejection.
 - `ExecutionConfigurationParserTest`: exact configuration/credential boundary and nested validation.
 - `LoomspanPublicSurfaceArchitectureTest`: closed supported API and absence of extension SPIs.
+
+## Publish consumer executor settings
+
+With the complete billing documents in `billingDocuments`, publish only billing.
+Keep billing Public when foreign parents invoke its leaves; every publication
+defaults to Private when visibility is omitted:
+
+```java
+var config = new ExecutionConfiguration("""
+    loomspan:
+      executor-config:
+        billing:
+          typesafe:
+            api_key: example-billing-v2
+    """);
+try (var update = reloader.prepare("billing", billingDocuments, config, NamespaceVisibility.PUBLIC)) {
+    reloader.publish(update);
+}
+```
+
+Fresh billing leaf calls, including those reached through another parent, use the
+replacement consumer map. Omission clears it. Foreign namespace entries are
+rejected even if empty. Retained handoffs keep both original maps and
+`executorConfigGenerationId()` still identifies the captured executor owner.
+`ExecutorGenerationExecutionIntegrationTest` covers rotation, omission, independent
+consumers and retained public handoff. See [executor configuration](../skill-authoring/executor-skills.md).

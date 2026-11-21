@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.*;
 class SharedJavaDiscoveryInvocationTest
 {
     static final SkillExecutorInvocation INPUT = ai.loomspan.internal.core.ExecutorInvocations.create(Map.of("value", "input"),
-            Map.of("value", "skill"), Map.of("value", "executor"), "sales-create", "generation", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class));
+            Map.of("value", "skill"), Map.of("value", "executor"), java.util.Map.of(), "sales-create", "generation", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class));
 
     static SkillMethodBeanPostProcessor process(Object bean)
     {

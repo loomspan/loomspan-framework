@@ -35,7 +35,7 @@ class VersionedExecutorInvocationTest
     {
         var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
         var remaining = new java.util.concurrent.atomic.AtomicReference<Optional<Duration>>(Optional.empty());
-        var call = ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), "default-leaf", "generation",
+        var call = ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), java.util.Map.of(), "default-leaf", "generation",
                 cancelled::get, remaining::get, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class));
         assertThat(call.isCancelled()).isFalse();
         assertThat(call.remainingTime()).isEmpty();

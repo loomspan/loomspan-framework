@@ -66,7 +66,7 @@ The leaf's ordinary `input_schema` defines caller and planner input. Parent
 bindings target that schema. On every direct or child execution, the leaf
 validates the assembled business input and resolves references before evaluating
 JSLT once. JSLT `.` sees that business input object. The expression result is the
-complete Java input object. Both configuration maps remain available in their
+complete Java input object. All three configuration maps remain available in their
 own [v1 invocation accessors](../java-api/java-skills.md#reference-only-executor-declaration).
 
 Use objects with string keys, arrays, strings, booleans, nulls, and finite
@@ -243,7 +243,24 @@ The section and each namespace root MUST be maps. Namespace names follow the exi
 
 Published `ExecutionConfiguration` uses the same layout and accepts only its target namespace, rejecting even an empty foreign entry. Each publication is complete replacement: omitted executor configuration is empty and never inherits startup or prior-generation data. Skill `config` and namespace executor configuration remain separate; Framework does not merge, interpolate, resolve credentials, validate executor domain data, or call application validation code. See [complete namespace publication](../java-api/skill-reload.md).
 
-The `config` element on `@SkillExecutor` selects an optional dot-separated map path relative to the executor namespace. Omission or an explicitly empty string supplies an empty immutable map. Whitespace-only paths, surrounding whitespace and empty segments (`.x`, `x.`, `x..y`) fail without trimming. Selection uses exact case-sensitive map keys: no array indexing, expressions, wildcard, fallback lookup or literal-dot key addressing is supported. Explicit missing, null, scalar, list and non-map intermediate selections fail; an empty selected map succeeds. Literal dotted keys inside the selected subtree remain unchanged data. The shared dependency validator validates this structure during startup/preparation and resolves the reached binding during admission; invocation does not reselect it. See [Java declarations](../java-api/java-skills.md#reference-only-executor-declaration).
+The `config` element on `@SkillExecutor` selects an optional dot-separated map path relative to the executor namespace. Omission or an explicitly empty string supplies an empty immutable map. Whitespace-only paths, surrounding whitespace and empty segments (`.x`, `x.`, `x..y`) fail without trimming. Selection uses exact case-sensitive map keys: no array indexing, expressions, wildcard, fallback lookup or literal-dot key addressing is supported. Owner missing, null, scalar, list and non-map intermediate selections fail; an empty selected map succeeds. Literal dotted keys inside the selected subtree remain unchanged data. The shared dependency validator validates this structure during startup/preparation and resolves the reached binding during admission; invocation does not reselect it. See [Java declarations](../java-api/java-skills.md#reference-only-executor-declaration).
+
+For foreign executors the same exact selector also selects
+`consumerExecutorConfig()` from the namespace owning the executing YAML leaf.
+A support parent reaching a billing leaf uses billing, just like direct execution.
+Missing keys at any map level and selected `{}` yield an empty consumer map.
+Present null, scalar or list nodes at intermediate or final segments fail metadata
+validation. Case mismatches and literal dotted root keys are missing, not alternate
+lookup syntax. Same-namespace execution and no selector always yield an empty
+consumer map; owner validation remains required. Only the selected subtree is
+exposed. Framework never merges maps or decides which consumer fields are allowed.
+
+Complete publication replaces the target's consumer settings with its leaves.
+Omission clears fresh admissions. Retained handoffs keep the original leaf and
+owner generations and both maps. Publishing a consumer changes neither another
+consumer nor the owner ID from `executorConfigGenerationId()`.
+`ExecutorDependencyResolutionTest` and `ExecutorGenerationExecutionIntegrationTest`
+exercise selection, leaf ownership, rotation, omission and retained capture.
 
 ## Dependency capture and lifecycle
 
@@ -253,7 +270,7 @@ Each namespace generation owns its fixed executor registrations and immutable co
 
 Preparation overlays the complete candidate namespace on captured foreign metadata, invokes no application code and retains no foreign runtime lease. Foreign changes after preparation do not invalidate target-base publication; each fresh admission validates the graph it captures. Admission follows only root-reachable callable edges and their executor dependencies, selecting one coherent generation per needed namespace. Retaining an executor namespace does not traverse unrelated skills or grant authority to call them.
 
-The invocation receives the executor input object, the executing YAML leaf's `config` and qualified name, the selected executor configuration map, and the executor namespace generation ID even when no config path is declared. Retained execution uses only that captured registration and map across replacement, removal and recreation. Both Java forms share mission execution, caller authentication scope, observation, timeout and cancellation behavior. The leaf requires its YAML role policy AND its captured executor's Java declarative policy, evaluated against the same caller at root validation, planner filtering and execution. Role alternatives remain within each declaration; unrestricted/PermitAll cannot override the other constituent, and DenyAll denies. See [authorization](authorization.md#compose-executor-declaration-boundaries) for the composition rule and examples. Captured executor policy is rechecked with the trusted execution caller; retaining a generation never freezes an earlier authorization grant.
+The invocation receives the executor input object, the executing YAML leaf's `config` and qualified name, the selected owner and consumer configuration maps, and the executor namespace generation ID even when no config path is declared. Retained execution uses only that captured registration and maps across replacement, removal and recreation. Both Java forms share mission execution, caller authentication scope, observation, timeout and cancellation behavior. The leaf requires its YAML role policy AND its captured executor's Java declarative policy, evaluated against the same caller at root validation, planner filtering and execution. Role alternatives remain within each declaration; unrestricted/PermitAll cannot override the other constituent, and DenyAll denies. See [authorization](authorization.md#compose-executor-declaration-boundaries) for the composition rule and examples. Captured executor policy is rechecked with the trusted execution caller; retaining a generation never freezes an earlier authorization grant.
 
 Validation and discovery execute no application code or argument-dependent advice. Invocation still runs the final Spring proxy with actual arguments, so application advice may reject a leaf that passed declarative validation. Catalog visibility is unchanged.
 

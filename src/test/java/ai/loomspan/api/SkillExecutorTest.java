@@ -40,11 +40,11 @@ class SkillExecutorTest
         var nested = new LinkedHashMap<Object, Object>(); nested.put(null, null); nested.put("leaf", leaf);
         var list = new ArrayList<>(Arrays.asList(nested, null, resource, array, set));
         var source = new LinkedHashMap<String, Object>(); source.put("list", list); source.put(null, null);
-        var invocation = ai.loomspan.internal.core.ExecutorInvocations.create(source, source, source, "  sales-create  ", " generation ", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class));
+        var invocation = ai.loomspan.internal.core.ExecutorInvocations.create(source, source, source, source, "  sales-create  ", " generation ", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class));
         source.clear(); list.clear(); nested.clear();
         assertThat(invocation.skillName()).isEqualTo("  sales-create  ");
         assertThat(invocation.executorConfigGenerationId()).isEqualTo(" generation ");
-        for (Map<String, Object> copied : List.of(invocation.input(), invocation.skillConfig(), invocation.executorConfig()))
+        for (Map<String, Object> copied : List.of(invocation.input(), invocation.skillConfig(), invocation.executorConfig(), invocation.consumerExecutorConfig()))
         {
             assertThat(copied).containsEntry(null, null);
             var copiedList = (List<?>) copied.get("list");
@@ -62,21 +62,44 @@ class SkillExecutorTest
         }
     }
 
+    @Test void mapsRemainIndependentAndConsumerCyclesAreRejected() {
+        var input = new LinkedHashMap<String,Object>(); input.put("same", "input");
+        var skill = new LinkedHashMap<String,Object>(); skill.put("same", "skill");
+        var owner = new LinkedHashMap<String,Object>(); owner.put("same", "owner");
+        var consumer = new LinkedHashMap<String,Object>(); consumer.put("same", "consumer");
+        var nested = new LinkedHashMap<Object,Object>(); nested.put(3, null); nested.put("Case.Dot", new java.math.BigDecimal("2.50"));
+        consumer.put("nested", nested); consumer.put("empty", List.of());
+        var call = ai.loomspan.internal.core.ExecutorInvocations.create(input, skill, owner, consumer, "default-leaf", "generation",
+                () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class));
+        input.clear(); skill.clear(); owner.clear(); consumer.clear(); nested.clear();
+        assertThat(call.input()).containsEntry("same", "input");
+        assertThat(call.skillConfig()).containsEntry("same", "skill");
+        assertThat(call.executorConfig()).containsEntry("same", "owner");
+        assertThat(call.consumerExecutorConfig()).containsEntry("same", "consumer");
+        var frozen = (Map<?,?>) call.consumerExecutorConfig().get("nested");
+        assertThat(frozen.containsKey(3)).isTrue(); assertThat(frozen.get(3)).isNull();
+        assertThat(frozen.get("Case.Dot")).isEqualTo(new java.math.BigDecimal("2.50"));
+        consumer.put("cycle", consumer);
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), consumer,
+                "default-leaf", "generation", () -> false, java.util.Optional::empty,
+                org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class))).isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void requiresAllComponentsAndNonblankMetadata()
     {
-        for (int index = 0; index < 5; index++)
+        for (int index = 0; index < 6; index++)
         {
             int field = index;
             assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(field == 0 ? null : Map.of(),
-                    field == 1 ? null : Map.of(), field == 2 ? null : Map.of(),
-                    field == 3 ? null : "sales-create", field == 4 ? null : "generation", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class)))
+                    field == 1 ? null : Map.of(), field == 2 ? null : Map.of(), field == 3 ? null : Map.of(),
+                    field == 4 ? null : "sales-create", field == 5 ? null : "generation", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class)))
                     .isInstanceOf(NullPointerException.class);
         }
         for (String blank : List.of("", " \t\n"))
         {
-            assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), blank, "g", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class)))
+            assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), java.util.Map.of(), blank, "g", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class)))
                     .isInstanceOf(IllegalArgumentException.class);
-            assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), "s", blank, () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class)))
+            assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), java.util.Map.of(), "s", blank, () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class)))
                     .isInstanceOf(IllegalArgumentException.class);
         }
     }

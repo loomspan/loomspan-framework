@@ -91,12 +91,13 @@ The final Framework-created class has these captured read-only accessors:
 Map<String, Object> input();
 Map<String, Object> skillConfig();
 Map<String, Object> executorConfig();
+Map<String, Object> consumerExecutorConfig();
 String skillName();
 String executorConfigGenerationId();
 ```
 
 Framework supplies the executing YAML skill's `config` and canonical qualified name,
-the selected executor configuration map, and the executor namespace's captured
+the selected owner and foreign leaf-namespace consumer maps, and the executor namespace's captured
 generation ID, even when the annotation declares no configuration path.
 `input()` supplies validated, reference-resolved business input by default.
 When the executing leaf declares `input_transform`, `input()` supplies the
@@ -106,7 +107,15 @@ configuration rebinding. Domain configuration validation and application resourc
 remain application-owned.
 [Executor input transform](../skill-authoring/executor-skills.md#transform-executor-input)
 
-There is no public constructor or builder. Captured values are non-null and metadata strings nonblank; valid strings retain their exact text. All three maps are defensively copied recursively into unmodifiable map/list containers, preserving nulls. Other leaves retain identity, including Spring `Resource` handles, arrays and arbitrary application objects. This does not freeze those objects or copy/freeze resource bytes. There is no builder, authentication field, context bag or internal runtime value in the invocation.
+There is no public constructor or builder. Captured values are non-null and metadata strings nonblank; valid strings retain their exact text. All four maps are defensively copied recursively into unmodifiable map/list containers, preserving nulls. Other leaves retain identity, including Spring `Resource` handles, arrays and arbitrary application objects. This does not freeze those objects or copy/freeze resource bytes. There is no builder, authentication field, context bag or internal runtime value in the invocation.
+
+`consumerExecutorConfig()` selects the registration's exact path in the executing
+leaf's namespace, independent of its parent. Missing entries, empty selected maps,
+same-namespace execution and selector-free registrations return an empty map.
+Present malformed path nodes fail validation. `executorConfig()` remains the
+required owner map; Framework never merges the maps. Both are captured for
+retained handoffs. Consumer-only publication preserves the owner generation ID.
+See [configuration selection](../skill-authoring/executor-skills.md).
 
 ### Cooperative lifecycle
 
@@ -197,7 +206,7 @@ and the mixed `java-root-success` trace in `ConsoleTraceFixtureCorpusTest`.
 ## Runnable example and resource ownership
 
 For a complete application-owned HTTP executor and SQL-shaped example, run the
-executor quickstart (`docs/quickstart-executors.md` in the matching framework checkout). Both configuration
+executor quickstart (`docs/quickstart-executors.md` in the matching framework checkout). All three configuration
 maps remain general application data. For generation-keyed application resources,
 see [resource ownership and retirement](skill-reload.md#executor-owned-application-resources).
 `ExecutorApplicationIntegrationTest` verifies HTTP root/standard-child execution,

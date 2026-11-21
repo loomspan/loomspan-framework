@@ -68,6 +68,31 @@ child. It executes as `JAVA`, with YAML declaration provenance. Existing local
 and qualified executor references follow the visibility, authorization,
 configuration, publication and retirement rules for [executor leaves](executor-skills.md).
 
+## Shared endpoint and namespace keys
+
+Publish the executor owner as Public before publishing foreign leaves. Startup
+configuration can supply both namespaces:
+
+```yaml
+loomspan:
+  executor-config:
+    default:
+      typesafe:
+        base_url: https://typesafe-gateway.example.com
+    billing:
+      typesafe:
+        api_key: example-billing-key
+```
+
+In billing, declare `executor: default-typesafe` and optionally
+`config: {max_attempts: 2}`. Two billing leaves share billing's key; a support
+parent reaching either leaf still uses billing's key. The owner needs no key when
+a consumer supplies one. Consumer-only publication rotates fresh calls while
+retained handoffs keep both original maps. See the [publication example](../java-api/skill-reload.md#publish-consumer-executor-settings).
+Pack `TypeSafeSettingsTest`, `TypeSafeTransportTest` and installed-JAR
+`PublicationConsumerTest` cover destination, selected credentials, retry capture
+and publication using local providers. Hosted quality and access remain untested.
+
 ## Native input, settings and results
 
 The pack receives a complete native object with exactly `model`, `state` and
@@ -78,9 +103,16 @@ skill input. For business input, use `input_transform` to produce the same nativ
 object after Framework validates the leaf's ordinary input schema. Parent
 `input_bindings` supply ordinary child input or select values from child results.
 
-Omit `config` or leave it empty. The pack rejects every key in the leaf's `config`
-at invocation. Supply required `api_key` and optional `base_url` in the captured
-namespace executor map. Both values must be nonblank strings when present.
+Leaf `config.max_attempts` accepts integers 1–3 including the first send; omission
+defaults to 3. Null, noninteger, out-of-range and unknown leaf settings fail before
+HTTP. Owner `executorConfig()` accepts `api_key` and `base_url`; consumer
+`consumerExecutorConfig()` accepts only `api_key`. Select the consumer key by
+presence, falling back to the owner key only when omitted. Present malformed
+consumer keys fail without fallback. The selected key must be a nonblank string
+of printable ASCII header characters and retains its exact text. An unselected
+owner key need not be valid or present. Any consumer `base_url`, including null or
+an owner-equal URL, fails at `consumerExecutorConfig.base_url`. Unknown consumer
+fields fail at their path. Endpoint selection is owner-only.
 Absent `base_url` defaults to `https://api.typesafe.ai`. A configured path prefix stays
 in place when `/v1/systemone` is appended. The resolved key is used verbatim.
 Alternate routes require protocol compatibility and appropriate account/model
@@ -116,8 +148,9 @@ Diagnostic resource limits never truncate the business result.
   Framework's JSLT transform accepts JSON values. See
   [executor input transforms](executor-skills.md#transform-executor-input) for
   the supported input and result types.
-- Executor settings belong to the executor namespace. Admitted work retains its
-  captured settings across publication, and new work receives the replacement.
+- Owner endpoint and consumer key settings belong to separate namespaces.
+  Admitted work retains both captured maps across publication; fresh work selects
+  the current leaf and owner generations.
 - Pack requests/retries do not reserve Framework-native provider-attempt quota.
   Provider usage remains in results and captured diagnostics without contributing
   to Framework-accounted totals. Zero Framework-accounted usage does not mean

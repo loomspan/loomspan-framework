@@ -299,7 +299,7 @@ class SkillReloaderTest {
                 var capture=manager.capture(new SkillIdentity(namespace,"leaf"));
                 try {
                     var binding=manager.validateAdmission(capture.snapshot()).executorBinding(namespace+"-leaf");
-                    assertThat(binding.registration().invoker().apply(ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(),Map.of(),binding.configuration(),namespace+"-leaf",binding.generationId(), () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class)))).isEqualTo("ok");
+                    assertThat(binding.registration().invoker().apply(ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(),Map.of(),binding.configuration(), binding.consumerConfiguration(),namespace+"-leaf",binding.generationId(), () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class)))).isEqualTo("ok");
                 } finally { capture.lease().close(); }
             }
             assertThat(invocations).hasValue(2);

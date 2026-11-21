@@ -189,7 +189,7 @@ public class ExecutionCoordinator
                             try
                             {
                                 rawResult = binding.registration().invoker().apply(ExecutorInvocations.create(
-                                        executorInput, definition.config(), binding.configuration(), skillName, binding.generationId(),
+                                        executorInput, definition.config(), binding.configuration(), binding.consumerConfiguration(), skillName, binding.generationId(),
                                         mission.lifecycle()::isCancelled, mission.lifecycle()::remainingExecutionTime, diagnostics));
                             }
                             finally { diagnostics.close(); }

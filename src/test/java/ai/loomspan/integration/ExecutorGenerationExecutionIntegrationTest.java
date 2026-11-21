@@ -174,7 +174,7 @@ class ExecutorGenerationExecutionIntegrationTest {
             var bean = context.getBean(Executors.class);
             var first = publish(reloader,"infra",List.of(),config("first"),NamespaceVisibility.PUBLIC);
             var secured = new SkillDocument("secured",leaf("secured","infra-secured").yaml()+"rbac_roles: [SALES]\n");
-            publish(reloader,"caller",List.of(secured),new ExecutionConfiguration("loomspan: {}"),NamespaceVisibility.PRIVATE);
+            publish(reloader,"caller",List.of(secured),consumerConfig("caller", "secured-consumer"),NamespaceVisibility.PRIVATE);
             var previous = SecurityContextHolder.getContext();
             var captured = SecurityContextHolder.createEmptyContext();
             var principal = UsernamePasswordAuthenticationToken.authenticated("writer","unused",
@@ -195,10 +195,13 @@ class ExecutorGenerationExecutionIntegrationTest {
                 assertThat(SecurityContextHolder.getContext()).isSameAs(ambient);
                 var recreated = publish(reloader,"infra",List.of(),config("third"),NamespaceVisibility.PUBLIC);
                 assertThat(old.invoke()).isEqualTo("first");
+                assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "secured-consumer");
                 assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(first.generationId());
                 assertThat(bean.authentications).allSatisfy(authentication -> assertThat(authentication).isSameAs(principal));
-                assertThatThrownBy(() -> template.validate("caller-secured",Map.of()))
+                int beforeDenied = bean.invocations.size();
+                assertThatThrownBy(() -> template.invoke("caller-secured",Map.of()))
                         .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                assertThat(bean.invocations).hasSize(beforeDenied);
                 SecurityContextHolder.setContext(captured);
                 assertThat(template.invoke("caller-secured",Map.of())).isEqualTo("third");
                 assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(recreated.generationId());
@@ -208,6 +211,97 @@ class ExecutorGenerationExecutionIntegrationTest {
                         .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
             } finally { SecurityContextHolder.setContext(previous); }
         });
+    }
+
+    @Test void leafConsumerConfigurationIsCapturedIndependentlyAcrossParentsAndPublication(@TempDir Path directory) throws Exception {
+        var settings = directory.resolve("application.yml");
+        Files.writeString(settings, "loomspan: {executor-config: {infra: {settings: {}}}}\n");
+        try (var planner = new okhttp3.mockwebserver.MockWebServer()) {
+            planner.start();
+            context(directory).withInitializer(new ConfigDataApplicationContextInitializer())
+                    .withPropertyValues("spring.config.location=" + settings.toUri()).run(context -> {
+                assertThat(context).hasNotFailed();
+                var reloader = context.getBean(SkillReloader.class);
+                var template = context.getBean(SkillTemplate.class);
+                var handoffs = context.getBean(SkillInvocationHandoff.class);
+                var bean = context.getBean(Executors.class);
+                var owner = publish(reloader, "infra", List.of(leaf("same", "configured")), config("owner"), NamespaceVisibility.PUBLIC);
+                var leaves = List.of("one", "two").stream().map(name -> new SkillDocument(name,
+                        leaf(name, "infra-configured").yaml() + "input_schema: {type: object, properties: {value: {type: string}}, required: [value], additionalProperties: false}\n")).toList();
+                publish(reloader, "billing", leaves, consumerConfig("billing", "billing-v1"), NamespaceVisibility.PUBLIC);
+                publish(reloader, "other", List.of(leaf("one", "infra-configured")), consumerConfig("other", "other-key"), NamespaceVisibility.PRIVATE);
+                var parent = new SkillDocument("root", """
+                        name: root
+                        description: Forward explicit business input to billing
+                        model: local
+                        planning_mode: true
+                        max_steps: 1
+                        input_schema: {type: object, additionalProperties: true}
+                        allowed_skills:
+                          - name: billing-one
+                            required: true
+                            max_tasks: 1
+                            input_bindings:
+                              /value: {from: input, path: /value}
+                        output_from: {skill: billing-one}
+                        """);
+                String models = "loomspan:\n  executor-config: {support: {settings: {key: wrong-parent}}}\n"
+                        + "  connections: {local: {driver: openai, base-url: '" + planner.url("/v1") + "', api-key-ref: fixture}}\n"
+                        + "  models: {local: {connection: local, provider-model: fixture}}\n  session: {mission-timeout: 10s}\n";
+                var prepared = reloader.prepare("support", List.of(parent), new ExecutionConfiguration(models), Map.of("fixture", "test"));
+                reloader.publish(prepared);
+                for (String name : List.of("billing-one", "billing-two", "other-one", "infra-same")) {
+                    assertThat(template.invoke(name, Map.of("value", "business"))).isEqualTo("owner");
+                    var call = bean.invocations.getLast();
+                    assertThat(call.executorConfig()).containsEntry("version", "owner");
+                    assertThat(call.skillConfig()).containsEntry("operation", "echo");
+                    assertThat(call.input()).containsEntry("value", "business");
+                    assertThat(call.consumerExecutorConfig()).isEqualTo(name.startsWith("billing") ? Map.of("key", "billing-v1")
+                            : name.startsWith("other") ? Map.of("key", "other-key") : Map.of());
+                }
+                String plan = "{\"capabilityName\":\"support-root\",\"createdAt\":\"2026-11-20T00:00:00Z\",\"status\":\"VALID\",\"tasks\":[{\"taskId\":\"one\",\"title\":\"one\",\"status\":\"PENDING\",\"capabilityName\":\"billing-one\",\"intent\":\"Forward\",\"dependsOn\":[],\"expectedOutputs\":[],\"parallelGroup\":null,\"note\":\"\"}]}";
+                planner.enqueue(plannerResponse(plan));
+                assertThat(template.invoke("support-root", Map.of("value", "business"))).isEqualTo("owner");
+                assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "billing-v1");
+                assertThat(bean.invocations.getLast().input()).containsEntry("value", "business");
+                var billingId = reloader.snapshot("billing").generationId();
+                var forbidden = new ExecutionConfiguration("loomspan: {executor-config: {billing: {}, infra: {}}}");
+                assertThat(reloader.validate("billing", leaves, forbidden, NamespaceVisibility.PUBLIC).valid()).isFalse();
+                assertThatThrownBy(() -> reloader.prepare("billing", leaves, forbidden, NamespaceVisibility.PUBLIC)).hasMessageContaining("infra");
+                assertThatThrownBy(() -> reloader.prepare("billing", leaves, forbidden, NamespaceVisibility.PUBLIC, Map.of())).hasMessageContaining("infra");
+                assertThat(reloader.snapshot("billing").generationId()).isEqualTo(billingId);
+                assertThat(reloader.snapshot("infra").generationId()).isEqualTo(owner.generationId());
+                var retained = handoffs.handoff("billing-one", Map.of("value", "retained"));
+                publish(reloader, "billing", leaves, consumerConfig("billing", "billing-v2"), NamespaceVisibility.PUBLIC);
+                template.invoke("billing-two", Map.of("value", "business"));
+                assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "billing-v2");
+                assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(owner.generationId());
+                planner.enqueue(plannerResponse(plan));
+                template.invoke("support-root", Map.of("value", "business"));
+                assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "billing-v2");
+                template.invoke("other-one", Map.of());
+                assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "other-key");
+                publish(reloader, "billing", leaves, new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PUBLIC);
+                template.invoke("billing-one", Map.of("value", "business"));
+                assertThat(bean.invocations.getLast().consumerExecutorConfig()).isEmpty();
+                publish(reloader, "infra", List.of(), config("new-owner"), NamespaceVisibility.PUBLIC);
+                assertThat(retained.invoke()).isEqualTo("owner");
+                assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "billing-v1");
+                assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(owner.generationId());
+            });
+        }
+    }
+
+    private static ExecutionConfiguration consumerConfig(String namespace, String key) {
+        return new ExecutionConfiguration("loomspan: {executor-config: {" + namespace + ": {settings: {key: " + key + "}}}}");
+    }
+    private static okhttp3.mockwebserver.MockResponse plannerResponse(String plan) {
+        var json = tools.jackson.databind.json.JsonMapper.builder().build();
+        return new okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "application/json").setBody(json.writeValueAsString(Map.of(
+                "id", "fixture", "object", "response", "created_at", 1, "model", "fixture", "status", "completed",
+                "output", List.of(Map.of("id", "msg_0", "type", "message", "role", "assistant", "status", "completed",
+                        "content", List.of(Map.of("type", "output_text", "text", plan, "annotations", List.of())))),
+                "usage", Map.of("input_tokens", 1, "output_tokens", 1, "total_tokens", 2))));
     }
 
     private static ApplicationContextRunner context(Path directory) {

@@ -103,7 +103,7 @@ class ApplicationApiValueTest
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("nested", nested);
 
-        SkillExecutorInvocation invocation = ai.loomspan.internal.core.ExecutorInvocations.create(input, Map.of(), Map.of(), "tax-lookup", "generation-a", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class));
+        SkillExecutorInvocation invocation = ai.loomspan.internal.core.ExecutorInvocations.create(input, Map.of(), Map.of(), java.util.Map.of(), "tax-lookup", "generation-a", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class));
         assertThat(invocation.skillName()).isEqualTo("tax-lookup");
         assertThat(invocation.executorConfigGenerationId()).isEqualTo("generation-a");
         values.add("late");
@@ -123,9 +123,9 @@ class ApplicationApiValueTest
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> ((Map<Object, Object>) copiedNested.get("nonStringKeyed")).put(8, "x"))
                 .isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), null, "generation-a", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class))).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(null, Map.of(), Map.of(), "tax-lookup", "generation-a", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class))).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), "tax-lookup", null, () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class))).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), java.util.Map.of(), null, "generation-a", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class))).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(null, Map.of(), Map.of(), java.util.Map.of(), "tax-lookup", "generation-a", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class))).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(), Map.of(), Map.of(), java.util.Map.of(), "tax-lookup", null, () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class))).isInstanceOf(NullPointerException.class);
     }
 
     @Test
@@ -133,7 +133,7 @@ class ApplicationApiValueTest
     {
         assertThat(SkillExecutorInvocation.class.getDeclaredMethods())
                 .extracting(java.lang.reflect.Method::getName)
-                .containsExactlyInAnyOrder("input", "skillConfig", "executorConfig", "skillName",
+                .containsExactlyInAnyOrder("input", "skillConfig", "executorConfig", "consumerExecutorConfig", "skillName",
                         "executorConfigGenerationId", "diagnostics", "isCancelled", "remainingTime");
     }
 

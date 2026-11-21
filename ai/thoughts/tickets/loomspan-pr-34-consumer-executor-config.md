@@ -60,11 +60,11 @@ Update `loomspan-decisions` in the sibling repository `../loomspan-extensions/ex
 
 ## Acceptance criteria
 
-- [ ] Direct and parent-mediated execution deliver the three maps shown above. Two billing leaves share the billing settings, and another consuming namespace receives its own settings. Ordinary mission input and existing namespace access controls retain their behavior.
-- [ ] The supported accessor returns immutable, independently scoped data with existing key, null and nested container fidelity. Same-namespace, absent, empty and selector-free cases yield an empty consumer map. Existing owner config selection still works, including for same-namespace calls.
-- [ ] Publishing billing alone rotates the key for newly captured calls. A handoff captured before publication still uses its original billing key and owner configuration. Removing billing's entry yields an empty map on fresh calls. Billing cannot publish settings into the owner namespace, and rotating billing leaves other namespaces' configurations and the owner generation ID intact.
-- [ ] The updated decisions pack runs against the changed framework. Verify the example through the actual TypeSafe executor and transport with a local endpoint, including destination, selected credential, rejected consumer URL, leaf retries and existing owner-only usage.
-- [ ] The framework README and decisions pack documentation explain the YAML layout, lookup, publication behavior and TypeSafe policy. Update the supported-surface expectations for the v1 invocation and run `LoomspanPublicSurfaceArchitectureTest` after changing production types.
+- [x] Direct and parent-mediated execution deliver the three maps shown above. Two billing leaves share the billing settings, and another consuming namespace receives its own settings. Ordinary mission input and existing namespace access controls retain their behavior.
+- [x] The supported accessor returns immutable, independently scoped data with existing key, null and nested container fidelity. Same-namespace, absent, empty and selector-free cases yield an empty consumer map. Existing owner config selection still works, including for same-namespace calls.
+- [x] Publishing billing alone rotates the key for newly captured calls. A handoff captured before publication still uses its original billing key and owner configuration. Removing billing's entry yields an empty map on fresh calls. Billing cannot publish settings into the owner namespace, and rotating billing leaves other namespaces' configurations and the owner generation ID intact.
+- [x] The updated decisions pack runs against the changed framework. Verify the example through the actual TypeSafe executor and transport with a local endpoint, including destination, selected credential, rejected consumer URL, leaf retries and existing owner-only usage.
+- [x] The framework README and decisions pack documentation explain the YAML layout, lookup, publication behavior and TypeSafe policy. Update the supported-surface expectations for the v1 invocation and run `LoomspanPublicSurfaceArchitectureTest` after changing production types.
 
 ## Execution profile
 

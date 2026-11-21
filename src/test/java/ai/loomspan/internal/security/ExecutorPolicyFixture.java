@@ -23,7 +23,7 @@ record ExecutorPolicyFixture(CapabilityMetadata capability, SkillAdmissionSnapsh
                 ai.loomspan.api.NamespaceVisibility.PUBLIC, Map.of(registration.name(), registration), Map.of(), null);
         return new ExecutorPolicyFixture(capability, new SkillAdmissionSnapshot(capability.identity(),
                 Map.of("caller", caller, "infra", owner), Map.of(capability.name(),
-                new SkillAdmissionSnapshot.ExecutorBinding(registration, Map.of(), owner.id()))));
+                new SkillAdmissionSnapshot.ExecutorBinding(registration, Map.of(), Map.of(), owner.id()))));
     }
 }
 

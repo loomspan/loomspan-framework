@@ -264,6 +264,18 @@ only its target namespace. Omission is empty with no inheritance. Nested nulls,
 empty containers, scalar types and exact case/dotted keys survive YAML loading;
 executor data is uninterpreted and separate from skill config.
 
+The v1 invocation supplies separate `executorConfig()` (owner),
+`consumerExecutorConfig()` (executing YAML leaf namespace) and `skillConfig()`
+(leaf) maps. Foreign executors select the same exact dot path in both namespaces.
+Owner selection is required; missing consumer keys yield an empty map. Present
+null, scalar or list path nodes fail. Same-namespace execution and no selector
+also yield an empty consumer map. Containers are recursively copied and
+unmodifiable; other leaves retain identity. There is no automatic merge.
+A support parent reaching a billing leaf receives billing's settings. Complete
+billing publication rotates fresh work; retained handoffs keep both captured maps.
+`executorConfigGenerationId()` remains the owner's ID. See the
+[shared TypeSafe example](agent-skills/loomspan-docs/references/skill-authoring/typesafe-skills.md).
+
 Executor leaves execute as `SkillKind.JAVA` through captured namespace generations.
 The executor namespace owns its fixed registrations and immutable configuration;
 local references use the YAML owner and foreign references require a Public target.
@@ -453,7 +465,7 @@ exact application message. Direct invocation and explicit steps still throw;
 ordinary application wrappers remain terminal. Feedback earns no successful-result
 credit and continuation uses existing budgets and the original parent timeout.
 Executor methods accept exactly `ai.loomspan.api.extensions.v1.SkillExecutorInvocation`.
-Its five captured business/configuration accessors retain copied map/list containers
+Its six captured business/configuration accessors retain copied map/list containers
 and generation identity. `isCancelled()` reads live Framework cancellation;
 `remainingTime()` reads the remaining execution budget, capped by ancestors and
 shutdown, with empty for no deadline and zero at expiry. Executors should also

@@ -19,6 +19,7 @@ public final class SkillExecutorInvocation
     private final Map<String, Object> input;
     private final Map<String, Object> skillConfig;
     private final Map<String, Object> executorConfig;
+    private final Map<String, Object> consumerExecutorConfig;
     private final String skillName;
     private final String executorConfigGenerationId;
     private final ExecutorDiagnostics diagnostics;
@@ -26,12 +27,13 @@ public final class SkillExecutorInvocation
     private final Supplier<Optional<Duration>> remaining;
 
     private SkillExecutorInvocation(Map<String, Object> input, Map<String, Object> skillConfig,
-            Map<String, Object> executorConfig, String skillName, String executorConfigGenerationId,
+            Map<String, Object> executorConfig, Map<String, Object> consumerExecutorConfig, String skillName, String executorConfigGenerationId,
             BooleanSupplier cancelled, Supplier<Optional<Duration>> remaining, ExecutorDiagnostics diagnostics)
     {
         Objects.requireNonNull(input, "input must not be null");
         Objects.requireNonNull(skillConfig, "skillConfig must not be null");
         Objects.requireNonNull(executorConfig, "executorConfig must not be null");
+        Objects.requireNonNull(consumerExecutorConfig, "consumerExecutorConfig must not be null");
         Objects.requireNonNull(skillName, "skillName must not be null");
         Objects.requireNonNull(executorConfigGenerationId, "executorConfigGenerationId must not be null");
         if (skillName.isBlank()) throw new IllegalArgumentException("skillName must not be blank");
@@ -39,6 +41,7 @@ public final class SkillExecutorInvocation
         this.input = ImmutableContainers.copyMap(input);
         this.skillConfig = ImmutableContainers.copyMap(skillConfig);
         this.executorConfig = ImmutableContainers.copyMap(executorConfig);
+        this.consumerExecutorConfig = ImmutableContainers.copyMap(consumerExecutorConfig);
         this.skillName = skillName;
         this.executorConfigGenerationId = executorConfigGenerationId;
         this.diagnostics = Objects.requireNonNull(diagnostics);
@@ -49,6 +52,9 @@ public final class SkillExecutorInvocation
     public Map<String, Object> input() { return input; }
     public Map<String, Object> skillConfig() { return skillConfig; }
     public Map<String, Object> executorConfig() { return executorConfig; }
+    /** Selected configuration from the executing YAML leaf's namespace for a foreign executor.
+     * Empty for absent entries, same-namespace execution or no selector; never merged with owner data. */
+    public Map<String, Object> consumerExecutorConfig() { return consumerExecutorConfig; }
     public String skillName() { return skillName; }
     public String executorConfigGenerationId() { return executorConfigGenerationId; }
 

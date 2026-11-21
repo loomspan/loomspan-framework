@@ -169,26 +169,44 @@ public final class SkillDependencyValidator {
         var registration = owner.executors().get(reference.identity().toString());
         if (registration == null) throw new IllegalStateException("Unknown executor '" + reference.identity() + "'");
         return new SkillAdmissionSnapshot.ExecutorBinding(registration,
-                selectConfiguration(registration, owner.configuration()), owner.generationId());
+                selectConfiguration(registration, owner.configuration()),
+                reference.identity().namespace().equals(definition.identity().namespace()) ? Map.of()
+                        : selectConfiguration(registration, owners.get(definition.identity().namespace()).configuration(),
+                                true, definition.identity().namespace()), owner.generationId());
     }
 
     /** Exact dot-path selection belongs to dependency binding, never invocation or domain validation. */
     private static Map<String, Object> selectConfiguration(ai.loomspan.internal.core.SkillExecutorRegistration registration,
             Map<String, Object> configuration) {
+        return selectConfiguration(registration, configuration, false, registration.identity().namespace());
+    }
+
+    private static Map<String, Object> selectConfiguration(ai.loomspan.internal.core.SkillExecutorRegistration registration,
+            Map<String, Object> configuration, boolean optional, String namespace) {
         String path = registration.config();
         if (path == null || path.isEmpty()) return Map.of();
         if (!path.equals(path.strip()) || path.isBlank() || java.util.Arrays.stream(path.split("\\.", -1)).anyMatch(String::isEmpty))
             throw new IllegalStateException("Invalid executor config path '" + path + "' for '" + registration.name() + "'");
         Object selected = configuration;
         for (String segment : path.split("\\.")) {
-            if (!(selected instanceof Map<?, ?> map) || !map.containsKey(segment))
-                throw new IllegalStateException("Executor config path '" + path + "' must select a map for '" + registration.name() + "'");
+            if (!(selected instanceof Map<?, ?> map))
+                throw malformedConfiguration(registration, path, namespace);
+            if (!map.containsKey(segment)) {
+                if (optional) return Map.of();
+                throw malformedConfiguration(registration, path, namespace);
+            }
             selected = map.get(segment);
         }
         if (!(selected instanceof Map<?, ?> map))
-            throw new IllegalStateException("Executor config path '" + path + "' must select a map for '" + registration.name() + "'");
+            throw malformedConfiguration(registration, path, namespace);
         @SuppressWarnings("unchecked") var result = (Map<String, Object>) map;
         return ai.loomspan.internal.util.ImmutableContainers.copyMap(result);
+    }
+
+    private static IllegalStateException malformedConfiguration(ai.loomspan.internal.core.SkillExecutorRegistration registration,
+            String path, String namespace) {
+        return new IllegalStateException("Executor config path '" + path + "' in namespace '" + namespace
+                + "' must select a map for '" + registration.name() + "'");
     }
 
     private static void validateOutputBindings(YamlSkillDefinition definition, SkillInputContract input,

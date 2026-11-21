@@ -21,6 +21,8 @@ public @interface SkillExecutor
     String name() default "";
     /** Owning namespace, normalized to lowercase. */
     String namespace() default "default";
-    /** Relative configuration path in the executor namespace; empty selects no configuration. */
+    /** Exact dot-separated map path in the executor owner's namespace and, for foreign
+     * references, the executing YAML leaf's namespace. Owner selection is required;
+     * missing consumer entries are empty. Empty selects neither map. */
     String config() default "";
 }

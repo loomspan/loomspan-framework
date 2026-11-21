@@ -54,6 +54,38 @@ class ExecutorDependencyResolutionTest {
         finally { capture.lease().close(); }
     }
 
+    @Test void foreignLeafSelectsIndependentOwnerAndConsumerSubtrees() {
+        var manager = manager(List.of(executor("default-run", "a.b")), Map.of("default", Map.of("a", Map.of("b", Map.of()))));
+        try {
+            publish(manager, "default", List.of(), "loomspan: {executor-config: {default: {a: {b: {gateway: owner}}}}}", NamespaceVisibility.PUBLIC);
+            publish(manager, "billing", List.of(leaf("leaf", "default-run")), "loomspan: {executor-config: {billing: {a: {b: {key: billing}}, sibling: ignored}}}", NamespaceVisibility.PRIVATE);
+            var binding = admit(manager, "billing-leaf").executorBinding("billing-leaf");
+            assertThat(binding.configuration()).containsExactlyEntriesOf(Map.of("gateway", "owner"));
+            assertThat(binding.consumerConfiguration()).containsExactlyEntriesOf(Map.of("key", "billing"));
+        } finally { manager.destroy(); }
+    }
+
+    @Test void optionalConsumerSelectionDistinguishesAbsenceFromMalformedPresence() {
+        var manager = manager(List.of(executor("default-run", "a.b"), executor("default-plain", "")), Map.of("default", Map.of("a", Map.of("b", Map.of()))));
+        try {
+            publish(manager, "default", List.of(leaf("same", "run")), "loomspan: {executor-config: {default: {a: {b: {gateway: owner}}}}}", NamespaceVisibility.PUBLIC);
+            assertThat(admit(manager, "default-same").executorBinding("default-same").consumerConfiguration()).isEmpty();
+            for (String value : List.of("{}", "{a: {}}", "{a: {b: {}}}", "{A: {b: {key: ignored}}}", "{'a.b': {key: ignored}}")) {
+                publish(manager, "billing", List.of(leaf("leaf", "default-run")), "loomspan: {executor-config: {billing: " + value + "}}", NamespaceVisibility.PRIVATE);
+                assertThat(admit(manager, "billing-leaf").executorBinding("billing-leaf").consumerConfiguration()).as(value).isEmpty();
+            }
+            for (String value : List.of("{a: null}", "{a: 1}", "{a: []}", "{a: {b: null}}", "{a: {b: text}}", "{a: {b: []}}")) {
+                var config = new ExecutionConfiguration("loomspan: {executor-config: {billing: " + value + "}}");
+                var view = manager.capturePreparation("billing");
+                assertThat(manager.validate(view, List.of(leaf("leaf", "default-run")), config, NamespaceVisibility.PRIVATE).valid()).as(value).isFalse();
+                assertThatThrownBy(() -> manager.prepare(view, List.of(leaf("leaf", "default-run")), config, NamespaceVisibility.PRIVATE, null, null))
+                        .hasMessageContaining("billing").hasMessageContaining("a.b").hasMessageContaining("default-run");
+            }
+            publish(manager, "billing", List.of(leaf("leaf", "default-plain")), "loomspan: {executor-config: {billing: {anything: null}}}", NamespaceVisibility.PRIVATE);
+            assertThat(admit(manager, "billing-leaf").executorBinding("billing-leaf").consumerConfiguration()).isEmpty();
+        } finally { manager.destroy(); }
+    }
+
     @Test void exactPathSelectionRejectsMalformedMissingNullScalarAndListButAcceptsEmptyMap() {
         for (String path : List.of(" ", " x", "x ", ".x", "x.", "x..y"))
             assertThatThrownBy(() -> manager(List.of(executor("default-run", path)), Map.of()))
@@ -265,7 +297,7 @@ class ExecutorDependencyResolutionTest {
                         if (allowed) {
                             guard.checkAccess(capability,session,null);
                             assertThat(snapshot.executorBinding(capability.name()).registration().invoker().apply(
-                                    ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(),Map.of(),Map.of(),capability.name(),"test", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class))))
+                                    ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(),Map.of(),Map.of(), java.util.Map.of(),capability.name(),"test", () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class))))
                                     .isEqualTo(snapshot == retained ? "old" : "new");
                         } else assertThatThrownBy(() -> guard.checkAccess(capability,session,null))
                                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);

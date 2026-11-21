@@ -8,10 +8,11 @@ import java.util.Objects;
 public record SkillAdmissionSnapshot(SkillIdentity entry, Map<String, SkillGeneration> generations,
         Map<String, ExecutorBinding> executorBindings) {
     public record ExecutorBinding(ai.loomspan.internal.core.SkillExecutorRegistration registration,
-            Map<String, Object> configuration, String generationId) {
+            Map<String, Object> configuration, Map<String, Object> consumerConfiguration, String generationId) {
         public ExecutorBinding {
             Objects.requireNonNull(registration);
             configuration = ai.loomspan.internal.util.ImmutableContainers.copyMap(configuration);
+            consumerConfiguration = ai.loomspan.internal.util.ImmutableContainers.copyMap(consumerConfiguration);
             Objects.requireNonNull(generationId);
         }
     }
