@@ -33,6 +33,7 @@ public final class AuthoredYamlVariables {
     public static final class AuthoredMap extends LinkedHashMap<Object, Object> {
         private final Map<Object, Location> variableKeys = new LinkedHashMap<>();
         public Location variableKeyLocation(Object key) { return variableKeys.get(key); }
+        public void variableKey(Object key, Location location) { variableKeys.put(key, location); }
     }
 
     /** Failures contain authored locations and fixed reasons, independent of lookup contents. */
@@ -64,6 +65,60 @@ public final class AuthoredYamlVariables {
 
     public static Document skill(InputStream yaml, String source) {
         return new Document(new Compose(YamlValues.settings(false, true)).composeInputStream(yaml), source, false);
+    }
+
+    /** Startup documents retain their authored nodes until Boot selects active sources. */
+    public static List<Document> startupDocuments(InputStream yaml, String source) {
+        var result = new ArrayList<Document>();
+        int index = 0;
+        for (Node node : new Compose(YamlValues.settings(false, true)).composeAllFromInputStream(yaml))
+            result.add(new Document(Optional.of(node), source + " (document #" + index++ + ")", true));
+        return List.copyOf(result);
+    }
+
+    /** A selected node keeps its original path, even when fields inherit from several sources. */
+    public static final class Slice {
+        private final Document document;
+        private final Node node;
+        private final String path;
+        private Slice(Document document, Node node, String path) { this.document = document; this.node = node; this.path = path; }
+        public Location location() { return new Location(document.source, path); }
+        public boolean selected() {
+            return document.selectedPaths.stream().anyMatch(boundary -> path.equals(boundary)
+                    || path.startsWith(boundary + ".") || path.startsWith(boundary + "[") || path.startsWith(boundary + "{"));
+        }
+        public boolean variable() { return selected() && markerName(node) != null; }
+        public Object literal() {
+            return document.materialize(node, path, false, null, true,
+                    new StandardConstructor(YamlValues.settings(false, true)), new IdentityHashMap<>());
+        }
+        public Object resolve(Function<String, String> lookup) {
+            discover();
+            return document.materialize(node, path, selected(), lookup, false,
+                    new StandardConstructor(YamlValues.settings(false, true)), new IdentityHashMap<>());
+        }
+        public List<Occurrence> discover() {
+            var result = new ArrayList<Occurrence>();
+            if (selected()) document.discover(node, path, result);
+            else for (Boundary boundary : document.boundaries)
+                if (boundary.path().startsWith(path + ".") || boundary.path().startsWith(path + "["))
+                    document.discover(boundary.node(), boundary.path(), result);
+            return List.copyOf(result);
+        }
+        public List<Map.Entry<Slice, Slice>> entries() {
+            if (!(node instanceof MappingNode map) || markerName(node) != null) return null;
+            var result = new ArrayList<Map.Entry<Slice, Slice>>();
+            for (int i = 0; i < map.getValue().size(); i++) {
+                var entry = map.getValue().get(i);
+                result.add(Map.entry(new Slice(document, entry.getKeyNode(), path + "{key#" + i + "}"),
+                        new Slice(document, entry.getValueNode(), valuePath(path, entry.getKeyNode(), i))));
+            }
+            return result;
+        }
+    }
+
+    public static InvalidVariablesException collision(Location first, Location second) {
+        return new InvalidVariablesException("key-collision", List.of(first, second));
     }
 
     /** Opaque reusable authored document. Every substitution builds independent output containers. */
@@ -102,6 +157,30 @@ public final class AuthoredYamlVariables {
         private void select(Node node, String path) {
             boundaries.add(new Boundary(node, path));
             selectedPaths.add(path);
+        }
+
+        public Slice slice(String... fields) {
+            Node node = root;
+            String path = "";
+            for (String name : fields) {
+                node = field(node, name);
+                path = path.isEmpty() ? name : path + "." + name;
+                if (node == null) return null;
+            }
+            return new Slice(this, node, path);
+        }
+
+        /** A flattened Spring YAML field still retains its own authored occurrence. */
+        public void startupSelection(Slice slice) {
+            if (slice.document != this) throw new IllegalArgumentException("slice belongs to another document");
+            select(slice.node, slice.path);
+        }
+
+        public boolean bootDocumentPresent() {
+            if (root == null) return false;
+            if (root instanceof ScalarNode scalar)
+                return !Tag.NULL.equals(scalar.getTag()) && !scalar.getValue().isEmpty();
+            return !(root instanceof SequenceNode sequence && sequence.getValue().isEmpty());
         }
 
         public List<Occurrence> discover() {

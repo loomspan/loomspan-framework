@@ -118,7 +118,7 @@ class ExecutorConfigurationStartupTests {
     }
 
     @Test void leadingNullAndSequenceDocumentsDoNotBreakAssociation() throws Exception {
-        for (String empty : java.util.List.of("[]", "~", "null", "''")) {
+        for (String empty : java.util.List.of("[]", "~", "null", "''", "scalar", "7", "[nonempty]")) {
             Path file = directory.resolve("documents.yml");
             Files.writeString(file, "---\n" + empty + "\n---\nloomspan:\n  executor-config: {default: {selected: retained}}\n");
             try (var context = start(file)) {

@@ -48,9 +48,11 @@ The YAML skill declares `model: summarizer` or `model: planner`; it does not dec
 
 The resolved per-skill execution configuration and its named connection clients belong to the executing target namespace generation retained by the root snapshot. Cross-namespace children select their own captured models, provider credentials, request timeouts and retries; they do not inherit entry provider settings. Session quotas still use the entry generation; see [execution limits](execution-limits.md). Nested and parallel work, including provider retries, uses those captured clients after another generation is published. New roots use the new generation. Superseded clients close only after captured physical work finishes. A skill and a previously unknown model alias can therefore be validated and published together through `SkillReloader.validate(namespace, documents, configuration)` and `prepare(namespace, documents, configuration)`; hosts with their own credential store may use the map overload. See the [Java publication contract](../java-api/skill-reload.md).
 
-The connection table below applies to embedded `application.yml` and published `ExecutionConfiguration`. Published candidates accept literal settings and whole-node `{ $var: name }` markers under each connection, including header names and values. For example, `api-key: { $var: provider.key }` uses the ordinary provider field. Each distinct name resolves once across providers, namespace executor data and executor-backed skill config before clients are constructed. Normal preparation uses `Environment.getProperty(name)`. An explicit `variableValues` map is copied, matches exact case, requires every used name and rejects unused entries. A candidate without markers accepts an empty map. Validation checks structure and decidable constraints without fetching values.
+The connection table below applies to embedded `application.yml` and published `ExecutionConfiguration`. Both accept literal settings and whole-node `{ $var: name }` markers under each connection, including header names and values. For example, `api-key: { $var: provider.key }` uses the ordinary provider field. Each distinct name resolves once across providers, namespace executor data and configured executor-backed skill config before clients are constructed. Startup and normal preparation use `Environment.getProperty(name)`. An explicit preparation `variableValues` map is copied, matches exact case, requires every used name and rejects unused entries. A candidate without markers accepts an empty map. Staged validation checks structure and decidable constraints without fetching values.
 
-Published authored `${...}` strings and returned variable strings remain literal after that single lookup. Multiline JSON remains one string. Normal conversion and authentication validation apply after substitution. Candidate YAML may include only `loomspan.connections`, `loomspan.models`, `loomspan.session`, `loomspan.executor-config` and `loomspan.execution-trace.persistence`. Every publication supplies complete configuration and omitted scalars use built-in defaults. Startup provider settings use ordinary Spring binding. The shared marker semantics described here apply to supplied published candidates. See [publication](../java-api/skill-reload.md).
+Authored `${...}` strings and returned variable strings remain literal in these three selected subtrees. A marker for a host property `report.label=${region}` receives the effective value returned by Spring. Multiline JSON remains one string. Normal conversion and authentication validation apply after substitution. Startup resolves only effective settings after Spring selects profiles, imports and property-source precedence. Connections inherit individual fields, so an active profile can override an API key while inheriting its driver and headers. Overridden and inactive markers cause zero lookups. Each startup has its own lookup cache and captures its resolved settings. Other Loomspan properties retain normal Spring binding.
+
+Candidate YAML may include only `loomspan.connections`, `loomspan.models`, `loomspan.session`, `loomspan.executor-config` and `loomspan.execution-trace.persistence`. Every publication supplies complete configuration and omitted scalars use built-in defaults. See [publication](../java-api/skill-reload.md).
 
 ## Connection rules
 
@@ -109,7 +111,7 @@ loomspan:
     reasoning:
       driver: openai
       base-url: https://openrouter.ai/api/v1
-      api-key: ${OPENROUTER_API_KEY}
+      api-key: { $var: OPENROUTER_API_KEY }
       request-timeout: 240s
   session:
     mission-timeout: 600s
@@ -172,6 +174,7 @@ For chat drivers, the identical bounded guidance is recorded on every failed phy
 ## Source verification anchors
 
 - Configuration and validation: `LoomspanProperties`, `LoomspanPropertiesTest`, `ExecutionConfigurationParserTest`.
+- Effective startup sources and terminal values: `StartupVariableResolutionIntegrationTest#effectiveProfileSettingsShareOneLookupWithConfiguredSkill`, `#authoredAndReturnedPlaceholderTextReachesConsumersLiterally`, `#flattenedYamlMarkersAndCommandLineOverridesUseEffectiveFields` and `#multilineVertexJsonBindsAndConstructsFromLiteralAndReferencedSettings`.
 - Skill model resolution: `YamlSkillCatalog`, `EffectiveSkillExecutionConfiguration`.
 - Connection construction and lookup: `NamedAiConnectionRegistry`, `SpringAiProviderIntegration`, `DefaultSkillChatModelResolver`.
 - Retry ownership: `LoomspanPropertiesTest`, `ProviderRetryDeciderTest`,

@@ -204,3 +204,31 @@ For installation, Go sends the ZIP, namespace, opaque Cloud-assigned `publicatio
 - Exercise Sidecar file startup, managed validation, publish, and restoration. Verify fixed headers, caller passthrough, and per-skill route substitution independently.
 - Rotate a value and reinstall the original ZIP and publication version. Verify fresh values on new work and original values on work already admitted. Exercise Cloud restart and recovery, including wrapper rejection of omitted/null maps and failure of an incomplete replacement.
 - Return the Framework revision or artifact version, final syntax and shared fixtures, test names and results, and linked Sidecar/test-suite and Cloud follow-ups. Use the Cloud results to revisit Fable's finding before deciding whether to close it.
+
+## Framework implementation handoff, 2026-11-22
+
+The Framework series implements whole-node `{ $var: name }` markers in effective startup connections, namespace executor settings and configured executor-backed skill `config`, and across the same three sections of each published candidate. Authored `${...}` and returned strings are terminal in these sections. Native conversion and owning validation follow substitution. Explicit-map preparation copies an exact-name map, rejects null, missing, blank and unused entries as applicable, accepts an empty reference-free map and performs no host fallback. Provider `api-key`, `headers` and `gemini.credentials-json` accept literals or markers. Credential URI loading and the superseded provider reference fields are removed.
+
+Spring selects active profiles, imports and source precedence before startup discovery. Connections inherit individual fields. The winning executor section replaces lower sections. One startup-local cache spans effective provider, executor and configured skill settings. Inactive and overridden markers cause zero lookups. Normal Environment lookup expands a host property's own placeholders, and the returned string then reaches consumers as one terminal value. Prepared and startup generations retain their captured settings through later value rotation.
+
+The artifact coordinates are `ai.loomspan:loomspan-spring-boot-starter:1.0.0-beta.10-SNAPSHOT`, verified in `pom.xml`. PR 35.3 is integrated at `2045545807c883025c8ecba92bdb9c53a64446a6`. The final PR 35.4 completion revision is supplied in the pipeline's completion report after the local commit. The verified deliverable is the source checkout.
+
+The shared corpus remains [loomspan-variable-fixtures](../../../loomspan-variable-fixtures/README.md). Its worked case carries four names and six occurrences. `VariableMarkerFixtureTest` checks every corpus case. `ExecutorGenerationExecutionIntegrationTest#workedVariableCorpusReachesProviderAndActualExecutor` consumes the worked fixture through provider settings and an actual executor. `#resolvedForeignOwnerConsumerAndLeafRemainCapturedAcrossRotation` protects captured publication values.
+
+Startup consumer evidence is in `StartupVariableResolutionIntegrationTest`.
+
+- `effectiveProfileSettingsShareOneLookupWithConfiguredSkill` verifies the base/profile example, one shared lookup, actual provider authorization/headers and an invoked configured leaf.
+- `importedExecutorSectionReplacesLowerMarkersBeforeLookup` verifies whole-section replacement independently of connection inheritance.
+- `authoredAndReturnedPlaceholderTextReachesConsumersLiterally` verifies authored literals, normal host placeholder expansion, terminal returned placeholders and multiline data at bound providers and invoked executors.
+- `higherSourcesInheritConnectionFieldsAndSystemEnvironmentSuppliesValues` and `flattenedYamlMarkersAndCommandLineOverridesUseEffectiveFields` verify non-YAML sources and native field conversion.
+- `markerKeysAndTypedSettingsReachTheirOwningValidator` covers exact header keys, collisions, typed values and invalid constraints.
+- `startupCachesStayLocalAndCapturedWhileLaterPreparationReadsFreshly` verifies independent startup caches, captured settings and fresh later preparation.
+- `configuredForeignExecutorRetainsExistingStartupDependencyBoundary` protects the existing startup dependency check. Actual foreign owner/consumer/leaf delivery is covered by the PR 35.3 publication test named above.
+- `multilineVertexJsonBindsAndConstructsFromLiteralAndReferencedSettings` constructs explicit Vertex clients from both literal and referenced JSON contents.
+- `baseMissingValueFailsWithAuthoredLocation` and `missingSkillValuePreventsProviderConstructionAndStartupActivation` protect authored failure paths and startup ordering.
+
+Step 4's final production-dependent group passed 153 tests, including all 15 startup tests and eight public-surface architecture checks. Forced test-compilation follow-ups passed the 15 startup tests and five transport tests after strengthening returned-placeholder and leading-document assertions. Exact Framework commands and results are recorded in [the implementation plan](../plans/2026-11-22-PR-35.4-startup-variable-resolution.md). Fresh independent pipeline review establishes completion. Live Sidecar and Cloud qualification remains with those products.
+
+Sidecar file mode must qualify this Framework build through its own startup and HTTP executor tests. Managed mode must discover the selected publication's complete provider, executor and skill references, send exact maps for publication and restoration, and migrate fixed service headers into captured settings. The implementation anchors remain `RuntimeConfigurationService`, `EffectiveExecutionConfiguration` and `HttpSkillExecutor`. Caller-token passthrough remains request-scoped.
+
+Cloud owns Go corpus parity, immutable ZIP and document selection, destination-application lookup, exact-map transport over mTLS, private versioned installation, omitted/null-map rejection, restart/recovery and rotation. Its wrapper must prepare the actual selected documents and version afresh. Cloud must evaluate tenant Vertex identity and its own installation/recovery results before closing Fable's finding. No downstream ticket identifiers are recorded in this checkout.

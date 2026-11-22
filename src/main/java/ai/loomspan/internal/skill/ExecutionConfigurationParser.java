@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.bind.BindException;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
+import org.springframework.boot.context.properties.source.ConfigurationPropertyName;
 import org.springframework.core.env.Environment;
 
 import java.util.LinkedHashMap;
@@ -158,6 +159,69 @@ public final class ExecutionConfigurationParser
     }
 
     public record Parsed(LoomspanProperties properties, TracePersistencePolicy tracePersistence, ExecutorConfiguration executorConfig) {}
+
+    /** The startup connection tree shares the provider schema and terminal native conversion. */
+    public static Map<String, LoomspanProperties.ConnectionProperties> startupConnections(Object connections) {
+        if (!(connections instanceof Map<?, ?> source)) throw invalid("loomspan.connections");
+        var result = new LinkedHashMap<String, LoomspanProperties.ConnectionProperties>();
+        for (var entry : source.entrySet()) {
+            if (!(entry.getKey() instanceof String name) || name.isBlank()) throw invalid("loomspan.connections");
+            String path = "loomspan.connections." + name;
+            if (!(entry.getValue() instanceof Map<?, ?>)) throw invalid(path);
+            Object fields = startupFields(entry.getValue(), CONNECTION, path);
+            // Bind one connection under a fixed key so native property-path parsing cannot
+            // reinterpret an application-owned connection name containing punctuation.
+            try {
+                var parsed = parseTree("default", Map.of("loomspan", Map.of("connections", Map.of("configured", fields))));
+                result.put(name, parsed.properties().getConnections().get("configured"));
+            } catch (IllegalArgumentException | IllegalStateException failure) {
+                throw new IllegalArgumentException(failure.getMessage().replace("loomspan.connections.configured", path));
+            }
+        }
+        return result;
+    }
+
+    private static Object startupFields(Object value, Set<String> allowed, String path) {
+        if (!(value instanceof Map<?, ?> map)) return value;
+        var result = new AuthoredYamlVariables.AuthoredMap();
+        map.forEach((key, child) -> {
+            Object normalized = key;
+            if (key instanceof String text) {
+                var name = ConfigurationPropertyName.adapt(text.toLowerCase(java.util.Locale.ROOT), '.');
+                normalized = allowed.stream().filter(field -> name.equals(
+                        ConfigurationPropertyName.of(field))).findFirst().orElse(text);
+            }
+            if (result.containsKey(normalized)) throw invalid(path + " contains competing field spellings");
+            if (!allowed.contains(normalized)) {
+                var origin = map instanceof AuthoredYamlVariables.AuthoredMap authored ? authored.variableKeyLocation(key) : null;
+                String fieldPath = origin == null ? startupUnknownPath(path + "." + key, child) : origin.source() + " at " + origin.path();
+                throw new IllegalArgumentException(fieldPath + " is not supported");
+            }
+            if (child == null) return; // Native startup binding treats null optional fields as absent.
+            Object item = switch (String.valueOf(normalized)) {
+                case "gemini" -> startupFields(child, Set.of("vertex-ai", "project-id", "location", "credentials-json"), path + ".gemini");
+                case "openai" -> startupFields(child, Set.of("organization-id", "project-id"), path + ".openai");
+                case "provider-retry" -> startupFields(child, RETRY, path + ".provider-retry");
+                default -> child;
+            };
+            result.put(normalized, item);
+            if (map instanceof AuthoredYamlVariables.AuthoredMap authored && authored.variableKeyLocation(key) != null)
+                result.variableKey(normalized, authored.variableKeyLocation(key));
+        });
+        return result;
+    }
+
+    private static String startupUnknownPath(String path, Object value) {
+        if (value instanceof Map<?, ?> fields && !fields.isEmpty()) {
+            var first = fields.entrySet().iterator().next();
+            if (fields instanceof AuthoredYamlVariables.AuthoredMap authored && authored.variableKeyLocation(first.getKey()) != null) {
+                var origin = authored.variableKeyLocation(first.getKey());
+                return origin.source() + " at " + origin.path();
+            }
+            return startupUnknownPath(path + "." + first.getKey(), first.getValue());
+        }
+        return path;
+    }
 
     private static void validateSession(LoomspanProperties.Session session)
     {

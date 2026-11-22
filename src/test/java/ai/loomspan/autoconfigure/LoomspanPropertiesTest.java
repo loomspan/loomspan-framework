@@ -256,7 +256,6 @@ class LoomspanPropertiesTest {
                     "loomspan.connections.removed.api-key=test-key",
                     "loomspan.connections.removed." + removed)
                     .run(context -> assertThat(context.getStartupFailure())
-                            .hasRootCauseInstanceOf(org.springframework.boot.context.properties.bind.UnboundConfigurationPropertiesException.class)
                             .rootCause().hasMessageContaining(fullPath));
         }
     }

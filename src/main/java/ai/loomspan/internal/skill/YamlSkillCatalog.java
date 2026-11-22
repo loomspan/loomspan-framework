@@ -56,6 +56,7 @@ public class YamlSkillCatalog implements InitializingBean
     private final LoomspanProperties.Skills skillProperties;
     private final ResourcePatternResolver resourcePatternResolver;
     private final ObjectMapper yamlObjectMapper;
+    private ai.loomspan.internal.autoconfigure.StartupVariableResolution startupVariables;
     private final Map<String, YamlSkillDefinition> skillsByName = new LinkedHashMap<>();
     private final Map<Resource, String> diagnosticSkillNames = new IdentityHashMap<>();
     private final Map<Resource, String> diagnosticSources = new IdentityHashMap<>();
@@ -110,6 +111,12 @@ public class YamlSkillCatalog implements InitializingBean
         this.skillProperties = properties.getSkills();
         this.resourcePatternResolver = Objects.requireNonNull(resourcePatternResolver, "resourcePatternResolver must not be null");
         this.yamlObjectMapper = Objects.requireNonNull(yamlObjectMapper, "yamlObjectMapper must not be null");
+    }
+
+    public YamlSkillCatalog(LoomspanProperties properties, ResourcePatternResolver resources, ObjectMapper mapper,
+            ai.loomspan.internal.autoconfigure.StartupVariableResolution startupVariables) {
+        this(properties, resources, mapper);
+        this.startupVariables = Objects.requireNonNull(startupVariables);
     }
 
     @Override
@@ -401,6 +408,8 @@ public class YamlSkillCatalog implements InitializingBean
         try (InputStream inputStream = new ByteArrayInputStream(bytes))
         {
             var tree = candidateTrees.get(diagnosticSource(resource));
+            if (tree == null && startupVariables != null)
+                tree = startupVariables.skill(new String(bytes, StandardCharsets.UTF_8), diagnosticSource(resource));
             var decoded = tree == null ? ai.loomspan.internal.serialization.SkillDocumentValues.decode(
                     inputStream, describe(resource), yamlObjectMapper)
                     : ai.loomspan.internal.serialization.SkillDocumentValues.decode(

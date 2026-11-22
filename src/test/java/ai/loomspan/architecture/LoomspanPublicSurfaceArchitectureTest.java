@@ -78,6 +78,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.skill.ExecutorConfiguration", "Public only for immutable executor configuration handoff across framework packages."),
             Map.entry("ai.loomspan.internal.autoconfigure.ExecutorYamlPropertySourceLoader", "Public only for Spring factories YAML loader discovery."),
             Map.entry("ai.loomspan.internal.autoconfigure.ExecutorConfigurationBinding", "Public only for fixed early configuration binding integration."),
+            Map.entry("ai.loomspan.internal.autoconfigure.StartupVariableResolution", "Public only for startup binding and configured catalog coordination across framework packages."),
             Map.entry("ai.loomspan.internal.util.ImmutableContainers", "Public only for shared invocation-record and configuration container copying across framework packages."),
             Map.entry("ai.loomspan.internal.core.SkillFailurePolicy", "Public only for one failure policy across framework invocation, recording and Spring AI integration."),
             Map.entry("ai.loomspan.internal.core.SkillExecutorRegistration", "Public only for fixed executor declaration handoff to generation ownership."),

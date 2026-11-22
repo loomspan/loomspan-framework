@@ -66,7 +66,7 @@ loomspan:
   connections:
     primary:
       driver: openai
-      api-key: ${OPENAI_API_KEY}
+      api-key: { $var: OPENAI_API_KEY }
   models:
     assistant:
       connection: primary
