@@ -1,0 +1,11 @@
+{
+  "documents":[{"source":"skill.yaml","kind":"skill"}],
+  "names":["dotted","escaped","empty"],
+  "occurrences":[
+    {"name":"dotted","source":"skill.yaml","path":"config.headers[\"X.Region\"]"},
+    {"name":"escaped","source":"skill.yaml","path":"config.headers[\"a\\\"b\\\\c\\t\\n\"][0]"},
+    {"name":"empty","source":"skill.yaml","path":"config.headers[\"\"]"}
+  ],
+  "values":{"dotted":"v","escaped":"v","empty":"v"},
+  "resolved":[{"executor":"http","config":{"headers":{"X.Region":"v","a\"b\\c\t\n":["v"],"":"v"}}}]
+}

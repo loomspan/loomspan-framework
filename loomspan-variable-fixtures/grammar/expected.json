@@ -1,0 +1,14 @@
+{
+  "documents":[{"source":"skill.yaml","kind":"skill"}],
+  "names":["app.region","123","child","inside"],
+  "occurrences":[
+    {"name":"app.region","source":"skill.yaml","path":"config.flow"},
+    {"name":"app.region","source":"skill.yaml","path":"config.block"},
+    {"name":"123","source":"skill.yaml","path":"config.quoted"},
+    {"name":"child","source":"skill.yaml","path":"config.ordinary.child"},
+    {"name":"inside","source":"skill.yaml","path":"config.prompt"},
+    {"name":"app.region","source":"skill.yaml","path":"config.unknown[0][0]"}
+  ],
+  "values":{"app.region":" west\n ","123":"{ $var: other }","child":"${region}","inside":"a: [b]"},
+  "resolved":[{"executor":"http","prompt":{"$var":"excluded"},"roles":[{"$var":"excluded"}],"schema":{"config":{"$var":"excluded"}},"input-transform":{"$var":"excluded"},"output-transform":{"$var":"excluded"},"config":{"flow":" west\n ","block":" west\n ","quoted":"{ $var: other }","case":{"$Var":"literal"},"ordinary":{"$var":"literal","child":"${region}"},"prompt":"a: [b]","unknown":[[" west\n "]],"text":"${region} { $var: other }"}}]
+}

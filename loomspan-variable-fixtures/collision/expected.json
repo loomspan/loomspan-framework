@@ -1,0 +1,13 @@
+{
+  "documents":[{"source":"skill.yaml","kind":"skill"}],
+  "names":["header.name","app.region"],
+  "occurrences":[
+    {"name":"header.name","source":"skill.yaml","path":"config.headers{key#0}"},
+    {"name":"app.region","source":"skill.yaml","path":"config.headers{value#0}"}
+  ],
+  "values":{"header.name":"X-Region","app.region":"west"},
+  "failure":{"phase":"substitution","reason":"key-collision","locations":[
+    {"source":"skill.yaml","path":"config.headers{key#0}"},
+    {"source":"skill.yaml","path":"config.headers.X-Region"}
+  ]}
+}

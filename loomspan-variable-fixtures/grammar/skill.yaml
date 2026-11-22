@@ -1,0 +1,18 @@
+executor: http
+prompt: { $var: excluded }
+roles: [{ $var: excluded }]
+schema: { config: { $var: excluded } }
+input-transform: { $var: excluded }
+output-transform: { $var: excluded }
+config:
+  flow: { $var: app.region }
+  block:
+    $var: app.region
+  quoted: { $var: "123" }
+  case: { $Var: literal }
+  ordinary:
+    $var: literal
+    child: { $var: child }
+  prompt: { $var: inside }
+  unknown: [[{ $var: app.region }]]
+  text: '${region} { $var: other }'

@@ -1,0 +1,18 @@
+loomspan:
+  connections:
+    primary:
+      provider: openai
+      api-key: { $var: provider.key }
+      headers:
+        X-Region: { $var: app.region }
+  executor-config:
+    sales:
+      targets:
+        records:
+          base-url: { $var: records.url }
+          headers:
+            X-Region: { $var: app.region }
+            Accept: application/json
+          regions:
+            - values:
+                - { $var: app.region }

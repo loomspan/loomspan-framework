@@ -74,6 +74,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.schema.StandardSchemaCompiler", "Public only for shared declaration compilation across framework packages."),
             Map.entry("ai.loomspan.internal.serialization.SkillDocumentValues", "Public only for lossless skill ingress across framework packages."),
             Map.entry("ai.loomspan.internal.serialization.YamlValues", "Public only for shared raw YAML ingress across framework packages."),
+            Map.entry("ai.loomspan.internal.serialization.AuthoredYamlVariables", "Public only for authored variable discovery and substitution across framework packages."),
             Map.entry("ai.loomspan.internal.skill.ExecutorConfiguration", "Public only for immutable executor configuration handoff across framework packages."),
             Map.entry("ai.loomspan.internal.autoconfigure.ExecutorYamlPropertySourceLoader", "Public only for Spring factories YAML loader discovery."),
             Map.entry("ai.loomspan.internal.autoconfigure.ExecutorConfigurationBinding", "Public only for fixed early configuration binding integration."),

@@ -1,0 +1,6 @@
+executor: http
+config:
+  headers:
+    Accept: application/json
+    ? { $var: header.name }
+    : { $var: app.region }

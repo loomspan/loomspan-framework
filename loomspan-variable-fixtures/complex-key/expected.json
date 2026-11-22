@@ -1,0 +1,9 @@
+{
+  "documents":[{"source":"skill.yaml","kind":"skill"}],
+  "names":["key.part","value"],
+  "occurrences":[
+    {"name":"key.part","source":"skill.yaml","path":"config{key#0}.nested[0]"},
+    {"name":"value","source":"skill.yaml","path":"config{value#0}"}
+  ],
+  "values":{"key.part":"literal","value":"result"}
+}

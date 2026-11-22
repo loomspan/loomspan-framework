@@ -1,0 +1,6 @@
+name: read-record
+executor: http
+config:
+  target: records
+  method: GET
+  path: { $var: records.lookup-path }

@@ -1,0 +1,6 @@
+executor: http
+config:
+  headers:
+    "X.Region": { $var: dotted }
+    "a\"b\\c\t\n": [{ $var: escaped }]
+    "": { $var: empty }

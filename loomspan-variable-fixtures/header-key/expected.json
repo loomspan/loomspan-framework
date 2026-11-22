@@ -1,0 +1,10 @@
+{
+  "documents":[{"source":"skill.yaml","kind":"skill"}],
+  "names":["header.name","app.region"],
+  "occurrences":[
+    {"name":"header.name","source":"skill.yaml","path":"config.headers{key#1}"},
+    {"name":"app.region","source":"skill.yaml","path":"config.headers{value#1}"}
+  ],
+  "values":{"header.name":"X-Region","app.region":"west"},
+  "resolved":[{"executor":"http","config":{"headers":{"Accept":"application/json","X-Region":"west"}}}]
+}

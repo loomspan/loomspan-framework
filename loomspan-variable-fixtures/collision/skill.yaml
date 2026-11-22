@@ -1,0 +1,6 @@
+executor: http
+config:
+  headers:
+    ? { $var: header.name }
+    : { $var: app.region }
+    X-Region: literal

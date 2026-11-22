@@ -1,0 +1,18 @@
+{
+  "documents": [
+    {
+      "source": "skill.yaml",
+      "kind": "skill"
+    }
+  ],
+  "failure": {
+    "phase": "discovery",
+    "reason": "blank-name",
+    "locations": [
+      {
+        "path": "config.value",
+        "source": "skill.yaml"
+      }
+    ]
+  }
+}

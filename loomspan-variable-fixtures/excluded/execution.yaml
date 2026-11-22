@@ -1,0 +1,10 @@
+input: { $var: excluded }
+loomspan:
+  models: { $var: excluded }
+  session-policy: { $var: excluded }
+  connections:
+    ? { $var: selector }
+    : { literal: true }
+  executor-config:
+    ? { $var: selector }
+    : { literal: 12 }

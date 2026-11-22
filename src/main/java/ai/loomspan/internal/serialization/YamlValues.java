@@ -15,6 +15,10 @@ public final class YamlValues {
     }
 
     private static Load loader(boolean losslessNumbers) {
+        return new Load(settings(losslessNumbers, false));
+    }
+
+    static LoadSettings settings(boolean losslessNumbers, boolean authoredKeys) {
         var constructors = new java.util.HashMap<org.snakeyaml.engine.v2.nodes.Tag,
                 org.snakeyaml.engine.v2.api.ConstructNode>();
         constructors.put(new org.snakeyaml.engine.v2.nodes.Tag("tag:yaml.org,2002:timestamp"),
@@ -36,12 +40,13 @@ public final class YamlValues {
                 }
             };
         });
-        return new Load(LoadSettings.builder().setSchema(new CoreSchema())
+        return LoadSettings.builder().setSchema(new CoreSchema())
                 // Keep explicit timestamps textual, as the existing Jackson value ingress did.
                 // Ordinary Spring values are still decoded by Boot's delegated loader.
                 .setTagConstructors(constructors)
+                .setAllowNonScalarKeys(authoredKeys)
                 .setAllowDuplicateKeys(false).setMaxAliasesForCollections(Integer.MAX_VALUE)
-                .setCodePointLimit(Integer.MAX_VALUE).build());
+                .setCodePointLimit(Integer.MAX_VALUE).build();
     }
 
     private record UnrepresentableDecimal(String literal) {
@@ -84,7 +89,7 @@ public final class YamlValues {
         return size;
     }
 
-    private static long bounded(long size) {
+    static long bounded(long size) {
         if (size > MAX_EXPANDED_VALUES)
             throw new org.snakeyaml.engine.v2.exceptions.YamlEngineException("YAML expanded value count exceeds limit " + MAX_EXPANDED_VALUES);
         return size;
