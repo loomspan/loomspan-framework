@@ -239,8 +239,6 @@ public class LoomspanProperties implements InitializingBean
         {
             requireText(gemini.getProjectId(), path + ".gemini.project-id", AiDriver.GEMINI);
             requireText(gemini.getLocation(), path + ".gemini.location", AiDriver.GEMINI);
-            if (StringUtils.hasText(gemini.getCredentialsUri()) && StringUtils.hasText(gemini.getCredentialsJson()))
-                throw invalid(path + ".gemini.credentials-json", "cannot be combined with credentials-uri");
         }
     }
 
@@ -531,7 +529,6 @@ public class LoomspanProperties implements InitializingBean
         private Boolean vertexAi;
         private String projectId;
         private String location;
-        private String credentialsUri;
         private String credentialsJson;
         public Boolean getVertexAi() { return vertexAi; }
         public void setVertexAi(Boolean value) { vertexAi = value; }
@@ -539,8 +536,6 @@ public class LoomspanProperties implements InitializingBean
         public void setProjectId(String value) { projectId = value; }
         public String getLocation() { return location; }
         public void setLocation(String value) { location = value; }
-        public String getCredentialsUri() { return credentialsUri; }
-        public void setCredentialsUri(String value) { credentialsUri = value; }
         public String getCredentialsJson() { return credentialsJson; }
         public void setCredentialsJson(String value) { credentialsJson = value; }
     }

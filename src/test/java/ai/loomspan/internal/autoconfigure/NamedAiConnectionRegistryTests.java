@@ -54,11 +54,11 @@ class NamedAiConnectionRegistryTests {
         connections.put("second", geminiConnection());
         when(integration.create("first", connections.get("first"))).thenReturn(runtime(closeable));
         when(integration.create("second", connections.get("second"))).thenThrow(new SafeAiConnectionConfigurationException(
-                "loomspan.connections.second.gemini.credentials-uri could not be loaded"));
+                "loomspan.connections.second.gemini.credentials-json could not be loaded"));
 
         assertThatThrownBy(() -> new NamedAiConnectionRegistry(connections, integration))
                 .isInstanceOf(SafeAiConnectionConfigurationException.class)
-                .hasMessage("loomspan.connections.second.gemini.credentials-uri could not be loaded");
+                .hasMessage("loomspan.connections.second.gemini.credentials-json could not be loaded");
         verify((DisposableBean) closeable).destroy();
     }
 
@@ -100,7 +100,7 @@ class NamedAiConnectionRegistryTests {
                 .hasMessageContaining("loomspan.connections.gemini.gemini.vertex-ai")
                 .hasMessageContaining("loomspan.connections.gemini.gemini.project-id")
                 .hasMessageContaining("loomspan.connections.gemini.gemini.location")
-                .hasMessageContaining("loomspan.connections.gemini.gemini.credentials-uri")
+                .hasMessageContaining("loomspan.connections.gemini.gemini.credentials-json")
                 .hasMessageNotContaining("loomspan.connections.gemini.base-url")
                 .hasCause(original)
                 .satisfies(failure -> assertThat(failure.getCause()).isSameAs(original));

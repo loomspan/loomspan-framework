@@ -18,6 +18,27 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class SkillReloaderTest {
+    @Test
+    void referenceFreeProviderPackPreparesWithExplicitEmptyMap() {
+        var captured = new AtomicReference<LoomspanProperties>();
+        var fixture = new Fixture((properties, policy) -> {
+            captured.set(properties);
+            return runtime(properties, policy);
+        });
+        var configuration = new ExecutionConfiguration(MODEL.yaml()
+                .replace("api-key-ref: fixture.key", "api-key: demo-key, headers: {X-Region: west}"));
+        try (var candidate = fixture.reloader.prepare("literal", "literal-v1", List.of(model("leaf")),
+                configuration, NamespaceVisibility.PRIVATE, Map.of())) {
+            assertThat(candidate).isNotNull();
+            assertThat(captured.get().getConnections().get("local").getApiKey()).isEqualTo("demo-key");
+            assertThat(captured.get().getConnections().get("local").getHeaders()).containsEntry("X-Region", "west");
+        }
+        finally {
+            fixture.manager.destroy();
+            fixture.lifecycle.destroy();
+        }
+    }
+
     static final ExecutionConfiguration EMPTY = new ExecutionConfiguration("loomspan: {}");
     static final ExecutionConfiguration MODEL = new ExecutionConfiguration("""
             loomspan:

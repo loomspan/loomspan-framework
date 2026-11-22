@@ -19,7 +19,6 @@ import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.openai.responses.*;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
-import org.springframework.core.io.DefaultResourceLoader;
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.*;
@@ -335,7 +334,7 @@ class SharedResponsesProtocolIntegrationTest {
         properties.setDriver(AiDriver.OPENAI); properties.setApiKey("local-fixture");
         properties.setBaseUrl(server.url("/v1").toString()); properties.setRequestTimeout(Duration.ofSeconds(5));
         properties.setHeaders(Map.of("X-Connection","kept"));
-        return (OpenAiResponsesChatModel)new SpringAiProviderIntegration(new DefaultResourceLoader()).create("fixture",properties).chatModel();
+        return (OpenAiResponsesChatModel)new SpringAiProviderIntegration().create("fixture",properties).chatModel();
     }
     private static ChatClient client(OpenAiResponsesChatModel model,OpenAiResponsesChatOptions options) {
         return ChatClient.builder(model,io.micrometer.observation.ObservationRegistry.NOOP,null,null,

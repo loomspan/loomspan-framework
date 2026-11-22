@@ -14,6 +14,106 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ExecutionConfigurationParserTest
 {
+    @Test
+    void literalProviderSettingsPrepareWithEmptyValues()
+    {
+        var parsed = ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
+                CANDIDATE.replace("api-key-ref: provider.key", "api-key: demo-key")
+                        .replace("header-refs:", "headers:").replace("tenant.header", "west")), Map.of());
+        var connection = parsed.properties().getConnections().get("primary");
+        assertThat(connection.getApiKey()).isEqualTo("demo-key");
+        assertThat(connection.getHeaders()).containsEntry("X-Tenant", "west");
+    }
+
+    @Test
+    void literalHeadersPreserveNamesAndConvertScalarValuesAtProviderValidation()
+    {
+        for (String driver : java.util.List.of("openai", "anthropic"))
+        {
+            var parsed = literal(driver, "headers: {X-Region: west, X-Count: 3, X-Enabled: true, X!Token: exact}");
+            assertThat(parsed.properties().getConnections().get("primary").getHeaders())
+                    .containsEntry("X-Count", "3").containsEntry("X-Enabled", "true")
+                    .containsEntry("X!Token", "exact");
+        }
+        for (String name : java.util.List.of("", " ", "X Bad", "X[Bad]", "X/Bad"))
+            assertThatThrownBy(() -> literal("openai", "headers: {'" + name + "': value}"))
+                    .hasMessageContaining("headers").hasMessageContaining("invalid HTTP header name");
+        assertThatThrownBy(() -> literal("openai", "headers: {X-Null: null}"))
+                .hasMessageContaining("headers").hasMessageContaining("null");
+        assertThatThrownBy(() -> literal("openai", "headers: {X-Nested: {a: b}}"))
+                .hasMessageContaining("headers.X-Nested");
+        assertThatThrownBy(() -> literal("gemini", "headers: {X-Region: west}"))
+                .hasMessageContaining("only supported for drivers OPENAI and ANTHROPIC");
+        assertThat(literal("gemini", "").properties().getConnections().get("primary").getApiKey())
+                .isEqualTo("demo-key");
+    }
+
+    @Test
+    void rejectsCompetingSourcesInEitherOrder()
+    {
+        for (String pair : java.util.List.of("api-key: key\napi-key-ref: key.ref",
+                "headers: {}\nheader-refs: {}", "gemini: {credentials-json: '{}', credentials-json-ref: json.ref}"))
+        {
+            String[] lines = pair.split("\n");
+            for (String fields : java.util.List.of(pair, lines.length == 1
+                    ? pair.replace("{credentials-json: '{}', credentials-json-ref: json.ref}",
+                            "{credentials-json-ref: json.ref, credentials-json: '{}'}")
+                    : String.join("\n", java.util.Arrays.asList(lines).reversed())))
+                assertThatThrownBy(() -> literal("openai", fields))
+                        .as(fields).hasMessageContaining("cannot be combined");
+        }
+    }
+
+    @Test
+    void literalGeminiOptionsKeepModeAndTypedValidation()
+    {
+        String vertex = "loomspan: {connections: {primary: {driver: gemini, gemini: {vertex-ai: true, project-id: project, location: west, credentials-json: '{}'}}}}";
+        assertThat(ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(vertex), Map.of())
+                .properties().getConnections().get("primary").getGemini().getCredentialsJson()).isEqualTo("{}");
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
+                vertex.replace("driver: gemini,", "driver: gemini, api-key: demo-key,")), Map.of()))
+                .hasMessageContaining("exactly one");
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
+                vertex.replace("project-id: project, ", "")), Map.of()))
+                .hasMessageContaining("gemini.project-id");
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
+                vertex.replace("vertex-ai: true", "vertex-ai: malformed")), Map.of()))
+                .hasMessageContaining("gemini.vertex-ai");
+        assertThatThrownBy(() -> literal("openai", "gemini: {vertex-ai: true}"))
+                .hasMessageContaining("only supported for driver GEMINI");
+        assertThatThrownBy(() -> literal("openai", "request-timeout: 0ms"))
+                .hasMessageContaining("request-timeout");
+    }
+
+    @Test
+    void retiredCredentialSyntaxRejectsBeforeAnyResourceAccess() throws Exception
+    {
+        try (var server = new okhttp3.mockwebserver.MockWebServer())
+        {
+            server.start();
+            for (String uri : java.util.List.of("file:unread-credential.json", server.url("/credentials").toString()))
+                for (String field : java.util.List.of("credentials-ref", "credentials-uri"))
+                {
+                    String yaml = "loomspan: {connections: {vertex: {driver: gemini, gemini: {vertex-ai: true, project-id: p, location: west, "
+                            + field + ": 'vertex.uri'}}}}";
+                    assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(yaml), Map.of("vertex.uri", uri)))
+                            .hasMessageContaining("gemini." + field + " is not publishable");
+                    assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(yaml), new StandardEnvironment(), false))
+                            .hasMessageContaining("gemini." + field + " is not publishable");
+                }
+            assertThat(server.getRequestCount()).isZero();
+        }
+    }
+
+    private static ExecutionConfigurationParser.Parsed literal(String driver, String fields)
+    {
+        String yaml = "loomspan:\n  connections:\n    primary:\n      driver: " + driver + "\n      api-key: demo-key\n"
+                + fields.indent(6);
+        // A source-conflict case supplies its own API key.
+        if (fields.contains("api-key:")) yaml = yaml.replace("      api-key: demo-key\n", "");
+        return ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(yaml), Map.of());
+    }
+
     @Test void rejectsRemovedTypeSafeDriver() {
         assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
                 CANDIDATE.replace("driver: openai", "driver: typesafe")), new StandardEnvironment(), false))
@@ -131,7 +231,7 @@ class ExecutionConfigurationParserTest
     }
 
     @Test
-    void rejectsProcessSettingsDirectSecretsAndDuplicateKeys()
+    void rejectsProcessSettingsAndDuplicateKeys()
     {
         StandardEnvironment environment = new StandardEnvironment();
         assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration("""
@@ -139,14 +239,6 @@ class ExecutionConfigurationParserTest
                   shutdown:
                     timeout: 1s
                 """), environment, false)).hasMessageContaining("loomspan.shutdown");
-        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration("""
-                loomspan:
-                  connections:
-                    primary:
-                      driver: openai
-                      api-key: literal-secret-sentinel
-                """), environment, false)).hasMessageContaining("loomspan.connections.primary.api-key")
-                .hasMessageNotContaining("literal-secret-sentinel");
         assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration("""
                 loomspan:
                   session:
@@ -203,6 +295,6 @@ class ExecutionConfigurationParserTest
         assertThatThrownBy(() -> ExecutionConfigurationParser.parse("default", new ExecutionConfiguration(
                 yaml.replace("credentials-json-ref: vertex.json", "credentials-ref: vertex.uri\n        credentials-json-ref: vertex.json")),
                 new StandardEnvironment(), false))
-                .hasMessageContaining("credentials-json-ref");
+                .hasMessageContaining("credentials-ref");
     }
 }

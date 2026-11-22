@@ -20,7 +20,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.DefaultResourceLoader;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -227,7 +226,7 @@ class OrdinaryFinalOutputRepairLifecycleTest {
         var properties = new LoomspanProperties.ConnectionProperties();
         properties.setDriver(AiDriver.OPENAI); properties.setApiKey("local"); properties.setBaseUrl(server.url("/v1").toString());
         properties.getProviderRetry().setEnabled(false);
-        var runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("loopback", properties);
+        var runtime = new SpringAiProviderIntegration().create("loopback", properties);
         var usage = new DefaultSessionUsageService(quotas, new NoOpUsageMetricsRecorder());
         var state = new DefaultExecutionStateService(Clock.systemUTC(), usage);
         var callback = FunctionToolCallback.<Map<String,Object>,String>builder("test-lookup", effect)

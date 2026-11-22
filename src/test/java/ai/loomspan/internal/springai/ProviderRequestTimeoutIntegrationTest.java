@@ -13,7 +13,6 @@ import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.core.io.DefaultResourceLoader;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -49,7 +48,7 @@ class ProviderRequestTimeoutIntegrationTest
         for (Duration timeout : new Duration[] {null, Duration.ofSeconds(240)})
         {
             properties.setRequestTimeout(timeout);
-            var runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("local", properties);
+            var runtime = new SpringAiProviderIntegration().create("local", properties);
             okhttp3.OkHttpClient transport = transport(runtime.chatModel(), new java.util.IdentityHashMap<>(), 0);
             assertThat(transport).as("actual %s transport", provider).isNotNull();
             assertThat(transport.callTimeoutMillis()).isEqualTo(timeout == null ? google ? 0 : 60000 : 240000);
@@ -125,7 +124,7 @@ class ProviderRequestTimeoutIntegrationTest
             Client.setDefaultBaseUrls(Optional.of(server.url("/").toString()), Optional.of(server.url("/").toString()));
             try
             {
-                var runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("local", properties);
+                var runtime = new SpringAiProviderIntegration().create("local", properties);
                 var options = switch (properties.getDriver()) {
                     case OPENAI -> OpenAiResponsesChatOptions.builder().model("test-model").build();
                     case ANTHROPIC -> AnthropicChatOptions.builder().model("test-model").maxTokens(128).build();

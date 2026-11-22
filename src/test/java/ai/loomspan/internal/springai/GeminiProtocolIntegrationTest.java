@@ -12,7 +12,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
-import org.springframework.core.io.DefaultResourceLoader;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -107,7 +106,7 @@ class GeminiProtocolIntegrationTest
         var properties = new LoomspanProperties.ConnectionProperties();
         properties.setDriver(AiDriver.GEMINI);
         properties.setApiKey("local-fake-key");
-        return new SpringAiProviderIntegration(new DefaultResourceLoader()).create("test", properties).chatModel();
+        return new SpringAiProviderIntegration().create("test", properties).chatModel();
     }
 
     private static void local(LocalCase action) throws Exception

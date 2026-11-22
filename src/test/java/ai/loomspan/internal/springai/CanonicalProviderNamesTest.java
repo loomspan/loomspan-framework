@@ -8,7 +8,6 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.function.FunctionToolCallback;
-import org.springframework.core.io.DefaultResourceLoader;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.*;
@@ -33,7 +32,7 @@ class CanonicalProviderNamesTest {
             } else {
                 var properties = new LoomspanProperties.ConnectionProperties(); properties.setDriver(driver);
                 properties.setApiKey("test-key"); properties.setBaseUrl(server.url("/").toString());
-                model = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("test",properties).chatModel();
+                model = new SpringAiProviderIntegration().create("test",properties).chatModel();
             }
             var names = List.of("a_b-c_d","n".repeat(32)+"-"+"x".repeat(31));
             var callbacks = names.stream().map(name -> FunctionToolCallback.<String,String>builder(name,input -> input)

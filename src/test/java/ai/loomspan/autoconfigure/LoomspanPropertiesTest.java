@@ -11,6 +11,55 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LoomspanPropertiesTest {
+    @Test
+    void startupLiteralsBindAndRetiredCredentialUrisNeverLoad() throws Exception
+    {
+        String json = "{\n  \"type\": \"service_account\"\n}\n";
+        new ApplicationContextRunner().withUserConfiguration(TimeoutBinding.class)
+                .withInitializer(context -> context.getEnvironment().getPropertySources().addFirst(
+                        new org.springframework.core.env.MapPropertySource("literal-json", java.util.Map.of(
+                                "loomspan.connections.vertex.gemini.credentials-json", json))))
+                .withPropertyValues("loomspan.connections.key.driver=openai",
+                        "loomspan.connections.key.api-key=demo-key", "loomspan.connections.key.headers[X-Region]=west",
+                        "loomspan.connections.vertex.driver=gemini", "loomspan.connections.vertex.gemini.vertex-ai=true",
+                        "loomspan.connections.vertex.gemini.project-id=project", "loomspan.connections.vertex.gemini.location=west")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    var connections = context.getBean(LoomspanProperties.class).getConnections();
+                    assertThat(connections.get("key").getApiKey()).isEqualTo("demo-key");
+                    assertThat(connections.get("key").getHeaders()).containsEntry("X-Region", "west");
+                    assertThat(connections.get("vertex").getGemini().getCredentialsJson()).isEqualTo(json);
+                });
+        try (var server = new okhttp3.mockwebserver.MockWebServer())
+        {
+            server.start();
+            for (String uri : java.util.List.of("file:unread-credential.json", server.url("/credentials").toString()))
+            {
+                var reads = new java.util.concurrent.atomic.AtomicInteger();
+                var constructions = new java.util.concurrent.atomic.AtomicInteger();
+                new ApplicationContextRunner().withUserConfiguration(TimeoutBinding.class)
+                        .withInitializer(context -> context.addProtocolResolver((location, loader) -> {
+                            if (!location.equals(uri)) return null;
+                            reads.incrementAndGet();
+                            throw new AssertionError("Credential resource access");
+                        }))
+                        .withBean("providerProbe", Object.class, () -> {
+                            constructions.incrementAndGet();
+                            return new Object();
+                        }, definition -> definition.setDependsOn("loomspan-ai.loomspan.autoconfigure.LoomspanProperties"))
+                        .withPropertyValues("loomspan.connections.vertex.driver=gemini",
+                                "loomspan.connections.vertex.gemini.vertex-ai=true",
+                                "loomspan.connections.vertex.gemini.project-id=project",
+                                "loomspan.connections.vertex.gemini.location=west",
+                                "loomspan.connections.vertex.gemini.credentials-uri=" + uri)
+                        .run(context -> assertThat(context.getStartupFailure()).rootCause()
+                                .hasMessageContaining("loomspan.connections.vertex.gemini.credentials-uri"));
+                assertThat(reads).hasValue(0);
+                assertThat(constructions).hasValue(0);
+            }
+            assertThat(server.getRequestCount()).isZero();
+        }
+    }
 
     @Test void startupRejectsRemovedTypeSafeDriver() {
         new ApplicationContextRunner().withUserConfiguration(TimeoutBinding.class)

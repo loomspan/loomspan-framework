@@ -87,7 +87,7 @@ class ProviderFailureGuidanceTest
                 .contains("driver GEMINI", "loomspan.connections.gemini.api-key",
                         "loomspan.connections.gemini.gemini.project-id",
                         "loomspan.connections.gemini.gemini.location",
-                        "loomspan.connections.gemini.gemini.credentials-uri")
+                        "loomspan.connections.gemini.gemini.credentials-json")
                 .doesNotContain("gemini.gemini Vertex");
         assertThat(authenticationGuidance(AiDriver.OPENAI, "ollama"))
                 .contains("driver OPENAI", "loomspan.connections.ollama.api-key");

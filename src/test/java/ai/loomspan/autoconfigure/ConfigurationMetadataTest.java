@@ -37,7 +37,7 @@ class ConfigurationMetadataTest {
                     "loomspan.connections.*.gemini.vertex-ai",
                     "loomspan.connections.*.gemini.project-id",
                     "loomspan.connections.*.gemini.location",
-                    "loomspan.connections.*.gemini.credentials-uri",
+                    "loomspan.connections.*.gemini.credentials-json",
                     "loomspan.connections.*.provider-retry.enabled",
                     "loomspan.connections.*.provider-retry.max-attempts",
                     "loomspan.connections.*.provider-retry.initial-backoff",
@@ -60,7 +60,7 @@ class ConfigurationMetadataTest {
                             + "for provider-specific headers such as anthropic-beta.");
             assertThat(metadata)
                     .contains("loomspan.connections.*.driver")
-                    .contains("loomspan.connections.*.gemini.credentials-uri")
+                    .contains("loomspan.connections.*.gemini.credentials-json")
                     .contains("loomspan.models.*.connection")
                     .contains("loomspan.models.*.thinking-levels")
                     .contains("loomspan.observability.enabled")

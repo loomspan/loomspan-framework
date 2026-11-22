@@ -70,7 +70,7 @@ public final class ProviderFailureGuidance
     {
         return driver == AiDriver.GEMINI
                 ? connection + ".api-key or the Vertex AI settings " + connection + ".gemini.project-id, "
-                        + connection + ".gemini.location, and " + connection + ".gemini.credentials-uri"
+                        + connection + ".gemini.location, and " + connection + ".gemini.credentials-json"
                 : connection + ".api-key";
     }
 

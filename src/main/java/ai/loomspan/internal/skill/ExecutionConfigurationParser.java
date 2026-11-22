@@ -21,7 +21,7 @@ public final class ExecutionConfigurationParser
 {
     private static final Set<String> ROOT = Set.of("loomspan");
     private static final Set<String> PUBLISHABLE = Set.of("connections", "models", "session", "execution-trace", "executor-config");
-    private static final Set<String> CONNECTION = Set.of("driver", "base-url", "request-timeout", "api-key-ref", "header-refs", "openai", "gemini", "provider-retry");
+    private static final Set<String> CONNECTION = Set.of("driver", "base-url", "request-timeout", "api-key", "headers", "api-key-ref", "header-refs", "openai", "gemini", "provider-retry");
     private static final Set<String> MODEL = Set.of("connection", "provider-model", "thinking-levels");
     private static final Set<String> SESSION = Set.of("max-depth", "mission-timeout", "quotas", "attachments");
     private static final Set<String> QUOTAS = Set.of("max-skill-invocations", "max-tool-invocations", "max-linter-retries", "max-model-calls", "max-provider-attempts", "max-usage-units");
@@ -54,32 +54,41 @@ public final class ExecutionConfigurationParser
             ExecutorConfiguration executorConfig = loomspan.containsKey("executor-config")
                     ? ExecutorConfiguration.from(loomspan.get("executor-config")).requireTarget(targetNamespace) : ExecutorConfiguration.empty();
             Map<String, Object> flat = new LinkedHashMap<>();
+            Map<String, Map<String, String>> connectionHeaders = new LinkedHashMap<>();
             Map<String, Object> connections = optionalObject(loomspan.get("connections"), "loomspan.connections");
             for (var entry : connections.entrySet())
             {
                 String path = "loomspan.connections." + entry.getKey();
                 Map<String, Object> connection = object(entry.getValue(), path);
                 keys(connection, CONNECTION, path);
+                exclusive(connection, "api-key", "api-key-ref", path);
+                exclusive(connection, "headers", "header-refs", path);
                 for (var field : connection.entrySet())
                 {
                     String fieldPath = path + "." + field.getKey();
                     switch (field.getKey())
                     {
                         case "api-key-ref" -> flat.put(path + ".api-key", reference(field.getValue(), fieldPath, environment, supplied, used, resolveReferences));
-                        case "header-refs" -> {
-                            for (var header : object(field.getValue(), fieldPath).entrySet())
-                                flat.put(path + ".headers[" + header.getKey() + "]", reference(header.getValue(), fieldPath + "." + header.getKey(), environment, supplied, used, resolveReferences));
+                        case "headers", "header-refs" -> {
+                            if (!(field.getValue() instanceof Map<?, ?> headers)) throw invalid(fieldPath);
+                            Map<String, String> values = new LinkedHashMap<>();
+                            for (var header : headers.entrySet())
+                            {
+                                if (!(header.getKey() instanceof String name)) throw invalid(fieldPath);
+                                String headerPath = fieldPath + "." + name;
+                                values.put(name, field.getKey().equals("header-refs")
+                                        ? reference(header.getValue(), headerPath, environment, supplied, used, resolveReferences)
+                                        : header.getValue() == null ? null : scalar(header.getValue(), headerPath));
+                            }
+                            connectionHeaders.put(entry.getKey(), values);
                         }
                         case "openai" -> flattenObject(object(field.getValue(), fieldPath), Set.of("organization-id", "project-id"), fieldPath, flat);
                         case "gemini" -> {
                             Map<String, Object> gemini = object(field.getValue(), fieldPath);
-                            keys(gemini, Set.of("vertex-ai", "project-id", "location", "credentials-ref", "credentials-json-ref"), fieldPath);
-                            if (gemini.containsKey("credentials-ref") && gemini.containsKey("credentials-json-ref"))
-                                throw invalid(fieldPath + ".credentials-json-ref");
+                            keys(gemini, Set.of("vertex-ai", "project-id", "location", "credentials-json", "credentials-json-ref"), fieldPath);
+                            exclusive(gemini, "credentials-json", "credentials-json-ref", fieldPath);
                             for (var geminiField : gemini.entrySet())
-                                if (geminiField.getKey().equals("credentials-ref"))
-                                    flat.put(fieldPath + ".credentials-uri", reference(geminiField.getValue(), fieldPath + ".credentials-ref", environment, supplied, used, resolveReferences));
-                                else if (geminiField.getKey().equals("credentials-json-ref"))
+                                if (geminiField.getKey().equals("credentials-json-ref"))
                                     flat.put(fieldPath + ".credentials-json", reference(geminiField.getValue(), fieldPath + ".credentials-json-ref", environment, supplied, used, resolveReferences));
                                 else flat.put(fieldPath + "." + geminiField.getKey(), scalar(geminiField.getValue(), fieldPath));
                         }
@@ -120,6 +129,8 @@ public final class ExecutionConfigurationParser
             LoomspanProperties properties = new Binder(new MapConfigurationPropertySource(flat))
                     .bind("loomspan", Bindable.of(LoomspanProperties.class)).orElseGet(LoomspanProperties::new);
             properties.setExecutorConfig(executorConfig);
+            connectionHeaders.forEach((name, headers) -> properties.getConnections()
+                    .computeIfAbsent(name, ignored -> new LoomspanProperties.ConnectionProperties()).setHeaders(headers));
             properties.afterPropertiesSet();
             validateSession(properties.getSession());
             return new Parsed(properties, properties.getExecutionTrace().getPersistence(), executorConfig);
@@ -130,6 +141,12 @@ public final class ExecutionConfigurationParser
     }
 
     public record Parsed(LoomspanProperties properties, TracePersistencePolicy tracePersistence, ExecutorConfiguration executorConfig) {}
+
+    private static void exclusive(Map<String, Object> fields, String literal, String reference, String path)
+    {
+        if (fields.containsKey(literal) && fields.containsKey(reference))
+            throw new IllegalArgumentException(path + "." + literal + " cannot be combined with " + reference);
+    }
 
     private static void validateSession(LoomspanProperties.Session session)
     {

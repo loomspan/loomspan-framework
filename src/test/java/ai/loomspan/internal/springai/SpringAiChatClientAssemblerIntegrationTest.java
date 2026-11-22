@@ -27,7 +27,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.DefaultResourceLoader;
 
 import java.time.Clock;
 import java.nio.charset.StandardCharsets;
@@ -458,7 +457,7 @@ class SpringAiChatClientAssemblerIntegrationTest
         if (driver != AiDriver.GEMINI)
             properties.setBaseUrl(server.url(driver == AiDriver.OPENAI ? "/v1" : "/").toString());
         properties.getProviderRetry().setEnabled(false);
-        ProviderConnectionRuntime runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("openai", properties);
+        ProviderConnectionRuntime runtime = new SpringAiProviderIntegration().create("openai", properties);
         DefaultSessionUsageService usage = new DefaultSessionUsageService(quotas, new NoOpUsageMetricsRecorder());
         DefaultExecutionStateService state = new DefaultExecutionStateService(Clock.systemUTC(), usage);
         var resolver = (ai.loomspan.internal.chat.SkillAdvisorResolver) ignored -> List.of(

@@ -13,7 +13,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.core.io.DefaultResourceLoader;
 import ai.loomspan.internal.chat.ProviderAttemptCallAdvisor;
 import ai.loomspan.internal.core.*;
 import ai.loomspan.internal.runtime.state.DefaultExecutionStateService;
@@ -53,7 +52,7 @@ class SpringAiObservationIntegrationTest
             properties.setBaseUrl(server.url("/" + baseUrlCanary).toString());
             properties.setHeaders(Map.of("X-Observation-Canary", headerCanary));
 
-            var model = new SpringAiProviderIntegration(new DefaultResourceLoader(), registry)
+            var model = new SpringAiProviderIntegration(registry)
                     .create("openai-main", properties).chatModel();
             model.call(new Prompt(promptCanary, OpenAiResponsesChatOptions.builder().model("gpt-test").build()));
         }
@@ -86,7 +85,7 @@ class SpringAiObservationIntegrationTest
             properties.getProviderRetry().setMaxAttempts(2);
             properties.getProviderRetry().setInitialBackoff(java.time.Duration.ZERO);
             properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
-            var providerRuntime = new SpringAiProviderIntegration(new DefaultResourceLoader(), registry)
+            var providerRuntime = new SpringAiProviderIntegration(registry)
                     .create("openai", properties);
             var runtime = ProviderConnectionRuntime.chat(providerRuntime.chatModel(), AiDriver.OPENAI,
                     AttemptOwnership.EXACT_ATTEMPT_OWNERSHIP,
@@ -155,7 +154,7 @@ class SpringAiObservationIntegrationTest
             properties.setApiKey("terminal-key-secret-730");
             properties.setBaseUrl(server.url("/v1").toString());
             properties.getProviderRetry().setEnabled(false);
-            ProviderConnectionRuntime runtime = new SpringAiProviderIntegration(new DefaultResourceLoader(), registry)
+            ProviderConnectionRuntime runtime = new SpringAiProviderIntegration(registry)
                     .create("openai", properties);
             DefaultSessionUsageService usage = new DefaultSessionUsageService(
                     new LoomspanProperties().getSession().getQuotas(), new NoOpUsageMetricsRecorder());

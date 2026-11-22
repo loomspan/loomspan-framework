@@ -30,7 +30,6 @@ import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
-import org.springframework.core.io.DefaultResourceLoader;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -432,7 +431,7 @@ class OrdinaryNativeOutputIntegrationTest
                 properties.getProviderRetry().setInitialBackoff(java.time.Duration.ZERO);
                 properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
                 properties.getProviderRetry().setJitter(0);
-                action.run(server, new SpringAiProviderIntegration(new DefaultResourceLoader()).create("loopback", properties));
+                action.run(server, new SpringAiProviderIntegration().create("loopback", properties));
             } finally { if (driver == AiDriver.GEMINI) Client.setDefaultBaseUrls(Optional.empty(), Optional.empty()); }
         }
     }

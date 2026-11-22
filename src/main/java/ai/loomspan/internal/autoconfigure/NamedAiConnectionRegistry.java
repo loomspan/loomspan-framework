@@ -62,7 +62,7 @@ public final class NamedAiConnectionRegistry
         return properties.getDriver() == ai.loomspan.autoconfigure.AiDriver.GEMINI
                 ? connection + ".api-key or " + connection + ".gemini.vertex-ai, "
                         + connection + ".gemini.project-id, "
-                        + connection + ".gemini.location, and " + connection + ".gemini.credentials-uri"
+                        + connection + ".gemini.location, and " + connection + ".gemini.credentials-json"
                 : connection + ".base-url";
     }
 

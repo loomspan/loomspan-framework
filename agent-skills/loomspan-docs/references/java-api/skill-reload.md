@@ -83,15 +83,9 @@ and unknown keys reject validation/preparation. Every omitted supported scalar u
 its built-in default; previous, startup and other namespace settings do not fill
 missing values. Missing models/connections required by a declaration fail.
 
-Credentials use explicit `api-key-ref`, `header-refs`,
-`gemini.credentials-ref` or `gemini.credentials-json-ref` references. Preparation
-normally resolves them from Spring Environment. The complete overload
-`prepare(namespace, documents, configuration, credentialValues)` copies a supplied
-map and resolves every reference from it without Environment fallback. Missing,
-blank or unused map entries fail. The full overload accepts visibility before the
-credential map. Validation does not resolve credentials, construct provider clients, or
-invoke application implementations. Preparation builds independent
-clients but sends no model request. Diagnostic content is preserved.
+Connections accept literal `api-key`, `headers` and Vertex `gemini.credentials-json` contents. They also accept `api-key-ref`, `header-refs` and `gemini.credentials-json-ref` references, resolved during preparation from Spring Environment. Each setting chooses either its literal or reference form. Explicit Vertex credentials contain service-account JSON, including multiline contents.
+
+`prepare(namespace, documents, configuration, credentialValues)` copies the supplied map and resolves every reference from it without Environment fallback. Missing, blank or unused entries fail. A reference-free configuration accepts an empty map. The full overload accepts visibility before the map. Validation checks structure without resolving references, constructing provider clients or invoking application implementations. Preparation builds independent clients and sends no model request. Diagnostic content is preserved.
 
 `loomspan.executor-config` uses namespace-indexed maps, with the same structural rules and immutable data as startup YAML. Publication permits only its target namespace; foreign entries fail even when empty. Omission supplies no executor data and never inherits startup or prior-generation configuration. Nested maps/lists, null leaves, empty containers, scalar types and exact case/dotted data keys are preserved. Executor-owned `api-key-ref` and `${...}` strings are ordinary content; they do not consume credential references or undergo interpolation. Each generation owns its assigned fixed executors and immutable executor data. Startup/preparation validate annotation paths and selected map structure without application execution. Admission resolves only root-reachable executor dependencies against captured generations, and invocation consumes the captured binding without live lookup. See [executor configuration](../skill-authoring/executor-skills.md).
 

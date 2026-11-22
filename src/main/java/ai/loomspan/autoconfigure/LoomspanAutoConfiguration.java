@@ -157,7 +157,6 @@ public class LoomspanAutoConfiguration
             SkillMethodBeanPostProcessor skillMethodBeanPostProcessor,
             SkillInputContractResolver skillInputContractResolver,
             org.springframework.core.env.Environment environment,
-            org.springframework.core.io.ResourceLoader resourceLoader,
             org.springframework.beans.factory.ObjectProvider<io.micrometer.observation.ObservationRegistry> observationRegistryProvider)
     {
         LoomspanProperties fixedSkillLoadingProperties = skillLoadingPropertiesSnapshot(properties);
@@ -168,7 +167,7 @@ public class LoomspanAutoConfiguration
                 skillInputContractResolver, properties, environment,
                 (effective, policy) -> new ai.loomspan.internal.skill.ExecutionRuntime(effective, policy,
                         new ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry(effective.getConnections(),
-                                new ai.loomspan.internal.springai.SpringAiProviderIntegration(resourceLoader,
+                                new ai.loomspan.internal.springai.SpringAiProviderIntegration(
                                         observationRegistryProvider.getIfAvailable(() -> io.micrometer.observation.ObservationRegistry.NOOP),
                                         codecs.schemaTree()))));
     }

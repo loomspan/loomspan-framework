@@ -27,7 +27,6 @@ import org.springframework.ai.openai.responses.OpenAiResponsesChatModel;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
-import org.springframework.core.io.ResourceLoader;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -56,44 +55,42 @@ import java.util.concurrent.CancellationException;
 public final class SpringAiProviderIntegration
 {
     static final int DIAGNOSTIC_LIMIT_BYTES = 1024 * 1024;
-    private final ResourceLoader resourceLoader;
     private final Clock clock;
     private final ObservationRegistry observationRegistry;
     private final ObjectMapper objectMapper;
 
-    public SpringAiProviderIntegration(ResourceLoader resourceLoader)
+    public SpringAiProviderIntegration()
     {
-        this(resourceLoader, ObservationRegistry.NOOP);
+        this(ObservationRegistry.NOOP);
     }
 
-    public SpringAiProviderIntegration(ResourceLoader resourceLoader, ObservationRegistry observationRegistry)
+    public SpringAiProviderIntegration(ObservationRegistry observationRegistry)
     {
-        this(resourceLoader, Clock.systemUTC(), observationRegistry,
+        this(Clock.systemUTC(), observationRegistry,
                 ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree());
     }
 
-    public SpringAiProviderIntegration(ResourceLoader resourceLoader, ObservationRegistry observationRegistry,
+    public SpringAiProviderIntegration(ObservationRegistry observationRegistry,
             ObjectMapper objectMapper)
     {
-        this(resourceLoader, Clock.systemUTC(), observationRegistry, objectMapper);
+        this(Clock.systemUTC(), observationRegistry, objectMapper);
     }
 
-    SpringAiProviderIntegration(ResourceLoader resourceLoader, Clock clock)
+    SpringAiProviderIntegration(Clock clock)
     {
-        this(resourceLoader, clock, ObservationRegistry.NOOP,
+        this(clock, ObservationRegistry.NOOP,
                 ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree());
     }
 
-    SpringAiProviderIntegration(ResourceLoader resourceLoader, Clock clock, ObservationRegistry observationRegistry)
+    SpringAiProviderIntegration(Clock clock, ObservationRegistry observationRegistry)
     {
-        this(resourceLoader, clock, observationRegistry,
+        this(clock, observationRegistry,
                 ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree());
     }
 
-    SpringAiProviderIntegration(ResourceLoader resourceLoader, Clock clock, ObservationRegistry observationRegistry,
+    SpringAiProviderIntegration(Clock clock, ObservationRegistry observationRegistry,
             ObjectMapper objectMapper)
     {
-        this.resourceLoader = resourceLoader;
         this.clock = clock;
         this.observationRegistry = java.util.Objects.requireNonNull(observationRegistry,
                 "observationRegistry must not be null");
@@ -159,8 +156,7 @@ public final class SpringAiProviderIntegration
         else
         {
             builder.vertexAI(true).project(options.getProjectId()).location(options.getLocation());
-            if (StringUtils.hasText(options.getCredentialsUri())) builder.credentials(loadCredentials(connectionName, options.getCredentialsUri()));
-            else if (StringUtils.hasText(options.getCredentialsJson())) builder.credentials(loadCredentialsJson(connectionName, options.getCredentialsJson()));
+            if (StringUtils.hasText(options.getCredentialsJson())) builder.credentials(loadCredentialsJson(connectionName, options.getCredentialsJson()));
         }
         return GoogleGenAiChatModel.builder().genAiClient(builder.build()).retryTemplate(oneAttemptTemplate())
                 .observationRegistry(observationRegistry).build();
@@ -457,19 +453,6 @@ public final class SpringAiProviderIntegration
 
     private static String text(JsonNode node) { return node.isTextual() && !node.asText().isBlank() ? node.asText() : null; }
 
-    private GoogleCredentials loadCredentials(String connectionName, String uri)
-    {
-        try (InputStream input = resourceLoader.getResource(uri).getInputStream())
-        {
-            return GoogleCredentials.fromStream(input);
-        }
-        catch (IOException ex)
-        {
-            throw new SafeAiConnectionConfigurationException("loomspan.connections." + connectionName
-                    + ".gemini.credentials-uri could not be loaded");
-        }
-    }
-
     private GoogleCredentials loadCredentialsJson(String connectionName, String json)
     {
         try (InputStream input = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)))
@@ -479,7 +462,7 @@ public final class SpringAiProviderIntegration
         catch (IOException | RuntimeException ex)
         {
             throw new SafeAiConnectionConfigurationException("loomspan.connections." + connectionName
-                    + ".gemini.credentials-json-ref is invalid");
+                    + ".gemini.credentials-json is invalid");
         }
     }
 

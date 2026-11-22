@@ -12,7 +12,6 @@ import ai.loomspan.autoconfigure.LoomspanProperties;
 import ai.loomspan.internal.provider.ProviderFailureCategory;
 import ai.loomspan.internal.provider.ProviderFailureClassification;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
@@ -46,7 +45,7 @@ import static org.mockito.Mockito.when;
 class SpringAiProviderIntegrationTest
 {
     private final SpringAiProviderIntegration integration =
-            new SpringAiProviderIntegration(new DefaultResourceLoader());
+            new SpringAiProviderIntegration();
 
     @Test
     void malformedInMemoryVertexCredentialFailsLocallyWithoutDisclosingContent()
@@ -60,7 +59,7 @@ class SpringAiProviderIntegrationTest
         options.setCredentialsJson("invalid-json-secret-sentinel");
         connection.setGemini(options);
         assertThat(catchThrowable(() -> integration.create("vertex", connection)))
-                .hasMessageContaining("credentials-json-ref")
+                .hasMessageContaining("credentials-json")
                 .hasMessageNotContaining("invalid-json-secret-sentinel");
     }
 
@@ -81,15 +80,16 @@ class SpringAiProviderIntegrationTest
                 """.formatted(pem.replace("\n", "\\n"));
         assertThat(com.google.auth.oauth2.ServiceAccountCredentials.fromStream(
                 new ByteArrayInputStream(json.getBytes(java.nio.charset.StandardCharsets.UTF_8)))).isNotNull();
-        var connection = new LoomspanProperties.ConnectionProperties();
-        connection.setDriver(AiDriver.GEMINI);
-        var options = new LoomspanProperties.GeminiOptions();
-        options.setVertexAi(true);
-        options.setProjectId("project");
-        options.setLocation("us-central1");
-        options.setCredentialsJson(json);
-        connection.setGemini(options);
-        assertThat(integration.create("vertex", connection).chatModel()).isNotNull();
+        String yaml = "loomspan:\n  connections:\n    vertex:\n      driver: gemini\n      gemini:\n"
+                + "        vertex-ai: true\n        project-id: project\n        location: us-central1\n        credentials-json: |\n"
+                + json.indent(10);
+        var connection = ai.loomspan.internal.skill.ExecutionConfigurationParser.parse("default",
+                new ai.loomspan.api.ExecutionConfiguration(yaml), java.util.Map.of())
+                .properties().getConnections().get("vertex");
+        assertThat(connection.getGemini().getCredentialsJson()).isEqualTo(json);
+        var runtime = integration.create("vertex", connection);
+        assertThat(runtime.chatModel()).isNotNull();
+        ((org.springframework.beans.factory.DisposableBean) runtime.chatModel()).destroy();
     }
 
     @Test

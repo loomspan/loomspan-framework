@@ -7,7 +7,6 @@ import ai.loomspan.internal.springai.SpringAiChatOptionsContributor;
 import ai.loomspan.internal.provider.ProviderFailureCategory;
 import ai.loomspan.internal.provider.ProviderFailureClassification;
 import ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration;
-import org.springframework.core.io.DefaultResourceLoader;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -60,10 +59,17 @@ class ConnectionProtocolTest {
             server.enqueue(json("""
                 {"id":"chatcmpl-1","object":"response","created_at":1,"model":"routed-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"ok","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """));
-            LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
-            properties.setDriver(AiDriver.OPENAI);
-            properties.setApiKey("gateway-key");
-            properties.setBaseUrl(server.url("/api/v1").toString());
+            var properties = ai.loomspan.internal.skill.ExecutionConfigurationParser.parse("default",
+                    new ai.loomspan.api.ExecutionConfiguration("""
+                            loomspan:
+                              connections:
+                                gateway:
+                                  driver: openai
+                                  api-key: gateway-key
+                                  base-url: %s
+                                  headers: {X-Region: west}
+                            """.formatted(server.url("/api/v1"))), Map.of())
+                    .properties().getConnections().get("gateway");
 
             var model = integration().create("gateway", properties).chatModel();
             model.call(new Prompt("hello", OpenAiResponsesChatOptions.builder().model("routed-model").build()));
@@ -72,6 +78,8 @@ class ConnectionProtocolTest {
             assertThat(request).isNotNull();
             assertThat(server.getRequestCount()).isEqualTo(1);
             assertThat(request.getPath()).isEqualTo("/api/v1/responses");
+            assertThat(request.getHeader("Authorization")).isEqualTo("Bearer gateway-key");
+            assertThat(request.getHeader("X-Region")).isEqualTo("west");
         }
     }
 
@@ -248,6 +256,6 @@ class ConnectionProtocolTest {
     }
 
     private static SpringAiProviderIntegration integration() {
-        return new SpringAiProviderIntegration(new DefaultResourceLoader());
+        return new SpringAiProviderIntegration();
     }
 }

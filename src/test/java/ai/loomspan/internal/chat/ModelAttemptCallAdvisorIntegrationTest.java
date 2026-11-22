@@ -48,7 +48,6 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
-import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
@@ -99,7 +98,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                 properties.getProviderRetry().setInitialBackoff(java.time.Duration.ZERO);
                 properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
                 properties.getProviderRetry().setJitter(0);
-                var runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("local", properties);
+                var runtime = new SpringAiProviderIntegration().create("local", properties);
                 var quotas = new LoomspanProperties.Session.Quotas();
                 if (scenario.equals("quota")) quotas.setMaxProviderAttempts(1);
                 var usage = new DefaultSessionUsageService(quotas, new NoOpUsageMetricsRecorder());
@@ -159,7 +158,7 @@ class ModelAttemptCallAdvisorIntegrationTest
             properties.getProviderRetry().setInitialBackoff(java.time.Duration.ZERO);
             properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
             properties.getProviderRetry().setJitter(0);
-            var runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("local", properties);
+            var runtime = new SpringAiProviderIntegration().create("local", properties);
             var usage = usageService();
             var state = new DefaultExecutionStateService(CLOCK, usage);
             var session = TestLoomspanSessions.withId("complete-correction-context-limit", "default-test_entry", 4);
@@ -300,7 +299,7 @@ class ModelAttemptCallAdvisorIntegrationTest
             properties.setApiKey("test-key");
             properties.setBaseUrl(server.url("/v1").toString());
             properties.getProviderRetry().setEnabled(false);
-            ProviderConnectionRuntime runtime = new SpringAiProviderIntegration(new DefaultResourceLoader())
+            ProviderConnectionRuntime runtime = new SpringAiProviderIntegration()
                     .create("openai", properties);
             DefaultSessionUsageService usageService = usageService();
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
@@ -373,7 +372,7 @@ class ModelAttemptCallAdvisorIntegrationTest
             properties.setApiKey("test-key");
             properties.setBaseUrl(server.url("/v1").toString());
             properties.getProviderRetry().setEnabled(false);
-            ProviderConnectionRuntime runtime = new SpringAiProviderIntegration(new DefaultResourceLoader())
+            ProviderConnectionRuntime runtime = new SpringAiProviderIntegration()
                     .create("openai", properties);
             DefaultSessionUsageService usageService = usageService();
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
@@ -486,7 +485,7 @@ class ModelAttemptCallAdvisorIntegrationTest
         LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
         properties.setDriver(AiDriver.OPENAI);
         properties.setApiKey("not-configured");
-        ProviderFailureTranslator translator = new SpringAiProviderIntegration(new DefaultResourceLoader())
+        ProviderFailureTranslator translator = new SpringAiProviderIntegration()
                 .create("primary-openai", properties)
                 .failureTranslator();
         AtomicInteger calls = new AtomicInteger();
@@ -657,7 +656,7 @@ class ModelAttemptCallAdvisorIntegrationTest
         LoomspanProperties.ConnectionProperties properties = new LoomspanProperties.ConnectionProperties();
         properties.setDriver(AiDriver.OPENAI);
         properties.setApiKey("test-key");
-        ProviderFailureTranslator translator = new SpringAiProviderIntegration(new DefaultResourceLoader())
+        ProviderFailureTranslator translator = new SpringAiProviderIntegration()
                 .create("openai", properties)
                 .failureTranslator();
         ProviderConnectionRuntime runtime = ProviderConnectionRuntime.chat(
@@ -964,7 +963,7 @@ class ModelAttemptCallAdvisorIntegrationTest
             properties.getProviderRetry().setInitialBackoff(java.time.Duration.ZERO);
             properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
             properties.getProviderRetry().setJitter(0.0d);
-            ProviderConnectionRuntime runtime = new SpringAiProviderIntegration(new DefaultResourceLoader())
+            ProviderConnectionRuntime runtime = new SpringAiProviderIntegration()
                     .create("openrouter", properties);
             DefaultSessionUsageService usageService = usageService();
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);

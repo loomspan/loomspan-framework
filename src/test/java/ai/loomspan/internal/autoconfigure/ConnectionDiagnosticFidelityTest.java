@@ -34,7 +34,7 @@ class ConnectionDiagnosticFidelityTest {
     private static final String API_KEY = "SENTINEL-API-KEY";
     private static final String HEADER_VALUE = "SENTINEL-HEADER-VALUE";
     private static final String BASE_URL = "http://[SENTINEL-BASE-URL";
-    private static final String CREDENTIAL_URI = "file:SENTINEL-CREDENTIAL-PATH.json";
+    private static final String CREDENTIAL_JSON = "{SENTINEL-CREDENTIAL-JSON}";
 
     @Test
     void constructionCauseRemainsVerbatimAlongsideStructuredIdentity(CapturedOutput output) throws Exception {
@@ -44,7 +44,7 @@ class ConnectionDiagnosticFidelityTest {
         connection.setBaseUrl(BASE_URL);
         connection.setHeaders(Map.of("X-Private", HEADER_VALUE));
         LoomspanProperties.GeminiOptions gemini = new LoomspanProperties.GeminiOptions();
-        gemini.setCredentialsUri(CREDENTIAL_URI);
+        gemini.setCredentialsJson(CREDENTIAL_JSON);
 
         String registryFailure = registryFailure(connection);
 
@@ -81,14 +81,14 @@ class ConnectionDiagnosticFidelityTest {
                 connection.toString(), gemini.toString(), registryFailure, serializedMetadata,
                 descriptor, meterTags, output.getAll());
         assertThat(allOwnedOutput)
-                .contains(API_KEY, HEADER_VALUE, BASE_URL, CREDENTIAL_URI,
+                .contains(API_KEY, HEADER_VALUE, BASE_URL, CREDENTIAL_JSON,
                         "safe-connection", "OPENAI", "loomspan.connections.sensitive.base-url");
     }
 
     private static String registryFailure(LoomspanProperties.ConnectionProperties connection) {
         SpringAiProviderIntegration integration = mock(SpringAiProviderIntegration.class);
         when(integration.create("sensitive", connection))
-                .thenThrow(new IllegalStateException(API_KEY + HEADER_VALUE + BASE_URL + CREDENTIAL_URI));
+                .thenThrow(new IllegalStateException(API_KEY + HEADER_VALUE + BASE_URL + CREDENTIAL_JSON));
         try {
             new NamedAiConnectionRegistry(Map.of("sensitive", connection), integration);
             throw new AssertionError("Expected connection construction to fail");

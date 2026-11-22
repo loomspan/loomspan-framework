@@ -7,14 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatModel;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatModel;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.ResourceLoader;
-
-import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class AiConnectionChatModelFactoryTests {
 
@@ -43,11 +37,7 @@ class AiConnectionChatModelFactoryTests {
         assertThat(integration().create("anthropic", anthropic).chatModel())
                 .isInstanceOf(AnthropicChatModel.class);
 
-        ResourceLoader resourceLoader = mock(ResourceLoader.class);
-        when(resourceLoader.getResource("test:credentials")).thenReturn(new ByteArrayResource("""
-                {"type":"authorized_user","client_id":"client","client_secret":"secret","refresh_token":"token"}
-                """.getBytes(StandardCharsets.UTF_8)));
-        SpringAiProviderIntegration geminiFactory = new SpringAiProviderIntegration(resourceLoader);
+        SpringAiProviderIntegration geminiFactory = new SpringAiProviderIntegration();
         LoomspanProperties.ConnectionProperties apiKeyGemini = new LoomspanProperties.ConnectionProperties();
         apiKeyGemini.setDriver(AiDriver.GEMINI);
         apiKeyGemini.setApiKey("test-key");
@@ -59,12 +49,18 @@ class AiConnectionChatModelFactoryTests {
         vertex.setVertexAi(true);
         vertex.setProjectId("test-project");
         vertex.setLocation("us-central1");
-        vertex.setCredentialsUri("test:credentials");
         vertexGemini.setGemini(vertex);
-        assertThat(geminiFactory.create("gemini-vertex", vertexGemini).chatModel()).isInstanceOf(GoogleGenAiChatModel.class);
+        var defaultCredentials = com.google.auth.oauth2.GoogleCredentials.create(
+                new com.google.auth.oauth2.AccessToken("fixture-token", new java.util.Date(Long.MAX_VALUE)));
+        try (var defaults = org.mockito.Mockito.mockStatic(com.google.auth.oauth2.GoogleCredentials.class)) {
+            defaults.when(com.google.auth.oauth2.GoogleCredentials::getApplicationDefault)
+                    .thenReturn(defaultCredentials);
+            assertThat(geminiFactory.create("gemini-vertex", vertexGemini).chatModel()).isInstanceOf(GoogleGenAiChatModel.class);
+            defaults.verify(com.google.auth.oauth2.GoogleCredentials::getApplicationDefault);
+        }
     }
 
     private static SpringAiProviderIntegration integration() {
-        return new SpringAiProviderIntegration(mock(ResourceLoader.class));
+        return new SpringAiProviderIntegration();
     }
 }

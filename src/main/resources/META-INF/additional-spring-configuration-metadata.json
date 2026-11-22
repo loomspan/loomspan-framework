@@ -122,9 +122,9 @@
       "description": "Required Google Cloud location in Gemini Vertex AI mode."
     },
     {
-      "name": "loomspan.connections.*.gemini.credentials-uri",
+      "name": "loomspan.connections.*.gemini.credentials-json",
       "type": "java.lang.String",
-      "description": "Optional Spring resource URI for credentials in Gemini Vertex AI mode."
+      "description": "Optional service-account JSON contents in Gemini Vertex AI mode."
     },
     {
       "name": "loomspan.models",

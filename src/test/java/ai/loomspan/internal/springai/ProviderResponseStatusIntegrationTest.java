@@ -23,7 +23,6 @@ import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.openai.responses.OpenAiResponsesChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
-import org.springframework.core.io.DefaultResourceLoader;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
@@ -490,7 +489,7 @@ class ProviderResponseStatusIntegrationTest
             properties.getProviderRetry().setInitialBackoff(java.time.Duration.ZERO);
             properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
             properties.getProviderRetry().setJitter(0);
-            runtime = new SpringAiProviderIntegration(new DefaultResourceLoader()).create("fixture", properties);
+            runtime = new SpringAiProviderIntegration().create("fixture", properties);
             session = TestLoomspanSessions.withId("status-" + driver + "-" + UUID.randomUUID(), "default-test_entry", 4);
             binding = TestExecutionBindings.missionBinding(session);
             ExecutionBindingScope.runWith(binding, () -> {

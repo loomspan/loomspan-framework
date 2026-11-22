@@ -14,7 +14,6 @@ import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.function.FunctionToolCallback;
-import org.springframework.core.io.DefaultResourceLoader;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -178,7 +177,7 @@ class AnthropicProtocolIntegrationTest
         properties.setDriver(AiDriver.ANTHROPIC);
         properties.setApiKey("fixture");
         properties.setBaseUrl(server.url("/").toString());
-        return new SpringAiProviderIntegration(new DefaultResourceLoader()).create("test", properties).chatModel();
+        return new SpringAiProviderIntegration().create("test", properties).chatModel();
     }
 
     private static Map<String,Object> schema(String json)
