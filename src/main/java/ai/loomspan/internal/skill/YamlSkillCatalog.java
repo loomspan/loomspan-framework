@@ -151,6 +151,15 @@ public class YamlSkillCatalog implements InitializingBean
         return checked(issues);
     }
 
+    private Map<String, Map<?, ?>> candidateTrees = Map.of();
+
+    CheckedDocuments checkedSupplied(String namespace, List<SkillDocument> documents, boolean logWarnings,
+            Map<String, Map<?, ?>> trees) {
+        candidateTrees = trees;
+        try { return checkedSupplied(namespace, documents, logWarnings); }
+        finally { candidateTrees = Map.of(); }
+    }
+
     CheckedDocuments checkedSupplied(String namespace, List<SkillDocument> documents, boolean logWarnings)
     {
         this.namespace = SkillIdentity.normalizeNamespace(namespace);
@@ -391,8 +400,12 @@ public class YamlSkillCatalog implements InitializingBean
     {
         try (InputStream inputStream = new ByteArrayInputStream(bytes))
         {
-            var decoded = ai.loomspan.internal.serialization.SkillDocumentValues.decode(
-                    inputStream, describe(resource), yamlObjectMapper);
+            var tree = candidateTrees.get(diagnosticSource(resource));
+            var decoded = tree == null ? ai.loomspan.internal.serialization.SkillDocumentValues.decode(
+                    inputStream, describe(resource), yamlObjectMapper)
+                    : ai.loomspan.internal.serialization.SkillDocumentValues.decode(
+                            new String(bytes, StandardCharsets.UTF_8), diagnosticSource(resource), yamlObjectMapper,
+                            tree.get("config"), tree.containsKey("config"));
             Object executorConfig = decoded.executorConfig();
             boolean configPresent = decoded.configPresent();
             JsonNode root = decoded.root();

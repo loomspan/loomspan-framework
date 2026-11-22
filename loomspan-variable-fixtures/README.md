@@ -1,6 +1,6 @@
 # YAML variable conformance fixtures
 
-These files exercise whole-node discovery and substitution through the internal authored YAML facility. Java consumes every case with `VariableMarkerFixtureTest`. Independent implementations can consume the same YAML and JSON files. Startup and skill preparation currently retain their existing parsing behavior.
+These files exercise whole-node discovery and substitution through the internal authored YAML facility. Java consumes every case with `VariableMarkerFixtureTest`. Independent implementations can consume the same YAML and JSON files. Published skill preparation consumes the same markers across all three selected sections. `ExecutorGenerationExecutionIntegrationTest#workedVariableCorpusReachesProviderAndActualExecutor` prepares and invokes the worked case. Startup provider settings use ordinary Spring binding.
 
 Enumerate every immediate case directory and read its `expected.json`. Read `documents` in array order. Each document has a relative `source` filename and `kind` equal to `execution` or `skill`. The source string is also the exact filename carried by occurrences and failures.
 

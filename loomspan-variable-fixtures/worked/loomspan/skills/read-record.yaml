@@ -1,4 +1,5 @@
-name: read-record
+name: read_record
+description: Read a record from the configured service
 executor: http
 config:
   target: records

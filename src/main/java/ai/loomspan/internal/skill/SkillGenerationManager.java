@@ -160,15 +160,17 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     }
 
     public SkillGeneration prepare(PreparationView view, List<SkillDocument> documents, ExecutionConfiguration configuration,
-            NamespaceVisibility visibility, Map<String, String> credentialValues, String publicationVersion) {
+            NamespaceVisibility visibility, Map<String, String> variableValues, String publicationVersion) {
         requireInitialized();
         Objects.requireNonNull(visibility, "visibility must not be null");
-        var parsed = ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, false);
-        var checked = check(view.namespace(), new YamlSkillCatalog(parsed.properties()).checkedSupplied(view.namespace(), documents, true),
-                visibility, view.namespaces(), parsed.executorConfig());
+        var authored = new PreparedCandidateVariables(configuration, documents);
+        var staged = ExecutionConfigurationParser.parseTree(view.namespace(), authored.stagedExecution());
+        check(view.namespace(), authored.checkedSkills(staged.properties(), documents, true, authored.stagedSkills(), view.namespace()), visibility, view.namespaces(), staged.executorConfig(),
+                path -> authored.unknownSelector(view.namespace(), path)).requireValid();
+        var resolved = authored.resolve(variableValues == null ? name -> environment.getProperty(name) : variableValues::get, variableValues);
+        var parsed = ExecutionConfigurationParser.parseTree(view.namespace(), resolved.execution());
+        var checked = check(view.namespace(), authored.checkedSkills(parsed.properties(), documents, true, resolved.skills(), view.namespace()), visibility, view.namespaces(), parsed.executorConfig());
         checked.requireValid();
-        parsed = credentialValues == null ? ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, true)
-                : ExecutionConfigurationParser.parse(view.namespace(), configuration, credentialValues);
         return prepareCatalog(checked, parsed.properties(), parsed.tracePersistence(), visibility, publicationVersion);
     }
 
@@ -178,9 +180,10 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         Objects.requireNonNull(visibility, "visibility must not be null");
         Objects.requireNonNull(configuration, "configuration must not be null");
         try {
-            var parsed = ExecutionConfigurationParser.parse(view.namespace(), configuration, environment, false);
-            return validationResult(check(view.namespace(), new YamlSkillCatalog(parsed.properties()).checkedSupplied(view.namespace(), documents, false),
-                    visibility, view.namespaces(), parsed.executorConfig()));
+            var authored = new PreparedCandidateVariables(configuration, documents);
+            var parsed = ExecutionConfigurationParser.parseTree(view.namespace(), authored.stagedExecution());
+            return validationResult(check(view.namespace(), authored.checkedSkills(parsed.properties(), documents, false, authored.stagedSkills(), view.namespace()), visibility, view.namespaces(), parsed.executorConfig(),
+                    path -> authored.unknownSelector(view.namespace(), path)));
         } catch (RuntimeException ex) {
             return new SkillValidationResult(List.of(new SkillValidationIssue(SkillValidationIssue.Severity.ERROR,
                     "<configuration>", null, "configuration", ex.getMessage())), List.of());
@@ -189,9 +192,15 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
 
     private SkillDependencyValidator.CheckedSet check(String namespace, YamlSkillCatalog.CheckedDocuments documents,
             NamespaceVisibility visibility, Map<String, SkillGeneration> external, ExecutorConfiguration configuration) {
+        return check(namespace, documents, visibility, external, configuration, path -> false);
+    }
+
+    private SkillDependencyValidator.CheckedSet check(String namespace, YamlSkillCatalog.CheckedDocuments documents,
+            NamespaceVisibility visibility, Map<String, SkillGeneration> external, ExecutorConfiguration configuration,
+            java.util.function.Predicate<String> unknownSelector) {
         return new SkillDependencyValidator(inputs, fixedJavaCapabilities).check(namespace, documents, visibility, external,
                 fixedExecutors.stream().filter(registration -> registration.identity().namespace().equals(namespace)).toList(),
-                configuration.namespaces().getOrDefault(namespace, Map.of()));
+                configuration.namespaces().getOrDefault(namespace, Map.of()), unknownSelector);
     }
 
     private void requireInitialized() {

@@ -317,7 +317,7 @@ class PublicSkillReloadIntegrationTest
                         SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
                         var firstConfiguration = candidateConfiguration(first, "host.key");
                         assertThatThrownBy(() -> reloader.prepare("default", documents, firstConfiguration, Map.of()))
-                                .isInstanceOf(SkillReloadException.class).hasMessageContaining("api-key-ref");
+                                .isInstanceOf(SkillReloadException.class).hasMessageContaining("api-key");
                         PreparedSkillUpdate a = reloader.prepare("default", documents, firstConfiguration, Map.of("host.key", "host-A"));
                         assertThat(first.getRequestCount()).isZero();
                         reloader.publish(a);
@@ -440,7 +440,7 @@ class PublicSkillReloadIntegrationTest
                     candidate:
                       driver: openai
                       base-url: %s
-                      api-key-ref: %s
+                      api-key: {$var: %s}
                       provider-retry:
                         max-attempts: %d
                         initial-backoff: 0ms
@@ -468,7 +468,7 @@ class PublicSkillReloadIntegrationTest
                         candidate:
                           driver: openai
                           base-url: %s
-                          api-key-ref: candidate.key
+                          api-key: {$var: candidate.key}
                       models:
                         candidate-model:
                           connection: candidate

@@ -1,7 +1,7 @@
 loomspan:
   connections:
     primary:
-      provider: openai
+      driver: openai
       api-key: { $var: provider.key }
       headers:
         X-Region: { $var: app.region }

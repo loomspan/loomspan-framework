@@ -42,6 +42,14 @@ public final class SkillDependencyValidator {
             ai.loomspan.api.NamespaceVisibility visibility, Map<String, SkillGeneration> external,
             List<ai.loomspan.internal.core.SkillExecutorRegistration> fixedExecutors, Map<String, Object> configuration)
     {
+        return check(namespace, documents, visibility, external, fixedExecutors, configuration, path -> false);
+    }
+
+    CheckedSet check(String namespace, YamlSkillCatalog.CheckedDocuments documents,
+            ai.loomspan.api.NamespaceVisibility visibility, Map<String, SkillGeneration> external,
+            List<ai.loomspan.internal.core.SkillExecutorRegistration> fixedExecutors, Map<String, Object> configuration,
+            java.util.function.Predicate<String> unknownSelector)
+    {
         List<SkillValidationIssue> issues = new ArrayList<>(documents.issues());
         LinkedHashMap<String, CapabilityMetadata> names = new LinkedHashMap<>();
         for (CapabilityMetadata javaCapability : fixedJavaCapabilities.stream().filter(cap -> cap.identity().namespace().equals(namespace)).toList())
@@ -63,11 +71,11 @@ public final class SkillDependencyValidator {
         var owners = namespaceViews(external);
         var registrations = new LinkedHashMap<String, ai.loomspan.internal.core.SkillExecutorRegistration>();
         fixedExecutors.forEach(registration -> registrations.put(registration.name(), registration));
-        var candidate = new NamespaceView(visibility, registrations, configuration, "candidate");
+        var candidate = new NamespaceView(visibility, registrations, configuration, "candidate", unknownSelector);
         owners.put(namespace, candidate);
         // Every assigned fixed declaration is validated for the complete candidate, even without a callable.
         for (var registration : fixedExecutors) {
-            try { selectConfiguration(registration, configuration); }
+            try { selectConfiguration(registration, configuration, false, namespace, unknownSelector); }
             catch (IllegalStateException ex) { issues.add(new SkillValidationIssue(SkillValidationIssue.Severity.ERROR,
                     registration.source().toString(), registration.name(), "executor.config", ex.getMessage())); }
         }
@@ -140,12 +148,12 @@ public final class SkillDependencyValidator {
 
     private record NamespaceView(ai.loomspan.api.NamespaceVisibility visibility,
             Map<String, ai.loomspan.internal.core.SkillExecutorRegistration> executors,
-            Map<String, Object> configuration, String generationId) {}
+            Map<String, Object> configuration, String generationId, java.util.function.Predicate<String> unknownSelector) {}
 
     private static Map<String, NamespaceView> namespaceViews(Map<String, SkillGeneration> generations) {
         var result = new LinkedHashMap<String, NamespaceView>();
         generations.forEach((namespace, generation) -> result.put(namespace,
-                new NamespaceView(generation.visibility(), generation.executors(), generation.executorConfiguration(), generation.id())));
+                new NamespaceView(generation.visibility(), generation.executors(), generation.executorConfiguration(), generation.id(), path -> false)));
         return result;
     }
 
@@ -169,24 +177,20 @@ public final class SkillDependencyValidator {
         var registration = owner.executors().get(reference.identity().toString());
         if (registration == null) throw new IllegalStateException("Unknown executor '" + reference.identity() + "'");
         return new SkillAdmissionSnapshot.ExecutorBinding(registration,
-                selectConfiguration(registration, owner.configuration()),
+                selectConfiguration(registration, owner.configuration(), false, reference.identity().namespace(), owner.unknownSelector()),
                 reference.identity().namespace().equals(definition.identity().namespace()) ? Map.of()
                         : selectConfiguration(registration, owners.get(definition.identity().namespace()).configuration(),
-                                true, definition.identity().namespace()), owner.generationId());
+                                true, definition.identity().namespace(), owners.get(definition.identity().namespace()).unknownSelector()), owner.generationId());
     }
 
     /** Exact dot-path selection belongs to dependency binding, never invocation or domain validation. */
     private static Map<String, Object> selectConfiguration(ai.loomspan.internal.core.SkillExecutorRegistration registration,
-            Map<String, Object> configuration) {
-        return selectConfiguration(registration, configuration, false, registration.identity().namespace());
-    }
-
-    private static Map<String, Object> selectConfiguration(ai.loomspan.internal.core.SkillExecutorRegistration registration,
-            Map<String, Object> configuration, boolean optional, String namespace) {
+            Map<String, Object> configuration, boolean optional, String namespace, java.util.function.Predicate<String> unknownSelector) {
         String path = registration.config();
         if (path == null || path.isEmpty()) return Map.of();
         if (!path.equals(path.strip()) || path.isBlank() || java.util.Arrays.stream(path.split("\\.", -1)).anyMatch(String::isEmpty))
             throw new IllegalStateException("Invalid executor config path '" + path + "' for '" + registration.name() + "'");
+        if (unknownSelector.test(path)) return Map.of();
         Object selected = configuration;
         for (String segment : path.split("\\.")) {
             if (!(selected instanceof Map<?, ?> map))

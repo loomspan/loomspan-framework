@@ -213,8 +213,8 @@ reloader.remove("department", current.generationId());
 ```
 
 The labeled preparation overload accepts the host's `publicationVersion` next to
-the namespace and requires explicit visibility. Add a credential map after visibility
-to use explicit credentials.
+the namespace and requires explicit visibility. Add `variableValues` after visibility
+to use a copied explicit map.
 
 ```java
 try (PreparedSkillUpdate candidate = reloader.prepare(
@@ -248,7 +248,7 @@ declarations and execution configuration; omitted settings use built-in defaults
 with no inheritance of models, connections or previous settings. Publishable keys are
 `loomspan.connections`, `loomspan.models`, `loomspan.session`, `loomspan.executor-config`, and
 `loomspan.execution-trace.persistence`; host and unknown settings fail validation.
-Credential references resolve through Environment or a copied explicit map.
+Whole-node `{ $var: name }` markers resolve once per published candidate across provider settings, namespace executor data and executor-backed skill `config`. Every no-map preparation uses normal `Environment.getProperty(name)`. Explicit `variableValues` maps use exact names, require every used value and reject unused entries. Returned strings remain terminal, including `${...}` and multiline JSON. Staged validation needs no values. Preparation independently resolves and captures its supplied documents, and publication performs zero lookups. See the [publication guide](agent-skills/loomspan-docs/references/java-api/skill-reload.md).
 
 Executor leaf declarations use `executor:` and optional map-valued `config:`.
 An optional `input_transform:` uses JSLT to produce the complete Java input object
@@ -335,7 +335,7 @@ ExecutionConfiguration execution = new ExecutionConfiguration("""
             chat:
               driver: openai
               base-url: https://api.openai.com/v1
-              api-key-ref: provider-key
+              api-key: { $var: provider-key }
           models:
             assistant: {connection: chat, provider-model: gpt-4.1-mini}
         """);

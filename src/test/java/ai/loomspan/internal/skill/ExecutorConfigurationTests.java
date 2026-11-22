@@ -63,7 +63,7 @@ class ExecutorConfigurationTests {
                 .containsEntry("sql", "${UNSET_EXECUTOR_VALUE}").containsEntry("Nil", null)
                 .containsEntry("Upper", "A").containsEntry("upper", "B").containsEntry("literal.dot", "kept");
         assertThatThrownBy(() -> ExecutionConfigurationParser.parse("sales", new ExecutionConfiguration("loomspan: {executor-config: {sales: {api-key-ref: unused}}}"), Map.of("unused", "value")))
-                .hasMessageContaining("unused reference");
+                .hasMessageContaining("unused entry");
         assertThat(ExecutorConfiguration.from(Map.of("sales", Map.of(), "infrastructure", Map.of())).namespaces()).hasSize(2);
     }
 }

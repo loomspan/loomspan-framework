@@ -22,6 +22,82 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.*;
 
 class ExecutorGenerationExecutionIntegrationTest {
+    @Test void workedVariableCorpusReachesProviderAndActualExecutor(@TempDir Path directory) throws Exception {
+        var root = Path.of("loomspan-variable-fixtures/worked");
+        var execution = new ExecutionConfiguration(Files.readString(root.resolve("loomspan/execution.yaml")));
+        var skill = new SkillDocument("loomspan/skills/read-record.yaml", Files.readString(root.resolve("loomspan/skills/read-record.yaml")));
+        var counts = new java.util.concurrent.ConcurrentHashMap<String, Integer>();
+        var values = Map.<String, Object>of("provider.key", "demo-key", "app.region", "west",
+                "records.url", "https://records.example.test", "records.lookup-path", "/v2/records/{recordId}");
+        var settings = directory.resolve("application.yml");
+        Files.writeString(settings, "loomspan: {executor-config: {infra: {settings: {}}, sales: {targets: {}}}}\n");
+        context(directory).withUserConfiguration(SalesBeans.class).withInitializer(new ConfigDataApplicationContextInitializer())
+                .withPropertyValues("spring.config.location=" + settings.toUri())
+                .withInitializer(context -> context.getEnvironment().getPropertySources().addFirst(
+                        new org.springframework.core.env.MapPropertySource("variables", values) {
+                            @Override public Object getProperty(String name) {
+                                if (values.containsKey(name)) counts.merge(name, 1, Integer::sum);
+                                return super.getProperty(name);
+                            }
+                        })).run(context -> {
+                    assertThat(context).hasNotFailed();
+                    counts.clear();
+                    var reloader = context.getBean(SkillReloader.class);
+                    assertThat(reloader.validate("sales", List.of(skill), execution).valid()).isTrue();
+                    assertThat(counts).isEmpty();
+                    try (var candidate = reloader.prepare("sales", List.of(skill), execution)) {
+                        assertThat(counts).containsOnlyKeys(values.keySet()).allSatisfy((name, count) -> assertThat(count).isEqualTo(1));
+                        reloader.publish(candidate);
+                    }
+                    var connection = context.getBean(ai.loomspan.internal.skill.SkillGenerationManager.class)
+                            .active("sales").runtime().properties().getConnections().get("primary");
+                    assertThat(connection.getApiKey()).isEqualTo("demo-key");
+                    assertThat(connection.getHeaders()).containsEntry("X-Region", "west");
+                    assertThat(context.getBean(SkillTemplate.class).invoke("sales-read_record", Map.of("recordId", "42"))).isEqualTo("record");
+                    var invocation = context.getBean(SalesHttp.class).invocation;
+                    var records = (Map<?, ?>) invocation.executorConfig().get("records");
+                    assertThat(records.get("base-url")).isEqualTo("https://records.example.test");
+                    assertThat(records.get("headers")).isEqualTo(Map.of("X-Region", "west", "Accept", "application/json"));
+                    assertThat(records.get("regions")).isEqualTo(List.of(Map.of("values", List.of("west"))));
+                    assertThat(invocation.skillConfig()).containsEntry("path", "/v2/records/{recordId}");
+                    assertThat(invocation.input()).containsEntry("recordId", "42");
+                    assertThat(counts).allSatisfy((name, count) -> assertThat(count).isEqualTo(1));
+                });
+    }
+
+    @Test void resolvedForeignOwnerConsumerAndLeafRemainCapturedAcrossRotation(@TempDir Path directory) throws Exception {
+        var settings = directory.resolve("application.yml");
+        Files.writeString(settings, "loomspan: {executor-config: {infra: {settings: {}}}}\n");
+        context(directory).withInitializer(new ConfigDataApplicationContextInitializer())
+                .withPropertyValues("spring.config.location=" + settings.toUri(), "shared=host-third")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    var reloader = context.getBean(SkillReloader.class);
+                    var ownerConfig = new ExecutionConfiguration("loomspan: {executor-config: {infra: {settings: {version: {$var: shared}}}}}");
+                    var consumerConfig = new ExecutionConfiguration("loomspan: {executor-config: {caller: {settings: {key: {$var: shared}}}}}");
+                    var leaf = new SkillDocument("leaf", leaf("leaf", "infra-configured").yaml()
+                            .replace("operation: echo", "operation: echo, value: {$var: shared}"));
+                    var owner = reloader.prepare("infra", "same", List.of(), ownerConfig, NamespaceVisibility.PUBLIC, Map.of("shared", "owner-first"));
+                    reloader.publish(owner);
+                    var consumer = reloader.prepare("caller", "same", List.of(leaf), consumerConfig, NamespaceVisibility.PRIVATE, Map.of("shared", "consumer-first"));
+                    reloader.publish(consumer);
+                    var retained = context.getBean(SkillInvocationHandoff.class).handoff("caller-leaf", Map.of("value", "business"));
+                    var nextOwner = reloader.prepare("infra", "same", List.of(), ownerConfig, NamespaceVisibility.PUBLIC, Map.of("shared", "owner-second"));
+                    reloader.publish(nextOwner);
+                    var nextConsumer = reloader.prepare("caller", "same", List.of(leaf), consumerConfig, NamespaceVisibility.PRIVATE, Map.of("shared", "consumer-second"));
+                    reloader.publish(nextConsumer);
+                    assertThat(context.getBean(SkillTemplate.class).invoke("caller-leaf", Map.of())).isEqualTo("owner-second");
+                    var bean = context.getBean(Executors.class);
+                    assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "consumer-second");
+                    assertThat(bean.invocations.getLast().skillConfig()).containsEntry("value", "consumer-second");
+                    assertThat(retained.invoke()).isEqualTo("owner-first");
+                    assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "consumer-first");
+                    assertThat(bean.invocations.getLast().skillConfig()).containsEntry("value", "consumer-first");
+                    assertThat(bean.invocations.getLast().input()).containsEntry("value", "business");
+                    assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(owner.generationId());
+                });
+    }
+
     @Test void startupAndPublishedConfigurationDeliverTheSameSelectedData(@TempDir Path directory) throws Exception {
         String data = "{Upper: A, upper: B, 'literal.dot': [null, {}, [], 7, 2.5, true, '7'], placeholder: '${UNSET_EXECUTOR_VALUE}', api-key-ref: ordinary}";
         Path settings = directory.resolve("application.yml");
@@ -246,7 +322,7 @@ class ExecutorGenerationExecutionIntegrationTest {
                         output_from: {skill: billing-one}
                         """);
                 String models = "loomspan:\n  executor-config: {support: {settings: {key: wrong-parent}}}\n"
-                        + "  connections: {local: {driver: openai, base-url: '" + planner.url("/v1") + "', api-key-ref: fixture}}\n"
+                        + "  connections: {local: {driver: openai, base-url: '" + planner.url("/v1") + "', api-key: {$var: fixture}}}\n"
                         + "  models: {local: {connection: local, provider-model: fixture}}\n  session: {mission-timeout: 10s}\n";
                 var prepared = reloader.prepare("support", List.of(parent), new ExecutionConfiguration(models), Map.of("fixture", "test"));
                 reloader.publish(prepared);
@@ -320,6 +396,12 @@ class ExecutorGenerationExecutionIntegrationTest {
         var candidate = reloader.prepare(namespace, docs, config, visibility); reloader.publish(candidate); return candidate;
     }
     @Configuration(proxyBeanMethods = false) static class Beans { @Bean Executors executors() { return new Executors(); } }
+    @Configuration(proxyBeanMethods = false) static class SalesBeans { @Bean SalesHttp salesHttp() { return new SalesHttp(); } }
+    static class SalesHttp {
+        SkillExecutorInvocation invocation;
+        @SkillExecutor(namespace = "sales", name = "http", config = "targets")
+        public String execute(SkillExecutorInvocation invocation) { this.invocation = invocation; return "record"; }
+    }
     @Configuration(proxyBeanMethods = false)
     @org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity(jsr250Enabled=true,proxyTargetClass=true)
     static class SecuredBeans {

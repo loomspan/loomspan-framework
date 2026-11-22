@@ -26,7 +26,7 @@ class SkillReloaderTest {
             return runtime(properties, policy);
         });
         var configuration = new ExecutionConfiguration(MODEL.yaml()
-                .replace("api-key-ref: fixture.key", "api-key: demo-key, headers: {X-Region: west}"));
+                .replace("api-key: {$var: fixture.key}", "api-key: demo-key, headers: {X-Region: west}"));
         try (var candidate = fixture.reloader.prepare("literal", "literal-v1", List.of(model("leaf")),
                 configuration, NamespaceVisibility.PRIVATE, Map.of())) {
             assertThat(candidate).isNotNull();
@@ -39,10 +39,27 @@ class SkillReloaderTest {
         }
     }
 
+    @Test void candidateSharesVariablesAcrossProviderNamespaceAndSkillConfig() {
+        var fixture = new Fixture(null);
+        var config = new ExecutionConfiguration("""
+                loomspan:
+                  connections: {api: {driver: openai, api-key: {$var: key}, headers: {X-Region: {$var: region}}}}
+                  models: {model: {connection: api, provider-model: fixture}}
+                  executor-config: {sales: {region: {$var: region}}}
+                """);
+        try (var candidate = fixture.reloader.prepare("sales", List.of(model("leaf")), config,
+                Map.of("key", "demo-key", "region", "west"))) {
+            fixture.reloader.publish(candidate);
+            var generation = fixture.manager.active("sales");
+            assertThat(generation.runtime().properties().getConnections().get("api").getApiKey()).isEqualTo("demo-key");
+            assertThat(generation.executorConfiguration()).containsEntry("region", "west");
+        } finally { fixture.manager.destroy(); fixture.lifecycle.destroy(); }
+    }
+
     static final ExecutionConfiguration EMPTY = new ExecutionConfiguration("loomspan: {}");
     static final ExecutionConfiguration MODEL = new ExecutionConfiguration("""
             loomspan:
-              connections: {local: {driver: openai, api-key-ref: fixture.key, base-url: 'http://localhost:11434/v1'}}
+              connections: {local: {driver: openai, api-key: {$var: fixture.key}, base-url: 'http://localhost:11434/v1'}}
               models: {model: {connection: local, provider-model: fixture}}
             """);
 
@@ -279,7 +296,7 @@ class SkillReloaderTest {
     @Test void concurrentCredentialsAndInvalidPeerRemainIsolated() throws Exception {
         var f=new Fixture(null);String config="""
                 loomspan:
-                  connections: {api: {driver: openai, api-key-ref: key}}
+                  connections: {api: {driver: openai, api-key: {$var: key}}}
                   models: {model: {connection: api, provider-model: fixture}}
                 """;
         var start=new CountDownLatch(1);

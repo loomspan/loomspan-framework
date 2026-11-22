@@ -8,20 +8,20 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.bind.BindException;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.springframework.core.env.Environment;
-import ai.loomspan.internal.serialization.YamlValues;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
+import ai.loomspan.internal.serialization.AuthoredYamlVariables;
 
 /** Strict boundary between authored candidate YAML and runtime configuration. */
 public final class ExecutionConfigurationParser
 {
     private static final Set<String> ROOT = Set.of("loomspan");
     private static final Set<String> PUBLISHABLE = Set.of("connections", "models", "session", "execution-trace", "executor-config");
-    private static final Set<String> CONNECTION = Set.of("driver", "base-url", "request-timeout", "api-key", "headers", "api-key-ref", "header-refs", "openai", "gemini", "provider-retry");
+    private static final Set<String> CONNECTION = Set.of("driver", "base-url", "request-timeout", "api-key", "headers", "openai", "gemini", "provider-retry");
     private static final Set<String> MODEL = Set.of("connection", "provider-model", "thinking-levels");
     private static final Set<String> SESSION = Set.of("max-depth", "mission-timeout", "quotas", "attachments");
     private static final Set<String> QUOTAS = Set.of("max-skill-invocations", "max-tool-invocations", "max-linter-retries", "max-model-calls", "max-provider-attempts", "max-usage-units");
@@ -29,30 +29,40 @@ public final class ExecutionConfigurationParser
 
     private ExecutionConfigurationParser() {}
 
-    public static Parsed parse(String targetNamespace, ExecutionConfiguration authored, Environment environment, boolean resolveReferences)
+    public static Parsed parse(String targetNamespace, ExecutionConfiguration authored, Environment environment, boolean resolveVariables)
     {
-        return parse(targetNamespace, authored, environment, null, resolveReferences);
+        var candidate = new PreparedCandidateVariables(authored, List.of());
+        var staged = parseTree(targetNamespace, candidate.stagedExecution());
+        return resolveVariables ? parseTree(targetNamespace, candidate.resolve(name -> environment.getProperty(name), null).execution()) : staged;
     }
 
-    public static Parsed parse(String targetNamespace, ExecutionConfiguration authored, Map<String, String> supplied)
+    public static Parsed parse(String targetNamespace, ExecutionConfiguration authored, Map<String, String> variableValues)
     {
-        return parse(targetNamespace, authored, null, supplied, true);
+        var values = new LinkedHashMap<>(java.util.Objects.requireNonNull(variableValues, "variableValues must not be null"));
+        var candidate = new PreparedCandidateVariables(authored, List.of());
+        parseTree(targetNamespace, candidate.stagedExecution());
+        return parseTree(targetNamespace, candidate.resolve(values::get, values).execution());
     }
 
-    private static Parsed parse(String targetNamespace, ExecutionConfiguration authored, Environment environment,
-            Map<String, String> supplied, boolean resolveReferences)
+    private final Set<String> unknown = new HashSet<>();
+    private final Set<String> nonblank = new HashSet<>();
+    private final Map<String, AuthoredYamlVariables.Location> variableFields = new LinkedHashMap<>();
+
+    static Parsed parseTree(String targetNamespace, Object decoded)
     {
-        if (authored == null) throw new IllegalArgumentException("configuration must not be null");
-        Set<String> used = new HashSet<>();
+        return new ExecutionConfigurationParser().bindTree(targetNamespace, decoded);
+    }
+
+    private Parsed bindTree(String targetNamespace, Object decoded)
+    {
         try
         {
-            Object decoded = YamlValues.read(authored.yaml());
             Map<String, Object> document = object(decoded, "configuration");
             keys(document, ROOT, "configuration");
             Map<String, Object> loomspan = object(document.get("loomspan"), "loomspan");
             keys(loomspan, PUBLISHABLE, "loomspan");
             ExecutorConfiguration executorConfig = loomspan.containsKey("executor-config")
-                    ? ExecutorConfiguration.from(loomspan.get("executor-config")).requireTarget(targetNamespace) : ExecutorConfiguration.empty();
+                    ? ExecutorConfiguration.from(PreparedCandidateVariables.knownKeys(loomspan.get("executor-config"))).requireTarget(targetNamespace) : ExecutorConfiguration.empty();
             Map<String, Object> flat = new LinkedHashMap<>();
             Map<String, Map<String, String>> connectionHeaders = new LinkedHashMap<>();
             Map<String, Object> connections = optionalObject(loomspan.get("connections"), "loomspan.connections");
@@ -61,36 +71,34 @@ public final class ExecutionConfigurationParser
                 String path = "loomspan.connections." + entry.getKey();
                 Map<String, Object> connection = object(entry.getValue(), path);
                 keys(connection, CONNECTION, path);
-                exclusive(connection, "api-key", "api-key-ref", path);
-                exclusive(connection, "headers", "header-refs", path);
                 for (var field : connection.entrySet())
                 {
                     String fieldPath = path + "." + field.getKey();
                     switch (field.getKey())
                     {
-                        case "api-key-ref" -> flat.put(path + ".api-key", reference(field.getValue(), fieldPath, environment, supplied, used, resolveReferences));
-                        case "headers", "header-refs" -> {
+                        case "headers" -> {
                             if (!(field.getValue() instanceof Map<?, ?> headers)) throw invalid(fieldPath);
                             Map<String, String> values = new LinkedHashMap<>();
                             for (var header : headers.entrySet())
                             {
+                                if (header.getValue() == null) throw invalid(fieldPath + " value must not be null");
+                                if (header.getKey() instanceof AuthoredYamlVariables.Unresolved) {
+                                    scalar(header.getValue(), fieldPath);
+                                    continue;
+                                }
                                 if (!(header.getKey() instanceof String name)) throw invalid(fieldPath);
-                                String headerPath = fieldPath + "." + name;
-                                values.put(name, field.getKey().equals("header-refs")
-                                        ? reference(header.getValue(), headerPath, environment, supplied, used, resolveReferences)
-                                        : header.getValue() == null ? null : scalar(header.getValue(), headerPath));
+                                LoomspanProperties.validateHeaderName(fieldPath, name);
+                                if (header.getValue() instanceof AuthoredYamlVariables.Unresolved) continue;
+                                values.put(name, scalar(header.getValue(), fieldPath + "." + name));
                             }
                             connectionHeaders.put(entry.getKey(), values);
                         }
                         case "openai" -> flattenObject(object(field.getValue(), fieldPath), Set.of("organization-id", "project-id"), fieldPath, flat);
                         case "gemini" -> {
                             Map<String, Object> gemini = object(field.getValue(), fieldPath);
-                            keys(gemini, Set.of("vertex-ai", "project-id", "location", "credentials-json", "credentials-json-ref"), fieldPath);
-                            exclusive(gemini, "credentials-json", "credentials-json-ref", fieldPath);
+                            keys(gemini, Set.of("vertex-ai", "project-id", "location", "credentials-json"), fieldPath);
                             for (var geminiField : gemini.entrySet())
-                                if (geminiField.getKey().equals("credentials-json-ref"))
-                                    flat.put(fieldPath + ".credentials-json", reference(geminiField.getValue(), fieldPath + ".credentials-json-ref", environment, supplied, used, resolveReferences));
-                                else flat.put(fieldPath + "." + geminiField.getKey(), scalar(geminiField.getValue(), fieldPath));
+                                flat.put(fieldPath + "." + geminiField.getKey(), scalar(geminiField.getValue(), fieldPath + "." + geminiField.getKey()));
                         }
                         case "provider-retry" -> flattenObject(object(field.getValue(), fieldPath), RETRY, fieldPath, flat);
                         default -> flat.put(fieldPath, scalar(field.getValue(), fieldPath));
@@ -124,14 +132,23 @@ public final class ExecutionConfigurationParser
             Map<String, Object> trace = optionalObject(loomspan.get("execution-trace"), "loomspan.execution-trace");
             keys(trace, Set.of("persistence"), "loomspan.execution-trace");
             if (trace.containsKey("persistence")) flat.put("loomspan.execution-trace.persistence", scalar(trace.get("persistence"), "loomspan.execution-trace.persistence"));
-            if (supplied != null && !used.containsAll(supplied.keySet()))
-                throw new CredentialReferenceException("credentialValues contains an unused reference");
             LoomspanProperties properties = new Binder(new MapConfigurationPropertySource(flat))
                     .bind("loomspan", Bindable.of(LoomspanProperties.class)).orElseGet(LoomspanProperties::new);
             properties.setExecutorConfig(executorConfig);
+            connections.forEach((name, fields) -> {
+                var connection = properties.getConnections().computeIfAbsent(name, ignored -> new LoomspanProperties.ConnectionProperties());
+                var authoredFields = (Map<?, ?>) fields;
+                if (authoredFields.get("headers") instanceof Map<?, ?> headers)
+                    LoomspanProperties.validateHeaderDriver("loomspan.connections." + name + ".headers", connection.getDriver(), !headers.isEmpty());
+                if (authoredFields.containsKey("openai") && connection.getOpenai() == null)
+                    connection.setOpenai(new LoomspanProperties.OpenAiOptions());
+                if (authoredFields.containsKey("gemini") && connection.getGemini() == null)
+                    connection.setGemini(new LoomspanProperties.GeminiOptions());
+            });
             connectionHeaders.forEach((name, headers) -> properties.getConnections()
                     .computeIfAbsent(name, ignored -> new LoomspanProperties.ConnectionProperties()).setHeaders(headers));
-            properties.afterPropertiesSet();
+            properties.validateAuthored(path -> flat.get(path) != null
+                    || unknown.stream().noneMatch(item -> path.equals(item) || path.startsWith(item + ".")), nonblank::contains);
             validateSession(properties.getSession());
             return new Parsed(properties, properties.getExecutionTrace().getPersistence(), executorConfig);
         }
@@ -142,12 +159,6 @@ public final class ExecutionConfigurationParser
 
     public record Parsed(LoomspanProperties properties, TracePersistencePolicy tracePersistence, ExecutorConfiguration executorConfig) {}
 
-    private static void exclusive(Map<String, Object> fields, String literal, String reference, String path)
-    {
-        if (fields.containsKey(literal) && fields.containsKey(reference))
-            throw new IllegalArgumentException(path + "." + literal + " cannot be combined with " + reference);
-    }
-
     private static void validateSession(LoomspanProperties.Session session)
     {
         if (session.getMaxDepth() < 1) throw invalid("loomspan.session.max-depth");
@@ -157,58 +168,49 @@ public final class ExecutionConfigurationParser
             throw invalid("loomspan.session.quotas");
     }
 
-    private static String reference(Object value, String path, Environment environment,
-            Map<String, String> supplied, Set<String> used, boolean resolve)
-    {
-        String key = scalar(value, path);
-        if (key.isBlank()) throw invalid(path);
-        if (!resolve) return "unresolved-reference";
-        String resolved = supplied == null ? environment.getProperty(key) : supplied.get(key);
-        if (resolved == null || resolved.isBlank()) throw new CredentialReferenceException(
-                path + " references a missing or blank external property");
-        used.add(key);
-        return resolved;
-    }
-
-    private static void flattenObject(Map<String, Object> object, Set<String> allowed, String path, Map<String, Object> flat)
+    private void flattenObject(Map<String, Object> object, Set<String> allowed, String path, Map<String, Object> flat)
     {
         keys(object, allowed, path);
         object.forEach((key, value) -> flat.put(path + "." + key, scalar(value, path + "." + key)));
     }
 
-    private static Map<String, Object> optionalObject(Object value, String path)
+    private Map<String, Object> optionalObject(Object value, String path)
     {
         return value == null ? Map.of() : object(value, path);
     }
 
-    private static Map<String, Object> object(Object value, String path)
+    private Map<String, Object> object(Object value, String path)
     {
         if (!(value instanceof Map<?, ?> source)) throw invalid(path);
         Map<String, Object> result = new LinkedHashMap<>();
         for (var entry : source.entrySet())
         {
+            if (entry.getKey() instanceof AuthoredYamlVariables.Unresolved) { unknown.add(path); continue; }
             if (!(entry.getKey() instanceof String key) || key.isBlank()) throw invalid(path);
+            if (source instanceof AuthoredYamlVariables.AuthoredMap authored && authored.variableKeyLocation(key) != null)
+                variableFields.put(path + "." + key, authored.variableKeyLocation(key));
             result.put(key, entry.getValue());
         }
         return result;
     }
 
-    private static String scalar(Object value, String path)
+    private String scalar(Object value, String path)
     {
-        if (value == null || value instanceof Map<?, ?> || value instanceof List<?>) throw invalid(path);
+        if (value instanceof AuthoredYamlVariables.Unresolved) { unknown.add(path); nonblank.add(path); return null; }
+        if (value == null || value instanceof Map<?, ?> || value instanceof java.util.Collection<?>) throw invalid(path);
         return String.valueOf(value);
     }
 
-    private static void keys(Map<String, Object> object, Set<String> allowed, String path)
+    private void keys(Map<String, Object> object, Set<String> allowed, String path)
     {
-        for (String key : object.keySet()) if (!allowed.contains(key)) throw new IllegalArgumentException(path + "." + key + " is not publishable");
+        for (String key : object.keySet()) {
+            if (allowed.contains(key)) continue;
+            var location = variableFields.get(path + "." + key);
+            String authored = location == null ? path + "." + key : location.source() + " at " + location.path();
+            throw new IllegalArgumentException(authored + " is not publishable");
+        }
     }
 
     private static IllegalArgumentException invalid(String path) { return new IllegalArgumentException(path + " has an invalid value"); }
 
-    /** Messages contain authored field paths only, never reference names or resolved values. */
-    public static final class CredentialReferenceException extends IllegalArgumentException
-    {
-        private CredentialReferenceException(String message) { super(message); }
-    }
 }

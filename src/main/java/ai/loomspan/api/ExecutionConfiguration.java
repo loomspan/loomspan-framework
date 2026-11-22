@@ -2,7 +2,7 @@ package ai.loomspan.api;
 
 import java.util.Objects;
 
-/** Authored, reference-only YAML for a complete publishable execution configuration. */
+/** Authored YAML with literal settings and whole-node variable markers for a complete publishable execution configuration. */
 public record ExecutionConfiguration(String yaml)
 {
     public ExecutionConfiguration

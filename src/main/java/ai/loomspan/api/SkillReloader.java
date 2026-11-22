@@ -16,18 +16,18 @@ public interface SkillReloader
     PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration);
     PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration,
             NamespaceVisibility visibility);
-    /** Uses a copied credential map without Environment fallback. */
+    /** Uses a copied exact-name variable map without Environment fallback. */
     PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration,
-            Map<String, String> credentialValues);
+            Map<String, String> variableValues);
     PreparedSkillUpdate prepare(String namespace, Collection<SkillDocument> documents, ExecutionConfiguration configuration,
-            NamespaceVisibility visibility, Map<String, String> credentialValues);
+            NamespaceVisibility visibility, Map<String, String> variableValues);
 
-    /** Prepares a labeled complete replacement using Environment credential resolution. Null omits the label. */
+    /** Prepares a labeled complete replacement using normal Environment variable resolution. Null omits the label. */
     PreparedSkillUpdate prepare(String namespace, String publicationVersion, Collection<SkillDocument> documents,
             ExecutionConfiguration configuration, NamespaceVisibility visibility);
-    /** Prepares a labeled replacement using a copied credential map without Environment fallback. */
+    /** Prepares a labeled replacement using a copied exact-name variable map without Environment fallback. */
     PreparedSkillUpdate prepare(String namespace, String publicationVersion, Collection<SkillDocument> documents,
-            ExecutionConfiguration configuration, NamespaceVisibility visibility, Map<String, String> credentialValues);
+            ExecutionConfiguration configuration, NamespaceVisibility visibility, Map<String, String> variableValues);
 
     /** Withdraws exactly the expected active generation without waiting for retained work. */
     void remove(String namespace, String expectedGenerationId);

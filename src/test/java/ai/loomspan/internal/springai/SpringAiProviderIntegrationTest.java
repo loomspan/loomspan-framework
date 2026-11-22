@@ -83,13 +83,19 @@ class SpringAiProviderIntegrationTest
         String yaml = "loomspan:\n  connections:\n    vertex:\n      driver: gemini\n      gemini:\n"
                 + "        vertex-ai: true\n        project-id: project\n        location: us-central1\n        credentials-json: |\n"
                 + json.indent(10);
-        var connection = ai.loomspan.internal.skill.ExecutionConfigurationParser.parse("default",
-                new ai.loomspan.api.ExecutionConfiguration(yaml), java.util.Map.of())
-                .properties().getConnections().get("vertex");
-        assertThat(connection.getGemini().getCredentialsJson()).isEqualTo(json);
-        var runtime = integration.create("vertex", connection);
-        assertThat(runtime.chatModel()).isNotNull();
-        ((org.springframework.beans.factory.DisposableBean) runtime.chatModel()).destroy();
+        String marked = yaml.substring(0, yaml.indexOf("credentials-json:")) + "credentials-json: {$var: vertex.json}\n";
+        var host = new org.springframework.mock.env.MockEnvironment().withProperty("vertex.json", json);
+        var configurations = java.util.List.of(
+                ai.loomspan.internal.skill.ExecutionConfigurationParser.parse("default", new ai.loomspan.api.ExecutionConfiguration(yaml), java.util.Map.of()),
+                ai.loomspan.internal.skill.ExecutionConfigurationParser.parse("default", new ai.loomspan.api.ExecutionConfiguration(marked), java.util.Map.of("vertex.json", json)),
+                ai.loomspan.internal.skill.ExecutionConfigurationParser.parse("default", new ai.loomspan.api.ExecutionConfiguration(marked), host, true));
+        for (var configuration : configurations) {
+            var connection = configuration.properties().getConnections().get("vertex");
+            assertThat(connection.getGemini().getCredentialsJson()).isEqualTo(json);
+            var runtime = integration.create("vertex", connection);
+            assertThat(runtime.chatModel()).isNotNull();
+            ((org.springframework.beans.factory.DisposableBean) runtime.chatModel()).destroy();
+        }
     }
 
     @Test

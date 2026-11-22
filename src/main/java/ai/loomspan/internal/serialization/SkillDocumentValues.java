@@ -62,6 +62,16 @@ public final class SkillDocumentValues {
         return new Decoded(root, executorConfig, configPresent);
     }
 
+    /** Candidate config is supplied separately from the original declaration and source bytes. */
+    public static Decoded decode(String yaml, String source, ObjectMapper mapper, Object config, boolean configPresent) {
+        Object decoded = AuthoredYamlVariables.skill(yaml, source).declarationValues();
+        checkJson(decoded, "", source);
+        JsonNode root = mapper.valueToTree(decoded);
+        if (configPresent && root instanceof ObjectNode object)
+            object.set("config", config instanceof Map<?, ?> ? mapper.createObjectNode() : mapper.nullNode());
+        return new Decoded(root, config, configPresent);
+    }
+
     private static void checkJson(Object value, String path, String source) {
         if (value == null || value instanceof String || value instanceof Boolean
                 || value instanceof Byte || value instanceof Short || value instanceof Integer

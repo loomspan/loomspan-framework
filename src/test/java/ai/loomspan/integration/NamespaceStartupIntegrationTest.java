@@ -24,7 +24,7 @@ class NamespaceStartupIntegrationTest {
         return new ExecutionConfiguration("""
                 loomspan:
                   connections:
-                    local: {driver: openai, base-url: '%s', api-key-ref: fixture-key}
+                    local: {driver: openai, base-url: '%s', api-key: {$var: fixture-key}}
                   models: {model: {connection: local, provider-model: fixture}}
                 """.formatted(server.url("/v1")));
     }

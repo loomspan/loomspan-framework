@@ -53,14 +53,14 @@ class ConnectionProtocolTest {
         }
     }
 
-    @Test
-    void openAiCompatibleBaseUrlEndingInV1DoesNotDuplicateTheVersionPath() throws Exception {
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void openAiCompatibleBaseUrlEndingInV1DoesNotDuplicateTheVersionPath(boolean variables) throws Exception {
         try (MockWebServer server = new MockWebServer()) {
             server.enqueue(json("""
                 {"id":"chatcmpl-1","object":"response","created_at":1,"model":"routed-model","status":"completed","output":[{"id":"msg_0","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"ok","annotations":[]}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """));
-            var properties = ai.loomspan.internal.skill.ExecutionConfigurationParser.parse("default",
-                    new ai.loomspan.api.ExecutionConfiguration("""
+            String yaml = """
                             loomspan:
                               connections:
                                 gateway:
@@ -68,7 +68,12 @@ class ConnectionProtocolTest {
                                   api-key: gateway-key
                                   base-url: %s
                                   headers: {X-Region: west}
-                            """.formatted(server.url("/api/v1"))), Map.of())
+                            """.formatted(server.url("/api/v1"));
+            if (variables) yaml = yaml.replace("api-key: gateway-key", "api-key: {$var: key}")
+                    .replace("X-Region: west", "{$var: header}: {$var: region}");
+            var properties = ai.loomspan.internal.skill.ExecutionConfigurationParser.parse("default",
+                    new ai.loomspan.api.ExecutionConfiguration(yaml), variables
+                            ? Map.of("key", "gateway-key", "header", "X-Region", "region", "west") : Map.of())
                     .properties().getConnections().get("gateway");
 
             var model = integration().create("gateway", properties).chatModel();

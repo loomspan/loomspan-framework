@@ -225,7 +225,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
                     selected:
                       driver: openai
                       base-url: %s
-                      api-key-ref: key
+                      api-key: {$var: key}
                       request-timeout: 5s
                       provider-retry:
                         max-attempts: 1

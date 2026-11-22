@@ -22,8 +22,7 @@ reference-only `default-typesafe`; installation creates no callable skills.
 Pack internal/autoconfigure Java types are not supported application APIs.
 
 Supply the selected executor map, even if empty, through YAML Config Data or
-complete namespace publication. Applications must supply resolved values;
-executor maps do not resolve `${...}`, `api-key-ref` or Framework connection aliases.
+complete namespace publication. Published maps can use whole-node `{ $var: name }` markers through the host-selected source. Other content such as `${...}`, `api-key-ref` and Framework connection alias strings remains ordinary data.
 This is a local test configuration fragment:
 
 ```yaml

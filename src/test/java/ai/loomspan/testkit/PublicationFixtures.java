@@ -12,7 +12,7 @@ public final class PublicationFixtures {
         return new ExecutionConfiguration("""
                 loomspan:
                   connections:
-                    connection: {driver: openai, api-key-ref: fixture.key, base-url: 'http://localhost:11434/v1'}
+                    connection: {driver: openai, api-key: {$var: fixture.key}, base-url: 'http://localhost:11434/v1'}
                   models:
                     model: {connection: connection, provider-model: provider-model, thinking-levels: [medium]}
                     gpt-5: {connection: connection, provider-model: provider-model}
@@ -24,11 +24,11 @@ public final class PublicationFixtures {
         properties.getConnections().forEach((name, connection) -> {
             Map<String,Object> value = bean(connection);
             value.remove("headers"); value.remove("api-key");
-            if (connection.getApiKey() != null) value.put("api-key-ref", "loomspan.connections." + name + ".api-key");
+            if (connection.getApiKey() != null) value.put("api-key", Map.of("$var", "loomspan.connections." + name + ".api-key"));
             if (!connection.getHeaders().isEmpty()) {
                 Map<String,Object> headers = new LinkedHashMap<>();
-                connection.getHeaders().forEach((header, ignored) -> headers.put(header, "loomspan.connections." + name + ".headers." + header));
-                value.put("header-refs", headers);
+                connection.getHeaders().forEach((header, ignored) -> headers.put(header, Map.of("$var", "loomspan.connections." + name + ".headers." + header)));
+                value.put("headers", headers);
             }
             connections.put(name, value);
         });

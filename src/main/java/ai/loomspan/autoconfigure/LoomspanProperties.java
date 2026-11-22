@@ -125,11 +125,17 @@ public class LoomspanProperties implements InitializingBean
     @Override
     public void afterPropertiesSet()
     {
-        validateConnections();
+        validateAuthored(path -> true, path -> false);
+    }
+
+    /** Internal candidate validation can defer checks whose authored operands are unresolved. */
+    public void validateAuthored(java.util.function.Predicate<String> known, java.util.function.Predicate<String> nonblank)
+    {
+        validateConnections(known, nonblank);
         validateModels();
     }
 
-    private void validateConnections()
+    private void validateConnections(java.util.function.Predicate<String> known, java.util.function.Predicate<String> nonblank)
     {
         for (Map.Entry<String, ConnectionProperties> entry : connections.entrySet())
         {
@@ -145,22 +151,22 @@ public class LoomspanProperties implements InitializingBean
                 throw invalid(path, "connection definition must not be null");
             }
             AiDriver driver = connection.getDriver();
-            if (driver == null)
+            if (driver == null && known.test(path + ".driver"))
             {
                 throw invalid(path + ".driver", "is required");
             }
-            validateApplicableOptions(path, connection, driver);
+            if (driver != null) validateApplicableOptions(path, connection, driver, nonblank);
             validateRequestTimeout(path, connection, driver);
-            validateRequiredFields(path, connection, driver);
+            if (driver != null) validateRequiredFields(path, connection, driver, known, nonblank);
             validateHeaders(path, connection, driver);
-            validateProviderRetry(path, connection.getProviderRetry());
+            validateProviderRetry(path, connection.getProviderRetry(), known);
         }
     }
 
-    private void validateProviderRetry(String connectionPath, ProviderRetryProperties retry)
+    private void validateProviderRetry(String connectionPath, ProviderRetryProperties retry, java.util.function.Predicate<String> known)
     {
         String path = connectionPath + ".provider-retry";
-        if (retry.getMaxAttempts() < 1 || retry.getMaxAttempts() > 10)
+        if (known.test(path + ".max-attempts") && (retry.getMaxAttempts() < 1 || retry.getMaxAttempts() > 10))
         {
             throw invalid(path + ".max-attempts", "must be between 1 and 10");
         }
@@ -172,7 +178,8 @@ public class LoomspanProperties implements InitializingBean
         {
             throw invalid(path + ".max-backoff", "must not be negative");
         }
-        if (retry.getMaxBackoff().compareTo(retry.getInitialBackoff()) < 0)
+        if (known.test(path + ".max-backoff") && known.test(path + ".initial-backoff")
+                && retry.getMaxBackoff().compareTo(retry.getInitialBackoff()) < 0)
         {
             throw invalid(path + ".max-backoff", "must not be less than " + path + ".initial-backoff");
         }
@@ -197,9 +204,9 @@ public class LoomspanProperties implements InitializingBean
             throw invalid(path, "must be an exact whole-millisecond duration between 1ms and 2147483647ms");
     }
 
-    private void validateApplicableOptions(String path, ConnectionProperties connection, AiDriver driver)
+    private void validateApplicableOptions(String path, ConnectionProperties connection, AiDriver driver, java.util.function.Predicate<String> nonblank)
     {
-        if (StringUtils.hasText(connection.getBaseUrl()) && driver == AiDriver.GEMINI)
+        if ((StringUtils.hasText(connection.getBaseUrl()) || nonblank.test(path + ".base-url")) && driver == AiDriver.GEMINI)
         {
             throw invalid(path + ".base-url", "is not supported for driver GEMINI");
         }
@@ -213,21 +220,22 @@ public class LoomspanProperties implements InitializingBean
         }
     }
 
-    private void validateRequiredFields(String path, ConnectionProperties connection, AiDriver driver)
+    private void validateRequiredFields(String path, ConnectionProperties connection, AiDriver driver, java.util.function.Predicate<String> known, java.util.function.Predicate<String> nonblank)
     {
         switch (driver)
         {
-            case OPENAI, ANTHROPIC -> requireText(connection.getApiKey(), path + ".api-key", driver);
-            case GEMINI -> validateGeminiMode(path, connection);
+            case OPENAI, ANTHROPIC -> { if (known.test(path + ".api-key")) requireText(connection.getApiKey(), path + ".api-key", driver); }
+            case GEMINI -> validateGeminiMode(path, connection, known, nonblank);
         }
     }
 
-    private void validateGeminiMode(String path, ConnectionProperties connection)
+    private void validateGeminiMode(String path, ConnectionProperties connection, java.util.function.Predicate<String> known, java.util.function.Predicate<String> nonblank)
     {
         GeminiOptions gemini = connection.getGemini();
-        boolean apiKeyMode = StringUtils.hasText(connection.getApiKey());
+        boolean apiKeyMode = StringUtils.hasText(connection.getApiKey()) || nonblank.test(path + ".api-key");
         boolean vertexMode = gemini != null && Boolean.TRUE.equals(gemini.getVertexAi());
-        if (apiKeyMode == vertexMode)
+        if ((known.test(path + ".api-key") || nonblank.test(path + ".api-key"))
+                && known.test(path + ".gemini.vertex-ai") && apiKeyMode == vertexMode)
         {
             throw invalid(path, "driver GEMINI requires exactly one of api-key mode or gemini.vertex-ai=true");
         }
@@ -237,28 +245,34 @@ public class LoomspanProperties implements InitializingBean
         }
         if (vertexMode)
         {
-            requireText(gemini.getProjectId(), path + ".gemini.project-id", AiDriver.GEMINI);
-            requireText(gemini.getLocation(), path + ".gemini.location", AiDriver.GEMINI);
+            if (known.test(path + ".gemini.project-id")) requireText(gemini.getProjectId(), path + ".gemini.project-id", AiDriver.GEMINI);
+            if (known.test(path + ".gemini.location")) requireText(gemini.getLocation(), path + ".gemini.location", AiDriver.GEMINI);
         }
     }
 
     private void validateHeaders(String path, ConnectionProperties connection, AiDriver driver)
     {
-        if (!connection.getHeaders().isEmpty() && driver != AiDriver.OPENAI && driver != AiDriver.ANTHROPIC)
-        {
-            throw invalid(path + ".headers", "is only supported for drivers OPENAI and ANTHROPIC");
-        }
+        validateHeaderDriver(path + ".headers", driver, !connection.getHeaders().isEmpty());
         for (Map.Entry<String, String> header : connection.getHeaders().entrySet())
         {
-            if (!StringUtils.hasText(header.getKey()) || !HTTP_TOKEN.matcher(header.getKey()).matches())
-            {
-                throw invalid(path + ".headers", "contains an invalid HTTP header name");
-            }
+            validateHeaderName(path + ".headers", header.getKey());
             if (header.getValue() == null)
             {
                 throw invalid(path + ".headers." + header.getKey(), "value must not be null");
             }
         }
+    }
+
+    public static void validateHeaderDriver(String path, AiDriver driver, boolean present)
+    {
+        if (present && driver != null && driver != AiDriver.OPENAI && driver != AiDriver.ANTHROPIC)
+            throw invalid(path, "is only supported for drivers OPENAI and ANTHROPIC");
+    }
+
+    public static void validateHeaderName(String path, String name)
+    {
+        if (!StringUtils.hasText(name) || !HTTP_TOKEN.matcher(name).matches())
+            throw invalid(path, "contains an invalid HTTP header name");
     }
 
     private void validateModels()

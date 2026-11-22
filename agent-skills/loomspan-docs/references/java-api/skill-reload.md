@@ -52,8 +52,8 @@ SkillCatalog active = reloader.snapshot("department");
 ```
 
 `prepare(namespace, publicationVersion, documents, configuration, visibility)` uses
-Environment credentials. Add `credentialValues` as the last argument to use a copied
-explicit map with the existing reference rules. Null omits the label. Every supplied
+normal `Environment.getProperty(name)` for variables. Add `variableValues` as the last argument to use a copied
+explicit map with exact name matching. Null omits the label. Every supplied
 string remains exact, including empty strings, whitespace and line breaks. The host
 defines its meaning and whether equal labels identify equal complete content across engines.
 
@@ -73,7 +73,7 @@ Overview show those facts on initial reads, refresh and reconnect. The UI marks 
 as “Not supplied”. Observation uses its existing credentials independently of call
 visibility. See [HTTP observation](../skill-authoring/observability-http.md).
 
-## Complete configuration and credentials
+## Complete configuration and variables
 
 Only `loomspan.connections`, `loomspan.models`, `loomspan.session`, `loomspan.executor-config`, and
 `loomspan.execution-trace.persistence` are publishable. Existing nested provider
@@ -83,11 +83,15 @@ and unknown keys reject validation/preparation. Every omitted supported scalar u
 its built-in default; previous, startup and other namespace settings do not fill
 missing values. Missing models/connections required by a declaration fail.
 
-Connections accept literal `api-key`, `headers` and Vertex `gemini.credentials-json` contents. They also accept `api-key-ref`, `header-refs` and `gemini.credentials-json-ref` references, resolved during preparation from Spring Environment. Each setting chooses either its literal or reference form. Explicit Vertex credentials contain service-account JSON, including multiline contents.
+Connections accept literal `api-key`, `headers` and Vertex `gemini.credentials-json` contents. A whole-node `{ $var: name }` mapping supplies one string from the host. Markers participate under each connection, namespace executor data and executor-backed skill `config`, including mapping keys and sequence elements. Names are opaque, case-sensitive, nonblank strings without surrounding whitespace. A mapping with additional keys is ordinary data. Models, session settings, declarations and request inputs retain their own syntax.
 
-`prepare(namespace, documents, configuration, credentialValues)` copies the supplied map and resolves every reference from it without Environment fallback. Missing, blank or unused entries fail. A reference-free configuration accepts an empty map. The full overload accepts visibility before the map. Validation checks structure without resolving references, constructing provider clients or invoking application implementations. Preparation builds independent clients and sends no model request. Diagnostic content is preserved.
+`prepare(namespace, documents, configuration, variableValues)` copies the supplied map and uses only its exact entries. Missing or blank required values and unused entries fail. All three sections count toward usage, including names used only in skill config. An empty map accepts a candidate without markers. The full overload accepts visibility before the map. Without a map, every overload uses normal `Environment.getProperty(name)`. Packs cannot choose a source.
 
-`loomspan.executor-config` uses namespace-indexed maps, with the same structural rules and immutable data as startup YAML. Publication permits only its target namespace; foreign entries fail even when empty. Omission supplies no executor data and never inherits startup or prior-generation configuration. Nested maps/lists, null leaves, empty containers, scalar types and exact case/dotted data keys are preserved. Executor-owned `api-key-ref` and `${...}` strings are ordinary content; they do not consume credential references or undergo interpolation. Each generation owns its assigned fixed executors and immutable executor data. Startup/preparation validate annotation paths and selected map structure without application execution. Admission resolves only root-reachable executor dependencies against captured generations, and invocation consumes the captured binding without live lookup. See [executor configuration](../skill-authoring/executor-skills.md).
+Validation checks authored structure, marker names, declarations, dependencies and every decidable literal constraint with zero lookups, provider constructions or application calls. An unresolved key defers only configuration selection that depends on it. Preparation independently validates the documents passed to that call, resolves each distinct name once and checks all effective keys, typed values and dependencies before creating clients. It sends no model request. Resolution failures identify authored source paths and fixed reasons.
+
+Each returned string is terminal. An explicit `${region}` remains those exact characters in provider and executor settings. A host property `report.label=${region}` can yield `west` through normal Environment lookup. Returned multiline JSON and YAML-looking strings retain their contents. Native typed conversion and provider authentication validation still apply. Every new preparation resolves freshly, including one with the same documents and publication label. Publication performs zero lookups and activates the captured candidate.
+
+`loomspan.executor-config` uses namespace-indexed maps and permits only the publication target, including empty entries. Omission supplies empty data. Nested maps/lists, null leaves, empty containers, scalar types and exact case/dotted data keys are preserved. Ordinary application keys such as `api-key-ref` remain data. The provider schema accepts ordinary setting names with literals or markers. Each generation owns immutable namespace and skill settings. Admission captures the executor owner's `executorConfig()`, the skill owner's `consumerExecutorConfig()` and its `skillConfig()` from their respective namespaces. Executor domain checks remain at invocation. See [executor configuration](../skill-authoring/executor-skills.md).
 
 ## Capture, concurrency and one-shot candidates
 
@@ -169,7 +173,7 @@ namespace with empty supplied documents, complete configuration and explicit
 `PUBLIC`, then publish the caller's complete documents/configuration through the
 same API. Namespace names are host choices. A Java-only target can use
 `new ExecutionConfiguration("loomspan: {}")`; the model-backed caller supplies its
-own complete connections/models, including explicit credential references. Pass
+own complete connections/models, including explicit variable markers. Pass
 in-memory `SkillDocument` values to `prepare` rather than configuring startup files.
 See [Java declarations](java-skills.md) and [model configuration](../skill-authoring/model-selection-and-connections.md)
 for the corresponding authored contracts.
@@ -228,12 +232,14 @@ retained work, retirement notifications and preserved bean ownership.
 
 ## Evidence
 
-- `SkillReloaderTest`: exact immutable labels, credential modes, concurrent ID/label pairing, complete replacement, base/absence, state/lifecycle, deterministic concurrent preparation/publication, disposal and retirement.
+- `SkillReloaderTest`: exact immutable labels, variable source modes, concurrent ID/label pairing, complete replacement, base/absence, state/lifecycle, deterministic concurrent preparation/publication, disposal and retirement.
 - `NamespacePublicationObservationIntegrationTest`: independent engines, before-invocation reads, candidate/active separation, exact labels, omission, stale rejection, removal and restart installation.
 - `SkillDependencyValidatorTest`: candidate overlay, transitive contracts/visibility, captured metadata retirement and coherent capture races.
 - `NamespaceStartupIntegrationTest`: actual embedded and file-free managed caller execution, explicit Public sharing, prospective visibility changes, departmental complete replacement retaining fixed Java, removal/recreation and Private restart.
 - `SkillDependencyValidatorTest#transitiveReturnUsesCandidateDeclarationsContractsAndVisibility`: staged ordinary cycles with candidate return paths and unchanged forwarding-cycle rejection.
-- `ExecutionConfigurationParserTest`: exact configuration/credential boundary and nested validation.
+- `ExecutionConfigurationParserTest`: exact configuration/variable boundary and nested validation.
+- `PreparedCandidateVariablesTest`: all overloads, exact maps, once-per-name resolution, staged selectors, candidate edits, key collisions and terminal strings.
+- `ExecutorGenerationExecutionIntegrationTest`: actual worked-corpus consumers and retained owner/consumer/leaf settings across rotation.
 - `LoomspanPublicSurfaceArchitectureTest`: closed supported API and absence of extension SPIs.
 
 ## Publish consumer executor settings

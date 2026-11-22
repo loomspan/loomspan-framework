@@ -460,7 +460,7 @@ class SkillGenerationManagerTest
                   connections:
                     primary:
                       driver: openai
-                      api-key-ref: host.key
+                      api-key: {$var: host.key}
                   models:
                     chosen:
                       connection: primary
