@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class InvoiceLookup {
-    @SkillMethod(name = "invoiceExists", description = "Find whether an invoice reference already exists")
+    @SkillMethod(name = "invoice-exists", description = "Find whether an invoice reference already exists")
     public boolean exists(
             @SkillParam(description = "Invoice reference") String reference) {
         return false; // application-owned lookup
@@ -26,7 +26,7 @@ public class InvoiceLookup {
 }
 ```
 
-Call this skill with `skills.invoke("default-invoiceExists", Map.of("reference", "INV-42"))`, where `skills` is the injected `SkillTemplate`.
+Call this skill with `skills.invoke("default:invoice-exists", Map.of("reference", "INV-42"))`, where `skills` is the injected `SkillTemplate`.
 
 The runtime method annotation has three elements:
 
@@ -36,13 +36,26 @@ String namespace() default "default";
 String description();
 ```
 
-An omitted or empty `name` uses the canonical Java method name. The declaration name remains local. A nonempty name MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` exactly. Padded, whitespace-only, non-ASCII, hyphenated, and overlength names fail startup; Loomspan does not rewrite them. The annotation owns the description. A blank description retains the method-name fallback.
+An omitted or empty `name` uses the Java method name verbatim. A nonempty name
+is used verbatim. Both namespace and local name have 1–64 ASCII characters,
+match `[a-z][a-z0-9]*(?:-[a-z0-9]+)*` exactly, and exclude the substrings
+`anthropic` and `claude`. The pair satisfies
+`namespace.length() + 2 + localName.length() <= 64`. In `order-support`, 49 local
+characters succeed and 50 fail. `search()` can omit its name. `findOrder()`
+declares `name = "find-order"`. Invalid declarations fail startup with the bean,
+method and advice to provide a valid annotation name or rename the method.
 
-Java, executor-backed YAML and model-backed YAML skills use canonical qualified identities. Authored local references resolve to their containing owner, including same-owner Java skills; host local invocation names always select default. Explicit foreign references remain qualified. Namespace ownership comes from `namespace`, normalized to lowercase with an independent 32-character limit; total identity length is at most 64. Duplicate canonical identities fail startup with both declaration locations; equal local names in different namespaces are distinct. Distinct overloaded methods MAY declare distinct explicit names; overloads that retain the same name collide. Bean aliases and compiler bridge methods do not create additional registrations. Bean and method locations shown in Console are diagnostics, never alternative invocation names.
+Both Java annotations default their namespace to `default`. Startup YAML belongs
+to `default`, including nested files. Supplied YAML uses its reloader namespace.
+Callable identities are unique across YAML and Java within each namespace, and
+render as `namespace:local-name`. Equal local names in different owners remain
+distinct. Overloads with the same selected pair collide. Bean aliases and compiler
+bridge methods do not create additional registrations. Diagnostic bean and method
+locations identify the declaration.
 
 A YAML `mapping` key is rejected, including null, empty, and scalar forms. Remove the wrapper and put its chosen callable name and description on the annotation.
 
-The example registers `default-invoiceExists`. See the [identity rules](../skill-authoring/mental-model.md#canonical-namespace-identity) for exact grammar, limits and reference syntax.
+The example registers `default:invoice-exists`. See the [identity rules](../skill-authoring/mental-model.md#canonical-namespace-identity) for exact grammar, limits and reference syntax.
 
 ## Inputs, results, and lifecycle
 
@@ -81,7 +94,7 @@ String config() default "";
 An executor method MUST accept exactly one
 `ai.loomspan.api.extensions.v1.SkillExecutorInvocation` parameter. The Java
 parameter selects v1; no manifest/version switch or application implementation
-is accepted. It supports the same return values as `@SkillMethod`. Omitted names and namespace normalization follow the callable identity rules above. `config` records an optional configuration path; empty selects no configuration.
+is accepted. It supports the same return values as `@SkillMethod`. Omitted names and exact namespace validation follow the callable identity rules above. `config` records an optional configuration path; empty selects no configuration.
 
 Loomspan discovers executor methods and preserves Spring proxy invocation. A YAML leaf selects one with `executor:` and executes as `SkillKind.JAVA`, retaining its YAML input contract and operation configuration. Configuration selection and registration ownership come from the captured executor namespace generation. An executor is reference-only: it has no generated callable schema, catalog entry, `allowed_skills` membership or `SkillTemplate` invocation route. Callable and executor names have separate indexes, so both roles may share one qualified identity; duplicates within either role fail. A bean may declare either or both roles.
 

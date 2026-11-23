@@ -1,4 +1,4 @@
-name: evidenceContractNullExpressionSkill
+name: evidence-contract-null-expression-skill
 description: Invalid null evidence expression
 model: gpt-5
 allowed_skills:

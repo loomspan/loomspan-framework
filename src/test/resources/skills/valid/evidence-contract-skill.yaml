@@ -1,4 +1,4 @@
-name: evidenceContractSkill
+name: evidence-contract-skill
 description: Skill with an evidence contract
 model: gpt-5
 allowed_skills:

@@ -1,4 +1,4 @@
-name: inputSchemaSkill
+name: input-schema-skill
 description: YAML skill with an explicit input schema.
 model: gpt-5
 input_schema:

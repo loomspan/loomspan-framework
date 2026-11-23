@@ -84,7 +84,7 @@ This topic covers reflected Java contracts; [standard schemas](standard-schemas.
 Minimal Java skill:
 
 ```java
-@SkillMethod(name = "rankTransportOptions", description = "Rank transport choices.")
+@SkillMethod(name = "rank-transport-options", description = "Rank transport choices.")
 Map<String, Object> rank(
         @SkillParam(description = "Compact transport choices.")
         List<Map<String, Object>> options) {
@@ -92,7 +92,7 @@ Map<String, Object> rank(
 }
 ```
 
-The exact callable name is `default-rankTransportOptions`; use it in `SkillTemplate` or a YAML parent's `allowed_skills`. No YAML wrapper is required or accepted.
+The exact callable name is `default:rank-transport-options`; use it in `SkillTemplate` or a YAML parent's `allowed_skills`. No YAML wrapper is required or accepted.
 
 ## Generated Input Guidance
 

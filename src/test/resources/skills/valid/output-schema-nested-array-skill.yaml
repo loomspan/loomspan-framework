@@ -1,4 +1,4 @@
-name: outputSchemaNestedArraySkill
+name: output-schema-nested-array-skill
 description: Homogeneous nested arrays.
 model: gpt-5
 output_schema:

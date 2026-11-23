@@ -73,19 +73,19 @@ These illustrative fragments belong in separate skill files; they omit surroundi
 Model producer with its own structured-output contract:
 
 ```yaml
-name: prepareReport
+name: prepare-report
 model: assistant
 description: Prepare the report request and delegate its completion.
 planning_mode: true
 max_steps: 1
 prompt: Determine the report scope and supply explicit arguments to finishReport.
 allowed_skills:
-  - {name: default-finishReport, required: true, max_tasks: 1}
-output_from: {skill: default-finishReport}
+  - {name: default:finish-report, required: true, max_tasks: 1}
+output_from: {skill: default:finish-report}
 ```
 
 ```yaml
-name: finishReport
+name: finish-report
 model: assistant
 description: Produce the complete report.
 prompt: Produce the complete report for the supplied request.
@@ -100,20 +100,20 @@ output_schema:
 Annotation-only Java producer, registered on an application Spring bean:
 
 ```java
-@SkillMethod(name = "finishReport", description = "Produce the complete report")
+@SkillMethod(name = "finish-report", description = "Produce the complete report")
 public String finishReport() { return "Report complete"; }
 ```
 
 ```yaml
-name: prepareReport
+name: prepare-report
 model: assistant
 description: Determine when to produce the report.
 planning_mode: true
 max_steps: 1
 prompt: Determine the report request and invoke finishReport.
 allowed_skills:
-  - {name: default-finishReport, required: true, max_tasks: 1}
-output_from: {skill: default-finishReport}
+  - {name: default:finish-report, required: true, max_tasks: 1}
+output_from: {skill: default:finish-report}
 ```
 
 The returned Framework text is `Report complete`, without JSON quotes. No output schema is inferred from the Java return type.
@@ -137,7 +137,7 @@ runtime values or general schema implication.
 This full assembly combines two direct-child objects with the current input identifier. `assistant` must be a configured model alias; declare each producer separately with its own input contract. The selected child results must be objects compatible with these destination schemas.
 
 ```yaml
-name: assembleCase
+name: assemble-case
 model: assistant
 planning_mode: true
 max_steps: 2
@@ -170,7 +170,7 @@ Every bound child producer must occur exactly once in the accepted plan, even wh
 An ordinary skill can bind only from its own input. This mixed contract preserves assessment evidence and asks the model for `summary` only:
 
 ```yaml
-name: summarizeAssessment
+name: summarize-assessment
 model: assistant
 prompt: Explain the supplied assessment in a short summary.
 input_schema:

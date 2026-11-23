@@ -1,4 +1,4 @@
-name: supportedExecutorLeaf
+name: supported-executor-leaf
 description: Echo a message through the application EXECUTOR handler.
 executor: fixture
 input_schema:

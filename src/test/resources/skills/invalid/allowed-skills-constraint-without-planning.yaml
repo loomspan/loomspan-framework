@@ -1,4 +1,4 @@
-name: directConstraintParent
+name: direct-constraint-parent
 description: Constraint on a direct skill.
 model: gpt-5
 allowed_skills:

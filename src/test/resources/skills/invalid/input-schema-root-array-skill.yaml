@@ -1,4 +1,4 @@
-name: invalidInputSchemaRoot
+name: invalid-input-schema-root
 description: Invalid input schema root.
 model: gpt-5
 input_schema:

@@ -1,4 +1,4 @@
-name: evidenceContractNondirectChildSkill
+name: evidence-contract-nondirect-child-skill
 description: Invalid non-direct evidence child
 model: gpt-5
 allowed_skills:

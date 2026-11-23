@@ -1,4 +1,4 @@
-name: nonAttachmentMediaFieldSkill
+name: non-attachment-media-field-skill
 description: Invalid media field on string input.
 model: gpt-5
 input_schema:

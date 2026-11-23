@@ -1,4 +1,4 @@
-name: impossibleMaximumParent
+name: impossible-maximum-parent
 description: Impossible maximum.
 model: gpt-5
 planning_mode: true

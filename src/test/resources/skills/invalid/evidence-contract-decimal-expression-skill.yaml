@@ -1,4 +1,4 @@
-name: evidenceContractDecimalExpressionSkill
+name: evidence-contract-decimal-expression-skill
 description: Invalid decimal-valued evidence expression
 model: gpt-5
 allowed_skills:

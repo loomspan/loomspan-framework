@@ -73,7 +73,7 @@ Turn an unstructured support request into an assessment of impact, possible caus
 and concrete investigation steps. Start with one model-backed YAML skill:
 
 ```yaml
-name: triageSupportRequest
+name: triage-support-request
 description: Turn a customer issue into an actionable engineering triage brief.
 model: assistant
 prompt: >
@@ -91,7 +91,7 @@ input_schema:
 In an embedded Java application, invoke it through an injected `SkillTemplate`:
 
 ```java
-String triage = skills.invoke("default-triageSupportRequest", Map.of("customerMessage", """
+String triage = skills.invoke("default:triage-support-request", Map.of("customerMessage", """
         Since this morning's deployment, checkout times out after payment.
         Three customers say they were charged but received no order confirmation.
         Retrying sometimes creates two orders. Browsing and cart updates still work.
@@ -138,24 +138,25 @@ for complete schemas, object pointers, dependencies and diagnostics.
 
 ## Skill identities and catalogs
 
-Declarations keep local names such as `search`. All `SkillTemplate` invocation,
-validation and observer overloads, and both `SkillInvocationHandoff` input forms,
-accept `search` as `default-search`, regardless of ambient execution namespace.
-Authored `allowed_skills`, `output_from.skill`, child-result input/output binding
-producers and evidence leaves may use local names relative to the containing
-skill's owner: `search` in `sales` becomes `sales-search`. Explicit `shared-search`
-keeps its cross-namespace meaning. Startup files belong to `default`; API-supplied
-documents use the validation/preparation namespace. Qualification happens before
-reference comparisons and dependency validation; raw YAML, prompts and evidence
-source positions are preserved. Java `@SkillMethod(namespace = "Tax", name = "search", description = "Search")`
-registers `tax-search`; the namespace defaults to `default`. Only namespace case
-normalizes; local-name case remains exact. Components start with an ASCII letter
-or underscore and contain ASCII letters, digits or underscores. Namespace length
-is at most 32 and total identity length at most 64 including its single hyphen.
-Combined length is enforced after qualification. Local and qualified spellings
-of the same child are duplicates. Missing local targets fail in their resolved
-namespace; no aliases, fallback search, trimming or character replacement exists.
-Runtime keys, model tool/plan selections, executor handoffs and observations remain qualified.
+Declarations use exact namespace and local-name components. Each component has
+1–64 ASCII characters matching `[a-z][a-z0-9]*(?:-[a-z0-9]+)*` and excludes the
+substrings `anthropic` and `claude`. The pair must satisfy
+`namespace.length() + 2 + localName.length() <= 64`. In `order-support`, a
+49-character local name succeeds and a 50-character name fails for both callable
+skills and reference-only executors. Qualified identities render as `namespace:local-name`.
+
+Startup YAML belongs to `default`, including nested files. Supplied documents
+belong to the validation/preparation namespace. Both Java annotations default to
+`default` and use an explicit nonempty `name` verbatim, otherwise the Java method
+name verbatim. `search()` can omit its name. A method `findOrder()` supplies
+`name = "find-order"` or fails startup with correction guidance. Components are
+validated as supplied. Callable pairs must be unique across YAML and Java, while
+executor pairs have their own index. A callable and executor may share one pair.
+
+Authored local references resolve in the containing owner and explicit colon
+references select their stated owner. Missing local targets fail in that owner.
+Reference comparisons use the resolved identity and retain the original source,
+prompts and evidence text. Runtime identity keys use the colon-qualified pair.
 
 Inject `SkillReloader` and acquire `SkillCatalog catalog = reloader.snapshot("default")`.
 There is no injected startup catalog or no-argument acquisition. `namespace()` and

@@ -154,7 +154,7 @@ class ExecutorDeclarationTests {
         assertThat(checked.issues()).singleElement().satisfies(issue -> {
             assertThat(issue.fieldPath()).isEqualTo(path);
             assertThat(issue.sourceName()).isEqualTo("executor-fixture.yml");
-            assertThat(issue.skillName()).isEqualTo("default-lookup");
+            assertThat(issue.skillName()).isEqualTo("default:lookup");
             assertThat(issue.message()).contains(message);
         });
     }

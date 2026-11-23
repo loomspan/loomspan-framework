@@ -1,6 +1,6 @@
-name: rootRecursiveSkill
+name: root-recursive-skill
 description: Root recursive integration test skill.
 model: gpt-5
 planning_mode: true
 allowed_skills:
-  - name: default-childRecursiveSkill
+  - name: default:child-recursive-skill

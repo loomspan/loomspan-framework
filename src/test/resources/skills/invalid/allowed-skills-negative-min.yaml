@@ -1,4 +1,4 @@
-name: negativeMinimumParent
+name: negative-minimum-parent
 description: Negative minimum.
 model: gpt-5
 planning_mode: true

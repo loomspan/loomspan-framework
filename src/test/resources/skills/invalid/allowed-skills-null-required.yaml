@@ -1,4 +1,4 @@
-name: nullRequiredParent
+name: null-required-parent
 description: Null required.
 model: gpt-5
 planning_mode: true

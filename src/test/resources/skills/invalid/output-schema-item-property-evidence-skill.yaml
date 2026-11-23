@@ -1,4 +1,4 @@
-name: outputSchemaItemPropertyEvidenceSkill
+name: output-schema-item-property-evidence-skill
 description: Invalid evidence below an array item object
 model: gpt-5
 allowed_skills:

@@ -18,18 +18,18 @@ Use an `x-loomspan-evidence` annotation on an immediate root `output_schema` pro
 
 ```yaml
 allowed_skills:
-  - name: classifyIncident
-  - name: investigateNetwork
-  - name: investigateApp
+  - name: classify-incident
+  - name: investigate-network
+  - name: investigate-app
 output_schema:
   type: object
   properties:
     severity:
       type: string
-      x-loomspan-evidence: classifyIncident
+      x-loomspan-evidence: classify-incident
     likelyCause:
       type: string
-      x-loomspan-evidence: classifyIncident and (investigateNetwork or investigateApp)
+      x-loomspan-evidence: classify-incident and (investigate-network or investigate-app)
   required: [severity, likelyCause]
   additionalProperties: false
 ```
@@ -85,7 +85,7 @@ Planned, started, failed, cancelled, merely visible, wrong-case, or blank capabi
 
 Evidence correction can still make additional physical model attempts and consume model-call and usage quotas. See [traces-and-debugging.md](traces-and-debugging.md) for retry identity and accounting semantics.
 
-`classifyIncident and (investigateNetwork or investigateApp)` succeeds with classification plus either investigator. It does not require both investigators. Runtime prompts and diagnostics retain the canonical expression and structured all/any gaps.
+`classify-incident and (investigate-network or investigate-app)` succeeds with classification plus either investigator. It does not require both investigators. Runtime prompts and diagnostics retain the canonical expression and structured all/any gaps.
 
 ## Direct-child and nested boundaries
 

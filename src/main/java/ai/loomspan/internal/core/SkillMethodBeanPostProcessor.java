@@ -186,7 +186,8 @@ public class SkillMethodBeanPostProcessor implements BeanPostProcessor, BeanFact
         catch (IllegalArgumentException ex)
         {
             throw new IllegalArgumentException("Invalid @" + role + " namespace/name at " + beanName + "#"
-                    + method.toGenericString() + ": " + ex.getMessage(), ex);
+                    + method.toGenericString() + ": " + ex.getMessage()
+                    + ". Supply a valid annotation name or rename the Java method. Provide a valid annotation namespace.", ex);
         }
     }
 

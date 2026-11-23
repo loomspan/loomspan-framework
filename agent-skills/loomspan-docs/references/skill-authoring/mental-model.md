@@ -24,46 +24,31 @@ Not every tree needs every level. Java skills can be roots without a model; a si
 
 ## Canonical namespace identity
 
-A declaration's `name` is a local component matching `[A-Za-z_][A-Za-z0-9_]{0,63}`.
-Startup YAML belongs to `default`; Java `@SkillMethod.namespace` defaults to
-`default`. An empty Java annotation `name` uses the canonical method name.
-Authoritative ownership constructs one callable identity: `namespace-localName`.
+A declaration has an owning namespace and a local name. Both components have
+1–64 ASCII characters matching `[a-z][a-z0-9]*(?:-[a-z0-9]+)*` and exclude
+`anthropic` and `claude` anywhere in the component. The pair must satisfy
+`namespace.length() + 2 + localName.length() <= 64`, including reference-only
+executors. Thus `order-support` permits 49 local characters. `lookup-3pl` is valid.
+Case changes, whitespace, underscores and repeated hyphens fail validation.
 
-Input qualification is optional at two boundaries:
+Startup YAML belongs to `default` regardless of subdirectory. Supplied YAML uses
+the namespace passed to validation/preparation. Both Java annotations use their
+declared namespace, defaulting to `default`. A nonempty annotation `name` is used
+verbatim. An omitted or empty name uses the Java method name verbatim. For example,
+`search()` needs no name, while `findOrder()` declares `name = "find-order"`.
+Invalid Java declarations identify the method and explain how to correct it.
 
-| Input | Local `search` resolves to | Explicit `shared-search` |
-| --- | --- | --- |
-| All `SkillTemplate` invocation/validation/observer and handoff overloads | `default-search`, regardless of ambient execution | `shared-search` |
-| Authored references in a document owned by `sales` | `sales-search` | `shared-search` |
+Callable pairs are unique across YAML and Java in each namespace. Executor pairs
+are unique independently, so a callable and executor can share the same pair.
+Qualified identities render as `namespace:local-name`. `(a-b, c)` and `(a, b-c)`
+therefore remain distinct. Local authored references resolve in the containing
+owner. Explicit `warehouse:lookup` selects that exact pair under the usual
+visibility and authorization checks. Missing local targets fail in their owner.
+Raw YAML, prompts, diagnostic labels and original evidence text retain their content.
 
-Authored references include `allowed_skills`, evidence leaves, `output_from.skill`
-and child-result input/output binding producers. Startup ownership is `default`;
-API validation/preparation supplies the owner for the same document. Ownership is
-never inferred from available targets. Missing `sales-search` fails even if
-`default-search` or a Public `shared-search` exists. Qualification grants no
-access: declared-child, same-namespace/foreign Public visibility and RBAC rules remain.
-Catalog lookup, runtime keys, model plan/tool selections, executor handoffs and
-observations MUST use qualified identities. Namespace case normalizes to lowercase;
-local case remains exact: `Tax-search` equals `tax-search`, while `tax-Search` differs.
-`a_b-c` and `a-b_c` differ. Local `child` and explicit owner `sales-child` are
-canonical duplicates in sales; bindings may mix these spellings.
-
-Each component starts with an ASCII letter or underscore and contains only ASCII
-letters, digits or underscores. Namespace length is at most 32; total identity
-length including its single hyphen is at most 64. Thus an N-character namespace
-leaves `63 - N` local characters (`default` leaves 56). Standalone declaration
-grammar does not waive this combined limit, including for unoffered/optional skills.
-Apply combined length after owner qualification. Whitespace, slash/colon separators, extra hyphens, encoding, imports,
-wildcards and fallback searches are invalid. Loomspan never trims or repairs input.
-
-Duplicate and binding comparisons use resolved canonical identities. Source labels,
-raw YAML, prompts and original evidence expression text remain unchanged. Renaming
-a namespace means creating another namespace, updating explicit references to it, and
-removing the old namespace; there is no identity-preserving rename or inheritance.
-
-**Implementation boundary:** Namespace parsing, startup, publication/removal, retained
-reachable admission and captured cross-namespace execution are implemented.
-Captured canonical observation metadata and existing Console consumers are implemented; see `NamespaceObservationIntegrationTest` and `ConsoleTraceFixtureCorpusTest`.
+Declaration grammar, owner assignment and role uniqueness are covered by
+`SkillIdentityTest`, `SkillMethodBeanPostProcessorTest` and
+`PortableDeclarationIdentityIntegrationTest`.
 
 Each root captures an immutable association of exactly the namespace generations reached
 by its declared child graph, before input conversion or validation. Every declared branch
@@ -115,7 +100,7 @@ Distinct overloaded methods MAY have distinct explicit skill names. Same/default
 Use Java for operations whose correctness should not depend on model reasoning: lookups, calculations, controlled I/O, policy operations, and fixture access. Read [Java skills](../java-api/java-skills.md) for declaration and proxy guidance, [input contracts](input-contracts.md) for reflected shapes, and [authorization](authorization.md) for JSR-250 enforcement.
 
 ```java
-@SkillMethod(name = "accountLookup", description = "Look up one account")
+@SkillMethod(name = "account-lookup", description = "Look up one account")
 public Account lookup(
         @SkillParam(description = "Stable account identifier") String accountId,
         @SkillParam(description = "Optional region", required = false) String region) {

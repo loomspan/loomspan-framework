@@ -1,4 +1,4 @@
-name: evidenceContractReservedChildSkill
+name: evidence-contract-reserved-child-skill
 description: Invalid reserved-word evidence child
 model: gpt-5
 allowed_skills:

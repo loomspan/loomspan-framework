@@ -1,4 +1,4 @@
-name: unknownConstraintFieldParent
+name: unknown-constraint-field-parent
 description: Invalid constraint field.
 model: gpt-5
 allowed_skills:

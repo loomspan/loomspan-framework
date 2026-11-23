@@ -1,4 +1,4 @@
-name: attachmentMissingAllowedSkill
+name: attachment-missing-allowed-skill
 description: Invalid attachment input.
 model: gpt-5
 input_schema:

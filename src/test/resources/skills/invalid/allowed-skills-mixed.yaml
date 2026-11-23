@@ -1,4 +1,4 @@
-name: mixedEntryParent
+name: mixed-entry-parent
 description: Invalid mixed entries.
 model: gpt-5
 allowed_skills:

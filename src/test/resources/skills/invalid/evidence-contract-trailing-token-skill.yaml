@@ -1,4 +1,4 @@
-name: evidenceContractTrailingTokenSkill
+name: evidence-contract-trailing-token-skill
 description: Invalid trailing evidence expression token
 model: gpt-5
 allowed_skills:

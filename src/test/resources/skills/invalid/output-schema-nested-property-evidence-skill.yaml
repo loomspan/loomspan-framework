@@ -1,4 +1,4 @@
-name: outputSchemaNestedPropertyEvidenceSkill
+name: output-schema-nested-property-evidence-skill
 description: Invalid evidence on a nested property
 model: gpt-5
 allowed_skills:

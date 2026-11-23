@@ -1,4 +1,4 @@
-name: concurrencyWrongTypePlanner
+name: concurrency-wrong-type-planner
 description: Invalid concurrency type.
 model: gpt-5
 planning_mode: true

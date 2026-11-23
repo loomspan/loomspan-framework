@@ -1,4 +1,4 @@
-name: invalidInputSchemaKeyword
+name: invalid-input-schema-keyword
 description: Invalid input schema keyword.
 model: gpt-5
 input_schema:

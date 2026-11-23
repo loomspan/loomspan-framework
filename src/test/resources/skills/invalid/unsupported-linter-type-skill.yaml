@@ -1,4 +1,4 @@
-name: invalidUnsupportedLinterTypeSkill
+name: invalid-unsupported-linter-type-skill
 description: Invalid skill with unsupported linter type.
 model: gpt-5
 linter:

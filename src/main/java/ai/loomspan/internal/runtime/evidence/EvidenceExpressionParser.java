@@ -20,7 +20,7 @@ public final class EvidenceExpressionParser
     /** Compile authored identifier leaves using ownership while retaining original token positions. */
     public EvidenceExpression parse(String expression, String ownerNamespace)
     {
-        this.ownerNamespace = ownerNamespace == null ? null : SkillIdentity.normalizeNamespace(ownerNamespace);
+        this.ownerNamespace = ownerNamespace == null ? null : SkillIdentity.requireNamespace(ownerNamespace);
         source = expression == null ? "" : expression;
         offset = 0;
         lookahead = nextToken();

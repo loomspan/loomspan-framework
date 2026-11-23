@@ -1,4 +1,4 @@
-name: invalidWrongTypeLinterMaxRetriesSkill
+name: invalid-wrong-type-linter-max-retries-skill
 description: Invalid skill with a non-numeric linter retry budget.
 model: gpt-5
 linter:

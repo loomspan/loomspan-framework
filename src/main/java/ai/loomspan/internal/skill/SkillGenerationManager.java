@@ -118,7 +118,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     }
 
     public SkillGeneration active(String namespace) {
-        String owner = SkillIdentity.normalizeNamespace(namespace);
+        String owner = SkillIdentity.requireNamespace(namespace);
         synchronized (generationMonitor) {
             SkillGeneration generation = active.get(owner);
             if (generation == null) throw new SkillReloadException("No active namespace '" + owner + "'");
@@ -151,7 +151,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     public record PreparationView(String namespace, String baseId, Map<String, SkillGeneration> namespaces) {}
 
     public PreparationView capturePreparation(String namespace) {
-        String owner = SkillIdentity.normalizeNamespace(namespace);
+        String owner = SkillIdentity.requireNamespace(namespace);
         synchronized (generationMonitor) {
             if (destroyed) throw new SkillReloadException("Framework has shut down");
             SkillGeneration base = active.get(owner);
@@ -316,7 +316,7 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
     }
 
     public Retirement remove(String namespace, String expectedGenerationId) {
-        String owner = SkillIdentity.normalizeNamespace(namespace);
+        String owner = SkillIdentity.requireNamespace(namespace);
         Objects.requireNonNull(expectedGenerationId, "expectedGenerationId must not be null");
         if (expectedGenerationId.isBlank()) throw new IllegalArgumentException("expectedGenerationId must not be blank");
         synchronized (generationMonitor) {

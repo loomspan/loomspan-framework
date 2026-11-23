@@ -1,3 +1,3 @@
-name: thinkingDefaultSkill
+name: thinking-default-skill
 description: Thinking skill with implicit default level.
 model: gpt-5

@@ -1,4 +1,4 @@
-name: outputSchemaRetriesInvalid
+name: output-schema-retries-invalid
 description: Invalid retries without schema.
 model: gpt-5
 output_schema_max_retries: 1

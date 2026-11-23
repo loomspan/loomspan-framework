@@ -18,7 +18,7 @@ runtime bindings, complete JSON results and normal canonical diagnostics.
 An executor leaf declares an operation owned by application Java code, with YAML supplying its input contract, roles and operation configuration. Loomspan prepares and executes these leaves through the shared Java route, classifies them as `SkillKind.JAVA`, and retains their YAML declarations and exact configuration. The example below shows accepted declaration syntax. The shared [standard schema topic](standard-schemas.md) defines input validation; the application example below exercises root and standard-tool child execution.
 
 ```yaml
-name: fetchAccount
+name: fetch-account
 description: Fetch one account
 executor: infrastructure-http
 config:
@@ -239,7 +239,7 @@ loomspan:
         empty: []
 ```
 
-The section and each namespace root MUST be maps. Namespace names follow the existing identity grammar and normalize case; duplicate normalized namespace names fail. Data keys inside a namespace retain case and literal dots. Startup YAML ingestion preserves nested maps/lists, nulls, empty containers and scalar distinctions before normal Spring flattening. YAML `null` and `~` remain null; quoted `"~"` remains text. Aliased maps/lists retain their contents; recursive containers fail validation. YAML logical expansion is limited to 1,000,000 values, including repeated alias contents, before downstream tree processing. Executor strings such as `${NAME}` and keys such as `api-key-ref` remain literal domain content. Ordinary Spring properties outside this section retain normal Spring binding behavior within that resource limit.
+The section and each namespace root MUST be maps. Namespace names use the exact portable component grammar in the [identity rules](mental-model.md#canonical-namespace-identity). Invalid case or whitespace fails validation. Data keys inside a namespace retain case and literal dots. Startup YAML ingestion preserves nested maps/lists, nulls, empty containers and scalar distinctions before normal Spring flattening. YAML `null` and `~` remain null; quoted `"~"` remains text. Aliased maps/lists retain their contents; recursive containers fail validation. YAML logical expansion is limited to 1,000,000 values, including repeated alias contents, before downstream tree processing. Executor strings such as `${NAME}` and keys such as `api-key-ref` remain literal domain content. Ordinary Spring properties outside this section retain normal Spring binding behavior within that resource limit.
 
 Skill `config` and namespace executor configuration are distinct maps. A whole-node `{ $var: name }` marker anywhere under either map resolves from the same source as provider markers. Mapping keys and sequence elements participate. Other strings, including `${...}`, remain literal. Supplied strings are terminal and retain multiline contents. At startup, Spring selects the winning executor section as a complete replacement before lookup. Displaced sections and inactive profiles cause zero lookups. One normal `Environment.getProperty(name)` lookup per distinct name spans effective provider data, executor namespaces and configured executor leaves. Resolved settings are captured in the startup generation. Invocation uses those captured maps.
 

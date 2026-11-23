@@ -10,6 +10,15 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.*;
 
 class ExecutorConfigurationTests {
+    @Test void namespaceKeysAreValidatedExactlyWhileDomainKeysRetainCase() {
+        for (String namespace : List.of("Sales", " sales", "sales ", "sales_", "claude", "anthropic-tools"))
+            assertThatThrownBy(() -> ExecutorConfiguration.from(Map.of(namespace, Map.of())))
+                    .hasMessageContaining("executor-config", namespace);
+        var configured = ExecutorConfiguration.from(Map.of("order-support", Map.of("Upper", "A", "upper", "B")));
+        assertThat(configured.requireTarget("order-support").namespaces().get("order-support"))
+                .containsEntry("Upper", "A").containsEntry("upper", "B");
+        assertThatThrownBy(() -> configured.requireTarget("Order-Support")).hasMessageContaining("namespace");
+    }
     private ExecutionConfigurationParser.Parsed parse(String section) {
         return ExecutionConfigurationParser.parse("sales", new ExecutionConfiguration("loomspan:\n" + section), new StandardEnvironment(), false);
     }
@@ -17,7 +26,7 @@ class ExecutorConfigurationTests {
         var nested = new LinkedHashMap<String, Object>();
         var list = new ArrayList<Object>(); list.add(null); list.add(Map.of());
         nested.put("List", list); nested.put("Nil", null); nested.put("literal.dot", 7);
-        var source = new LinkedHashMap<String, Object>(); source.put("Sales", nested);
+        var source = new LinkedHashMap<String, Object>(); source.put("sales", nested);
         var value = ExecutorConfiguration.from(source);
         nested.clear(); list.add("mutated"); source.clear();
         assertThat(value.namespaces()).containsOnlyKeys("sales");
@@ -46,7 +55,7 @@ class ExecutorConfigurationTests {
                 .hasMessageContaining("expanded value count", "limit");
     }
     @Test void publicationEnforcesTargetAndNeverInherits() {
-        var configured = parse("  executor-config: {Sales: {database: arbitrary}}\n");
+        var configured = parse("  executor-config: {sales: {database: arbitrary}}\n");
         assertThat(configured.executorConfig().namespaces().get("sales")).containsEntry("database", "arbitrary");
         assertThat(configured.properties().getExecutorConfig()).isSameAs(configured.executorConfig());
         assertThat(parse("  executor-config: {}\n").executorConfig().namespaces()).isEmpty();

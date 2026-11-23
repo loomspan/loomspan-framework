@@ -1,4 +1,4 @@
-name: evidenceHashNameSkill
+name: evidence-hash-name-skill
 description: Evidence producer using an exact validated public skill name
 model: gpt-5
 allowed_skills:

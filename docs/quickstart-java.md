@@ -80,7 +80,7 @@ your account, not the Loomspan alias `assistant`.
 Create `src/main/resources/skills/triage-support-request.yaml`:
 
 ```yaml
-name: triageSupportRequest
+name: triage-support-request
 description: Turn a customer issue into an actionable engineering triage brief.
 model: assistant
 prompt: >
@@ -121,7 +121,7 @@ public class DemoApplication {
 
     @Bean
     ApplicationRunner triage(SkillTemplate skills) {
-        return args -> System.out.println(skills.invoke("default-triageSupportRequest",
+        return args -> System.out.println(skills.invoke("default:triage-support-request",
             Map.of("customerMessage", """
                 Since this morning's deployment, checkout times out after payment.
                 Three customers say they were charged but received no order confirmation.

@@ -1,4 +1,4 @@
-name: lintedSkill
+name: linted-skill
 description: Regex-linted skill.
 model: gpt-5
 linter:

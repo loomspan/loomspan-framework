@@ -1,4 +1,4 @@
-name: decimalMaximumParent
+name: decimal-maximum-parent
 description: Decimal maximum.
 model: gpt-5
 planning_mode: true

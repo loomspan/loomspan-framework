@@ -23,7 +23,7 @@ public final class DefaultSkillCatalog implements SkillCatalog
 
     public DefaultSkillCatalog(String namespace, String generationId, String publicationVersion, List<CapabilityMetadata> capabilities)
     {
-        this.namespace = SkillIdentity.normalizeNamespace(namespace);
+        this.namespace = SkillIdentity.requireNamespace(namespace);
         this.publicationVersion = publicationVersion;
         this.generationId = Objects.requireNonNull(generationId, "generationId must not be null");
         if (generationId.isBlank()) throw new IllegalArgumentException("generationId must not be blank");

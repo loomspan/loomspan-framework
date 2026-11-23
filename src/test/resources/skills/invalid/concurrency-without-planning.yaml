@@ -1,4 +1,4 @@
-name: concurrencyWithoutPlanning
+name: concurrency-without-planning
 description: Inapplicable concurrency.
 model: gpt-5
 concurrency: false

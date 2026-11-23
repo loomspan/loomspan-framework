@@ -1,4 +1,4 @@
-name: concurrencyFalse
+name: concurrency-false
 description: Planning concurrency disabled.
 model: gpt-5
 planning_mode: true

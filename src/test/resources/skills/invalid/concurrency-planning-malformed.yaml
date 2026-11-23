@@ -1,4 +1,4 @@
-name: concurrencyPlanningMalformed
+name: concurrency-planning-malformed
 description: Inapplicable concurrency.
 model: gpt-5
 planning_mode:

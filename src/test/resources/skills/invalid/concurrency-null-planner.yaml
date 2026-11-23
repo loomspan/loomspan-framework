@@ -1,4 +1,4 @@
-name: concurrencyNullPlanner
+name: concurrency-null-planner
 description: Invalid null concurrency.
 model: gpt-5
 planning_mode: true

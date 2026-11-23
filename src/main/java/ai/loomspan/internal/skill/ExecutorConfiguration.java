@@ -19,7 +19,7 @@ public final class ExecutorConfiguration {
         for (var entry : map.entrySet()) {
             if (!(entry.getKey() instanceof String key)) throw invalid("loomspan.executor-config", "namespace must be textual");
             String namespace;
-            try { namespace = SkillIdentity.normalizeNamespace(key); }
+            try { namespace = SkillIdentity.requireNamespace(key); }
             catch (IllegalArgumentException ex) { throw invalid("loomspan.executor-config." + key, ex.getMessage()); }
             if (!(entry.getValue() instanceof Map<?, ?> data)) throw invalid("loomspan.executor-config." + key, "must be a non-null map");
             var typed = new LinkedHashMap<String, Object>();
@@ -27,15 +27,14 @@ public final class ExecutorConfiguration {
                 if (!(item.getKey() instanceof String dataKey)) throw invalid("loomspan.executor-config." + key, "data keys must be textual");
                 typed.put(dataKey, item.getValue());
             }
-            if (result.putIfAbsent(namespace, ImmutableContainers.copyMap(typed)) != null)
-                throw invalid("loomspan.executor-config." + key, "duplicate normalized namespace");
+            result.put(namespace, ImmutableContainers.copyMap(typed));
         }
         return new ExecutorConfiguration(result);
     }
     public ExecutorConfiguration requireTarget(String target) {
-        String normalized = SkillIdentity.normalizeNamespace(target);
+        SkillIdentity.requireNamespace(target);
         for (String namespace : namespaces.keySet())
-            if (!namespace.equals(normalized)) throw invalid("loomspan.executor-config." + namespace, "is outside publication target namespace " + normalized);
+            if (!namespace.equals(target)) throw invalid("loomspan.executor-config." + namespace, "is outside publication target namespace " + target);
         return this;
     }
     public Map<String, Map<String, Object>> namespaces() { return namespaces; }

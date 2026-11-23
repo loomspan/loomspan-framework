@@ -1,4 +1,4 @@
-name: evidenceOperatorSubstringSkill
+name: evidence-operator-substring-skill
 description: Valid operator substrings in evidence skill names
 model: gpt-5
 allowed_skills:

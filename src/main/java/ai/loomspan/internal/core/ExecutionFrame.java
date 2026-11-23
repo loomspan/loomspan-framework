@@ -27,8 +27,7 @@ public record ExecutionFrame(
             throw new IllegalArgumentException("executing namespace and generation must be present together");
         if (executingNamespace != null)
         {
-            if (!SkillIdentity.normalizeNamespace(executingNamespace).equals(executingNamespace))
-                throw new IllegalArgumentException("executingNamespace must be canonical");
+            SkillIdentity.requireNamespace(executingNamespace);
             executingGenerationId = requireNonBlank(executingGenerationId, "executingGenerationId");
         }
     }

@@ -169,7 +169,7 @@ public class YamlSkillCatalog implements InitializingBean
 
     CheckedDocuments checkedSupplied(String namespace, List<SkillDocument> documents, boolean logWarnings)
     {
-        this.namespace = SkillIdentity.normalizeNamespace(namespace);
+        this.namespace = SkillIdentity.requireNamespace(namespace);
         return checkSuppliedDocuments(documents, logWarnings);
     }
 

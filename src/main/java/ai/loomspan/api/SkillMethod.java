@@ -14,10 +14,13 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SkillMethod
 {
-    /** Local declaration name; empty uses the canonical Java method name. */
+    /** Exact local name matching {@code [a-z][a-z0-9]*(?:-[a-z0-9]+)*}.
+     * empty uses the Java method name verbatim. Invalid names fail startup.
+     * Each component has 1–64 ASCII characters and excludes {@code anthropic} and {@code claude}.
+     * Namespace length plus two plus local-name length must be at most 64. */
     String name() default "";
 
-    /** Owning namespace; normalized to lowercase, 1–32 ASCII letters, digits or underscores. */
+    /** Exact owning namespace, using the same component rules as {@link #name()}. */
     String namespace() default "default";
 
     /** Description presented to callers and parent models. */

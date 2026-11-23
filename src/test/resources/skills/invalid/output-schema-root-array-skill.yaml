@@ -1,4 +1,4 @@
-name: outputSchemaRootArray
+name: output-schema-root-array
 description: Root array should fail.
 model: gpt-5
 output_schema:

@@ -1,4 +1,4 @@
-name: attachmentMalformedMime
+name: attachment-malformed-mime
 description: Reject malformed MIME before execution.
 model: gpt-5
 prompt: Describe the image.

@@ -1,4 +1,4 @@
-name: nullMinimumParent
+name: null-minimum-parent
 description: Null minimum.
 model: gpt-5
 planning_mode: true

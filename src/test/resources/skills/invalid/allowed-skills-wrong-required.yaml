@@ -1,4 +1,4 @@
-name: wrongRequiredParent
+name: wrong-required-parent
 description: Wrong required type.
 model: gpt-5
 planning_mode: true

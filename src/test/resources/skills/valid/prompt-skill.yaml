@@ -1,4 +1,4 @@
-name: promptSkill
+name: prompt-skill
 description: Short public summary
 model: gpt-5
 prompt: |

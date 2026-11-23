@@ -1,4 +1,4 @@
-name: negativeMaximumParent
+name: negative-maximum-parent
 description: Negative maximum.
 model: gpt-5
 planning_mode: true

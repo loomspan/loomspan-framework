@@ -1,4 +1,4 @@
-name: invalidChildNameParent
+name: invalid-child-name-parent
 description: Invalid child name.
 model: gpt-5
 allowed_skills:

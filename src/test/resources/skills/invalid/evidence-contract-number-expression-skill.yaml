@@ -1,4 +1,4 @@
-name: evidenceContractNumberExpressionSkill
+name: evidence-contract-number-expression-skill
 description: Invalid number-valued evidence expression
 model: gpt-5
 allowed_skills:

@@ -1,4 +1,4 @@
-name: concurrencyPlanningFalse
+name: concurrency-planning-false
 description: Inapplicable concurrency.
 model: gpt-5
 planning_mode: false

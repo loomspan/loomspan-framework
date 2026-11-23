@@ -1,4 +1,4 @@
-name: evidenceContractListExpressionSkill
+name: evidence-contract-list-expression-skill
 description: Invalid list-valued expression
 model: gpt-5
 allowed_skills:

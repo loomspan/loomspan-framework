@@ -1,4 +1,4 @@
-name: evidenceContractWrongCaseChildSkill
+name: evidence-contract-wrong-case-child-skill
 description: Invalid wrong-case child reference
 model: gpt-5
 allowed_skills:

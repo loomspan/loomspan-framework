@@ -41,7 +41,7 @@ public final class DefaultSkillReloader implements SkillReloader
 
     @Override public SkillValidationResult validate(String namespace, Collection<SkillDocument> documents,
             ExecutionConfiguration configuration, NamespaceVisibility visibility) {
-        String target = SkillIdentity.normalizeNamespace(namespace);
+        String target = SkillIdentity.requireNamespace(namespace);
         Objects.requireNonNull(configuration, "configuration must not be null");
         Objects.requireNonNull(visibility, "visibility must not be null");
         var supplied = new ArrayList<>(Objects.requireNonNull(documents, "documents must not be null"));
@@ -78,7 +78,7 @@ public final class DefaultSkillReloader implements SkillReloader
 
     private PreparedSkillUpdate prepareInternal(String namespace, String publicationVersion, Collection<SkillDocument> documents,
             ExecutionConfiguration configuration, NamespaceVisibility visibility, Map<String, String> variableValues) {
-        String target = SkillIdentity.normalizeNamespace(namespace);
+        String target = SkillIdentity.requireNamespace(namespace);
         Objects.requireNonNull(configuration, "configuration must not be null");
         Objects.requireNonNull(visibility, "visibility must not be null");
         var supplied = new ArrayList<>(Objects.requireNonNull(documents, "documents must not be null"));
@@ -135,11 +135,11 @@ public final class DefaultSkillReloader implements SkillReloader
     }
 
     @Override public SkillCatalog snapshot(String namespace) {
-        return generations.active(SkillIdentity.normalizeNamespace(namespace)).skillCatalog();
+        return generations.active(SkillIdentity.requireNamespace(namespace)).skillCatalog();
     }
 
     @Override public void remove(String namespace, String expectedGenerationId) {
-        String target = SkillIdentity.normalizeNamespace(namespace);
+        String target = SkillIdentity.requireNamespace(namespace);
         SkillGenerationManager.Retirement[] retirement = new SkillGenerationManager.Retirement[1];
         try { lifecycle.whileAdmissionOpen(() -> retirement[0] = generations.remove(target, expectedGenerationId)); }
         catch (RejectedExecutionException ex) { throw new SkillReloadException("Cannot remove namespace after shutdown began", ex); }

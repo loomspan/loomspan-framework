@@ -1,4 +1,4 @@
-name: outputSchemaMissingRequired
+name: output-schema-missing-required
 description: Required undeclared property in an open object.
 model: gpt-5
 output_schema:

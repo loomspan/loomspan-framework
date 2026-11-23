@@ -66,7 +66,7 @@ public final class SkillGeneration implements AutoCloseable
             Map<String, Object> executorConfiguration, String publicationVersion)
     {
         this.visibility = Objects.requireNonNull(visibility, "visibility must not be null");
-        this.namespace = SkillIdentity.normalizeNamespace(namespace);
+        this.namespace = SkillIdentity.requireNamespace(namespace);
         this.runtime = runtime;
         this.id = requireNonBlank(id, "id");
         this.capabilities = immutableExactMap(capabilities, "capabilities");

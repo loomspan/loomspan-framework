@@ -1,4 +1,4 @@
-name: outputSchemaObjectEnum
+name: output-schema-object-enum
 description: Valid object declaration with an unsatisfiable scalar enum.
 model: gpt-5
 output_schema:

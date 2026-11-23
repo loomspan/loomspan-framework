@@ -1,4 +1,4 @@
-name: scalarBlockParent
+name: scalar-block-parent
 description: Invalid scalar block entry.
 model: gpt-5
 allowed_skills:

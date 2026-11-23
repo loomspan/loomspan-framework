@@ -1,4 +1,4 @@
-name: invalidMissingLinterTypeSkill
+name: invalid-missing-linter-type-skill
 description: Invalid skill with missing linter type.
 model: gpt-5
 linter:

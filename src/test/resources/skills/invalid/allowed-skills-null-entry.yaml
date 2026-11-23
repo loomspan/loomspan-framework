@@ -1,4 +1,4 @@
-name: nullEntryParent
+name: null-entry-parent
 description: Invalid null entry.
 model: gpt-5
 allowed_skills:

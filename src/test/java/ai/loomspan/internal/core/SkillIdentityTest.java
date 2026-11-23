@@ -6,38 +6,54 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.*;
 
 class SkillIdentityTest {
-    @Test void resolvesOnlyAtExplicitBoundariesWithExistingGrammarAndLimits() {
-        assertThat(SkillIdentity.resolve("Search", "Sales").toString()).isEqualTo("sales-Search");
-        assertThat(SkillIdentity.resolve("Shared-Search", "sales").toString()).isEqualTo("shared-Search");
-        assertThat(SkillIdentity.resolve("s".repeat(56), "default").toString()).hasSize(64);
-        String owner = "n".repeat(32);
-        assertThat(SkillIdentity.resolve("s".repeat(31), owner).toString()).hasSize(64);
-        assertThatThrownBy(() -> SkillIdentity.resolve("s".repeat(32), owner)).hasMessageContaining("length 65");
-        assertThatThrownBy(() -> SkillIdentity.resolve("s".repeat(57), "default")).hasMessageContaining("length 65");
-        for (String invalid : new String[]{null, "", " ", " x", "x ", "-child", "sales-", "a-b-c", "a/b", "a:b", "é"})
-            assertThatThrownBy(() -> SkillIdentity.resolve(invalid, "sales")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> SkillIdentity.parse("Search")).isInstanceOf(IllegalArgumentException.class);
+    @Test void acceptsPortableHyphenatedPair() {
+        SkillIdentity identity = new SkillIdentity("order-support", "lookup-3pl");
+        assertThat(identity.namespace()).isEqualTo("order-support");
+        assertThat(identity.localName()).isEqualTo("lookup-3pl");
+        assertThat(identity.toString()).isEqualTo("order-support:lookup-3pl");
+        assertThat(SkillIdentity.parse(identity.toString())).isEqualTo(identity);
+        assertThat(SkillIdentity.resolve("lookup-3pl", "orders")).isEqualTo(new SkillIdentity("orders", "lookup-3pl"));
+        assertThat(SkillIdentity.resolve("warehouse:lookup", "orders")).isEqualTo(new SkillIdentity("warehouse", "lookup"));
     }
-    @Test void canonicalizesOnlyNamespace() {
-        assertThat(SkillIdentity.parse("Tax-search")).isEqualTo(SkillIdentity.parse("tax-search"));
-        assertThat(SkillIdentity.parse("tax-Search")).isNotEqualTo(SkillIdentity.parse("tax-search"));
-        assertThat(SkillIdentity.parse("a_b-c")).isNotEqualTo(SkillIdentity.parse("a-b_c"));
-        assertThat(SkillIdentity.normalizeNamespace("I")).isEqualTo("i");
-        assertThat(SkillIdentity.parse("_A-_B1").toString()).isEqualTo("_a-_B1");
+    @Test void rejectsNamespaceCaseChanges() {
+        assertThatThrownBy(() -> new SkillIdentity("Orders", "lookup")).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("namespace", "Orders");
     }
-    @ParameterizedTest @ValueSource(strings={"", "search", "a/b", "a:b", "a-b-c", "-b", "a-", " a-b", "a-b ", "a-b c", "1a-b", "a-1b", "a-*", "a-%62", "a-\u00e9"})
-    void rejectsMalformedWithoutRepair(String value) {
+    @ParameterizedTest @ValueSource(strings={"a", "lookup", "lookup-3pl", "order-support", "a0", "a-0"})
+    void acceptsPortableComponents(String value) {
+        assertThat(SkillIdentity.requireNamespace(value)).isEqualTo(value);
+        SkillIdentity.validateLocalName(value);
+    }
+    @ParameterizedTest @ValueSource(strings={"", "3pl-lookup", "Lookup", "LOOKUP", " lookup", "lookup ", "look up", "lookup\n", "lookup\r\n", "_lookup", "lookup_name", "-lookup", "lookup-", "look--up", "look/up", "look:up", "é", "myclaudeskill", "anthropic-tools"})
+    void rejectsMalformedComponentsWithoutRepair(String value) {
+        assertThatThrownBy(() -> new SkillIdentity(value, "lookup")).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("namespace", value);
+        assertThatThrownBy(() -> new SkillIdentity("orders", value)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("local name", value);
+    }
+    @Test void rejectsNullComponents() {
+        assertThatThrownBy(() -> new SkillIdentity(null, "lookup")).hasMessageContaining("namespace");
+        assertThatThrownBy(() -> new SkillIdentity("orders", null)).hasMessageContaining("local name");
+        assertThatThrownBy(() -> SkillIdentity.parse(null)).hasMessageContaining("reference");
+    }
+    @ParameterizedTest @ValueSource(strings={"", "search", "a-b", "a/b", ":b", "a:", "a:b:c", " a:b", "a:b ", "1a:b", "a:1b", "a:*", "a:%62", "a:é"})
+    void rejectsMalformedQualifiedReferences(String value) {
         assertThatThrownBy(() -> SkillIdentity.parse(value)).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void preservesDistinctHyphenBearingPairs() {
+        var first = new SkillIdentity("a-b", "c");
+        var second = new SkillIdentity("a", "b-c");
+        assertThat(first).isNotEqualTo(second);
+        assertThat(first.toString()).isNotEqualTo(second.toString());
+        assertThat(SkillIdentity.parse(first.toString())).isEqualTo(first);
+        assertThat(SkillIdentity.parse(second.toString())).isEqualTo(second);
+    }
     @Test void enforcesIndependentAndCombinedLimits() {
-        String owner = "n".repeat(32);
-        assertThat(new SkillIdentity(owner, "s".repeat(31)).toString()).hasSize(64);
-        assertThat(new SkillIdentity("n", "s".repeat(62)).toString()).hasSize(64);
-        assertThatThrownBy(() -> new SkillIdentity(owner + "n", "x")).hasMessageContaining("length 33").hasMessageContaining("limit 32");
-        assertThatThrownBy(() -> new SkillIdentity(owner, "s".repeat(32))).hasMessageContaining("length 65").hasMessageContaining("limit 64");
-        assertThatThrownBy(() -> SkillIdentity.normalizeNamespace(owner + "n")).hasMessageContaining("limit 32");
+        SkillIdentity.requireNamespace("n".repeat(64));
         SkillIdentity.validateLocalName("s".repeat(64));
-        assertThatThrownBy(() -> new SkillIdentity("default", "s".repeat(57))).hasMessageContaining("length 65");
-        assertThat(new SkillIdentity("default", "s".repeat(56)).toString()).hasSize(64);
+        assertThatThrownBy(() -> SkillIdentity.requireNamespace("n".repeat(65))).hasMessageContaining("length 65", "limit 64");
+        assertThatThrownBy(() -> SkillIdentity.validateLocalName("s".repeat(65))).hasMessageContaining("length 65", "limit 64");
+        assertThat(new SkillIdentity("order-support", "s".repeat(49)).toString()).hasSize(63);
+        assertThatThrownBy(() -> new SkillIdentity("order-support", "s".repeat(50))).hasMessageContaining("length 65", "limit 64");
+        assertThat(new SkillIdentity("n", "s".repeat(61)).toString()).hasSize(63);
+        assertThat(new SkillIdentity("n".repeat(61), "s").toString()).hasSize(63);
+        assertThatThrownBy(() -> new SkillIdentity("n", "s".repeat(62))).hasMessageContaining("length 65");
     }
 }

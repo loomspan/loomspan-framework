@@ -16,7 +16,7 @@ planning_mode: true
 allowed_skills:
   - name: default-invoiceParser
     required: true
-  - name: default-expenseLookup
+  - name: default:expense-lookup
     min_tasks: 1
     max_tasks: 2
   - name: default-optionalReviewer

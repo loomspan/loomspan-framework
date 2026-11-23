@@ -1,4 +1,4 @@
-name: evidenceContractAmbiguousCaseChildSkill
+name: evidence-contract-ambiguous-case-child-skill
 description: Invalid ambiguous-case evidence child
 model: gpt-5
 allowed_skills:

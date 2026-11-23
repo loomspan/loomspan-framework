@@ -1,4 +1,4 @@
-name: evidenceContractMalformedExpressionSkill
+name: evidence-contract-malformed-expression-skill
 description: Invalid malformed evidence expression
 model: gpt-5
 allowed_skills:

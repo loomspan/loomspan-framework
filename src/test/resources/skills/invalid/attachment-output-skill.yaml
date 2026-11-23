@@ -1,4 +1,4 @@
-name: attachmentOutputSkill
+name: attachment-output-skill
 description: Invalid attachment output.
 model: gpt-5
 output_schema:

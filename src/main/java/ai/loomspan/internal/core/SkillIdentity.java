@@ -1,52 +1,52 @@
 package ai.loomspan.internal.core;
 
-import java.util.Locale;
-
-/** Canonical internal identity. Only namespace case is normalized; authored content is never repaired. */
+/** Exact portable identity used by callable and executor registrations. */
 public record SkillIdentity(String namespace, String localName)
 {
     public SkillIdentity
     {
-        namespace = normalizeNamespace(namespace);
+        namespace = requireNamespace(namespace);
         validateLocalName(localName);
-        int length = namespace.length() + 1 + localName.length();
-        if (length > 64) throw new IllegalArgumentException("skill identity '" + namespace + "-" + localName
+        int length = namespace.length() + 2 + localName.length();
+        if (length > 64) throw new IllegalArgumentException("skill identity '" + namespace + ":" + localName
                 + "' length " + length + " exceeds limit 64");
     }
 
     public static SkillIdentity parse(String reference)
     {
         if (reference == null) throw new IllegalArgumentException("skill reference must not be null");
-        int separator = reference.indexOf('-');
-        if (separator < 1 || separator != reference.lastIndexOf('-') || separator == reference.length() - 1)
-            throw new IllegalArgumentException("invalid qualified skill reference '" + reference + "'; expected namespace-localName");
+        int separator = reference.indexOf(':');
+        if (separator < 1 || separator != reference.lastIndexOf(':') || separator == reference.length() - 1)
+            throw new IllegalArgumentException("invalid qualified skill reference '" + reference + "'; expected namespace:local-name");
         return new SkillIdentity(reference.substring(0, separator), reference.substring(separator + 1));
     }
 
     /** Resolve input at an authoring or host-entry boundary, never during canonical lookup. */
     public static SkillIdentity resolve(String reference, String ownerNamespace)
     {
-        if (reference == null || reference.indexOf('-') >= 0) return parse(reference);
+        if (reference == null || reference.indexOf(':') >= 0) return parse(reference);
         return new SkillIdentity(ownerNamespace, reference);
     }
 
-    public static String normalizeNamespace(String namespace)
+    public static String requireNamespace(String namespace)
     {
-        component(namespace, "namespace", 32);
-        return namespace.toLowerCase(Locale.ROOT);
+        component(namespace, "namespace");
+        return namespace;
     }
 
-    public static void validateLocalName(String localName) { component(localName, "local name", 64); }
+    public static void validateLocalName(String localName) { component(localName, "local name"); }
 
-    private static void component(String value, String field, int limit)
+    private static void component(String value, String field)
     {
         if (value == null) throw new IllegalArgumentException(field + " must not be null");
-        if (value.length() > limit) throw new IllegalArgumentException(field + " '" + value + "' length "
-                + value.length() + " exceeds limit " + limit);
-        if (!value.matches("[A-Za-z_][A-Za-z0-9_]*"))
+        if (value.length() > 64) throw new IllegalArgumentException(field + " '" + value + "' length "
+                + value.length() + " exceeds limit 64");
+        if (!value.matches("[a-z][a-z0-9]*(?:-[a-z0-9]+)*"))
             throw new IllegalArgumentException("invalid " + field + " '" + value
-                    + "'; must start with an ASCII letter or underscore and contain only ASCII letters, digits or underscores");
+                    + "'; must match [a-z][a-z0-9]*(?:-[a-z0-9]+)* using 1–64 ASCII characters");
+        if (value.contains("anthropic") || value.contains("claude"))
+            throw new IllegalArgumentException("invalid " + field + " '" + value + "'; must not contain anthropic or claude");
     }
 
-    @Override public String toString() { return namespace + "-" + localName; }
+    @Override public String toString() { return namespace + ":" + localName; }
 }

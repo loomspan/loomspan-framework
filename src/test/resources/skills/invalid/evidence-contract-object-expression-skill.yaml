@@ -1,4 +1,4 @@
-name: evidenceContractObjectExpressionSkill
+name: evidence-contract-object-expression-skill
 description: Invalid object-valued evidence expression
 model: gpt-5
 allowed_skills:

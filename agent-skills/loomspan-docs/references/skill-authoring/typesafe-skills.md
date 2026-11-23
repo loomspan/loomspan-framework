@@ -37,7 +37,7 @@ loomspan:
 Declare the callable leaf separately:
 
 ```yaml
-name: repeatContact
+name: repeat-contact
 description: Judge whether this is a repeat contact
 executor: typesafe
 input_schema:
@@ -62,7 +62,7 @@ input_transform:
     }
 ```
 
-Invoke `repeatContact` through `SkillTemplate` or expose it as an ordinary direct
+Invoke `repeat-contact` through `SkillTemplate` or expose it as an ordinary direct
 child. It executes as `JAVA`, with YAML declaration provenance. Existing local
 and qualified executor references follow the visibility, authorization,
 configuration, publication and retirement rules for [executor leaves](executor-skills.md).

@@ -1,4 +1,4 @@
-name: invalidMissingLinterMaxRetriesSkill
+name: invalid-missing-linter-max-retries-skill
 description: Invalid skill with missing linter retry budget.
 model: gpt-5
 linter:

@@ -17,9 +17,10 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SkillExecutor
 {
-    /** Local declaration name; empty uses the canonical Java method name. */
+    /** Exact portable local name; empty uses the Java method name verbatim.
+     * The component grammar and pair length limit are specified by {@link SkillMethod#name()}. */
     String name() default "";
-    /** Owning namespace, normalized to lowercase. */
+    /** Exact owning namespace, using the component rules of {@link SkillMethod#name()}. */
     String namespace() default "default";
     /** Exact dot-separated map path in the executor owner's namespace and, for foreign
      * references, the executing YAML leaf's namespace. Owner selection is required;

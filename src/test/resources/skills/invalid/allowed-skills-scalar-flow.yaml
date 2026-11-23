@@ -1,4 +1,4 @@
-name: scalarFlowParent
+name: scalar-flow-parent
 description: Invalid scalar flow allowlist.
 model: gpt-5
 allowed_skills: [childOne, childTwo]

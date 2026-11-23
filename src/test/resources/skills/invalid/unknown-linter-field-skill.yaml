@@ -1,4 +1,4 @@
-name: invalidUnknownLinterFieldSkill
+name: invalid-unknown-linter-field-skill
 description: Invalid skill with unknown linter field.
 model: gpt-5
 linter:

@@ -27,7 +27,7 @@ Then annotate an application Spring bean method or its class:
 
 ```java
 @RolesAllowed({"FINANCE", "ADMIN"})
-@SkillMethod(name = "expenseLookup", description = "Retrieve recent expenses")
+@SkillMethod(name = "expense-lookup", description = "Retrieve recent expenses")
 public List<Expense> lookup() { /* application implementation */ }
 ```
 

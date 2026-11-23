@@ -1,4 +1,4 @@
-name: rootBinarySkill
+name: root-binary-skill
 description: Root YAML skill for binary ref integration testing.
 model: gpt-5
 planning_mode: true

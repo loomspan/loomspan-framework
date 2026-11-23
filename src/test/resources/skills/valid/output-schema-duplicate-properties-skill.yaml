@@ -1,4 +1,4 @@
-name: outputSchemaDuplicateProperties
+name: output-schema-duplicate-properties
 description: Distinct exact names differing only by case.
 model: gpt-5
 output_schema:

@@ -1,4 +1,4 @@
-name: allowedVisibleSkill
+name: allowed-visible-skill
 description: Allowed child YAML skill.
 rbac_roles:
   - ALLOWED

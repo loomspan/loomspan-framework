@@ -123,8 +123,8 @@ public class DemoApplication {
     @Bean
     ApplicationRunner demo(SkillTemplate skills) {
         return args -> {
-            String http = skills.invoke("default-send", Map.of("message", "hello"));
-            String sql = skills.invoke("default-query", Map.of("id", 7));
+            String http = skills.invoke("default:send", Map.of("message", "hello"));
+            String sql = skills.invoke("default:query", Map.of("id", 7));
             if (!"service:hello".equals(http) || !"archive|select :id|7".equals(sql)) {
                 throw new IllegalStateException("Unexpected executor output: " + http + " / " + sql);
             }

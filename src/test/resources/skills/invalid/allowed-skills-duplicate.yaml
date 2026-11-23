@@ -1,4 +1,4 @@
-name: duplicateConstraintParent
+name: duplicate-constraint-parent
 description: Duplicate child names.
 model: gpt-5
 allowed_skills:

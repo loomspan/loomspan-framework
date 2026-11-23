@@ -1,4 +1,4 @@
-name: structuredConstraintParent
+name: structured-constraint-parent
 description: Structured task constraints.
 model: gpt-5
 planning_mode: true

@@ -1,4 +1,4 @@
-name: attachmentInputSkill
+name: attachment-input-skill
 description: Accepts image attachment input.
 model: gpt-5
 input_schema:

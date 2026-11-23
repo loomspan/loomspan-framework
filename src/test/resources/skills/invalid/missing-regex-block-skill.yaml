@@ -1,4 +1,4 @@
-name: invalidMissingRegexBlockSkill
+name: invalid-missing-regex-block-skill
 description: Invalid skill with missing regex block.
 model: gpt-5
 linter:

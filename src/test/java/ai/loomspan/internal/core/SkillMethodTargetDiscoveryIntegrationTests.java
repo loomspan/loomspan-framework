@@ -24,8 +24,8 @@ class SkillMethodTargetDiscoveryIntegrationTests
 
         assertThat(harness.registry().getAllCapabilities())
                 .extracting(CapabilityMetadata::name)
-                .containsExactly("default-execute");
-        CapabilityMetadata target = harness.registry().getCapability("default-execute");
+                .containsExactly("default:execute");
+        CapabilityMetadata target = harness.registry().getCapability("default:execute");
         JsonNode schema = new ObjectMapper().readTree(target.tool().inputSchema());
         assertThat(schema.path("properties").has("internalInput")).isFalse();
         assertThat(schema.path("properties").path("externalInput").path("description").asText())
@@ -44,8 +44,8 @@ class SkillMethodTargetDiscoveryIntegrationTests
 
         assertThat(harness.registry().getAllCapabilities())
                 .extracting(CapabilityMetadata::name)
-                .containsExactly("default-convert");
-        CapabilityMetadata target = harness.registry().getCapability("default-convert");
+                .containsExactly("default:convert");
+        CapabilityMetadata target = harness.registry().getCapability("default:convert");
         assertThat(target.tool().inputSchema()).contains("genericInput").doesNotContain("implementationInput");
         assertThat(target.invoker().invoke(Map.of("genericInput", "alpha")))
                 .isEqualTo("generic:alpha");
@@ -60,8 +60,8 @@ class SkillMethodTargetDiscoveryIntegrationTests
 
         assertThat(harness.registry().getAllCapabilities())
                 .extracting(CapabilityMetadata::name)
-                .containsExactly("default-execute");
-        assertThat(harness.registry().getCapability("default-execute").invoker().invoke(Map.of("input", "alpha")))
+                .containsExactly("default:execute");
+        assertThat(harness.registry().getCapability("default:execute").invoker().invoke(Map.of("input", "alpha")))
                 .isEqualTo("class:alpha");
         assertThat(adviceCalls).hasValue(1);
     }
@@ -79,10 +79,10 @@ class SkillMethodTargetDiscoveryIntegrationTests
 
         processor.postProcessAfterInitialization(proxy, "overloadedSkill");
         assertThat(registry.getAllCapabilities()).extracting(CapabilityMetadata::name)
-                .containsExactlyInAnyOrder("default-executeText", "default-executeNumber");
-        assertThat(registry.getCapability("default-executeText").invoker().invoke(Map.of("input", "alpha")))
+                .containsExactlyInAnyOrder("default:execute-text", "default:execute-number");
+        assertThat(registry.getCapability("default:execute-text").invoker().invoke(Map.of("input", "alpha")))
                 .isEqualTo("alpha");
-        assertThat(registry.getCapability("default-executeNumber").invoker().invoke(Map.of("input", 42)))
+        assertThat(registry.getCapability("default:execute-number").invoker().invoke(Map.of("input", 42)))
                 .isEqualTo("42");
     }
 
@@ -92,7 +92,7 @@ class SkillMethodTargetDiscoveryIntegrationTests
         Object proxy = jdkProxy(new CompetingInterfaceSkillImpl(), null);
         TestHarness harness = process(proxy, "competingSkill");
 
-        assertThat(harness.registry().getCapability("default-execute").invoker()
+        assertThat(harness.registry().getCapability("default:execute").invoker()
                 .invoke(Map.of("input", "alpha")))
                 .isEqualTo("annotated:alpha");
     }
@@ -123,7 +123,7 @@ class SkillMethodTargetDiscoveryIntegrationTests
         Object proxy = jdkProxy(new EquivalentContractSkillImpl(), null);
         TestHarness harness = process(proxy, "equivalentContractSkill");
 
-        assertThat(harness.registry().getCapability("default-execute").invoker()
+        assertThat(harness.registry().getCapability("default:execute").invoker()
                 .invoke(Map.of("publicInput", "alpha")))
                 .isEqualTo("alpha");
     }
@@ -142,7 +142,7 @@ class SkillMethodTargetDiscoveryIntegrationTests
             factory.addAdvice((org.aopalliance.intercept.MethodInterceptor) invocation -> { throw failure; });
             TestHarness harness = process(factory.getProxy(), "deniedSkill");
             RuntimeException expected = failure;
-            assertThatThrownBy(() -> harness.registry().getCapability("default-denied").invoker().invoke(Map.of()))
+            assertThatThrownBy(() -> harness.registry().getCapability("default:denied").invoker().invoke(Map.of()))
                     .isSameAs(expected);
             assertThat(businessCalls).hasValue(0);
         }
@@ -313,13 +313,13 @@ class SkillMethodTargetDiscoveryIntegrationTests
 
     static class OverloadedConcreteSkill
     {
-        @SkillMethod(name = "executeText", description = "String skill")
+        @SkillMethod(name = "execute-text", description = "String skill")
         public String execute(String input)
         {
             return input;
         }
 
-        @SkillMethod(name = "executeNumber", description = "Integer skill")
+        @SkillMethod(name = "execute-number", description = "Integer skill")
         public String execute(Integer input)
         {
             return String.valueOf(input);

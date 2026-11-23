@@ -1,4 +1,4 @@
-name: outputSchemaRootEvidenceSkill
+name: output-schema-root-evidence-skill
 description: Invalid evidence on the root schema
 model: gpt-5
 allowed_skills:

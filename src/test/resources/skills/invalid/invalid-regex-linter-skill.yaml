@@ -1,4 +1,4 @@
-name: invalidRegexLinterSkill
+name: invalid-regex-linter-skill
 description: Invalid skill with malformed regex syntax.
 model: gpt-5
 linter:

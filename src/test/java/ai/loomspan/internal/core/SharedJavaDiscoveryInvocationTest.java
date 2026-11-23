@@ -42,9 +42,9 @@ class SharedJavaDiscoveryInvocationTest
 
     static Supplier<String> invocation(SkillMethodBeanPostProcessor processor, boolean executor)
     {
-        if (executor) return () -> processor.executors().stream().filter(e -> e.name().equals("default-result"))
+        if (executor) return () -> processor.executors().stream().filter(e -> e.name().equals("default:result"))
                 .findFirst().orElseThrow().invoker().apply(INPUT);
-        return () -> (String) processor.capabilities().stream().filter(c -> c.name().equals("default-result"))
+        return () -> (String) processor.capabilities().stream().filter(c -> c.name().equals("default:result"))
                 .findFirst().orElseThrow().invoker().invoke(Map.of());
     }
 
@@ -123,20 +123,20 @@ class SharedJavaDiscoveryInvocationTest
     @Test void separateRoleIndexesAllowSameNameAndRejectDuplicatesWithinRole()
     {
         var processor = process(new Results());
-        assertThat(processor.capabilities()).extracting(CapabilityMetadata::name).containsExactly("default-result");
-        assertThat(processor.executors()).extracting(SkillExecutorRegistration::name).containsExactly("default-result");
+        assertThat(processor.capabilities()).extracting(CapabilityMetadata::name).containsExactly("default:result");
+        assertThat(processor.executors()).extracting(SkillExecutorRegistration::name).containsExactly("default:result");
         assertThat(processor.executors()).isEqualTo(processor.executors());
         assertThatThrownBy(() -> processor.postProcessAfterInitialization(new ExecutorDuplicate(), "secondBean"))
-                .isInstanceOf(CapabilityCollisionException.class).hasMessageContaining("default-result")
+                .isInstanceOf(CapabilityCollisionException.class).hasMessageContaining("default:result")
                 .hasMessageContaining("applicationBean").hasMessageContaining("secondBean");
         var other = process(new ExecutorOnly());
         assertThat(other.capabilities()).isEmpty();
-        assertThat(other.executors()).extracting(SkillExecutorRegistration::name).containsExactly("tax-Run");
+        assertThat(other.executors()).extracting(SkillExecutorRegistration::name).containsExactly("tax:run");
         assertThat(other.executors().getFirst().config()).isEqualTo("connections.selected");
         assertThat(other.executors().getFirst().invoker().apply(INPUT)).isEmpty();
     }
     static class ExecutorDuplicate { @SkillExecutor(name="result") public void execute(SkillExecutorInvocation value) {} }
-    static class ExecutorOnly { @SkillExecutor(namespace="Tax", name="Run", config="connections.selected") public void run(SkillExecutorInvocation value) {} }
+    static class ExecutorOnly { @SkillExecutor(namespace="tax", name="run", config="connections.selected") public void run(SkillExecutorInvocation value) {} }
 
     @Test void lazyExecutorOnlyBeanUsesTheSameCompletionPassWithoutExecutingIt()
     {
@@ -211,8 +211,8 @@ class SharedJavaDiscoveryInvocationTest
     static class UnsupportedArgument { @SkillExecutor void execute(UnsupportedInvocation value) {} }
     static class DiagnosticArgument { @SkillExecutor void execute(ai.loomspan.api.extensions.v1.ExecutorDiagnostics value) {} }
     static class VarargsArgument { @SkillExecutor void execute(SkillExecutorInvocation... value) {} }
-    static class BadName { @SkillExecutor(name="bad-name") void execute(SkillExecutorInvocation value) {} }
-    static class BadNamespace { @SkillExecutor(namespace="nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn") void execute(SkillExecutorInvocation value) {} }
+    static class BadName { @SkillExecutor(name="bad--name") void execute(SkillExecutorInvocation value) {} }
+    static class BadNamespace { @SkillExecutor(namespace="Orders") void execute(SkillExecutorInvocation value) {} }
     static class TooLongIdentity { @SkillExecutor(namespace="nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",name="ssssssssssssssssssssssssssssssss") void execute(SkillExecutorInvocation value) {} }
 
     @Test void rejectsUnsafeProxyDispatchForExecutors()
@@ -243,17 +243,17 @@ class SharedJavaDiscoveryInvocationTest
             assertThat(processor.capabilities()).hasSize(3); assertThat(processor.executors()).hasSize(3);
             for (boolean executor : List.of(false,true))
             {
-                Supplier<String> call = () -> executor ? processor.executors().stream().filter(e -> e.name().equals("default-secured"))
+                Supplier<String> call = () -> executor ? processor.executors().stream().filter(e -> e.name().equals("default:secured"))
                         .findFirst().orElseThrow().invoker().apply(INPUT) : (String) processor.capabilities().stream()
-                        .filter(c -> c.name().equals("default-secured")).findFirst().orElseThrow().invoker().invoke(Map.of());
+                        .filter(c -> c.name().equals("default:secured")).findFirst().orElseThrow().invoker().invoke(Map.of());
                 SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("reader", "n/a", List.of(new SimpleGrantedAuthority("ROLE_READ"))));
                 assertThat(call.get()).isEqualTo("authorized");
                 SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("other", "n/a", List.of(new SimpleGrantedAuthority("ROLE_OTHER"))));
                 assertThatThrownBy(call::get).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
                 if (executor)
                 {
-                    assertThat(processor.executors().stream().filter(e -> e.name().equals("default-permit")).findFirst().orElseThrow().invoker().apply(INPUT)).isEqualTo("permitted");
-                    assertThatThrownBy(() -> processor.executors().stream().filter(e -> e.name().equals("default-deny")).findFirst().orElseThrow().invoker().apply(INPUT))
+                    assertThat(processor.executors().stream().filter(e -> e.name().equals("default:permit")).findFirst().orElseThrow().invoker().apply(INPUT)).isEqualTo("permitted");
+                    assertThatThrownBy(() -> processor.executors().stream().filter(e -> e.name().equals("default:deny")).findFirst().orElseThrow().invoker().apply(INPUT))
                             .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
                 }
             }

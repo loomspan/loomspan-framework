@@ -1,4 +1,4 @@
-name: outputSchemaPropertyEvidenceSkill
+name: output-schema-property-evidence-skill
 description: Skill with evidence colocated on an output property
 model: gpt-5
 allowed_skills:
