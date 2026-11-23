@@ -14,12 +14,13 @@ public enum ImmediateCompletionRetention implements CompletionGraceRetention
 
     @Override
     public Optional<RetainedArtifact> retainOrDelete(
-            Path artifactPath,
+            Path activePath,
+            Path completedPath,
             Instant finalizedAt,
             String traceId,
             String sessionId) throws IOException
     {
-        Files.deleteIfExists(artifactPath);
+        Files.deleteIfExists(activePath);
         return Optional.empty();
     }
 

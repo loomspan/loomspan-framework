@@ -33,7 +33,7 @@ class NdjsonTraceRecordWriterTest {
 
         assertThat(handle.tracePath().getFileName().toString())
                 .contains(sessionId)
-                .endsWith(".execution-trace.ndjson");
+                .endsWith(".execution-trace.ndjson.in-progress");
         assertThat(Files.exists(handle.tracePath())).isTrue();
         String ndjson = Files.readString(handle.tracePath());
         assertThat(ndjson).endsWith("\n").doesNotContain("\r\n");

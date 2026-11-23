@@ -55,12 +55,14 @@ public final class ScheduledCompletionGraceRetention implements CompletionGraceR
 
     @Override
     public Optional<RetainedArtifact> retainOrDelete(
-            Path artifactPath,
+            Path activePath,
+            Path completedPath,
             Instant finalizedAt,
             String traceId,
             String sessionId) throws IOException
     {
-        Objects.requireNonNull(artifactPath, "artifactPath must not be null");
+        Objects.requireNonNull(activePath, "activePath must not be null");
+        Objects.requireNonNull(completedPath, "completedPath must not be null");
         Objects.requireNonNull(finalizedAt, "finalizedAt must not be null");
         Instant expiresAt;
         try
@@ -71,33 +73,23 @@ public final class ScheduledCompletionGraceRetention implements CompletionGraceR
         {
             throw new IllegalArgumentException("finalizedAt plus grace must be representable", ex);
         }
-        Path exactPath = artifactPath.toAbsolutePath().normalize();
-        if (grace.isZero() || !expiresAt.isAfter(Instant.now(clock)))
-        {
-            Files.deleteIfExists(exactPath);
-            return Optional.empty();
-        }
-
-        if (closed.get())
-        {
-            Files.deleteIfExists(exactPath);
-            return Optional.empty();
-        }
-        long sizeBytes = Files.size(exactPath);
-        RetentionState state = new RetentionState(
-                exactPath, traceId, sessionId, expiresAt, sizeBytes);
+        Path active = activePath.toAbsolutePath().normalize();
+        Path destination = completedPath.toAbsolutePath().normalize();
+        RetentionState state;
         synchronized (this)
         {
-            if (closed.get())
+            if (closed.get() || grace.isZero() || !expiresAt.isAfter(Instant.now(clock)))
             {
-                Files.deleteIfExists(exactPath);
+                Files.deleteIfExists(active);
                 return Optional.empty();
             }
-            if (states.putIfAbsent(exactPath, state) != null)
+            state = new RetentionState(active, destination, traceId, sessionId, expiresAt, Files.size(active));
+            if (states.putIfAbsent(destination, state) != null)
             {
                 throw new IllegalStateException("Completion retention already owns the exact artifact path");
             }
         }
+        ScheduledFuture<?> future;
         try
         {
             long delayNanos;
@@ -109,25 +101,44 @@ public final class ScheduledCompletionGraceRetention implements CompletionGraceR
             {
                 delayNanos = Long.MAX_VALUE;
             }
-            state.future = executor.schedule(() -> expire(state), delayNanos, TimeUnit.NANOSECONDS);
-            synchronized (this)
-            {
-                if (states.get(exactPath) != state)
-                {
-                    return Optional.empty();
-                }
-            }
-            return Optional.of(new RetainedArtifact(expiresAt, sizeBytes));
+            future = executor.schedule(() -> expire(state), delayNanos, TimeUnit.NANOSECONDS);
         }
         catch (RejectedExecutionException ex)
         {
             synchronized (this)
             {
-                states.remove(exactPath, state);
+                states.remove(destination, state);
                 state.closed = true;
+                Files.deleteIfExists(active);
             }
-            Files.deleteIfExists(exactPath);
             return Optional.empty();
+        }
+        synchronized (this)
+        {
+            state.future = future;
+            if (closed.get() || states.get(destination) != state
+                    || !expiresAt.isAfter(Instant.now(clock)))
+            {
+                states.remove(destination, state);
+                state.closed = true;
+                future.cancel(false);
+                Files.deleteIfExists(active);
+                return Optional.empty();
+            }
+            try
+            {
+                TraceFilePublication.publish(active, destination);
+                state.path = destination;
+                state.published = true;
+            }
+            catch (IOException ex)
+            {
+                states.remove(destination, state);
+                state.closed = true;
+                future.cancel(false);
+                throw ex;
+            }
+            return Optional.of(new RetainedArtifact(expiresAt, state.sizeBytes));
         }
     }
 
@@ -146,7 +157,7 @@ public final class ScheduledCompletionGraceRetention implements CompletionGraceR
             synchronized (this)
             {
                 state = states.get(exactPath);
-                if (closed.get() || state == null || state.closed || state.expired
+                if (closed.get() || state == null || !state.published || state.closed || state.expired
                         || !state.matches(artifact)
                         || !Instant.now(clock).isBefore(state.expiresAt))
                 {
@@ -185,7 +196,7 @@ public final class ScheduledCompletionGraceRetention implements CompletionGraceR
         boolean delete;
         synchronized (this)
         {
-            if (state.closed || states.get(state.path) != state)
+            if (state.closed || states.get(state.destination) != state)
             {
                 return;
             }
@@ -194,12 +205,9 @@ public final class ScheduledCompletionGraceRetention implements CompletionGraceR
             if (delete)
             {
                 state.closed = true;
-                states.remove(state.path, state);
+                states.remove(state.destination, state);
             }
-        }
-        if (delete)
-        {
-            delete(state);
+            if (delete) delete(state);
         }
     }
 
@@ -219,7 +227,7 @@ public final class ScheduledCompletionGraceRetention implements CompletionGraceR
             {
                 state.expired = true;
                 state.closed = true;
-                states.remove(state.path, state);
+                states.remove(state.destination, state);
                 delete = true;
             }
         }
@@ -253,6 +261,7 @@ public final class ScheduledCompletionGraceRetention implements CompletionGraceR
         states.values().forEach(state ->
         {
             state.closed = true;
+            if (!state.published) delete(state);
             if (state.future != null)
             {
                 state.future.cancel(false);
@@ -316,7 +325,9 @@ public final class ScheduledCompletionGraceRetention implements CompletionGraceR
 
     private static final class RetentionState
     {
-        private final Path path;
+        private Path path;
+        private final Path destination;
+        private boolean published;
         private final String traceId;
         private final String sessionId;
         private final Instant expiresAt;
@@ -326,9 +337,10 @@ public final class ScheduledCompletionGraceRetention implements CompletionGraceR
         private boolean expired;
         private boolean closed;
 
-        private RetentionState(Path path, String traceId, String sessionId, Instant expiresAt, long sizeBytes)
+        private RetentionState(Path path, Path destination, String traceId, String sessionId, Instant expiresAt, long sizeBytes)
         {
             this.path = path;
+            this.destination = destination;
             this.traceId = traceId;
             this.sessionId = sessionId;
             this.expiresAt = expiresAt;

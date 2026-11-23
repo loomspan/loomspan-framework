@@ -65,7 +65,7 @@ class NamespaceObservationIntegrationTest
                             var records = Files.readAllLines(financeTrace).stream().map(mapper::readTree).toList();
                             var metadata = records.getFirst().path("metadata");
                             assertThat(metadata.path("entryNamespace").asText()).isEqualTo("finance");
-                            assertThat(metadata.path("tracePath").asText()).isEqualTo(financeTrace.toString());
+                            assertThat(metadata.path("tracePath").asText()).isEqualTo(financeTrace + ".in-progress");
                             assertThat(records.stream().map(record -> record.path("traceId").asText()).distinct().count()).isOne();
                             assertThat(records.stream().map(record -> record.path("sessionId").asText()).distinct())
                                     .containsExactly(observations.getFirst().sessionId());

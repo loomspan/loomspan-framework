@@ -27,8 +27,9 @@ public final class BlockingTraceHandleTestSupport
         try
         {
             var path = Files.createTempFile("loomspan-blocking-completion-", ".ndjson");
+            Files.delete(path);
             TraceRecordWriter delegate = new NdjsonTraceRecordWriter(
-                    path, LoomspanJacksonCodecs.defaults().canonicalTrace());
+                    path.resolveSibling(path.getFileName() + ".in-progress"), LoomspanJacksonCodecs.defaults().canonicalTrace());
             TraceRecordWriter blocking = record -> {
                 if (record.recordType() == TraceRecordType.TRACE_COMPLETED)
                 {

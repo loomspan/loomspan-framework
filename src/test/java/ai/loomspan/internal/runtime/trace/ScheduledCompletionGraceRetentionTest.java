@@ -31,6 +31,103 @@ class ScheduledCompletionGraceRetentionTest
     Path tempDir;
 
     @Test
+    void schedulingCannotPublishAfterExpiryClosureOrRejection() throws Exception
+    {
+        for (String ordering : java.util.List.of("inline-expiry", "deadline", "close", "reject"))
+        {
+            MutableClock clock = new MutableClock(Instant.parse("2026-07-26T12:00:00Z"));
+            ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+            ScheduledFuture<?> future = mock(ScheduledFuture.class);
+            var retention = new ScheduledCompletionGraceRetention(Duration.ofMinutes(1), clock, executor);
+            Path active = Files.writeString(tempDir.resolve(ordering + ".in-progress"), "{}\n");
+            Path completed = tempDir.resolve(ordering + ".ndjson");
+            when(executor.schedule(any(Runnable.class), anyLong(), eq(java.util.concurrent.TimeUnit.NANOSECONDS)))
+                    .thenAnswer(call -> {
+                        assertThat(completed).doesNotExist();
+                        if (ordering.equals("reject")) throw new java.util.concurrent.RejectedExecutionException();
+                        if (ordering.equals("close")) retention.close();
+                        else {
+                            clock.advance(Duration.ofMinutes(1));
+                            if (ordering.equals("inline-expiry")) ((Runnable) call.getArgument(0)).run();
+                        }
+                        return future;
+                    });
+            assertThat(retention.retainOrDelete(active, completed, clock.instant(), "trace", "session")).isEmpty();
+            assertThat(active).doesNotExist();
+            assertThat(completed).doesNotExist();
+            assertThat(retention.retainedArtifactCount()).isZero();
+            if (!ordering.equals("reject")) verify(future).cancel(false);
+            retention.close();
+        }
+    }
+
+    @Test
+    void failedPublicationCancelsPendingOwnershipAndKeepsActiveEvidence() throws Exception
+    {
+        MutableClock clock = new MutableClock(Instant.parse("2026-07-26T12:00:00Z"));
+        ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+        ScheduledFuture<?> future = mock(ScheduledFuture.class);
+        doReturn(future).when(executor).schedule(any(Runnable.class), anyLong(), eq(java.util.concurrent.TimeUnit.NANOSECONDS));
+        var retention = new ScheduledCompletionGraceRetention(Duration.ofMinutes(1), clock, executor);
+        Path active = Files.writeString(tempDir.resolve("failed.in-progress"), "{}\n");
+        Path completed = Files.createDirectory(tempDir.resolve("blocked.ndjson"));
+        Path marker = Files.writeString(completed.resolve("marker"), "owned");
+        assertThatThrownBy(() -> retention.retainOrDelete(active, completed, clock.instant(), "trace", "session"))
+                .isInstanceOf(java.io.IOException.class);
+        verify(future).cancel(false);
+        assertThat(retention.retainedArtifactCount()).isZero();
+        assertThat(active).exists();
+        assertThat(Files.readString(marker)).isEqualTo("owned");
+        var task = org.mockito.ArgumentCaptor.forClass(Runnable.class);
+        verify(executor).schedule(task.capture(), anyLong(), eq(java.util.concurrent.TimeUnit.NANOSECONDS));
+        task.getValue().run();
+        assertThat(active).exists();
+        retention.close();
+    }
+
+    @Test
+    @org.junit.jupiter.api.Timeout(10)
+    void concurrentExpiryOrCloseWhileSchedulingNeverPublishes() throws Exception
+    {
+        for (boolean close : java.util.List.of(false, true))
+        {
+            MutableClock clock = new MutableClock(Instant.parse("2026-07-26T12:00:00Z"));
+            ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
+            ScheduledFuture<?> future = mock(ScheduledFuture.class);
+            var retention = new ScheduledCompletionGraceRetention(Duration.ofMinutes(1), clock, scheduler);
+            var scheduled = new java.util.concurrent.CountDownLatch(1);
+            var release = new java.util.concurrent.CountDownLatch(1);
+            var task = new java.util.concurrent.atomic.AtomicReference<Runnable>();
+            when(scheduler.schedule(any(Runnable.class), anyLong(), eq(java.util.concurrent.TimeUnit.NANOSECONDS)))
+                    .thenAnswer(call -> {
+                        task.set(call.getArgument(0));
+                        scheduled.countDown();
+                        if (!release.await(5, java.util.concurrent.TimeUnit.SECONDS)) throw new AssertionError("schedule release timed out");
+                        return future;
+                    });
+            Path active = Files.writeString(tempDir.resolve("concurrent-" + close + ".in-progress"), "{}\n");
+            Path completed = tempDir.resolve("concurrent-" + close + ".ndjson");
+            try (var workers = java.util.concurrent.Executors.newSingleThreadExecutor())
+            {
+                var result = workers.submit(() -> retention.retainOrDelete(active, completed, clock.instant(), "trace", "session"));
+                try {
+                    assertThat(scheduled.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                    if (close) retention.close();
+                    else {
+                        clock.advance(Duration.ofMinutes(1));
+                        task.get().run();
+                    }
+                    assertThat(active).doesNotExist();
+                    assertThat(completed).doesNotExist();
+                } finally { release.countDown(); }
+                assertThat(result.get(5, java.util.concurrent.TimeUnit.SECONDS)).isEmpty();
+                verify(future).cancel(false);
+                assertThat(retention.retainedArtifactCount()).isZero();
+            } finally { retention.close(); }
+        }
+    }
+
+    @Test
     void zeroGraceDeletesSynchronouslyAndNonzeroCloseCancelsWithoutDeleting() throws Exception
     {
         Path immediate = Files.writeString(tempDir.resolve("immediate"), "trace");
@@ -38,7 +135,7 @@ class ScheduledCompletionGraceRetentionTest
                      new ScheduledCompletionGraceRetention(Duration.ZERO))
         {
             assertThat(retention.retainOrDelete(
-                    immediate, Instant.parse("2026-07-24T12:00:00Z"), "trace", "session")).isEmpty();
+                    immediate, tempDir.resolve("immediate-completed"), Instant.parse("2026-07-24T12:00:00Z"), "trace", "session")).isEmpty();
         }
         assertThat(immediate).doesNotExist();
 
@@ -47,12 +144,13 @@ class ScheduledCompletionGraceRetentionTest
                 new ScheduledCompletionGraceRetention(Duration.ofHours(1));
         Instant finalizedAt = Instant.now();
         assertThat(retention.retainOrDelete(
-                held, finalizedAt, "trace", "session"))
+                held, tempDir.resolve("held-completed"), finalizedAt, "trace", "session"))
                 .contains(new CompletionGraceRetention.RetainedArtifact(
                         finalizedAt.plus(Duration.ofHours(1)),
-                        Files.size(held)));
+                        Files.size(tempDir.resolve("held-completed"))));
         retention.close();
-        assertThat(held).exists();
+        assertThat(held).doesNotExist();
+        assertThat(tempDir.resolve("held-completed")).exists();
     }
 
     @Test
@@ -75,9 +173,9 @@ class ScheduledCompletionGraceRetentionTest
         ScheduledCompletionGraceRetention retention =
                 new ScheduledCompletionGraceRetention(Duration.ofMinutes(1), clock, executor);
         Instant finalizedAt = clock.instant();
-        var retained = retention.retainOrDelete(file, finalizedAt, "trace", "session").orElseThrow();
+        var retained = retention.retainOrDelete(file, tempDir.resolve("completed.ndjson"), finalizedAt, "trace", "session").orElseThrow();
         FinalizedTraceArtifact artifact = new FinalizedTraceArtifact(
-                "trace", "session", "default-test_entry", "generation-test", "default", java.util.Map.of("default", "generation-test"), TraceOutcome.SUCCEEDED, finalizedAt, file,
+                "trace", "session", "default-test_entry", "generation-test", "default", java.util.Map.of("default", "generation-test"), TraceOutcome.SUCCEEDED, finalizedAt, tempDir.resolve("completed.ndjson"),
                 retained.sizeBytes(), TracePersistencePolicy.NEVER, retained.expiresAt());
         CompletionGraceRetention.ArtifactLease lease = retention.acquire(artifact).orElseThrow();
         var task = org.mockito.ArgumentCaptor.forClass(Runnable.class);
@@ -86,12 +184,13 @@ class ScheduledCompletionGraceRetentionTest
         clock.advance(Duration.ofMinutes(1));
         task.getValue().run();
 
-        assertThat(file).exists();
+        assertThat(tempDir.resolve("completed.ndjson")).exists();
         assertThat(retention.acquire(artifact)).isEmpty();
         assertThat(lease.input().readAllBytes()).isEqualTo("{}\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         lease.close();
         lease.close();
         assertThat(file).doesNotExist();
+        assertThat(tempDir.resolve("completed.ndjson")).doesNotExist();
         assertThat(retention.retainedArtifactCount()).isZero();
         retention.close();
     }

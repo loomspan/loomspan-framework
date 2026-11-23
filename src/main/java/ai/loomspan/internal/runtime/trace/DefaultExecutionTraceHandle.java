@@ -42,7 +42,9 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
     private final String sessionId;
     private final String entrySkill;
     private final CapturedNamespaceMetadata namespaceMetadata;
-    private final Path tracePath;
+    private final Path activePath;
+    private final Path completedPath;
+    private volatile Path tracePath;
     private final TracePersistencePolicy persistencePolicy;
     private final Clock clock;
     private final TraceRecordWriter writer;
@@ -59,6 +61,7 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
 
     private volatile boolean errored;
     private volatile boolean completed;
+    private IOException finalizationFailure;
     private Optional<FinalizedTraceArtifact> finalizedArtifact = Optional.empty();
 
     DefaultExecutionTraceHandle(
@@ -87,9 +90,11 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
         this.sessionId = requireNonBlank(sessionId, "sessionId");
         this.entrySkill = requireNonBlank(entrySkill, "entrySkill");
         this.namespaceMetadata = Objects.requireNonNull(namespaceMetadata, "namespaceMetadata must not be null");
-        this.tracePath = tracePath == null ? Objects.requireNonNull(traceDirectory, "traceDirectory must not be null")
+        this.completedPath = tracePath == null ? Objects.requireNonNull(traceDirectory, "traceDirectory must not be null")
                 .resolve(namespaceMetadata.entryNamespace())
                 .resolve(this.sessionId + "." + this.traceId + ".execution-trace.ndjson") : tracePath;
+        this.activePath = completedPath.resolveSibling(completedPath.getFileName() + ".in-progress");
+        this.tracePath = completed ? completedPath : activePath;
         this.persistencePolicy = persistencePolicy == null ? TracePersistencePolicy.NEVER : persistencePolicy;
         this.errored = errored;
         this.completed = completed;
@@ -97,7 +102,7 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
         this.objectMapper = canonicalTraceMapper == null
                 ? ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace()
                 : canonicalTraceMapper;
-        this.writer = writer == null ? new NdjsonTraceRecordWriter(this.tracePath, this.objectMapper) : writer;
+        this.writer = writer == null ? new NdjsonTraceRecordWriter(this.activePath, this.objectMapper) : writer;
         this.reader = new NdjsonExecutionTraceReader(this.objectMapper);
         this.sequence = new AtomicLong(startingSequence);
         this.initialized = new AtomicBoolean(initialized);
@@ -266,6 +271,7 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
         Objects.requireNonNull(completion, "completion must not be null");
         if (completed)
         {
+            if (finalizationFailure != null) throw finalizationFailure;
             return finalizedArtifact;
         }
 
@@ -276,30 +282,42 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
         TraceRecord completedRecord = append(TraceRecordType.TRACE_COMPLETED, metadata, null);
         completed = true;
 
-        if (shouldDeleteAfterCompletion())
+        try
         {
-            Optional<CompletionGraceRetention.RetainedArtifact> retained =
-                    completionGraceRetention.retainOrDelete(
-                            tracePath, completedRecord.timestamp(), traceId, sessionId);
-            if (retained.isEmpty())
+            if (shouldDeleteAfterCompletion())
             {
-                finalizedArtifact = Optional.empty();
+                Optional<CompletionGraceRetention.RetainedArtifact> retained =
+                        completionGraceRetention.retainOrDelete(
+                                activePath, completedPath, completedRecord.timestamp(), traceId, sessionId);
+                if (retained.isEmpty())
+                {
+                    finalizedArtifact = Optional.empty();
+                    return finalizedArtifact;
+                }
+                tracePath = completedPath;
+                CompletionGraceRetention.RetainedArtifact retainedArtifact = retained.orElseThrow();
+                finalizedArtifact = Optional.of(descriptor(
+                        completion,
+                        completedRecord.timestamp(),
+                        retainedArtifact.expiresAt(),
+                        retainedArtifact.sizeBytes()));
                 return finalizedArtifact;
             }
-            CompletionGraceRetention.RetainedArtifact retainedArtifact = retained.orElseThrow();
+            long sizeBytes = Files.size(activePath);
+            TraceFilePublication.publish(activePath, completedPath);
+            tracePath = completedPath;
             finalizedArtifact = Optional.of(descriptor(
                     completion,
                     completedRecord.timestamp(),
-                    retainedArtifact.expiresAt(),
-                    retainedArtifact.sizeBytes()));
+                    null,
+                    sizeBytes));
             return finalizedArtifact;
         }
-        finalizedArtifact = Optional.of(descriptor(
-                completion,
-                completedRecord.timestamp(),
-                null,
-                Files.size(tracePath)));
-        return finalizedArtifact;
+        catch (IOException ex)
+        {
+            finalizationFailure = ex;
+            throw ex;
+        }
     }
 
     private FinalizedTraceArtifact descriptor(

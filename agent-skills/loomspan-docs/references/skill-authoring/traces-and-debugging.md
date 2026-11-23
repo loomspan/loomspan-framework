@@ -134,15 +134,27 @@ journal's established field-name redaction retain their usual policies.
 
 Set `loomspan.execution-trace.directory` in host startup configuration to choose
 the trace root. It defaults to `${java.io.tmpdir}/loomspan-traces`. A configured
-value is used directly as the root. Files have the path
+value is used directly as the root. Completed files have the path
 `<root>/<canonical entry namespace>/<sessionId>.<traceId>.execution-trace.ndjson`.
+During execution the filename has an additional `.in-progress` suffix; live
+reads and journal projection use that active file. For retained traces, the
+closed `TRACE_COMPLETED` append is followed by a same-directory atomic rename.
+The completed name signals complete bytes, including for failed executions;
+it does not imply success or continued artifact availability. Immediately
+discarded traces are deleted under the active name. Grace-retained files use
+the completed name and the original expiry deadline, with open artifact reader leases
+deferring deletion. Trace-start `tracePath` records the initial active path;
+snapshots and finalized descriptors follow successful publication. Interrupted
+execution can leave an active file. Rename failure follows trace-finalization
+error handling, advertises no finalized artifact and can leave active diagnostic
+evidence. The filesystem must support atomic rename; there is no copy or
+non-atomic fallback.
 The entry namespace owns the complete trace, including foreign skill calls.
 
 Namespace-published `ExecutionConfiguration` permits
 `loomspan.execution-trace.persistence` and rejects `directory`. The host root
-applies to every admitted generation. Trace-start `tracePath`, snapshots and
-finalized descriptors report the selected file under existing persistence and
-completion-retention rules.
+applies to every admitted generation. The trace-ID download endpoint uses the finalized descriptor path after
+successful publication and remains subject to retention and authorization.
 
 The writer creates missing parent directories. Administrators manage filesystem
 permissions, and writing preserves permissions on pre-created directories.
@@ -152,8 +164,11 @@ the trace elsewhere.
 `ExecutionTraceProperties`, `LoomspanSessionRunner#executeAdmittedRoot` and
 `DefaultExecutionTraceHandle` own binding, host-root propagation and path
 selection. `NdjsonTraceRecordWriter` owns parent creation and writing.
-`ExecutionTraceHandleTest` covers default/configured paths, metadata, persistence,
-retention, permission preservation and unusable destinations.
+`ExecutionTraceHandleTest` covers active reads, complete publication, repeat
+finalization, rename failure, persistence, permissions and namespace paths.
+`ScheduledCompletionGraceRetentionTest` covers publication ordering, expiry and
+reader leases; `ObservabilityArtifactIntegrationTest#downloadsRealPublishedTraceByTraceId`
+verifies authenticated downloads from real published traces.
 `NamespaceObservationIntegrationTest#hostRootAndEntryNamespaceOwnCrossNamespaceTrace`
 verifies host configuration, publication rejection and finance/shared execution
 through the application API. `ExecutionConfigurationParserTest#publishedTraceConfigurationRejectsHostDirectory`

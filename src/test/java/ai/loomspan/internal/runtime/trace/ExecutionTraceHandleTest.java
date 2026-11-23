@@ -30,13 +30,96 @@ class ExecutionTraceHandleTest {
     Path tempDir;
 
     @Test
+    void activeTraceDoesNotExposeCompletedFilename() throws Exception {
+        var handle = namespaceTrace(tempDir, "finance", "active-session", TracePersistencePolicy.ALWAYS);
+        Path completed = tempDir.resolve("finance").resolve("active-session." + handle.snapshot().traceId()
+                + ".execution-trace.ndjson");
+        handle.append(TraceRecordType.PLAN_CREATED, java.util.Map.of(), java.util.Map.of("planId", "active-plan"));
+        assertThat(completed).doesNotExist();
+        assertThat(handle.tracePath()).isEqualTo(completed.resolveSibling(completed.getFileName() + ".in-progress"));
+        assertThat(handle.tracePath()).exists();
+        assertThat(readRecords(handle)).hasSize(3);
+        assertThat(new ExecutionJournalProjector().project(handle).getEntriesSnapshot()).singleElement()
+                .satisfies(entry -> assertThat(entry.payload().path("planId").asText()).isEqualTo("active-plan"));
+        assertThat(completed).doesNotExist();
+    }
+
+    @Test
+    void publishesCompleteRetainedTraceOnce() throws Exception {
+        for (TracePersistencePolicy policy : List.of(TracePersistencePolicy.ALWAYS, TracePersistencePolicy.ONERROR)) {
+            for (TraceOutcome outcome : List.of(TraceOutcome.SUCCEEDED, TraceOutcome.FAILED)) {
+                var observation = new RecordingObservationHandle();
+                var handle = new DefaultExecutionTraceHandle(policy + "-" + outcome, "finance-entry",
+                        namespaceMetadata("finance"), tempDir, policy, Clock.systemUTC(), observation);
+                if (policy == TracePersistencePolicy.ONERROR || outcome == TraceOutcome.FAILED) handle.markErrored();
+                Path active = handle.tracePath();
+                Path destination = active.resolveSibling(active.getFileName().toString().replace(".in-progress", ""));
+                observation.onTerminal = () -> {
+                    assertThat(active).exists();
+                    assertThat(destination).doesNotExist();
+                };
+                String payload = "\u00e9\ud83d\ude00".repeat(4000);
+                handle.append(TraceRecordType.MODEL_RESPONSE_RECEIVED, java.util.Map.of(), payload);
+                var before = readRecords(handle);
+                var artifact = handle.finalizeTrace(completion(outcome)).orElseThrow();
+                Path published = artifact.artifactPath();
+                assertThat(active).doesNotExist();
+                byte[] bytes = Files.readAllBytes(published);
+                assertThat(artifact.sizeBytes()).isEqualTo(bytes.length);
+                var after = readRecords(handle);
+                assertThat(after.subList(0, before.size())).isEqualTo(before);
+                assertThat(after.getLast().recordType()).isEqualTo(TraceRecordType.TRACE_COMPLETED);
+                assertThat(after.stream().filter(r -> r.recordType() == TraceRecordType.TRACE_COMPLETED)).hasSize(1);
+                assertThat(after.stream().filter(r -> r.recordType() == TraceRecordType.MODEL_RESPONSE_RECEIVED)
+                        .findFirst().orElseThrow().data().asText()).isEqualTo(payload);
+                assertThat(after.getFirst().metadata()).containsEntry("tracePath", active.toString());
+                assertThat(handle.snapshot().filePath()).isEqualTo(published.toString());
+                assertThat(handle.finalizeTrace(completion(outcome))).contains(artifact);
+                assertThat(Files.readAllBytes(published)).isEqualTo(bytes);
+            }
+        }
+    }
+
+    @Test
+    void failedRenameCachesFailureAndPreservesTerminalEvidence() throws Exception {
+        var handle = namespaceTrace(tempDir, "finance", "failed-rename", TracePersistencePolicy.ALWAYS);
+        Path active = handle.tracePath();
+        Path destination = active.resolveSibling(active.getFileName().toString().replace(".in-progress", ""));
+        Files.createDirectory(destination);
+        Path marker = Files.writeString(destination.resolve("marker"), "administrator-owned");
+        IOException failure = org.junit.jupiter.api.Assertions.assertThrows(IOException.class,
+                () -> handle.finalizeTrace(completion(TraceOutcome.SUCCEEDED)));
+        assertThat(org.junit.jupiter.api.Assertions.assertThrows(IOException.class,
+                () -> handle.finalizeTrace(completion(TraceOutcome.SUCCEEDED)))).isSameAs(failure);
+        assertThat(active).exists();
+        assertThat(Files.readString(marker)).isEqualTo("administrator-owned");
+        assertThat(readRecords(handle).stream().filter(r -> r.recordType() == TraceRecordType.TRACE_COMPLETED)).hasSize(1);
+    }
+
+    @Test
+    void immediateDiscardNeverPublishesCompletedName() throws Exception {
+        for (TracePersistencePolicy policy : List.of(TracePersistencePolicy.NEVER, TracePersistencePolicy.ONERROR)) {
+            for (TraceOutcome outcome : List.of(TraceOutcome.SUCCEEDED, TraceOutcome.FAILED)) {
+                var handle = namespaceTrace(tempDir, "finance", "discard-" + policy + outcome, policy);
+                Path active = handle.tracePath();
+                Path destination = active.resolveSibling(active.getFileName().toString().replace(".in-progress", ""));
+                assertThat(destination).doesNotExist();
+                assertThat(handle.finalizeTrace(completion(outcome))).isEmpty();
+                assertThat(handle.finalizeTrace(completion(outcome))).isEmpty();
+                assertThat(active).doesNotExist();
+                assertThat(destination).doesNotExist();
+            }
+        }
+    }
+
+    @Test
     void configuredTraceRootUsesCanonicalEntryNamespaceAndReportsActualPath() throws Exception {
         Path root = tempDir.resolve("host root with spaces");
         DefaultExecutionTraceHandle finance = namespaceTrace(root, "finance", "finance-session", TracePersistencePolicy.ALWAYS);
         assertThat(finance.tracePath().getParent()).isEqualTo(root.resolve("finance"));
         assertThat(finance.tracePath()).exists();
         assertThat(finance.tracePath().getFileName().toString())
-                .isEqualTo("finance-session." + finance.snapshot().traceId() + ".execution-trace.ndjson");
+                .isEqualTo("finance-session." + finance.snapshot().traceId() + ".execution-trace.ndjson.in-progress");
         assertThat(readRecords(finance).getFirst().metadata()).containsEntry("tracePath", finance.tracePath().toString());
         assertThat(finance.snapshot().filePath()).isEqualTo(finance.tracePath().toString());
         assertThat(finance.finalizeTrace(completion(TraceOutcome.SUCCEEDED)).orElseThrow().artifactPath())
@@ -114,10 +197,11 @@ class ExecutionTraceHandleTest {
         }
         var retainedPath = new java.util.concurrent.atomic.AtomicReference<Path>();
         CompletionGraceRetention retention = new CompletionGraceRetention() {
-            public java.util.Optional<RetainedArtifact> retainOrDelete(Path path, Instant finalizedAt, String traceId, String sessionId)
+            public java.util.Optional<RetainedArtifact> retainOrDelete(Path path, Path completedPath, Instant finalizedAt, String traceId, String sessionId)
                     throws IOException {
-                retainedPath.set(path);
-                return java.util.Optional.of(new RetainedArtifact(finalizedAt.plusSeconds(60), Files.size(path)));
+                TraceFilePublication.publish(path, completedPath);
+                retainedPath.set(completedPath);
+                return java.util.Optional.of(new RetainedArtifact(finalizedAt.plusSeconds(60), Files.size(completedPath)));
             }
             public java.util.Optional<ArtifactLease> acquire(ai.loomspan.internal.core.FinalizedTraceArtifact artifact) {
                 return java.util.Optional.empty();
@@ -153,7 +237,7 @@ class ExecutionTraceHandleTest {
             assertThat(handle.tracePath().getParent())
                     .isEqualTo(Path.of(System.getProperty("java.io.tmpdir"), "loomspan-traces", "finance"));
             assertThat(handle.tracePath().getFileName().toString())
-                    .isEqualTo(sessionId + "." + handle.snapshot().traceId() + ".execution-trace.ndjson");
+                    .isEqualTo(sessionId + "." + handle.snapshot().traceId() + ".execution-trace.ndjson.in-progress");
             assertThat(handle.tracePath()).exists();
         } finally {
             Files.deleteIfExists(handle.tracePath());
@@ -231,7 +315,7 @@ class ExecutionTraceHandleTest {
 
         assertThat(handle.tracePath().getFileName().toString())
                 .startsWith("shared-session.")
-                .endsWith(".execution-trace.ndjson");
+                .endsWith(".execution-trace.ndjson.in-progress");
 
         Files.deleteIfExists(handle.tracePath());
     }
@@ -271,11 +355,13 @@ class ExecutionTraceHandleTest {
             @Override
             public java.util.Optional<RetainedArtifact> retainOrDelete(
                     Path artifactPath,
+                    Path completedPath,
                     Instant finalizedAt,
                     String traceId,
                     String sessionId) throws IOException {
                 long sizeBytes = Files.size(artifactPath);
-                Files.delete(artifactPath);
+                TraceFilePublication.publish(artifactPath, completedPath);
+                Files.delete(completedPath);
                 return java.util.Optional.of(new RetainedArtifact(
                         finalizedAt.plusSeconds(1),
                         sizeBytes));
@@ -369,7 +455,7 @@ class ExecutionTraceHandleTest {
         Clock clock = Clock.fixed(Instant.parse("2026-03-24T12:00:00Z"), ZoneOffset.UTC);
         RecordingObservationHandle observation = new RecordingObservationHandle();
         Path tracePath = tempDir.resolve("failed-" + failingWrite + ".ndjson");
-        ControllableWriter writer = new ControllableWriter(tracePath, failingWrite);
+        ControllableWriter writer = new ControllableWriter(tracePath.resolveSibling(tracePath.getFileName() + ".in-progress"), failingWrite);
         DefaultExecutionTraceHandle handle = ai.loomspan.internal.runtime.trace.TestExecutionTraceHandles.create(
                 "trace-" + failingWrite,
                 "session-" + failingWrite,
@@ -417,10 +503,12 @@ class ExecutionTraceHandleTest {
 
     private static final class RecordingObservationHandle implements ExecutionObservationHandle {
         private final List<TraceRecord> records = new ArrayList<>();
+        private Runnable onTerminal = () -> {};
 
         @Override
         public void recordAppended(TraceRecord record) {
             records.add(record);
+            if (record.recordType() == TraceRecordType.TRACE_COMPLETED) onTerminal.run();
         }
 
         @Override

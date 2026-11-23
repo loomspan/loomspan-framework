@@ -371,8 +371,21 @@ role, namespace membership, reserved shared name, or app/environment mapping.
 ### Captured execution diagnostics
 
 The host setting `loomspan.execution-trace.directory` selects the trace root and
-defaults to `${java.io.tmpdir}/loomspan-traces`. Each trace is written to
+defaults to `${java.io.tmpdir}/loomspan-traces`. Each completed trace has the path
 `<root>/<canonical entry namespace>/<sessionId>.<traceId>.execution-trace.ndjson`.
+During execution the filename has an additional `.in-progress` suffix; live
+reads and journal projection use that active file. For retained traces, the
+closed `TRACE_COMPLETED` append is followed by a same-directory atomic rename.
+The completed name signals complete bytes, including for failed executions;
+it does not imply success or continued artifact availability. Immediately
+discarded traces are deleted under the active name. Grace-retained files use
+the completed name and the original expiry deadline, with open artifact reader leases
+deferring deletion. Trace-start `tracePath` records the initial active path;
+snapshots and finalized descriptors follow successful publication. Interrupted
+execution can leave an active file. Rename failure follows trace-finalization
+error handling, advertises no finalized artifact and can leave active diagnostic
+evidence. The filesystem must support atomic rename; there is no copy or
+non-atomic fallback.
 A configured value is the root itself. An execution starting in `finance` keeps
 its complete trace under `finance`, including calls into other namespaces.
 Namespace-published execution configuration can set trace persistence, while the

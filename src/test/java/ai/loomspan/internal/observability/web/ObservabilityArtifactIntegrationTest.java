@@ -50,6 +50,69 @@ class ObservabilityArtifactIntegrationTest
     @Autowired
     ObservabilityActivationCoordinator activation;
 
+    @org.junit.jupiter.api.io.TempDir
+    Path tempDir;
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = TracePersistencePolicy.class, names = {"ALWAYS", "NEVER"})
+    void downloadsRealPublishedTraceByTraceId(TracePersistencePolicy policy) throws Exception
+    {
+        var runtime = activation.runtime().orElseThrow();
+        String sessionId = "published-" + java.util.UUID.randomUUID();
+        var observation = runtime.observationFactory().create(sessionId, "default-entry");
+        var handle = new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                sessionId, "default-entry", new ai.loomspan.internal.core.CapturedNamespaceMetadata(
+                        "default", "generation", java.util.Map.of("default", "generation")), tempDir,
+                policy, runtime.clock(), observation, runtime.completionRetention());
+        String endpoint = ObservabilityApiPaths.TRACES + "/" + handle.snapshot().traceId() + "/artifact";
+        Path active = handle.tracePath();
+        handle.append(ai.loomspan.internal.core.TraceRecordType.MODEL_REQUEST_SENT, java.util.Map.of(), "exact request");
+        assertThat(send(endpoint, "application/x-ndjson").statusCode()).isEqualTo(404);
+        var artifact = handle.finalizeTrace(new ai.loomspan.internal.core.TraceCompletion(
+                TraceOutcome.SUCCEEDED, ai.loomspan.internal.runtime.usage.SessionUsageSnapshot.empty(), null,
+                java.util.Map.of())).orElseThrow();
+        observation.close(new ai.loomspan.internal.runtime.observation.ObservationCompletionDisposition(
+                ai.loomspan.internal.runtime.observation.ObservationCompletionDisposition.Status.CORE_FINALIZATION_SUCCEEDED,
+                TraceOutcome.SUCCEEDED, runtime.clock().instant(), java.util.Optional.of(artifact)));
+        var response = send(endpoint, "application/x-ndjson");
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo(Files.readAllBytes(artifact.artifactPath()));
+        assertThat(new String(response.body(), java.nio.charset.StandardCharsets.UTF_8)).contains("TRACE_COMPLETED");
+        assertThat(response.headers().firstValueAsLong("Content-Length")).hasValue(artifact.sizeBytes());
+        assertThat(response.headers().firstValue("Cache-Control")).hasValue("no-store");
+        assertThat(response.headers().firstValue("Content-Type").orElseThrow()).contains("application/x-ndjson");
+        assertThat(response.headers().firstValue("Content-Disposition").orElseThrow()).contains(handle.snapshot().traceId());
+        assertThat(response.headers().firstValue(ObservabilityApiKeyFilter.INSTANCE_HEADER))
+                .hasValue(runtime.instanceId().toString());
+        assertThat(active).doesNotExist();
+        assertThat(artifact.artifactPath().getFileName().toString()).endsWith(".execution-trace.ndjson");
+    }
+
+    @Test
+    void failedRenameHasNoDownloadableCatalogEntry() throws Exception
+    {
+        var runtime = activation.runtime().orElseThrow();
+        String sessionId = "rename-failure-" + java.util.UUID.randomUUID();
+        var observation = runtime.observationFactory().create(sessionId, "default-entry");
+        var handle = new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                sessionId, "default-entry", new ai.loomspan.internal.core.CapturedNamespaceMetadata(
+                        "default", "generation", java.util.Map.of("default", "generation")), tempDir,
+                TracePersistencePolicy.ALWAYS, runtime.clock(), observation, runtime.completionRetention());
+        Path active = handle.tracePath();
+        Path completed = active.resolveSibling(active.getFileName().toString().replace(".in-progress", ""));
+        Files.createDirectory(completed);
+        Files.writeString(completed.resolve("marker"), "owned");
+        org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+                () -> handle.finalizeTrace(new ai.loomspan.internal.core.TraceCompletion(
+                        TraceOutcome.SUCCEEDED, ai.loomspan.internal.runtime.usage.SessionUsageSnapshot.empty(), null, java.util.Map.of())));
+        observation.close(new ai.loomspan.internal.runtime.observation.ObservationCompletionDisposition(
+                ai.loomspan.internal.runtime.observation.ObservationCompletionDisposition.Status.CORE_FINALIZATION_FAILED,
+                TraceOutcome.SUCCEEDED, runtime.clock().instant()));
+        assertThat(send(ObservabilityApiPaths.TRACES + "/" + handle.snapshot().traceId() + "/artifact",
+                "application/x-ndjson").statusCode()).isEqualTo(404);
+        assertThat(active).exists();
+    }
+
     @Test
     @Timeout(20)
     void downloadsExactFinalizedArtifactWithRequiredHeaders() throws Exception

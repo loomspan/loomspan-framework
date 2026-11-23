@@ -74,13 +74,13 @@ public final class ObservabilityActivationCoordinator implements AutoCloseable
     {
         @Override
         public Optional<RetainedArtifact> retainOrDelete(
-                Path artifactPath, Instant finalizedAt, String traceId, String sessionId) throws IOException
+                Path activePath, Path completedPath, Instant finalizedAt, String traceId, String sessionId) throws IOException
         {
             ObservabilityRuntime current = runtime;
             return state.get() == State.ENABLED && current != null
-                    ? current.completionRetention().retainOrDelete(artifactPath, finalizedAt, traceId, sessionId)
+                    ? current.completionRetention().retainOrDelete(activePath, completedPath, finalizedAt, traceId, sessionId)
                     : ImmediateCompletionRetention.INSTANCE.retainOrDelete(
-                            artifactPath, finalizedAt, traceId, sessionId);
+                            activePath, completedPath, finalizedAt, traceId, sessionId);
         }
 
         @Override

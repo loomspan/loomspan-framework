@@ -44,6 +44,38 @@ import static org.mockito.Mockito.when;
 class LoomspanSessionRunnerTest {
 
     @Test
+    void realRenameFailureUsesSessionFinalizationErrorAndFailedObservation(
+            @org.junit.jupiter.api.io.TempDir Path root) throws Exception {
+        var observation = new RecordingObservationFactory();
+        AtomicReference<Path> active = new AtomicReference<>();
+        InternalExecutionTraceHandleFactory traceFactory = (sessionId, entrySkill, metadata, policy, clock, handle) -> {
+            var trace = new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                    sessionId, entrySkill, metadata, root, TracePersistencePolicy.ALWAYS, clock, handle);
+            active.set(trace.tracePath());
+            try {
+                Path completed = publishedPath(trace.tracePath().toString());
+                Files.createDirectory(completed);
+                Files.writeString(completed.resolve("marker"), "owned");
+            } catch (IOException ex) { throw new IllegalStateException(ex); }
+            return trace;
+        };
+        var runner = new LoomspanSessionRunner(4, TracePersistencePolicy.ALWAYS, Clock.systemUTC(), observation, traceFactory);
+        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry",
+                ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session -> "result"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Failed to finalize execution trace")
+                .hasCauseInstanceOf(IOException.class);
+        assertThat(active.get()).exists();
+        assertThat(observation.handles.getFirst().dispositions).singleElement().satisfies(disposition -> {
+            assertThat(disposition.status()).isEqualTo(ObservationCompletionDisposition.Status.CORE_FINALIZATION_FAILED);
+            assertThat(disposition.finalizedArtifact()).isEmpty();
+        });
+    }
+
+    private static Path publishedPath(String activePath) {
+        return Path.of(activePath.substring(0, activePath.length() - ".in-progress".length()));
+    }
+
+    @Test
     void hostTraceDirectoryAppliesWithoutCapturedRuntime(@org.junit.jupiter.api.io.TempDir Path root) throws Exception {
         try (var context = new org.springframework.context.support.GenericApplicationContext();
                 var executor = Executors.newSingleThreadExecutor()) {
@@ -52,9 +84,10 @@ class LoomspanSessionRunnerTest {
                     ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandleFactory.INSTANCE,
                     ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
                     ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace(), lifecycle, root);
-            var path = runner.callWithNewSession("default-test_entry",
+            var activePath = runner.callWithNewSession("default-test_entry",
                     ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()),
                     session -> Path.of(session.getExecutionTrace().filePath()));
+            var path = publishedPath(activePath.toString());
             assertThat(path.getParent()).isEqualTo(root.resolve("default"));
             assertThat(path).exists();
             var records = new ArrayList<TraceRecord>();
@@ -82,7 +115,7 @@ class LoomspanSessionRunnerTest {
             return session.getExecutionTrace().filePath();
         });
 
-        var tracePath = java.nio.file.Path.of(tracePathText);
+        var tracePath = publishedPath(tracePathText);
         try {
             assertThat(Files.exists(tracePath)).isTrue();
             List<TraceRecord> records = new ArrayList<>();
@@ -114,7 +147,7 @@ class LoomspanSessionRunnerTest {
 
         assertThat(sessionId).isNotBlank();
         assertThat(tracePathText.get()).isNotBlank();
-        var tracePath = java.nio.file.Path.of(tracePathText.get());
+        var tracePath = publishedPath(tracePathText.get());
         try {
             assertThat(Files.exists(tracePath)).isTrue();
             List<TraceRecord> records = new ArrayList<>();
@@ -140,7 +173,7 @@ class LoomspanSessionRunnerTest {
                 .hasMessage("boom");
 
         assertThat(tracePathText.get()).isNotBlank();
-        var tracePath = java.nio.file.Path.of(tracePathText.get());
+        var tracePath = publishedPath(tracePathText.get());
         try {
             List<TraceRecord> records = new ArrayList<>();
             ExecutionTraceReaders.ndjson().read(tracePath, records::add);
@@ -224,7 +257,7 @@ class LoomspanSessionRunnerTest {
         assertThat(session.getExecutionTrace().completed()).isTrue();
         assertThat(session.getExecutionTrace().errored()).isTrue();
 
-        var tracePath = java.nio.file.Path.of(tracePathText.get());
+        var tracePath = publishedPath(tracePathText.get());
         try {
             assertThat(Files.exists(tracePath)).isTrue();
             List<TraceRecord> records = new ArrayList<>();

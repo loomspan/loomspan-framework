@@ -23,6 +23,28 @@ import static org.mockito.Mockito.verify;
 class ObservabilityActivationCoordinatorTest
 {
     @Test
+    void disabledObservationDeletesActiveWithoutPublishing(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception
+    {
+        var coordinator = new ObservabilityActivationCoordinator();
+        coordinator.disable();
+        var handle = new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                "disabled", "default-entry", new ai.loomspan.internal.core.CapturedNamespaceMetadata(
+                        "default", "generation", java.util.Map.of("default", "generation")), directory,
+                TracePersistencePolicy.NEVER, Clock.systemUTC(),
+                coordinator.observationFactory().create("disabled", "default-entry"), coordinator.completionRetention());
+        var active = handle.tracePath();
+        var completed = active.resolveSibling(active.getFileName().toString().replace(".in-progress", ""));
+        assertThat(completed).doesNotExist();
+        assertThat(handle.finalizeTrace(new ai.loomspan.internal.core.TraceCompletion(
+                ai.loomspan.internal.core.TraceOutcome.SUCCEEDED,
+                ai.loomspan.internal.runtime.usage.SessionUsageSnapshot.empty(), null, java.util.Map.of()))).isEmpty();
+        assertThat(active).doesNotExist();
+        assertThat(completed).doesNotExist();
+        assertThat(coordinator.runtime()).isEmpty();
+    }
+
+    @Test
     void closeDisablesActivationAndClosesOwnedRuntimeResources()
     {
         CompletionGraceRetention retention = mock(CompletionGraceRetention.class);

@@ -10,7 +10,7 @@ import java.util.Optional;
 
 public interface CompletionGraceRetention extends AutoCloseable
 {
-    Optional<RetainedArtifact> retainOrDelete(Path artifactPath, Instant finalizedAt, String traceId, String sessionId)
+    Optional<RetainedArtifact> retainOrDelete(Path activePath, Path completedPath, Instant finalizedAt, String traceId, String sessionId)
             throws IOException;
 
     Optional<ArtifactLease> acquire(FinalizedTraceArtifact artifact) throws IOException;
