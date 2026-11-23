@@ -130,7 +130,9 @@ public final class TestLoomspanSessions {
     {
         return create(sessionId, entrySkill, maxDepth, null, null, null, null, authentication, persistencePolicy, clock,
                 observationHandleFactory,
-                DefaultExecutionTraceHandle::new);
+                (id, skill, namespace, policy, handleClock, observation) ->
+                        new DefaultExecutionTraceHandle(id, skill, namespace, DefaultExecutionTraceHandle.defaultDirectory(),
+                                policy, handleClock, observation));
     }
 
     public static LoomspanSession create(String sessionId,
@@ -161,7 +163,9 @@ public final class TestLoomspanSessions {
         return create(sessionId, entrySkill, maxDepth, executionPlan, lastLinterOutcome, lastOutputSchemaOutcome,
                 sessionUsage, authentication, persistencePolicy, clock,
                 NoOpExecutionObservationHandleFactory.INSTANCE,
-                DefaultExecutionTraceHandle::new);
+                (id, skill, namespace, policy, handleClock, observation) ->
+                        new DefaultExecutionTraceHandle(id, skill, namespace, DefaultExecutionTraceHandle.defaultDirectory(),
+                                policy, handleClock, observation));
     }
 
     public static LoomspanSession create(
@@ -179,7 +183,9 @@ public final class TestLoomspanSessions {
     {
         return create(sessionId, entrySkill, maxDepth, executionPlan, lastLinterOutcome, lastOutputSchemaOutcome,
                 sessionUsage, authentication, persistencePolicy, clock, observationHandleFactory,
-                DefaultExecutionTraceHandle::new);
+                (id, skill, namespace, policy, handleClock, observation) ->
+                        new DefaultExecutionTraceHandle(id, skill, namespace, DefaultExecutionTraceHandle.defaultDirectory(),
+                                policy, handleClock, observation));
     }
 
     public static LoomspanSession create(

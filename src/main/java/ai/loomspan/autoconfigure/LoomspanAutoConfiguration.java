@@ -147,7 +147,8 @@ public class LoomspanAutoConfiguration
                 properties.getSession().getQuotas(),
                 // The session factory carries the canonical role into every trace reader/writer it creates.
                 codecs.canonicalTrace(),
-                frameworkExecutionLifecycle);
+                frameworkExecutionLifecycle,
+                executionTraceProperties.getDirectory());
     }
 
     @Bean

@@ -30,6 +30,7 @@ loomspan:
       max-provider-attempts: 192
       max-usage-units: 200000
   execution-trace:
+    directory: /var/loomspan-traces # Host startup configuration
     persistence: ONERROR # NEVER, ONERROR, or ALWAYS
 ```
 
@@ -40,6 +41,12 @@ consume their configured budgets. Each accepted task still consumes its step
 slot, tool invocation and applicable skill/depth budgets. Request-specific hooks
 run only for actual model requests; independent authorization, lifecycle and
 application approval checks still apply before side effects.
+
+The trace directory is a host root, defaulting to `${java.io.tmpdir}/loomspan-traces`.
+Namespace publications can set persistence. The directory stays host-controlled,
+and the canonical entry namespace selects its immediate child directory for the
+whole execution. See [trace storage](traces-and-debugging.md#trace-storage) for
+layout, permissions and write failures.
 
 ## Captured entry and current settings
 

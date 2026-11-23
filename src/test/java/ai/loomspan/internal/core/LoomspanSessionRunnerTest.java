@@ -44,6 +44,26 @@ import static org.mockito.Mockito.when;
 class LoomspanSessionRunnerTest {
 
     @Test
+    void hostTraceDirectoryAppliesWithoutCapturedRuntime(@org.junit.jupiter.api.io.TempDir Path root) throws Exception {
+        try (var context = new org.springframework.context.support.GenericApplicationContext();
+                var executor = Executors.newSingleThreadExecutor()) {
+            var lifecycle = new FrameworkExecutionLifecycle(context, java.time.Duration.ofSeconds(1), executor);
+            var runner = new LoomspanSessionRunner(4, TracePersistencePolicy.ALWAYS, Clock.systemUTC(),
+                    ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandleFactory.INSTANCE,
+                    ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
+                    ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace(), lifecycle, root);
+            var path = runner.callWithNewSession("default-test_entry",
+                    ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()),
+                    session -> Path.of(session.getExecutionTrace().filePath()));
+            assertThat(path.getParent()).isEqualTo(root.resolve("default"));
+            assertThat(path).exists();
+            var records = new ArrayList<TraceRecord>();
+            ExecutionTraceReaders.ndjson().read(path, records::add);
+            assertThat(records.getLast().recordType()).isEqualTo(TraceRecordType.TRACE_COMPLETED);
+        }
+    }
+
+    @Test
     void defaultsNewSessionsToRetainTraceOnError() {
         LoomspanSessionRunner sessionRunner = new LoomspanSessionRunner(4);
 

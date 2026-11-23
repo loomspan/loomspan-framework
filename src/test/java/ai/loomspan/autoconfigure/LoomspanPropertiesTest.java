@@ -12,6 +12,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LoomspanPropertiesTest {
     @Test
+    void executionTraceDirectoryDefaultsAndBindsAsHostRoot() {
+        var expected = java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "loomspan-traces");
+        assertThat(new ExecutionTraceProperties().getDirectory()).isEqualTo(expected);
+        var runner = new ApplicationContextRunner().withUserConfiguration(TimeoutBinding.class);
+        runner.run(context -> assertThat(context.getBean(LoomspanProperties.class).getExecutionTrace().getDirectory())
+                .isEqualTo(expected));
+        var root = expected.resolve("host root with spaces");
+        runner.withPropertyValues("loomspan.execution-trace.directory=" + root).run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(LoomspanProperties.class).getExecutionTrace().getDirectory()).isEqualTo(root);
+        });
+        assertThatThrownBy(() -> new ExecutionTraceProperties().setDirectory(null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+
+    @Test
     void startupLiteralsBindAndRetiredCredentialUrisNeverLoad() throws Exception
     {
         String json = "{\n  \"type\": \"service_account\"\n}\n";

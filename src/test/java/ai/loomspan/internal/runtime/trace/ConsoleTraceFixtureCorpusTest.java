@@ -950,7 +950,7 @@ class ConsoleTraceFixtureCorpusTest
                 ? new DefaultExecutionTraceHandle("trace-" + name, "session-" + name, entrySkill,
                         new ai.loomspan.internal.core.CapturedNamespaceMetadata("orders", "orders-old",
                                 Map.of("orders", "orders-old", "tax", "tax-retired", "audit", "audit-unexecuted")),
-                        trace, TracePersistencePolicy.ALWAYS, false, false, CLOCK, 0L, false,
+                        trace, DefaultExecutionTraceHandle.defaultDirectory(), TracePersistencePolicy.ALWAYS, false, false, CLOCK, 0L, false,
                         () -> "namespace-id", "fixture-thread", "traces/" + name + ".ndjson",
                         ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandle.INSTANCE,
                         null, null, ImmediateCompletionRetention.INSTANCE, null)

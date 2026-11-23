@@ -3,11 +3,13 @@ package ai.loomspan.internal.core;
 import ai.loomspan.internal.runtime.observation.ExecutionObservationHandleFactory;
 import ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandleFactory;
 import ai.loomspan.internal.runtime.trace.CompletionGraceRetention;
+import ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle;
 import ai.loomspan.internal.runtime.trace.ConfiguredLimitsSnapshot;
 import ai.loomspan.autoconfigure.LoomspanProperties;
 import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.UUID;
@@ -21,6 +23,7 @@ import ai.loomspan.internal.skill.SkillAdmissionSnapshot;
 public class LoomspanSessionRunner
 {
     private final int maxDepth;
+    private final Path traceDirectory;
     private final TracePersistencePolicy tracePersistencePolicy;
     private final Clock clock;
     private final ExecutionObservationHandleFactory observationHandleFactory;
@@ -52,8 +55,9 @@ public class LoomspanSessionRunner
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
                 (sessionId, entrySkill, generationId, policy, handleClock, observationHandle) ->
-                        new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
-                                sessionId, entrySkill, generationId, policy, handleClock, observationHandle));
+                        new DefaultExecutionTraceHandle(
+                                sessionId, entrySkill, generationId, DefaultExecutionTraceHandle.defaultDirectory(),
+                                policy, handleClock, observationHandle));
     }
 
     public LoomspanSessionRunner(
@@ -65,10 +69,11 @@ public class LoomspanSessionRunner
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
                 (sessionId, entrySkill, generationId, policy, handleClock, observationHandle) ->
-                        new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                        new DefaultExecutionTraceHandle(
                                 sessionId,
                                 entrySkill,
                                 generationId,
+                                DefaultExecutionTraceHandle.defaultDirectory(),
                                 policy,
                                 handleClock,
                                 observationHandle,
@@ -87,10 +92,11 @@ public class LoomspanSessionRunner
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
                 (sessionId, entrySkill, generationId, policy, handleClock, observationHandle) ->
-                        new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
+                        new DefaultExecutionTraceHandle(
                                 sessionId,
                                 entrySkill,
                                 generationId,
+                                DefaultExecutionTraceHandle.defaultDirectory(),
                                 policy,
                                 handleClock,
                                 observationHandle,
@@ -111,8 +117,9 @@ public class LoomspanSessionRunner
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
                 (sessionId, entrySkill, generationId, policy, handleClock, observationHandle) ->
-                        new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
-                                sessionId, entrySkill, generationId, policy, handleClock, observationHandle,
+                        new DefaultExecutionTraceHandle(
+                                sessionId, entrySkill, generationId, DefaultExecutionTraceHandle.defaultDirectory(),
+                                policy, handleClock, observationHandle,
                                 Objects.requireNonNull(completionGraceRetention,
                                         "completionGraceRetention must not be null"),
                                 ConfiguredLimitsSnapshot.from(quotas),
@@ -128,7 +135,8 @@ public class LoomspanSessionRunner
             InternalExecutionTraceHandleFactory traceHandleFactory)
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory, traceHandleFactory,
-                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace(), null);
+                ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace(), null,
+                DefaultExecutionTraceHandle.defaultDirectory());
     }
 
     LoomspanSessionRunner(
@@ -141,7 +149,8 @@ public class LoomspanSessionRunner
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory, traceHandleFactory,
                 ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().canonicalTrace(),
-                Objects.requireNonNull(frameworkLifecycle, "frameworkLifecycle must not be null"));
+                Objects.requireNonNull(frameworkLifecycle, "frameworkLifecycle must not be null"),
+                DefaultExecutionTraceHandle.defaultDirectory());
     }
 
     private LoomspanSessionRunner(
@@ -153,7 +162,7 @@ public class LoomspanSessionRunner
             ObjectMapper canonicalTraceMapper)
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory, traceHandleFactory,
-                canonicalTraceMapper, null);
+                canonicalTraceMapper, null, DefaultExecutionTraceHandle.defaultDirectory());
     }
 
     private LoomspanSessionRunner(
@@ -163,7 +172,8 @@ public class LoomspanSessionRunner
             ExecutionObservationHandleFactory observationHandleFactory,
             InternalExecutionTraceHandleFactory traceHandleFactory,
             ObjectMapper canonicalTraceMapper,
-            @Nullable FrameworkExecutionLifecycle frameworkLifecycle)
+            @Nullable FrameworkExecutionLifecycle frameworkLifecycle,
+            Path traceDirectory)
     {
         if (maxDepth <= 0)
         {
@@ -171,6 +181,7 @@ public class LoomspanSessionRunner
         }
 
         this.maxDepth = maxDepth;
+        this.traceDirectory = Objects.requireNonNull(traceDirectory, "traceDirectory must not be null");
         this.tracePersistencePolicy = tracePersistencePolicy == null ? TracePersistencePolicy.ONERROR : tracePersistencePolicy;
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.observationHandleFactory = Objects.requireNonNull(
@@ -189,18 +200,19 @@ public class LoomspanSessionRunner
             CompletionGraceRetention completionGraceRetention,
             LoomspanProperties.Session.Quotas quotas,
             ObjectMapper canonicalTraceMapper,
-            FrameworkExecutionLifecycle frameworkLifecycle)
+            FrameworkExecutionLifecycle frameworkLifecycle,
+            Path traceDirectory)
     {
         this(maxDepth, tracePersistencePolicy, clock, observationHandleFactory,
                 (sessionId, entrySkill, generationId, policy, handleClock, observationHandle) ->
-                        new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
-                                sessionId, entrySkill, generationId, policy, handleClock, observationHandle,
+                        new DefaultExecutionTraceHandle(
+                                sessionId, entrySkill, generationId, traceDirectory, policy, handleClock, observationHandle,
                                 Objects.requireNonNull(completionGraceRetention,
                                         "completionGraceRetention must not be null"),
                                 ConfiguredLimitsSnapshot.from(quotas),
                                 Objects.requireNonNull(canonicalTraceMapper,
                                         "canonicalTraceMapper must not be null")),
-                canonicalTraceMapper, Objects.requireNonNull(frameworkLifecycle));
+                canonicalTraceMapper, Objects.requireNonNull(frameworkLifecycle), traceDirectory);
         this.generationTraceRetention = completionGraceRetention;
     }
 
@@ -300,8 +312,8 @@ public class LoomspanSessionRunner
             InternalExecutionTraceHandleFactory selectedTraceFactory = captured == null || generationTraceRetention == null
                     ? traceHandleFactory
                     : (sessionId, selectedEntrySkill, namespaceMetadata, policy, handleClock, observationHandle) ->
-                            new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
-                                    sessionId, selectedEntrySkill, namespaceMetadata, policy, handleClock, observationHandle,
+                            new DefaultExecutionTraceHandle(
+                                    sessionId, selectedEntrySkill, namespaceMetadata, traceDirectory, policy, handleClock, observationHandle,
                                     generationTraceRetention,
                                     ConfiguredLimitsSnapshot.from(captured.properties().getSession().getQuotas()),
                                     canonicalTraceMapper);

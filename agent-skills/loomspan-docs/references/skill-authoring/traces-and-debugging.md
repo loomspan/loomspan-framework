@@ -130,6 +130,35 @@ into provenance. Source, override and assembled-contract failures remain distinc
 and occur before child dispatch. Existing canonical evidence and the derived
 journal's established field-name redaction retain their usual policies.
 
+## Trace storage
+
+Set `loomspan.execution-trace.directory` in host startup configuration to choose
+the trace root. It defaults to `${java.io.tmpdir}/loomspan-traces`. A configured
+value is used directly as the root. Files have the path
+`<root>/<canonical entry namespace>/<sessionId>.<traceId>.execution-trace.ndjson`.
+The entry namespace owns the complete trace, including foreign skill calls.
+
+Namespace-published `ExecutionConfiguration` permits
+`loomspan.execution-trace.persistence` and rejects `directory`. The host root
+applies to every admitted generation. Trace-start `tracePath`, snapshots and
+finalized descriptors report the selected file under existing persistence and
+completion-retention rules.
+
+The writer creates missing parent directories. Administrators manage filesystem
+permissions, and writing preserves permissions on pre-created directories.
+An unusable destination follows existing write-error handling without writing
+the trace elsewhere.
+
+`ExecutionTraceProperties`, `LoomspanSessionRunner#executeAdmittedRoot` and
+`DefaultExecutionTraceHandle` own binding, host-root propagation and path
+selection. `NdjsonTraceRecordWriter` owns parent creation and writing.
+`ExecutionTraceHandleTest` covers default/configured paths, metadata, persistence,
+retention, permission preservation and unusable destinations.
+`NamespaceObservationIntegrationTest#hostRootAndEntryNamespaceOwnCrossNamespaceTrace`
+verifies host configuration, publication rejection and finance/shared execution
+through the application API. `ExecutionConfigurationParserTest#publishedTraceConfigurationRejectsHostDirectory`
+protects the published-key boundary.
+
 ## Trace identity
 
 Skill identities are full canonical `namespace-localName` strings, including

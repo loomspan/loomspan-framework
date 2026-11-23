@@ -19,6 +19,77 @@ import static org.assertj.core.api.Assertions.*;
 class NamespaceObservationIntegrationTest
 {
     @Test
+    void hostRootAndEntryNamespaceOwnCrossNamespaceTrace(@org.junit.jupiter.api.io.TempDir Path directory) throws Exception
+    {
+        Path root = directory.resolve("host root");
+        Path redirected = directory.resolve("published redirect");
+        try (var server = new MockWebServer())
+        {
+            server.enqueue(NamespaceStartupIntegrationTest.tool("shared-leaf", "{}"));
+            server.enqueue(NamespaceStartupIntegrationTest.text("finance complete"));
+            var configuration = new ExecutionConfiguration(NamespaceStartupIntegrationTest.modelConfiguration(server).yaml()
+                    + "  execution-trace: {persistence: always}\n");
+            NamespaceStartupIntegrationTest.runner().withPropertyValues("fixture-key=test-key",
+                    "loomspan.execution-trace.directory=" + root, "loomspan.execution-trace.persistence=never")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        var reloader = context.getBean(SkillReloader.class);
+                        var template = context.getBean(SkillTemplate.class);
+                        var shared = reloader.prepare("shared", List.of(new SkillDocument("shared leaf", """
+                                name: leaf
+                                description: shared executor
+                                executor: fixture
+                                """)), new ExecutionConfiguration("loomspan: {execution-trace: {persistence: always}}"),
+                                NamespaceVisibility.PUBLIC);
+                        reloader.publish(shared);
+                        reloader.publish(reloader.prepare("finance", List.of(new SkillDocument("finance caller", """
+                                name: entry
+                                description: finance caller
+                                model: model
+                                allowed_skills: [{name: shared-leaf}]
+                                """)), configuration));
+                        assertThatThrownBy(() -> reloader.prepare("finance", List.of(), new ExecutionConfiguration(
+                                "loomspan: {execution-trace: {persistence: always, directory: '" + redirected + "'}}")))
+                                .isInstanceOf(SkillReloadException.class).hasMessageContaining("loomspan.execution-trace.directory");
+                        var observations = new ArrayList<SkillExecutionView>();
+                        assertThat(template.invoke("FiNaNcE-entry", Map.of(), observations::add)).contains("finance complete");
+                        try {
+                            assertThat(root.resolve("shared")).doesNotExist();
+                            Path financeTrace;
+                            try (var paths = Files.list(root.resolve("finance"))) {
+                                var files = paths.toList();
+                                assertThat(files).hasSize(1);
+                                financeTrace = files.getFirst();
+                            }
+                            var mapper = JsonMapper.builder().build();
+                            var records = Files.readAllLines(financeTrace).stream().map(mapper::readTree).toList();
+                            var metadata = records.getFirst().path("metadata");
+                            assertThat(metadata.path("entryNamespace").asText()).isEqualTo("finance");
+                            assertThat(metadata.path("tracePath").asText()).isEqualTo(financeTrace.toString());
+                            assertThat(records.stream().map(record -> record.path("traceId").asText()).distinct().count()).isOne();
+                            assertThat(records.stream().map(record -> record.path("sessionId").asText()).distinct())
+                                    .containsExactly(observations.getFirst().sessionId());
+                            for (int index = 0; index < records.size(); index++)
+                                assertThat(records.get(index).path("sequence").asLong()).isEqualTo(index + 1L);
+                            assertThat(records).anySatisfy(record -> {
+                                assertThat(record.path("route").asText()).isEqualTo("shared-leaf");
+                                assertThat(record.path("metadata").path("executingNamespace").asText()).isEqualTo("shared");
+                            });
+                            assertThat(template.invoke("shared-leaf", Map.of())).contains("executor");
+                            try (var paths = Files.list(root.resolve("shared"))) {
+                                assertThat(paths.toList()).hasSize(1).allSatisfy(path -> assertThat(path).isRegularFile());
+                            }
+                            try (var paths = Files.list(root)) {
+                                assertThat(paths.toList()).containsExactlyInAnyOrder(root.resolve("finance"), root.resolve("shared"));
+                            }
+                            assertThat(redirected).doesNotExist();
+                        } catch (Exception failure) { throw new AssertionError(failure); }
+                    });
+            assertThat(server.getRequestCount()).isEqualTo(2);
+        }
+    }
+
+    @Test
     void capturedMapAndTargetOwnerSurviveRemovalAndRecreation() throws Exception
     {
         try (var server = new MockWebServer())
@@ -51,7 +122,7 @@ class NamespaceObservationIntegrationTest
                 assertThat(pending.invoke(observed::add)).contains("unchanged result");
                 assertThat(observed).hasSize(1);
                 String sessionId = observed.getFirst().sessionId();
-                try (var paths = Files.list(Path.of(System.getProperty("java.io.tmpdir"))))
+                try (var paths = Files.list(Path.of(System.getProperty("java.io.tmpdir"), "loomspan-traces", "caller")))
                 {
                     Path trace = paths.filter(path -> path.getFileName().toString().startsWith(sessionId + "."))
                             .filter(path -> path.toString().endsWith(".execution-trace.ndjson")).findFirst().orElseThrow();

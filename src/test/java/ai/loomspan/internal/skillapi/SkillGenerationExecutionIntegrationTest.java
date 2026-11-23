@@ -112,7 +112,8 @@ class SkillGenerationExecutionIntegrationTest
         var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.NEVER,
                 Clock.fixed(Instant.parse("2026-09-15T12:00:00Z"), ZoneOffset.UTC),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
-                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         var template = new DefaultSkillTemplate(generations, router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         var admitted = new DefaultSkillInvocationHandoff(template, lifecycle)
@@ -171,7 +172,8 @@ class SkillGenerationExecutionIntegrationTest
         var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.NEVER,
                 Clock.fixed(Instant.parse("2026-09-15T12:00:00Z"), ZoneOffset.UTC),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
-                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         var template = new DefaultSkillTemplate(generations,
                 new CapabilityExecutionRouter(provider, new DefaultAccessGuard()), runner, mapper,
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);

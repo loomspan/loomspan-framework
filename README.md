@@ -370,6 +370,18 @@ role, namespace membership, reserved shared name, or app/environment mapping.
 
 ### Captured execution diagnostics
 
+The host setting `loomspan.execution-trace.directory` selects the trace root and
+defaults to `${java.io.tmpdir}/loomspan-traces`. Each trace is written to
+`<root>/<canonical entry namespace>/<sessionId>.<traceId>.execution-trace.ndjson`.
+A configured value is the root itself. An execution starting in `finance` keeps
+its complete trace under `finance`, including calls into other namespaces.
+Namespace-published execution configuration can set trace persistence, while the
+directory is host-controlled. Missing directories are created on write.
+Administrators manage filesystem permissions, and existing directory permissions
+are preserved. The recorded path identifies the selected file, subject to normal
+persistence and retention rules. Filesystem write failures use existing error
+handling without choosing another destination.
+
 One invocation has one session, trace, canonical event sequence and completed
 observer flow across all namespaces. Existing Console skill displays, lookups,
 correlations and trace readers use complete qualified names, so `a-search` and

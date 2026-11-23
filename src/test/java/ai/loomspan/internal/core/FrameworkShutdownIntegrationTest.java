@@ -53,7 +53,8 @@ class FrameworkShutdownIntegrationTest
         var codecs = LoomspanJacksonCodecs.defaults();
         var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
-                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         CapabilityMetadata metadata = new CapabilityMetadata("test:root", "default-root", "Root",
@@ -132,7 +133,7 @@ class FrameworkShutdownIntegrationTest
                 ImmediateCompletionRetention.INSTANCE,
                 new LoomspanProperties.Session.Quotas(),
                 codecs.canonicalTrace(),
-                lifecycle);
+                lifecycle, ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         context.addApplicationListener(lifecycle);
         context.refresh();
         var admitted = lifecycle.admitRoot();
@@ -160,7 +161,8 @@ class FrameworkShutdownIntegrationTest
         var codecs = LoomspanJacksonCodecs.defaults();
         var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
-                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         registry.register("default-root", new CapabilityMetadata("test:root", "default-root", "Root",
@@ -322,7 +324,8 @@ class FrameworkShutdownIntegrationTest
         var codecs = LoomspanJacksonCodecs.defaults();
         var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
-                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityMetadata metadata = new CapabilityMetadata("test:root", "default-root", "Root",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",

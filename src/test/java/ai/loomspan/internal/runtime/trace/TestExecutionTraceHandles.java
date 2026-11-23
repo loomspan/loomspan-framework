@@ -191,7 +191,7 @@ public final class TestExecutionTraceHandles {
             CompletionGraceRetention completionGraceRetention,
             @Nullable ObjectMapper canonicalTraceMapper)
     {
-        return new DefaultExecutionTraceHandle(traceId, sessionId, entrySkill, new CapturedNamespaceMetadata("default", traceId, Map.of("default", traceId)), tracePath, persistencePolicy,
+        return new DefaultExecutionTraceHandle(traceId, sessionId, entrySkill, new CapturedNamespaceMetadata("default", traceId, Map.of("default", traceId)), tracePath, DefaultExecutionTraceHandle.defaultDirectory(), persistencePolicy,
                 errored, completed, clock, startingSequence, initialized, idSupplier, threadName,
                 tracePathMetadata, observationHandle, configuredLimits, writer, completionGraceRetention,
                 canonicalTraceMapper);

@@ -381,7 +381,8 @@ class FrameworkExecutionLifecycleTest
         var codecs = LoomspanJacksonCodecs.defaults();
         var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.ONERROR, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
-                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
 
         String value = runner.callWithNewSession("entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), null, session -> "done", (result, session, failure) -> {
             assertThat(ExecutionBindingScope.current()).isEmpty();
@@ -403,7 +404,8 @@ class FrameworkExecutionLifecycleTest
         var codecs = LoomspanJacksonCodecs.defaults();
         var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
-                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         IllegalStateException failure = new IllegalStateException("failed");
         AtomicLong callbacks = new AtomicLong();
         AtomicBoolean resultWasNull = new AtomicBoolean();
@@ -444,7 +446,8 @@ class FrameworkExecutionLifecycleTest
         var codecs = LoomspanJacksonCodecs.defaults();
         var runner = new LoomspanSessionRunner(3, TracePersistencePolicy.NEVER, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
-                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle);
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         var completionEntered = new CountDownLatch(1);
         var releaseCompletion = new CountDownLatch(1);
         var invocationFailure = new AtomicReference<Throwable>();

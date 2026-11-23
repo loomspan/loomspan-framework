@@ -67,6 +67,7 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
             String entrySkill,
             CapturedNamespaceMetadata namespaceMetadata,
             Path tracePath,
+            Path traceDirectory,
             TracePersistencePolicy persistencePolicy,
             boolean errored,
             boolean completed,
@@ -86,7 +87,9 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
         this.sessionId = requireNonBlank(sessionId, "sessionId");
         this.entrySkill = requireNonBlank(entrySkill, "entrySkill");
         this.namespaceMetadata = Objects.requireNonNull(namespaceMetadata, "namespaceMetadata must not be null");
-        this.tracePath = tracePath == null ? defaultPath(this.sessionId, this.traceId) : tracePath;
+        this.tracePath = tracePath == null ? Objects.requireNonNull(traceDirectory, "traceDirectory must not be null")
+                .resolve(namespaceMetadata.entryNamespace())
+                .resolve(this.sessionId + "." + this.traceId + ".execution-trace.ndjson") : tracePath;
         this.persistencePolicy = persistencePolicy == null ? TracePersistencePolicy.NEVER : persistencePolicy;
         this.errored = errored;
         this.completed = completed;
@@ -111,11 +114,12 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
             String sessionId,
             String entrySkill,
             CapturedNamespaceMetadata namespaceMetadata,
+            Path traceDirectory,
             TracePersistencePolicy persistencePolicy,
             Clock clock,
             ExecutionObservationHandle observationHandle)
     {
-        this(newTraceId(), sessionId, entrySkill, namespaceMetadata, null, persistencePolicy, false, false,
+        this(newTraceId(), sessionId, entrySkill, namespaceMetadata, null, traceDirectory, persistencePolicy, false, false,
                 clock, 0L, false, DefaultExecutionTraceHandle::newTraceId, null, null,
                 observationHandle, null, null, ImmediateCompletionRetention.INSTANCE, null);
         resetTraceFile();
@@ -126,12 +130,13 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
             String sessionId,
             String entrySkill,
             CapturedNamespaceMetadata namespaceMetadata,
+            Path traceDirectory,
             TracePersistencePolicy persistencePolicy,
             Clock clock,
             ExecutionObservationHandle observationHandle,
             CompletionGraceRetention completionGraceRetention)
     {
-        this(newTraceId(), sessionId, entrySkill, namespaceMetadata, null, persistencePolicy, false, false,
+        this(newTraceId(), sessionId, entrySkill, namespaceMetadata, null, traceDirectory, persistencePolicy, false, false,
                 clock, 0L, false, DefaultExecutionTraceHandle::newTraceId, null, null,
                 observationHandle, null, null, completionGraceRetention, null);
         resetTraceFile();
@@ -142,6 +147,7 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
             String sessionId,
             String entrySkill,
             CapturedNamespaceMetadata namespaceMetadata,
+            Path traceDirectory,
             TracePersistencePolicy persistencePolicy,
             Clock clock,
             ExecutionObservationHandle observationHandle,
@@ -149,7 +155,7 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
             ConfiguredLimitsSnapshot configuredLimits,
             ObjectMapper canonicalTraceMapper)
     {
-        this(newTraceId(), sessionId, entrySkill, namespaceMetadata, null, persistencePolicy, false, false,
+        this(newTraceId(), sessionId, entrySkill, namespaceMetadata, null, traceDirectory, persistencePolicy, false, false,
                 clock, 0L, false, DefaultExecutionTraceHandle::newTraceId, null, null,
                 observationHandle, Objects.requireNonNull(configuredLimits, "configuredLimits must not be null"),
                 null, completionGraceRetention,
@@ -162,13 +168,14 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
             String sessionId,
             String entrySkill,
             CapturedNamespaceMetadata namespaceMetadata,
+            Path traceDirectory,
             TracePersistencePolicy persistencePolicy,
             Clock clock,
             ExecutionObservationHandle observationHandle,
             CompletionGraceRetention completionGraceRetention,
             ConfiguredLimitsSnapshot configuredLimits)
     {
-        this(newTraceId(), sessionId, entrySkill, namespaceMetadata, null, persistencePolicy, false, false,
+        this(newTraceId(), sessionId, entrySkill, namespaceMetadata, null, traceDirectory, persistencePolicy, false, false,
                 clock, 0L, false, DefaultExecutionTraceHandle::newTraceId, null, null,
                 observationHandle, Objects.requireNonNull(configuredLimits, "configuredLimits must not be null"),
                 null, completionGraceRetention, null);
@@ -547,9 +554,9 @@ public final class DefaultExecutionTraceHandle implements ExecutionTraceHandle
         return tracePath.toString();
     }
 
-    private static Path defaultPath(String sessionId, String traceId)
+    public static Path defaultDirectory()
     {
-        return Path.of(System.getProperty("java.io.tmpdir"), sessionId + "." + traceId + ".execution-trace.ndjson");
+        return Path.of(System.getProperty("java.io.tmpdir"), "loomspan-traces");
     }
 
     private static String newTraceId()

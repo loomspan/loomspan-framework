@@ -69,7 +69,8 @@ class DefaultSkillTemplateTest {
         var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS,
                 fixedClock(), NoOpExecutionObservationHandleFactory.INSTANCE,
                 ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
-                codecs.canonicalTrace(), lifecycle);
+                codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         DefaultSkillTemplate template = new DefaultSkillTemplate(
                 registry.manager(), router, runner, new ObjectMapper(), new SkillInputValidator(),
                 new SkillRoleEvaluator(null, null), null);
@@ -120,7 +121,8 @@ class DefaultSkillTemplateTest {
         var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.NEVER,
                 fixedClock(), NoOpExecutionObservationHandleFactory.INSTANCE,
                 ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
-                codecs.canonicalTrace(), lifecycle);
+                codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         DefaultSkillInvocationHandoff handoff = new DefaultSkillInvocationHandoff(
                 new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                         new SkillInputValidator(), new SkillRoleEvaluator(null, null), null), lifecycle);
@@ -164,7 +166,8 @@ class DefaultSkillTemplateTest {
         var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.NEVER,
                 fixedClock(), NoOpExecutionObservationHandleFactory.INSTANCE,
                 ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
-                codecs.canonicalTrace(), lifecycle);
+                codecs.canonicalTrace(), lifecycle,
+                ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         var admitted = new DefaultSkillInvocationHandoff(template, lifecycle)

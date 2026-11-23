@@ -1,6 +1,12 @@
 {
   "properties": [
     {
+      "name": "loomspan.execution-trace.directory",
+      "type": "java.nio.file.Path",
+      "defaultValue": "${java.io.tmpdir}/loomspan-traces",
+      "description": "Host trace root directory with canonical entry namespace subdirectories. Namespace-published execution configuration cannot override it."
+    },
+    {
       "name": "loomspan.shutdown.timeout",
       "type": "java.time.Duration",
       "defaultValue": "30s",

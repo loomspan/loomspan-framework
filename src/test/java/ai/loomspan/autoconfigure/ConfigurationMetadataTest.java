@@ -15,6 +15,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConfigurationMetadataTest {
 
     @Test
+    void generatedMetadataDocumentsHostTraceDirectory() throws Exception {
+        try (InputStream stream = Thread.currentThread().getContextClassLoader()
+                .getResourceAsStream("META-INF/spring-configuration-metadata.json")) {
+            var root = JsonMapper.builder().build().readTree(stream);
+            var property = StreamSupport.stream(root.path("properties").spliterator(), false)
+                    .filter(value -> value.path("name").asText().equals("loomspan.execution-trace.directory"))
+                    .findFirst().orElseThrow();
+            assertThat(property.path("type").asText()).isEqualTo("java.nio.file.Path");
+            assertThat(property.path("defaultValue").asText()).isEqualTo("${java.io.tmpdir}/loomspan-traces");
+            assertThat(property.path("description").asText()).contains("Host trace root", "entry namespace", "cannot override");
+        }
+    }
+
+    @Test
     void generatedMetadataDocumentsNamedConnectionSurfaceAndDriverHints() throws Exception {
         try (InputStream stream = Thread.currentThread().getContextClassLoader()
                 .getResourceAsStream("META-INF/spring-configuration-metadata.json")) {

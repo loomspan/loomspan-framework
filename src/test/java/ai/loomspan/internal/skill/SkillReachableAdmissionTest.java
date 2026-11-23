@@ -345,7 +345,7 @@ class SkillReachableAdmissionTest {
         var codecs = LoomspanJacksonCodecs.defaults();
         var runner = new LoomspanSessionRunner(4, TracePersistencePolicy.NEVER, Clock.systemUTC(),
                 NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
-                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), f.lifecycle);
+                new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), f.lifecycle, ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         return new DefaultSkillTemplate(f.manager, router, runner, codecs.applicationConversion(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
     }
 

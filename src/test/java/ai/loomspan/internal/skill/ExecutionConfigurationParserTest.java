@@ -14,6 +14,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ExecutionConfigurationParserTest
 {
+    @Test
+    void publishedTraceConfigurationRejectsHostDirectory() {
+        assertThatThrownBy(() -> ExecutionConfigurationParser.parse("finance", new ExecutionConfiguration(
+                "loomspan: {execution-trace: {persistence: always, directory: redirected}}"), Map.of()))
+                .hasMessageContaining("loomspan.execution-trace.directory").hasMessageContaining("not publishable");
+    }
+
     @Test void markedTypedSettingsKeepNativeConversionAndOwningValidation() {
         String yaml = """
                 loomspan:
