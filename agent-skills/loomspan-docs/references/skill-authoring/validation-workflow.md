@@ -23,11 +23,20 @@ An application edits YAML skills and needs feedback before staging a complete re
 
 ## Limits
 
+`SkillDocument.sourceName` retains exact labels such as `Orders import #42` and
+`Orders/lookup.yaml` through both validation and preparation. Namespace and
+manifest names still undergo exact identity validation. A host reading files or
+archives checks their definition paths before constructing the documents.
+Framework startup discovery checks lowercase relative directories and filenames
+beneath a pattern's fixed prefix; literal locations check only the filename.
+See the [startup path examples](mental-model.md#canonical-namespace-identity).
+
 Validation is advisory. It creates no candidate or generation ID and does not change the active catalog, fixed registrations or retirement state. Preparation checks and freezes its own current input; files or documents edited after validation can fail preparation. Successful validation does not guarantee resource staging or publication. Validation does not invoke a skill or model, resolve variable markers, construct provider clients, test service connectivity, or authorize publication. Missing variable values, provider construction, shutdown, ownership, staleness, and one-shot publication remain later lifecycle checks. Use the [Java update API](../java-api/skill-reload.md) for the publication lifecycle.
 
 ## Evidence
 
 - `YamlSkillCatalogTests` covers independent-document diagnostics, source and path fields, complexity warnings, and suppressed editor warning logs.
+- `StartupSkillPathTest` and `SkillSourcePathResolverTest` cover actual definition paths and exact supplied labels/bytes. `PortableDeclarationIdentityIntegrationTest#suppliedLabelsRemainExactThroughValidationAndPreparation` covers both requested label forms with normal and explicit-map preparation.
 - `SkillGenerationManagerTest` covers whole-set parity, fixed declarations, ID continuity, handler construction, and premature validation rejection.
 - `SkillReloaderTest` and `PublicSkillReloadIntegrationTest` protect candidate and public publication behavior.
 - `ExecutionConfigurationParserTest` protects candidate fields, defaults, variable timing, and process-setting rejection.

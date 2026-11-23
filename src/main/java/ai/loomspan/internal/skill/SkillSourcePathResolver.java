@@ -1,15 +1,17 @@
-package ai.loomspan.internal.runtime.observation.catalog;
+package ai.loomspan.internal.skill;
 
-import ai.loomspan.internal.skill.YamlSkillSource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -37,35 +39,66 @@ public final class SkillSourcePathResolver
         {
             return source.suppliedLabel();
         }
-        String location = source.locationPattern();
+        return resolve(source.locationPattern(), source.resource());
+    }
+
+    public void validateLocation(String location)
+    {
+        int patternIndex = firstPatternIndex(location);
+        int separator = patternIndex < 0
+                ? Math.max(location.lastIndexOf('/'), location.lastIndexOf('\\'))
+                : Math.max(location.lastIndexOf('/', patternIndex), location.lastIndexOf('\\', patternIndex));
+        int relativeStart = Math.max(separator + 1, location.indexOf(':') + 1);
+        String relativePath = location.substring(relativeStart);
+        boolean encodedLocation = SCHEME.matcher(location).find()
+                && !DRIVE.matcher(location).find() && !location.startsWith("classpath:");
+        requireLowercase(validate(encodedLocation ? decode(relativePath) : relativePath));
+    }
+
+    public void validateResource(String location, Resource resource)
+    {
+        requireLowercase(resolve(location, resource));
+    }
+
+    private String resolve(String location, Resource resource)
+    {
         int patternIndex = firstPatternIndex(location);
         if (patternIndex < 0)
         {
-            return validate(source.resource().getFilename());
+            try
+            {
+                URI uri = actualUri(resource);
+                String path = decode(uri.toString());
+                return validate(path.substring(path.lastIndexOf('/') + 1));
+            }
+            catch (IOException ex)
+            {
+                throw unsafe(resource, "resource filename cannot be resolved", ex);
+            }
         }
 
         int separator = Math.max(location.lastIndexOf('/', patternIndex), location.lastIndexOf('\\', patternIndex));
         String rootPattern = separator < 0 ? location.substring(0, patternIndex) : location.substring(0, separator + 1);
         try
         {
-            URI resourceUri = source.resource().getURI().normalize();
+            URI resourceUri = actualUri(resource);
             List<URI> roots = new ArrayList<>();
             for (Resource root : resolver.getResources(rootPattern))
             {
                 if (root.exists())
                 {
-                    roots.add(directoryUri(root.getURI().normalize()));
+                    roots.add(directoryUri(actualUri(root)));
                 }
             }
             return roots.stream()
                     .filter(root -> isBelow(root, resourceUri))
                     .max(Comparator.comparingInt(uri -> uri.toString().length()))
                     .map(root -> validate(relativize(root, resourceUri)))
-                    .orElseThrow(() -> unsafe(source, "matched resource cannot be relativized against its configured root"));
+                    .orElseThrow(() -> unsafe(resource, "matched resource cannot be relativized against its configured root", null));
         }
         catch (IOException ex)
         {
-            throw unsafe(source, "configured root cannot be resolved", ex);
+            throw unsafe(resource, "configured root cannot be resolved", ex);
         }
     }
 
@@ -98,7 +131,37 @@ public final class SkillSourcePathResolver
 
     private static String relativize(URI root, URI resource)
     {
-        return resource.toString().substring(root.toString().length());
+        return decode(resource.toString().substring(root.toString().length()));
+    }
+
+    private static URI actualUri(Resource resource) throws IOException
+    {
+        URI uri = resource.getURI().normalize();
+        if ("file".equals(uri.getScheme()))
+        {
+            return Path.of(uri).toRealPath(LinkOption.NOFOLLOW_LINKS).toUri();
+        }
+        return uri;
+    }
+
+    private static String decode(String path)
+    {
+        return org.springframework.util.StringUtils.uriDecode(path, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private static void requireLowercase(String relativePath)
+    {
+        String[] components = relativePath.split("/");
+        for (int index = 0; index < components.length; index++)
+        {
+            String component = components[index];
+            if (!component.equals(component.toLowerCase(Locale.ROOT)))
+            {
+                String kind = index == components.length - 1 ? "filename" : "directory";
+                throw new IllegalStateException("Skill definition relative path '" + relativePath
+                        + "' contains uppercase " + kind + " component '" + component + "'");
+            }
+        }
     }
 
     private static String validate(String candidate)
@@ -126,15 +189,10 @@ public final class SkillSourcePathResolver
         return String.join("/", segments);
     }
 
-    private static IllegalStateException unsafe(YamlSkillSource source, String detail)
-    {
-        return unsafe(source, detail, null);
-    }
-
-    private static IllegalStateException unsafe(YamlSkillSource source, String detail, Throwable cause)
+    private static IllegalStateException unsafe(Resource resource, String detail, Throwable cause)
     {
         return new IllegalStateException(
-                "Cannot derive a safe descriptive source path for " + source.resource().getDescription() + ": " + detail,
+                "Cannot derive a safe descriptive source path for " + resource.getDescription() + ": " + detail,
                 cause);
     }
 }

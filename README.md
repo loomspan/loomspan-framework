@@ -153,6 +153,31 @@ name verbatim. `search()` can omit its name. A method `findOrder()` supplies
 validated as supplied. Callable pairs must be unique across YAML and Java, while
 executor pairs have their own index. A callable and executor may share one pair.
 
+Startup discovery checks lowercase spelling of directories and filenames beneath
+the configured pattern's fixed prefix. With `classpath:/skills/**/*.yaml`,
+`orders/lookup.yaml` succeeds, while `Orders/lookup.yaml` and
+`orders/lookup.YAML` fail with the relative path and offending component.
+A literal `classpath:/skills/Orders/lookup.yaml` checks only `lookup.yaml`.
+Select `.yml` explicitly when using that extension.
+
+Supplied documents use exact diagnostic labels independently of file paths.
+Given an executor-backed definition in `yaml` and its executor registered in
+`orders`, either label works in validation and preparation.
+
+```java
+for (String label : List.of("Orders import #42", "Orders/lookup.yaml")) {
+    var documents = List.of(new SkillDocument(label, yaml));
+    var configuration = new ExecutionConfiguration("loomspan: {}");
+    var feedback = reloader.validate("orders", documents, configuration);
+    try (var candidate = reloader.prepare("orders", documents, configuration)) {
+        candidate.snapshot();
+    }
+}
+```
+
+The namespace and manifest name still follow the declaration rules. A host that
+reads files or archives checks their definition paths before constructing documents.
+
 Authored local references resolve in the containing owner and explicit colon
 references select their stated owner. Missing local targets fail in that owner.
 Reference comparisons use the resolved identity and retain the original source,

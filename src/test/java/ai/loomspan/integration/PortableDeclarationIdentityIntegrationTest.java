@@ -5,6 +5,8 @@ import ai.loomspan.api.extensions.v1.SkillExecutorInvocation;
 import ai.loomspan.autoconfigure.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -13,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import static org.assertj.core.api.Assertions.*;
 
 class PortableDeclarationIdentityIntegrationTest {
@@ -86,6 +89,32 @@ class PortableDeclarationIdentityIntegrationTest {
             assertThat(reloader.validate("other", duplicateJava, EMPTY).valid()).isTrue();
         });
     }
+    @ParameterizedTest
+    @ValueSource(strings = {"Orders import #42", "Orders/lookup.yaml"})
+    void suppliedLabelsRemainExactThroughValidationAndPreparation(String label) {
+        runner().run(context -> {
+            assertThat(context).hasNotFailed();
+            var reloader = context.getBean(SkillReloader.class);
+            var documents = List.of(document(label, "lookup"));
+            var result = reloader.validate("orders", documents, EMPTY);
+            assertThat(result.valid()).as(result.issues().toString()).isTrue();
+            try (var candidate = reloader.prepare("orders", documents, EMPTY)) {
+                assertThat(candidate.snapshot().namespace()).isEqualTo("orders");
+            }
+            try (var candidate = reloader.prepare("orders", documents, EMPTY, Map.of())) {
+                assertThat(candidate.snapshot().namespace()).isEqualTo("orders");
+            }
+            var invalid = List.of(document(label, "Lookup"));
+            assertThat(reloader.validate("orders", invalid, EMPTY).issues())
+                    .anySatisfy(issue -> assertThat(issue.sourceName()).isEqualTo(label));
+            assertThatThrownBy(() -> reloader.prepare("orders", invalid, EMPTY))
+                    .isInstanceOf(SkillReloadException.class).hasMessageContaining(label);
+            assertThatThrownBy(() -> reloader.validate("Orders", documents, EMPTY))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> reloader.prepare("Orders", documents, EMPTY))
+                    .isInstanceOf(IllegalArgumentException.class);
+        });
+    }
     @Test void startupRejectsInvalidAndDuplicateCallableDeclarations(@TempDir Path directory) throws Exception {
         Path file = directory.resolve("lookup.yaml");
         for (String name : List.of("Lookup", " lookup ", "lookup_name", "anthropic-tools", "fixed")) {
@@ -107,5 +136,6 @@ class PortableDeclarationIdentityIntegrationTest {
         @SkillExecutor(name="fixture") String local(SkillExecutorInvocation invocation) { return "ok"; }
         @SkillExecutor(namespace="order-support", name="fixture") String orders(SkillExecutorInvocation invocation) { return "ok"; }
         @SkillExecutor(namespace="other", name="fixture") String other(SkillExecutorInvocation invocation) { return "ok"; }
+        @SkillExecutor(namespace="orders", name="fixture") String orderFixture(SkillExecutorInvocation invocation) { return "ok"; }
     }
 }

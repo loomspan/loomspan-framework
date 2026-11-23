@@ -285,7 +285,7 @@ class LoomspanPublicSurfaceArchitectureTest
             Map.entry("ai.loomspan.internal.runtime.observation.catalog.InMemoryFinalizedTraceCatalog", "Public only for framework-owned observability composition."),
             Map.entry("ai.loomspan.internal.runtime.observation.catalog.RegisteredSkillCatalog", "Public only for future internal application-adapter collaboration."),
             Map.entry("ai.loomspan.internal.runtime.observation.catalog.RegisteredSkillEntry", "Public only for future internal application-adapter collaboration."),
-            Map.entry("ai.loomspan.internal.runtime.observation.catalog.SkillSourcePathResolver", "Public only for framework-owned registered-skill catalog construction."),
+            Map.entry("ai.loomspan.internal.skill.SkillSourcePathResolver", "Public only for framework-owned loading and registered-skill source paths."),
             Map.entry("ai.loomspan.internal.runtime.observation.catalog.TraceCatalogSlice", "Public only for future internal keyset adapter collaboration."),
             Map.entry("ai.loomspan.internal.runtime.usage.DefaultSessionUsageService", "Public only for Java collaboration between distinct internal subsystem packages."),
             Map.entry("ai.loomspan.internal.runtime.usage.GuardrailType", "Public only for Java collaboration between distinct internal subsystem packages."),

@@ -1,4 +1,4 @@
-package ai.loomspan.internal.runtime.observation.catalog;
+package ai.loomspan.internal.skill;
 
 import ai.loomspan.internal.skill.YamlSkillSource;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SkillSourcePathResolverTest
 {
     @ParameterizedTest
-    @ValueSource(strings = {"opaque label", "support/triage.yaml", "scheme:value <untrusted>"})
+    @ValueSource(strings = {"opaque label", "support/triage.yaml", "scheme:value <untrusted>", "Orders import #42", "Orders/lookup.yaml"})
     void suppliedLabelIsReturnedVerbatimWithoutPathInterpretation(String label)
     {
         YamlSkillSource source = new YamlSkillSource(new ByteArrayResource(new byte[0], label),

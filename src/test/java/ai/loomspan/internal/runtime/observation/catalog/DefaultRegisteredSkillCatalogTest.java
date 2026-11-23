@@ -31,40 +31,40 @@ class DefaultRegisteredSkillCatalogTest
     @Test
     void preservesYamlAndTraversesByExactRegisteredName() throws Exception
     {
-        String alphaYaml = "# comment\r\nname: Alpha\r\ndescription: first\r\n";
+        String alphaYaml = "# comment\r\nname: alpha\r\ndescription: first\r\n";
         String betaYaml = "name: beta\ndescription: second\n";
-        DefaultRegisteredSkillCatalog catalog = catalog(List.of(definition("beta", betaYaml), definition("Alpha", alphaYaml)), true);
+        DefaultRegisteredSkillCatalog catalog = catalog(List.of(definition("beta", betaYaml), definition("alpha", alphaYaml)), true);
 
         assertThat(catalog.listAfter(null, 10))
                 .extracting(RegisteredSkillEntry.Summary::registeredName)
-                .containsExactly("Alpha", "JavaLookup", "beta");
-        assertThat(catalog.listAfter("Alpha", 10))
+                .containsExactly("alpha", "beta", "java-lookup");
+        assertThat(catalog.listAfter("alpha", 10))
                 .extracting(RegisteredSkillEntry.Summary::registeredName)
-                .containsExactly("JavaLookup", "beta");
-        assertThat(catalog.find("Alpha").orElseThrow().yaml()).isEqualTo(alphaYaml);
-        assertThat(catalog.find("alpha")).isEmpty();
+                .containsExactly("beta", "java-lookup");
+        assertThat(catalog.find("alpha").orElseThrow().yaml()).isEqualTo(alphaYaml);
+        assertThat(catalog.find("Alpha")).isEmpty();
         assertThat(catalog.registeredSkillCount()).isEqualTo(3);
-        assertThat(catalog.find("JavaLookup").orElseThrow()).isEqualTo(new RegisteredSkillEntry(
-                "JavaLookup", "JAVA", "SKILL_METHOD", null, null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null, null));
+        assertThat(catalog.find("java-lookup").orElseThrow()).isEqualTo(new RegisteredSkillEntry(
+                "java-lookup", "JAVA", "SKILL_METHOD", null, null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null, null));
     }
 
     @Test
     void preservesExecutorJavaKindAndYamlDeclaration() throws Exception
     {
-        String executorYaml = "name: FetchDns\ndescription: fetch DNS\nexecutor: infrastructure-dns\n";
-        DefaultRegisteredSkillCatalog catalog = catalog(List.of(executorDefinition("FetchDns", executorYaml)), false);
+        String executorYaml = "name: fetch-dns\ndescription: fetch DNS\nexecutor: infrastructure-dns\n";
+        DefaultRegisteredSkillCatalog catalog = catalog(List.of(executorDefinition("fetch-dns", executorYaml)), false);
 
         assertThat(catalog.listAfter(null, 10)).singleElement().satisfies(summary ->
         {
-            assertThat(summary.registeredName()).isEqualTo("FetchDns");
+            assertThat(summary.registeredName()).isEqualTo("fetch-dns");
             assertThat(summary.kind()).isEqualTo("JAVA");
-            assertThat(summary.sourcePath()).isEqualTo("FetchDns.yaml");
+            assertThat(summary.sourcePath()).isEqualTo("fetch-dns.yaml");
             assertThat(summary.beanName()).isEqualTo("executorBean");
             assertThat(summary.declaration()).isEqualTo("YAML");
             assertThat(summary.executorName()).isEqualTo("default-infrastructure-dns");
             assertThat(summary.method()).isEqualTo("example.Executor.execute()");
         });
-        assertThat(catalog.find("FetchDns").orElseThrow()).satisfies(entry ->
+        assertThat(catalog.find("fetch-dns").orElseThrow()).satisfies(entry ->
         {
             assertThat(entry.kind()).isEqualTo("JAVA");
             assertThat(entry.yaml()).isEqualTo(executorYaml);
@@ -111,7 +111,7 @@ class DefaultRegisteredSkillCatalogTest
         if (includeJava)
         {
             var metadata = mock(CapabilityMetadata.class);
-            when(metadata.name()).thenReturn("JavaLookup");
+            when(metadata.name()).thenReturn("java-lookup");
             when(metadata.kind()).thenReturn(SkillKind.JAVA);
             when(metadata.source()).thenReturn(new SkillSource(null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null));
             entries.add(metadata);

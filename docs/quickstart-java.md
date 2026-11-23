@@ -79,6 +79,13 @@ your account, not the Loomspan alias `assistant`.
 
 Create `src/main/resources/skills/triage-support-request.yaml`:
 
+The default `classpath:/skills/**/*.yaml` discovery checks every relative directory
+and filename beneath `skills/` for lowercase spelling, including the extension.
+`orders/lookup.yaml` passes, while `Orders/lookup.yaml` and `orders/lookup.YAML`
+fail with the relative path and offending component. Nested startup definitions
+still belong to `default`. A literal location such as
+`classpath:/skills/Orders/lookup.yaml` checks only the filename `lookup.yaml`.
+
 ```yaml
 name: triage-support-request
 description: Turn a customer issue into an actionable engineering triage brief.

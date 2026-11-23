@@ -72,6 +72,21 @@ Evidence: `SkillGenerationManager#capture`, `SkillDependencyValidator#checkAdmis
 
 Bean names, YAML source labels, and declared method signatures are diagnostic locations, never a second callable identity. File-loaded YAML has a file-derived label; application-supplied `SkillDocument` YAML has its exact arbitrary `sourceName` label, which need not resemble a path or have an extension. Neither changes manifest `name` or `allowed_skills` resolution. The inspection wire field remains named `sourcePath`. Any YAML `mapping` key, including null, empty, or scalar forms, is rejected with annotation-only guidance.
 
+Startup discovery requires lowercase directories and filenames beneath a pattern's
+fixed prefix. With `classpath:/skills/**/*.yaml`, `Orders/lookup.yaml` fails on
+`Orders`, and `orders/lookup.YAML` fails on `lookup.YAML`, including on hosts
+whose usual glob would omit it. A literal `classpath:/skills/Orders/lookup.yaml`
+checks only `lookup.yaml`. The `.yaml` pattern selects that extension; configure
+`.yml` explicitly to load `.yml` definitions. Every nested startup definition still
+belongs to `default`.
+
+Supplied labels such as `Orders import #42` and `Orders/lookup.yaml` retain their
+exact content through validation and preparation. Hosts loading files or archives
+check the actual definition paths before constructing documents. See the
+[validation workflow](validation-workflow.md) and [publication API](../java-api/skill-reload.md).
+`StartupSkillPathTest` covers filesystem, exploded classpath and packaged JAR
+paths; `PortableDeclarationIdentityIntegrationTest` covers public label behavior.
+
 ## Capability types
 
 ### Executor-backed YAML leaf

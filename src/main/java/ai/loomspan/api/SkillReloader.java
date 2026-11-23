@@ -4,7 +4,13 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Framework-owned two-stage update service for complete namespace generations. */
+/**
+ * Framework-owned two-stage update service for complete namespace generations.
+ * Validation and preparation validate the supplied namespace and declared skill names.
+ * Each {@link SkillDocument#sourceName()} remains an exact diagnostic label, including
+ * labels such as {@code Orders import #42} and {@code Orders/lookup.yaml}.
+ * Hosts check definition paths when loading files or archives before supplying documents.
+ */
 public interface SkillReloader
 {
     /** Checks a complete namespace replacement without creating provider clients; visibility defaults to Private. */
@@ -35,7 +41,7 @@ public interface SkillReloader
     /** Publishes a candidate prepared by this framework instance exactly once. */
     void publish(PreparedSkillUpdate update);
 
-    /** Selects the normalized namespace once; missing namespaces fail. Returned metadata remains immutable. */
+    /** Selects the exact namespace once; missing namespaces fail. Returned metadata remains immutable. */
     SkillCatalog snapshot(String namespace);
 
     /**

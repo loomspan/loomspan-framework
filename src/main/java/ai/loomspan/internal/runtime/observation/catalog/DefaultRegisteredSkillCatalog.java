@@ -1,6 +1,7 @@
 package ai.loomspan.internal.runtime.observation.catalog;
 
 import ai.loomspan.internal.skill.YamlSkillDefinition;
+import ai.loomspan.internal.skill.SkillSourcePathResolver;
 import ai.loomspan.internal.core.CapabilityMetadata;
 import ai.loomspan.api.SkillKind;
 import org.springframework.lang.Nullable;

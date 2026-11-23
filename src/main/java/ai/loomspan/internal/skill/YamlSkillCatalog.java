@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.support.ResourcePatternResolver;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.util.StringUtils;
 
@@ -54,7 +54,7 @@ public class YamlSkillCatalog implements InitializingBean
     private static final Set<String> ALLOWED_SKILL_ENTRY_FIELDS = Set.of("name", "min_tasks", "max_tasks", "required", "input_bindings");
     private final LoomspanProperties modelsProperties;
     private final LoomspanProperties.Skills skillProperties;
-    private final ResourcePatternResolver resourcePatternResolver;
+    private final PathMatchingResourcePatternResolver resourcePatternResolver;
     private final ObjectMapper yamlObjectMapper;
     private ai.loomspan.internal.autoconfigure.StartupVariableResolution startupVariables;
     private final Map<String, YamlSkillDefinition> skillsByName = new LinkedHashMap<>();
@@ -87,33 +87,33 @@ public class YamlSkillCatalog implements InitializingBean
         properties.setSkills(skills);
         this.modelsProperties = Objects.requireNonNull(properties, "properties must not be null");
         this.skillProperties = properties.getSkills();
-        this.resourcePatternResolver = new PathMatchingResourcePatternResolver();
+        this.resourcePatternResolver = discoveryResolver(new PathMatchingResourcePatternResolver());
         this.yamlObjectMapper = defaultYamlObjectMapper();
     }
 
     YamlSkillCatalog(LoomspanProperties properties,
             LoomspanProperties.Skills skills,
-            ResourcePatternResolver resourcePatternResolver,
+            PathMatchingResourcePatternResolver resourcePatternResolver,
             ObjectMapper yamlObjectMapper)
     {
         properties.setSkills(skills);
         this.modelsProperties = Objects.requireNonNull(properties, "properties must not be null");
         this.skillProperties = properties.getSkills();
-        this.resourcePatternResolver = Objects.requireNonNull(resourcePatternResolver, "resourcePatternResolver must not be null");
+        this.resourcePatternResolver = discoveryResolver(resourcePatternResolver);
         this.yamlObjectMapper = Objects.requireNonNull(yamlObjectMapper, "yamlObjectMapper must not be null");
     }
 
     public YamlSkillCatalog(LoomspanProperties properties,
-            ResourcePatternResolver resourcePatternResolver,
+            PathMatchingResourcePatternResolver resourcePatternResolver,
             ObjectMapper yamlObjectMapper)
     {
         this.modelsProperties = Objects.requireNonNull(properties, "properties must not be null");
         this.skillProperties = properties.getSkills();
-        this.resourcePatternResolver = Objects.requireNonNull(resourcePatternResolver, "resourcePatternResolver must not be null");
+        this.resourcePatternResolver = discoveryResolver(resourcePatternResolver);
         this.yamlObjectMapper = Objects.requireNonNull(yamlObjectMapper, "yamlObjectMapper must not be null");
     }
 
-    public YamlSkillCatalog(LoomspanProperties properties, ResourcePatternResolver resources, ObjectMapper mapper,
+    public YamlSkillCatalog(LoomspanProperties properties, PathMatchingResourcePatternResolver resources, ObjectMapper mapper,
             ai.loomspan.internal.autoconfigure.StartupVariableResolution startupVariables) {
         this(properties, resources, mapper);
         this.startupVariables = Objects.requireNonNull(startupVariables);
@@ -286,16 +286,19 @@ public class YamlSkillCatalog implements InitializingBean
     private List<DiscoveredYamlSkillResource> discoverResources()
     {
         List<DiscoveredYamlSkillResource> resources = new ArrayList<>();
+        SkillSourcePathResolver paths = new SkillSourcePathResolver(resourcePatternResolver);
 
         for (String location : skillProperties.getLocations())
         {
             try
             {
+                paths.validateLocation(location);
                 Resource[] found = resourcePatternResolver.getResources(location);
                 for (Resource resource : found)
                 {
                     if (resource.exists())
                     {
+                        paths.validateResource(location, resource);
                         resources.add(new DiscoveredYamlSkillResource(location, resource));
                     }
                 }
@@ -308,10 +311,23 @@ public class YamlSkillCatalog implements InitializingBean
             {
                 throw new DiscoveryException("Failed to discover YAML skills from " + location, ex);
             }
+            catch (IllegalStateException ex)
+            {
+                throw new DiscoveryException("Failed to discover YAML skills from " + location + ". " + ex.getMessage(), ex);
+            }
         }
 
         resources.sort(Comparator.comparing(resource -> describe(resource.resource())));
         return resources;
+    }
+
+    private static PathMatchingResourcePatternResolver discoveryResolver(PathMatchingResourcePatternResolver resolver)
+    {
+        Objects.requireNonNull(resolver, "resourcePatternResolver must not be null");
+        AntPathMatcher matcher = new AntPathMatcher();
+        matcher.setCaseSensitive(false);
+        resolver.setPathMatcher(matcher);
+        return resolver;
     }
 
     private YamlSkillDefinition loadDefinition(DiscoveredYamlSkillResource discovered)
@@ -1049,7 +1065,7 @@ public class YamlSkillCatalog implements InitializingBean
 
     private static final class DiscoveryException extends IllegalStateException
     {
-        private DiscoveryException(String message, IOException cause) { super(message, cause); }
+        private DiscoveryException(String message, Throwable cause) { super(message, cause); }
     }
 
     private static final class DocumentReadException extends IllegalStateException

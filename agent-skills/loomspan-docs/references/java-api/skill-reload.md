@@ -31,11 +31,37 @@ reloader.remove("department", current.generationId());
 `NamespaceVisibility.PRIVATE` is the default on **every** publication, including
 replacement of a Public generation. Pass `PUBLIC` explicitly on each Public
 replacement. Visibility changes are complete publications and allocate fresh IDs.
-Namespaces normalize case and independently enforce the 32-character limit.
+Namespaces use their exact supplied spelling and the declaration component grammar.
+Each skill pair satisfies `namespace.length() + 2 + localName.length() <= 64`.
 Catalogs and validation feedback contain only the target's supplied declarations
 and assigned fixed Java methods; qualified catalog lookup never searches elsewhere.
 Empty supplied declarations are valid when ordinary validation permits them, and
 an empty published namespace still has its namespace and generation ID.
+
+`SkillDocument.sourceName` is an exact diagnostic label. Given a complete valid
+executor-backed definition in `yaml` and its executor registered in `orders`,
+both labels below succeed without treating them as paths.
+
+```java
+ExecutionConfiguration empty = new ExecutionConfiguration("loomspan: {}");
+for (String label : List.of("Orders import #42", "Orders/lookup.yaml")) {
+    var documents = List.of(new SkillDocument(label, yaml));
+    SkillValidationResult feedback = reloader.validate("orders", documents, empty);
+    if (feedback.valid()) {
+        try (PreparedSkillUpdate candidate = reloader.prepare("orders", documents, empty)) {
+            candidate.snapshot();
+        }
+    }
+}
+```
+
+The supplied namespace and declared name undergo exact identity validation.
+Hosts loading definitions from files or archives check the actual paths before
+constructing documents. Framework startup performs that check for its configured
+locations. Under `classpath:/skills/**/*.yaml`, both `Orders/lookup.yaml` and
+`orders/lookup.YAML` fail with their relative path and offending component.
+For literal `classpath:/skills/Orders/lookup.yaml`, only `lookup.yaml` is relative.
+Nested startup files still belong to `default`.
 
 ## Publication labels and current discovery
 
@@ -231,6 +257,9 @@ ordinary Spring-owned HTTP resource cleanup without a generation-specific cache.
 retained work, retirement notifications and preserved bean ownership.
 
 ## Evidence
+
+- `StartupSkillPathTest`: caller spelling before lookup and actual filesystem, exploded classpath, all-classpath and JAR path validation. `SkillSourcePathResolverTest` protects shared source paths and exact labels/bytes.
+- `PortableDeclarationIdentityIntegrationTest#suppliedLabelsRemainExactThroughValidationAndPreparation`: both labels through public validation and both variable-source preparation routes. `SkillIdentityTest` protects exact declaration components and pair limits.
 
 - `SkillReloaderTest`: exact immutable labels, variable source modes, concurrent ID/label pairing, complete replacement, base/absence, state/lifecycle, deterministic concurrent preparation/publication, disposal and retirement.
 - `NamespacePublicationObservationIntegrationTest`: independent engines, before-invocation reads, candidate/active separation, exact labels, omission, stale rejection, removal and restart installation.
