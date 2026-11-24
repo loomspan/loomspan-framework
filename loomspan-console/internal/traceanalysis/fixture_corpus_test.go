@@ -87,6 +87,45 @@ type fixtureActivePrefix struct {
 
 const fixtureCompatibilityVersion = "1.0.0-beta.10-SNAPSHOT"
 
+func TestNamespaceCorpusKeepsNativeProviderNameAndResolvedSkill(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(fixtureRoot(t), "traces", "namespace-captured-context.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newServiceTestHarnessForVersion(t, "trace-namespace-captured-context", string(raw), fixtureCompatibilityVersion)
+	page, domain := h.service.QueryRecords(context.Background(), targetEvidence(h.scopeID), RecordQuery{
+		Handle: h.handle, Representation: RecordRepresentationLogical, PageSize: 10,
+		Filter: RecordFilter{Types: []string{"MODEL_RESPONSE_RECEIVED"}},
+	})
+	if domain != nil || len(page.Items) != 1 || page.Items[0].Content == nil {
+		t.Fatalf("records=%+v domain=%v", page, domain)
+	}
+	read, domain := h.service.ReadContentRange(context.Background(), targetEvidence(h.scopeID), RangeRequest{
+		Handle: h.handle, ContentRef: page.Items[0].Content.ContentRef, MaxBytes: 4096,
+	})
+	if domain != nil {
+		t.Fatal(domain)
+	}
+	var payload struct {
+		Generations []struct {
+			ToolCalls []struct {
+				Name      string
+				Arguments string
+			}
+		}
+	}
+	if err := json.Unmarshal(read.Content, &payload); err != nil {
+		t.Fatal(err)
+	}
+	call := payload.Generations[0].ToolCalls[0]
+	if call.Name != "tax--search" || call.Arguments != `{ "businessReference": "warehouse-lookup", "token": "original" }` {
+		t.Fatalf("raw exchange changed: %+v", call)
+	}
+	if !bytes.Contains(raw, []byte(`"capabilityName":"tax:search"`)) || !bytes.Contains(raw, []byte(`"entrySkill":"orders:search"`)) {
+		t.Fatal("qualified resolved facts missing")
+	}
+}
+
 func TestAttachmentFixturesPreserveLogicalDescriptorCollectionsThroughTinyRanges(t *testing.T) {
 	for _, name := range []string{"attachment-descriptors", "chunked-attachment-descriptors"} {
 		t.Run(name, func(t *testing.T) {
@@ -395,7 +434,7 @@ func TestFixtureCorpusExposesCurrentEntrySkillPlanIdentityAndAcceptedAttempt(t *
 	if domain != nil {
 		t.Fatalf("process fixture: %v", domain)
 	}
-	if processed.Metadata.EntrySkill != "default-test_entry" {
+	if processed.Metadata.EntrySkill != "default:test-entry" {
 		t.Fatalf("entrySkill=%q", processed.Metadata.EntrySkill)
 	}
 	h := newServiceTestHarnessForVersion(t, "trace-current-plan-semantic-evidence", string(traceBytes), fixtureCompatibilityVersion)
@@ -674,7 +713,7 @@ func TestProcessorPublishesOnlyValidatedTraceStartedEntrySkill(t *testing.T) {
 		raw  string
 		want string
 	}{
-		{name: "valid", raw: `{"entrySkill":"default-actual_skill"}`, want: "default-actual_skill"},
+		{name: "valid", raw: `{"entrySkill":"default:actual-skill"}`, want: "default:actual-skill"},
 		{name: "missing", raw: `{"misleading":"filename.skill"}`},
 		{name: "blank", raw: `{"entrySkill":"  "}`},
 		{name: "non-string", raw: `{"entrySkill":{"name":"model.skill"}}`},
@@ -707,7 +746,7 @@ func TestFrameworkDispatchFixtureKeepsAuthoritativeRawEvidenceWithoutModelCall(t
 		}
 		if kind == "STEP_STARTED" {
 			metadata := record["metadata"].(map[string]any)
-			if metadata["dispatchOrigin"] != "framework" || metadata["dispatchReason"] != "eligible" || metadata["assignedTaskId"] != "task-lookup" || metadata["capabilityName"] != "default-lookupCustomer" {
+			if metadata["dispatchOrigin"] != "framework" || metadata["dispatchReason"] != "eligible" || metadata["assignedTaskId"] != "task-lookup" || metadata["capabilityName"] != "default:lookup-customer" {
 				t.Fatalf("dispatch identity: %#v", metadata)
 			}
 			found = true

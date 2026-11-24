@@ -29,6 +29,38 @@ class DefaultRegisteredSkillCatalogTest
     Path tempDir;
 
     @Test
+    void sameLocalNamesKeepReusableComponentsAndExactLookup()
+    {
+        var capabilities = new java.util.ArrayList<CapabilityMetadata>();
+        for (String namespace : List.of("orders", "warehouse"))
+        {
+            var metadata = mock(CapabilityMetadata.class);
+            var identity = new ai.loomspan.internal.core.SkillIdentity(namespace, "lookup");
+            when(metadata.identity()).thenReturn(identity);
+            when(metadata.name()).thenReturn(identity.toString());
+            when(metadata.kind()).thenReturn(SkillKind.JAVA);
+            when(metadata.source()).thenReturn(new SkillSource(null, "lookupBean", "example.Lookup.lookup()", null));
+            capabilities.add(metadata);
+        }
+        var catalog = new DefaultRegisteredSkillCatalog(capabilities, Map.of());
+        assertThat(catalog.listAfter(null, 10)).extracting(RegisteredSkillEntry.Summary::registeredName)
+                .containsExactly("orders:lookup", "warehouse:lookup");
+        var mapper = new ai.loomspan.internal.observability.web.ObservabilityDtoMapper();
+        for (String namespace : List.of("orders", "warehouse"))
+        {
+            var entry = catalog.find(namespace + ":lookup").orElseThrow();
+            assertThat(entry.namespace()).isEqualTo(namespace);
+            assertThat(entry.localName()).isEqualTo("lookup");
+            var dto = mapper.skill(entry);
+            assertThat(dto.registeredName()).isEqualTo(namespace + ":lookup");
+            assertThat(dto.namespace()).isEqualTo(namespace);
+            assertThat(dto.localName()).isEqualTo("lookup");
+        }
+        assertThat(catalog.find("lookup")).isEmpty();
+        assertThat(catalog.find("orders-lookup")).isEmpty();
+    }
+
+    @Test
     void preservesYamlAndTraversesByExactRegisteredName() throws Exception
     {
         String alphaYaml = "# comment\r\nname: alpha\r\ndescription: first\r\n";
@@ -37,15 +69,15 @@ class DefaultRegisteredSkillCatalogTest
 
         assertThat(catalog.listAfter(null, 10))
                 .extracting(RegisteredSkillEntry.Summary::registeredName)
-                .containsExactly("alpha", "beta", "java-lookup");
-        assertThat(catalog.listAfter("alpha", 10))
+                .containsExactly("default:alpha", "default:beta", "default:java-lookup");
+        assertThat(catalog.listAfter("default:alpha", 10))
                 .extracting(RegisteredSkillEntry.Summary::registeredName)
-                .containsExactly("beta", "java-lookup");
-        assertThat(catalog.find("alpha").orElseThrow().yaml()).isEqualTo(alphaYaml);
+                .containsExactly("default:beta", "default:java-lookup");
+        assertThat(catalog.find("default:alpha").orElseThrow().yaml()).isEqualTo(alphaYaml);
         assertThat(catalog.find("Alpha")).isEmpty();
         assertThat(catalog.registeredSkillCount()).isEqualTo(3);
-        assertThat(catalog.find("java-lookup").orElseThrow()).isEqualTo(new RegisteredSkillEntry(
-                "java-lookup", "JAVA", "SKILL_METHOD", null, null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null, null));
+        assertThat(catalog.find("default:java-lookup").orElseThrow()).isEqualTo(new RegisteredSkillEntry(
+                "default", "java-lookup", "JAVA", "SKILL_METHOD", null, null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null, null));
     }
 
     @Test
@@ -56,15 +88,15 @@ class DefaultRegisteredSkillCatalogTest
 
         assertThat(catalog.listAfter(null, 10)).singleElement().satisfies(summary ->
         {
-            assertThat(summary.registeredName()).isEqualTo("fetch-dns");
+            assertThat(summary.registeredName()).isEqualTo("default:fetch-dns");
             assertThat(summary.kind()).isEqualTo("JAVA");
             assertThat(summary.sourcePath()).isEqualTo("fetch-dns.yaml");
             assertThat(summary.beanName()).isEqualTo("executorBean");
             assertThat(summary.declaration()).isEqualTo("YAML");
-            assertThat(summary.executorName()).isEqualTo("default-infrastructure-dns");
+            assertThat(summary.executorName()).isEqualTo("infrastructure:dns");
             assertThat(summary.method()).isEqualTo("example.Executor.execute()");
         });
-        assertThat(catalog.find("fetch-dns").orElseThrow()).satisfies(entry ->
+        assertThat(catalog.find("default:fetch-dns").orElseThrow()).satisfies(entry ->
         {
             assertThat(entry.kind()).isEqualTo("JAVA");
             assertThat(entry.yaml()).isEqualTo(executorYaml);
@@ -99,11 +131,12 @@ class DefaultRegisteredSkillCatalogTest
         for (var definition : definitions)
         {
             var metadata = mock(CapabilityMetadata.class);
-            when(metadata.name()).thenReturn(definition.manifest().getName());
+            when(metadata.name()).thenReturn("default:" + definition.manifest().getName());
+            when(metadata.identity()).thenReturn(new ai.loomspan.internal.core.SkillIdentity("default", definition.manifest().getName()));
             when(metadata.tool()).thenReturn(ai.loomspan.internal.core.CapabilityToolDescriptor.generic(definition.manifest().getName(), "description"));
             when(metadata.kind()).thenReturn(definition.form() == YamlSkillDefinition.Form.EXECUTOR ? SkillKind.JAVA : SkillKind.YAML);
             when(metadata.source()).thenReturn(definition.form() == YamlSkillDefinition.Form.EXECUTOR
-                    ? new SkillSource(null, "executorBean", "example.Executor.execute()", "default-infrastructure-dns")
+                    ? new SkillSource(null, "executorBean", "example.Executor.execute()", "infrastructure:dns")
                     : new SkillSource(definition.source().diagnosticName(), null, null, null));
             definitionsByName.put(metadata.name(), definition);
             entries.add(metadata);
@@ -111,7 +144,8 @@ class DefaultRegisteredSkillCatalogTest
         if (includeJava)
         {
             var metadata = mock(CapabilityMetadata.class);
-            when(metadata.name()).thenReturn("java-lookup");
+            when(metadata.name()).thenReturn("default:java-lookup");
+            when(metadata.identity()).thenReturn(new ai.loomspan.internal.core.SkillIdentity("default", "java-lookup"));
             when(metadata.kind()).thenReturn(SkillKind.JAVA);
             when(metadata.source()).thenReturn(new SkillSource(null, "lookupBean", "example.Lookup.lookup(java.lang.String)", null));
             entries.add(metadata);

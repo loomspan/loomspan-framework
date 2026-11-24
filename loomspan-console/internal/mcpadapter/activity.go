@@ -24,7 +24,7 @@ type getExecutionActivityInput struct {
 func addActivityTool(server *mcp.Server, options ServerOptions) {
 	addValidatedTool(server, &mcp.Tool{
 		Name:        GetExecutionActivityToolName,
-		Description: "Return bounded untrusted activity. hasMore is backlog now; continuation is a future checkpoint after false. Empty results may advance it.",
+		Description: "Read untrusted activity. hasMore marks backlog; continuation checkpoints after false. Empty results may advance it.",
 		Annotations: readOnlyAnnotations, InputSchema: pageInputSchema[getExecutionActivityInput](),
 	}, activityOutputSchema(), func(ctx context.Context, _ *mcp.CallToolRequest, input getExecutionActivityInput) (*mcp.CallToolResult, toolEnvelope[activityResult], error) {
 		return handleGetExecutionActivity(ctx, options, input)

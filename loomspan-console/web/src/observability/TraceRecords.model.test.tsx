@@ -55,6 +55,19 @@ beforeEach(() => {
   getRawRecordRangeMock.mockReset();
 });
 
+test("raw provider names and argument text survive beside qualified runtime facts", async () => {
+  const args = '{ "businessReference": "warehouse-lookup", "token": "original" }';
+  getContentRangeMock.mockResolvedValue(range(JSON.stringify({ generations: [{
+    messageType: "ASSISTANT", text: "", toolCalls: [{ id: "call-1", name: "order-support--find-order", arguments: args }],
+  }] })));
+  renderRecords([{ ...record(9, "MODEL_RESPONSE_RECEIVED", "native-response"), route: "order-support:find-order#model" }]);
+  fireEvent.click(screen.getByRole("button", { name: "Response" }));
+  const detail = await screen.findByRole("region", { name: "Model response for record 9" });
+  expect(detail).toHaveTextContent("order-support--find-order");
+  expect(detail).toHaveTextContent("warehouse-lookup");
+  expect(detail).toHaveTextContent("original");
+});
+
 test("reconstructs a chunked model request and presents messages by role", async () => {
   const request = JSON.stringify({
     messages: [

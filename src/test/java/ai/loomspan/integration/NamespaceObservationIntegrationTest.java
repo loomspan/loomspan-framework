@@ -25,7 +25,7 @@ class NamespaceObservationIntegrationTest
         Path redirected = directory.resolve("published redirect");
         try (var server = new MockWebServer())
         {
-            server.enqueue(NamespaceStartupIntegrationTest.tool("shared-leaf", "{}"));
+            server.enqueue(NamespaceStartupIntegrationTest.tool("shared--leaf", "{}"));
             server.enqueue(NamespaceStartupIntegrationTest.text("finance complete"));
             var configuration = new ExecutionConfiguration(NamespaceStartupIntegrationTest.modelConfiguration(server).yaml()
                     + "  execution-trace: {persistence: always}\n");
@@ -52,7 +52,7 @@ class NamespaceObservationIntegrationTest
                                 "loomspan: {execution-trace: {persistence: always, directory: '" + redirected + "'}}")))
                                 .isInstanceOf(SkillReloadException.class).hasMessageContaining("loomspan.execution-trace.directory");
                         var observations = new ArrayList<SkillExecutionView>();
-                        assertThat(template.invoke("FiNaNcE", "entry", Map.of(), observations::add)).contains("finance complete");
+                        assertThat(template.invoke("finance", "entry", Map.of(), observations::add)).contains("finance complete");
                         try {
                             assertThat(root.resolve("shared")).doesNotExist();
                             Path financeTrace;
@@ -72,7 +72,7 @@ class NamespaceObservationIntegrationTest
                             for (int index = 0; index < records.size(); index++)
                                 assertThat(records.get(index).path("sequence").asLong()).isEqualTo(index + 1L);
                             assertThat(records).anySatisfy(record -> {
-                                assertThat(record.path("route").asText()).isEqualTo("shared-leaf");
+                                assertThat(record.path("route").asText()).isEqualTo("shared:leaf");
                                 assertThat(record.path("metadata").path("executingNamespace").asText()).isEqualTo("shared");
                             });
                             assertThat(template.invoke("shared", "leaf", Map.of())).contains("executor");
@@ -94,7 +94,7 @@ class NamespaceObservationIntegrationTest
     {
         try (var server = new MockWebServer())
         {
-            server.enqueue(NamespaceStartupIntegrationTest.tool("dept-fixed", "{\"value\":\"payload\"}"));
+            server.enqueue(NamespaceStartupIntegrationTest.tool("dept--fixed", "{\"value\":\"payload\"}"));
             server.enqueue(NamespaceStartupIntegrationTest.text("unchanged result"));
             var configuration = new ExecutionConfiguration(
                     NamespaceStartupIntegrationTest.modelConfiguration(server).yaml()
@@ -129,7 +129,7 @@ class NamespaceObservationIntegrationTest
                     var mapper = JsonMapper.builder().build();
                     var records = Files.readAllLines(trace).stream().map(mapper::readTree).toList();
                     var start = records.getFirst().path("metadata");
-                    assertThat(start.path("entrySkill").asText()).isEqualTo("caller-fixed");
+                    assertThat(start.path("entrySkill").asText()).isEqualTo("caller:fixed");
                     assertThat(start.path("entryNamespace").asText()).isEqualTo("caller");
                     assertThat(start.path("generationId").asText()).isEqualTo(caller.generationId());
                     assertThat(start.path("namespaceGenerationIds").path("caller").asText()).isEqualTo(caller.generationId());
@@ -138,7 +138,7 @@ class NamespaceObservationIntegrationTest
                     assertThat(records.stream().map(node -> node.path("traceId").asText()).distinct().count()).isOne();
                     for (int index = 0; index < records.size(); index++)
                         assertThat(records.get(index).path("sequence").asLong()).isEqualTo(index + 1L);
-                    var targets = records.stream().filter(node -> node.path("route").asText().equals("dept-fixed")).toList();
+                    var targets = records.stream().filter(node -> node.path("route").asText().equals("dept:fixed")).toList();
                     assertThat(targets).isNotEmpty();
                     assertThat(targets).allSatisfy(node -> {
                         assertThat(node.path("metadata").path("executingNamespace").asText()).isEqualTo("dept");
@@ -152,10 +152,10 @@ class NamespaceObservationIntegrationTest
                 // Existing host inspection includes Private namespaces and works after default withdrawal.
                 var manager = context.getBean(SkillGenerationManager.class);
                 assertThat(manager.registeredSkillCatalog().listAfter(null, 100)).extracting(entry -> entry.registeredName())
-                        .contains("caller-fixed", "dept-fixed", "default-local");
+                        .contains("caller:fixed", "dept:fixed", "default:local");
                 reloader.remove("default", reloader.snapshot("default").generationId());
-                assertThat(manager.registeredSkillCatalog().find("caller-fixed")).isPresent();
-                assertThat(manager.registeredSkillCatalog().find("dept-fixed")).isPresent();
+                assertThat(manager.registeredSkillCatalog().find("caller:fixed")).isPresent();
+                assertThat(manager.registeredSkillCatalog().find("dept:fixed")).isPresent();
                 reloader.remove("caller", caller.generationId());
                 reloader.remove("dept", replacement.generationId());
                 assertThat(manager.registeredSkillCatalog().registeredSkillCount()).isZero();

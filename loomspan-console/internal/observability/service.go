@@ -280,7 +280,7 @@ func validatePage[T any](page Page[T], validateItem func(T) error) error {
 }
 
 func validateSkillSummary(skill SkillSummary) error {
-	if strings.TrimSpace(skill.RegisteredName) == "" {
+	if !skillidentity.ValidQualified(skill.RegisteredName, skill.Namespace, skill.LocalName) {
 		return errors.New("skill identity is missing")
 	}
 	if skill.Kind != "YAML" && skill.Kind != "JAVA" {
@@ -318,7 +318,7 @@ func validateSkillDetail(skill SkillDetail, requestedName string) error {
 			return errors.New("outputSchema must be JSON object text or null")
 		}
 	}
-	if err := validateSkillSummary(SkillSummary{RegisteredName: skill.RegisteredName,
+	if err := validateSkillSummary(SkillSummary{RegisteredName: skill.RegisteredName, Namespace: skill.Namespace, LocalName: skill.LocalName,
 		Kind: skill.Kind, Declaration: skill.Declaration, ExecutorName: skill.ExecutorName, SourcePath: skill.SourcePath, BeanName: skill.BeanName, Method: skill.Method}); err != nil {
 		return err
 	}

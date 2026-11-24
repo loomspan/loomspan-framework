@@ -9,10 +9,10 @@ const read = vi.mocked(getContentRange);
 const payload = { severity: "ERROR", message: "  caught request failure\n雪 <script>bad()</script>  ", messageState: "COMPLETE", dataState: "COMPLETE", data: { outcome: "FAILED", retry: true, usage: 999999, unknown: null } };
 function record(data: unknown = payload, changes: Partial<TraceRecord> = {}): TraceRecord {
   const json = JSON.stringify(data);
-  return { sequence: 4, type: "EXECUTOR_DIAGNOSTIC_RECORDED", frameId: "executor-child", parentFrameId: "root", frameType: "ROOT_MISSION", route: "default-lookup", timestampMillis: 10, threadName: "worker", representation: "LOGICAL", isChunk: false, isEnvelope: false,
+  return { sequence: 4, type: "EXECUTOR_DIAGNOSTIC_RECORDED", frameId: "executor-child", parentFrameId: "root", frameType: "ROOT_MISSION", route: "default:lookup", timestampMillis: 10, threadName: "worker", representation: "LOGICAL", isChunk: false, isEnvelope: false,
     content: { role: "DATA", contentType: "application/json", encoding: "UTF8", retainedBytes: new TextEncoder().encode(json).length, available: true, complete: true, inlineEligibility: true, inlineContent: json, contentRef: "data-4" }, ...changes };
 }
-const frame = { frameId: "executor-child", parentFrameId: "root", frameType: "ROOT_MISSION", route: "default-lookup", openedTimestampMillis: 1, closedTimestampMillis: 20, inclusiveDurationMillis: 19, outcome: "SUCCEEDED" } as TraceFrame;
+const frame = { frameId: "executor-child", parentFrameId: "root", frameType: "ROOT_MISSION", route: "default:lookup", openedTimestampMillis: 1, closedTimestampMillis: 20, inclusiveDurationMillis: 19, outcome: "SUCCEEDED" } as TraceFrame;
 function props(current = record(), source: TraceSource = "IMPORTED", scopeGeneration = 0) {
   return { traceId: "trace-1", records: [current], source, scopeGeneration, frames: [frame], failures: [], onSelectRecord: vi.fn(), onSelectFailure: vi.fn(), onContent: vi.fn() };
 }

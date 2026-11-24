@@ -443,7 +443,11 @@ handling without choosing another destination.
 One invocation has one session, trace, canonical event sequence and completed
 observer flow across all namespaces. Existing Console skill displays, lookups,
 correlations and trace readers use complete qualified names, so `a:search` and
-`b:search` remain distinct. Host inspection includes Private and restricted skill
+`b:search` remain distinct. Catalog summaries and details expose `namespace`
+and `localName` alongside their colon-qualified `registeredName`. For example,
+`orders:lookup` yields `orders` and `lookup`, and exact lookup distinguishes it
+from `warehouse:lookup`. Raw provider tool calls retain names such as
+`orders--lookup` while resolved skill fields use `orders:lookup`. Host inspection includes Private and restricted skill
 metadata under existing observation authorization; runtime discovery remains
 execution-permission filtered.
 

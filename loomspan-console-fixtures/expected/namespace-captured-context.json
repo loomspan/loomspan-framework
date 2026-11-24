@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-namespace-captured-context",
   "sessionId" : "session-namespace-captured-context",
-  "entrySkill" : "orders-search",
+  "entrySkill" : "orders:search",
   "generationId" : "orders-old",
   "entryNamespace" : "orders",
   "namespaceGenerationIds" : {
@@ -29,8 +29,30 @@
     "totalUnits" : 0
   },
   "usageComplete" : true,
-  "attempts" : [ ],
-  "retries" : [ ],
+  "attempts" : [ {
+    "retrySequenceId" : "namespace-retry",
+    "attemptId" : "namespace-attempt",
+    "attemptNumber" : 1,
+    "attemptReason" : "INITIAL",
+    "providerAttemptNumber" : 1,
+    "outcome" : "SUCCEEDED",
+    "retryDelayMillis" : 0,
+    "usage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "usageComplete" : true
+  } ],
+  "retries" : [ {
+    "retrySequenceId" : "namespace-retry",
+    "usage" : {
+      "promptUnits" : 0,
+      "completionUnits" : 0,
+      "totalUnits" : 0
+    },
+    "usageComplete" : true
+  } ],
   "validationLinks" : [ ],
   "frames" : [ {
     "frameId" : "namespace-root",
@@ -53,7 +75,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "orders-search"
+    "route" : "orders:search"
   }, {
     "frameId" : "namespace-target",
     "parentFrameId" : "namespace-root",
@@ -75,7 +97,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "tax-search"
+    "route" : "tax:search"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

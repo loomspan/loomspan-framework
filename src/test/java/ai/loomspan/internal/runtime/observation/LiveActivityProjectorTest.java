@@ -97,7 +97,7 @@ class LiveActivityProjectorTest
                 prefixes.put(prefix.path("sequence").longValue(), prefix.path("branches")));
 
         ExecutionProjectionState state = state(
-                "session-canonical-concurrent-contract", "default-test_entry");
+                "session-canonical-concurrent-contract", "default:test-entry");
         LiveActivityProjector projector = new LiveActivityProjector();
         for (String line : Files.readAllLines(root.resolve("traces/canonical-concurrent-contract.ndjson")))
         {
@@ -626,7 +626,7 @@ class LiveActivityProjectorTest
                 null, null, null, null, "thread",
                 Map.of("entryNamespace", "orders", "generationId", "generation-entry",
                         "namespaceGenerationIds", generations), null);
-        var projection = new LiveActivityProjector().project(state("session", "orders-search"), start);
+        var projection = new LiveActivityProjector().project(state("session", "orders:search"), start);
         generations.put("tax", "generation-recreated");
         assertThat(projection.snapshot().entryNamespace()).isEqualTo("orders");
         assertThat(projection.snapshot().generationId()).isEqualTo("generation-entry");

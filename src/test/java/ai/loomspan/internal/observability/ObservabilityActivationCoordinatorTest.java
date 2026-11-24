@@ -29,10 +29,10 @@ class ObservabilityActivationCoordinatorTest
         var coordinator = new ObservabilityActivationCoordinator();
         coordinator.disable();
         var handle = new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
-                "disabled", "default-entry", new ai.loomspan.internal.core.CapturedNamespaceMetadata(
+                "disabled", "default:entry", new ai.loomspan.internal.core.CapturedNamespaceMetadata(
                         "default", "generation", java.util.Map.of("default", "generation")), directory,
                 TracePersistencePolicy.NEVER, Clock.systemUTC(),
-                coordinator.observationFactory().create("disabled", "default-entry"), coordinator.completionRetention());
+                coordinator.observationFactory().create("disabled", "default:entry"), coordinator.completionRetention());
         var active = handle.tracePath();
         var completed = active.resolveSibling(active.getFileName().toString().replace(".in-progress", ""));
         assertThat(completed).doesNotExist();

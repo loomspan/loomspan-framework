@@ -33,7 +33,7 @@ const execution: ActiveExecution = {
   startedAt: "2026-07-27T10:00:00Z",
   updatedAt: "2026-07-27T10:05:00Z",
   elapsedMillis: 300000,
-  entrySkill: "default-CheckDns",
+  entrySkill: "default:check-dns",
   generationId: "generation-fixture", entryNamespace: "default", namespaceGenerationIds: { default: "generation-fixture" },
   status: "RUNNING",
   phase: "EXECUTING",
@@ -61,7 +61,7 @@ test("active executions renders items in a table", () => {
   view.current.activeExecutions.items = [execution];
   render(<ActiveExecutions />);
   expect(screen.getByText("session-1")).toBeInTheDocument();
-  expect(screen.getByText("default-CheckDns")).toBeInTheDocument();
+  expect(screen.getByText("default:check-dns")).toBeInTheDocument();
   expect(screen.getByText("RUNNING")).toBeInTheDocument();
   expect(screen.getByText("EXECUTING")).toBeInTheDocument();
   expect(screen.getByText("Checking DNS records")).toBeInTheDocument();

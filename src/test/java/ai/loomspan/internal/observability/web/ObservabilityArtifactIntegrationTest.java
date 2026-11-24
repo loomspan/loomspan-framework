@@ -59,9 +59,9 @@ class ObservabilityArtifactIntegrationTest
     {
         var runtime = activation.runtime().orElseThrow();
         String sessionId = "published-" + java.util.UUID.randomUUID();
-        var observation = runtime.observationFactory().create(sessionId, "default-entry");
+        var observation = runtime.observationFactory().create(sessionId, "default:entry");
         var handle = new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
-                sessionId, "default-entry", new ai.loomspan.internal.core.CapturedNamespaceMetadata(
+                sessionId, "default:entry", new ai.loomspan.internal.core.CapturedNamespaceMetadata(
                         "default", "generation", java.util.Map.of("default", "generation")), tempDir,
                 policy, runtime.clock(), observation, runtime.completionRetention());
         String endpoint = ObservabilityApiPaths.TRACES + "/" + handle.snapshot().traceId() + "/artifact";
@@ -93,9 +93,9 @@ class ObservabilityArtifactIntegrationTest
     {
         var runtime = activation.runtime().orElseThrow();
         String sessionId = "rename-failure-" + java.util.UUID.randomUUID();
-        var observation = runtime.observationFactory().create(sessionId, "default-entry");
+        var observation = runtime.observationFactory().create(sessionId, "default:entry");
         var handle = new ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle(
-                sessionId, "default-entry", new ai.loomspan.internal.core.CapturedNamespaceMetadata(
+                sessionId, "default:entry", new ai.loomspan.internal.core.CapturedNamespaceMetadata(
                         "default", "generation", java.util.Map.of("default", "generation")), tempDir,
                 TracePersistencePolicy.ALWAYS, runtime.clock(), observation, runtime.completionRetention());
         Path active = handle.tracePath();

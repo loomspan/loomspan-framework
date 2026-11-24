@@ -29,7 +29,7 @@ const trace: Trace = {
   targetScopeId: "scope-1",
   traceId: "trace-1",
   sessionId: "session-1",
-  entrySkill: "default-CheckDns",
+  entrySkill: "default:check-dns",
   generationId: "generation-fixture", entryNamespace: "default", namespaceGenerationIds: { default: "generation-fixture" },
   outcome: "SUCCEEDED",
   finalizedAt: "2026-07-27T10:10:00Z",
@@ -51,7 +51,7 @@ test("traces renders items in a table", () => {
   render(<Traces />);
   expect(screen.getByText("trace-1")).toBeInTheDocument();
   expect(screen.getAllByRole("columnheader")[0]).toHaveTextContent("Entry skill");
-  expect(screen.getAllByRole("cell")[0]).toHaveTextContent("default-CheckDns");
+  expect(screen.getAllByRole("cell")[0]).toHaveTextContent("default:check-dns");
   expect(screen.getByText("session-1")).toBeInTheDocument();
   expect(screen.getByText("SUCCEEDED")).toBeInTheDocument();
   expect(screen.getByText("4096")).toBeInTheDocument();

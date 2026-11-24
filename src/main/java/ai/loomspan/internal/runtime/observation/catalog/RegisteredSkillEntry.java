@@ -1,31 +1,41 @@
 package ai.loomspan.internal.runtime.observation.catalog;
 
+import ai.loomspan.internal.core.SkillIdentity;
+
 import java.util.Objects;
 
 /** Immutable source-specific diagnostic snapshot of one callable registration. */
-public record RegisteredSkillEntry(String registeredName, String kind, String declaration, String sourcePath,
+public record RegisteredSkillEntry(String namespace, String localName, String kind, String declaration, String sourcePath,
         String executorName, String beanName, String method, String yaml, String outputSchema)
 {
     public RegisteredSkillEntry
     {
-        validateLocation(registeredName, kind, declaration, sourcePath, executorName, beanName, method);
+        new SkillIdentity(namespace, localName);
+        validateLocation(namespace + ":" + localName, kind, declaration, sourcePath, executorName, beanName, method);
         if ("YAML".equals(declaration)) Objects.requireNonNull(yaml, "yaml must not be null");
         else if (yaml != null) throw new IllegalArgumentException("SkillMethod declarations must not contain YAML");
     }
 
+    public String registeredName() { return namespace + ":" + localName; }
+
     public Summary summary()
     {
-        return new Summary(registeredName, kind, declaration, sourcePath, executorName, beanName, method);
+        return new Summary(namespace, localName, kind, declaration, sourcePath, executorName, beanName, method);
     }
 
-    public record Summary(String registeredName, String kind, String declaration, String sourcePath, String executorName, String beanName, String method)
+    public record Summary(String namespace, String localName, String kind, String declaration, String sourcePath, String executorName, String beanName, String method)
     {
-        public Summary { validateLocation(registeredName, kind, declaration, sourcePath, executorName, beanName, method); }
+        public String registeredName() { return namespace + ":" + localName; }
+        public Summary
+        {
+            new SkillIdentity(namespace, localName);
+            validateLocation(namespace + ":" + localName, kind, declaration, sourcePath, executorName, beanName, method);
+        }
     }
 
     public static void validateLocation(String name, String kind, String declaration, String path, String executor, String bean, String method)
     {
-        requireNonBlank(name, "registeredName");
+        SkillIdentity.parse(name);
         if (!"YAML".equals(kind) && !"JAVA".equals(kind))
             throw new IllegalArgumentException("kind must be YAML or JAVA");
         if ("YAML".equals(declaration))

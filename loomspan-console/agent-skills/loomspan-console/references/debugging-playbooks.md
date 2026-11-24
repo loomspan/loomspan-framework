@@ -169,7 +169,10 @@ integrity, authenticity, durability, nor deployment provenance.
 
 ## WF-UNFAMILIAR-SKILL-PATH
 
-Follow parent/child frame identity and exact registered skill names. Repeated
+Follow parent/child frame identity and exact colon-qualified registered skill names,
+such as `orders:lookup`. Keep returned `namespace` and `localName` with the
+selected catalog item. Raw provider names such as `orders--lookup` identify the
+recorded exchange; use the resolved skill fact for a catalog drill-down. Repeated
 invocations are distinct frames even when names match. Load registered YAML
 only when its declared contract helps explain the path. Treat mapping IDs and
 `sourcePath` as search hints, and any workspace match as context rather than

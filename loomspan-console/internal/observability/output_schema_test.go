@@ -7,7 +7,7 @@ import (
 )
 
 func TestSkillDetailOutputSchemaMetadataPreservesTextAndRejectsMalformedShapes(t *testing.T) {
-	skill := SkillDetail{RegisteredName: "parent", Kind: "YAML", Declaration: "YAML", SourcePath: "parent.yaml", Yaml: "name: parent\noutput_from: {skill: child}"}
+	skill := SkillDetail{RegisteredName: "default:parent", Namespace: "default", LocalName: "parent", Kind: "YAML", Declaration: "YAML", SourcePath: "parent.yaml", Yaml: "name: parent\noutput_from: {skill: child}"}
 	schema := "{\n  \"type\":\"object\",\"description\":\"<script>unchanged</script>\"\n}"
 	skill.OutputSchema = &schema
 	encoded, err := json.Marshal(skill)
@@ -23,12 +23,12 @@ func TestSkillDetailOutputSchemaMetadataPreservesTextAndRejectsMalformedShapes(t
 	}
 	for _, invalid := range []string{"", " ", "null", "[]", "42", "\"text\"", "{bad"} {
 		skill.OutputSchema = &invalid
-		if validateSkillDetail(skill, "parent") == nil {
+		if validateSkillDetail(skill, "default:parent") == nil {
 			t.Fatalf("accepted outputSchema %q", invalid)
 		}
 	}
 	skill.OutputSchema = nil
-	if err := validateSkillDetail(skill, "parent"); err != nil {
+	if err := validateSkillDetail(skill, "default:parent"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -42,9 +42,9 @@ func TestForwardingSkillDetailFixturePreservesDerivedMetadataAndSource(t *testin
 	if detail.OutputSchema == nil || detail.Yaml == "" {
 		t.Fatalf("forwarding detail missing schema or original source: %#v", detail)
 	}
-	if detail.RegisteredName != "default-prepareReport" ||
-		!strings.Contains(detail.Yaml, "name: default-finishReport,") ||
-		!strings.Contains(detail.Yaml, "output_from: {skill: default-finishReport}") {
+	if detail.RegisteredName != "default:prepare-report" ||
+		!strings.Contains(detail.Yaml, "name: default:finish-report,") ||
+		!strings.Contains(detail.Yaml, "output_from: {skill: default:finish-report}") {
 		t.Fatalf("forwarding fixture must use canonical skill references: %#v", detail)
 	}
 	if err := validateSkillDetail(detail, detail.RegisteredName); err != nil {

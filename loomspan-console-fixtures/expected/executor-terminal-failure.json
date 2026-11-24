@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-executor-terminal-failure",
   "sessionId" : "session-executor-terminal-failure",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-executor-terminal-failure",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -51,7 +51,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-test_entry"
+    "route" : "default:test-entry"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

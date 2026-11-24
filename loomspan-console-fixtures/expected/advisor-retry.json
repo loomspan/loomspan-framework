@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-advisor-retry",
   "sessionId" : "session-advisor-retry",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-advisor-retry",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {

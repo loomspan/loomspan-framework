@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-repeated-search-content",
   "sessionId" : "session-repeated-search-content",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-repeated-search-content",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {

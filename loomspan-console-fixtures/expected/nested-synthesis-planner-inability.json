@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-nested-synthesis-planner-inability",
   "sessionId" : "session-nested-synthesis-planner-inability",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-nested-synthesis-planner-inability",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -117,7 +117,7 @@
       "completionUnits" : 3,
       "totalUnits" : 9
     },
-    "route" : "default-test_entry"
+    "route" : "default:test-entry"
   }, {
     "frameId" : "parent-first-model",
     "parentFrameId" : "inability-root",
@@ -139,7 +139,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-test_entry-model"
+    "route" : "default:test-entry-model"
   }, {
     "frameId" : "parent-tool",
     "parentFrameId" : "inability-root",
@@ -161,7 +161,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-coordinate"
+    "route" : "default:coordinate"
   }, {
     "frameId" : "coordinator",
     "parentFrameId" : "parent-tool",
@@ -183,7 +183,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-coordinate"
+    "route" : "default:coordinate"
   }, {
     "frameId" : "inability-planning",
     "parentFrameId" : "coordinator",
@@ -205,7 +205,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-coordinate#planning"
+    "route" : "default:coordinate#planning"
   }, {
     "frameId" : "surrounding-step",
     "parentFrameId" : "coordinator",
@@ -227,7 +227,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-coordinate#step-1"
+    "route" : "default:coordinate#step-1"
   }, {
     "frameId" : "synthesis-child",
     "parentFrameId" : "surrounding-step",
@@ -249,7 +249,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-summarize"
+    "route" : "default:summarize"
   }, {
     "frameId" : "synthesis-step",
     "parentFrameId" : "synthesis-child",
@@ -271,7 +271,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-summarize#step-2"
+    "route" : "default:summarize#step-2"
   }, {
     "frameId" : "synthesis-model",
     "parentFrameId" : "synthesis-step",
@@ -293,7 +293,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-summarize#step-2-model"
+    "route" : "default:summarize#step-2-model"
   }, {
     "frameId" : "parent-final-model",
     "parentFrameId" : "inability-root",
@@ -315,7 +315,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-test_entry-model"
+    "route" : "default:test-entry-model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

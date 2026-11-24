@@ -25,6 +25,49 @@ type blockingMCPClient struct {
 	once    sync.Once
 }
 
+func TestCatalogSelectsEachOwnerOfTheSameLocalName(t *testing.T) {
+	var selected []string
+	options := newMCPTestOptions(t, func(endpoint string) ([]byte, error) {
+		parsed, err := url.Parse(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		if strings.HasSuffix(parsed.Path, "/skills") {
+			return []byte(`{"items":[{"registeredName":"orders:lookup","namespace":"orders","localName":"lookup","kind":"YAML","declaration":"YAML","sourcePath":"opaque label"},{"registeredName":"warehouse:lookup","namespace":"warehouse","localName":"lookup","kind":"YAML","declaration":"YAML","sourcePath":"opaque label"}],"hasMore":false,"nextCursor":null,"observedAt":"2026-08-13T20:30:00Z"}`), nil
+		}
+		registeredName := strings.TrimPrefix(parsed.Path, "/_loomspan/observability/v1/skills/")
+		namespace, localName, found := strings.Cut(registeredName, ":")
+		if !found || localName != "lookup" || (namespace != "orders" && namespace != "warehouse") {
+			return nil, fmt.Errorf("unexpected target %q", registeredName)
+		}
+		selected = append(selected, registeredName)
+		return json.Marshal(map[string]any{"registeredName": registeredName, "namespace": namespace, "localName": localName, "kind": "YAML", "declaration": "YAML", "sourcePath": "Orders import #42", "yaml": "name: lookup\n", "outputSchema": nil})
+	})
+	_, list, err := handleListSkills(context.Background(), options, listSkillsInput{})
+	if err != nil || list.Result == nil || len(list.Result.Items) != 2 {
+		t.Fatalf("list=%+v err=%v", list, err)
+	}
+	for _, namespace := range []string{"orders", "warehouse"} {
+		result, detail, err := handleGetSkill(context.Background(), options, getSkillInput{RegisteredName: namespace + ":lookup"})
+		if err != nil || detail.Result == nil {
+			t.Fatalf("detail=%+v err=%v", detail, err)
+		}
+		item := detail.Result.Skill
+		if item.RegisteredName != namespace+":lookup" || item.Namespace != namespace || item.LocalName != "lookup" {
+			t.Fatalf("wrong owner: %+v", item)
+		}
+		text := result.Content[0].(*mcp.TextContent).Text
+		for _, fact := range []string{`skill.registeredName: "` + namespace + `:lookup"`, `skill.namespace: "` + namespace + `"`, `skill.localName: "lookup"`} {
+			if !containsLine(text, fact) {
+				t.Fatalf("missing %s in %s", fact, text)
+			}
+		}
+	}
+	if strings.Join(selected, ",") != "orders:lookup,warehouse:lookup" {
+		t.Fatalf("unexpected requests %v", selected)
+	}
+}
+
 func (client *blockingMCPClient) Get(ctx context.Context, _ string, _ int64, _ applicationclient.Credential) ([]byte, string, error) {
 	client.once.Do(func() { close(client.started) })
 	<-ctx.Done()
@@ -37,7 +80,7 @@ func TestListSkillsGoldenStructuredResultAndText(t *testing.T) {
 		if !strings.HasSuffix(parsed.Path, "/skills") || parsed.Query().Get("pageSize") != "2" {
 			return nil, errors.New("unexpected endpoint: " + endpoint)
 		}
-		return []byte(`{"items":[{"registeredName":"skill-☃","kind":"JAVA","declaration":"YAML","executorName":"default-fetchDns","beanName":"dnsSkills","method":"example.DnsSkills.fetch()", "sourcePath":"nested/skill.yaml","href":"/_ignored"}],"hasMore":true,"nextCursor":"next-1","observedAt":"2026-08-13T20:30:00.000000123Z"}`), nil
+		return []byte(`{"items":[{"registeredName":"default:skill", "namespace":"default", "localName":"skill","kind":"JAVA","declaration":"YAML","executorName":"default:fetch-dns","beanName":"dnsSkills","method":"example.DnsSkills.fetch()", "sourcePath":"nested/skill.yaml","href":"/_ignored"}],"hasMore":true,"nextCursor":"next-1","observedAt":"2026-08-13T20:30:00.000000123Z"}`), nil
 	})
 	result, envelope, err := handleListSkills(context.Background(), options, listSkillsInput{PageSize: 2})
 	if err != nil || result.IsError || envelope.Result == nil || envelope.Error != nil {
@@ -47,7 +90,7 @@ func TestListSkillsGoldenStructuredResultAndText(t *testing.T) {
 	text := result.Content[0].(*mcp.TextContent).Text
 	for _, required := range []string{
 		`count: 1`, `hasMore: true`,
-		`items[0].registeredName: "skill-☃"`, `items[0].sourcePath: "nested/skill.yaml"`,
+		`items[0].registeredName: "default:skill"`, `items[0].sourcePath: "nested/skill.yaml"`,
 	} {
 		if !containsLine(text, required) {
 			t.Errorf("missing %q in:\n%s", required, text)
@@ -78,9 +121,9 @@ func TestGetSkillGoldenPreservesUnchangedYAML(t *testing.T) {
 		if !strings.Contains(endpoint, "/skills/") {
 			return nil, errors.New("unexpected endpoint: " + endpoint)
 		}
-		return json.Marshal(map[string]any{"registeredName": "skill-☃", "kind": "JAVA", "declaration": "YAML", "executorName": "default-fetchDns", "beanName": "dnsSkills", "method": "example.DnsSkills.fetch()", "sourcePath": `C:\\deployed\\skill.yaml`, "yaml": yaml})
+		return json.Marshal(map[string]any{"registeredName": "default:skill", "namespace": "default", "localName": "skill", "kind": "JAVA", "declaration": "YAML", "executorName": "default:fetch-dns", "beanName": "dnsSkills", "method": "example.DnsSkills.fetch()", "sourcePath": `C:\\deployed\\skill.yaml`, "yaml": yaml})
 	})
-	result, envelope, err := handleGetSkill(context.Background(), options, getSkillInput{RegisteredName: "skill-☃"})
+	result, envelope, err := handleGetSkill(context.Background(), options, getSkillInput{RegisteredName: "default:skill"})
 	if err != nil || result.IsError || envelope.Result == nil {
 		t.Fatalf("result=%#v envelope=%#v err=%v", result, envelope, err)
 	}
@@ -95,8 +138,8 @@ func TestListSkillsMaximumPageHas64WholeItems(t *testing.T) {
 	items := make([]map[string]string, maxMCPPageSize)
 	for index := range items {
 		items[index] = map[string]string{
-			"registeredName": fmt.Sprintf("skill-%02d", index),
-			"kind":           "YAML", "declaration": "YAML", "sourcePath": fmt.Sprintf("skills/skill-%02d.yaml", index),
+			"registeredName": fmt.Sprintf("default:skill-%02d", index), "namespace": "default", "localName": fmt.Sprintf("skill-%02d", index),
+			"kind": "YAML", "declaration": "YAML", "sourcePath": fmt.Sprintf("skills/skill-%02d.yaml", index),
 		}
 	}
 	body, err := json.Marshal(map[string]any{
@@ -111,11 +154,11 @@ func TestListSkillsMaximumPageHas64WholeItems(t *testing.T) {
 	if err != nil || result.IsError || envelope.Result == nil {
 		t.Fatalf("result=%#v envelope=%#v err=%v", result, envelope, err)
 	}
-	if len(envelope.Result.Items) != maxMCPPageSize || envelope.Result.Items[63].RegisteredName != "skill-63" || envelope.Result.Continuation == "" {
+	if len(envelope.Result.Items) != maxMCPPageSize || envelope.Result.Items[63].RegisteredName != "default:skill-63" || envelope.Result.Continuation == "" {
 		t.Fatalf("maximum page was truncated or incomplete: %#v", envelope.Result)
 	}
 	text := result.Content[0].(*mcp.TextContent).Text
-	if !containsLine(text, `count: 64`) || !containsLine(text, `items[63].registeredName: "skill-63"`) {
+	if !containsLine(text, `count: 64`) || !containsLine(text, `items[63].registeredName: "default:skill-63"`) {
 		t.Fatalf("maximum page text was truncated:\n%s", text)
 	}
 }
@@ -123,13 +166,13 @@ func TestListSkillsMaximumPageHas64WholeItems(t *testing.T) {
 func TestGetSkillMaximumAcceptedYAMLRoundTripsWithoutTruncation(t *testing.T) {
 	yaml := "name: maximum\nspec: |\n  " + strings.Repeat("x", 3*1024*1024) + "\n"
 	body, err := json.Marshal(map[string]any{
-		"registeredName": "maximum", "kind": "YAML", "declaration": "YAML", "sourcePath": "skills/maximum.yaml", "yaml": yaml,
+		"registeredName": "default:maximum", "namespace": "default", "localName": "maximum", "kind": "YAML", "declaration": "YAML", "sourcePath": "skills/maximum.yaml", "yaml": yaml,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	options := newMCPTestOptions(t, func(string) ([]byte, error) { return body, nil })
-	result, envelope, err := handleGetSkill(context.Background(), options, getSkillInput{RegisteredName: "maximum"})
+	result, envelope, err := handleGetSkill(context.Background(), options, getSkillInput{RegisteredName: "default:maximum"})
 	if err != nil || result.IsError || envelope.Result == nil {
 		t.Fatalf("result=%#v envelope=%#v err=%v", result, envelope, err)
 	}

@@ -47,11 +47,21 @@ class ObservabilityJsonCodecContractTest
     void skillDetailsRoundTripWithOnlyApplicableSourceFields() throws Exception
     {
         var java = new ai.loomspan.internal.observability.web.dto.ObservabilityDtos.SkillDetail(
-                "Lookup", "JAVA", "SKILL_METHOD", null, null, "lookupBean", "example.Lookup.find(java.lang.String)", null, null);
+                "default:lookup", "default", "lookup", "JAVA", "SKILL_METHOD", null, null, "lookupBean", "example.Lookup.find(java.lang.String)", null, null);
         String encoded = new String(codec.write(java), StandardCharsets.UTF_8);
         assertThat(encoded).contains("\"kind\":\"JAVA\"", "\"declaration\":\"SKILL_METHOD\"", "\"beanName\":\"lookupBean\"")
                 .doesNotContain("sourcePath", "yaml");
         assertThat(codec.read(encoded.getBytes(StandardCharsets.UTF_8), java.getClass())).isEqualTo(java);
+    }
+
+    @Test
+    void catalogIdentityComponentsMustAgreeWithQualifiedKey()
+    {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                new ai.loomspan.internal.observability.web.dto.ObservabilityDtos.SkillSummary(
+                        "orders:lookup", "warehouse", "lookup", "JAVA", "SKILL_METHOD", null, null,
+                        "bean", "lookup()", "skills/orders%3Alookup"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("registeredName");
     }
 
     @Test

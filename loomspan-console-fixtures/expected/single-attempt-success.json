@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-single-attempt-success",
   "sessionId" : "session-single-attempt-success",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-single-attempt-success",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {

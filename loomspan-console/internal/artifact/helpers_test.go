@@ -138,7 +138,7 @@ func testTraceMetadata(traceID string, sizeBytes int64) TraceMetadata {
 	return TraceMetadata{
 		TraceID:                   traceID,
 		SessionID:                 "session-" + traceID,
-		EntrySkill:                "default-CheckDns",
+		EntrySkill:                "default:check-dns",
 		Outcome:                   "COMPLETED",
 		FinalizedAt:               time.UnixMilli(1000000),
 		SizeBytes:                 sizeBytes,

@@ -23,7 +23,7 @@ type instanceResult struct {
 func addInstanceTool(server *mcp.Server, options ServerOptions) {
 	addValidatedTool(server, &mcp.Tool{
 		Name:        GetInstanceToolName,
-		Description: "Read the selected instance and every active namespace generation and host publication label, including empty namespaces.",
+		Description: "Read instance and installed namespace generations/publication labels, including empty namespaces.",
 		Annotations: readOnlyAnnotations,
 	}, instanceOutputSchema(), func(ctx context.Context, _ *mcp.CallToolRequest, _ emptyInput) (*mcp.CallToolResult, toolEnvelope[instanceResult], error) {
 		return handleGetInstance(ctx, options)

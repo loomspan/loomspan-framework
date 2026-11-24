@@ -370,7 +370,10 @@ and details include unchanged `yaml`, including executor-backed Java skills.
 Those executor leaves also expose qualified `executorName`, `beanName` and
 declared `method`; annotated Java methods expose bean/method provenance only.
 Inapplicable fields are omitted. Reference-only executors are absent from callable catalogs.
-The registered name remains the only lookup and navigation identity.
+Catalog summaries and details expose `namespace`, `localName` and the complete
+colon-qualified `registeredName`. For `orders:lookup`, these components are
+`orders` and `lookup`. `warehouse:lookup` is a distinct registration with the
+same local name. Use the exact `registeredName` for lookups and navigation.
 
 The supported MCP revisions do not negotiate text-only versus
 structured-only tool results. Loomspan therefore emits the same client-neutral

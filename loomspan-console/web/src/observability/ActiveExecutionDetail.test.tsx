@@ -62,7 +62,7 @@ const execution: ActiveExecution = {
   startedAt: "2026-07-27T10:00:00Z",
   updatedAt: "2026-07-27T10:05:00Z",
   elapsedMillis: 300000,
-  entrySkill: "default-CheckDns",
+  entrySkill: "default:check-dns",
   generationId: "generation-fixture", entryNamespace: "default", namespaceGenerationIds: { default: "generation-fixture" },
   status: "ACTIVE",
   phase: "EXECUTING",
@@ -102,7 +102,7 @@ test("active execution detail renders facts when loaded", async () => {
     expect(screen.getAllByText("session-1").length).toBeGreaterThan(0);
   });
   expect(screen.getAllByText("trace-1").length).toBeGreaterThan(0);
-  expect(screen.getByText("default-CheckDns")).toBeInTheDocument();
+  expect(screen.getByText("default:check-dns")).toBeInTheDocument();
   expect(screen.getAllByText("EXECUTING").length).toBeGreaterThan(0);
 });
 

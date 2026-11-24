@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-java-root-success",
   "sessionId" : "session-java-root-success",
-  "entrySkill" : "default-javaLookup",
+  "entrySkill" : "default:java-lookup",
   "generationId" : "trace-java-root-success",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -51,7 +51,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-javaLookup"
+    "route" : "default:java-lookup"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

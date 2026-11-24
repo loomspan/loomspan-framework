@@ -35,7 +35,7 @@ public final class DefaultRegisteredSkillCatalog implements RegisteredSkillCatal
             if (definitions.containsKey(name))
             {
                 var definition = Objects.requireNonNull(definitions.get(name), "manifest registration must have a definition");
-                entry = new RegisteredSkillEntry(name,
+                entry = new RegisteredSkillEntry(metadata.identity().namespace(), metadata.identity().localName(),
                         metadata.kind().name(), "YAML",
                         pathResolver.resolve(definition.source()),
                         metadata.source().executorName(), metadata.source().beanName(), metadata.source().method(),
@@ -43,7 +43,7 @@ public final class DefaultRegisteredSkillCatalog implements RegisteredSkillCatal
             }
             else if (metadata.kind() == SkillKind.JAVA)
             {
-                entry = new RegisteredSkillEntry(name, metadata.kind().name(), "SKILL_METHOD", null, null,
+                entry = new RegisteredSkillEntry(metadata.identity().namespace(), metadata.identity().localName(), metadata.kind().name(), "SKILL_METHOD", null, null,
                         metadata.source().beanName(), metadata.source().method(), null, null);
             }
             else throw new IllegalStateException("Unsupported capability kind " + metadata.kind());

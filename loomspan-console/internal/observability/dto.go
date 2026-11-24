@@ -72,6 +72,8 @@ func (namespace *NamespacePublication) UnmarshalJSON(data []byte) error {
 
 type SkillSummary struct {
 	RegisteredName string `json:"registeredName"`
+	Namespace      string `json:"namespace"`
+	LocalName      string `json:"localName"`
 	Kind           string `json:"kind"`
 	Declaration    string `json:"declaration"`
 	ExecutorName   string `json:"executorName,omitempty"`
@@ -84,6 +86,8 @@ type SkillSummary struct {
 type SkillDetail struct {
 	TargetScopeID  string  `json:"targetScopeId"`
 	RegisteredName string  `json:"registeredName"`
+	Namespace      string  `json:"namespace"`
+	LocalName      string  `json:"localName"`
 	Kind           string  `json:"kind"`
 	Declaration    string  `json:"declaration"`
 	ExecutorName   string  `json:"executorName,omitempty"`

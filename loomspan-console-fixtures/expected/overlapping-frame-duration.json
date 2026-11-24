@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-overlapping-frame-duration",
   "sessionId" : "session-overlapping-frame-duration",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-overlapping-frame-duration",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -51,7 +51,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-root_skill"
+    "route" : "default:root-skill"
   }, {
     "frameId" : "child-1",
     "parentFrameId" : "root",
@@ -73,7 +73,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-root_first"
+    "route" : "default:root-first"
   }, {
     "frameId" : "child-2",
     "parentFrameId" : "root",
@@ -95,7 +95,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-root_second"
+    "route" : "default:root-second"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

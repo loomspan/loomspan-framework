@@ -87,7 +87,7 @@ func newServiceTestHarnessForOutcomeAndVersion(t *testing.T, traceID, ndjson, ou
 			// The session ID must match the NDJSON content's sessionId.
 			// All test traces use "session-" + (traceID without "trace-" prefix).
 			sessionID := deriveSessionID(traceID)
-			_, _ = fmt.Fprintf(w, `{"targetScopeId":"scope-test","traceId":"%s","sessionId":"%s","entrySkill":"default-CheckDns","outcome":"%s","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":%d,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-08-01T12:00:00Z"}`,
+			_, _ = fmt.Fprintf(w, `{"targetScopeId":"scope-test","traceId":"%s","sessionId":"%s","entrySkill":"default:check-dns","outcome":"%s","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":%d,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-08-01T12:00:00Z"}`,
 				traceID, sessionID, outcome, len(body))
 		case strings.HasSuffix(r.URL.Path, "/traces/"+traceID+"/artifact"):
 			w.Header().Set("Content-Type", applicationclient.ArtifactMediaType)
@@ -1382,7 +1382,7 @@ func TestFramesAttachDirectGapKindsWithoutPropagation(t *testing.T) {
 
 // nestedFrameUsageTrace is a trace with two frames (root + skill) matching the
 // Java fixture corpus nested-frame-usage case.
-const nestedFrameUsageTrace = `{"traceId":"trace-nested-frame-usage","sessionId":"session-nested-frame-usage","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/nested-frame-usage.ndjson","consoleCompatibilityVersion":"development","generationId":"generation-test","entrySkill":"default-test","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-test"}},"data":{"sessionId":"session-nested-frame-usage"}}
+const nestedFrameUsageTrace = `{"traceId":"trace-nested-frame-usage","sessionId":"session-nested-frame-usage","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/nested-frame-usage.ndjson","consoleCompatibilityVersion":"development","generationId":"generation-test","entrySkill":"default:test","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-test"}},"data":{"sessionId":"session-nested-frame-usage"}}
 {"traceId":"trace-nested-frame-usage","sessionId":"session-nested-frame-usage","sequence":2,"timestamp":1784894400.000000000,"recordType":"TRACE_CAPTURE_POLICY_RECORDED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"persistencePolicy":"ALWAYS"},"data":null}
 {"traceId":"trace-nested-frame-usage","sessionId":"session-nested-frame-usage","sequence":3,"timestamp":1784894400.000000000,"recordType":"FRAME_OPENED","frameId":"root","parentFrameId":null,"frameType":"ROOT_MISSION","route":"root.skill","threadName":"fixture-thread","metadata":{"timestampOverride":"2026-07-24T12:00:00Z"},"data":null}
 {"traceId":"trace-nested-frame-usage","sessionId":"session-nested-frame-usage","sequence":4,"timestamp":1784894401.000000000,"recordType":"FRAME_OPENED","frameId":"skill","parentFrameId":"root","frameType":"SKILL_EXECUTION","route":"root.skill","threadName":"fixture-thread","metadata":{"timestampOverride":"2026-07-24T12:00:01Z"},"data":null}
@@ -1409,14 +1409,14 @@ func TestCapturedNamespaceQueriesKeepEqualLocalNamesAndRetainedGenerations(t *te
 		}
 		metadata := record["metadata"].(map[string]any)
 		if record["recordType"] == "TRACE_STARTED" {
-			metadata["entrySkill"] = "orders-search"
+			metadata["entrySkill"] = "orders:search"
 			metadata["entryNamespace"] = "orders"
 			metadata["namespaceGenerationIds"] = map[string]string{"orders": "generation-test", "tax": "retired-target"}
 		}
 		if frameID, ok := record["frameId"].(string); ok {
-			namespace, identity, generation := "orders", "orders-search", "generation-test"
+			namespace, identity, generation := "orders", "orders:search", "generation-test"
 			if frameID == "skill" {
-				namespace, identity, generation = "tax", "tax-search", "retired-target"
+				namespace, identity, generation = "tax", "tax:search", "retired-target"
 			}
 			record["route"] = identity
 			metadata["skillName"] = identity
@@ -1432,7 +1432,7 @@ func TestCapturedNamespaceQueriesKeepEqualLocalNamesAndRetainedGenerations(t *te
 	}
 	h := newServiceTestHarness(t, "trace-nested-frame-usage", raw.String())
 	summary, domain := h.service.GetSummary(context.Background(), targetEvidence(h.scopeID), SummaryRequest{Handle: h.handle})
-	if domain != nil || summary.EntrySkill != "orders-search" || summary.GenerationID != "generation-test" || summary.NamespaceGenerationIDs["tax"] != "retired-target" {
+	if domain != nil || summary.EntrySkill != "orders:search" || summary.GenerationID != "generation-test" || summary.NamespaceGenerationIDs["tax"] != "retired-target" {
 		t.Fatalf("captured summary=%+v error=%v", summary, domain)
 	}
 	summary.NamespaceGenerationIDs["tax"] = "caller mutation"
@@ -1440,7 +1440,7 @@ func TestCapturedNamespaceQueriesKeepEqualLocalNamesAndRetainedGenerations(t *te
 	if domain != nil || again.NamespaceGenerationIDs["tax"] != "retired-target" {
 		t.Fatalf("mutable summary leaked: %+v %v", again, domain)
 	}
-	for skill, frameID := range map[string]string{"orders-search": "root", "tax-search": "skill"} {
+	for skill, frameID := range map[string]string{"orders:search": "root", "tax:search": "skill"} {
 		page, domain := h.service.QueryFrames(context.Background(), targetEvidence(h.scopeID), FrameQuery{Handle: h.handle, PageSize: 10, Filter: FrameFilter{SkillName: skill}})
 		if domain != nil || len(page.Items) != 1 || page.Items[0].FrameID != frameID || page.Items[0].Route != skill {
 			t.Fatalf("lookup %s: %+v %v", skill, page, domain)

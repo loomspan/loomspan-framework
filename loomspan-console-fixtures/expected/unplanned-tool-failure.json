@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-unplanned-tool-failure",
   "sessionId" : "session-unplanned-tool-failure",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-unplanned-tool-failure",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -51,7 +51,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-handleBilling"
+    "route" : "default:handle-billing"
   }, {
     "frameId" : "step",
     "parentFrameId" : "root",
@@ -73,7 +73,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-handleBilling#step-1"
+    "route" : "default:handle-billing#step-1"
   }, {
     "frameId" : "tool",
     "parentFrameId" : "step",
@@ -95,7 +95,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-lookupCustomer"
+    "route" : "default:lookup-customer"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

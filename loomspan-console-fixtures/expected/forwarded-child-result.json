@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-forwarded-child-result",
   "sessionId" : "session-forwarded-child-result",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-forwarded-child-result",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -28,10 +28,10 @@
   },
   "usageComplete" : true,
   "resultForwardings" : [ {
-    "skillName" : "default-prepareReport",
+    "skillName" : "default:prepare-report",
     "planId" : "report-plan",
     "linkedTaskId" : "finish-task",
-    "capabilityName" : "default-finishReport"
+    "capabilityName" : "default:finish-report"
   } ],
   "attempts" : [ {
     "retrySequenceId" : "retry-report-plan",
@@ -79,7 +79,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-prepareReport"
+    "route" : "default:prepare-report"
   }, {
     "frameId" : "planning-report-plan",
     "parentFrameId" : "forward-root",
@@ -101,7 +101,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-prepareReport#planning"
+    "route" : "default:prepare-report#planning"
   }, {
     "frameId" : "selected-tool",
     "parentFrameId" : "forward-root",
@@ -123,7 +123,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-finishReport"
+    "route" : "default:finish-report"
   }, {
     "frameId" : "root-later",
     "parentFrameId" : "forward-root",
@@ -145,7 +145,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-laterWork"
+    "route" : "default:later-work"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

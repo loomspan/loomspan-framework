@@ -275,7 +275,7 @@ test("expired pagination cursor restarts from the first page", async () => {
     .mockRejectedValueOnce(new BrowserAPIError("STALE_CURSOR", "expired", 409))
     .mockResolvedValueOnce({
       targetScopeId: "scope-1",
-      items: [{ registeredName: "fresh", kind: "YAML", declaration: "YAML", sourcePath: "classpath:/fresh.yaml" }],
+      items: [{ registeredName: "default:fresh", namespace: "default", localName: "fresh", kind: "YAML", declaration: "YAML", sourcePath: "classpath:/fresh.yaml" }],
       hasMore: false,
       nextCursor: null,
       observedAt: "2026-07-27T00:00:00Z",
@@ -287,7 +287,7 @@ test("expired pagination cursor restarts from the first page", async () => {
   );
   screen.getByText("continue").click();
   await vi.waitFor(() => {
-    expect(screen.getByTestId("skills").textContent).toBe("fresh");
+    expect(screen.getByTestId("skills").textContent).toBe("default:fresh");
   });
   expect(vi.mocked(listSkills).mock.calls).toEqual([["stale-cursor"], []]);
 });
@@ -427,23 +427,23 @@ test("older pagination response cannot overwrite a newer refresh", async () => {
   await act(async () => {
     resolveNew({
       targetScopeId: "scope-1",
-      items: [{ registeredName: "new", kind: "YAML", declaration: "YAML", sourcePath: "classpath:/new.yaml" }],
+      items: [{ registeredName: "default:new", namespace: "default", localName: "new", kind: "YAML", declaration: "YAML", sourcePath: "classpath:/new.yaml" }],
       hasMore: false,
       nextCursor: null,
       observedAt: "2026-07-27T00:00:00Z",
     });
   });
   await vi.waitFor(() => {
-    expect(screen.getByTestId("skills").textContent).toBe("new");
+    expect(screen.getByTestId("skills").textContent).toBe("default:new");
   });
   await act(async () => {
     resolveOld({
       targetScopeId: "scope-1",
-      items: [{ registeredName: "old", kind: "YAML", declaration: "YAML", sourcePath: "classpath:/old.yaml" }],
+      items: [{ registeredName: "default:old", namespace: "default", localName: "old", kind: "YAML", declaration: "YAML", sourcePath: "classpath:/old.yaml" }],
       hasMore: false,
       nextCursor: null,
       observedAt: "2026-07-27T00:00:00Z",
     });
   });
-  expect(screen.getByTestId("skills").textContent).toBe("new");
+  expect(screen.getByTestId("skills").textContent).toBe("default:new");
 });

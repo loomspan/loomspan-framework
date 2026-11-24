@@ -126,7 +126,7 @@ class ConsoleRestFixtureCorpusTest
         }
         new ActiveExecutionSnapshot("session-live", "trace-live", 1, 7,
                 Instant.parse("2026-07-25T11:59:55Z"), Instant.parse("2026-07-25T11:59:59Z"),
-                "default-planner", "generation-fixture", "default", java.util.Map.of("default", "generation-fixture"), "RUNNING", "Executing", branches, SessionUsageSnapshot.empty(), null);
+                "default:planner", "generation-fixture", "default", java.util.Map.of("default", "generation-fixture"), "RUNNING", "Executing", branches, SessionUsageSnapshot.empty(), null);
     }
 
     private static String nullableText(ObjectNode node, String field)
@@ -139,15 +139,15 @@ class ConsoleRestFixtureCorpusTest
     {
         Map<String, Object> result = new LinkedHashMap<>();
         var skill = new ObservabilityDtos.SkillSummary(
-                "default-CheckDns", "YAML", "YAML", "classpath:/skills/check-dns.yaml", null, null, null, "skills/default-CheckDns");
+                "default:check-dns", "default", "check-dns", "YAML", "YAML", "classpath:/skills/check-dns.yaml", null, null, null, "skills/default:check-dns");
         var usage = new ObservabilityDtos.Usage(1, 0, 0, 1, 2, 10, 5, 15, 1, 0, 0);
         var limits = new ObservabilityDtos.QuotaLimits(64, 128, 32, 64, 192, 200000);
         var active = new ObservabilityDtos.ActiveExecution(
                 "session-1", "trace-1", 7, Instant.parse("2026-07-25T11:59:55Z"),
-                Instant.parse("2026-07-25T11:59:59Z"), 5000, "default-CheckDns", "generation-fixture", "default", java.util.Map.of("default", "generation-fixture"), "ACTIVE",
+                Instant.parse("2026-07-25T11:59:59Z"), 5000, "default:check-dns", "generation-fixture", "default", java.util.Map.of("default", "generation-fixture"), "ACTIVE",
                 "RUNNING", "Checking DNS", List.of(), usage, limits);
         var trace = new ObservabilityDtos.Trace(
-                "trace-1", "session-1", "default-CheckDns", "generation-fixture", "default", java.util.Map.of("default", "generation-fixture"), TraceOutcome.SUCCEEDED, OBSERVED, 128,
+                "trace-1", "session-1", "default:check-dns", "generation-fixture", "default", java.util.Map.of("default", "generation-fixture"), TraceOutcome.SUCCEEDED, OBSERVED, 128,
                 TracePersistencePolicy.ONERROR, Instant.parse("2026-07-25T12:15:00Z"));
 
         result.put("instance-status.json", new ObservabilityDtos.InstanceStatus(
@@ -157,19 +157,19 @@ class ConsoleRestFixtureCorpusTest
                         new ObservabilityDtos.NamespaceStatus("empty", "generation-empty", "P7"),
                         new ObservabilityDtos.NamespaceStatus("unlabeled", "generation-unlabeled", null))));
         result.put("skills-page.json", new ObservabilityDtos.Page<>(List.of(skill,
-                new ObservabilityDtos.SkillSummary("default-FetchDns", "JAVA", "YAML", "classpath:/skills/fetch-dns.yaml", "default-fetchDns",
-                        "dnsSkills", "example.DnsSkills.fetch()", "skills/default-FetchDns"), new ObservabilityDtos.SkillSummary(
-                "default-LookupDns", "JAVA", "SKILL_METHOD", null, null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", "skills/default-LookupDns")), false, null, OBSERVED));
+                new ObservabilityDtos.SkillSummary("default:fetch-dns", "default", "fetch-dns", "JAVA", "YAML", "classpath:/skills/fetch-dns.yaml", "default:fetch-dns",
+                        "dnsSkills", "example.DnsSkills.fetch()", "skills/default:fetch-dns"), new ObservabilityDtos.SkillSummary(
+                "default:lookup-dns", "default", "lookup-dns", "JAVA", "SKILL_METHOD", null, null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", "skills/default:lookup-dns")), false, null, OBSERVED));
         result.put("skill-detail.json", new ObservabilityDtos.SkillDetail(
-                "default-CheckDns", "YAML", "YAML", "classpath:/skills/check-dns.yaml", null, null, null, "# DNS check\r\nname: CheckDns\r\n", null));
+                "default:check-dns", "default", "check-dns", "YAML", "YAML", "classpath:/skills/check-dns.yaml", null, null, null, "# DNS check\r\nname: check-dns\r\n", null));
         result.put("skill-java-detail.json", new ObservabilityDtos.SkillDetail(
-                "default-LookupDns", "JAVA", "SKILL_METHOD", null, null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", null, null));
+                "default:lookup-dns", "default", "lookup-dns", "JAVA", "SKILL_METHOD", null, null, "dnsSkills", "example.DnsSkills.lookup(java.lang.String)", null, null));
         result.put("skill-executor-detail.json", new ObservabilityDtos.SkillDetail(
-                "default-FetchDns", "JAVA", "YAML", "opaque label", "default-fetchDns", "dnsSkills", "example.DnsSkills.fetch()",
-                "# Executor DNS lookup\r\nname: FetchDns\r\ndescription: Fetch DNS through the application executor\r\nexecutor: fetchDns\r\n", null));
+                "default:fetch-dns", "default", "fetch-dns", "JAVA", "YAML", "opaque label", "default:fetch-dns", "dnsSkills", "example.DnsSkills.fetch()",
+                "# Executor DNS lookup\r\nname: fetch-dns\r\ndescription: Fetch DNS through the application executor\r\nexecutor: fetch-dns\r\n", null));
         result.put("forwarding-skill-detail.json", new ObservabilityDtos.SkillDetail(
-                "default-prepareReport", "YAML", "YAML", "opaque forwarding label", null, null, null,
-                "name: prepareReport\nmodel: local\ndescription: Prepare report\nplanning_mode: true\n"
+                "default:prepare-report", "default", "prepare-report", "YAML", "YAML", "opaque forwarding label", null, null, null,
+                "name: prepare-report\nmodel: local\ndescription: Prepare report\nplanning_mode: true\n"
                         + "allowed_skills:\n  - {name: default:finish-report, required: true, max_tasks: 1}\noutput_from: {skill: default:finish-report}\n",
                 "{\"type\":\"object\",\"properties\":{\"report\":{\"type\":\"string\"}},\"required\":[\"report\"],\"additionalProperties\":false}"));
         result.put("active-executions-page.json",
@@ -189,7 +189,7 @@ class ConsoleRestFixtureCorpusTest
     private static void activeExecutionContracts(Map<String, Object> result,
             ObservabilityDtos.Usage usage, ObservabilityDtos.QuotaLimits limits) throws Exception
     {
-        var root = new ObservabilityDtos.FramePathEntry("root", TraceFrameType.ROOT_MISSION, "default-planner");
+        var root = new ObservabilityDtos.FramePathEntry("root", TraceFrameType.ROOT_MISSION, "default:planner");
         var stepA = new ObservabilityDtos.FramePathEntry("step-a", TraceFrameType.STEP_EXECUTION, "planner#step-1");
         var stepB = new ObservabilityDtos.FramePathEntry("step-b", TraceFrameType.STEP_EXECUTION, "planner#step-2");
         var nested = new ObservabilityDtos.FramePathEntry("nested", TraceFrameType.MODEL_CALL, "nested-model");
@@ -236,7 +236,7 @@ class ConsoleRestFixtureCorpusTest
     {
         return new ObservabilityDtos.ActiveExecution("session-live", "trace-live", 7,
                 Instant.parse("2026-07-25T11:59:55Z"), Instant.parse("2026-07-25T11:59:59Z"),
-                5000, "default-planner", "generation-fixture", "default", java.util.Map.of("default", "generation-fixture"), "ACTIVE", "RUNNING", "Executing", branches, usage, limits);
+                5000, "default:planner", "generation-fixture", "default", java.util.Map.of("default", "generation-fixture"), "ACTIVE", "RUNNING", "Executing", branches, usage, limits);
     }
 
     private static ObjectNode mutate(ObjectNode base, java.util.function.Consumer<ObjectNode> mutation)

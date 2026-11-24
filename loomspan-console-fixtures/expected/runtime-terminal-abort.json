@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-runtime-terminal-abort",
   "sessionId" : "session-runtime-terminal-abort",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-runtime-terminal-abort",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -73,7 +73,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-root_skill"
+    "route" : "default:root-skill"
   }, {
     "frameId" : "model",
     "parentFrameId" : "root",
@@ -95,7 +95,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-root_skill#mission-model"
+    "route" : "default:root-skill#mission-model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

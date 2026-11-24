@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-canonical-concurrent-contract",
   "sessionId" : "session-canonical-concurrent-contract",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-canonical-concurrent-contract",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -51,7 +51,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-test_entry"
+    "route" : "default:test-entry"
   }, {
     "frameId" : "concurrent-planning",
     "parentFrameId" : "concurrent-root",
@@ -73,7 +73,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-test_entry#planning"
+    "route" : "default:test-entry#planning"
   }, {
     "frameId" : "step-d",
     "parentFrameId" : "concurrent-root",
@@ -95,7 +95,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-worker_d"
+    "route" : "default:worker-d"
   }, {
     "frameId" : "step-e",
     "parentFrameId" : "concurrent-root",
@@ -117,7 +117,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-worker_e"
+    "route" : "default:worker-e"
   }, {
     "frameId" : "step-f",
     "parentFrameId" : "concurrent-root",
@@ -139,7 +139,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-worker_f"
+    "route" : "default:worker-f"
   }, {
     "frameId" : "nested-planning-f",
     "parentFrameId" : "step-f",
@@ -161,7 +161,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-worker_f#planning"
+    "route" : "default:worker-f#planning"
   }, {
     "frameId" : "step-b",
     "parentFrameId" : "concurrent-root",
@@ -183,7 +183,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-worker_b"
+    "route" : "default:worker-b"
   }, {
     "frameId" : "nested-planning-b",
     "parentFrameId" : "step-b",
@@ -205,7 +205,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-worker_b#planning"
+    "route" : "default:worker-b#planning"
   }, {
     "frameId" : "step-a",
     "parentFrameId" : "concurrent-root",
@@ -227,7 +227,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-worker_a"
+    "route" : "default:worker-a"
   }, {
     "frameId" : "model-a",
     "parentFrameId" : "step-a",
@@ -249,7 +249,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-worker_a#model"
+    "route" : "default:worker-a#model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,
@@ -442,7 +442,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "default-test_entry"
+        "route" : "default:test-entry"
       } ]
     } ]
   }, {
@@ -456,7 +456,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "default-test_entry"
+        "route" : "default:test-entry"
       } ]
     } ]
   }, {
@@ -470,15 +470,15 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "default-test_entry"
+        "route" : "default:test-entry"
       }, {
         "frameId" : "step-f",
         "frameType" : "STEP_EXECUTION",
-        "route" : "default-worker_f"
+        "route" : "default:worker-f"
       }, {
         "frameId" : "nested-planning-f",
         "frameType" : "PLANNING",
-        "route" : "default-worker_f#planning"
+        "route" : "default:worker-f#planning"
       } ]
     } ]
   }, {
@@ -492,7 +492,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "default-test_entry"
+        "route" : "default:test-entry"
       } ]
     } ]
   }, {
@@ -506,7 +506,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "default-test_entry"
+        "route" : "default:test-entry"
       } ]
     } ]
   }, {
@@ -520,15 +520,15 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "default-test_entry"
+        "route" : "default:test-entry"
       }, {
         "frameId" : "step-b",
         "frameType" : "STEP_EXECUTION",
-        "route" : "default-worker_b"
+        "route" : "default:worker-b"
       }, {
         "frameId" : "nested-planning-b",
         "frameType" : "PLANNING",
-        "route" : "default-worker_b#planning"
+        "route" : "default:worker-b#planning"
       } ]
     }, {
       "planId" : "concurrent-plan",
@@ -539,15 +539,15 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "default-test_entry"
+        "route" : "default:test-entry"
       }, {
         "frameId" : "step-a",
         "frameType" : "STEP_EXECUTION",
-        "route" : "default-worker_a"
+        "route" : "default:worker-a"
       }, {
         "frameId" : "model-a",
         "frameType" : "MODEL_CALL",
-        "route" : "default-worker_a#model"
+        "route" : "default:worker-a#model"
       } ]
     } ]
   }, {
@@ -561,15 +561,15 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "default-test_entry"
+        "route" : "default:test-entry"
       }, {
         "frameId" : "step-a",
         "frameType" : "STEP_EXECUTION",
-        "route" : "default-worker_a"
+        "route" : "default:worker-a"
       }, {
         "frameId" : "model-a",
         "frameType" : "MODEL_CALL",
-        "route" : "default-worker_a#model"
+        "route" : "default:worker-a#model"
       } ]
     } ]
   }, {
@@ -583,7 +583,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "default-test_entry"
+        "route" : "default:test-entry"
       } ]
     } ]
   }, {
@@ -597,7 +597,7 @@
       "path" : [ {
         "frameId" : "concurrent-root",
         "frameType" : "ROOT_MISSION",
-        "route" : "default-test_entry"
+        "route" : "default:test-entry"
       } ]
     } ]
   }, {

@@ -853,3 +853,18 @@ checks the outbound definition, execution, original argument text, continuation
 name and separate resolved metadata in one invocation.
 `RequestBoundToolCallingManagerTest` checks original response and rich-part
 identity through dispatch and rejection.
+
+## Console catalog identity components
+
+Catalog summaries and details expose `registeredName`, `namespace` and
+`localName`. For `orders:lookup`, the components are `orders` and `lookup`.
+Console detail navigation and entry/frame filters compare complete recorded
+identities, so `warehouse:lookup` and `orders:warehouse-lookup` remain distinct.
+The current catalog can omit a recorded skill while its trace remains readable.
+Source labels and returned YAML retain their exact authored content.
+
+`DefaultRegisteredSkillCatalogTest`, `TestCatalogIdentityTupleIsRequiredAndExact`,
+`SkillCatalog.test.tsx` and `target-context.spec.ts` verify these boundaries.
+The `namespace-captured-context` corpus pairs raw `tax--search` calls and exact
+arguments with resolved `tax:search` facts. Go corpus/range tests and
+`TraceRecords.model.test.tsx` verify both forms without altering ordinary data.

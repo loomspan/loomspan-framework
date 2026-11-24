@@ -90,3 +90,15 @@ x86_64, macOS arm64, and macOS x86_64; and browser/API tests. Official
 fixture-specific scenarios for diagnostic tools, prompts, resources, sampling,
 and elicitation are intentionally inapplicable and must not be made to pass by
 adding production capabilities.
+
+## Catalog identity fields
+
+Both structured list/detail results and deterministic text expose
+`registeredName`, `namespace` and `localName`. All are required. The consumed
+qualified key must exactly equal `namespace + ":" + localName`, and both
+components follow Framework portable grammar and the combined provider limit.
+`LOOMSPAN_get_skill` accepts the exact complete `registeredName`.
+`TestCatalogIdentityTupleIsRequiredAndExact`, the Java catalog/DTO tests and browser
+catalog navigation cover matching components and distinct owners of `lookup`.
+Raw model names such as `tax--search` remain visible beside resolved `tax:search`
+facts in the shared namespace trace fixture and ranged content inspection.

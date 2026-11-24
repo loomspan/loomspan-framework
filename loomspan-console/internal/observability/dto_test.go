@@ -50,7 +50,7 @@ func TestSkillPageDecodesFromFixture(t *testing.T) {
 	if page.Items[2].Kind != "JAVA" || page.Items[2].BeanName != "dnsSkills" {
 		t.Fatalf("missing Java summary: %#v", page.Items[2])
 	}
-	if page.Items[0].RegisteredName != "default-CheckDns" {
+	if page.Items[0].RegisteredName != "default:check-dns" {
 		t.Fatalf("unexpected registeredName: %s", page.Items[0].RegisteredName)
 	}
 	if page.HasMore {
@@ -66,10 +66,10 @@ func TestExecutorSkillDetailDecodesFromFixture(t *testing.T) {
 	if err := json.Unmarshal(readFixture(t, "skill-executor-detail.json"), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.Kind != "JAVA" || detail.SourcePath != "opaque label" || !strings.Contains(detail.Yaml, "executor: fetchDns") {
+	if detail.Kind != "JAVA" || detail.SourcePath != "opaque label" || !strings.Contains(detail.Yaml, "executor: fetch-dns") {
 		t.Fatalf("unexpected executor detail: %#v", detail)
 	}
-	if err := validateSkillDetail(detail, "default-FetchDns"); err != nil {
+	if err := validateSkillDetail(detail, "default:fetch-dns"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -80,7 +80,7 @@ func TestSkillDetailDecodesFromFixture(t *testing.T) {
 	if err := json.Unmarshal(body, &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.RegisteredName != "default-CheckDns" {
+	if detail.RegisteredName != "default:check-dns" {
 		t.Fatalf("unexpected registeredName: %s", detail.RegisteredName)
 	}
 	if detail.Yaml == "" {
@@ -114,7 +114,7 @@ func TestActiveExecutionDetailDecodesFromFixture(t *testing.T) {
 	if exec.SessionID != "session-1" {
 		t.Fatalf("unexpected sessionId: %s", exec.SessionID)
 	}
-	if exec.EntrySkill != "default-CheckDns" {
+	if exec.EntrySkill != "default:check-dns" {
 		t.Fatalf("unexpected entrySkill: %s", exec.EntrySkill)
 	}
 	if exec.Usage.SkillInvocations != 1 {
@@ -214,7 +214,7 @@ func TestActiveExecutionDecodesCanonicalActiveBranchesAndExplicitNulls(t *testin
 		"updatedAt":"2026-07-25T11:59:59Z",
 		"activeBranches":[{
 			"planId":null,"taskId":null,"stepNumber":null,"parallelGroup":null,"effectiveConcurrency":null,
-			"path":[{"frameId":"frame-root","frameType":"ROOT_MISSION","route":"default-CheckDns"}]
+			"path":[{"frameId":"frame-root","frameType":"ROOT_MISSION","route":"default:check-dns"}]
 		}]
 	}`)
 	var execution ActiveExecution
@@ -229,14 +229,14 @@ func TestActiveExecutionDecodesCanonicalActiveBranchesAndExplicitNulls(t *testin
 		t.Fatalf("explicit null assignment changed: %#v", branch)
 	}
 	entry := branch.Path[0]
-	if entry.FrameID != "frame-root" || entry.FrameType != "ROOT_MISSION" || entry.Route != "default-CheckDns" {
+	if entry.FrameID != "frame-root" || entry.FrameType != "ROOT_MISSION" || entry.Route != "default:check-dns" {
 		t.Fatalf("unexpected active-branch entry: %#v", entry)
 	}
 	encoded, err := json.Marshal(execution)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{`"planId":null`, `"taskId":null`, `"effectiveConcurrency":null`, `"frameId":"frame-root"`, `"frameType":"ROOT_MISSION"`, `"route":"default-CheckDns"`} {
+	for _, field := range []string{`"planId":null`, `"taskId":null`, `"effectiveConcurrency":null`, `"frameId":"frame-root"`, `"frameType":"ROOT_MISSION"`, `"route":"default:check-dns"`} {
 		if !json.Valid(encoded) || !containsJSONField(encoded, field) {
 			t.Fatalf("encoded active execution does not preserve %s: %s", field, encoded)
 		}
@@ -361,7 +361,7 @@ func TestJavaSkillDetailFixtureHasOnlyJavaLocation(t *testing.T) {
 	if err := json.Unmarshal(readFixture(t, "skill-java-detail.json"), &detail); err != nil {
 		t.Fatal(err)
 	}
-	if err := validateSkillDetail(detail, "default-LookupDns"); err != nil {
+	if err := validateSkillDetail(detail, "default:lookup-dns"); err != nil {
 		t.Fatal(err)
 	}
 	if detail.Kind != "JAVA" || detail.BeanName != "dnsSkills" || detail.Method != "example.DnsSkills.lookup(java.lang.String)" || detail.SourcePath != "" || detail.Yaml != "" {
@@ -371,19 +371,19 @@ func TestJavaSkillDetailFixtureHasOnlyJavaLocation(t *testing.T) {
 
 func TestSkillSourceVariantsRejectMalformedDetails(t *testing.T) {
 	for _, detail := range []SkillDetail{
-		{RegisteredName: "skill", SourcePath: "skill.yaml", Yaml: "name: skill"},
-		{RegisteredName: "skill", Kind: "UNKNOWN", Declaration: "YAML"},
-		{RegisteredName: "skill", Kind: "TYPESAFE", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill"},
-		{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", Yaml: "name: skill"},
-		{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill", BeanName: "bean"},
-		{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml"},
-		{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill", Method: "lookup()"},
-		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean"},
-		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", Method: "lookup()"},
-		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean", Method: "lookup()", SourcePath: "skill.yaml"},
-		{RegisteredName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean", Method: "lookup()", Yaml: "name: skill"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", SourcePath: "skill.yaml", Yaml: "name: skill"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "UNKNOWN", Declaration: "YAML"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "TYPESAFE", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "YAML", Declaration: "YAML", Yaml: "name: skill"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill", BeanName: "bean"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", Yaml: "name: skill", Method: "lookup()"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", Method: "lookup()"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean", Method: "lookup()", SourcePath: "skill.yaml"},
+		{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "JAVA", Declaration: "SKILL_METHOD", BeanName: "bean", Method: "lookup()", Yaml: "name: skill"},
 	} {
-		if err := validateSkillDetail(detail, "skill"); err == nil {
+		if err := validateSkillDetail(detail, detail.RegisteredName); err == nil {
 			t.Errorf("accepted malformed source: %#v", detail)
 		}
 	}
@@ -391,10 +391,10 @@ func TestSkillSourceVariantsRejectMalformedDetails(t *testing.T) {
 
 func TestSkillDecodersRejectInapplicableFieldsByPresence(t *testing.T) {
 	for _, body := range []string{
-		`{"registeredName":"javaSkill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","sourcePath":""}`,
-		`{"registeredName":"javaSkill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","yaml":null}`,
-		`{"registeredName":"modelSkill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
-		`{"registeredName":"modelSkill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","method":""}`,
+		`{"registeredName":"default:java-skill","namespace":"default","localName":"java-skill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","sourcePath":""}`,
+		`{"registeredName":"default:java-skill","namespace":"default","localName":"java-skill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","yaml":null}`,
+		`{"registeredName":"default:model-skill","namespace":"default","localName":"model-skill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
+		`{"registeredName":"default:model-skill","namespace":"default","localName":"model-skill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","method":""}`,
 	} {
 		var detail SkillDetail
 		if err := json.Unmarshal([]byte(body), &detail); err == nil {
@@ -403,8 +403,8 @@ func TestSkillDecodersRejectInapplicableFieldsByPresence(t *testing.T) {
 	}
 
 	for _, body := range []string{
-		`{"registeredName":"javaSkill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","sourcePath":null}`,
-		`{"registeredName":"modelSkill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
+		`{"registeredName":"default:java-skill","namespace":"default","localName":"java-skill","kind":"JAVA","declaration":"SKILL_METHOD","beanName":"bean","method":"lookup()","sourcePath":null}`,
+		`{"registeredName":"default:model-skill","namespace":"default","localName":"model-skill","kind":"YAML","declaration":"YAML","sourcePath":"skill.yaml","beanName":null}`,
 	} {
 		var summary SkillSummary
 		if err := json.Unmarshal([]byte(body), &summary); err == nil {
@@ -429,7 +429,7 @@ func TestInstanceNamespaceWireValidation(t *testing.T) {
 	invalid := []string{
 		`{}`, `{"namespaces":null}`, `{"namespaces":{}}`,
 		`{"namespaces":[null]}`, `{"namespaces":[{}]}`,
-		`{"namespaces":[{"namespace":"bad-name","generationId":"g","publicationVersion":null}]}`,
+		`{"namespaces":[{"namespace":"bad_name","generationId":"g","publicationVersion":null}]}`,
 		`{"namespaces":[{"namespace":"empty","generationId":" ","publicationVersion":null}]}`,
 		`{"namespaces":[{"namespace":"empty","publicationVersion":null}]}`,
 		`{"namespaces":[{"namespace":"empty","generationId":"g"}]}`,

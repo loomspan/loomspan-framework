@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-recoverable-failed-completion",
   "sessionId" : "session-recoverable-failed-completion",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-recoverable-failed-completion",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {

@@ -84,6 +84,14 @@ task-purpose source.
 
 ## Callable skill provenance
 
+Catalog items expose `namespace`, `localName` and the exact qualified
+`registeredName`, such as `orders`, `lookup` and `orders:lookup`. Catalog
+selection and entry/frame filters compare the complete recorded identity.
+A provider function name such as `orders--lookup` is retained in raw model
+content. The resolved skill fact uses `orders:lookup`. Inspect either recorded
+form directly, including a skill absent from the current catalog.
+
+
 Execution kind and declaration provenance are independent diagnostic facts.
 Executor-backed YAML uses Java execution while retaining authored source and
 resolved Java implementation; reference-only registrations are absent from callable

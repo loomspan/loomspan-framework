@@ -121,7 +121,7 @@ func TestAcquireRetainsProcessorValidatedGenerationID(t *testing.T) {
 	processor := newFakeProcessor()
 	validated := testTraceMetadata("trace-1", int64(len(data)))
 	validated.GenerationID = "generation-from-trace"
-	validated.EntrySkill = "orders-root"
+	validated.EntrySkill = "orders:root"
 	validated.EntryNamespace = "orders"
 	validated.NamespaceGenerationIDs = map[string]string{"orders": "generation-from-trace", "tax": "old-target"}
 	processor.metadata = &validated
@@ -143,7 +143,7 @@ func TestAcquireRetainsProcessorValidatedGenerationID(t *testing.T) {
 	if lookup.Metadata.GenerationID != validated.GenerationID {
 		t.Fatalf("cached generation ID = %q, want %q", lookup.Metadata.GenerationID, validated.GenerationID)
 	}
-	if acquired.Metadata.EntryNamespace != "orders" || acquired.Metadata.EntrySkill != "orders-root" || acquired.Metadata.NamespaceGenerationIDs["tax"] != "old-target" {
+	if acquired.Metadata.EntryNamespace != "orders" || acquired.Metadata.EntrySkill != "orders:root" || acquired.Metadata.NamespaceGenerationIDs["tax"] != "old-target" {
 		t.Fatalf("lost canonical capture: %+v", acquired.Metadata)
 	}
 	acquired.Metadata.NamespaceGenerationIDs["tax"] = "caller mutation"

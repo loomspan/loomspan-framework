@@ -133,8 +133,8 @@ type SkillLocation =
   | { kind: "JAVA"; declaration: "YAML"; sourcePath: string; executorName: string; beanName: string; method: string }
   | { kind: "JAVA"; declaration: "SKILL_METHOD"; sourcePath?: never; executorName?: never; beanName: string; method: string };
 
-export type SkillSummary = SkillLocation & { registeredName: string; href?: string };
-export type SkillDetail = { targetScopeId: string; registeredName: string; outputSchema: string | null } & (
+export type SkillSummary = SkillLocation & { registeredName: string; namespace: string; localName: string; href?: string };
+export type SkillDetail = { targetScopeId: string; registeredName: string; namespace: string; localName: string; outputSchema: string | null } & (
   | (Extract<SkillLocation, { declaration: "YAML" }> & { yaml: string })
   | (Extract<SkillLocation, { declaration: "SKILL_METHOD" }> & { yaml?: never })
 );

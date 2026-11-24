@@ -69,7 +69,7 @@ func newArtifactTestServer(t *testing.T, artifactBody []byte) *artifactTestServe
 			[]byte(`"consoleCompatibilityVersion":"development"`), 1)
 	}
 	traceMetadata := fmt.Sprintf(
-		`{"targetScopeId":"scope-1","traceId":"trace-single-attempt-success","sessionId":"session-single-attempt-success","entrySkill":"default-CheckDns","outcome":"SUCCEEDED","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":%d,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-08-01T12:00:00Z"}`,
+		`{"targetScopeId":"scope-1","traceId":"trace-single-attempt-success","sessionId":"session-single-attempt-success","entrySkill":"default:check-dns","outcome":"SUCCEEDED","finalizedAt":"2026-07-24T12:00:00Z","sizeBytes":%d,"persistencePolicy":"ALWAYS","applicationTraceExpiresAt":"2026-08-01T12:00:00Z"}`,
 		len(artifactBody),
 	)
 	srv := &artifactTestServer{
@@ -249,7 +249,7 @@ func TestArtifactAcquisitionInstallsOneCopyAndChargesOnce(t *testing.T) {
 	if lookupDomain != nil {
 		t.Fatalf("Lookup failed: %v", lookupDomain)
 	}
-	if lookup.Metadata.EntrySkill != "default-test_entry" {
+	if lookup.Metadata.EntrySkill != "default:test-entry" {
 		t.Fatalf("expected canonical byte-derived entry skill default-test_entry, got %q", lookup.Metadata.EntrySkill)
 	}
 	if server.artifactRequestCount() != 1 {
@@ -570,7 +570,7 @@ func TestArtifactShutdownWaitsForStreamCleanup(t *testing.T) {
 			return artifact.TraceMetadata{
 				TraceID:    "trace-single-attempt-success",
 				SessionID:  "session-single-attempt-success",
-				EntrySkill: "default-CheckDns",
+				EntrySkill: "default:check-dns",
 				Outcome:    "SUCCEEDED",
 				SizeBytes:  int64(len(server.artifactBody)),
 			}, nil

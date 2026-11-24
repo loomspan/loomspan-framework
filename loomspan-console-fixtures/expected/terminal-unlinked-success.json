@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-terminal-unlinked-success",
   "sessionId" : "session-terminal-unlinked-success",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-terminal-unlinked-success",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {

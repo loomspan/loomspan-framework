@@ -34,7 +34,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const semanticTrace = `{"traceId":"trace-t","sessionId":"session-t","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/t.ndjson","consoleCompatibilityVersion":"development","generationId":"generation-fixture","entrySkill":"default-test","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-fixture"}},"data":{"sessionId":"session-t"}}
+const semanticTrace = `{"traceId":"trace-t","sessionId":"session-t","sequence":1,"timestamp":1784894400.000000000,"recordType":"TRACE_STARTED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"tracePath":"traces/t.ndjson","consoleCompatibilityVersion":"development","generationId":"generation-fixture","entrySkill":"default:test","entryNamespace":"default","namespaceGenerationIds":{"default":"generation-fixture"}},"data":{"sessionId":"session-t"}}
 {"traceId":"trace-t","sessionId":"session-t","sequence":2,"timestamp":1784894400.000000000,"recordType":"MODEL_REQUEST_SENT","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1},"data":{"messages":[{"messageType":"USER","text":"user"}]}}
 {"traceId":"trace-t","sessionId":"session-t","sequence":3,"timestamp":1784894400.000000000,"recordType":"MODEL_RESPONSE_RECEIVED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"retrySequenceId":"retry-1","attemptId":"attempt-1","attemptNumber":1,"attemptReason":"INITIAL","providerAttemptNumber":1,"usage":{"promptUnits":10,"completionUnits":4,"totalUnits":14,"precision":"EXACT"}},"data":{"generations":[{"messageType":"ASSISTANT","text":"fixture response","toolCalls":[]}]}}
 {"traceId":"trace-t","sessionId":"session-t","sequence":4,"timestamp":1784894400.000000000,"recordType":"TRACE_COMPLETED","frameId":null,"parentFrameId":null,"frameType":null,"route":null,"threadName":"fixture-thread","metadata":{"outcome":"SUCCEEDED","sessionUsageSnapshot":{"promptUnits":10,"completionUnits":4,"totalUnits":14},"errored":false,"persistencePolicy":"ALWAYS"},"data":null}
@@ -632,9 +632,9 @@ func TestPlannerInabilityUsesExistingFailureFrameAndContentTools(t *testing.T) {
 		name, origin, parent, route, task, context, reason string
 		terminal                                           bool
 	}{
-		{"assigned-planner-inability", "assigned-step", "inability-root", "default-test_entry#step-1",
+		{"assigned-planner-inability", "assigned-step", "inability-root", "default:test-entry#step-1",
 			"verify-source", "Assigned task reported planner inability", "  Need an approved source.\r\n雪\t", true},
-		{"nested-synthesis-planner-inability", "synthesis-step", "synthesis-child", "default-summarize#step-2",
+		{"nested-synthesis-planner-inability", "synthesis-step", "synthesis-child", "default:summarize#step-2",
 			"gather-records", "Final synthesis reported planner inability", "  Records disagree.\r\n雪\t", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {

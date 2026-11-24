@@ -24,7 +24,7 @@ vi.mock("react-router", () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => (
     <a href={to}>{children}</a>
   ),
-  useParams: () => ({ registeredName: "default-CheckDns" }),
+  useParams: () => ({ registeredName: "default:check-dns" }),
   useNavigate: () => route.navigate,
   useSearchParams: () => [new URLSearchParams({ targetScopeId: route.scope })],
 }));
@@ -49,7 +49,7 @@ beforeEach(() => {
 test("Model detail retains source label, original declaration and descriptive schema", async () => {
   const yaml = "name: CheckDns\nmodel: planner\ninstructions: Ready?\n";
   const schema = '{"type":"object","properties":{"ready":{"type":"object"}}}';
-  vi.mocked(getSkillDetail).mockResolvedValue({ targetScopeId: "scope-1", registeredName: "default-CheckDns", kind: "YAML", declaration: "YAML", sourcePath: "opaque <label>", yaml, outputSchema: schema });
+  vi.mocked(getSkillDetail).mockResolvedValue({ targetScopeId: "scope-1", registeredName: "default:check-dns", namespace: "default", localName: "check-dns", kind: "YAML", declaration: "YAML", sourcePath: "opaque <label>", yaml, outputSchema: schema });
   render(<SkillDetailView />);
   expect(await screen.findAllByText("YAML")).toHaveLength(2);
   expect(screen.getByText("opaque <label>")).toBeInTheDocument();
@@ -65,10 +65,10 @@ test.each(["YAML"] as const)("rich effective %s schema remains inert text beside
     properties: {evidence: {type: ["string", "null"], minLength: 1, maxLength: 20},
       "x-loomspan-evidence": {type: "array", minItems: 1, maxItems: 3,
         items: {type: "object", properties: {value: {type: "number", minimum: 0.25, maximum: 10}}}}}});
-  vi.mocked(getSkillDetail).mockResolvedValue({ targetScopeId: "scope-1", registeredName: "default-CheckDns",
+  vi.mocked(getSkillDetail).mockResolvedValue({ targetScopeId: "scope-1", registeredName: "default:check-dns", namespace: "default", localName: "check-dns",
     kind, declaration: "YAML", sourcePath: "original", yaml, outputSchema: schema });
   render(<SkillDetailView />);
-  await screen.findByText("default-CheckDns");
+  await screen.findByText("default:check-dns");
   const output = document.querySelector('pre[aria-label="Effective output schema"]');
   expect(output?.textContent).toBe(schema);
   expect(output?.querySelector("script")).toBeNull();
@@ -92,13 +92,13 @@ test("skill detail renders sourcePath as plain text and yaml inside pre element"
   vi.mocked(getSkillDetail).mockResolvedValue({
     outputSchema: null,
     targetScopeId: "scope-1",
-    registeredName: "default-CheckDns",
+    registeredName: "default:check-dns", namespace: "default", localName: "check-dns",
     kind: "YAML", declaration: "YAML", sourcePath: "/skills/check_dns.yaml",
     yaml: yamlWithHtml,
   });
   render(<SkillDetailView />);
   await vi.waitFor(() => {
-    expect(screen.getByText("default-CheckDns")).toBeInTheDocument();
+    expect(screen.getByText("default:check-dns")).toBeInTheDocument();
   });
   expect(screen.getByText("/skills/check_dns.yaml")).toBeInTheDocument();
   const pre = document.querySelector("pre.yaml-block");
@@ -129,7 +129,7 @@ test("skill detail sourcePath is not a clickable link", async () => {
   vi.mocked(getSkillDetail).mockResolvedValue({
     outputSchema: null,
     targetScopeId: "scope-1",
-    registeredName: "default-CheckDns",
+    registeredName: "default:check-dns", namespace: "default", localName: "check-dns",
     kind: "YAML", declaration: "YAML", sourcePath: "opaque <label>",
     yaml: "name: CheckDns",
   });
@@ -147,12 +147,12 @@ test("executor skill detail shows Java kind, YAML source, and implementation", a
   const yaml = "# authored executor\r\nname: CheckDns\r\nexecutor: fetchDns\r\n# https://handler.example is inert text\r\n";
   vi.mocked(getSkillDetail).mockResolvedValue({
     outputSchema: null,
-    targetScopeId: "scope-1", registeredName: "default-CheckDns", kind: "JAVA", declaration: "YAML", executorName: "default-fetchDns", beanName: "dnsSkills", method: "example.DnsSkills.fetch()",
+    targetScopeId: "scope-1", registeredName: "default:check-dns", namespace: "default", localName: "check-dns", kind: "JAVA", declaration: "YAML", executorName: "default:fetch-dns", beanName: "dnsSkills", method: "example.DnsSkills.fetch()",
     sourcePath: "/skills/check_dns.yaml", yaml,
   });
   render(<SkillDetailView />);
   expect(await screen.findByText("Java")).toBeInTheDocument();
-  expect(screen.getByText("default-fetchDns")).toBeInTheDocument();
+  expect(screen.getByText("default:fetch-dns")).toBeInTheDocument();
   expect(screen.getByText("dnsSkills")).toBeInTheDocument();
   expect(screen.getByText("example.DnsSkills.fetch()")).toBeInTheDocument();
   expect(screen.getByText("/skills/check_dns.yaml")).toBeInTheDocument();
@@ -164,7 +164,7 @@ test("executor skill detail shows Java kind, YAML source, and implementation", a
 test("Java skill details show bean and declared method without YAML content", async () => {
   vi.mocked(getSkillDetail).mockResolvedValue({
     outputSchema: null,
-    targetScopeId: "scope-1", registeredName: "default-CheckDns", kind: "JAVA", declaration: "SKILL_METHOD",
+    targetScopeId: "scope-1", registeredName: "default:check-dns", namespace: "default", localName: "check-dns", kind: "JAVA", declaration: "SKILL_METHOD",
     beanName: "dnsSkills", method: "public java.lang.String example.Dns.lookup(java.lang.String)",
   });
   render(<SkillDetailView />);
@@ -180,7 +180,7 @@ test("Java skill details show bean and declared method without YAML content", as
 test("shows effective schema as inert metadata without modifying original YAML", async () => {
   const outputSchema = JSON.stringify({ type: "object", description: "<script>schema</script>", properties: { answer: { type: "string" } } });
   vi.mocked(getSkillDetail).mockResolvedValue({
-    targetScopeId: "scope-1", registeredName: "default-CheckDns", kind: "YAML", declaration: "YAML", sourcePath: "parent.yaml",
+    targetScopeId: "scope-1", registeredName: "default:check-dns", namespace: "default", localName: "check-dns", kind: "YAML", declaration: "YAML", sourcePath: "parent.yaml",
     yaml: "name: parent\\noutput_from: {skill: child}", outputSchema,
   });
   render(<SkillDetailView />);

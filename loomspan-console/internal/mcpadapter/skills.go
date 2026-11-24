@@ -35,7 +35,7 @@ func addSkillTools(server *mcp.Server, options ServerOptions) {
 	})
 	addValidatedTool(server, &mcp.Tool{
 		Name:        GetSkillToolName,
-		Description: "Inspect callable provenance and YAML.",
+		Description: "Inspect skill provenance/YAML.",
 		Annotations: readOnlyAnnotations, InputSchema: nonblankInputSchema[getSkillInput]("registeredName"),
 	}, skillDetailOutputSchema(), func(ctx context.Context, _ *mcp.CallToolRequest, input getSkillInput) (*mcp.CallToolResult, toolEnvelope[skillDetailResult], error) {
 		return handleGetSkill(ctx, options, input)
@@ -68,7 +68,7 @@ func handleListSkills(ctx context.Context, options ServerOptions, input listSkil
 	}
 	items := make([]skillSummaryDTO, 0, len(page.Items))
 	for _, item := range page.Items {
-		items = append(items, skillSummaryDTO{RegisteredName: item.RegisteredName, Kind: item.Kind, Declaration: item.Declaration, ExecutorName: item.ExecutorName, SourcePath: item.SourcePath, BeanName: item.BeanName, Method: item.Method})
+		items = append(items, skillSummaryDTO{RegisteredName: item.RegisteredName, Namespace: item.Namespace, LocalName: item.LocalName, Kind: item.Kind, Declaration: item.Declaration, ExecutorName: item.ExecutorName, SourcePath: item.SourcePath, BeanName: item.BeanName, Method: item.Method})
 	}
 	continuation := ""
 	if page.HasMore && page.NextCursor != nil {
@@ -105,7 +105,7 @@ func handleGetSkill(ctx context.Context, options ServerOptions, input getSkillIn
 	result := skillDetailResult{
 		ObservedAt: options.Now().UTC(),
 		Skill: skillDetailDTO{
-			RegisteredName: detail.RegisteredName, Kind: detail.Kind, Declaration: detail.Declaration, ExecutorName: detail.ExecutorName, SourcePath: detail.SourcePath, BeanName: detail.BeanName, Method: detail.Method, YAML: detail.Yaml, OutputSchema: detail.OutputSchema,
+			RegisteredName: detail.RegisteredName, Namespace: detail.Namespace, LocalName: detail.LocalName, Kind: detail.Kind, Declaration: detail.Declaration, ExecutorName: detail.ExecutorName, SourcePath: detail.SourcePath, BeanName: detail.BeanName, Method: detail.Method, YAML: detail.Yaml, OutputSchema: detail.OutputSchema,
 		},
 	}
 	if domain := publicationDomain(options, scope); domain != nil {
@@ -126,6 +126,8 @@ func skillListText(result skillListResult) string {
 	for index, item := range result.Items {
 		prefix := fmt.Sprintf("items[%d].", index)
 		writer.quoted(prefix+"registeredName", item.RegisteredName)
+		writer.quoted(prefix+"namespace", item.Namespace)
+		writer.quoted(prefix+"localName", item.LocalName)
 		writer.quoted(prefix+"kind", item.Kind)
 		writer.quoted(prefix+"declaration", item.Declaration)
 		if item.ExecutorName != "" {
@@ -146,6 +148,8 @@ func skillDetailText(result skillDetailResult) string {
 	var writer lineWriter
 	appendCommon(&writer, result.ObservedAt)
 	writer.quoted("skill.registeredName", result.Skill.RegisteredName)
+	writer.quoted("skill.namespace", result.Skill.Namespace)
+	writer.quoted("skill.localName", result.Skill.LocalName)
 	writer.quoted("skill.kind", result.Skill.Kind)
 	writer.quoted("skill.declaration", result.Skill.Declaration)
 	if result.Skill.ExecutorName != "" {

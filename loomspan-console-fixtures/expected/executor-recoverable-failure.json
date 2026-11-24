@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-executor-recoverable-failure",
   "sessionId" : "session-executor-recoverable-failure",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-executor-recoverable-failure",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -51,7 +51,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-test_entry"
+    "route" : "default:test-entry"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

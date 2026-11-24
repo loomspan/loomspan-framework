@@ -109,13 +109,13 @@ func TestEveryInstalledToolRepresentativeOutputsValidateAgainstBothSchemas(t *te
 			validateTypedEnvelope(t, "instance", instanceOutputSchema(), instanceResult{ObservedAt: now, InstanceID: "instance", Namespaces: []observability.NamespacePublication{}})
 		}},
 		{"skill-detail", func(t *testing.T) {
-			validateTypedEnvelope(t, "skill-detail", skillDetailOutputSchema(), skillDetailResult{ObservedAt: now, Skill: skillDetailDTO{RegisteredName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", YAML: "name: skill"}})
+			validateTypedEnvelope(t, "skill-detail", skillDetailOutputSchema(), skillDetailResult{ObservedAt: now, Skill: skillDetailDTO{RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: "skill.yaml", YAML: "name: skill"}})
 		}},
 		{"executions-list", func(t *testing.T) {
 			validateTypedEnvelope(t, "executions-list", executionListOutputSchema(), executionListResult{ObservedAt: now, Items: []executionListItemDTO{}})
 		}},
 		{"execution-detail", func(t *testing.T) {
-			validateTypedEnvelope(t, "execution-detail", executionDetailOutputSchema(), executionDetailResult{ObservedAt: now, Execution: executionDetailDTO{EntrySkill: "orders-search", GenerationID: "entry-id", EntryNamespace: "orders", NamespaceGenerationIDs: map[string]string{"orders": "entry-id", "tax": "target-id"}, SessionID: "session", TraceID: "trace", Status: "RUNNING", Phase: "STEP", ActiveBranches: []activeBranchDTO{}}})
+			validateTypedEnvelope(t, "execution-detail", executionDetailOutputSchema(), executionDetailResult{ObservedAt: now, Execution: executionDetailDTO{EntrySkill: "orders:search", GenerationID: "entry-id", EntryNamespace: "orders", NamespaceGenerationIDs: map[string]string{"orders": "entry-id", "tax": "target-id"}, SessionID: "session", TraceID: "trace", Status: "RUNNING", Phase: "STEP", ActiveBranches: []activeBranchDTO{}}})
 		}},
 		{"activity", func(t *testing.T) {
 			validateTypedEnvelope(t, "activity", activityOutputSchema(), activityResult{ObservedAt: now, Items: []activityDTO{}})
@@ -125,7 +125,7 @@ func TestEveryInstalledToolRepresentativeOutputsValidateAgainstBothSchemas(t *te
 		}},
 		{"trace-summary", func(t *testing.T) {
 			terminalFailureID := "failure-terminal"
-			validateTypedEnvelope(t, "trace-summary", traceSummaryOutputSchema(), getTraceResult{Evidence: evidence, Summary: traceSummaryDTO{EntrySkill: "orders-search", GenerationID: "entry-id", EntryNamespace: "orders", NamespaceGenerationIDs: map[string]string{"orders": "entry-id", "tax": "target-id"}, Outcome: "FAILED", TerminalFailureID: &terminalFailureID, RecordCountsByType: map[string]int64{}, RootFrameIDs: []string{"root"}, UsageComplete: true}})
+			validateTypedEnvelope(t, "trace-summary", traceSummaryOutputSchema(), getTraceResult{Evidence: evidence, Summary: traceSummaryDTO{EntrySkill: "orders:search", GenerationID: "entry-id", EntryNamespace: "orders", NamespaceGenerationIDs: map[string]string{"orders": "entry-id", "tax": "target-id"}, Outcome: "FAILED", TerminalFailureID: &terminalFailureID, RecordCountsByType: map[string]int64{}, RootFrameIDs: []string{"root"}, UsageComplete: true}})
 		}},
 		{"frames", func(t *testing.T) {
 			validateTypedEnvelope(t, "frames", frameQueryOutputSchema(), queryFramesResult{Evidence: evidence, Projection: "COMPACT", Items: []frameDTO{}})
@@ -198,8 +198,8 @@ func TestCompactSchemasRetainDecisionAndNavigationFields(t *testing.T) {
 	}{
 		{"runtime", runtimeOutputSchema(), map[string]any{"observedAt": "2026-08-19T00:00:00Z", "targetSelection": "NONE", "targetConnection": "DISCONNECTED", "targetAuthentication": "UNKNOWN", "javaGoCompatibility": "UNKNOWN", "runtimeIdentity": "UNKNOWN", "liveMonitoring": "UNAVAILABLE"}},
 		{"instance", instanceOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "instanceId": "instance", "namespaces": []any{map[string]any{"namespace": "empty", "generationId": "g7", "publicationVersion": nil}}}}},
-		{"skills-list", skillListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"registeredName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml"}}, "hasMore": false}}},
-		{"skill-detail", skillDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": map[string]any{"registeredName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml", "yaml": "name: skill", "outputSchema": nil}}}},
+		{"skills-list", skillListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"registeredName": "default:skill", "namespace": "default", "localName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml"}}, "hasMore": false}}},
+		{"skill-detail", skillDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": map[string]any{"registeredName": "default:skill", "namespace": "default", "localName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml", "yaml": "name: skill", "outputSchema": nil}}}},
 		{"executions-list", executionListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"sessionId": "s", "traceId": "t", "status": "RUNNING", "phase": "STEP", "updatedAt": "2026-08-19T00:00:00Z", "activeBranchCount": 0}}, "hasMore": false}}},
 		{"execution-detail", executionDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "execution": map[string]any{"sessionId": "s", "traceId": "t", "status": "RUNNING", "phase": "STEP", "activeBranches": []any{}, "usage": map[string]any{}, "configuredLimits": map[string]any{}}}}},
 		{"activity", activityOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"cursor": "c", "sessionId": "s", "traceId": "t", "timestamp": "2026-08-19T00:00:00Z", "kind": "STEP_COMPLETED", "facts": map[string]any{}}}, "hasMore": false, "coverage": map[string]any{}}}},
@@ -312,7 +312,7 @@ func compactEvidenceInstance() map[string]any {
 }
 
 func TestSkillSchemasRejectRetiredKind(t *testing.T) {
-	summary := map[string]any{"registeredName": "skill", "kind": "TYPESAFE", "declaration": "YAML", "sourcePath": "skill.yaml"}
+	summary := map[string]any{"registeredName": "default:skill", "namespace": "default", "localName": "skill", "kind": "TYPESAFE", "declaration": "YAML", "sourcePath": "skill.yaml"}
 	list := map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{summary}, "hasMore": false}}
 	if err := validateCompactInstance(t, skillListOutputSchema(), list); err == nil {
 		t.Fatal("retired skill kind accepted in list")

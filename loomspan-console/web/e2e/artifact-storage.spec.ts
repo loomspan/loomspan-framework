@@ -32,7 +32,7 @@ function makeTraceMetadata(traceId: string, sessionId: string, outcome: string, 
     generationId: traceId,
     entryNamespace: "default",
     namespaceGenerationIds: { default: traceId },
-    entrySkill: "default-test_entry",
+    entrySkill: "default:test-entry",
     outcome,
     // Both Java-produced fixture artifacts complete at this instant. The
     // console's processor deliberately checks this metadata against the
@@ -65,7 +65,7 @@ function makeLargeChunkedPayloadArtifact(): Buffer {
   const chunkCount = 36;
   const chunkBytes = 64 * 1024;
   const records: Array<Record<string, unknown>> = [
-    { ...common, sequence: 1, recordType: "TRACE_STARTED", metadata: { tracePath: "generated/large-chunked-payload.ndjson", consoleCompatibilityVersion: "1.0.0-beta.10-SNAPSHOT", generationId: traceId, entrySkill: "default-test_entry", entryNamespace: "default", namespaceGenerationIds: { default: traceId } }, data: { sessionId } },
+    { ...common, sequence: 1, recordType: "TRACE_STARTED", metadata: { tracePath: "generated/large-chunked-payload.ndjson", consoleCompatibilityVersion: "1.0.0-beta.10-SNAPSHOT", generationId: traceId, entrySkill: "default:test-entry", entryNamespace: "default", namespaceGenerationIds: { default: traceId } }, data: { sessionId } },
     { ...common, sequence: 2, recordType: "TRACE_CAPTURE_POLICY_RECORDED", metadata: { persistencePolicy: "ALWAYS" }, data: null },
     { ...common, sequence: 3, recordType: "MODEL_REQUEST_SENT", metadata: { retrySequenceId: "retry-1", attemptId: "attempt-1", attemptNumber: 1, attemptReason: "INITIAL", providerAttemptNumber: 1, payloadId: "payload-large", chunkCount, payloadChunked: true, contentType: "application/json" }, data: null },
   ];
@@ -139,7 +139,7 @@ function makeTargetServer(initial: TargetState) {
     if (pathname === "/_loomspan/observability/v1/skills") {
       response.writeHead(200, headers);
       response.end(JSON.stringify({
-        items: [{ registeredName: "default-root_skill", kind: "JAVA", declaration: "YAML", executorName: "default-fetchDns", beanName: "dnsSkills", method: "example.DnsSkills.fetch()", sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml", href: "skills/default-root_skill" }],
+        items: [{ registeredName: "default:root-skill", namespace: "default", localName: "root-skill", kind: "JAVA", declaration: "YAML", executorName: "default:fetch-dns", beanName: "dnsSkills", method: "example.DnsSkills.fetch()", sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml", href: "skills/default-root_skill" }],
         hasMore: false, nextCursor: null, observedAt: "2026-07-27T00:00:00Z",
       }));
       return;
@@ -147,8 +147,8 @@ function makeTargetServer(initial: TargetState) {
     if (pathname === "/_loomspan/observability/v1/skills/default-root_skill") {
       response.writeHead(200, headers);
       response.end(JSON.stringify({
-        registeredName: "default-root_skill",
-        kind: "JAVA", declaration: "YAML", executorName: "default-fetchDns", beanName: "dnsSkills", method: "example.DnsSkills.fetch()",
+        registeredName: "default:root-skill", namespace: "default", localName: "root-skill",
+        kind: "JAVA", declaration: "YAML", executorName: "default:fetch-dns", beanName: "dnsSkills", method: "example.DnsSkills.fetch()",
         sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml",
         yaml: "name: default-root_skill\ndescription: inert executor fixture\nexecutor: fetchDns\ninstructions: '<script>window.location=\\\"https://attacker.invalid\\\"</script><a href=\\\"/target\\\">connect</a>'\n",
       }));

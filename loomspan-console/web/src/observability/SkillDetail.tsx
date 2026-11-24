@@ -68,6 +68,8 @@ export function SkillDetailView() {
               <dt>Registered name</dt>
               <dd>{detail.registeredName}</dd>
             </div>
+            <div><dt>Namespace</dt><dd>{detail.namespace}</dd></div>
+            <div><dt>Local name</dt><dd>{detail.localName}</dd></div>
             <div><dt>Execution kind</dt><dd>{detail.kind === "JAVA" ? "Java" : detail.kind}</dd></div>
             <div><dt>Declaration</dt><dd>{detail.declaration}</dd></div>
             {detail.executorName && <div><dt>Executor</dt><dd><code>{detail.executorName}</code></dd></div>}

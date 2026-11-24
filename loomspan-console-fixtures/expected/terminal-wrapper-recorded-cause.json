@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-terminal-wrapper-recorded-cause",
   "sessionId" : "session-terminal-wrapper-recorded-cause",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-terminal-wrapper-recorded-cause",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {

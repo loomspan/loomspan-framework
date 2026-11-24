@@ -102,3 +102,9 @@ handles, cursors, catalogs, and indexes are never portable.
 Trace files can contain sensitive diagnostics and application paths and are
 not secret-scanned or redacted. The compatibility marker says nothing about
 who produced a file or whether its content is trustworthy.
+
+The `namespace-captured-context` case records the colon-qualified `orders:search`
+entry and resolved `tax:search` target. Raw model content retains `tax--search`
+and the original `warehouse-lookup` business reference and argument text. Catalog
+REST fixtures expose required `namespace` and `localName` components alongside
+the exact `registeredName`.

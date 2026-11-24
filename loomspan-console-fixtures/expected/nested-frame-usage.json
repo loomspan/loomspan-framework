@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-nested-frame-usage",
   "sessionId" : "session-nested-frame-usage",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-nested-frame-usage",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -95,7 +95,7 @@
       "completionUnits" : 2,
       "totalUnits" : 6
     },
-    "route" : "default-root_skill"
+    "route" : "default:root-skill"
   }, {
     "frameId" : "skill",
     "parentFrameId" : "root",
@@ -117,7 +117,7 @@
       "completionUnits" : 2,
       "totalUnits" : 6
     },
-    "route" : "default-root_skill"
+    "route" : "default:root-skill"
   }, {
     "frameId" : "executor-child",
     "parentFrameId" : "skill",
@@ -139,7 +139,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-applicationRequest"
+    "route" : "default:application-request"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 1,

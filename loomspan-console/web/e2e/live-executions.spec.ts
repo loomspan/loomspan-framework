@@ -6,7 +6,7 @@ import { test as consoleTest, expect } from "./fixtures/consoleProcess";
 
 const fixtureRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../loomspan-console-fixtures/traces");
 const completedTraceArtifact = fs.readFileSync(path.join(fixtureRoot, "single-attempt-success.ndjson"), "utf8").replaceAll("trace-single-attempt-success", "trace-1").replaceAll("session-single-attempt-success", "session-1");
-const completedTraceMetadata = JSON.stringify({ targetScopeId: "scope-1", traceId: "trace-1", sessionId: "session-1", generationId: "trace-1", entrySkill: "default-test_entry", entryNamespace: "default", namespaceGenerationIds: { default: "trace-1" }, outcome: "SUCCEEDED", finalizedAt: "2026-07-24T12:00:00Z", sizeBytes: new TextEncoder().encode(completedTraceArtifact).byteLength, persistencePolicy: "ALWAYS", applicationTraceExpiresAt: "2026-08-03T00:00:00Z" });
+const completedTraceMetadata = JSON.stringify({ targetScopeId: "scope-1", traceId: "trace-1", sessionId: "session-1", generationId: "trace-1", entrySkill: "default:test-entry", entryNamespace: "default", namespaceGenerationIds: { default: "trace-1" }, outcome: "SUCCEEDED", finalizedAt: "2026-07-24T12:00:00Z", sizeBytes: new TextEncoder().encode(completedTraceArtifact).byteLength, persistencePolicy: "ALWAYS", applicationTraceExpiresAt: "2026-08-03T00:00:00Z" });
 
 type TargetState = {
   instanceId: string;
@@ -26,7 +26,7 @@ function activePage(sessionId: string, traceId: string): string {
       startedAt: "2026-07-27T00:00:00Z",
       updatedAt: "2026-07-27T00:00:00Z",
       elapsedMillis: 0,
-      entrySkill: "test-skill",
+      entrySkill: "test:skill",
       status: "RUNNING",
       phase: "EXECUTING",
       summary: "Execution is active",
@@ -252,11 +252,11 @@ test("Overview gives each active execution its own compact activity feed", async
   await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");
   await page.getByRole("button", { name: "Connect" }).click();
 
-  const feed = page.getByRole("article", { name: "test-skill" });
+  const feed = page.getByRole("article", { name: "test:skill" });
   await expect(feed).toBeVisible({ timeout: 10_000 });
   await expect(feed.getByText("Started", { exact: true })).toBeVisible();
   await expect(feed.getByText("Running", { exact: true })).toBeVisible();
-  await expect(feed.getByRole("log", { name: "test-skill activity" }).getByText("Step completed", { exact: true })).toBeVisible();
+  await expect(feed.getByRole("log", { name: "test:skill activity" }).getByText("Step completed", { exact: true })).toBeVisible();
   await expect(feed.getByRole("button", { name: /auto-scroll/i })).toHaveCount(0);
   await feed.getByRole("link", { name: "View active execution" }).click();
   await expect(page).toHaveURL(/\/active-executions\/session-1\?targetScopeId=/);
@@ -358,10 +358,10 @@ test("WF-SE target change discards prior live state", async ({
   await expect(page.getByRole("heading", { name: "Instance Overview" })).toBeFocused();
 
   await page.goto(`${consoleProcess.origin}/`);
-  const feed = page.getByRole("article", { name: "test-skill" });
+  const feed = page.getByRole("article", { name: "test:skill" });
   await expect(
     feed
-      .getByRole("log", { name: "test-skill activity" })
+      .getByRole("log", { name: "test:skill activity" })
       .getByText("Execution started", { exact: true }),
   ).toBeVisible({ timeout: 10_000 });
 
@@ -382,7 +382,7 @@ test("WF-SE target change discards prior live state", async ({
   await expect(page.getByText("New execution after restart", { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(
     page
-      .getByRole("log", { name: "test-skill activity" })
+      .getByRole("log", { name: "test:skill activity" })
       .getByText("Step completed", { exact: true }),
   ).toHaveCount(0);
 });

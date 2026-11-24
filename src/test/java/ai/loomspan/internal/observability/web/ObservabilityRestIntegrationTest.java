@@ -95,7 +95,7 @@ class ObservabilityRestIntegrationTest
     }
 
     @Test
-    void collectionAndNamespaceFallbackAreStable() throws Exception
+    void collectionAndExactIdentityLookupAreStable() throws Exception
     {
         mvc.perform(get(ObservabilityApiPaths.SKILLS)
                         .header(ObservabilityApiKeyFilter.API_KEY_HEADER, KEY)
@@ -105,11 +105,11 @@ class ObservabilityRestIntegrationTest
                 .andExpect(jsonPath("$.hasMore").value(false))
                 .andExpect(jsonPath("$.nextCursor").doesNotExist());
 
-        mvc.perform(get(ObservabilityApiPaths.SKILLS + "/default-CheckDns")
+        mvc.perform(get(ObservabilityApiPaths.SKILLS + "/default:check-dns")
                         .header(ObservabilityApiKeyFilter.API_KEY_HEADER, KEY))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.registeredName").value("default-CheckDns"))
-                .andExpect(jsonPath("$.yaml").value(org.hamcrest.Matchers.containsString("name: CheckDns")));
+                .andExpect(jsonPath("$.registeredName").value("default:check-dns"))
+                .andExpect(jsonPath("$.yaml").value(org.hamcrest.Matchers.containsString("name: check-dns")));
 
         mvc.perform(get(ObservabilityApiPaths.ROOT + "/unknown")
                         .header(ObservabilityApiKeyFilter.API_KEY_HEADER, KEY))
@@ -143,7 +143,7 @@ class ObservabilityRestIntegrationTest
     {
         for (String path : List.of(
                 ObservabilityApiPaths.INSTANCE,
-                ObservabilityApiPaths.SKILLS + "/default-CheckDns",
+                ObservabilityApiPaths.SKILLS + "/default:check-dns",
                 ObservabilityApiPaths.ACTIVE + "/missing",
                 ObservabilityApiPaths.TRACES + "/missing"))
         {
@@ -230,7 +230,7 @@ class ObservabilityRestIntegrationTest
         Instant now = Instant.now(runtime.clock());
         runtime.activeExecutions().replace(new ActiveExecutionSnapshot(
                 "session-live", "trace-live", 0, 1, now.minusSeconds(2), now,
-                "CheckDns", "generation-test", "default", java.util.Map.of("default", "generation-test"), "RUNNING", "Checking DNS", List.of(),
+                "default:check-dns", "generation-test", "default", java.util.Map.of("default", "generation-test"), "RUNNING", "Checking DNS", List.of(),
                 SessionUsageSnapshot.empty(), null));
         Path artifact = Files.writeString(temporaryDirectory.resolve("trace.ndjson"), "{}\n");
         runtime.traces().publish(new FinalizedTraceArtifact(
@@ -288,7 +288,7 @@ class ObservabilityRestIntegrationTest
             runtime.activeExecutions().replace(activeSnapshot("session-4", now));
             runtime.activeExecutions().replace(new ActiveExecutionSnapshot(
                     "session-2", "trace-session-2", 0, 2, now.minusSeconds(2), now.plusMillis(1),
-                    "CheckDns", "generation-test", "default", java.util.Map.of("default", "generation-test"), "RUNNING", "Checking DNS", List.of(),
+                    "default:check-dns", "generation-test", "default", java.util.Map.of("default", "generation-test"), "RUNNING", "Checking DNS", List.of(),
                     SessionUsageSnapshot.empty(), null));
             runtime.activeExecutions().remove("session-1");
             String secondBody = mvc.perform(get(ObservabilityApiPaths.ACTIVE)
@@ -358,7 +358,7 @@ class ObservabilityRestIntegrationTest
     {
         return new ActiveExecutionSnapshot(
                 sessionId, "trace-" + sessionId, 0, 1, now.minusSeconds(2), now,
-                "CheckDns", "generation-test", "default", java.util.Map.of("default", "generation-test"), "RUNNING", "Checking DNS", List.of(),
+                "default:check-dns", "generation-test", "default", java.util.Map.of("default", "generation-test"), "RUNNING", "Checking DNS", List.of(),
                 SessionUsageSnapshot.empty(), null);
     }
 

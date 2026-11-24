@@ -98,7 +98,7 @@ func TestActiveInspectionDualOutputBaselines(t *testing.T) {
 		},
 		{
 			"execution detail", toolEnvelope[executionDetailResult]{Result: &executionDetail}, executionDetailText(executionDetail),
-			dualOutputMeasurement{FullResponse: 2214, TextWireContribution: 1302, StructuredWireContribution: 864},
+			dualOutputMeasurement{FullResponse: 2216, TextWireContribution: 1303, StructuredWireContribution: 865},
 		},
 		{
 			"activity, one item", toolEnvelope[activityResult]{Result: &activity}, activityText(activity),

@@ -108,3 +108,14 @@ trace views and report that assistant evidence retrieval is unavailable. If the
 artifact has expired or the application restarted, rerun the example and reconnect
 within its completion grace; absence of an artifact does not establish execution
 failure. Use the Console skill's playbooks for precise runtime and trace errors.
+
+## Catalog identities and recorded tool names
+
+Skill Catalog displays the complete `registeredName`, such as `orders:lookup`.
+Detail exposes its `namespace` and `localName` components and exact source label.
+`warehouse:lookup` has a separate detail link even though its local name matches.
+Use the full returned key for Console catalog lookups and trace filters.
+
+Model records preserve provider function names such as `orders--lookup` and
+original argument text. Resolved skill facts and plans use `orders:lookup`.
+Inspect the selected raw request or response to see the exchanged spelling.

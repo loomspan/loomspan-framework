@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-assembled-child-result",
   "sessionId" : "session-assembled-child-result",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-assembled-child-result",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -28,7 +28,7 @@
   },
   "usageComplete" : true,
   "resultAssemblies" : [ {
-    "skillName" : "default-prepareReport",
+    "skillName" : "default:prepare-report",
     "owningMissionFrameId" : "forward-root",
     "planId" : "report-plan",
     "modelContributionRequired" : true,
@@ -38,7 +38,7 @@
       "sourcePath" : "",
       "parentMissionFrameId" : "forward-root",
       "sourceTaskId" : "finish-task",
-      "sourceSkill" : "default-finishReport"
+      "sourceSkill" : "default:finish-report"
     } ]
   } ],
   "attempts" : [ {
@@ -109,7 +109,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-prepareReport"
+    "route" : "default:prepare-report"
   }, {
     "frameId" : "planning-report-plan",
     "parentFrameId" : "forward-root",
@@ -131,7 +131,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-prepareReport#planning"
+    "route" : "default:prepare-report#planning"
   }, {
     "frameId" : "selected-tool",
     "parentFrameId" : "forward-root",
@@ -153,7 +153,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-finishReport"
+    "route" : "default:finish-report"
   }, {
     "frameId" : "root-later",
     "parentFrameId" : "forward-root",
@@ -175,7 +175,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-laterWork"
+    "route" : "default:later-work"
   }, {
     "frameId" : "assembly-model",
     "parentFrameId" : "forward-root",
@@ -197,7 +197,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-prepareReport#model"
+    "route" : "default:prepare-report#model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

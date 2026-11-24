@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-assigned-planner-inability",
   "sessionId" : "session-assigned-planner-inability",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-assigned-planner-inability",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -73,7 +73,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-test_entry"
+    "route" : "default:test-entry"
   }, {
     "frameId" : "inability-planning",
     "parentFrameId" : "inability-root",
@@ -95,7 +95,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-test_entry#planning"
+    "route" : "default:test-entry#planning"
   }, {
     "frameId" : "assigned-step",
     "parentFrameId" : "inability-root",
@@ -117,7 +117,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-test_entry#step-1"
+    "route" : "default:test-entry#step-1"
   }, {
     "frameId" : "assigned-model",
     "parentFrameId" : "assigned-step",
@@ -139,7 +139,7 @@
       "completionUnits" : 1,
       "totalUnits" : 3
     },
-    "route" : "default-test_entry#step-1-model"
+    "route" : "default:test-entry#step-1-model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

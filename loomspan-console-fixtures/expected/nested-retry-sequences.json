@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-nested-retry-sequences",
   "sessionId" : "session-nested-retry-sequences",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-nested-retry-sequences",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {

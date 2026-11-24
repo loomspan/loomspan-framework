@@ -25,7 +25,7 @@ func TestBrowserAndMCPPreserveSameSkillFacts(t *testing.T) {
 	schema := "{ \"type\": \"object\", \"description\": \"<schema>\" }"
 	browserFact := observability.SkillDetail{
 		OutputSchema:   &schema,
-		RegisteredName: "skill-☃", Kind: "YAML", Declaration: "YAML", SourcePath: `opaque <label>`,
+		RegisteredName: "default:skill", Namespace: "default", LocalName: "skill", Kind: "YAML", Declaration: "YAML", SourcePath: `opaque <label>`,
 		Yaml: "name: skill-☃\nmodel: planner\ninstructions: Preserved\n",
 	}
 	body, err := json.Marshal(browserFact)
@@ -47,7 +47,7 @@ func TestBrowserAndMCPPreserveSameSkillFacts(t *testing.T) {
 }
 
 func TestBrowserAndMCPPreserveModelSummaryFacts(t *testing.T) {
-	body := []byte(`{"items":[{"registeredName":"model","kind":"YAML","declaration":"YAML","sourcePath":" opaque ../ Model: <label> "}],"hasMore":false,"nextCursor":null,"observedAt":"2026-10-11T00:00:00Z"}`)
+	body := []byte(`{"items":[{"registeredName":"default:model","namespace":"default","localName":"model","kind":"YAML","declaration":"YAML","sourcePath":" opaque ../ Model: <label> "}],"hasMore":false,"nextCursor":null,"observedAt":"2026-10-11T00:00:00Z"}`)
 	options := newMCPTestOptions(t, func(string) ([]byte, error) { return body, nil })
 	_, envelope, err := handleListSkills(context.Background(), options, listSkillsInput{})
 	if err != nil || envelope.Result == nil {
@@ -57,7 +57,7 @@ func TestBrowserAndMCPPreserveModelSummaryFacts(t *testing.T) {
 		t.Fatalf("unexpected items: %#v", envelope.Result.Items)
 	}
 	item := envelope.Result.Items[0]
-	if item.Kind != "YAML" || item.RegisteredName != "model" || item.SourcePath != " opaque ../ Model: <label> " {
+	if item.Kind != "YAML" || item.RegisteredName != "default:model" || item.SourcePath != " opaque ../ Model: <label> " {
 		t.Fatalf("summary changed: %#v", item)
 	}
 	encoded, err := json.Marshal(item)

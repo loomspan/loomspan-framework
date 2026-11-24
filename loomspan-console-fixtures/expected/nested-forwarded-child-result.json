@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-nested-forwarded-child-result",
   "sessionId" : "session-nested-forwarded-child-result",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-nested-forwarded-child-result",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -28,15 +28,15 @@
   },
   "usageComplete" : true,
   "resultForwardings" : [ {
-    "skillName" : "default-coordinateReport",
+    "skillName" : "default:coordinate-report",
     "planId" : "child-plan",
     "linkedTaskId" : "finish-task",
-    "capabilityName" : "default-finishReport"
+    "capabilityName" : "default:finish-report"
   }, {
-    "skillName" : "default-prepareReport",
+    "skillName" : "default:prepare-report",
     "planId" : "report-plan",
     "linkedTaskId" : "finish-task",
-    "capabilityName" : "default-coordinateReport"
+    "capabilityName" : "default:coordinate-report"
   } ],
   "attempts" : [ {
     "retrySequenceId" : "retry-report-plan",
@@ -106,7 +106,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-prepareReport"
+    "route" : "default:prepare-report"
   }, {
     "frameId" : "planning-report-plan",
     "parentFrameId" : "forward-root",
@@ -128,7 +128,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-prepareReport#planning"
+    "route" : "default:prepare-report#planning"
   }, {
     "frameId" : "selected-tool",
     "parentFrameId" : "forward-root",
@@ -150,7 +150,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-coordinateReport"
+    "route" : "default:coordinate-report"
   }, {
     "frameId" : "forward-child",
     "parentFrameId" : "selected-tool",
@@ -172,7 +172,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-coordinateReport"
+    "route" : "default:coordinate-report"
   }, {
     "frameId" : "planning-child-plan",
     "parentFrameId" : "forward-child",
@@ -194,7 +194,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-coordinateReport#planning"
+    "route" : "default:coordinate-report#planning"
   }, {
     "frameId" : "producer-tool",
     "parentFrameId" : "forward-child",
@@ -216,7 +216,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-finishReport"
+    "route" : "default:finish-report"
   }, {
     "frameId" : "child-later",
     "parentFrameId" : "forward-child",
@@ -238,7 +238,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-laterWork"
+    "route" : "default:later-work"
   }, {
     "frameId" : "root-later",
     "parentFrameId" : "forward-root",
@@ -260,7 +260,7 @@
       "completionUnits" : 0,
       "totalUnits" : 0
     },
-    "route" : "default-laterWork"
+    "route" : "default:later-work"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

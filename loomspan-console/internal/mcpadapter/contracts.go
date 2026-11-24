@@ -40,6 +40,8 @@ type errorDetailsDTO struct {
 
 type skillSummaryDTO struct {
 	RegisteredName string `json:"registeredName"`
+	Namespace      string `json:"namespace"`
+	LocalName      string `json:"localName"`
 	Kind           string `json:"kind"`
 	Declaration    string `json:"declaration"`
 	ExecutorName   string `json:"executorName,omitempty"`
@@ -50,6 +52,8 @@ type skillSummaryDTO struct {
 
 type skillDetailDTO struct {
 	RegisteredName string  `json:"registeredName"`
+	Namespace      string  `json:"namespace"`
+	LocalName      string  `json:"localName"`
 	Kind           string  `json:"kind"`
 	Declaration    string  `json:"declaration"`
 	ExecutorName   string  `json:"executorName,omitempty"`

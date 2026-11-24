@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-chunked-payload",
   "sessionId" : "session-chunked-payload",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-chunked-payload",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {

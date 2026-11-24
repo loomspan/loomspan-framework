@@ -3,7 +3,7 @@
   "valid" : true,
   "traceId" : "trace-recovered-provider-attempt-diagnostic",
   "sessionId" : "session-recovered-provider-attempt-diagnostic",
-  "entrySkill" : "default-test_entry",
+  "entrySkill" : "default:test-entry",
   "generationId" : "trace-recovered-provider-attempt-diagnostic",
   "entryNamespace" : "default",
   "namespaceGenerationIds" : {
@@ -92,7 +92,7 @@
       "completionUnits" : 2,
       "totalUnits" : 6
     },
-    "route" : "default-recoverProviderCall"
+    "route" : "default:recover-provider-call"
   }, {
     "frameId" : "model",
     "parentFrameId" : "root",
@@ -114,7 +114,7 @@
       "completionUnits" : 2,
       "totalUnits" : 6
     },
-    "route" : "default-recoverProviderCall#model"
+    "route" : "default:recover-provider-call#model"
   } ],
   "unframedAttributedUsage" : {
     "promptUnits" : 0,

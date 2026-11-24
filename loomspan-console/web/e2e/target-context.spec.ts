@@ -21,7 +21,7 @@ const test = consoleTest.extend<{
     const sessionId = "session-with-a-long-identifier-1234567890";
     const fixtureRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../loomspan-console-fixtures/traces");
     const artifactBody = fs.readFileSync(path.join(fixtureRoot, "single-attempt-success.ndjson"), "utf8").replaceAll("trace-single-attempt-success", traceId).replaceAll("session-single-attempt-success", sessionId);
-    const traceMetadata = JSON.stringify({ traceId, sessionId, generationId: traceId, entrySkill: "default-test_entry", entryNamespace: "default", namespaceGenerationIds: { default: traceId }, outcome: "SUCCEEDED", finalizedAt: "2026-07-24T12:00:00Z", sizeBytes: new TextEncoder().encode(artifactBody).byteLength, persistencePolicy: "ALWAYS", applicationTraceExpiresAt: "2026-08-03T00:00:00Z" });
+    const traceMetadata = JSON.stringify({ traceId, sessionId, generationId: traceId, entrySkill: "default:test-entry", entryNamespace: "default", namespaceGenerationIds: { default: traceId }, outcome: "SUCCEEDED", finalizedAt: "2026-07-24T12:00:00Z", sizeBytes: new TextEncoder().encode(artifactBody).byteLength, persistencePolicy: "ALWAYS", applicationTraceExpiresAt: "2026-08-03T00:00:00Z" });
     let state: TargetState = {
       instanceId: "11111111-1111-4111-8111-111111111111",
       artifactBody,
@@ -49,7 +49,7 @@ const test = consoleTest.extend<{
             consoleCompatibilityVersion: "1.0.0-beta.10-SNAPSHOT",
             observedAt: "2026-07-27T00:00:00Z",
             liveMonitoringAvailable: true,
-            registeredSkillCount: 0,
+            registeredSkillCount: 2,
             activeExecutionCount: 0,
             catalogedTraceCount: 1,
             tracePersistencePolicy: "PERSISTENT",
@@ -58,6 +58,25 @@ const test = consoleTest.extend<{
             namespaces: [],
           }),
         );
+        return;
+      }
+      if (path === "/_loomspan/observability/v1/skills") {
+        response.writeHead(200, headers);
+        response.end(JSON.stringify({
+          items: ["orders", "warehouse"].map((namespace) => ({
+            registeredName: `${namespace}:lookup`, namespace, localName: "lookup",
+            kind: "YAML", declaration: "YAML", sourcePath: "Orders import #42",
+          })), hasMore: false, nextCursor: null, observedAt: "2026-07-27T00:00:00Z",
+        }));
+        return;
+      }
+      if (path.startsWith("/_loomspan/observability/v1/skills/")) {
+        const registeredName = decodeURIComponent(path.slice("/_loomspan/observability/v1/skills/".length));
+        const namespace = ["orders", "warehouse"].find((owner) => registeredName === `${owner}:lookup`);
+        if (!namespace) { response.writeHead(404).end(); return; }
+        response.writeHead(200, headers);
+        response.end(JSON.stringify({ registeredName, namespace, localName: "lookup", kind: "YAML",
+          declaration: "YAML", sourcePath: "Orders import #42", yaml: `name: lookup\ndescription: ${namespace} lookup\n`, outputSchema: null }));
         return;
       }
       if (path === "/_loomspan/observability/v1/traces") {
@@ -104,6 +123,25 @@ const test = consoleTest.extend<{
 });
 
 test.use({ trace: "off", screenshot: "off", video: "off" });
+
+test("catalog navigation selects each owner of the same local name", async ({ page, consoleProcess, targetApplication }) => {
+  await page.goto(consoleProcess.pairingUrl);
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
+  await page.goto(`${consoleProcess.origin}/target`);
+  await page.getByLabel("Target address").fill(targetApplication.origin);
+  await page.getByLabel("Application key").fill("E2E_APPLICATION_KEY_12345678901234567890");
+  await page.getByRole("button", { name: "Connect" }).click();
+  await expect(page.getByRole("heading", { name: "Instance Overview" })).toBeVisible();
+  for (const namespace of ["orders", "warehouse"]) {
+    await page.goto(`${consoleProcess.origin}/skills`);
+    await page.getByRole("link", { name: `${namespace}:lookup`, exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Skill Detail" })).toBeVisible();
+    await expect(page.getByText(`${namespace}:lookup`, { exact: true })).toBeVisible();
+    await expect(page.getByText(`${namespace} lookup`)).toBeVisible();
+    await expect(page.locator(".skill-detail-facts")).toContainText(`Namespace${namespace}`);
+    await expect(page.locator(".skill-detail-facts")).toContainText("Local namelookup");
+  }
+});
 
 // navigateToTraceDetail goes to the trace catalog, clicks the trace link (which
 // includes the targetScopeId query parameter), and waits for the Trace Detail
