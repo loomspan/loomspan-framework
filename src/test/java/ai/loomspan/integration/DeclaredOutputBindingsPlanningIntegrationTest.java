@@ -64,7 +64,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
             server.setDispatcher(new Dispatcher() {
                 @Override public MockResponse dispatch(RecordedRequest request) {
                     calls.incrementAndGet();
-                    return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-10T00:00:00Z", "status", "VALID", "tasks", List.of(task("evaluation")))));
+                    return response(JSON.writeValueAsString(Map.of("capabilityName", "default:root", "createdAt", "2026-10-10T00:00:00Z", "status", "VALID", "tasks", List.of(task("evaluation")))));
                 }
             }); server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class)
@@ -86,7 +86,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                             var diagnosis = ((ai.loomspan.api.SkillException) failure).getFailureDiagnosis();
                             if (probability) assertThat(diagnosis).isEmpty();
                             else assertThat(diagnosis).hasValueSatisfying(detail -> {
-                                assertThat(detail.skillName()).isEqualTo("default-root");
+                                assertThat(detail.skillName()).isEqualTo("default:root");
                                 assertThat(detail.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA);
                                 assertThat(detail.issues().getFirst().path()).isEqualTo("/selected");
                                 assertThat(detail.issues().getFirst().code()).isEqualTo("enum");
@@ -162,10 +162,10 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                         int attempt = plans.incrementAndGet();
                         assertThat(system).contains("exactly one direct task", "first", "second");
                         var tasks = attempt == 1 ? List.of(task("later")) : List.of(task("first"),task("second"),task("later"));
-                        return response(JSON.writeValueAsString(Map.of("capabilityName","default-root","createdAt","2026-10-05T00:00:00Z","status","VALID","tasks",tasks)));
+                        return response(JSON.writeValueAsString(Map.of("capabilityName","default:root","createdAt","2026-10-05T00:00:00Z","status","VALID","tasks",tasks)));
                     }
                     if (system.contains("coordinator-assigned task")) {
-                        var match = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
+                        var match = Pattern.compile("Exact capability/tool: ([a-z0-9:-]+)").matcher(system);
                         assertThat(match.find()).isTrue(); String child=match.group(1);
                         return response(JSON.writeValueAsString(Map.of("stepAction","CALL_TOOL","taskId",child.substring("default-".length()),"toolName",child,"toolArguments",Map.of())));
                     }
@@ -180,8 +180,8 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
             ApplicationContextRunner runner = new ApplicationContextRunner().withUserConfiguration(App.class).withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
                 children.incrementAndGet();
                 return switch(invocation.skillName()) {
-                    case "default-first" -> EXACT;
-                    case "default-second" -> "[3,1,2]";
+                    case "default:first" -> EXACT;
+                    case "default:second" -> "[3,1,2]";
                     default -> { later.incrementAndGet(); yield "unrelated completed"; }
                 };
             })).withPropertyValues("spring.main.web-application-type=none","loomspan.skills.locations="+directory.toUri()+"*.yaml",
@@ -203,7 +203,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
         assertThat(finals.get()).isEqualTo(mixed ? 2 : 0); assertThat(children.get()).isEqualTo(kind.equals("executor") ? 3 : 2);
     }
     private static Map<String,Object> task(String name) {
-        Map<String,Object> task = new java.util.LinkedHashMap<>(Map.of("taskId",name,"title",name,"status","PENDING","capabilityName","default-" + name,"intent","work","dependsOn",List.of(),"expectedOutputs",List.of("result")));
+        Map<String,Object> task = new java.util.LinkedHashMap<>(Map.of("taskId",name,"title",name,"status","PENDING","capabilityName","default:" + name,"intent","work","dependsOn",List.of(),"expectedOutputs",List.of("result")));
         task.put("parallelGroup", null); task.put("note", ""); return task;
     }
     @ParameterizedTest
@@ -249,15 +249,15 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                         var body = JSON.readTree(request.getBody().readUtf8());
                         String system = ai.loomspan.testkit.ResponsesFixtures.transcript(body).get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan"))
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-05T00:00:00Z", "status", "VALID", "tasks", List.of(task("first"), task("later")))));
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default:root", "createdAt", "2026-10-05T00:00:00Z", "status", "VALID", "tasks", List.of(task("first"), task("later")))));
                         if (system.contains("coordinator-assigned task")) {
-                            var match = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
+                            var match = Pattern.compile("Exact capability/tool: ([a-z0-9:-]+)").matcher(system);
                             assertThat(match.find()).isTrue();
                             String name = match.group(1);
                             return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", name.substring("default-".length()), "toolName", name, "toolArguments", Map.of())));
                         }
                         assertThat(modelOwnedSpace).isTrue();
-                        assertThat(completed).containsExactly("default-first", "default-later");
+                        assertThat(completed).containsExactly("default:first", "default:later");
                         finals.incrementAndGet();
                         Map<String, Object> contribution = nested ? Map.of("context", Map.of("extra", "reasoned")) : Map.of("extra", "reasoned");
                         return response(JSON.writeValueAsString(Map.of("stepAction", "FINAL_RESPONSE", "finalResponse", contribution)));
@@ -279,7 +279,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                     });
         }
         assertThat(failure.get()).isNull();
-        assertThat(completed).containsExactly("default-first", "default-later");
+        assertThat(completed).containsExactly("default:first", "default:later");
         assertThat(finals.get()).isEqualTo(modelOwnedSpace ? 1 : 0);
     }
     private static MockResponse response(String content) {

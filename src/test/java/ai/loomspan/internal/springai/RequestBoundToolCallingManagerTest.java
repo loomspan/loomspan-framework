@@ -15,19 +15,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class CanonicalToolCallingManagerTest {
+class RequestBoundToolCallingManagerTest {
     @Test void nativeDriverOptionsUseTheSharedDecisionBeforeAnyDelegation() {
         var delegate = mock(ToolCallingManager.class);
-        var manager = new CanonicalToolCallingManager(delegate);
+        var manager = new RequestBoundToolCallingManager(delegate);
         var calls = new AtomicInteger();
-        var callback = callback("tax-calculateTax", calls);
+        var callback = callback("order-support--find-order", calls);
         List<org.springframework.ai.chat.prompt.ChatOptions> options = List.of(
                 org.springframework.ai.openai.responses.OpenAiResponsesChatOptions.builder().toolCallbacks(callback).build(),
                 org.springframework.ai.anthropic.AnthropicChatOptions.builder().toolCallbacks(callback).build(),
                 org.springframework.ai.google.genai.GoogleGenAiChatOptions.builder().toolCallbacks(callback).build());
         for (int index = 0; index < options.size(); index++) {
             String finish = List.of("LENGTH", "refusal", "SAFETY").get(index);
-            var response = new ChatResponse(List.of(new Generation(response("tax-calculateTax").getResult().getOutput(),
+            var response = new ChatResponse(List.of(new Generation(response("order-support--find-order").getResult().getOutput(),
                     org.springframework.ai.chat.metadata.ChatGenerationMetadata.builder().finishReason(finish).build())));
             var prompt = new Prompt("user", options.get(index));
             assertThatThrownBy(() -> manager.executeToolCalls(prompt, response))
@@ -38,9 +38,9 @@ class CanonicalToolCallingManagerTest {
     }
     @Test void incompleteContainingResponseRejectsEveryGenerationBeforeDelegation() {
         var delegate = mock(ToolCallingManager.class);
-        var manager = new CanonicalToolCallingManager(delegate);
-        var options = ToolCallingChatOptions.builder().toolCallbacks(callback("tax-calculateTax", new AtomicInteger())).build();
-        var complete = generation(call("tax-calculateTax", "{}"));
+        var manager = new RequestBoundToolCallingManager(delegate);
+        var options = ToolCallingChatOptions.builder().toolCallbacks(callback("order-support--find-order", new AtomicInteger())).build();
+        var complete = generation(call("order-support--find-order", "{}"));
         var incomplete = new Generation(complete.getOutput(), org.springframework.ai.chat.metadata.ChatGenerationMetadata
                 .builder().finishReason("LENGTH").build());
         assertThatThrownBy(() -> manager.executeToolCalls(new Prompt("user", options),
@@ -55,7 +55,7 @@ class CanonicalToolCallingManagerTest {
             "{\"reason\":\"x\",\"reason\":\"y\"}", "{\"reason\":\"x\"} {}"})
     void rejectsMalformedBoundControlArguments(String arguments) {
         var delegate = mock(ToolCallingManager.class);
-        var manager = new CanonicalToolCallingManager(delegate);
+        var manager = new RequestBoundToolCallingManager(delegate);
         var prompt = new Prompt("user", ToolCallingChatOptions.builder().toolCallbacks(new PlannerInabilityTool()).build());
 
         assertThatThrownBy(() -> manager.executeToolCalls(prompt,
@@ -66,11 +66,11 @@ class CanonicalToolCallingManagerTest {
 
     @Test void rejectsMixedOrRepeatedControlsAcrossAllGenerationsBeforeDispatch() {
         var delegate = mock(ToolCallingManager.class);
-        var manager = new CanonicalToolCallingManager(delegate);
+        var manager = new RequestBoundToolCallingManager(delegate);
         var prompt = new Prompt("user", ToolCallingChatOptions.builder()
-                .toolCallbacks(new PlannerInabilityTool(), callback("tax-calculateTax", new AtomicInteger())).build());
+                .toolCallbacks(new PlannerInabilityTool(), callback("order-support--find-order", new AtomicInteger())).build());
         var control = call(PlannerInabilityTool.NAME, "{\"reason\":\"blocked\"}");
-        var application = call("Tax-calculateTax", "{}");
+        var application = call("order-support--find-order", "{}");
 
         for (var generations : List.of(List.of(generation(control, application)), List.of(generation(application, control)),
                 List.of(generation(control, control)), List.of(generation(application), generation(control)),
@@ -83,7 +83,7 @@ class CanonicalToolCallingManagerTest {
 
     @Test void controlNameRequiresExactSpellingAndAnActualFrameworkBinding() {
         var delegate = mock(ToolCallingManager.class);
-        var manager = new CanonicalToolCallingManager(delegate);
+        var manager = new RequestBoundToolCallingManager(delegate);
         var fake = callback(PlannerInabilityTool.NAME, new AtomicInteger());
         for (var options : List.of(ToolCallingChatOptions.builder().build(),
                 ToolCallingChatOptions.builder().toolCallbacks(fake).build())) {
@@ -98,43 +98,47 @@ class CanonicalToolCallingManagerTest {
         verifyNoInteractions(delegate);
     }
 
-    @Test void canonicalExecutionCopyPreservesOriginalEvidenceAndArguments() {
+    @Test void rejectedResponseRetainsOriginalEvidenceAndArguments() {
         var delegate = mock(ToolCallingManager.class);
-        var manager = new CanonicalToolCallingManager(delegate);
-        var callback = callback("tax-calculateTax", new AtomicInteger());
-        var prompt = new Prompt("authored Tax-calculateTax", ToolCallingChatOptions.builder().toolCallbacks(callback).build());
-        var original = response("Tax-calculateTax");
-        manager.executeToolCalls(prompt, original);
-        var captured = org.mockito.ArgumentCaptor.forClass(ChatResponse.class);
-        verify(delegate).executeToolCalls(eq(prompt), captured.capture());
-        var copy = captured.getValue();
-        assertThat(original.getResult().getOutput().getToolCalls().getFirst().name()).isEqualTo("Tax-calculateTax");
-        assertThat(copy.getResult().getOutput().getToolCalls().getFirst())
-                .isEqualTo(new AssistantMessage.ToolCall("id", "function", "tax-calculateTax", "{\"value\":null}"));
-        assertThat(copy.getMetadata()).isSameAs(original.getMetadata());
-        assertThat(copy.getResult().getMetadata()).isSameAs(original.getResult().getMetadata());
-        assertThat(copy.getResult().getOutput().getText()).isEqualTo("raw text");
-        assertThat(copy.getResult().getOutput().getMetadata()).containsEntry("raw", "Tax-calculateTax");
+        var manager = new RequestBoundToolCallingManager(delegate);
+        var prompt = new Prompt("user", ToolCallingChatOptions.builder()
+                .toolCallbacks(callback("order-support--find-order", new AtomicInteger())).build());
+        var original = response("order-support:find-order");
+        assertThatThrownBy(() -> manager.executeToolCalls(prompt, original)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(original.getResult().getOutput().getToolCalls().getFirst().name()).isEqualTo("order-support:find-order");
+        assertThat(original.getResult().getOutput().getToolCalls().getFirst().arguments()).isEqualTo("{\"value\":null}");
+        verifyNoInteractions(delegate);
+    }
+
+    @Test void callbackFromAnotherRequestCannotBeResolved() {
+        var count = new AtomicInteger();
+        var manager = new RequestBoundToolCallingManager(ToolCallingManager.builder().build());
+        var first = ToolCallingChatOptions.builder().toolCallbacks(callback("order-support--find-order", count)).build();
+        manager.resolveToolDefinitions(first);
+        var second = ToolCallingChatOptions.builder().build();
+        assertThatThrownBy(() -> manager.executeToolCalls(new Prompt("user", second), response("order-support--find-order")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(count).hasValue(0);
     }
 
     @Test void rejectsEveryInvalidOrUnboundSelectionBeforeAnyCallbackExecutes() {
-        for (String name : List.of("tax-CalculateTax", "other-calculateTax", "calculateTax", "tax-a-b", "tax/a", " tax-calculateTax",
+        for (String name : List.of("order-support:find-order", "other--find-order", "order-support--other", "Order-support--find-order", "", "order-support--find-order ", "tax-CalculateTax", "other-calculateTax", "calculateTax", "tax-a-b", "tax/a", " order-support--find-order",
                 "n".repeat(33) + "-x", "tax-" + "x".repeat(61))) {
             var count = new AtomicInteger();
-            var manager = new CanonicalToolCallingManager(ToolCallingManager.builder().build());
-            var prompt = new Prompt("user", ToolCallingChatOptions.builder().toolCallbacks(callback("tax-calculateTax", count)).build());
+            var manager = new RequestBoundToolCallingManager(ToolCallingManager.builder().build());
+            var prompt = new Prompt("user", ToolCallingChatOptions.builder().toolCallbacks(callback("order-support--find-order", count)).build());
             var response = new ChatResponse(List.of(new Generation(AssistantMessage.builder().toolCalls(List.of(
-                    new AssistantMessage.ToolCall("valid", "function", "tax-calculateTax", "{}"),
+                    new AssistantMessage.ToolCall("valid", "function", "order-support--find-order", "{}"),
                     new AssistantMessage.ToolCall("invalid", "function", name, "{}"))).build())));
             assertThatThrownBy(() -> manager.executeToolCalls(prompt, response)).isInstanceOf(IllegalArgumentException.class);
             assertThat(count).hasValue(0);
         }
     }
 
-    @Test void realManagerExecutesCanonicalUnderscoresAndMaximumLengthWithoutRenaming() {
-        for (String name : List.of("a_b-c_d", "a".repeat(32) + "-" + "b".repeat(31), "loomspan-loomspan_cannot_complete")) {
+    @Test void realManagerExecutesExactOfferedNamesAndMaximumLength() {
+        for (String name : List.of("order-support--find-order", "a".repeat(31) + "--" + "b".repeat(31))) {
             var count = new AtomicInteger();
-            var manager = new CanonicalToolCallingManager(ToolCallingManager.builder().build());
+            var manager = new RequestBoundToolCallingManager(ToolCallingManager.builder().build());
             var callback = callback(name, count);
             var options = ToolCallingChatOptions.builder().toolCallbacks(callback, new PlannerInabilityTool()).build();
             assertThat(manager.resolveToolDefinitions(options)).extracting(ToolDefinition::name)
@@ -145,41 +149,52 @@ class CanonicalToolCallingManagerTest {
         }
     }
 
-    @Test void unchangedCanonicalResponseRetainsMessageAndPartIdentity() {
+    @ParameterizedTest @NullSource @ValueSource(strings = {"", " "})
+    void rejectsMissingNamesBeforeDelegation(String name) {
         var delegate = mock(ToolCallingManager.class);
-        var message = richMessage("tax-calculateTax");
+        var prompt = new Prompt("user", ToolCallingChatOptions.builder()
+                .toolCallbacks(callback("order-support--find-order", new AtomicInteger())).build());
+        var original = new ChatResponse(List.of(generation(call(name, "{}"))));
+        assertThatThrownBy(() -> new RequestBoundToolCallingManager(delegate).executeToolCalls(prompt, original))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(delegate);
+    }
+
+    @Test void laterGenerationCannotRunAnEarlierValidSelectionBeforePreflight() {
+        var count = new AtomicInteger();
+        var manager = new RequestBoundToolCallingManager(ToolCallingManager.builder().build());
+        var prompt = new Prompt("user", ToolCallingChatOptions.builder()
+                .toolCallbacks(callback("order-support--find-order", count)).build());
+        var original = new ChatResponse(List.of(generation(call("order-support--find-order", "{}")),
+                generation(call("other--find-order", "{}"))));
+        assertThatThrownBy(() -> manager.executeToolCalls(prompt, original)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(count).hasValue(0);
+    }
+
+    @Test void unchangedResponseRetainsMessageAndPartIdentity() {
+        var delegate = mock(ToolCallingManager.class);
+        var message = richMessage("order-support--find-order");
         var original = new ChatResponse(List.of(new Generation(message)));
         var prompt = new Prompt("user", ToolCallingChatOptions.builder()
-                .toolCallbacks(callback("tax-calculateTax", new AtomicInteger())).build());
-        new CanonicalToolCallingManager(delegate).executeToolCalls(prompt, original);
+                .toolCallbacks(callback("order-support--find-order", new AtomicInteger())).build());
+        new RequestBoundToolCallingManager(delegate).executeToolCalls(prompt, original);
         var capture = org.mockito.ArgumentCaptor.forClass(ChatResponse.class);
         verify(delegate).executeToolCalls(eq(prompt), capture.capture());
         assertThat(capture.getValue()).isSameAs(original);
         assertThat(capture.getValue().getResult().getOutput()).isSameAs(message);
     }
 
-    @Test void canonicalRenameReplacesOnlyTheAttributedToolPart() {
+    @Test void rejectedRichResponseRetainsEveryPart() {
         var delegate = mock(ToolCallingManager.class);
-        var message = richMessage("Tax-calculateTax");
+        var message = richMessage("order-support:find-order");
         var original = new ChatResponse(List.of(new Generation(message)));
         var prompt = new Prompt("user", ToolCallingChatOptions.builder()
-                .toolCallbacks(callback("tax-calculateTax", new AtomicInteger())).build());
-        new CanonicalToolCallingManager(delegate).executeToolCalls(prompt, original);
-        var capture = org.mockito.ArgumentCaptor.forClass(ChatResponse.class);
-        verify(delegate).executeToolCalls(eq(prompt), capture.capture());
-        var parts = capture.getValue().getResult().getOutput().getParts();
-        assertThat(parts).hasSize(message.getParts().size());
-        for (int i : List.of(0, 1, 3, 4)) assertThat(parts.get(i)).isSameAs(message.getParts().get(i));
-        var changed = (org.springframework.ai.chat.messages.part.ToolCallPart) parts.get(2);
-        var before = (org.springframework.ai.chat.messages.part.ToolCallPart) message.getParts().get(2);
-        assertThat(changed.toolCall().name()).isEqualTo("tax-calculateTax");
-        assertThat(changed.toolCall().id()).isEqualTo(before.toolCall().id());
-        assertThat(changed.toolCall().arguments()).isEqualTo(before.toolCall().arguments());
-        assertThat(changed.payload()).isSameAs(before.payload());
-        assertThat(changed.attributes()).isEqualTo(before.attributes());
-        assertThat(before.toolCall().name()).isEqualTo("Tax-calculateTax");
+                .toolCallbacks(callback("order-support--find-order", new AtomicInteger())).build());
+        assertThatThrownBy(() -> new RequestBoundToolCallingManager(delegate).executeToolCalls(prompt, original))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(original.getResult().getOutput()).isSameAs(message);
+        verifyNoInteractions(delegate);
     }
-
 
     /** Uses the actual Spring manager and callback, with a mocked downstream capability boundary. */
     @ParameterizedTest @NullSource
@@ -189,9 +204,9 @@ class CanonicalToolCallingManagerTest {
         var capability = SpringAiToolCallbackAdapterTest.capability("{\"type\":\"object\"}");
         var callback = SpringAiToolCallbackAdapterTest.adapt(capability);
         var prompt = new Prompt("user", ToolCallingChatOptions.builder().toolCallbacks(callback).build());
-        var manager = new CanonicalToolCallingManager(ToolCallingManager.builder().build());
+        var manager = new RequestBoundToolCallingManager(ToolCallingManager.builder().build());
         assertThatThrownBy(() -> manager.executeToolCalls(prompt,
-                new ChatResponse(List.of(generation(call(capability.name(), arguments))))))
+                new ChatResponse(List.of(generation(call(callback.getToolDefinition().name(), arguments))))))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(capability, never()).invoke(any(), any());
     }
@@ -201,9 +216,9 @@ class CanonicalToolCallingManagerTest {
         when(capability.invoke(anyMap(), isNull())).thenReturn(Map.of("accepted", true));
         var callback = SpringAiToolCallbackAdapterTest.adapt(capability);
         var prompt = new Prompt("user", ToolCallingChatOptions.builder().toolCallbacks(callback).build());
-        var manager = new CanonicalToolCallingManager(ToolCallingManager.builder().build());
+        var manager = new RequestBoundToolCallingManager(ToolCallingManager.builder().build());
         for (String arguments : List.of("{} \r\n\t", "{\"value\":null}  ")) {
-            manager.executeToolCalls(prompt, new ChatResponse(List.of(generation(call(capability.name(), arguments)))));
+            manager.executeToolCalls(prompt, new ChatResponse(List.of(generation(call(callback.getToolDefinition().name(), arguments)))));
         }
         var captured = org.mockito.ArgumentCaptor.forClass(Map.class);
         verify(capability, times(2)).invoke(captured.capture(), isNull());
@@ -257,12 +272,12 @@ class CanonicalToolCallingManagerTest {
         });
         var callback = SpringAiToolCallbackAdapterTest.adapt(capability);
         var prompt = new Prompt("user", ToolCallingChatOptions.builder().toolCallbacks(callback).build());
-        var manager = new CanonicalToolCallingManager(ToolCallingManager.builder().build());
+        var manager = new RequestBoundToolCallingManager(ToolCallingManager.builder().build());
         String raw = """
                 {"value":0.12345678901234567890123456789,
                  "nested":{"fraction":9.876543210987654321e30,"values":[1.234567890123456789e-30,null]}}
                 """;
-        var response = new ChatResponse(List.of(generation(call(capability.name(), raw))));
+        var response = new ChatResponse(List.of(generation(call(callback.getToolDefinition().name(), raw))));
         manager.executeToolCalls(prompt, response);
         assertThat(target.calls).isEqualTo(1);
         assertThat(target.received).isEqualTo(new java.math.BigDecimal("0.12345678901234567890123456789"));
@@ -270,7 +285,7 @@ class CanonicalToolCallingManagerTest {
         assertThat(target.nested.get("values")).isEqualTo(Arrays.asList(new java.math.BigDecimal("1.234567890123456789e-30"), null));
         assertThat(response.getResult().getOutput().getToolCalls().getFirst().arguments()).isEqualTo(raw);
         for (String invalid : List.of("1.000000000000000000000000000001", "-0.000000000000000000000000000001")) {
-            var rejected = new ChatResponse(List.of(generation(call(capability.name(), "{\"value\":" + invalid + "}"))));
+            var rejected = new ChatResponse(List.of(generation(call(callback.getToolDefinition().name(), "{\"value\":" + invalid + "}"))));
             var feedback = manager.executeToolCalls(prompt, rejected);
             assertThat(feedback.conversationHistory().toString()).contains("Invalid ordinary arguments");
             assertThat(target.calls).isEqualTo(1);

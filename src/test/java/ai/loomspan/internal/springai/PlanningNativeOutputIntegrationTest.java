@@ -60,13 +60,13 @@ class PlanningNativeOutputIntegrationTest {
                     identity.startsWith("qwen") ? null : "medium");
             var definition = new ai.loomspan.internal.skill.YamlSkillDefinition(ai.loomspan.internal.skill.YamlSkillDefinition.Form.MODEL,
                     "default", new org.springframework.core.io.ByteArrayResource(new byte[0]), manifest, config);
-            var session = TestLoomspanSessions.withId("planner-wire", "default-planner", 3);
+            var session = TestLoomspanSessions.withId("planner-wire", "default:planner", 3);
             var state = new ai.loomspan.internal.runtime.state.DefaultExecutionStateService(java.time.Clock.systemUTC());
             var planner = new ai.loomspan.internal.runtime.planning.DefaultPlanningService(state);
             var captures = new java.util.ArrayList<ModelInteractionRequest>();
             var interaction = new SpringAiModelInteraction(client, ModelInteractionMode.STEP_EXECUTION);
             server.enqueue(text(runtime.driver(), "{\"name\":\"wrong final schema\"}"));
-            server.enqueue(text(runtime.driver(), "{\"capabilityName\":\"default-planner\",\"createdAt\":\"2026-01-01T00:00:00Z\",\"status\":\"VALID\",\"tasks\":[]}"));
+            server.enqueue(text(runtime.driver(), "{\"capabilityName\":\"default:planner\",\"createdAt\":\"2026-01-01T00:00:00Z\",\"status\":\"VALID\",\"tasks\":[]}"));
             TestExecutionBindings.callWithSession(session, () -> planner.initializePlan(session, "plan", Map.of("attachmentDescriptor", "descriptor-only"),
                     definition, request -> { captures.add(request); return interaction.call(request); }, List.of()).orElseThrow());
             assertThat(captures).hasSize(2);

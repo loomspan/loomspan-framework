@@ -37,7 +37,7 @@ final class PlanStructureValidator
             return new PlanStructureValidationResult(issues);
         }
         if (executingName != null) {
-            String selected = canonicalSelection(planNode, issues, "Plan root");
+            String selected = validatedSelection(planNode, issues, "Plan root");
             if (selected != null && !executingName.equals(selected))
                 issues.add(issue(PLAN_STRUCTURE, "Plan root capabilityName must match executing skill '" + executingName + "'."));
         }
@@ -95,7 +95,7 @@ final class PlanStructureValidator
             }
             else
             {
-                String selected = canonicalSelection(task, issues, label);
+                String selected = validatedSelection(task, issues, label);
                 if (selected != null && !visibleNames.contains(selected)) issues.add(issue(PLAN_STRUCTURE,
                         "%s field 'capabilityName' value '%s' is not an exact visible capability name."
                                 .formatted(label, capabilityNode.textValue())));
@@ -262,13 +262,12 @@ final class PlanStructureValidator
         return new PlanStructureIssue(code, message);
     }
 
-    private static String canonicalSelection(ObjectNode node, List<PlanStructureIssue> issues, String label) {
+    private static String validatedSelection(ObjectNode node, List<PlanStructureIssue> issues, String label) {
         var value = node.get("capabilityName");
         try {
             if (value == null || !value.isTextual()) throw new IllegalArgumentException("capabilityName must be a string");
-            String canonical = ai.loomspan.internal.core.SkillIdentity.parse(value.textValue()).toString();
-            node.put("capabilityName", canonical);
-            return canonical;
+            ai.loomspan.internal.core.SkillIdentity.parse(value.textValue());
+            return value.textValue();
         } catch (IllegalArgumentException ex) {
             issues.add(issue(PLAN_STRUCTURE, label + " invalid capabilityName: " + ex.getMessage()));
             return null;

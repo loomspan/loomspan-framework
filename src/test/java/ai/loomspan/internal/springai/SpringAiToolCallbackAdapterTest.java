@@ -24,6 +24,15 @@ import static org.mockito.Mockito.*;
 /** Real callback codec; capability is mocked because construction enters binding projection. */
 class SpringAiToolCallbackAdapterTest
 {
+    @Test void rendersProviderNameFromResolvedIdentity()
+    {
+        var capability = capability("{\"type\":\"object\"}");
+        var metadata = mock(ai.loomspan.internal.core.CapabilityMetadata.class);
+        when(metadata.identity()).thenReturn(new ai.loomspan.internal.core.SkillIdentity("order-support", "find-order"));
+        when(capability.metadata()).thenReturn(metadata);
+        assertThat(adapt(capability).getToolDefinition().name()).isEqualTo("order-support--find-order");
+    }
+
     @Test void adaptsUnconstrainedSchemaVerbatimToSpringAiToolCallback()
     {
         String schema = """
@@ -32,11 +41,20 @@ class SpringAiToolCallbackAdapterTest
                 """;
         var capability = capability(schema);
         var callback = adapt(capability);
-        assertThat(callback.getToolDefinition().name()).isEqualTo("a_b-rankTransportOptions");
+        assertThat(callback.getToolDefinition().name()).isEqualTo("order-support--find-order");
         assertThat(callback.getToolDefinition().description()).isEqualTo("description exact");
         assertThat(callback.getToolDefinition().inputSchema()).isEqualTo(schema);
         assertThat(callback.getToolMetadata().returnDirect()).isFalse();
         assertThat(callback.getToolMetadata().requiresConfirmation()).isFalse();
+    }
+
+    @Test void supportsMaximumProviderNameLength()
+    {
+        var capability = capability("{}");
+        var metadata = mock(ai.loomspan.internal.core.CapabilityMetadata.class);
+        when(metadata.identity()).thenReturn(new ai.loomspan.internal.core.SkillIdentity("order-support", "a".repeat(49)));
+        when(capability.metadata()).thenReturn(metadata);
+        assertThat(adapt(capability).getToolDefinition().name()).isEqualTo("order-support--" + "a".repeat(49)).hasSize(64);
     }
 
     @Test void preservesNestedFractionsExponentsLargeIntegersAndNulls()
@@ -105,7 +123,10 @@ class SpringAiToolCallbackAdapterTest
     static BoundCapability capability(String schema)
     {
         var capability = mock(BoundCapability.class);
-        when(capability.name()).thenReturn("a_b-rankTransportOptions");
+        when(capability.name()).thenReturn("unrelated:display-name");
+        var metadata = mock(ai.loomspan.internal.core.CapabilityMetadata.class);
+        when(metadata.identity()).thenReturn(new ai.loomspan.internal.core.SkillIdentity("order-support", "find-order"));
+        when(capability.metadata()).thenReturn(metadata);
         when(capability.description()).thenReturn("description exact");
         when(capability.inputSchema()).thenReturn(schema);
         return capability;

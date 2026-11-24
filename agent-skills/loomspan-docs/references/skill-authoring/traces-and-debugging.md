@@ -176,11 +176,12 @@ protects the published-key boundary.
 
 ## Trace identity
 
-Skill identities are full canonical `namespace-localName` strings, including
-`default-search`. Local-name case is preserved. Existing Console lookups,
-correlations and displays keep the whole identity; `a-search` and `b-search` name
-different skills. A model/planning operation route is still an operation, not a
-skill identity. Unknown-skill diagnostics retain null/unavailable context.
+Resolved skill identities use the exact `namespace:local-name` reference,
+including `default:search`. Both components follow the lowercase declaration
+grammar. Lookups, correlations and displays retain the whole identity.
+`a:search` and `b:search` identify distinct skills. Model and planning operation
+routes retain their operation meaning. Unknown-skill diagnostics retain
+null/unavailable context.
 
 `TRACE_STARTED.metadata` records `entryNamespace`, entry-scoped `generationId`
 and `namespaceGenerationIds`, the admission snapshot's complete reachable namespace
@@ -834,3 +835,21 @@ diagnostics, `nested-frame-usage` native/executor evidence, and
 `executor-recoverable-failure` / `executor-terminal-failure` classifications.
 Go `executor_diagnostics_test.go` and real MCP/browser semantic tests cover bounded
 traversal; `TraceRecords.executorDiagnostics.test.tsx` covers lazy inert details.
+
+## Raw function names and resolved skills
+
+Canonical model response `toolCalls.name` and continuation request tool-call or
+tool-response names retain the provider spelling actually exchanged. For a child
+`order-support:find-order`, a native call uses `order-support--find-order`.
+Tool lifecycle `metadata.capabilityName` and the resolved skill route use
+`order-support:find-order`. Plans and assigned worker actions also use the colon
+reference. Their raw recorded content retains the model's exact spelling,
+including rejected selections.
+
+Request records capture the model messages and response schema. Inspect the
+provider request when verifying the advertised function definitions.
+`NamespaceExecutionAuthorityIntegrationTest#exactProviderOfferExecutesResolvedChildAndKeepsRawEvidence`
+checks the outbound definition, execution, original argument text, continuation
+name and separate resolved metadata in one invocation.
+`RequestBoundToolCallingManagerTest` checks original response and rich-part
+identity through dispatch and rejection.

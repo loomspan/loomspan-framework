@@ -162,7 +162,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
             assertThatThrownBy(()->template.invoke("default", "comparison",Map.of("assessment",Map.of("count","uncoerced")),view->events.addAll(view.events())))
                     .hasStackTraceContaining("binding_output_validation")
                     .satisfies(failure -> assertThat(((ai.loomspan.api.SkillException) failure).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
-                        assertThat(diagnosis.skillName()).isEqualTo("default-comparison");
+                        assertThat(diagnosis.skillName()).isEqualTo("default:comparison");
                         assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA);
                         assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/count");
                         assertThat(diagnosis.issues().getFirst().code()).isEqualTo("type");
@@ -177,7 +177,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
                 output_schema:
                   type: object
                   properties:
-                    assessment: {type: object, additionalProperties: true, x-loomspan-evidence: default-producer}
+                    assessment: {type: object, additionalProperties: true, x-loomspan-evidence: default:producer}
                     summary: {type: string}
                   required: [assessment, summary]
                   additionalProperties: false

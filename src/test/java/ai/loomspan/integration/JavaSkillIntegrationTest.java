@@ -58,13 +58,13 @@ class JavaSkillIntegrationTest
                 assertThat(context).hasNotFailed();
                 var observed = new AtomicReference<SkillExecutionView>();
                 var skills = context.getBean(SkillTemplate.class);
-                assertThat(skills.invoke("default", "plainEcho", Map.of("message", "hello"), observed::set))
+                assertThat(skills.invoke("default", "plain-echo", Map.of("message", "hello"), observed::set))
                         .isEqualTo("{\"message\":\"hello\"}");
                 assertThat(observed.get()).isNotNull();
                 assertThat(observed.get().sessionId()).isNotBlank();
                 assertThat(observed.get().events()).isNotEmpty();
                 assertThat(calls).hasValue(1);
-                assertThatThrownBy(() -> skills.invoke("default", "plainEcho", Map.of()))
+                assertThatThrownBy(() -> skills.invoke("default", "plain-echo", Map.of()))
                         .isInstanceOf(SkillInputValidationException.class);
                 assertThat(calls).hasValue(1);
             });
@@ -87,15 +87,15 @@ class JavaSkillIntegrationTest
                         SecurityContextHolder.setContext(caller);
                         try
                         {
-                            assertThat(skills.invoke("default", "securedEcho", Map.of("message", "hello"))).isEqualTo("alice:hello");
+                            assertThat(skills.invoke("default", "secured-echo", Map.of("message", "hello"))).isEqualTo("alice:hello");
                             assertThat(SecurityContextHolder.getContext()).isSameAs(caller);
-                            assertThatThrownBy(() -> skills.invoke("default", "alwaysDenied", Map.of())).isInstanceOf(AccessDeniedException.class);
+                            assertThatThrownBy(() -> skills.invoke("default", "always-denied", Map.of())).isInstanceOf(AccessDeniedException.class);
                             assertThat(SecurityContextHolder.getContext()).isSameAs(caller);
                             SecurityContext empty = new SecurityContextImpl();
                             SecurityContextHolder.setContext(empty);
-                            assertThatThrownBy(() -> skills.invoke("default", "securedEcho", Map.of("message", "hidden")))
+                            assertThatThrownBy(() -> skills.invoke("default", "secured-echo", Map.of("message", "hidden")))
                                     .isInstanceOf(AccessDeniedException.class);
-                            assertThat(skills.invoke("default", "outsidePermit", Map.of())).isEqualTo("public");
+                            assertThat(skills.invoke("default", "outside-permit", Map.of())).isEqualTo("public");
                             assertThat(SecurityContextHolder.getContext()).isSameAs(empty);
                             assertThat(calls).hasValue(1);
                         }
@@ -116,10 +116,10 @@ class JavaSkillIntegrationTest
                 try
                 {
                     SecurityContextHolder.setContext(new SecurityContextImpl(authentication("alice", "ROLE_READ")));
-                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "genericEcho", Map.of("message", "hello")))
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "generic-echo", Map.of("message", "hello")))
                             .isEqualTo("hello");
                     SecurityContextHolder.setContext(new SecurityContextImpl());
-                    assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "genericEcho", Map.of("message", "denied")))
+                    assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "generic-echo", Map.of("message", "denied")))
                             .isInstanceOf(AccessDeniedException.class);
                 }
                 finally { SecurityContextHolder.setContext(before); }
@@ -159,7 +159,7 @@ class JavaSkillIntegrationTest
         probe.callerThreads.add(Thread.currentThread().threadId());
         try
         {
-            return skills.invoke("default", "parallelEcho", Map.of("message", "hello"));
+            return skills.invoke("default", "parallel-echo", Map.of("message", "hello"));
         }
         finally
         {
@@ -219,7 +219,7 @@ class JavaSkillIntegrationTest
     void yamlParentPublishesOnlyAuthorizedLocalChildrenAndPropagatesCallerToJava() throws Exception
     {
         Files.writeString(directory.resolve("parent.yml"), """
-                name: securedParent
+                name: secured-parent
                 description: Invoke an authorized local child.
                 model: integration
                 planning_mode: false
@@ -229,7 +229,7 @@ class JavaSkillIntegrationTest
                   - name: default:yaml-sibling
                 """);
         Files.writeString(directory.resolve("sibling.yml"), """
-                name: yamlSibling
+                name: yaml-sibling
                 description: A YAML child with the equivalent role policy.
                 model: integration
                 planning_mode: false
@@ -238,7 +238,7 @@ class JavaSkillIntegrationTest
         try (var server = new MockWebServer())
         {
             server.enqueue(jsonResponse("""
-                {"id":"child-call","object":"response","created_at":1,"model":"integration-model","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"call1","name":"default-securedEcho","arguments":"{\\"message\\":\\"child hello\\"}","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                {"id":"child-call","object":"response","created_at":1,"model":"integration-model","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"call1","name":"default--secured-echo","arguments":"{\\"message\\":\\"child hello\\"}","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """));
             server.enqueue(finalResponse());
             server.enqueue(finalResponse());
@@ -250,11 +250,11 @@ class JavaSkillIntegrationTest
                         try
                         {
                             SecurityContextHolder.setContext(new SecurityContextImpl(authentication("alice", "ROLE_READ")));
-                            assertThat(context.getBean(SkillTemplate.class).invoke("default", "securedParent", Map.of("objective", "run child")))
+                            assertThat(context.getBean(SkillTemplate.class).invoke("default", "secured-parent", Map.of("objective", "run child")))
                                     .isEqualTo("done");
                             assertThat(calls).hasValue(1);
                             SecurityContextHolder.setContext(new SecurityContextImpl());
-                            assertThat(context.getBean(SkillTemplate.class).invoke("default", "securedParent", Map.of("objective", "no restricted children")))
+                            assertThat(context.getBean(SkillTemplate.class).invoke("default", "secured-parent", Map.of("objective", "no restricted children")))
                                     .isEqualTo("done");
                             assertThat(calls).hasValue(1);
                         }
@@ -262,14 +262,14 @@ class JavaSkillIntegrationTest
                     });
             var first = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(first).isNotNull();
-            assertThat(first.getBody().readUtf8()).contains("securedEcho", "yamlSibling")
-                    .doesNotContain("alwaysDenied", "outsidePermit");
+            assertThat(first.getBody().readUtf8()).contains("secured-echo", "yaml-sibling")
+                    .doesNotContain("always-denied", "outside-permit");
             var result = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(result).isNotNull();
             assertThat(result.getBody().readUtf8()).contains("alice:child hello");
             var anonymous = server.takeRequest(2, TimeUnit.SECONDS);
             assertThat(anonymous).isNotNull();
-            assertThat(anonymous.getBody().readUtf8()).doesNotContain("securedEcho", "yamlSibling", "alwaysDenied", "outsidePermit");
+            assertThat(anonymous.getBody().readUtf8()).doesNotContain("secured-echo", "yaml-sibling", "always-denied", "outside-permit");
         }
     }
 
@@ -308,7 +308,7 @@ class JavaSkillIntegrationTest
     {
         private final AtomicInteger calls;
         PlainSkill(AtomicInteger calls) { this.calls = calls; }
-        @SkillMethod(description = "Echo reflected input")
+        @SkillMethod(name = "plain-echo", description = "Echo reflected input")
         public Map<String, Object> plainEcho(@SkillParam(description = "Message") String message)
         { calls.incrementAndGet(); return Map.of("message", message); }
     }
@@ -317,12 +317,12 @@ class JavaSkillIntegrationTest
     {
         private final AtomicInteger calls;
         SecuredSkills(AtomicInteger calls) { this.calls = calls; }
-        @SkillMethod(description = "Echo as the trusted caller") @RolesAllowed("READ")
+        @SkillMethod(name = "secured-echo", description = "Echo as the trusted caller") @RolesAllowed("READ")
         public String securedEcho(String message)
         { calls.incrementAndGet(); return SecurityContextHolder.getContext().getAuthentication().getName() + ":" + message; }
-        @SkillMethod(description = "Never available") @DenyAll
+        @SkillMethod(name = "always-denied", description = "Never available") @DenyAll
         public String alwaysDenied() { calls.incrementAndGet(); return "bad"; }
-        @SkillMethod(description = "Public but outside the parent allowlist") @PermitAll
+        @SkillMethod(name = "outside-permit", description = "Public but outside the parent allowlist") @PermitAll
         public String outsidePermit() { return "public"; }
     }
     public static class RolesOnly { @SkillMethod(description = "Roles") @RolesAllowed("READ") public String exposed() { return "ok"; } }
@@ -344,7 +344,7 @@ class JavaSkillIntegrationTest
     }
     interface GenericSkill<T>
     {
-        @SkillMethod(description = "Secured generic interface skill") @RolesAllowed("READ")
+        @SkillMethod(name = "generic-echo", description = "Secured generic interface skill") @RolesAllowed("READ")
         T genericEcho(T message);
     }
     public static class GenericStringSkill implements GenericSkill<String>
@@ -363,7 +363,7 @@ class JavaSkillIntegrationTest
         private final ParallelProbe probe;
         ParallelSecuredSkill(SecurityContextHolderStrategy strategy, ParallelProbe probe)
         { this.strategy = strategy; this.probe = probe; }
-        @SkillMethod(description = "Report trusted caller on concurrent execution") @RolesAllowed({"READ", "WRITE"})
+        @SkillMethod(name = "parallel-echo", description = "Report trusted caller on concurrent execution") @RolesAllowed({"READ", "WRITE"})
         public String parallelEcho(String message) throws Exception
         {
             Authentication caller = strategy.getContext().getAuthentication();

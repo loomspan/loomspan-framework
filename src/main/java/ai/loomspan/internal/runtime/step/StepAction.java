@@ -20,11 +20,12 @@ record StepAction(
         @JsonProperty("finalResponse") @Nullable JsonNode finalResponse,
         @JsonIgnore @Nullable String reason)
 {
-    StepAction canonicalSelection()
+    void validateSelection()
     {
-        return stepAction == StepActionType.CALL_TOOL
-                ? callTool(taskId, ai.loomspan.internal.core.SkillIdentity.parse(toolName).toString(), toolArguments)
-                : this;
+        if (stepAction == StepActionType.CALL_TOOL)
+        {
+            ai.loomspan.internal.core.SkillIdentity.parse(toolName);
+        }
     }
     /**
      * Creates a CALL_TOOL action.

@@ -173,7 +173,7 @@ class ExecutionTraceContractTest {
     }
 
     private static LoomspanSession captureChatExchange(Prompt prompt, ChatResponse response) {
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("structured-chat", "default-test_entry", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("structured-chat", "default:test-entry", 3);
         var usage = new DefaultSessionUsageService(new LoomspanProperties().getSession().getQuotas(), new NoOpUsageMetricsRecorder());
         var state = new DefaultExecutionStateService(FIXED_CLOCK, usage);
         var retry = new LoomspanProperties.ProviderRetryProperties();
@@ -183,11 +183,11 @@ class ExecutionTraceContractTest {
         var advisor = new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), usage);
         var chain = mock(CallAdvisorChain.class);
         var request = new ChatClientRequest(prompt, Map.of(ModelTraceContext.REQUEST_CONTEXT_KEY,
-                new ModelTraceContext(ModelExecutionIdentity.from(EXECUTION_CONFIGURATION), "default-test_entry", "mission")));
+                new ModelTraceContext(ModelExecutionIdentity.from(EXECUTION_CONFIGURATION), "default:test-entry", "mission")));
         when(chain.copy(advisor)).thenReturn(chain);
         when(chain.nextCall(request)).thenReturn(response == null ? null : ChatClientResponse.builder().chatResponse(response).build());
         TestExecutionBindings.callWithSession(session, () -> {
-            state.openFrame(session, TraceFrameType.MODEL_CALL, "default-test_entry#model", Map.of());
+            state.openFrame(session, TraceFrameType.MODEL_CALL, "default:test-entry#model", Map.of());
             return advisor.adviseCall(request, chain);
         });
         return session;
@@ -198,7 +198,7 @@ class ExecutionTraceContractTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
 
-        LoomspanSession planningSession = ai.loomspan.internal.core.TestLoomspanSessions.withId("planning-trace", "default-test_entry", 3);
+        LoomspanSession planningSession = ai.loomspan.internal.core.TestLoomspanSessions.withId("planning-trace", "default:test-entry", 3);
         TestExecutionBindings.callWithSession(planningSession, () -> planningService.initializePlan(
                 planningSession,
                 "hello",
@@ -209,7 +209,7 @@ class ExecutionTraceContractTest {
 
         List<TraceRecord> planningModelRecords = modelRecords(planningSession);
 
-        LoomspanSession missionSession = ai.loomspan.internal.core.TestLoomspanSessions.withId("mission-trace", "default-test_entry", 3);
+        LoomspanSession missionSession = ai.loomspan.internal.core.TestLoomspanSessions.withId("mission-trace", "default:test-entry", 3);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             DefaultMissionExecutionEngine engine = new DefaultMissionExecutionEngine(
                 new DefaultPlanningService(stateService),
@@ -243,7 +243,7 @@ class ExecutionTraceContractTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
 
         LoomspanSession planningSession = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "planning-provider-failure", "default-test_entry", 3);
+                "planning-provider-failure", "default:test-entry", 3);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
 
         assertThatThrownBy(() -> TestExecutionBindings.callWithSession(planningSession, () -> planningService.initializePlan(
@@ -258,7 +258,7 @@ class ExecutionTraceContractTest {
         assertSafeFailureRecords(readRecords(planningSession), endpointSentinel, "Planning model invocation failed");
 
         LoomspanSession missionSession = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "mission-provider-failure", "default-test_entry", 3);
+                "mission-provider-failure", "default:test-entry", 3);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             DefaultMissionExecutionEngine engine = new DefaultMissionExecutionEngine(
                 new DefaultPlanningService(stateService),
@@ -301,7 +301,7 @@ class ExecutionTraceContractTest {
     void planCreationIsOwnedByPlanningFrameNotNestedModelFrame() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("planning-owner-trace", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("planning-owner-trace", "default:test-entry", 3);
 
         TestExecutionBindings.callWithSession(session, () -> planningService.initializePlan(
                 session,
@@ -317,7 +317,7 @@ class ExecutionTraceContractTest {
                 .orElseThrow();
 
         assertThat(planCreated.frameType()).isEqualTo(TraceFrameType.PLANNING);
-        assertThat(planCreated.route()).isEqualTo("default-rootVisibleSkill#planning");
+        assertThat(planCreated.route()).isEqualTo("default:root-visible-skill#planning");
         assertThat(planCreated.data()).isNotNull();
         assertThat(planCreated.data().path("createdAt").isTextual()).isTrue();
         assertThat(planCreated.data().path("createdAt").asText()).isEqualTo("2026-03-15T12:00:00Z");
@@ -327,7 +327,7 @@ class ExecutionTraceContractTest {
     void evidenceRetryEventsStayUnderThePlanningFrameAndLinkAttempts() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("planning-quality-trace", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("planning-quality-trace", "default:test-entry", 3);
 
         TestExecutionBindings.callWithSession(session, () -> planningService.initializePlan(
                 session,
@@ -335,8 +335,8 @@ class ExecutionTraceContractTest {
                 null,
                 duplicateInvoiceDefinition(),
                 new SequencePlanningChatClient(weakPlanJson(), correctedPlanJson()),
-                List.of(tool("default-invoiceParser", "Extract invoice fields from source documents"),
-                        tool("default-expenseLookup", "Look up related expenses for comparison"))));
+                List.of(tool("default:invoice-parser", "Extract invoice fields from source documents"),
+                        tool("default:expense-lookup", "Look up related expenses for comparison"))));
 
         List<TraceRecord> records = readRecords(session);
         assertThat(records).anyMatch(record -> record.recordType() == TraceRecordType.PLAN_VALIDATION_FAILED
@@ -370,16 +370,16 @@ class ExecutionTraceContractTest {
                 "framework-nested-plan"));
         DefaultPlanningService planningService = PlanningServiceTestFactory.withPlanIds(stateService, planIds::removeFirst);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "multi-plan-lineage", "default-duplicateInvoiceChecker", 5);
+                "multi-plan-lineage", "default:duplicate-invoice-checker", 5);
         List<BoundCapability> tools = List.of(
-                tool("default-invoiceParser", "Extract invoice fields from source documents"),
-                tool("default-expenseLookup", "Look up related expenses for comparison"));
+                tool("default:invoice-parser", "Extract invoice fields from source documents"),
+                tool("default:expense-lookup", "Look up related expenses for comparison"));
 
         ExecutionBinding primaryBinding = TestExecutionBindings.missionBinding(session);
         ExecutionFrame[] roots = new ExecutionFrame[2];
         ExecutionPlan[] plans = new ExecutionPlan[2];
         ExecutionBindingScope.runWith(primaryBinding, () -> {
-        ExecutionFrame primaryRoot = roots[0] = stateService.openMissionFrame(session, "default-duplicateInvoiceChecker", Map.of());
+        ExecutionFrame primaryRoot = roots[0] = stateService.openMissionFrame(session, "default:duplicate-invoice-checker", Map.of());
         ExecutionPlan primary = plans[0] = planningService.initializePlan(
                         session,
                         "check invoice duplicates",
@@ -392,7 +392,7 @@ class ExecutionTraceContractTest {
         stateService.logPlanUpdated(session, primaryFirstUpdate, null);
 
         ExecutionPlan nested = plans[1] = TestExecutionBindings.callWithCurrentSessionMission(() -> {
-        ExecutionFrame nestedRoot = roots[1] = stateService.openMissionFrame(session, "default-duplicateInvoiceChecker", Map.of());
+        ExecutionFrame nestedRoot = roots[1] = stateService.openMissionFrame(session, "default:duplicate-invoice-checker", Map.of());
         ExecutionPlan nestedPlan = planningService.initializePlan(
                         session,
                         "check invoice duplicates",
@@ -550,25 +550,25 @@ class ExecutionTraceContractTest {
         assertThat(missionRecord.metadata()).containsEntry("driver", AiDriver.OPENAI.name());
         assertThat(planningRecord.metadata()).containsEntry("providerModel", "openai/gpt-5");
         assertThat(missionRecord.metadata()).containsEntry("providerModel", "openai/gpt-5");
-        assertThat(planningRecord.metadata()).containsEntry("skillName", "default-rootVisibleSkill");
-        assertThat(missionRecord.metadata()).containsEntry("skillName", "default-rootVisibleSkill");
+        assertThat(planningRecord.metadata()).containsEntry("skillName", "default:root-visible-skill");
+        assertThat(missionRecord.metadata()).containsEntry("skillName", "default:root-visible-skill");
     }
 
     private static ExecutionPlan plan(String planId) {
         return new ExecutionPlan(
                 planId,
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of());
     }
 
     private static YamlSkillDefinition rootDefinition() {
-        return definition("default-rootVisibleSkill");
+        return definition("default:root-visible-skill");
     }
 
     private static YamlSkillDefinition duplicateInvoiceDefinition() {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("duplicateInvoiceChecker");
+        manifest.setName("duplicate-invoice-checker");
         manifest.setDescription("default-duplicateInvoiceChecker");
         manifest.setModel("gpt-5");
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
@@ -576,7 +576,7 @@ class ExecutionTraceContractTest {
                 manifest,
                 EXECUTION_CONFIGURATION,
                 ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(
-                        Map.of("isDuplicate", "default-invoiceParser and default-expenseLookup")));
+                        Map.of("isDuplicate", "default:invoice-parser and default:expense-lookup")));
     }
 
     private static YamlSkillDefinition definition(String name) {
@@ -611,13 +611,13 @@ class ExecutionTraceContractTest {
         return """
                 {
 
-                  "capabilityName": "default-duplicateInvoiceChecker",
+                  "capabilityName": "default:duplicate-invoice-checker",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
                   "tasks": [
-                    {"taskId": "t-1", "title": "Parse invoice", "status": "PENDING", "capabilityName": "default-invoiceParser", "intent": "Extract invoice fields", "dependsOn": [], "expectedOutputs": ["parsed"], "parallelGroup": null, "note": ""},
-                    {"taskId": "t-2", "title": "Check duplicates", "status": "PENDING", "capabilityName": "default-invoiceParser", "intent": "Check for matching expenses", "dependsOn": ["t-1"], "expectedOutputs": ["matches"], "parallelGroup": null, "note": ""},
-                    {"taskId": "t-3", "title": "Final report", "status": "PENDING", "capabilityName": "default-invoiceParser", "intent": "Summarize duplicate findings", "dependsOn": ["t-2"], "expectedOutputs": ["report"], "parallelGroup": null, "note": ""}
+                    {"taskId": "t-1", "title": "Parse invoice", "status": "PENDING", "capabilityName": "default:invoice-parser", "intent": "Extract invoice fields", "dependsOn": [], "expectedOutputs": ["parsed"], "parallelGroup": null, "note": ""},
+                    {"taskId": "t-2", "title": "Check duplicates", "status": "PENDING", "capabilityName": "default:invoice-parser", "intent": "Check for matching expenses", "dependsOn": ["t-1"], "expectedOutputs": ["matches"], "parallelGroup": null, "note": ""},
+                    {"taskId": "t-3", "title": "Final report", "status": "PENDING", "capabilityName": "default:invoice-parser", "intent": "Summarize duplicate findings", "dependsOn": ["t-2"], "expectedOutputs": ["report"], "parallelGroup": null, "note": ""}
                   ]
                 }
                 """;
@@ -643,13 +643,13 @@ class ExecutionTraceContractTest {
         return """
                 {
 
-                  "capabilityName": "default-duplicateInvoiceChecker",
+                  "capabilityName": "default:duplicate-invoice-checker",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
                   "tasks": [
-                    {"taskId": "t-1", "title": "Parse invoice", "status": "PENDING", "capabilityName": "default-invoiceParser", "intent": "Extract invoice fields", "dependsOn": [], "expectedOutputs": ["parsed"], "parallelGroup": null, "note": ""},
-                    {"taskId": "t-2", "title": "Look up matches", "status": "PENDING", "capabilityName": "default-expenseLookup", "intent": "Find matching expenses", "dependsOn": ["t-1"], "expectedOutputs": ["matches"], "parallelGroup": null, "note": ""},
-                    {"taskId": "t-3", "title": "Compare evidence", "status": "PENDING", "capabilityName": "default-expenseLookup", "intent": "Compare invoice and expenses", "dependsOn": ["t-2"], "expectedOutputs": ["decision"], "parallelGroup": null, "note": ""}
+                    {"taskId": "t-1", "title": "Parse invoice", "status": "PENDING", "capabilityName": "default:invoice-parser", "intent": "Extract invoice fields", "dependsOn": [], "expectedOutputs": ["parsed"], "parallelGroup": null, "note": ""},
+                    {"taskId": "t-2", "title": "Look up matches", "status": "PENDING", "capabilityName": "default:expense-lookup", "intent": "Find matching expenses", "dependsOn": ["t-1"], "expectedOutputs": ["matches"], "parallelGroup": null, "note": ""},
+                    {"taskId": "t-3", "title": "Compare evidence", "status": "PENDING", "capabilityName": "default:expense-lookup", "intent": "Compare invoice and expenses", "dependsOn": ["t-2"], "expectedOutputs": ["decision"], "parallelGroup": null, "note": ""}
                   ]
                 }
                 """;

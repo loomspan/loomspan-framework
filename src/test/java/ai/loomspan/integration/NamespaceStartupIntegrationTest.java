@@ -44,25 +44,25 @@ class NamespaceStartupIntegrationTest {
                     assertThat(reloader.validate(owner, documents, configuration).valid()).isTrue();
                     try (var candidate = reloader.prepare(owner, documents, configuration)) {
                         assertThat(candidate.snapshot().skills()).extracting(SkillDescriptor::qualifiedName)
-                                .contains(owner + "-parent", owner + "-leaf");
+                                .contains(owner + ":parent", owner + ":leaf");
                         reloader.publish(candidate);
-                        server.enqueue(tool(owner + "-leaf", "{}"));
+                        server.enqueue(tool(owner + "--leaf", "{}"));
                         server.enqueue(text("done"));
                         var views = new ArrayList<SkillExecutionView>();
                         assertThat(template.invoke(owner, "parent", Map.of(), views::add)).contains("done");
-                        assertThat(views.getFirst().events()).extracting(SkillExecutionEvent::route).contains(owner + "-leaf");
+                        assertThat(views.getFirst().events()).extracting(SkillExecutionEvent::route).contains(owner + ":leaf");
                     }
                 }
                 reloader.publish(reloader.prepare("shared", documents, configuration, NamespaceVisibility.PUBLIC));
                 var missing = List.of(caller("leaf"));
                 var feedback = reloader.validate("sales", missing, configuration);
                 assertThat(feedback.valid()).isFalse();
-                assertThat(feedback.issues()).anySatisfy(issue -> assertThat(issue.message()).contains("sales-leaf"));
-                assertThatThrownBy(() -> reloader.prepare("sales", missing, configuration)).hasMessageContaining("sales-leaf");
+                assertThat(feedback.issues()).anySatisfy(issue -> assertThat(issue.message()).contains("sales:leaf"));
+                assertThatThrownBy(() -> reloader.prepare("sales", missing, configuration)).hasMessageContaining("sales:leaf");
                 // Owner-assigned Java remains available privately in the same namespace.
                 assertThat(reloader.validate("dept", List.of(caller("fixed")), configuration).valid()).isTrue();
                 reloader.publish(reloader.prepare("dept", List.of(caller("fixed")), configuration));
-                server.enqueue(tool("dept-fixed", "{\"value\":\"same owner\"}"));
+                server.enqueue(tool("dept--fixed", "{\"value\":\"same owner\"}"));
                 server.enqueue(text("Java done"));
                 assertThat(template.invoke("dept", "parent", Map.of())).contains("Java done");
                 assertThat(context.getBean(Methods.class).calls).hasValue(1);
@@ -74,33 +74,33 @@ class NamespaceStartupIntegrationTest {
     @Test void managedWithoutLocalFilesDirectJavaRemovalRecreationAndRestart() throws Exception {
         var ids=new ArrayList<String>();
         for(int restart=0;restart<2;restart++) try (var server = new MockWebServer()) {
-            server.enqueue(tool("dept-fixed", "{\"value\":\"managed\"}"));
+            server.enqueue(tool("dept--fixed", "{\"value\":\"managed\"}"));
             server.enqueue(text("managed caller complete"));
             var model = modelConfiguration(server);
             runner().withPropertyValues("fixture-key=test-key").run(context->{
             assertThat(context).hasNotFailed();var reloader=context.getBean(SkillReloader.class);var template=context.getBean(SkillTemplate.class);
-            var bean=context.getBean(Methods.class);var startup=reloader.snapshot("DEPT");ids.add(startup.generationId());
-            assertThat(startup.skills()).extracting(SkillDescriptor::qualifiedName).containsExactly("dept-fixed");
+            var bean=context.getBean(Methods.class);var startup=reloader.snapshot("dept");ids.add(startup.generationId());
+            assertThat(startup.skills()).extracting(SkillDescriptor::qualifiedName).containsExactly("dept:fixed");
             assertThat(template.invoke("dept", "fixed",Map.of("value","initial"))).contains("initial");
-            assertThat(reloader.validate("caller",List.of(caller("dept-fixed")),model).valid()).isFalse();
+            assertThat(reloader.validate("caller",List.of(caller("dept:fixed")),model).valid()).isFalse();
             var publicJava=reloader.prepare("dept",List.of(),EMPTY,NamespaceVisibility.PUBLIC);reloader.publish(publicJava);
-            var callers=reloader.prepare("caller",List.of(caller("dept-fixed")),model);reloader.publish(callers);
+            var callers=reloader.prepare("caller",List.of(caller("dept:fixed")),model);reloader.publish(callers);
             assertThat(reloader.snapshot("caller").skills()).hasSize(1);
             template.validate("caller", "parent", Map.of());
             var pendingCaller = context.getBean(SkillInvocationHandoff.class).handoff("caller", "parent", Map.of());
             assertThat(pendingCaller.generationId()).isEqualTo(callers.generationId());
             var supplied=new SkillDocument("departmental","name: supplied\ndescription: supplied\nexecutor: fixture\n");
             reloader.publish(reloader.prepare("dept",List.of(supplied),EMPTY));
-            assertThat(reloader.snapshot("dept").skills()).extracting(SkillDescriptor::qualifiedName).containsExactly("dept-fixed","dept-supplied");
+            assertThat(reloader.snapshot("dept").skills()).extracting(SkillDescriptor::qualifiedName).containsExactly("dept:fixed","dept:supplied");
             // Omitted visibility is Private on replacement; fresh admission fails, captured work still runs.
             assertThatThrownBy(() -> template.invoke("caller", "parent", Map.of())).isInstanceOf(SkillException.class);
             var observed = new ArrayList<SkillExecutionView>();
             assertThat(pendingCaller.invoke(observed::add)).contains("managed");
             assertThat(observed).hasSize(1);
             assertThat(observed.getFirst().events()).extracting(SkillExecutionEvent::route)
-                    .contains("caller-parent", "dept-fixed");
+                    .contains("caller:parent", "dept:fixed");
             reloader.publish(reloader.prepare("dept", List.of(), EMPTY));
-            assertThat(reloader.snapshot("dept").skills()).extracting(SkillDescriptor::qualifiedName).containsExactly("dept-fixed");
+            assertThat(reloader.snapshot("dept").skills()).extracting(SkillDescriptor::qualifiedName).containsExactly("dept:fixed");
             assertThat(reloader.validate("dept",List.of(new SkillDocument("collision","name: fixed\ndescription: collision\nexecutor: fixture\n")),EMPTY).valid()).isFalse();
             var admitted=context.getBean(SkillInvocationHandoff.class).handoff("dept", "fixed",Map.of("value","retained"));
             String current=reloader.snapshot("dept").generationId();reloader.remove("dept",current);
@@ -108,7 +108,7 @@ class NamespaceStartupIntegrationTest {
             assertThatThrownBy(()->reloader.snapshot("dept")).isInstanceOf(SkillReloadException.class);
             assertThatThrownBy(()->template.invoke("dept", "fixed",Map.of("value","withdrawn"))).isInstanceOf(RuntimeException.class);
             assertThat(admitted.invoke()).contains("retained");assertThat(bean.destroyed).hasValue(0);
-            var recreated=reloader.prepare("DEPT",List.of(),EMPTY);reloader.publish(recreated);
+            var recreated=reloader.prepare("dept",List.of(),EMPTY);reloader.publish(recreated);
             assertThat(recreated.generationId()).isNotEqualTo(current).isNotEqualTo(startup.generationId());
             assertThat(template.invoke("dept", "fixed",Map.of("value","recreated"))).contains("recreated");
             assertThat(bean.calls).hasValue(4);
@@ -126,7 +126,7 @@ class NamespaceStartupIntegrationTest {
     @Test void embeddedSameNamespaceStartupCompositionIsValidAndForeignPrivateStartupFails(@TempDir Path directory)throws Exception{
         var file=directory.resolve("parent.yaml");Files.writeString(file,caller("local").yaml());
         try (var server = new MockWebServer()) {
-            server.enqueue(tool("default-local", "{}"));
+            server.enqueue(tool("default--local", "{}"));
             server.enqueue(text("local caller complete"));
             var configured=runner().withPropertyValues("loomspan.skills.locations="+directory.toUri()+"*.yaml",
                     "loomspan.connections.local.driver=openai", "loomspan.connections.local.base-url="+server.url("/v1"),
@@ -136,13 +136,13 @@ class NamespaceStartupIntegrationTest {
                 assertThat(context).hasNotFailed();
                 var reloader = context.getBean(SkillReloader.class);
                 var startup = reloader.snapshot("default");
-                assertThat(startup.skills()).extracting(SkillDescriptor::qualifiedName).contains("default-parent","default-local");
+                assertThat(startup.skills()).extracting(SkillDescriptor::qualifiedName).contains("default:parent","default:local");
                 assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of())).contains("local");
                 assertThat(context.getBean(Methods.class).localCalls).hasValue(1);
                 assertThat(reloader.snapshot("default").generationId()).isEqualTo(startup.generationId());
             });
             assertThat(server.getRequestCount()).isEqualTo(2);
-            Files.writeString(file,caller("dept-fixed").yaml());
+            Files.writeString(file,caller("dept:fixed").yaml());
             configured.run(context->assertThat(context).hasFailed());
             assertThat(server.getRequestCount()).isEqualTo(2);
         }

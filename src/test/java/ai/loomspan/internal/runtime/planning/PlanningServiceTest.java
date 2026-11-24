@@ -60,14 +60,14 @@ class PlanningServiceTest {
     private static final String YAML_PLAN_WITH_LLM_STATUSES = """
             ---
             planId: 12345
-            capabilityName: default-invoiceParser
+            capabilityName: default:invoice-parser
             createdAt: 2023-03-15T14:30:00.000Z
             status: EXECUTED
             tasks:
               - taskId: "67890"
                 title: Parse Invoice
                 status: SUCCESS
-                capabilityName: default-invoiceParser
+                capabilityName: default:invoice-parser
                 intent: Parse the invoice data
                 dependsOn: []
                 expectedOutputs: []
@@ -79,7 +79,7 @@ class PlanningServiceTest {
     void initializesPlanOnlyWhenInvoked() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default:test-entry", 3);
         ExecutionPlan plan = plan("plan-1", PlanTaskStatus.PENDING);
 
         assertThat(planFor(session)).isEmpty();
@@ -95,7 +95,7 @@ class PlanningServiceTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "session-framework-plan-id", "default-test_entry", 3);
+                "session-framework-plan-id", "default:test-entry", 3);
         String response = planJson("model-plan-id", PlanTaskStatus.PENDING)
                 .replaceFirst("\\s*\"planId\"\\s*:\\s*\"[^\"]+\"\\s*,", "");
 
@@ -124,7 +124,7 @@ class PlanningServiceTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "session-plan-lineage", "default-test_entry", 3);
+                "session-plan-lineage", "default:test-entry", 3);
         Map<String, Object> attempt = Map.of(
                 "retrySequenceId", "retry-sequence-accepted",
                 "attemptId", "attempt-accepted",
@@ -158,7 +158,7 @@ class PlanningServiceTest {
         SimpleChatClient chatClient = new SimpleChatClient(plan("untrusted-plan", PlanTaskStatus.PENDING), "done");
 
         initializePlan(planningService,
-                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-prompt-identity", "default-test_entry", 3),
+                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-prompt-identity", "default:test-entry", 3),
                 "hello", null, rootDefinition(), chatClient, defaultVisibleTools());
 
         assertThat(chatClient.getSystemMessagesSeen().getFirst())
@@ -172,7 +172,7 @@ class PlanningServiceTest {
         for (String payload : List.of(YAML_PLAN_WITH_LLM_STATUSES, "```json\n" + valid + "\n```", valid + " {}",
                 valid.replaceFirst("\\{", "{\"planId\":\"untrusted\","))) {
             var state = new DefaultExecutionStateService(FIXED_CLOCK);
-            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("strict-plan", "default-test_entry", 3);
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("strict-plan", "default:test-entry", 3);
             var model = new SequencePlanningChatClient(payload, payload);
             assertThatThrownBy(() -> initializePlan(new DefaultPlanningService(state), session, "hello", null,
                     rootDefinition(), model, defaultVisibleTools())).hasMessageContaining("Plan validation failed");
@@ -184,7 +184,7 @@ class PlanningServiceTest {
     @Test
     void correctsMalformedJsonIntoDedicatedNativePlan() {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("correct-json", "default-test_entry", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("correct-json", "default:test-entry", 3);
         var requests = new ArrayList<ai.loomspan.internal.model.ModelInteractionRequest>();
         initializePlan(new DefaultPlanningService(state), session, "hello", null, rootDefinition(), request -> {
             requests.add(request);
@@ -205,7 +205,7 @@ class PlanningServiceTest {
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
             Supplier<String> invalidSupplier = invalidSuppliers.get(index);
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "session-invalid-framework-id-" + index, "default-test_entry", 3);
+                    "session-invalid-framework-id-" + index, "default:test-entry", 3);
 
             DefaultPlanningService planningService = planningService(stateService, invalidSupplier);
             assertThatThrownBy(() -> initializePlan(planningService, session,
@@ -228,10 +228,10 @@ class PlanningServiceTest {
         String response = planJson("same-untrusted-id", PlanTaskStatus.PENDING);
 
         ExecutionPlan first = initializePlan(planningService,
-                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-distinct-1", "default-test_entry", 3),
+                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-distinct-1", "default:test-entry", 3),
                 "hello", null, rootDefinition(), new SimpleChatClient(null, response), defaultVisibleTools()).orElseThrow();
         ExecutionPlan second = initializePlan(planningService,
-                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-distinct-2", "default-test_entry", 3),
+                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-distinct-2", "default:test-entry", 3),
                 "hello", null, rootDefinition(), new SimpleChatClient(null, response), defaultVisibleTools()).orElseThrow();
 
         assertThat(first.planId()).isEqualTo("framework-plan-1");
@@ -242,7 +242,7 @@ class PlanningServiceTest {
     void missingAcceptedAttemptContextFailsBeforePlanStorage() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "session-missing-attempt", "default-test_entry", 3);
+                "session-missing-attempt", "default:test-entry", 3);
 
         DefaultPlanningService planningService = planningService(stateService, () -> "candidate-plan");
         assertThatThrownBy(() -> initializePlan(planningService, session,
@@ -281,7 +281,7 @@ class PlanningServiceTest {
         for (int index = 0; index < invalidContexts.size(); index++) {
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "session-invalid-attempt-" + index, "default-test_entry", 3);
+                    "session-invalid-attempt-" + index, "default:test-entry", 3);
             Map<String, Object> invalidContext = invalidContexts.get(index);
 
             DefaultPlanningService planningService = planningService(stateService, () -> "candidate-plan");
@@ -301,7 +301,7 @@ class PlanningServiceTest {
     void planningReceivesAttachmentDescriptorsButNoMedia() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-planning-attachment", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-planning-attachment", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(planJson("plan-attachment", PlanTaskStatus.PENDING));
 
         initializePlan(planningService,
@@ -326,7 +326,7 @@ class PlanningServiceTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         RecordingSessionUsageService usageService = new RecordingSessionUsageService();
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-usage", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-usage", "default:test-entry", 3);
         ExecutionPlan plan = plan("plan-usage", PlanTaskStatus.PENDING);
 
         assertThat(initializePlan(planningService, session, "hello", null, rootDefinition(), new SimpleChatClient(plan, "done"), defaultVisibleTools()))
@@ -338,7 +338,7 @@ class PlanningServiceTest {
     @Test
     void rejectsYamlAndPreservesNoAcceptedPlan() {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("yaml-rejected", "default-test_entry", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("yaml-rejected", "default:test-entry", 3);
         assertThatThrownBy(() -> initializePlan(new DefaultPlanningService(state), session, "hello", null,
                 rootDefinition(), new SimpleChatClient(null, YAML_PLAN_WITH_LLM_STATUSES), defaultVisibleTools()))
                 .hasMessageContaining("Plan validation failed");
@@ -349,7 +349,7 @@ class PlanningServiceTest {
     @Test
     void operationalValidationFailurePropagatesWithoutCandidateCorrectionOrStorage() {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("operational-validation", "default-test_entry", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("operational-validation", "default:test-entry", 3);
         var failure = new IllegalStateException("validation unavailable exact original detail");
         var evidence = new EvidenceCoverageValidator() {
             @Override public ai.loomspan.internal.runtime.evidence.EvidenceCoverageResult validatePlanCoverage(
@@ -369,7 +369,7 @@ class PlanningServiceTest {
     @Test
     void providerFailurePropagatesOnceWithoutPlanningCorrection() {
         var state = new DefaultExecutionStateService(FIXED_CLOCK);
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("provider-failure", "default-test_entry", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("provider-failure", "default:test-entry", 3);
         var count = new AtomicInteger();
         var failure = new IllegalArgumentException("provider schema support rejection original detail");
         assertThatThrownBy(() -> initializePlan(new DefaultPlanningService(state), session, "hello", null, rootDefinition(),
@@ -384,7 +384,7 @@ class PlanningServiceTest {
     void rejectsAliasesAndLaterTaskAndPlanStatuses() {
         for (String status : List.of("FAILED", "FAILURE", "ERROR", "INVALID", "STALE", "SUCCESS", "BLOCKED", "pending")) {
             var state = new DefaultExecutionStateService(FIXED_CLOCK);
-            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("status-rejected", "default-test_entry", 3);
+            var session = ai.loomspan.internal.core.TestLoomspanSessions.withId("status-rejected", "default:test-entry", 3);
             String payload = planJson("unused", PlanTaskStatus.PENDING).replace("\"PENDING\"", "\"" + status + "\"");
             assertThatThrownBy(() -> initializePlan(new DefaultPlanningService(state), session, "hello", null,
                     rootDefinition(), new SimpleChatClient(null, payload), defaultVisibleTools()))
@@ -404,15 +404,15 @@ class PlanningServiceTest {
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
             DefaultPlanningService planningService = new DefaultPlanningService(stateService);
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "session-plan-unknown-" + payload.charAt(0), "default-test_entry", 3);
+                    "session-plan-unknown-" + payload.charAt(0), "default:test-entry", 3);
 
             assertThatThrownBy(() -> initializePlan(planningService,
                     session,
                     "parse invoice",
                     null,
-                    rootDefinition(payload.startsWith("{") ? "default-rootVisibleSkill" : "default-invoiceParser"),
+                    rootDefinition(payload.startsWith("{") ? "default:root-visible-skill" : "default:invoice-parser"),
                     new SimpleChatClient(null, payload),
-                    List.of(toolCallback(payload.startsWith("{") ? "default-allowedVisibleSkill" : "default-invoiceParser", "test"))))
+                    List.of(toolCallback(payload.startsWith("{") ? "default:allowed-visible-skill" : "default:invoice-parser", "test"))))
                     .hasMessageContaining("Plan validation failed");
         }
     }
@@ -421,7 +421,7 @@ class PlanningServiceTest {
     void rejectsStaleAutoCompletableFieldAsUnknown() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-legacy-plan", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-legacy-plan", "default:test-entry", 3);
 
         String stalePlan = planJson("plan-stale", PlanTaskStatus.PENDING)
                 .replace("\"parallelGroup\": null", "\"auto" + "Completable\": false");
@@ -441,7 +441,7 @@ class PlanningServiceTest {
     void recordsPlanningTraceWithRealProviderMetadata() throws Exception {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-trace", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-trace", "default:test-entry", 3);
 
         initializePlan(planningService,
                 session,
@@ -461,7 +461,7 @@ class PlanningServiceTest {
         TraceRecord modelFrame = records.stream()
                 .filter(record -> record.recordType() == TraceRecordType.FRAME_OPENED
                         && record.frameType() == TraceFrameType.MODEL_CALL
-                        && "default-rootVisibleSkill#planning-model".equals(record.route()))
+                        && "default:root-visible-skill#planning-model".equals(record.route()))
                 .findFirst()
                 .orElseThrow();
 
@@ -479,15 +479,15 @@ class PlanningServiceTest {
     void marksLinkedTaskStartedCompletedAndFailed() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-test_entry", 3);
-        CapabilityMetadata capability = capability("default-allowedVisibleSkill");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default:test-entry", 3);
+        CapabilityMetadata capability = capability("default:allowed-visible-skill");
 
         storePlan(stateService, session, new ExecutionPlan(
                 "plan-1",
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(
-                        new PlanTask("task-1", "Use tool", PlanTaskStatus.PENDING, "default-allowedVisibleSkill", "Use tool", List.of(), List.of(), null, null),
+                        new PlanTask("task-1", "Use tool", PlanTaskStatus.PENDING, "default:allowed-visible-skill", "Use tool", List.of(), List.of(), null, null),
                         new PlanTask("task-2", "Summarize", PlanTaskStatus.PENDING, null))));
 
         String startedTaskId = markToolStarted(planningService, session, capability).orElseThrow();
@@ -502,9 +502,9 @@ class PlanningServiceTest {
 
         storePlan(stateService, session, new ExecutionPlan(
                 "plan-2",
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 Instant.parse("2026-03-15T12:01:00Z"),
-                List.of(new PlanTask("task-3", "Use tool", PlanTaskStatus.PENDING, "default-allowedVisibleSkill", "Use tool", List.of(), List.of(), null, null))));
+                List.of(new PlanTask("task-3", "Use tool", PlanTaskStatus.PENDING, "default:allowed-visible-skill", "Use tool", List.of(), List.of(), null, null))));
         String failedTaskId = markToolStarted(planningService, session, capability).orElseThrow();
         assertThat(markToolFailed(planningService, session, failedTaskId, capability.name(), new IllegalStateException("boom")))
                 .isPresent()
@@ -532,19 +532,19 @@ class PlanningServiceTest {
     void rejectsCompletingTaskWithMismatchedCapabilityBinding() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-mismatched-complete", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-mismatched-complete", "default:test-entry", 3);
 
         storePlan(stateService, session, new ExecutionPlan(
                 "plan-explicit",
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(new PlanTask("task-1", "Use tool once", PlanTaskStatus.IN_PROGRESS,
-                        "default-allowedVisibleSkill", "Use tool", List.of(), List.of(), null, null))));
+                        "default:allowed-visible-skill", "Use tool", List.of(), List.of(), null, null))));
 
         assertThatThrownBy(() -> markToolCompleted(planningService, session, "task-1", "different.visible.skill"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("task-1")
-                .hasMessageContaining("default-allowedVisibleSkill")
+                .hasMessageContaining("default:allowed-visible-skill")
                 .hasMessageContaining("different.visible.skill");
     }
 
@@ -552,14 +552,14 @@ class PlanningServiceTest {
     void rejectsFailingTaskWithMismatchedCapabilityBinding() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-mismatched-fail", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-mismatched-fail", "default:test-entry", 3);
 
         storePlan(stateService, session, new ExecutionPlan(
                 "plan-explicit",
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(new PlanTask("task-1", "Use tool once", PlanTaskStatus.IN_PROGRESS,
-                        "default-allowedVisibleSkill", "Use tool", List.of(), List.of(), null, null))));
+                        "default:allowed-visible-skill", "Use tool", List.of(), List.of(), null, null))));
 
         assertThatThrownBy(() -> markToolFailed(planningService,
                 session,
@@ -568,7 +568,7 @@ class PlanningServiceTest {
                 new IllegalStateException("boom")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("task-1")
-                .hasMessageContaining("default-allowedVisibleSkill")
+                .hasMessageContaining("default:allowed-visible-skill")
                 .hasMessageContaining("different.visible.skill");
     }
 
@@ -576,15 +576,15 @@ class PlanningServiceTest {
     void doesNotLogPlanUpdateWhenCompletedTaskIsMissing() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-missing-task", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-missing-task", "default:test-entry", 3);
 
         storePlan(stateService, session, new ExecutionPlan(
                 "plan-1",
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 Instant.parse("2026-03-15T12:00:00Z"),
-                List.of(new PlanTask("task-1", "Use tool", PlanTaskStatus.PENDING, "default-allowedVisibleSkill", "Use tool", List.of(), List.of(), null, null))));
+                List.of(new PlanTask("task-1", "Use tool", PlanTaskStatus.PENDING, "default:allowed-visible-skill", "Use tool", List.of(), List.of(), null, null))));
 
-        assertThat(markToolCompleted(planningService, session, "missing-task", "default-allowedVisibleSkill")).isEmpty();
+        assertThat(markToolCompleted(planningService, session, "missing-task", "default:allowed-visible-skill")).isEmpty();
         assertThat(session.getJournalSnapshot()).isEmpty();
     }
 
@@ -592,22 +592,22 @@ class PlanningServiceTest {
     void planningPromptIncludesToolDescriptionsAndAlignmentRules() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-tool-names", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-tool-names", "default:test-entry", 3);
         SimpleChatClient chatClient = new SimpleChatClient(duplicatePlan("plan-tools", PlanTaskStatus.PENDING), "done");
 
-        BoundCapability tool1 = toolCallback("default-invoiceParser", "Extract invoice fields from source documents");
-        BoundCapability tool2 = toolCallback("default-expenseLookup", "Look up prior expenses for a parsed invoice");
+        BoundCapability tool1 = toolCallback("default:invoice-parser", "Extract invoice fields from source documents");
+        BoundCapability tool2 = toolCallback("default:expense-lookup", "Look up prior expenses for a parsed invoice");
 
-        initializePlan(planningService, session, "check invoice", null, rootDefinition("default-duplicateInvoiceChecker"), chatClient,
+        initializePlan(planningService, session, "check invoice", null, rootDefinition("default:duplicate-invoice-checker"), chatClient,
                 List.of(tool1, tool2, defaultVisibleTools().getFirst()));
 
         String systemPrompt = chatClient.getSystemMessagesSeen().getFirst();
-        assertThat(systemPrompt).contains("default-invoiceParser: Extract invoice fields from source documents");
-        assertThat(systemPrompt).contains("default-expenseLookup: Look up prior expenses for a parsed invoice");
+        assertThat(systemPrompt).contains("default:invoice-parser: Extract invoice fields from source documents");
+        assertThat(systemPrompt).contains("default:expense-lookup: Look up prior expenses for a parsed invoice");
         assertThat(systemPrompt).contains("Available sub-skills");
         assertThat(systemPrompt).contains("Bind each task to the tool that best matches that task's intent.");
         assertThat(systemPrompt).contains("Gather enough evidence to support the final answer before the mission is complete.");
-        assertThat(systemPrompt).contains("\"capabilityName\": \"default-duplicateInvoiceChecker\"");
+        assertThat(systemPrompt).contains("\"capabilityName\": \"default:duplicate-invoice-checker\"");
         assertThat(systemPrompt)
                 .contains("\"parallelGroup\": null")
                 .contains("^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
@@ -625,20 +625,20 @@ class PlanningServiceTest {
         for (boolean grouped : List.of(false, true)) {
             DefaultPlanningService planningService = new DefaultPlanningService(new DefaultExecutionStateService(FIXED_CLOCK));
             String group = grouped ? "independent-results" : null;
-            ExecutionPlan scriptedPlan = new ExecutionPlan("direct-results", "default-rootVisibleSkill", FIXED_CLOCK.instant(), List.of(
-                    new PlanTask("source", "Read source", PlanTaskStatus.PENDING, "default-allowedVisibleSkill",
+            ExecutionPlan scriptedPlan = new ExecutionPlan("direct-results", "default:root-visible-skill", FIXED_CLOCK.instant(), List.of(
+                    new PlanTask("source", "Read source", PlanTaskStatus.PENDING, "default:allowed-visible-skill",
                             "Read initial source", List.of(), List.of("source data"), null, null),
-                    new PlanTask("required", "Derive required result", PlanTaskStatus.PENDING, "default-allowedVisibleSkill",
+                    new PlanTask("required", "Derive required result", PlanTaskStatus.PENDING, "default:allowed-visible-skill",
                             "Derive a result from source data", List.of("source"), List.of("required result"), group, null),
-                    new PlanTask("unrelated", "Gather independent result", PlanTaskStatus.PENDING, "default-allowedVisibleSkill",
+                    new PlanTask("unrelated", "Gather independent result", PlanTaskStatus.PENDING, "default:allowed-visible-skill",
                             "Gather unrelated data", List.of(), List.of("unrelated result"), group, null),
-                    new PlanTask("consume", "Use required result", PlanTaskStatus.PENDING, "default-allowedVisibleSkill",
+                    new PlanTask("consume", "Use required result", PlanTaskStatus.PENDING, "default:allowed-visible-skill",
                             "Use only the required result, without the source or unrelated data",
                             List.of("required"), List.of("derived conclusion"), null, null)));
             SimpleChatClient chatClient = new SimpleChatClient(scriptedPlan, "done");
 
             ExecutionPlan accepted = initializePlan(planningService,
-                    ai.loomspan.internal.core.TestLoomspanSessions.withId("session-direct-results-" + grouped, "default-test_entry", 3),
+                    ai.loomspan.internal.core.TestLoomspanSessions.withId("session-direct-results-" + grouped, "default:test-entry", 3),
                     "Derive a conclusion from the required result after gathering independent results",
                     null, rootDefinition(), chatClient, defaultVisibleTools()).orElseThrow();
 
@@ -660,17 +660,17 @@ class PlanningServiceTest {
     @Test
     void planningPromptAllowsEveryEarlierGroupMemberWhenAllResultsAreRequired() {
         DefaultPlanningService planningService = new DefaultPlanningService(new DefaultExecutionStateService(FIXED_CLOCK));
-        ExecutionPlan scriptedPlan = new ExecutionPlan("all-direct-results", "default-rootVisibleSkill", FIXED_CLOCK.instant(), List.of(
-                new PlanTask("first", "Gather first result", PlanTaskStatus.PENDING, "default-allowedVisibleSkill",
+        ExecutionPlan scriptedPlan = new ExecutionPlan("all-direct-results", "default:root-visible-skill", FIXED_CLOCK.instant(), List.of(
+                new PlanTask("first", "Gather first result", PlanTaskStatus.PENDING, "default:allowed-visible-skill",
                         "Gather first independent result", List.of(), List.of("first result"), "independent-results", null),
-                new PlanTask("second", "Gather second result", PlanTaskStatus.PENDING, "default-allowedVisibleSkill",
+                new PlanTask("second", "Gather second result", PlanTaskStatus.PENDING, "default:allowed-visible-skill",
                         "Gather second independent result", List.of(), List.of("second result"), "independent-results", null),
-                new PlanTask("combine", "Combine both results", PlanTaskStatus.PENDING, "default-allowedVisibleSkill",
+                new PlanTask("combine", "Combine both results", PlanTaskStatus.PENDING, "default:allowed-visible-skill",
                         "Combine the first and second results", List.of("first", "second"), List.of("combined conclusion"), null, null)));
         SimpleChatClient chatClient = new SimpleChatClient(scriptedPlan, "done");
 
         ExecutionPlan accepted = initializePlan(planningService,
-                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-all-direct-results", "default-test_entry", 3),
+                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-all-direct-results", "default:test-entry", 3),
                 "Combine both independent results", null, rootDefinition(), chatClient, defaultVisibleTools()).orElseThrow();
 
         assertThat(chatClient.getSystemMessagesSeen()).hasSize(1);
@@ -685,10 +685,10 @@ class PlanningServiceTest {
     void planningPromptIncludesSkillPromptBeforePlanningContract() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-planning-prompt", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-planning-prompt", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(planJson("plan-prompt", PlanTaskStatus.PENDING));
 
-        BoundCapability tool = toolCallback("default-invoiceParser", "Short child tool description");
+        BoundCapability tool = toolCallback("default:invoice-parser", "Short child tool description");
         initializePlan(planningService,
                 session,
                 "check invoice",
@@ -701,8 +701,8 @@ class PlanningServiceTest {
         assertThat(systemPrompt).startsWith("PARENT_PROMPT_SENTINEL");
         assertThat(systemPrompt.indexOf("PARENT_PROMPT_SENTINEL"))
                 .isLessThan(systemPrompt.indexOf("Create an ordered flight plan"));
-        assertThat(systemPrompt).contains("default-invoiceParser: Short child tool description");
-        assertThat(systemPrompt).doesNotContain("default-invoiceParser: PARENT_PROMPT_SENTINEL");
+        assertThat(systemPrompt).contains("default:invoice-parser: Short child tool description");
+        assertThat(systemPrompt).doesNotContain("default:invoice-parser: PARENT_PROMPT_SENTINEL");
 
     }
 
@@ -710,42 +710,42 @@ class PlanningServiceTest {
     void planningPromptIncludesEvidenceConstraints() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-evidence-constraints", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-evidence-constraints", "default:test-entry", 3);
         SimpleChatClient chatClient = new SimpleChatClient(duplicatePlan("plan-tools", PlanTaskStatus.PENDING), "done");
 
-        BoundCapability tool1 = toolCallback("default-invoiceParser", "Extract invoice fields from source documents");
-        BoundCapability tool2 = toolCallback("default-expenseLookup", "Look up prior expenses for a parsed invoice");
+        BoundCapability tool1 = toolCallback("default:invoice-parser", "Extract invoice fields from source documents");
+        BoundCapability tool2 = toolCallback("default:expense-lookup", "Look up prior expenses for a parsed invoice");
 
         assertThatThrownBy(() -> initializePlan(planningService, session, "check invoice", null, duplicateInvoiceDefinition(), chatClient, List.of(tool1, tool2)))
                 .isInstanceOf(IllegalStateException.class);
 
         String systemPrompt = chatClient.getSystemMessagesSeen().getFirst();
         assertThat(systemPrompt).contains("Evidence Constraints:");
-        assertThat(systemPrompt).contains("The 'isDuplicate' output field requires tasks whose exact capability names satisfy: default-invoiceParser and default-expenseLookup");
-        assertThat(systemPrompt).contains("The 'vendorName' output field requires tasks whose exact capability names satisfy: default-invoiceParser");
-        assertThat(systemPrompt).doesNotContain("[default-expenseLookup, default-invoiceParser] tool(s)");
+        assertThat(systemPrompt).contains("The 'isDuplicate' output field requires tasks whose exact capability names satisfy: default:invoice-parser and default:expense-lookup");
+        assertThat(systemPrompt).contains("The 'vendorName' output field requires tasks whose exact capability names satisfy: default:invoice-parser");
+        assertThat(systemPrompt).doesNotContain("[default:expense-lookup, default:invoice-parser] tool(s)");
     }
 
     @Test
     void planningPromptPreservesAuthoredDescriptionsVerbatim() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-authored-descriptions", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-authored-descriptions", "default:test-entry", 3);
         SimpleChatClient chatClient = new SimpleChatClient(duplicatePlan("plan-tools-verbatim", PlanTaskStatus.PENDING), "done");
 
         String authoredDescription = "Reads invoice PDFs exactly as-authored. Keep JSON keys `invoice_id`, `vendor_name`, and \"line_items\".";
-        BoundCapability tool = toolCallback("default-invoiceParser", authoredDescription);
+        BoundCapability tool = toolCallback("default:invoice-parser", authoredDescription);
 
         initializePlan(planningService,
                 session,
                 "check invoice",
                 null,
-                rootDefinition("default-duplicateInvoiceChecker"),
+                rootDefinition("default:duplicate-invoice-checker"),
                 chatClient,
                 List.of(tool, defaultVisibleTools().getFirst()));
 
         String systemPrompt = chatClient.getSystemMessagesSeen().getFirst();
-        assertThat(systemPrompt).contains("default-invoiceParser: " + authoredDescription);
+        assertThat(systemPrompt).contains("default:invoice-parser: " + authoredDescription);
     }
 
     @Test
@@ -753,13 +753,13 @@ class PlanningServiceTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         RecordingSessionUsageService usageService = new RecordingSessionUsageService();
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-weak-plan-retry-usage", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-weak-plan-retry-usage", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(
                 weakSingleToolPlanJson(),
                 correctedMultiToolPlanJson());
 
-        BoundCapability invoiceParser = toolCallback("default-invoiceParser", "Extract invoice fields from source documents");
-        BoundCapability expenseLookup = toolCallback("default-expenseLookup", "Look up related expenses for comparison");
+        BoundCapability invoiceParser = toolCallback("default:invoice-parser", "Extract invoice fields from source documents");
+        BoundCapability expenseLookup = toolCallback("default:expense-lookup", "Look up related expenses for comparison");
 
         initializePlan(planningService,
                         session,
@@ -778,7 +778,7 @@ class PlanningServiceTest {
     void rendersTaskConstraintsAndAcceptsOneCorrectedRetry() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("constraint-retry", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("constraint-retry", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(
                 weakSingleToolPlanJson(), correctedMultiToolPlanJson());
 
@@ -786,18 +786,18 @@ class PlanningServiceTest {
                 session,
                 "check invoice duplicates",
                 null,
-                constrainedDefinition(new AllowedSkillConstraint("default-expenseLookup", 1, 2, false, java.util.List.of())),
+                constrainedDefinition(new AllowedSkillConstraint("default:expense-lookup", 1, 2, false, java.util.List.of())),
                 chatClient,
-                List.of(toolCallback("default-invoiceParser", "parse"), toolCallback("default-expenseLookup", "lookup")))
+                List.of(toolCallback("default:invoice-parser", "parse"), toolCallback("default:expense-lookup", "lookup")))
                 .orElseThrow();
 
-        assertThat(accepted.tasks()).extracting(PlanTask::capabilityName).contains("default-expenseLookup");
+        assertThat(accepted.tasks()).extracting(PlanTask::capabilityName).contains("default:expense-lookup");
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
         assertThat(chatClient.systemMessagesSeen().getFirst())
-                .contains("Plan Task Count Constraints", "default-expenseLookup: use in at least 1 plan task(s) and use in at most 2 plan task(s)")
+                .contains("Plan Task Count Constraints", "default:expense-lookup: use in at least 1 plan task(s) and use in at most 2 plan task(s)")
                 .doesNotContain("Planning quality rules");
         assertThat(chatClient.systemMessagesSeen().getLast())
-                .contains("default-expenseLookup", "uses it 0 time(s)");
+                .contains("default:expense-lookup", "uses it 0 time(s)");
         assertThat(readRecords(session)).filteredOn(record -> record.recordType() == TraceRecordType.PLAN_RETRY_REQUESTED)
                 .hasSize(1);
         assertThat(readRecords(session)).filteredOn(record -> record.recordType() == TraceRecordType.PLAN_VALIDATION_FAILED)
@@ -805,7 +805,7 @@ class PlanningServiceTest {
                 .satisfies(record -> {
                     assertThat(record.metadata()).containsEntry("issueCodes", List.of("PLAN_TASK_MINIMUM_NOT_MET"));
                     assertThat(record.data().toString()).contains(
-                            "default-expenseLookup", "\"configuredMinTasks\":1", "\"effectiveMinTasks\":1",
+                            "default:expense-lookup", "\"configuredMinTasks\":1", "\"effectiveMinTasks\":1",
                             "\"maxTasks\":2", "\"actualTaskCount\":0");
                 });
     }
@@ -814,17 +814,17 @@ class PlanningServiceTest {
     void bindingDependenciesUseOneCorrectionAndPreserveExplicitProducerEdges() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("binding-retry", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("binding-retry", "default:test-entry", 3);
         String invalid = correctedMultiToolPlanJson().replace("[\"t-1\"]", "[]");
         String corrected = correctedMultiToolPlanJson().replace("[\"t-2\"]", "[\"t-1\", \"t-2\"]");
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(invalid, corrected);
         var binding = new ai.loomspan.internal.runtime.input.ChildInputBinding(
                 ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/evidence", false),
                 ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.CHILD_RESULT,
-                ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("", true), "default-invoiceParser");
-        var definition = constrainedDefinition(new AllowedSkillConstraint("default-expenseLookup", null, null, false, List.of(binding)));
+                ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("", true), "default:invoice-parser");
+        var definition = constrainedDefinition(new AllowedSkillConstraint("default:expense-lookup", null, null, false, List.of(binding)));
         ExecutionPlan accepted = initializePlan(planningService, session, "check invoice", null, definition, chatClient,
-                List.of(toolCallback("default-invoiceParser", "parse"), toolCallback("default-expenseLookup", "lookup"))).orElseThrow();
+                List.of(toolCallback("default:invoice-parser", "parse"), toolCallback("default:expense-lookup", "lookup"))).orElseThrow();
         assertThat(accepted.tasks().getLast().dependsOn()).contains("t-1", "t-2");
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
         assertThat(chatClient.systemMessagesSeen().getFirst()).contains("Declared child input dependencies", "exactly one", "Generate only inputs");
@@ -837,16 +837,16 @@ class PlanningServiceTest {
     void exhaustedBindingDependenciesStoreNoPlan() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("binding-exhausted", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("binding-exhausted", "default:test-entry", 3);
         String invalid = correctedMultiToolPlanJson().replace("[\"t-1\"]", "[]");
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(invalid, invalid);
         var binding = new ai.loomspan.internal.runtime.input.ChildInputBinding(
                 ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/evidence", false),
                 ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.CHILD_RESULT,
-                ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("", true), "default-invoiceParser");
+                ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("", true), "default:invoice-parser");
         assertThatThrownBy(() -> initializePlan(planningService, session, "check invoice", null,
-                constrainedDefinition(new AllowedSkillConstraint("default-expenseLookup", null, null, false, List.of(binding))), chatClient,
-                List.of(toolCallback("default-invoiceParser", "parse"), toolCallback("default-expenseLookup", "lookup"))))
+                constrainedDefinition(new AllowedSkillConstraint("default:expense-lookup", null, null, false, List.of(binding))), chatClient,
+                List.of(toolCallback("default:invoice-parser", "parse"), toolCallback("default:expense-lookup", "lookup"))))
                 .hasMessageContaining("Input binding dependency");
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
         assertThat(currentPlan(stateService, session)).isEmpty();
@@ -857,7 +857,7 @@ class PlanningServiceTest {
     void rejectsSecondConstraintViolationWithoutStoringPlan() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("constraint-exhausted", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("constraint-exhausted", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(
                 weakSingleToolPlanJson(), weakSingleToolPlanJson());
 
@@ -865,11 +865,11 @@ class PlanningServiceTest {
                 session,
                 "check invoice duplicates",
                 null,
-                constrainedDefinition(new AllowedSkillConstraint("default-expenseLookup", 1, null, false, java.util.List.of())),
+                constrainedDefinition(new AllowedSkillConstraint("default:expense-lookup", 1, null, false, java.util.List.of())),
                 chatClient,
-                List.of(toolCallback("default-invoiceParser", "parse"), toolCallback("default-expenseLookup", "lookup"))))
+                List.of(toolCallback("default:invoice-parser", "parse"), toolCallback("default:expense-lookup", "lookup"))))
                 .hasMessageContaining("Plan validation failed")
-                .hasMessageContaining("default-expenseLookup")
+                .hasMessageContaining("default:expense-lookup")
                 .hasMessageContaining("at least 1");
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
         assertThat(currentPlan(stateService, session)).isEmpty();
@@ -880,17 +880,17 @@ class PlanningServiceTest {
     void positiveMinimumFailsVisibilityPreflightBeforeModelCall() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("constraint-preflight", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("constraint-preflight", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(weakSingleToolPlanJson());
 
         assertThatThrownBy(() -> initializePlan(planningService,
                 session,
                 "check invoice duplicates",
                 null,
-                constrainedDefinition(new AllowedSkillConstraint("default-expenseLookup", null, null, true, java.util.List.of())),
+                constrainedDefinition(new AllowedSkillConstraint("default:expense-lookup", null, null, true, java.util.List.of())),
                 chatClient,
-                List.of(toolCallback("default-invoiceParser", "parse"))))
-                .hasMessageContaining("default-expenseLookup")
+                List.of(toolCallback("default:invoice-parser", "parse"))))
+                .hasMessageContaining("default:expense-lookup")
                 .hasMessageContaining("not visible");
         assertThat(chatClient.systemMessagesSeen()).isEmpty();
     }
@@ -899,12 +899,12 @@ class PlanningServiceTest {
     void invisibleMaximumOnlyChildDoesNotFailPreflight() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("constraint-max-only", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("constraint-max-only", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(weakSingleToolPlanJson());
 
         initializePlan(planningService, session, "check invoice", null,
-                constrainedDefinition(new AllowedSkillConstraint("default-expenseLookup", null, 1, false, java.util.List.of())),
-                chatClient, List.of(toolCallback("default-invoiceParser", "parse")));
+                constrainedDefinition(new AllowedSkillConstraint("default:expense-lookup", null, 1, false, java.util.List.of())),
+                chatClient, List.of(toolCallback("default:invoice-parser", "parse")));
 
         assertThat(chatClient.systemMessagesSeen()).hasSize(1);
     }
@@ -913,16 +913,16 @@ class PlanningServiceTest {
     void taskConstraintAndEvidenceFailuresShareOneCorrectiveAttempt() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("combined-validation", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("combined-validation", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(
                 weakSingleToolPlanJson(), correctedMultiToolPlanJson());
 
         initializePlan(planningService, session, "check invoice", null, constrainedEvidenceDefinition(), chatClient,
-                List.of(toolCallback("default-invoiceParser", "parse"), toolCallback("default-expenseLookup", "lookup")));
+                List.of(toolCallback("default:invoice-parser", "parse"), toolCallback("default:expense-lookup", "lookup")));
 
         assertThat(chatClient.systemMessagesSeen()).hasSize(2);
         assertThat(chatClient.systemMessagesSeen().getLast())
-                .contains("default-expenseLookup", "at least 1 plan task", "default-invoiceParser and default-expenseLookup");
+                .contains("default:expense-lookup", "at least 1 plan task", "default:invoice-parser and default:expense-lookup");
         assertThat(readRecords(session)).filteredOn(record -> record.recordType() == TraceRecordType.PLAN_RETRY_REQUESTED)
                 .hasSize(2);
     }
@@ -932,21 +932,21 @@ class PlanningServiceTest {
         BlockingCompletedPlanStateService stateService = new BlockingCompletedPlanStateService();
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "session-atomic-completion", "default-test_entry", 3);
+                "session-atomic-completion", "default:test-entry", 3);
         var binding = ai.loomspan.internal.core.TestExecutionBindings.missionBinding(session);
         BINDINGS.put(session, binding);
         storePlan(stateService, session, new ExecutionPlan(
                 "plan-atomic",
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(new PlanTask("task-1", "Use tool", PlanTaskStatus.IN_PROGRESS,
-                        "default-allowedVisibleSkill", "Use tool", List.of(), List.of(), null, null))));
+                        "default:allowed-visible-skill", "Use tool", List.of(), List.of(), null, null))));
 
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Future<Optional<ExecutionPlan>> completion = executor.submit(() ->
                     ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding,
                             () -> planningService.markToolCompleted(
-                                    session, "task-1", "default-allowedVisibleSkill")));
+                                    session, "task-1", "default:allowed-visible-skill")));
             assertThat(stateService.completedPlanStored.await(2, TimeUnit.SECONDS)).isTrue();
 
             Future<?> cutoff = executor.submit(() -> {
@@ -970,7 +970,7 @@ class PlanningServiceTest {
                 .extracting(TraceRecord::recordType)
                 .containsExactly(TraceRecordType.PLAN_UPDATED, TraceRecordType.EVIDENCE_RECORDED);
         assertThat(binding.requireMission().successfulDirectSkills())
-                .containsExactly("default-allowedVisibleSkill");
+                .containsExactly("default:allowed-visible-skill");
     }
 
     @Test
@@ -979,14 +979,14 @@ class PlanningServiceTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "fallback-in-progress", "default-test_entry", 3);
-        CapabilityMetadata capability = capability("default-allowedVisibleSkill");
-        ExecutionPlan unique = new ExecutionPlan("plan-unique", "default-rootVisibleSkill",
+                "fallback-in-progress", "default:test-entry", 3);
+        CapabilityMetadata capability = capability("default:allowed-visible-skill");
+        ExecutionPlan unique = new ExecutionPlan("plan-unique", "default:root-visible-skill",
                 Instant.parse("2026-03-15T12:00:00Z"), List.of(
                         new PlanTask("task-1", "Admitted", PlanTaskStatus.IN_PROGRESS,
-                                "default-allowedVisibleSkill", "work", List.of(), List.of(), null, null),
+                                "default:allowed-visible-skill", "work", List.of(), List.of(), null, null),
                         new PlanTask("task-2", "Ready", PlanTaskStatus.PENDING,
-                                "default-allowedVisibleSkill", "work", List.of(), List.of(), null, null)));
+                                "default:allowed-visible-skill", "work", List.of(), List.of(), null, null)));
         storePlan(stateService, session, unique);
 
         assertThat(markToolStarted(planningService, session, capability)).contains("task-1");
@@ -1031,13 +1031,13 @@ class PlanningServiceTest {
         DefaultPlanningService planningService = new DefaultPlanningService(stateService, codecs.planningJson(),
                 constraints, evidence, () -> "accepted-structure-plan");
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "structure-corrected", "default-test_entry", 3);
+                "structure-corrected", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(
                 invalidStructureJson(), correctedMultiToolPlanJson());
 
         ExecutionPlan accepted = initializePlan(planningService,
                 session, "check invoice", null, duplicateInvoiceDefinition(), chatClient,
-                List.of(toolCallback("default-invoiceParser", "parse"), toolCallback("default-expenseLookup", "lookup")))
+                List.of(toolCallback("default:invoice-parser", "parse"), toolCallback("default:expense-lookup", "lookup")))
                 .orElseThrow();
 
         assertThat(accepted.tasks().getFirst().parallelGroup()).isNull();
@@ -1066,10 +1066,10 @@ class PlanningServiceTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "concurrency-disabled-groups", "default-test_entry", 3);
+                "concurrency-disabled-groups", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(groupedPlanJson());
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("rootVisibleSkill");
+        manifest.setName("root-visible-skill");
         manifest.setDescription("default-rootVisibleSkill");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
@@ -1092,7 +1092,7 @@ class PlanningServiceTest {
                 .satisfies(record -> assertThat(record.data().toString())
                         .contains("\"parallelGroup\":\"invoice-batch\""));
 
-        ExecutionPlan admitted = accepted.updateTask("task-1", task -> task.bindInProgress("Starting tool default-allowedVisibleSkill"));
+        ExecutionPlan admitted = accepted.updateTask("task-1", task -> task.bindInProgress("Starting tool default:allowed-visible-skill"));
         storePlan(stateService, session, admitted);
         bound(session, () -> { stateService.logPlanUpdated(session, admitted,
                 ai.loomspan.internal.core.ExecutionTraceRecorder.PlanExecutionTransition.admission(
@@ -1110,13 +1110,13 @@ class PlanningServiceTest {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                "structure-exhausted", "default-test_entry", 3);
+                "structure-exhausted", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(
                 invalidStructureJson(), invalidStructureJson());
 
         assertThatThrownBy(() -> initializePlan(planningService,
-                session, "check invoice", null, rootDefinition("default-duplicateInvoiceChecker"), chatClient,
-                List.of(toolCallback("default-invoiceParser", "parse"))))
+                session, "check invoice", null, rootDefinition("default:duplicate-invoice-checker"), chatClient,
+                List.of(toolCallback("default:invoice-parser", "parse"))))
                 .hasMessageContaining("Plan validation failed")
                 .hasMessageContaining("parallel-group-format")
                 .hasMessageContaining("plan-dependency");
@@ -1141,13 +1141,13 @@ class PlanningServiceTest {
             DefaultPlanningService planningService = new DefaultPlanningService(stateService);
             SequencePlanningChatClient chatClient = new SequencePlanningChatClient(responses.toArray(String[]::new));
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "shared-retry-" + responses.getFirst().charAt(0), "default-test_entry", 3);
+                    "shared-retry-" + responses.getFirst().charAt(0), "default:test-entry", 3);
 
             assertThatThrownBy(() -> initializePlan(planningService,
                     session, "check invoice", null,
-                    constrainedDefinition(new AllowedSkillConstraint("default-expenseLookup", 1, null, false, java.util.List.of())),
+                    constrainedDefinition(new AllowedSkillConstraint("default:expense-lookup", 1, null, false, java.util.List.of())),
                     chatClient,
-                    List.of(toolCallback("default-invoiceParser", "parse"), toolCallback("default-expenseLookup", "lookup"))))
+                    List.of(toolCallback("default:invoice-parser", "parse"), toolCallback("default:expense-lookup", "lookup"))))
                     .hasMessageContaining("Plan validation failed");
             assertThat(chatClient.systemMessagesSeen()).hasSize(2);
             assertThat(currentPlan(stateService, session)).isEmpty();
@@ -1165,11 +1165,11 @@ class PlanningServiceTest {
             DefaultPlanningService planningService = new DefaultPlanningService(stateService);
             SequencePlanningChatClient chatClient = new SequencePlanningChatClient(responses.toArray(String[]::new));
             LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId(
-                    "shared-evidence-retry-" + responses.getFirst().charAt(0), "default-test_entry", 3);
+                    "shared-evidence-retry-" + responses.getFirst().charAt(0), "default:test-entry", 3);
 
             assertThatThrownBy(() -> initializePlan(planningService,
                     session, "check invoice", null, duplicateInvoiceDefinition(), chatClient,
-                    List.of(toolCallback("default-invoiceParser", "parse"), toolCallback("default-expenseLookup", "lookup"))))
+                    List.of(toolCallback("default:invoice-parser", "parse"), toolCallback("default:expense-lookup", "lookup"))))
                     .hasMessageContaining("Plan validation failed");
             assertThat(chatClient.systemMessagesSeen()).hasSize(2);
             assertThat(currentPlan(stateService, session)).isEmpty();
@@ -1181,10 +1181,10 @@ class PlanningServiceTest {
     void planningPromptShowsNoneWhenNoToolsProvided() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-no-tools", "default-test_entry", 3);
-        SimpleChatClient chatClient = new SimpleChatClient(new ExecutionPlan("plan-no-tools", "default-duplicateInvoiceChecker", Instant.parse("2026-03-15T12:00:00Z"), List.of()), "done");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-no-tools", "default:test-entry", 3);
+        SimpleChatClient chatClient = new SimpleChatClient(new ExecutionPlan("plan-no-tools", "default:duplicate-invoice-checker", Instant.parse("2026-03-15T12:00:00Z"), List.of()), "done");
 
-        initializePlan(planningService, session, "check invoice", null, rootDefinition("default-duplicateInvoiceChecker"), chatClient, List.of());
+        initializePlan(planningService, session, "check invoice", null, rootDefinition("default:duplicate-invoice-checker"), chatClient, List.of());
 
         String systemPrompt = chatClient.getSystemMessagesSeen().getFirst();
         assertThat(systemPrompt).contains("(none)");
@@ -1194,20 +1194,20 @@ class PlanningServiceTest {
     void planningPromptHardcodesTopLevelCapabilityName() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-cap-name", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-cap-name", "default:test-entry", 3);
         SimpleChatClient chatClient = new SimpleChatClient(duplicatePlan("plan-cap", PlanTaskStatus.PENDING), "done");
 
-        initializePlan(planningService, session, "check invoice", null, rootDefinition("default-duplicateInvoiceChecker"), chatClient, defaultVisibleTools());
+        initializePlan(planningService, session, "check invoice", null, rootDefinition("default:duplicate-invoice-checker"), chatClient, defaultVisibleTools());
 
         String systemPrompt = chatClient.getSystemMessagesSeen().getFirst();
-        assertThat(systemPrompt).contains("\"capabilityName\": \"default-duplicateInvoiceChecker\"");
+        assertThat(systemPrompt).contains("\"capabilityName\": \"default:duplicate-invoice-checker\"");
     }
 
     @Test
     void rejectsContractBackedPlanWhenRequiredEvidenceRemainsUncoveredAfterRetries() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-evidence-fail", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-evidence-fail", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(weakSingleToolPlanJson(), weakSingleToolPlanJson());
 
         assertThatThrownBy(() -> initializePlan(planningService,
@@ -1216,7 +1216,7 @@ class PlanningServiceTest {
                 null,
                 duplicateInvoiceDefinition(),
                 chatClient,
-                List.of(toolCallback("default-invoiceParser", "Extract invoice fields"), toolCallback("default-expenseLookup", "Look up matching expenses"))))
+                List.of(toolCallback("default:invoice-parser", "Extract invoice fields"), toolCallback("default:expense-lookup", "Look up matching expenses"))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Plan validation failed");
         assertThat(planFor(session)).isEmpty();
@@ -1235,7 +1235,7 @@ class PlanningServiceTest {
     void acceptsContractBackedPlanWhenTaskBindingsCoverAllRequiredEvidence() {
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(FIXED_CLOCK);
         DefaultPlanningService planningService = new DefaultPlanningService(stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-evidence-pass", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-evidence-pass", "default:test-entry", 3);
         SequencePlanningChatClient chatClient = new SequencePlanningChatClient(correctedMultiToolPlanJson());
 
         ExecutionPlan plan = initializePlan(planningService,
@@ -1244,11 +1244,11 @@ class PlanningServiceTest {
                         null,
                         duplicateInvoiceDefinition(),
                         chatClient,
-                        List.of(toolCallback("default-invoiceParser", "Extract invoice fields"), toolCallback("default-expenseLookup", "Look up matching expenses")))
+                        List.of(toolCallback("default:invoice-parser", "Extract invoice fields"), toolCallback("default:expense-lookup", "Look up matching expenses")))
                 .orElseThrow();
 
         assertThat(plan.tasks()).extracting(PlanTask::capabilityName)
-                .contains("default-invoiceParser", "default-expenseLookup");
+                .contains("default:invoice-parser", "default:expense-lookup");
     }
 
     private static BoundCapability toolCallback(String name, String description) {
@@ -1259,7 +1259,7 @@ class PlanningServiceTest {
         return """
                 {
 
-                  "capabilityName": "default-duplicateInvoiceChecker",
+                  "capabilityName": "default:duplicate-invoice-checker",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
                   "tasks": [
@@ -1267,7 +1267,7 @@ class PlanningServiceTest {
                       "taskId": "t-1",
                       "title": "Parse invoice",
                       "status": "PENDING",
-                      "capabilityName": "default-invoiceParser",
+                      "capabilityName": "default:invoice-parser",
                       "intent": "Extract invoice fields",
                       "dependsOn": [],
                       "expectedOutputs": ["parsed invoice"],
@@ -1278,7 +1278,7 @@ class PlanningServiceTest {
                       "taskId": "t-2",
                       "title": "Check duplicates",
                       "status": "PENDING",
-                      "capabilityName": "default-invoiceParser",
+                      "capabilityName": "default:invoice-parser",
                       "intent": "Check the invoice against prior expenses",
                       "dependsOn": ["t-1"],
                       "expectedOutputs": ["duplicate matches"],
@@ -1289,7 +1289,7 @@ class PlanningServiceTest {
                       "taskId": "t-3",
                       "title": "Final report",
                       "status": "PENDING",
-                      "capabilityName": "default-invoiceParser",
+                      "capabilityName": "default:invoice-parser",
                       "intent": "Summarize the duplicate invoice result",
                       "dependsOn": ["t-2"],
                       "expectedOutputs": ["final report"],
@@ -1305,7 +1305,7 @@ class PlanningServiceTest {
         return """
                 {
 
-                  "capabilityName": "default-duplicateInvoiceChecker",
+                  "capabilityName": "default:duplicate-invoice-checker",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
                   "tasks": [
@@ -1313,7 +1313,7 @@ class PlanningServiceTest {
                       "taskId": "t-1",
                       "title": "Parse invoice",
                       "status": "PENDING",
-                      "capabilityName": "default-invoiceParser",
+                      "capabilityName": "default:invoice-parser",
                       "intent": "Extract invoice fields",
                       "dependsOn": [],
                       "expectedOutputs": ["parsed invoice"],
@@ -1324,7 +1324,7 @@ class PlanningServiceTest {
                       "taskId": "t-2",
                       "title": "Look up matching expenses",
                       "status": "PENDING",
-                      "capabilityName": "default-expenseLookup",
+                      "capabilityName": "default:expense-lookup",
                       "intent": "Find matching expenses for the parsed invoice",
                       "dependsOn": ["t-1"],
                       "expectedOutputs": ["matching expenses"],
@@ -1335,7 +1335,7 @@ class PlanningServiceTest {
                       "taskId": "t-3",
                       "title": "Compare evidence",
                       "status": "PENDING",
-                      "capabilityName": "default-expenseLookup",
+                      "capabilityName": "default:expense-lookup",
                       "intent": "Compare the parsed invoice against matching expenses",
                       "dependsOn": ["t-2"],
                       "expectedOutputs": ["duplicate decision"],
@@ -1363,7 +1363,7 @@ class PlanningServiceTest {
 
     private static YamlSkillDefinition duplicateInvoiceDefinition() {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("duplicateInvoiceChecker");
+        manifest.setName("duplicate-invoice-checker");
         manifest.setDescription("default-duplicateInvoiceChecker");
         manifest.setModel("gpt-5");
         tools.jackson.databind.node.ObjectNode schema = LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
@@ -1376,8 +1376,8 @@ class PlanningServiceTest {
         manifest.setOutputSchema(schema);
         manifest.setOutputSchemaMaxRetries(1);
         Map<String, String> contract = Map.of(
-                "vendorName", "default-invoiceParser",
-                "isDuplicate", "default-invoiceParser and default-expenseLookup");
+                "vendorName", "default:invoice-parser",
+                "isDuplicate", "default:invoice-parser and default:expense-lookup");
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
@@ -1387,14 +1387,14 @@ class PlanningServiceTest {
 
     private static YamlSkillDefinition constrainedEvidenceDefinition() {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("duplicateInvoiceChecker");
+        manifest.setName("duplicate-invoice-checker");
         manifest.setDescription("default-duplicateInvoiceChecker");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
         manifest.setAllowedSkills(List.of(
-                new YamlSkillManifest.AllowedSkillManifest("default-invoiceParser", null, null, null),
-                new YamlSkillManifest.AllowedSkillManifest("default-expenseLookup", 1, null, null)));
-        Map<String, String> contract = Map.of("isDuplicate", "default-invoiceParser and default-expenseLookup");
+                new YamlSkillManifest.AllowedSkillManifest("default:invoice-parser", null, null, null),
+                new YamlSkillManifest.AllowedSkillManifest("default:expense-lookup", 1, null, null)));
+        Map<String, String> contract = Map.of("isDuplicate", "default:invoice-parser and default:expense-lookup");
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
@@ -1403,7 +1403,7 @@ class PlanningServiceTest {
     }
 
     private static YamlSkillDefinition rootDefinition() {
-        return rootDefinition("default-rootVisibleSkill");
+        return rootDefinition("default:root-visible-skill");
     }
 
     private static YamlSkillDefinition rootDefinition(String name) {
@@ -1419,7 +1419,7 @@ class PlanningServiceTest {
 
     private static YamlSkillDefinition constrainedDefinition(AllowedSkillConstraint... constraints) {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("duplicateInvoiceChecker");
+        manifest.setName("duplicate-invoice-checker");
         manifest.setDescription("default-duplicateInvoiceChecker");
         manifest.setModel("gpt-5");
         manifest.setPlanningMode(true);
@@ -1434,7 +1434,7 @@ class PlanningServiceTest {
 
     private static YamlSkillDefinition rootDefinitionWithPrompt(String prompt) {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("rootVisibleSkill");
+        manifest.setName("root-visible-skill");
         manifest.setDescription("Short planner-facing summary");
         manifest.setModel("gpt-5");
         manifest.setPrompt(prompt);
@@ -1452,16 +1452,16 @@ class PlanningServiceTest {
 
     private static ExecutionPlan duplicatePlan(String id, PlanTaskStatus status) {
         var plan = plan(id, status);
-        return new ExecutionPlan(plan.planId(), "default-duplicateInvoiceChecker", plan.createdAt(), plan.status(), plan.tasks());
+        return new ExecutionPlan(plan.planId(), "default:duplicate-invoice-checker", plan.createdAt(), plan.status(), plan.tasks());
     }
 
     private static ExecutionPlan plan(String id, PlanTaskStatus status) {
         return new ExecutionPlan(
                 id,
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(new PlanTask("task-1", "Use tool", status,
-                        "default-allowedVisibleSkill", "Use tool", List.of(), List.of(), null, null)));
+                        "default:allowed-visible-skill", "Use tool", List.of(), List.of(), null, null)));
     }
 
     private static String invalidStructureJson() {
@@ -1474,7 +1474,7 @@ class PlanningServiceTest {
         return """
                 {
 
-                  "capabilityName": "default-rootVisibleSkill",
+                  "capabilityName": "default:root-visible-skill",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
                   "tasks": [
@@ -1482,7 +1482,7 @@ class PlanningServiceTest {
                       "taskId": "task-1",
                       "title": "Parse first invoice",
                       "status": "PENDING",
-                      "capabilityName": "default-allowedVisibleSkill",
+                      "capabilityName": "default:allowed-visible-skill",
                       "intent": "Parse invoice A",
                       "dependsOn": [],
                       "expectedOutputs": ["parsed A"],
@@ -1493,7 +1493,7 @@ class PlanningServiceTest {
                       "taskId": "task-2",
                       "title": "Parse second invoice",
                       "status": "PENDING",
-                      "capabilityName": "default-allowedVisibleSkill",
+                      "capabilityName": "default:allowed-visible-skill",
                       "intent": "Parse invoice B",
                       "dependsOn": [],
                       "expectedOutputs": ["parsed B"],
@@ -1506,11 +1506,11 @@ class PlanningServiceTest {
     }
 
     private static ExecutionPlan emptyPlan(String id) {
-        return new ExecutionPlan(id, "default-rootVisibleSkill", Instant.parse("2026-03-15T12:00:00Z"), List.of());
+        return new ExecutionPlan(id, "default:root-visible-skill", Instant.parse("2026-03-15T12:00:00Z"), List.of());
     }
 
     private static List<BoundCapability> defaultVisibleTools() {
-        return List.of(toolCallback("default-allowedVisibleSkill", "Default test capability"));
+        return List.of(toolCallback("default:allowed-visible-skill", "Default test capability"));
     }
 
     private static DefaultPlanningService planningService(
@@ -1528,7 +1528,7 @@ class PlanningServiceTest {
         return """
                 {
 
-                  "capabilityName": "default-rootVisibleSkill",
+                  "capabilityName": "default:root-visible-skill",
                   "createdAt": "2026-03-15T12:00:00Z",
                   "status": "VALID",
                   "tasks": [
@@ -1536,7 +1536,7 @@ class PlanningServiceTest {
                       "taskId": "task-1",
                       "title": "Use tool",
                       "status": "%s",
-                      "capabilityName": "default-allowedVisibleSkill",
+                      "capabilityName": "default:allowed-visible-skill",
                       "intent": "Use tool",
                       "dependsOn": [],
                       "expectedOutputs": [],

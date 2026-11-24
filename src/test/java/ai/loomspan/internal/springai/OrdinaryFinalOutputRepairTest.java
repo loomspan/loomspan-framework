@@ -89,7 +89,7 @@ class OrdinaryFinalOutputRepairTest {
         var options = ToolCallingChatOptions.builder().toolContext(OrdinaryFinalOutputRepair.CONTEXT_KEY, state).build();
         OrdinaryFinalOutputRepair.repair(request(state, List.of(new UserMessage("input")), options), UnaryOperator.identity(), List.of());
         var delegate = mock(ToolCallingManager.class);
-        var manager = new CanonicalToolCallingManager(delegate);
+        var manager = new RequestBoundToolCallingManager(delegate);
         for (String name : List.of("test-authorized", "unbound", PlannerInabilityTool.NAME)) {
             var assistant = AssistantMessage.builder().toolCalls(List.of(new AssistantMessage.ToolCall("id", "function", name, "{}"))).build();
             assertThatThrownBy(() -> manager.executeToolCalls(new Prompt("input", options), new ChatResponse(List.of(new Generation(assistant)))))

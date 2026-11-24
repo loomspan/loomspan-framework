@@ -8,8 +8,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PlanningOutputContractTest {
     private static final tools.jackson.databind.ObjectMapper JSON = LoomspanJacksonCodecs.defaults().schemaTree();
     private static ObjectNode valid() { return (ObjectNode) JSON.readTree("""
-        {"capabilityName":"default-root","createdAt":"2026-01-01T00:00:00Z","status":"VALID","tasks":[{
-        "taskId":"one","title":"One","status":"PENDING","capabilityName":"default-child","intent":null,
+        {"capabilityName":"default:root","createdAt":"2026-01-01T00:00:00Z","status":"VALID","tasks":[{
+        "taskId":"one","title":"One","status":"PENDING","capabilityName":"default:child","intent":null,
         "dependsOn":[],"expectedOutputs":null,"parallelGroup":null,"note":null}]}
         """); }
     @Test void generatedShapeIsClosedRequiredAndInitialOnly() {

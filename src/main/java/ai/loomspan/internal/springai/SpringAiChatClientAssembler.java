@@ -55,7 +55,7 @@ final class SpringAiChatClientAssembler
                 modelUsageExtractor, sessionUsageService,
                 model -> ChatClient.builder(model, observationRegistry, null, null,
                         org.springframework.ai.chat.client.advisor.ToolCallingAdvisor.builder()
-                                .toolCallingManager(new CanonicalToolCallingManager(
+                                .toolCallingManager(new RequestBoundToolCallingManager(
                                         org.springframework.ai.model.tool.ToolCallingManager.builder()
                                                 // Keep tool-call limits owned by Loomspan rather than SDK defaults.
                                                 .unlimitedCallsPerTool().unlimitedTotalToolCalls()

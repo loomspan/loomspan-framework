@@ -71,7 +71,7 @@ class SharedResponsesProtocolIntegrationTest {
                     assertThat(items.get(at).at("/summary/0/text").asText()).isEqualTo("summary "+id);
                     assertThat(items.get(at+1).path("phase").asText()).isEqualTo("commentary");
                     assertThat(items.get(at+2).path("id").asText()).isEqualTo("fc_"+id);
-                    assertThat(items.get(at+2).path("name").asText()).isEqualTo("test-lookup");
+                    assertThat(items.get(at+2).path("name").asText()).isEqualTo("test--lookup");
                     assertThat(items.get(at+2).path("call_id").asText()).isEqualTo("call_"+id);
                     assertThat(items.get(at+3).path("type").asText()).isEqualTo("function_call_output");
                     assertThat(items.get(at+3).path("call_id").asText()).isEqualTo("call_"+id);
@@ -188,7 +188,7 @@ class SharedResponsesProtocolIntegrationTest {
             server.enqueue(ResponsesFixtures.text("done"));
             var effects=new AtomicInteger();
             ToolCallback callback=new ToolCallback() {
-                public ToolDefinition getToolDefinition(){return ToolDefinition.builder().name("test-lookup").description("lookup").inputSchema("{}").build();}
+                public ToolDefinition getToolDefinition(){return ToolDefinition.builder().name("test--lookup").description("lookup").inputSchema("{}").build();}
                 public String call(String input){
                     if(effects.incrementAndGet()==1)throw new org.springframework.ai.tool.execution.ToolExecutionException(getToolDefinition(),new IllegalArgumentException("recoverable detail"));
                     return "second result";
@@ -196,7 +196,7 @@ class SharedResponsesProtocolIntegrationTest {
             };
             var manager=ToolCallingManager.builder().toolExecutionExceptionProcessor(failure->"recoverable detail").build();
             var client=ChatClient.builder(model(server),io.micrometer.observation.ObservationRegistry.NOOP,null,null,
-                    ToolCallingAdvisor.builder().toolCallingManager(new CanonicalToolCallingManager(manager)))
+                    ToolCallingAdvisor.builder().toolCallingManager(new RequestBoundToolCallingManager(manager)))
                     .defaultOptions(requestOptions("gpt-6.1-terra",4096).toolCallbacks(callback)).build();
             assertThat(client.prompt("lookup").call().content()).isEqualTo("done");
             assertThat(effects).hasValue(2);
@@ -338,7 +338,7 @@ class SharedResponsesProtocolIntegrationTest {
     }
     private static ChatClient client(OpenAiResponsesChatModel model,OpenAiResponsesChatOptions options) {
         return ChatClient.builder(model,io.micrometer.observation.ObservationRegistry.NOOP,null,null,
-                ToolCallingAdvisor.builder().toolCallingManager(new CanonicalToolCallingManager(
+                ToolCallingAdvisor.builder().toolCallingManager(new RequestBoundToolCallingManager(
                         ToolCallingManager.builder().unlimitedCallsPerTool().unlimitedTotalToolCalls().build())))
                 .defaultOptions(options.mutate()).build();
     }
@@ -346,10 +346,10 @@ class SharedResponsesProtocolIntegrationTest {
         return new CountingCallback(effects,schema);
     }
     private record CountingCallback(AtomicInteger effects,String schema) implements ToolCallback {
-        public ToolDefinition getToolDefinition(){return ToolDefinition.builder().name("test-lookup").description("lookup").inputSchema(schema).build();}
+        public ToolDefinition getToolDefinition(){return ToolDefinition.builder().name("test--lookup").description("lookup").inputSchema(schema).build();}
         public String call(String input){return "effect "+effects.incrementAndGet();}
     }
-    private static Map<String,Object> call(String id) {return ResponsesFixtures.functionCall("Test-lookup","call_"+id,"{}").entrySet().stream()
+    private static Map<String,Object> call(String id) {return ResponsesFixtures.functionCall("test--lookup","call_"+id,"{}").entrySet().stream()
             .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey,e->e.getKey().equals("id")?"fc_"+id:e.getValue()));}
     private static Map<String,Object> reasoning(String id) {
         var item=new LinkedHashMap<String,Object>(); item.put("type","reasoning");item.put("id","rs_"+id);

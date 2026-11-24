@@ -23,7 +23,8 @@ final class SpringAiToolCallbackAdapter
 
     private static ToolCallback adapt(BoundCapability capability)
     {
-        ToolDefinition definition = ToolDefinition.builder().name(capability.name())
+        var identity = capability.metadata().identity();
+        ToolDefinition definition = ToolDefinition.builder().name(identity.namespace() + "--" + identity.localName())
                 .description(capability.description()).inputSchema(capability.inputSchema()).build();
         return new ToolCallback()
         {

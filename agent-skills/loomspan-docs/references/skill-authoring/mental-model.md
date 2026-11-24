@@ -61,6 +61,15 @@ Declaration grammar, owner assignment and role uniqueness are covered by
 `SkillIdentityTest`, `SkillMethodBeanPostProcessorTest` and
 `PortableDeclarationIdentityIntegrationTest`.
 
+The native provider adapter offers `order-support:find-order` as
+`order-support--find-order`. Returned function names must exactly match a callback
+offered for that request. That callback retains the resolved skill. Plans and
+assigned worker actions use `order-support:find-order`, and a worker must return
+the exact tool assigned to its task. See [planning](planning-concurrency.md) and
+[raw and resolved trace identities](traces-and-debugging.md#canonical-chat-attempt-evidence).
+`RequestBoundToolCallingManagerTest` covers request membership, and
+`NamespaceExecutionAuthorityIntegrationTest` covers both runtime protocols.
+
 Each root captures an immutable association of exactly the namespace generations reached
 by its declared child graph, before input conversion or validation. Every declared branch
 counts, including optional and role-restricted children; Java skills are leaves. Executor dependencies retain their owning namespace without traversing unrelated callables. Each

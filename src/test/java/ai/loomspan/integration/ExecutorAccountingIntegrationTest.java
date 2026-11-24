@@ -39,7 +39,7 @@ class ExecutorAccountingIntegrationTest {
             application.start(); nativeProvider.start();
             var bean = new Executor(application, false);
             Files.writeString(directory.resolve("parent.yaml"), "name: parent\ndescription: Native parent\nmodel: local\nallowed_skills: [{name: default:leaf}]\n");
-            nativeProvider.enqueue(nativeResponse(List.of(ResponsesFixtures.functionCall("default-leaf", "child", "{}")), unavailable));
+            nativeProvider.enqueue(nativeResponse(List.of(ResponsesFixtures.functionCall("default--leaf", "child", "{}")), unavailable));
             nativeProvider.enqueue(nativeResponse(List.of(ResponsesFixtures.textItem("DONE")), false));
             runner(bean).withPropertyValues("loomspan.connections.local.driver=openai",
                     "loomspan.connections.local.base-url=" + nativeProvider.url("/v1"),

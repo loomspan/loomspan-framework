@@ -144,12 +144,12 @@ class OrdinaryFinalOutputRepairIntegrationTest {
         return contract(driver, "name");
     }
     static ToolCallback callback(AtomicInteger effects) {
-        return FunctionToolCallback.<Map<String,Object>,String>builder("test-lookup", input -> "SENTINEL_COMPLETED_WORK_" + effects.incrementAndGet())
+        return FunctionToolCallback.<Map<String,Object>,String>builder("test--lookup", input -> "SENTINEL_COMPLETED_WORK_" + effects.incrementAndGet())
                 .description("fixture").inputType(Map.class).inputSchema("{\"type\":\"object\"}").build();
     }
     static ChatClient repairClient(ProviderConnectionRuntime runtime, String identity, CanonicalSchema schema, String mode, ToolCallback callback, int retries) {
         var builder = ChatClient.builder(runtime.chatModel(), io.micrometer.observation.ObservationRegistry.NOOP, null, null,
-                ToolCallingAdvisor.builder().toolCallingManager(new CanonicalToolCallingManager(ToolCallingManager.builder().build())))
+                ToolCallingAdvisor.builder().toolCallingManager(new RequestBoundToolCallingManager(ToolCallingManager.builder().build())))
                 .defaultOptions(options(runtime, identity, 2048, callback).mutate())
                 .defaultAdvisors(new ProviderAttemptCallAdvisor(runtime, mock(ExecutionStateService.class), new ModelUsageExtractor(), mock(SessionUsageService.class)));
         if (!mode.equals("evidence") && !mode.equals("linter")) builder.defaultAdvisors(new OutputSchemaCallAdvisor("ordinary-fixture", schema,
@@ -157,7 +157,7 @@ class OrdinaryFinalOutputRepairIntegrationTest {
         if (mode.equals("linter") || mode.equals("combined")) builder.defaultAdvisors(new LinterCallAdvisor("ordinary-fixture", "regex",
                 Pattern.compile("(?s).*accepted.*"), "Include accepted", retries, outcome -> {}));
         if (mode.equals("evidence") || mode.equals("combined")) builder.defaultAdvisors(new EvidenceContractCallAdvisor("ordinary-fixture",
-                EvidenceContract.compiled(Map.of("claim", new EvidenceExpressionParser().parse("test-unperformed"))),
+                EvidenceContract.compiled(Map.of("claim", new EvidenceExpressionParser().parse("test:unperformed"))),
                 new EvidenceBackedOutputValidator(), retries, outcome -> {}, outcome -> {}, fact -> {}));
         return builder.build();
     }
@@ -254,18 +254,18 @@ class OrdinaryFinalOutputRepairIntegrationTest {
             var parts = new ArrayList<Object>();
             if (rich) parts.add(Map.of("id", "rs_" + id, "type", "reasoning", "encrypted_content", "opaque-" + id,
                     "summary", List.of(Map.of("type", "summary_text", "text", "reason-" + id))));
-            parts.add(ResponsesFixtures.functionCall("test-lookup", id, "{\"value\":\"x\"}"));
+            parts.add(ResponsesFixtures.functionCall("test--lookup", id, "{\"value\":\"x\"}"));
             return ResponsesFixtures.response("fixture", "fixture", parts);
         }
         if (driver == AiDriver.ANTHROPIC) {
             var parts = new ArrayList<Object>();
             if (rich) parts.add(Map.of("type", "thinking", "thinking", "reason-" + id, "signature", "signed-" + id));
-            parts.add(Map.of("type", "tool_use", "id", id, "name", "test-lookup", "input", Map.of("value", "x")));
+            parts.add(Map.of("type", "tool_use", "id", id, "name", "test--lookup", "input", Map.of("value", "x")));
             return response(Map.of("id", "fixture", "type", "message", "role", "assistant", "model", "fixture", "content", parts,
                     "stop_reason", "tool_use", "usage", Map.of("input_tokens", 1, "output_tokens", 1)));
         }
         var part = new LinkedHashMap<String,Object>();
-        part.put("functionCall", Map.of("name", "test-lookup", "args", Map.of("value", "x")));
+        part.put("functionCall", Map.of("name", "test--lookup", "args", Map.of("value", "x")));
         if (rich) part.put("thoughtSignature", Base64.getEncoder().encodeToString(("signed-" + id).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         return response(Map.of("modelVersion", "fixture", "candidates", List.of(Map.of("content", Map.of("role", "model", "parts", List.of(part)), "finishReason", "STOP")),
                 "usageMetadata", Map.of("promptTokenCount", 1, "candidatesTokenCount", 1, "totalTokenCount", 2)));

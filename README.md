@@ -219,6 +219,14 @@ RBAC with temporary leases, then releases them. For executor leaves, entry RBAC 
 both YAML and captured Java executor policies. It creates no session, invokes no
 skill/provider, and reserves no root. Later invocation can fail after dependency,
 authentication, or lifecycle changes; use handoff when reserved admission is needed.
+An allowed child `order-support:find-order` is advertised to native function
+calling as `order-support--find-order`. Dispatch matches only the callbacks
+offered for that request. Plans and assigned worker `CALL_TOOL.toolName` values
+use `order-support:find-order` and must match the assigned target exactly. Raw
+provider evidence retains exchanged names, while resolved skill metadata uses
+the colon-qualified identity. See the [runtime model](agent-skills/loomspan-docs/references/skill-authoring/mental-model.md)
+and [planning protocol](agent-skills/loomspan-docs/references/skill-authoring/planning-concurrency.md).
+
 Admission leases already constructed runtimes. It is not a transaction over external
 systems. Each dispatch independently enforces the executing source's declared children,
 same-namespace or captured Public visibility, and target RBAC. Retaining a generation
@@ -434,8 +442,8 @@ handling without choosing another destination.
 
 One invocation has one session, trace, canonical event sequence and completed
 observer flow across all namespaces. Existing Console skill displays, lookups,
-correlations and trace readers use complete qualified names, so `a-search` and
-`b-search` remain distinct. Host inspection includes Private and restricted skill
+correlations and trace readers use complete qualified names, so `a:search` and
+`b:search` remain distinct. Host inspection includes Private and restricted skill
 metadata under existing observation authorization; runtime discovery remains
 execution-permission filtered.
 

@@ -1252,7 +1252,7 @@ public class StepLoopMissionExecutionEngine implements MissionExecutionEngine
                     return new ParsedStepAction(StepAction.finalResponse(node), null);
                 }
             }
-            parsed = parsed.canonicalSelection();
+            parsed.validateSelection();
             return new ParsedStepAction(parsed, null);
         }
         catch (IllegalArgumentException ex)

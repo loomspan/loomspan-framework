@@ -133,11 +133,11 @@ class DesignatedChildResultIntegrationTest {
                             List<Object> tasks = new ArrayList<>();
                             tasks.add(task(child, List.of()));
                             if (!middle) tasks.add(task("later", List.of(child)));
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-" + parent,
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default:" + parent,
                                     "createdAt", "2026-10-04T00:00:00Z", "status", "VALID", "tasks", tasks)));
                         }
                         if (system.contains("coordinator-assigned task")) {
-                            var matcher = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
+                            var matcher = Pattern.compile("Exact capability/tool: ([a-z0-9:-]+)").matcher(system);
                             assertThat(matcher.find()).isTrue();
                             String child = matcher.group(1);
                             return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL",
@@ -159,11 +159,11 @@ class DesignatedChildResultIntegrationTest {
             server.start();
             ApplicationContextRunner runner = new ApplicationContextRunner().withUserConfiguration(App.class)
                     .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
-                        if (invocation.skillName().equals("default-later")) {
+                        if (invocation.skillName().equals("default:later")) {
                             capture.laterCalls.incrementAndGet();
                             return "LATER_WORK_COMPLETE";
                         }
-                        assertThat(invocation.skillName()).isEqualTo("default-producer");
+                        assertThat(invocation.skillName()).isEqualTo("default:producer");
                         if (kind.startsWith("envelope")) {
                             capture.producerCalls.incrementAndGet();
                             if (kind.equals("envelope-failure")) throw new IllegalStateException("executor failed");
@@ -230,14 +230,14 @@ class DesignatedChildResultIntegrationTest {
                         var markerMatch = Pattern.compile("\"marker\"\\s*:\\s*\"([^\"]+)\"").matcher(messages);
                         assertThat(markerMatch.find()).isTrue();
                         String marker = markerMatch.group(1);
-                        boolean newer = system.contains("newProducer") || system.contains("PRODUCER_new");
+                        boolean newer = system.contains("new-producer") || system.contains("PRODUCER_new");
                         String producer = newer ? "newProducer" : "oldProducer";
                         if (system.contains("Create an ordered flight plan"))
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-04T00:00:00Z",
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default:root", "createdAt", "2026-10-04T00:00:00Z",
                                     "status", "VALID", "tasks", List.of(task(producer, List.of())))));
                         if (system.contains("coordinator-assigned task"))
                             return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", producer,
-                                    "toolName", "default-" + producer, "toolArguments", Map.of("marker", marker))));
+                                    "toolName", "default:" + producer.replace("Producer", "-producer"), "toolArguments", Map.of("marker", marker))));
                         assertThat(system).contains("PRODUCER_");
                         if (marker.equals("held")) { heldProducer.countDown(); await(releaseProducer); }
                         else if (!reload) { parallelProducers.countDown(); await(parallelProducers); }
@@ -292,7 +292,7 @@ class DesignatedChildResultIntegrationTest {
 
     private static String isolatedProducer(String generation) {
         return """
-                name: %sProducer
+                name: %s-producer
                 description: Produce the generation-specific report
                 model: local
                 prompt: PRODUCER_%s. Produce the report from the supplied marker.
@@ -321,7 +321,7 @@ class DesignatedChildResultIntegrationTest {
                 output_from: {skill: default:%s}
                 allowed_skills:
                   - {name: default:%s, required: true, max_tasks: 1}
-                """.formatted(name, later ? 2 : 1, name.equals("middle") ? "MIDDLE_ORCHESTRATION" : "ROOT_ORCHESTRATION", child, child)
+                """.formatted(name, later ? 2 : 1, name.equals("middle") ? "MIDDLE_ORCHESTRATION" : "ROOT_ORCHESTRATION", child.replace("Producer", "-producer"), child.replace("Producer", "-producer"))
                 + (later ? "  - {name: default:later, required: true, max_tasks: 1}\n" : "");
     }
 
@@ -337,13 +337,13 @@ class DesignatedChildResultIntegrationTest {
     }
 
     private static void write(Path directory, String name, String yaml) throws Exception {
-        Files.writeString(directory.resolve(name + ".yaml"), yaml);
+        Files.writeString(directory.resolve(name.replace("Producer", "-producer") + ".yaml"), yaml);
     }
 
     private static Map<String, Object> task(String child, List<String> dependencies) {
         Map<String, Object> task = new LinkedHashMap<>();
         task.put("taskId", child); task.put("title", child); task.put("status", "PENDING");
-        task.put("capabilityName", "default-" + child); task.put("intent", "Fulfill assigned responsibility");
+        task.put("capabilityName", "default:" + child.replace("Producer", "-producer")); task.put("intent", "Fulfill assigned responsibility");
         task.put("dependsOn", dependencies); task.put("expectedOutputs", List.of("complete result"));
         task.put("parallelGroup", null); task.put("note", "");
         return task;

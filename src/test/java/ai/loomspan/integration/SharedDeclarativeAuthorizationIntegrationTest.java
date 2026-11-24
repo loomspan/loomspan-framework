@@ -142,7 +142,7 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                 assertThat(context).hasNotFailed();
                 var state = context.getBean(State.class);
                 var reload = context.getBean(SkillReloader.class);
-                publish(reload,List.of(leaf("leaf","SALES"),leaf("yamlDenied","OTHER"),new SkillDocument("root","""
+                publish(reload,List.of(leaf("leaf","SALES"),leaf("yaml-denied","OTHER"),new SkillDocument("root","""
                         name: root
                         description: parent
                         model: model
@@ -171,20 +171,20 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                     caller.setAuthentication(both);
                     template.validate("default", "leaf",Map.of("value","reject"));
                     assertThat(reload.snapshot("default").skills()).extracting(SkillDescriptor::qualifiedName)
-                            .contains("default-leaf","default-yamlDenied","default-callable").doesNotContain("default-write");
-                    var capture = manager.capture(SkillIdentity.parse("default-root"));
+                            .contains("default:leaf","default:yaml-denied","default:callable").doesNotContain("default:write");
+                    var capture = manager.capture(SkillIdentity.parse("default:root"));
                     try {
                         var snapshot = manager.validateAdmission(capture.snapshot());
                         var root = snapshot.resolve(snapshot.entry());
-                        var leaf = snapshot.resolve(SkillIdentity.parse("default-leaf"));
-                        var yamlDenied = snapshot.resolve(SkillIdentity.parse("default-yamlDenied"));
-                        var session = TestLoomspanSessions.withId("shared-authorization","default-root",8);
+                        var leaf = snapshot.resolve(SkillIdentity.parse("default:leaf"));
+                        var yamlDenied = snapshot.resolve(SkillIdentity.parse("default:yaml-denied"));
+                        var session = TestLoomspanSessions.withId("shared-authorization","default:root",8);
                         session.setAuthentication(both);
                         var binding = ExecutionBinding.sessionOnly(session,snapshot)
                                 .withTarget(root,new MissionContext(session,root.name(),"source-frame",null));
                         ExecutionBindingScope.runWith(binding,() -> {
                             assertThat(resolver.visibleSkillsFor(root.name(),session,null)).extracting(CapabilityMetadata::name)
-                                    .containsExactly("default-leaf","default-callable");
+                                    .containsExactly("default:leaf","default:callable");
                             assertThat(resolver.visibleSkillsFor(root.name(),session,auth("ROLE_SALES"))).isEmpty();
                             assertThat(state.calls).isZero();
                             for (var denied : List.of(auth("ROLE_SALES"),auth("ROLE_DATABASE_WRITE"))) {
@@ -199,7 +199,7 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                             assertThat(router.execute(leaf,Map.of("value","ok"),session,null)).isEqualTo("ok");
                             assertThat(state.authentication).isSameAs(both);
                             assertThat(session.getAuthentication().orElseThrow()).isSameAs(both);
-                            var callable = snapshot.resolve(SkillIdentity.parse("default-callable"));
+                            var callable = snapshot.resolve(SkillIdentity.parse("default:callable"));
                             assertThat(router.execute(callable,Map.of("value","ok"),session,both)).isEqualTo("ok");
                             for (var target : List.of(leaf,callable)) {
                                 int before = state.calls;

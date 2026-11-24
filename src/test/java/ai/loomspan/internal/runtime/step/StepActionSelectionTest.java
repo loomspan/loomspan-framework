@@ -5,17 +5,18 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
 class StepActionSelectionTest {
-    @Test void commonParserNormalizesOnlyNamespaceAndEnforcesLimits() {
+    @Test void validatesExactSelectionWithoutReplacingActionOrArguments() {
         var arguments = new LinkedHashMap<String,Object>(); arguments.put("value",null);
-        var raw = StepAction.callTool("one","Tax-calculateTax",arguments);
-        var selected = raw.canonicalSelection();
-        assertThat(raw.toolName()).isEqualTo("Tax-calculateTax");
-        assertThat(selected.toolName()).isEqualTo("tax-calculateTax");
-        assertThat(selected.toolArguments()).isSameAs(arguments);
-        assertThat(StepAction.callTool("one","tax-CalculateTax",arguments).canonicalSelection().toolName()).isEqualTo("tax-CalculateTax");
-        for (String invalid : List.of("calculateTax","tax-a-b","tax/a"," tax-calculateTax","n".repeat(33)+"-x","tax-"+"x".repeat(61)))
-            assertThatThrownBy(() -> StepAction.callTool("one",invalid,arguments).canonicalSelection()).isInstanceOf(IllegalArgumentException.class);
-        for (String boundary : List.of("a_b-c_d","n".repeat(32)+"-"+"x".repeat(31)))
-            assertThat(StepAction.callTool("one",boundary,arguments).canonicalSelection().toolName()).isEqualTo(boundary);
+        var raw = StepAction.callTool("one", "order-support:find-order", arguments);
+        raw.validateSelection();
+        assertThat(raw.toolName()).isEqualTo("order-support:find-order");
+        assertThat(raw.toolArguments()).isSameAs(arguments);
+        for (String invalid : List.of("find-order", "order-support--find-order", "Order-support:find-order",
+                "orders:find_order", "orders:lookup ", "orders/lookup", "order-support:" + "a".repeat(50)))
+            assertThatThrownBy(() -> StepAction.callTool("one", invalid, arguments).validateSelection())
+                    .isInstanceOf(IllegalArgumentException.class);
+        for (String boundary : List.of("order-support:find-order", "order-support:" + "a".repeat(49)))
+            assertThatCode(() -> StepAction.callTool("one", boundary, arguments).validateSelection()).doesNotThrowAnyException();
+        assertThatCode(() -> StepAction.cannotComplete("exact reason").validateSelection()).doesNotThrowAnyException();
     }
 }

@@ -13,7 +13,7 @@ public final class OrdinaryRepairTestClients {
 
     public static ChatClient.Builder builder(ChatModel model) {
         return ChatClient.builder(model, ObservationRegistry.NOOP, null, null,
-                ToolCallingAdvisor.builder().toolCallingManager(new CanonicalToolCallingManager(
+                ToolCallingAdvisor.builder().toolCallingManager(new RequestBoundToolCallingManager(
                         ToolCallingManager.builder().unlimitedCallsPerTool().unlimitedTotalToolCalls().build())));
     }
 

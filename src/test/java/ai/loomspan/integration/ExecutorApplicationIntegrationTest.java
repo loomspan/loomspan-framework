@@ -40,11 +40,11 @@ class ExecutorApplicationIntegrationTest {
                 var views = new ArrayList<SkillExecutionView>();
                 assertThat(skills.invoke("default", "http", Map.of("message", "hello"), views::add))
                         .isEqualTo("  application result\n");
-                assertThat(beans.httpInvocation.skillName()).isEqualTo("default-http");
+                assertThat(beans.httpInvocation.skillName()).isEqualTo("default:http");
                 assertThat(beans.httpInvocation.skillConfig()).containsEntry("path", "/operation");
                 var catalog = context.getBean(SkillReloader.class).snapshot("default");
                 assertThat(catalog.skill("http").orElseThrow().kind()).isEqualTo(SkillKind.JAVA);
-                assertThat(catalog.skill("httpExecutor")).isEmpty();
+                assertThat(catalog.skill("http-executor")).isEmpty();
                 assertThat(beans.httpInvocation.executorConfigGenerationId()).isEqualTo(catalog.generationId());
                 assertThat(views).hasSize(1);
                 assertThat(views.getFirst().events()).isNotEmpty();
@@ -72,8 +72,8 @@ class ExecutorApplicationIntegrationTest {
                     model: local
                     allowed_skills: [{name: default:write-file}, {name: default:http}]
                     """);
-            provider.enqueue(tool("default-writeFile", "{}", "write"));
-            provider.enqueue(tool("default-http", "{\"message\":\"upload\",\"attachment\":\"ref://payload.txt\"}", "upload"));
+            provider.enqueue(tool("default:write-file", "{}", "write"));
+            provider.enqueue(tool("default:http", "{\"message\":\"upload\",\"attachment\":\"ref://payload.txt\"}", "upload"));
             provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.text("DONE")); provider.start();
             var beans = new ApplicationExecutors();
             runner(beans).withBean(FileWriter.class, () -> new FileWriter())
@@ -88,9 +88,9 @@ class ExecutorApplicationIntegrationTest {
                             var views = new ArrayList<SkillExecutionView>();
                             assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of(), views::add)).isEqualTo("DONE");
                             assertThat(beans.httpInvocation.input().get("attachment")).isInstanceOf(Resource.class);
-                            assertThat(beans.httpInvocation.skillName()).isEqualTo("default-http");
+                            assertThat(beans.httpInvocation.skillName()).isEqualTo("default:http");
                             assertThat(views).hasSize(1);
-                            assertThat(views.getFirst().events()).anySatisfy(event -> assertThat(event.route()).isEqualTo("default-http"));
+                            assertThat(views.getFirst().events()).anySatisfy(event -> assertThat(event.route()).isEqualTo("default:http"));
                             assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "http",
                                     Map.of("message", "missing", "attachment", "ref://unknown.txt")))
                                     .isInstanceOf(SkillException.class).hasStackTraceContaining("Unknown ref");
@@ -119,7 +119,7 @@ class ExecutorApplicationIntegrationTest {
                 assertThat(call.skillConfig().get("literal.dot")).isEqualTo(Arrays.asList(null, Map.of(), List.of()));
                 assertThat(call.executorConfig()).containsEntry("Upper", "A").containsEntry("upper", "B");
                 var reloader = context.getBean(SkillReloader.class);
-                var candidate = reloader.prepare("default", List.of(new SkillDocument("bad", "name: bad\ndescription: invalid domain\nexecutor: sqlExecutor\nconfig: {database: invalid}\n")),
+                var candidate = reloader.prepare("default", List.of(new SkillDocument("bad", "name: bad\ndescription: invalid domain\nexecutor: sql-executor\nconfig: {database: invalid}\n")),
                         new ExecutionConfiguration("loomspan: {executor-config: {default: {http: {}, sql: {sql: select}}}}"));
                 assertThat(beans.sqlCalls).isEqualTo(1);
                 reloader.publish(candidate);
@@ -143,7 +143,7 @@ class ExecutorApplicationIntegrationTest {
         Files.writeString(directory.resolve("http.yaml"), """
                 name: http
                 description: Send a message or session file to the application
-                executor: httpExecutor
+                executor: http-executor
                 config: {path: /operation}
                 input_schema:
                   type: object
@@ -156,7 +156,7 @@ class ExecutorApplicationIntegrationTest {
         Files.writeString(directory.resolve("query.yaml"), """
                 name: query
                 description: Demonstrate application-owned SQL data
-                executor: sqlExecutor
+                executor: sql-executor
                 config: {database: archive, sql: operation-data, nullable: null, 'literal.dot': [null, {}, []]}
                 """);
     }
@@ -177,7 +177,7 @@ class ExecutorApplicationIntegrationTest {
         volatile SkillExecutorInvocation httpInvocation;
         volatile SkillExecutorInvocation sqlInvocation;
         int sqlCalls;
-        @SkillExecutor(name = "httpExecutor", config = "http")
+        @SkillExecutor(name = "http-executor", config = "http")
         public String http(SkillExecutorInvocation call) throws Exception {
             httpInvocation = call;
             byte[] body;
@@ -191,7 +191,7 @@ class ExecutorApplicationIntegrationTest {
                 return client.send(request, HttpResponse.BodyHandlers.ofString()).body();
             }
         }
-        @SkillExecutor(name = "sqlExecutor", config = "sql")
+        @SkillExecutor(name = "sql-executor", config = "sql")
         public String sql(SkillExecutorInvocation call) {
             sqlCalls++; sqlInvocation = call;
             if ("invalid".equals(call.skillConfig().get("database"))) throw new IllegalStateException("Application database unavailable");
@@ -202,7 +202,7 @@ class ExecutorApplicationIntegrationTest {
     public static class FileWriter {
         SessionLocalVirtualFileSystem vfs;
         Path file;
-        @SkillMethod(name = "writeFile", description = "Create the fixture session file")
+        @SkillMethod(name = "write-file", description = "Create the fixture session file")
         public String write() throws Exception {
             file = vfs.sessionRoot(ExecutionBindingScope.requireCurrent().session()).resolve("payload.txt");
             Files.createDirectories(file.getParent()); Files.writeString(file, "session file bytes");

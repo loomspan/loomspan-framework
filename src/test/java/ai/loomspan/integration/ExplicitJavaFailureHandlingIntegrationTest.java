@@ -29,14 +29,14 @@ class ExplicitJavaFailureHandlingIntegrationTest {
 
     @Test
     void declaringChildStopsAndOnlyItsStandardCallerReceivesAssociatedFeedback() throws Exception {
-        Files.writeString(directory.resolve("child.yaml"), parent("child", "default-callable", false));
-        Files.writeString(directory.resolve("standard.yaml"), parent("standard", "default-child", false));
+        Files.writeString(directory.resolve("child.yaml"), parent("child", "default:callable", false));
+        Files.writeString(directory.resolve("standard.yaml"), parent("standard", "default:child", false));
         for (boolean parentDeclaresInability : List.of(false, true)) {
             var behavior = new Behavior();
             behavior.kind = "success";
             try (var server = new MockWebServer()) {
-                server.enqueue(tool("default-child"));
-                server.enqueue(tool("default-callable"));
+                server.enqueue(tool("default:child"));
+                server.enqueue(tool("default:callable"));
                 String rawArguments = "{ \r\n \"reason\" : " + JSON.writeValueAsString(EXACT) + " \n }";
                 server.enqueue(tool("loomspan_cannot_complete", "child-declaration", rawArguments, "Ignored candidate"));
                 String parentReason = "Parent independently stops";
@@ -52,7 +52,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                         assertThat(template.invoke("default", "standard", Map.of())).isEqualTo("DONE");
                     }
                     assertThat(behavior.calls).hasValue(1);
-                    assertThat(behavior.parent.get().successfulDirectSkills()).containsExactly("default-callable");
+                    assertThat(behavior.parent.get().successfulDirectSkills()).containsExactly("default:callable");
                     var session = behavior.session.get();
                     var usage = session.getSessionUsage().orElseThrow();
                     assertThat(usage.providerAttempts()).isEqualTo(4);
@@ -67,15 +67,15 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                     assertThat(failures).hasSize(parentDeclaresInability ? 2 : 1);
                     var childFailure = failures.getFirst();
                     assertThat(childFailure.frameType()).isEqualTo(TraceFrameType.MODEL_CALL);
-                    assertThat(childFailure.route()).isEqualTo("default-child#mission-model");
+                    assertThat(childFailure.route()).isEqualTo("default:child#mission-model");
                     assertThat(childFailure.data().path("kind").asString()).isEqualTo("planner_inability");
                     assertThat(childFailure.data().path("classification").asString()).isEqualTo("RECOVERABLE");
                     assertThat(childFailure.data().path("exceptionMessage").asString()).isEqualTo(EXACT);
                     assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.TOOL_CALL_COMPLETED)
-                            .singleElement().satisfies(record -> assertThat(record.route()).isEqualTo("default-callable"));
+                            .singleElement().satisfies(record -> assertThat(record.route()).isEqualTo("default:callable"));
                     assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.TOOL_CALL_FAILED)
                             .singleElement().satisfies(record -> {
-                                assertThat(record.route()).isEqualTo("default-child");
+                                assertThat(record.route()).isEqualTo("default:child");
                                 assertThat(record.data().path("failure").path("classification").asString()).isEqualTo("RECOVERABLE");
                                 assertThat(records).anySatisfy(mission -> {
                                     assertThat(mission.recordType()).isEqualTo(TraceRecordType.FRAME_OPENED);
@@ -100,7 +100,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                     var traceFeedback = traceRequest.data().path("messages").get(traceRequest.data().path("messages").size() - 1)
                             .path("toolResponses").get(0);
                     assertThat(traceFeedback.path("id").asString()).isEqualTo("failed-call");
-                    assertThat(traceFeedback.path("name").asString()).isEqualTo("default-child");
+                    assertThat(traceFeedback.path("name").asString()).isEqualTo("default--child");
                     for (int turn = 0; turn < 3; turn++) server.takeRequest();
                     var wire = JSON.readTree(server.takeRequest().getBody().readUtf8());
                     var messages = ai.loomspan.testkit.ResponsesFixtures.transcript(wire);
@@ -119,18 +119,18 @@ class ExplicitJavaFailureHandlingIntegrationTest {
 
     @Test
     void standardChildInabilityPropagatesThroughAnExplicitStepAncestor() throws Exception {
-        Files.writeString(directory.resolve("child.yaml"), parent("child", "default-callable", false));
-        Files.writeString(directory.resolve("step.yaml"), parent("step", "default-child", true));
-        Files.writeString(directory.resolve("standard.yaml"), parent("standard", "default-step", false));
+        Files.writeString(directory.resolve("child.yaml"), parent("child", "default:callable", false));
+        Files.writeString(directory.resolve("step.yaml"), parent("step", "default:child", true));
+        Files.writeString(directory.resolve("standard.yaml"), parent("standard", "default:step", false));
         var behavior = new Behavior();
         behavior.kind = "success";
         try (var server = new MockWebServer()) {
-            server.enqueue(tool("default-step"));
-            server.enqueue(text(JSON.writeValueAsString(Map.of("capabilityName", "default-step",
-                    "createdAt", "2026-11-01T00:00:00Z", "status", "VALID", "tasks", List.of(task("default-child"))))));
+            server.enqueue(tool("default:step"));
+            server.enqueue(text(JSON.writeValueAsString(Map.of("capabilityName", "default:step",
+                    "createdAt", "2026-11-01T00:00:00Z", "status", "VALID", "tasks", List.of(task("default:child"))))));
             server.enqueue(text(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", "child",
-                    "toolName", "default-child", "toolArguments", Map.of()))));
-            server.enqueue(tool("default-callable"));
+                    "toolName", "default:child", "toolArguments", Map.of()))));
+            server.enqueue(tool("default:callable"));
             server.enqueue(inability(EXACT));
             server.enqueue(text("DONE"));
             server.start();
@@ -141,7 +141,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                 behavior.session.get().readTraceRecords(records::add);
                 assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
                         .singleElement().satisfies(failure -> {
-                            assertThat(failure.route()).isEqualTo("default-child#mission-model");
+                            assertThat(failure.route()).isEqualTo("default:child#mission-model");
                             assertThat(failure.data().path("exceptionMessage").asString()).isEqualTo(EXACT);
                         });
                 assertThat(records.getLast().metadata()).containsEntry("outcome", "SUCCEEDED").doesNotContainKey("terminalFailureId");
@@ -166,7 +166,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                 output_schema:
                   type: object
                   properties:
-                    answer: {type: string, x-loomspan-evidence: default-callable}
+                    answer: {type: string, x-loomspan-evidence: default:callable}
                   required: [answer]
                   additionalProperties: false
                 linter:
@@ -193,7 +193,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
             String arguments = JSON.writeValueAsString(Map.of("reason", EXACT));
             server.enqueue(tool("loomspan_cannot_complete", "signal", arguments, candidate));
             server.enqueue(tool("loomspan_cannot_complete", "signal", arguments, candidate));
-            server.enqueue(tool("default-callable"));
+            server.enqueue(tool("default:callable"));
             server.enqueue(text(candidate));
             server.start();
             runner(server, behavior).run(context -> {
@@ -226,7 +226,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
             for (int turn = 0; turn < 4; turn++) {
                 var wire = JSON.readTree(server.takeRequest().getBody().readUtf8());
                 assertThat(wire.path("tools")).extracting(tool -> tool.path("name").asString())
-                        .containsExactlyInAnyOrder("default-callable", "loomspan_cannot_complete");
+                        .containsExactlyInAnyOrder("default--callable", "loomspan_cannot_complete");
                 assertThat(wire.path("input").toString()).contains("image_url");
             }
         }
@@ -234,12 +234,12 @@ class ExplicitJavaFailureHandlingIntegrationTest {
 
     @Test
     void assignedInabilityReachesDirectJavaCaller() throws Exception {
-        Files.writeString(directory.resolve("child.yaml"), parent("child", "default-callable", false));
-        Files.writeString(directory.resolve("step.yaml"), parent("step", "default-child", true));
+        Files.writeString(directory.resolve("child.yaml"), parent("child", "default:callable", false));
+        Files.writeString(directory.resolve("step.yaml"), parent("step", "default:child", true));
         var behavior = new Behavior();
         behavior.kind = "success";
         try (var server = new MockWebServer()) {
-            server.enqueue(plan("default-step", "default-child"));
+            server.enqueue(plan("default:step", "default:child"));
             server.enqueue(text(stepInability(EXACT)));
             server.start();
             runner(server, behavior).run(context -> {
@@ -266,7 +266,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
         behavior.kind = "success";
         String declaration = stepInability(EXACT);
         try (var server = new MockWebServer()) {
-            server.enqueue(plan("default-step", "default-callable"));
+            server.enqueue(plan("default:step", "default:callable"));
             server.enqueue(text(declaration));
             server.start();
             var runner = runner(server, behavior);
@@ -305,7 +305,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                                 assertThat(failure.data().path("classification").asString()).isEqualTo("TERMINAL");
                                 assertThat(failure.data().has("kind")).isFalse();
                                 assertThat(failure.data().path("diagnostics")).hasSize(1);
-                            } else assertStepSignal(failure, "default-step#step-2", declaration);
+                            } else assertStepSignal(failure, "default:step#step-2", declaration);
                         });
                 assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.MODEL_RESPONSE_RECEIVED)
                         .anySatisfy(record -> assertThat(record.data().path("generations").get(0).path("text").asString())
@@ -330,8 +330,8 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     @ParameterizedTest @ValueSource(booleans = {false, true})
     void stepChildInabilityUsesExistingStandardFeedbackThroughStepAncestors(boolean interveningStep) throws Exception {
         Files.writeString(directory.resolve("child.yaml"), stepSynthesis("child"));
-        Files.writeString(directory.resolve("step.yaml"), parent("step", "default-child", true));
-        String standardTarget = interveningStep ? "default-step" : "default-child";
+        Files.writeString(directory.resolve("step.yaml"), parent("step", "default:child", true));
+        String standardTarget = interveningStep ? "default:step" : "default:child";
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", standardTarget, false));
         var behavior = new Behavior();
         behavior.kind = "success";
@@ -339,11 +339,11 @@ class ExplicitJavaFailureHandlingIntegrationTest {
         try (var server = new MockWebServer()) {
             server.enqueue(tool(standardTarget));
             if (interveningStep) {
-                server.enqueue(plan("default-step", "default-child"));
+                server.enqueue(plan("default:step", "default:child"));
                 server.enqueue(text(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", "child",
-                        "toolName", "default-child", "toolArguments", Map.of()))));
+                        "toolName", "default:child", "toolArguments", Map.of()))));
             }
-            server.enqueue(plan("default-child", "default-callable"));
+            server.enqueue(plan("default:child", "default:callable"));
             server.enqueue(text("{\"stepAction\":\"CANNOT_COMPLETE\",\"reason\":\"Invalid candidate\",\"taskId\":null}"));
             server.enqueue(text(declaration));
             server.enqueue(text("DONE"));
@@ -354,13 +354,13 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                 assertThat(context.getBean(SkillTemplate.class).invoke("default", "standard", Map.of())).isEqualTo("DONE");
                 assertThat(behavior.calls).hasValue(1);
                 var caller = behavior.parent.get().parent().orElseThrow();
-                assertNoAcceptedResult(caller, "default-child");
-                if (interveningStep) assertNoAcceptedResult(caller.parent().orElseThrow(), "default-step");
+                assertNoAcceptedResult(caller, "default:child");
+                if (interveningStep) assertNoAcceptedResult(caller.parent().orElseThrow(), "default:step");
                 var session = behavior.session.get();
                 var records = new ArrayList<TraceRecord>();
                 session.readTraceRecords(records::add);
                 var failures = records.stream().filter(record -> record.recordType() == TraceRecordType.ERROR_RECORDED).toList();
-                assertThat(failures).singleElement().satisfies(failure -> assertStepSignal(failure, "default-child#step-2", declaration));
+                assertThat(failures).singleElement().satisfies(failure -> assertStepSignal(failure, "default:child#step-2", declaration));
                 Object failureId = failures.getFirst().metadata().get("failureId");
                 assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.STEP_FAILED)
                         .hasSize(interveningStep ? 2 : 1).allSatisfy(record ->
@@ -373,7 +373,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                         .hasSize(interveningStep ? 2 : 1).allSatisfy(record ->
                                 assertThat(record.metadata()).containsEntry("failureId", failureId));
                 assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.TOOL_CALL_COMPLETED)
-                        .singleElement().satisfies(record -> assertThat(record.route()).isEqualTo("default-callable"));
+                        .singleElement().satisfies(record -> assertThat(record.route()).isEqualTo("default:callable"));
                 assertThat(records.getLast().metadata()).containsEntry("outcome", "SUCCEEDED").doesNotContainKey("terminalFailureId");
                 var usage = session.getSessionUsage().orElseThrow();
                 assertThat(usage.providerAttempts()).isEqualTo(requests);
@@ -385,7 +385,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                 var messages = sent.data().path("messages");
                 var feedback = messages.get(messages.size() - 1).path("toolResponses").get(0);
                 assertThat(feedback.path("id").asString()).isEqualTo("failed-call");
-                assertThat(feedback.path("name").asString()).isEqualTo(standardTarget);
+                assertThat(feedback.path("name").asString()).isEqualTo(standardTarget.replace(":", "--"));
                 assertThat(JSON.readTree(feedback.path("content").asString())).isEqualTo(JSON.valueToTree(Map.of(
                         "status", "failed", "kind", "planner_inability", "correctionPermitted", true, "message", EXACT)));
             });
@@ -406,8 +406,8 @@ class ExplicitJavaFailureHandlingIntegrationTest {
         behavior.kind = "inability";
         try (var server = new MockWebServer()) {
             if (stepped) {
-                Files.writeString(directory.resolve("step.yaml"), parent("step", "default-callable", true));
-                server.enqueue(plan("default-step", "default-callable"));
+                Files.writeString(directory.resolve("step.yaml"), parent("step", "default:callable", true));
+                server.enqueue(plan("default:step", "default:callable"));
             }
             server.start();
             runner(server, behavior).run(context -> {
@@ -432,7 +432,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
 
     @ParameterizedTest @ValueSource(booleans={false,true})
     void bothJavaFormsFailTruthfullyAcrossDirectStandardAndStep(boolean executor) throws Exception {
-        String child = executor ? "default-leaf" : "default-callable";
+        String child = executor ? "default:leaf" : "default:callable";
         Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false));
         Files.writeString(directory.resolve("step.yaml"), parent("step", child, true));
@@ -448,7 +448,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                         var wire = JSON.readTree(request.getBody().readUtf8());
                         String system = ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan")) {
-                            return text(JSON.writeValueAsString(Map.of("capabilityName", "default-step", "createdAt", "2026-11-01T00:00:00Z",
+                            return text(JSON.writeValueAsString(Map.of("capabilityName", "default:step", "createdAt", "2026-11-01T00:00:00Z",
                                     "status", "VALID", "tasks", List.of(task(child)))));
                         }
                         if (system.contains("Exact capability/tool:")) return text(JSON.writeValueAsString(Map.of(
@@ -513,7 +513,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     }
     @ParameterizedTest @ValueSource(booleans={false,true})
     void terminalStandardFailureNeverBecomesFeedback(boolean executor) throws Exception {
-        String child = executor ? "default-leaf" : "default-callable";
+        String child = executor ? "default:leaf" : "default:callable";
         Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false));
         var behavior = new Behavior(); behavior.kind = "terminal";
@@ -530,7 +530,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
 
     @ParameterizedTest @ValueSource(booleans={false,true})
     void actualStandardCallbackKeepsSecurityCancellationAndShutdownTerminal(boolean executor) throws Exception {
-        String child = executor ? "default-leaf" : "default-callable";
+        String child = executor ? "default:leaf" : "default:callable";
         Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false));
         for (String control : List.of("security", "cancellation", "shutdown")) {
@@ -553,10 +553,10 @@ class ExplicitJavaFailureHandlingIntegrationTest {
 
     @ParameterizedTest @ValueSource(booleans={false,true})
     void normalReattemptAndAlternateSelectionCreditOnlyActualSuccess(boolean executor) throws Exception {
-        String child = executor ? "default-leaf" : "default-callable";
-        String alternate = executor ? "default-otherLeaf" : "default-otherCallable";
+        String child = executor ? "default:leaf" : "default:callable";
+        String alternate = executor ? "default:other-leaf" : "default:other-callable";
         Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
-        Files.writeString(directory.resolve("other.yaml"), "name: otherLeaf\ndescription: Other leaf\nexecutor: default:execute\n");
+        Files.writeString(directory.resolve("other.yaml"), "name: other-leaf\ndescription: Other leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false).replace("}]", "}, {name: " + alternate + "}]"));
         for (boolean changeTool : List.of(false,true)) {
             var behavior = new Behavior(); behavior.kind = "once";
@@ -592,7 +592,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
 
     @ParameterizedTest @ValueSource(booleans={false,true})
     void failedContinuationConsumesEveryExistingBudget(boolean executor) throws Exception {
-        String child = executor ? "default-leaf" : "default-callable";
+        String child = executor ? "default:leaf" : "default:callable";
         Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false));
         for (String meter : List.of("tool-invocations", "skill-invocations", "provider-attempts", "model-calls", "usage-units")) {
@@ -624,7 +624,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
 
     @ParameterizedTest @ValueSource(booleans={false,true})
     void feedbackKeepsOriginalParentDeadline(boolean executor) throws Exception {
-        String child = executor ? "default-leaf" : "default-callable";
+        String child = executor ? "default:leaf" : "default:callable";
         Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false));
         var behavior = new Behavior(); behavior.kind = "recoverable"; behavior.delayMillis = 450;
@@ -709,7 +709,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
             };
         }
         @SkillMethod(name="callable", description="Fails explicitly") public String callable() { return fail(); }
-        @SkillMethod(name="otherCallable", description="Alternative") public String otherCallable() { return fail(); }
+        @SkillMethod(name="other-callable", description="Alternative") public String otherCallable() { return fail(); }
         @SkillExecutor(name="execute") public String execute(SkillExecutorInvocation value) { return fail(); }
     }
     static String parent(String name, String child, boolean step) { return "name: " + name + "\ndescription: Failure route\nmodel: local\nplanning_mode: " + step
@@ -750,7 +750,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     static MockResponse tool(String name, String id, String arguments, String content) {
         var output = new java.util.ArrayList<Map<String,Object>>();
         if (!content.isEmpty()) output.add(ai.loomspan.testkit.ResponsesFixtures.textItem(content));
-        output.add(ai.loomspan.testkit.ResponsesFixtures.functionCall(name, id, arguments));
+        output.add(ai.loomspan.testkit.ResponsesFixtures.functionCall(name.replace(":", "--"), id, arguments));
         return ai.loomspan.testkit.ResponsesFixtures.response("fixture", "fixture", output);
     }
     static MockResponse inability(String reason) {

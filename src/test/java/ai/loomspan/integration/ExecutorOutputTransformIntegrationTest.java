@@ -86,11 +86,11 @@ class ExecutorOutputTransformIntegrationTest {
     @Test void publishesOneResultToDirectForwardingAndOrdinaryToolCallers() throws Exception {
         write("triage", executor("triage") + CASE_SCHEMA + inputTransform("{\"requestId\": .caseId}") + outputTransform(TRIAGE));
         write("forward", planned("forward", 1) + PLANNED_TRIAGE + "output_from: {skill: default:triage}\n");
-        write("ordinary", ExplicitJavaFailureHandlingIntegrationTest.parent("ordinary", "default-triage", false));
+        write("ordinary", ExplicitJavaFailureHandlingIntegrationTest.parent("ordinary", "default:triage", false));
         var executor = new ObservedExecutor(call -> RAW);
         try (var provider = new MockWebServer()) {
             provider.enqueue(plan("forward", task("triage")));
-            provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.tool("default-triage", "triage-call", JSON.writeValueAsString(CASE), ""));
+            provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.tool("default:triage", "triage-call", JSON.writeValueAsString(CASE), ""));
             provider.enqueue(ResponsesFixtures.text("ordinary done"));
             provider.start();
             withProvider(runner(executor), provider).run(context -> {
@@ -103,7 +103,7 @@ class ExecutorOutputTransformIntegrationTest {
                 assertThat(executor.calls).hasSize(3).allSatisfy(call ->
                         assertThat(call.input()).isEqualTo(Map.of("requestId", "case-17")));
                 assertThat(executor.sessions).hasSize(3).allSatisfy(session -> {
-                    var metadata = completion(ExecutorDiagnosticTestSupport.logicalRecords(session), "default-triage");
+                    var metadata = completion(ExecutorDiagnosticTestSupport.logicalRecords(session), "default:triage");
                     assertThat(metadata.data().path("executorOutput").textValue()).isEqualTo(RAW);
                     assertThat(metadata.data().path("skillOutput").textValue()).isEqualTo(direct);
                     assertThat(metadata.data().path("outputTransformStatus").textValue()).isEqualTo("succeeded");
@@ -146,7 +146,7 @@ class ExecutorOutputTransformIntegrationTest {
                 output_bindings:
                   /selected: {from: child_result, skill: default:triage, path: /repeatContactProbability}
                 """);
-        var executor = new ObservedExecutor(call -> call.skillName().equals("default-triage") ? RAW : "observed");
+        var executor = new ObservedExecutor(call -> call.skillName().equals("default:triage") ? RAW : "observed");
         try (var provider = new MockWebServer()) {
             provider.enqueue(plan("assemble", task("triage"), task("observe", "triage")));
             provider.start();
@@ -155,7 +155,7 @@ class ExecutorOutputTransformIntegrationTest {
                 assertThat(context.getBean(SkillTemplate.class).invoke("default", "assemble", CASE))
                         .isEqualTo("{\"selected\":0.95}");
                 assertThat(executor.calls).extracting(SkillExecutorInvocation::skillName)
-                        .containsExactly("default-triage", "default-observe");
+                        .containsExactly("default:triage", "default:observe");
                 assertThat(executor.calls.getLast().input()).containsExactlyEntriesOf(Map.of("probability", new BigDecimal("0.95")));
             });
             assertThat(provider.getRequestCount()).isEqualTo(1);
@@ -175,12 +175,12 @@ class ExecutorOutputTransformIntegrationTest {
         if (plannedChild) {
             write("planned", planned("planned", 1) + PLANNED_TRIAGE + "output_from: {skill: default:triage}\n");
         } else if (!direct) {
-            write("ordinary", ExplicitJavaFailureHandlingIntegrationTest.parent("ordinary", "default-triage", false));
+            write("ordinary", ExplicitJavaFailureHandlingIntegrationTest.parent("ordinary", "default:triage", false));
         }
         var executor = new ObservedExecutor(call -> raw);
         try (var provider = new MockWebServer()) {
             provider.enqueue(plannedChild ? plan("planned", task("triage"))
-                    : ExplicitJavaFailureHandlingIntegrationTest.tool("default-triage"));
+                    : ExplicitJavaFailureHandlingIntegrationTest.tool("default:triage"));
             provider.start();
             withProvider(runner(executor), provider).run(context -> {
                 assertThat(context).hasNotFailed();
@@ -188,14 +188,14 @@ class ExecutorOutputTransformIntegrationTest {
                 Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> context.getBean(SkillTemplate.class)
                         .invoke("default", entry, plannedChild ? CASE : Map.of(), events::add));
                 assertThat(((SkillException) thrown).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
-                    assertThat(diagnosis.skillName()).isEqualTo("default-triage");
+                    assertThat(diagnosis.skillName()).isEqualTo("default:triage");
                     assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.OUTPUT_TRANSFORM);
                     assertThat(diagnosis.message()).contains(detail);
                     assertThat(diagnosis.issues()).isEmpty();
                 });
                 var failure = assertThat(thrown)
                         .isInstanceOf(SkillException.class)
-                        .hasStackTraceContaining("default-triage' output_transform failed")
+                        .hasStackTraceContaining("default:triage' output_transform failed")
                         .hasStackTraceContaining(detail);
                 if (evaluation) failure.hasRootCauseInstanceOf(JsltException.class);
                 assertThat(events).singleElement().satisfies(view -> assertThat(view.events()).anySatisfy(event -> {
@@ -204,7 +204,7 @@ class ExecutorOutputTransformIntegrationTest {
                 }));
                 assertThat(executor.calls).hasSize(1);
                 var records = executor.records();
-                var metadata = completion(records, "default-triage");
+                var metadata = completion(records, "default:triage");
                 assertThat(metadata.data().path("executorOutput").textValue()).isEqualTo(raw);
                 assertThat(metadata.data().path("outputTransformStatus").textValue()).isEqualTo("failed");
                 assertThat(metadata.data().path("outputTransformFailure").textValue()).contains(detail);
@@ -266,7 +266,7 @@ class ExecutorOutputTransformIntegrationTest {
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of())).isEqualTo(raw);
             assertThat(executor.sessions.getLast().getLastOutputSchemaOutcome()).isEmpty();
-            var metadata = completion(executor.records(), "default-triage");
+            var metadata = completion(executor.records(), "default:triage");
             assertThat(metadata.data().path("executorOutput").textValue()).isEqualTo(raw);
             assertThat(metadata.data().has("skillOutput")).isFalse();
             assertThat(metadata.data().has("outputTransformStatus")).isFalse();
@@ -344,14 +344,14 @@ class ExecutorOutputTransformIntegrationTest {
     }
 
     private static Map<String, Object> task(String name, String... dependencies) {
-        var task = new LinkedHashMap<>(ExplicitJavaFailureHandlingIntegrationTest.task("default-" + name));
+        var task = new LinkedHashMap<>(ExplicitJavaFailureHandlingIntegrationTest.task("default:" + name));
         task.put("taskId", name);
         task.put("dependsOn", List.of(dependencies));
         return task;
     }
 
     private static MockResponse plan(String parent, Object... tasks) {
-        return ResponsesFixtures.text(JSON.writeValueAsString(Map.of("capabilityName", "default-" + parent,
+        return ResponsesFixtures.text(JSON.writeValueAsString(Map.of("capabilityName", "default:" + parent,
                 "createdAt", "2026-10-10T00:00:00Z", "status", "VALID", "tasks", List.of(tasks))));
     }
 

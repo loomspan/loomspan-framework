@@ -89,7 +89,7 @@ class PublicSkillReloadIntegrationTest
         try (MockWebServer first = new MockWebServer(); MockWebServer second = new MockWebServer())
         {
             first.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"tool","object":"response","created_at":1,"model":"compact","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"child-call","name":"default-child","arguments":"{}","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                {"id":"tool","object":"response","created_at":1,"model":"compact","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"child-call","name":"default--child","arguments":"{}","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """));
             first.enqueue(modelResponse("too-late").setHeadersDelay(3000, java.util.concurrent.TimeUnit.MILLISECONDS));
             first.enqueue(modelResponse("child-return").setHeadersDelay(1500, java.util.concurrent.TimeUnit.MILLISECONDS));
@@ -346,7 +346,7 @@ class PublicSkillReloadIntegrationTest
             second.enqueue(new MockResponse().setResponseCode(503).setBody("temporary"));
             second.enqueue(modelResponse("unexpected-retry"));
             var documents = List.of(new SkillDocument("candidate",
-                    "name: retrySkill\ndescription: selected model\nmodel: selected\nplanning_mode: false\n"));
+                    "name: retry-skill\ndescription: selected model\nmodel: selected\nplanning_mode: false\n"));
             new ApplicationContextRunner()
                     .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class,
                             ai.loomspan.autoconfigure.LoomspanJacksonAutoConfiguration.class,
@@ -359,10 +359,10 @@ class PublicSkillReloadIntegrationTest
                         SkillReloader reloader = context.getBean(SkillReloader.class);
                         SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
                         reloader.publish(reloader.prepare("default", documents, candidateConfiguration(first, "candidate.a", 2)));
-                        var pending = handoff.handoff("default", "retrySkill", Map.of());
+                        var pending = handoff.handoff("default", "retry-skill", Map.of());
                         reloader.publish(reloader.prepare("default", documents, candidateConfiguration(second, "candidate.b", 1)));
                         assertThat(pending.invoke()).isEqualTo("retried");
-                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "retrySkill", Map.of()))
+                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "retry-skill", Map.of()))
                                 .isInstanceOf(ai.loomspan.api.SkillException.class);
                     });
             assertThat(first.getRequestCount()).isEqualTo(2);
@@ -646,13 +646,13 @@ class PublicSkillReloadIntegrationTest
                         assertThat(context).hasNotFailed();
                         SkillReloader reloader = context.getBean(SkillReloader.class);
                         PreparedSkillUpdate candidate = reloader.prepare("default", List.of(new SkillDocument("model revision", """
-                                name: modelFromMemory
+                                name: model-from-memory
                                 description: Model from supplied YAML
                                 model: integration
                                 planning_mode: false
                                 """)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
                         reloader.publish(candidate);
-                        assertThat(context.getBean(SkillTemplate.class).invoke("default", "modelFromMemory", Map.of()))
+                        assertThat(context.getBean(SkillTemplate.class).invoke("default", "model-from-memory", Map.of()))
                                 .isEqualTo("done");
                     });
             assertThat(server.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS)).isNotNull();
@@ -751,7 +751,7 @@ class PublicSkillReloadIntegrationTest
     {
         Path yaml = directory.resolve("reload.yaml");
         String valid = """
-                name: reloadLeaf
+                name: reload-leaf
                 description: Initial description
                 executor: fixture
                 input_schema:
@@ -781,10 +781,10 @@ class PublicSkillReloadIntegrationTest
                     SkillCatalog startup = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
                     String initial = startup.generationId();
                     ExecutorConfiguration.config.put(initial, "A");
-                    assertThat(template.invoke("default", "reloadLeaf", Map.of("message", "hello"))).isEqualTo("A:hello");
-                    assertThat(template.invoke("default", "reloadLeaf", Map.of("message", "trusted", "generationId", "spoofed")))
+                    assertThat(template.invoke("default", "reload-leaf", Map.of("message", "hello"))).isEqualTo("A:hello");
+                    assertThat(template.invoke("default", "reload-leaf", Map.of("message", "trusted", "generationId", "spoofed")))
                             .isEqualTo("A:trusted");
-                    var admittedOld = handoff.handoff("default", "reloadLeaf", Map.of("message", "delayed", "generationId", "spoofed"));
+                    var admittedOld = handoff.handoff("default", "reload-leaf", Map.of("message", "delayed", "generationId", "spoofed"));
                     assertThat(admittedOld.generationId()).isEqualTo(initial).isNotBlank();
 
                     PreparedSkillUpdate candidate = reloader.prepare("default", ai.loomspan.testkit.PublicationFixtures.documents(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)));
@@ -796,17 +796,17 @@ class PublicSkillReloadIntegrationTest
                     reloader.publish(candidate);
 
                     assertThat(startup.generationId()).isEqualTo(initial);
-                    assertThat(startup.skill("reloadLeaf")).isPresent();
+                    assertThat(startup.skill("reload-leaf")).isPresent();
                     assertThat(reloader.snapshot("default").generationId()).isEqualTo(candidate.generationId());
                     assertThat(admittedOld.generationId()).isEqualTo(initial);
                     assertThat(admittedOld.invoke()).isEqualTo("A:delayed");
                     assertThat(ExecutorConfiguration.lastInvocation.get().executorConfigGenerationId()).isEqualTo(initial);
-                    var admittedNew = handoff.handoff("default", "reloadLeaf", new ReloadRequest("new"));
+                    var admittedNew = handoff.handoff("default", "reload-leaf", new ReloadRequest("new"));
                     assertThat(admittedNew.generationId()).isEqualTo(candidate.generationId());
                     assertThat(admittedNew.invoke()).isEqualTo("B:new");
                     assertThat(ExecutorConfiguration.lastInvocation.get().executorConfigGenerationId())
                             .isEqualTo(admittedNew.generationId());
-                    assertThat(template.invoke("default", "reloadLeaf", Map.of("message", "world"))).isEqualTo("B:world");
+                    assertThat(template.invoke("default", "reload-leaf", Map.of("message", "world"))).isEqualTo("B:world");
                     assertThatThrownBy(() -> reloader.publish(candidate)).isInstanceOf(SkillReloadException.class);
                     assertThatThrownBy(() -> reloader.prepare("default", ai.loomspan.testkit.PublicationFixtures.documents(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)), ai.loomspan.testkit.PublicationFixtures.configuration(context.getBean(ai.loomspan.autoconfigure.LoomspanProperties.class)))).isInstanceOf(SkillReloadException.class);
 
@@ -818,7 +818,7 @@ class PublicSkillReloadIntegrationTest
                             .isNotEqualTo(competing.generationId());
                     ExecutorConfiguration.config.put(sameYaml.generationId(), "C");
                     reloader.publish(sameYaml);
-                    assertThat(template.invoke("default", "reloadLeaf", Map.of("message", "again"))).isEqualTo("C:again");
+                    assertThat(template.invoke("default", "reload-leaf", Map.of("message", "again"))).isEqualTo("C:again");
                     assertThatThrownBy(() -> reloader.publish(competing)).isInstanceOf(SkillReloadException.class)
                             .hasMessageContaining("stale");
 
@@ -828,7 +828,7 @@ class PublicSkillReloadIntegrationTest
                     assertThat(empty.snapshot().skills()).isEmpty();
                     reloader.publish(empty);
                     assertThat(reloader.snapshot("default").skills()).isEmpty();
-                    assertThat(startup.skill("reloadLeaf")).isPresent();
+                    assertThat(startup.skill("reload-leaf")).isPresent();
                 });
         ExecutorConfiguration.config.clear();
     }

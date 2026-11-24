@@ -46,7 +46,7 @@ class BindingIsolationIntegrationTest {
                                 + "      /secondEvidence: {from: child_result, skill: default:second-producer, path: /data}");
         Files.writeString(skills.resolve("root.yaml"), root);
         Files.writeString(skills.resolve("producer.yaml"), leaf("producer"));
-        Files.writeString(skills.resolve("secondProducer.yaml"), leaf("secondProducer"));
+        Files.writeString(skills.resolve("second-producer.yaml"), leaf("second-producer"));
         Files.writeString(skills.resolve("consumer.yaml"), leaf("consumer")
                 .replace("  required: [marker, evidence]", "    secondEvidence: {type: object, additionalProperties: true}\n  required: [marker, evidence, secondEvidence]"));
         CountDownLatch firstEntered = new CountDownLatch(1);
@@ -65,10 +65,10 @@ class BindingIsolationIntegrationTest {
                         if (system.contains("Create an ordered flight plan")) {
                             var first = task("producer", List.of()); first.put("parallelGroup", "sources");
                             var second = task("secondProducer", List.of()); second.put("parallelGroup", "sources");
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-04T00:00:00Z",
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default:root", "createdAt", "2026-10-04T00:00:00Z",
                                     "status", "VALID", "tasks", List.of(first, second, task("consumer", List.of("producer", "secondProducer"))))));
                         }
-                        var matcher = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
+                        var matcher = Pattern.compile("Exact capability/tool: ([a-z0-9:-]+)").matcher(system);
                         assertThat(matcher.find()).isTrue();
                         String skill = matcher.group(1);
                         return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", skill.substring("default-".length()),
@@ -79,12 +79,12 @@ class BindingIsolationIntegrationTest {
             new ApplicationContextRunner().withUserConfiguration(App.class)
                     .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
                         assertThat(invocation.input()).containsEntry("marker", "original");
-                        if (invocation.skillName().equals("default-producer")) {
+                        if (invocation.skillName().equals("default:producer")) {
                             firstEntered.countDown(); await(releaseFirst);
                             firstFinished.countDown();
                             return "{\"data\":{\"amount\":9007199254740993,\"source\":\"first\"}}";
                         }
-                        if (invocation.skillName().equals("default-secondProducer")) {
+                        if (invocation.skillName().equals("default:second-producer")) {
                             if (!concurrent) assertThat(firstFinished.getCount()).isZero();
                             secondEntered.countDown(); await(releaseSecond);
                             return "{\"data\":{\"rows\":[\"original\"],\"source\":\"second\"}}";
@@ -135,9 +135,9 @@ class BindingIsolationIntegrationTest {
                         JsonNode wire = JSON.readTree(request.getBody().readUtf8());
                         String system = ai.loomspan.testkit.ResponsesFixtures.transcript(wire).get(0).path("content").asText();
                         if (system.contains("Create an ordered flight plan"))
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-04T00:00:00Z",
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default:root", "createdAt", "2026-10-04T00:00:00Z",
                                     "status", "VALID", "tasks", List.of(task("producer", List.of()), task("consumer", List.of("producer"))))));
-                        var matcher = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
+                        var matcher = Pattern.compile("Exact capability/tool: ([a-z0-9:-]+)").matcher(system);
                         assertThat(matcher.find()).isTrue();
                         String skill = matcher.group(1);
                         return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", skill.substring("default-".length()),
@@ -147,7 +147,7 @@ class BindingIsolationIntegrationTest {
             }); server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class)
                     .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
-                        if (invocation.skillName().equals("default-producer")) {
+                        if (invocation.skillName().equals("default:producer")) {
                             producerCalls.incrementAndGet();
                             return JSON.writeValueAsString(Map.of("data", Map.of("marker", invocation.input().get("marker"))));
                         }
@@ -189,11 +189,11 @@ class BindingIsolationIntegrationTest {
                             String owner = isOuter || !nested ? "root" : "middle";
                             List<Object> tasks = isOuter ? List.of(task("middle", List.of()))
                                     : List.of(task("producer", List.of()), task("consumer", List.of("producer")));
-                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default-" + owner,
+                            return response(JSON.writeValueAsString(Map.of("capabilityName", "default:" + owner,
                                     "createdAt", "2026-10-04T00:00:00Z", "status", "VALID", "tasks", tasks)));
                         }
                         assertThat(system).contains("coordinator-assigned task", "Supply only unbound arguments");
-                        var matcher = Pattern.compile("Exact capability/tool: ([A-Za-z0-9_-]+)").matcher(system);
+                        var matcher = Pattern.compile("Exact capability/tool: ([a-z0-9:-]+)").matcher(system);
                         assertThat(matcher.find()).isTrue();
                         String skill = matcher.group(1);
                         return response(JSON.writeValueAsString(Map.of("stepAction", "CALL_TOOL", "taskId", skill.substring("default-".length()),
@@ -208,7 +208,7 @@ class BindingIsolationIntegrationTest {
             new ApplicationContextRunner().withUserConfiguration(App.class)
                     .withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
                         String marker = (String) invocation.input().get("marker");
-                        if (invocation.skillName().equals("default-producer")) {
+                        if (invocation.skillName().equals("default:producer")) {
                             if (!reload || marker.equals("held")) {
                                 entered.countDown();
                                 await(entered);
@@ -216,7 +216,7 @@ class BindingIsolationIntegrationTest {
                             }
                             return JSON.writeValueAsString(Map.of("data", Map.of("marker", marker)));
                         }
-                        assertThat(invocation.skillName()).isEqualTo("default-consumer");
+                        assertThat(invocation.skillName()).isEqualTo("default:consumer");
                         delivered.add(invocation.input());
                         assertThat(invocation.input().get("evidence")).isEqualTo(Map.of("marker", marker));
                         return JSON.writeValueAsString(Map.of("marker", marker));
@@ -329,7 +329,7 @@ class BindingIsolationIntegrationTest {
 
     private static Map<String,Object> task(String child, List<String> dependencies) {
         Map<String,Object> task = new LinkedHashMap<>();
-        task.put("taskId", child); task.put("title", child); task.put("status", "PENDING"); task.put("capabilityName", "default-" + child);
+        task.put("taskId", child); task.put("title", child); task.put("status", "PENDING"); task.put("capabilityName", "default:" + (child.equals("secondProducer") ? "second-producer" : child));
         task.put("intent", "Fulfill responsibility"); task.put("dependsOn", dependencies); task.put("expectedOutputs", List.of("complete result"));
         task.put("parallelGroup", null); task.put("note", ""); return task;
     }

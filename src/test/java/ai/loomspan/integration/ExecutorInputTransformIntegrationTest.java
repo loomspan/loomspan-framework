@@ -69,8 +69,8 @@ class ExecutorInputTransformIntegrationTest {
                   additionalProperties: false
                 """ + transform(acceptanceExpression());
         Files.writeString(directory.resolve("evaluation.yaml"), leaf);
-        Files.writeString(directory.resolve("configBoundary.yaml"), """
-                name: configBoundary
+        Files.writeString(directory.resolve("config-boundary.yaml"), """
+                name: config-boundary
                 description: Observe the complete expression input
                 executor: configured
                 config: {marker: skill-only}
@@ -99,9 +99,9 @@ class ExecutorInputTransformIntegrationTest {
         var input = businessInput();
         var expected = executorOutput();
         try (var provider = new MockWebServer()) {
-            String plan = JSON.writeValueAsString(Map.of("capabilityName", "default-root",
+            String plan = JSON.writeValueAsString(Map.of("capabilityName", "default:root",
                     "createdAt", "2026-10-10T00:00:00Z", "status", "VALID",
-                    "tasks", List.of(ExplicitJavaFailureHandlingIntegrationTest.task("default-evaluation"))));
+                    "tasks", List.of(ExplicitJavaFailureHandlingIntegrationTest.task("default:evaluation"))));
             provider.enqueue(ResponsesFixtures.text(plan));
             provider.enqueue(ResponsesFixtures.text(plan));
             provider.start();
@@ -135,19 +135,19 @@ class ExecutorInputTransformIntegrationTest {
                 assertThat(schema.path("properties").propertyNames())
                         .containsExactlyInAnyOrder("context", "policy", "candidates", "parameters");
                 var catalogEntry = context.getBean(SkillGenerationManager.class).registeredSkillCatalog()
-                        .find("default-evaluation").orElseThrow();
+                        .find("default:evaluation").orElseThrow();
                 assertThat(catalogEntry.yaml()).isEqualTo(leaf);
                 assertThat(catalogEntry.sourcePath()).contains("evaluation.yaml");
                 assertThat(executor.sessions).hasSize(2).allSatisfy(session ->
                         assertThat(ExecutorDiagnosticTestSupport.logicalRecords(session).stream()
                                 .filter(record -> record.recordType() == TraceRecordType.FRAME_OPENED
-                                        && record.route().equals("default-evaluation")
+                                        && record.route().equals("default:evaluation")
                                         && record.data().has("missionInput")).toList())
                                 .singleElement().satisfies(record ->
                                         assertThat(record.data().path("missionInput")).isEqualTo(JSON.valueToTree(input))));
 
                 var configBoundaryInput = Map.<String, Object>of("business", "case");
-                assertThat(template.invoke("default", "configBoundary", configBoundaryInput)).isEqualTo("accepted");
+                assertThat(template.invoke("default", "config-boundary", configBoundaryInput)).isEqualTo("accepted");
                 assertThat(executor.calls).hasSize(3);
                 var configBoundaryCall = executor.calls.getLast();
                 assertThat(configBoundaryCall.input()).isEqualTo(configBoundaryInput);
@@ -177,8 +177,8 @@ class ExecutorInputTransformIntegrationTest {
         var calls = new AtomicInteger();
         var writer = new ExecutorApplicationIntegrationTest.FileWriter();
         try (var provider = new MockWebServer()) {
-            provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.tool("default-writeFile", "write", "{}", ""));
-            provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.tool("default-identity", "consume",
+            provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.tool("default:write-file", "write", "{}", ""));
+            provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.tool("default:identity", "consume",
                     "{\"file\":\"ref://payload.txt\"}", ""));
             provider.start();
             withProvider(runner(), provider).withBean(ExecutorApplicationIntegrationTest.FileWriter.class, () -> writer)
@@ -195,14 +195,14 @@ class ExecutorInputTransformIntegrationTest {
                 assertThatThrownBy(() -> template.invoke("default", "scalar", Map.of()))
                         .isInstanceOf(SkillException.class).hasStackTraceContaining("result must be a JSON object")
                         .satisfies(error -> assertThat(((SkillException) error).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
-                            assertThat(diagnosis.skillName()).isEqualTo("default-scalar");
+                            assertThat(diagnosis.skillName()).isEqualTo("default:scalar");
                             assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_TRANSFORM);
                             assertThat(diagnosis.issues()).isEmpty();
                         }));
                 var events = new ArrayList<SkillExecutionView>();
                 assertThatThrownBy(() -> template.invoke("default", "failure", Map.of(), events::add))
                         .isInstanceOf(SkillException.class).hasRootCauseInstanceOf(JsltException.class)
-                        .hasStackTraceContaining("default-failure' input_transform failed")
+                        .hasStackTraceContaining("default:failure' input_transform failed")
                         .hasStackTraceContaining("fixture evaluation failure");
                 assertThat(events).singleElement().satisfies(view -> assertThat(view.events()).anySatisfy(event -> {
                     assertThat(event.type()).isEqualTo("SKILL_FINISHED");

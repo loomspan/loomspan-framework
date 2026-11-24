@@ -24,19 +24,19 @@ class PlanningSuccessfulSkillCreditTest
         DefaultExecutionStateService state = new DefaultExecutionStateService(Clock.fixed(
                 Instant.parse("2026-03-15T12:00:00Z"), ZoneOffset.UTC));
         DefaultPlanningService planning = new DefaultPlanningService(state);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("planning-credit", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("planning-credit", "default:test-entry", 3);
         TestExecutionBindings.callWithSession(session, () -> {
-        state.storePlan(plan("task-success", "default-investigateNetwork"));
+        state.storePlan(plan("task-success", "default:investigate-network"));
 
         assertThat(successfulSkills()).isEmpty();
-        planning.markToolCompleted(session, "task-success", "default-investigateNetwork").orElseThrow();
-        assertThat(successfulSkills()).containsExactly("default-investigateNetwork");
+        planning.markToolCompleted(session, "task-success", "default:investigate-network").orElseThrow();
+        assertThat(successfulSkills()).containsExactly("default:investigate-network");
 
-        state.storePlan(plan("task-failure", "investigateApp"));
-        planning.markToolFailed(session, "task-failure", "investigateApp", new IllegalStateException("failed"));
+        state.storePlan(plan("task-failure", "default:investigate-app"));
+        planning.markToolFailed(session, "task-failure", "default:investigate-app", new IllegalStateException("failed"));
         assertThat(successfulSkills())
-                .containsExactly("default-investigateNetwork")
-                .doesNotContain("investigateApp");
+                .containsExactly("default:investigate-network")
+                .doesNotContain("default:investigate-app");
         return null;
         });
     }
@@ -50,7 +50,7 @@ class PlanningSuccessfulSkillCreditTest
     {
         return new ExecutionPlan(
                 "plan-" + taskId,
-                "handleIncident",
+                "default:handle-incident",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 List.of(new PlanTask(
                         taskId,

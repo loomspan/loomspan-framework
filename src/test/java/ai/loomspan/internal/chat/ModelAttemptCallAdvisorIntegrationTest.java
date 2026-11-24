@@ -103,7 +103,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                 if (scenario.equals("quota")) quotas.setMaxProviderAttempts(1);
                 var usage = new DefaultSessionUsageService(quotas, new NoOpUsageMetricsRecorder());
                 var state = new DefaultExecutionStateService(CLOCK, usage);
-                var session = TestLoomspanSessions.withId("real-timeout-" + scenario, "default-test_entry", 4);
+                var session = TestLoomspanSessions.withId("real-timeout-" + scenario, "default:test-entry", 4);
                 var binding = TestExecutionBindings.missionBinding(session);
                 ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding,
                         () -> state.openMissionFrame(session, "default-test_skill", Map.of()));
@@ -161,7 +161,7 @@ class ModelAttemptCallAdvisorIntegrationTest
             var runtime = new SpringAiProviderIntegration().create("local", properties);
             var usage = usageService();
             var state = new DefaultExecutionStateService(CLOCK, usage);
-            var session = TestLoomspanSessions.withId("complete-correction-context-limit", "default-test_entry", 4);
+            var session = TestLoomspanSessions.withId("complete-correction-context-limit", "default:test-entry", 4);
             var binding = TestExecutionBindings.missionBinding(session);
             ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding,
                     () -> state.openMissionFrame(session, "default-test_skill", Map.of()));
@@ -213,7 +213,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                 new LoomspanProperties().getSession().getQuotas(),
                 new MicrometerUsageMetricsRecorder(meterRegistry));
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("attempt-retry", "default-test_entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("attempt-retry", "default:test-entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ExecutionFrame root = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         ExecutionFrame modelFrame = openFrame(binding, stateService,
@@ -303,7 +303,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                     .create("openai", properties);
             DefaultSessionUsageService usageService = usageService();
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-            LoomspanSession session = TestLoomspanSessions.withId("advisor-recursion", "default-test_entry", 4);
+            LoomspanSession session = TestLoomspanSessions.withId("advisor-recursion", "default:test-entry", 4);
             ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
             openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
@@ -376,7 +376,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                     .create("openai", properties);
             DefaultSessionUsageService usageService = usageService();
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-            LoomspanSession session = TestLoomspanSessions.withId("output-schema-tool-reuse", "default-test_entry", 4);
+            LoomspanSession session = TestLoomspanSessions.withId("output-schema-tool-reuse", "default:test-entry", 4);
             ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
             openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
@@ -437,7 +437,7 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("attempt-throw", "default-test_entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("attempt-throw", "default:test-entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ExecutionFrame root = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         ExecutionFrame modelFrame = openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
@@ -503,7 +503,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                 translator);
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("openai-authentication", "default-test_entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("openai-authentication", "default:test-entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(
                 binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
@@ -557,7 +557,7 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("provider-retry", "default-test_entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("provider-retry", "default:test-entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
@@ -640,7 +640,7 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("openai-read-timeout", "default-test_entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("openai-read-timeout", "default:test-entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
@@ -720,7 +720,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                 new LoomspanProperties().getSession().getQuotas(),
                 new MicrometerUsageMetricsRecorder(meterRegistry));
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("provider-exhaustion", "default-test_entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("provider-exhaustion", "default:test-entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
@@ -811,7 +811,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                 properties.getSession().getQuotas(),
                 new NoOpUsageMetricsRecorder());
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("attempt-quota", "default-test_entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("attempt-quota", "default:test-entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
@@ -852,7 +852,7 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("retry-interrupted", "default-test_entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("retry-interrupted", "default:test-entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
@@ -912,7 +912,7 @@ class ModelAttemptCallAdvisorIntegrationTest
     {
         DefaultSessionUsageService usageService = usageService();
         DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-        LoomspanSession session = TestLoomspanSessions.withId("retry-pre-interrupted", "default-test_entry", 4);
+        LoomspanSession session = TestLoomspanSessions.withId("retry-pre-interrupted", "default:test-entry", 4);
         ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
         openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
@@ -967,7 +967,7 @@ class ModelAttemptCallAdvisorIntegrationTest
                     .create("openrouter", properties);
             DefaultSessionUsageService usageService = usageService();
             DefaultExecutionStateService stateService = new DefaultExecutionStateService(CLOCK, usageService);
-            LoomspanSession session = TestLoomspanSessions.withId("openrouter-recovery", "default-test_entry", 4);
+            LoomspanSession session = TestLoomspanSessions.withId("openrouter-recovery", "default:test-entry", 4);
             ai.loomspan.internal.core.ExecutionBinding binding = TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> stateService.openMissionFrame(session, "default-test_skill", Map.of()));
             openFrame(binding, stateService, session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());

@@ -46,7 +46,7 @@ class DefaultCapabilityInvokerTest {
         PlanningService planningService = mock(PlanningService.class);
         ExecutionStateService stateService = mock(ExecutionStateService.class);
         DefaultCapabilityInvoker factory = new DefaultCapabilityInvoker(router, planningService, stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-failure", "default-test_entry", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-failure", "default:test-entry", 2);
         CapabilityMetadata capability = capability();
         ExecutionFrame toolFrame = new ExecutionFrame(
                 "tool-frame-failure", null, ai.loomspan.internal.core.OperationType.SKILL,
@@ -72,12 +72,12 @@ class DefaultCapabilityInvokerTest {
         DefaultCapabilityInvoker factory = new DefaultCapabilityInvoker(router, planningService, stateService);
 
         BoundCapability callback = factory.bind(
-                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-test_entry", 2),
+                ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default:test-entry", 2),
                 definitionWithEvidenceContract(),
                 List.of(capability()),
                 null).getFirst();
 
-        assertThat(callback.name()).isEqualTo("default-allowedVisibleSkill");
+        assertThat(callback.name()).isEqualTo("default:allowed-visible-skill");
         assertThat(callback.description()).isEqualTo("child");
         assertThat(callback.inputSchema()).contains("\"type\":\"object\"");
     }
@@ -88,10 +88,10 @@ class DefaultCapabilityInvokerTest {
         PlanningService planningService = mock(PlanningService.class);
         ExecutionStateService stateService = mock(ExecutionStateService.class);
         DefaultCapabilityInvoker factory = new DefaultCapabilityInvoker(router, planningService, stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-test_entry", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default:test-entry", 2);
         CapabilityMetadata capability = capability();
         assertThat(capability.skillExecution().configured()).isFalse();
-        assertThat(capability.name()).isEqualTo("default-allowedVisibleSkill");
+        assertThat(capability.name()).isEqualTo("default:allowed-visible-skill");
         ExecutionFrame toolFrame = new ExecutionFrame(
                 "tool-frame-1",
                 null,
@@ -102,10 +102,10 @@ class DefaultCapabilityInvokerTest {
                 Instant.parse("2026-03-15T12:00:00Z"), null, null);
         ExecutionPlan linkedPlan = new ExecutionPlan(
                 "plan-1",
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 Instant.parse("2026-03-15T12:00:00Z"),
                 ai.loomspan.internal.core.PlanStatus.VALID,
-                List.of(new PlanTask("task-1", "Use tool", PlanTaskStatus.IN_PROGRESS, "default-allowedVisibleSkill", "Use tool", List.of(), List.of(), null, "Starting")));
+                List.of(new PlanTask("task-1", "Use tool", PlanTaskStatus.IN_PROGRESS, "default:allowed-visible-skill", "Use tool", List.of(), List.of(), null, "Starting")));
 
         when(planningService.markToolStarted(eq(session), eq(capability))).thenReturn(Optional.of("task-1"));
         when(stateService.openFrame(eq(session), eq(TraceFrameType.TOOL_INVOCATION), eq(capability.name()), any())).thenReturn(toolFrame);
@@ -182,7 +182,7 @@ class DefaultCapabilityInvokerTest {
                 new StaticListableBeanFactory(Map.of("executionCoordinator", coordinator))
                         .getBeanProvider(ai.loomspan.internal.core.ExecutionCoordinator.class), new DefaultAccessGuard());
         DefaultCapabilityInvoker factory = new DefaultCapabilityInvoker(router, planningService, stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-rootVisibleSkill", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default:root-visible-skill", 2);
 
         BoundCapability callback = factory.bind(session, definitionWithEvidenceContract(), List.of(metadata), null).getFirst();
         Object result = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
@@ -198,7 +198,7 @@ class DefaultCapabilityInvokerTest {
         PlanningService planningService = mock(PlanningService.class);
         ExecutionStateService stateService = mock(ExecutionStateService.class);
         DefaultCapabilityInvoker factory = new DefaultCapabilityInvoker(router, planningService, stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-test_entry", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default:test-entry", 2);
         CapabilityMetadata capability = capability();
         ExecutionFrame toolFrame = new ExecutionFrame(
                 "tool-frame-1",
@@ -231,17 +231,17 @@ class DefaultCapabilityInvokerTest {
     private static CapabilityMetadata capability() {
         return new CapabilityMetadata(
                 "yaml:child",
-                "default-allowedVisibleSkill",
+                "default:allowed-visible-skill",
                 "child",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "child:" + arguments.get("value"), SkillKind.JAVA,
-                CapabilityToolDescriptor.generic("default-allowedVisibleSkill", "child"), null);
+                CapabilityToolDescriptor.generic("default:allowed-visible-skill", "child"), null);
     }
 
     private static ai.loomspan.internal.skill.YamlSkillDefinition definitionWithEvidenceContract() {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("rootVisibleSkill");
-        manifest.setAllowedSkills(List.of(new YamlSkillManifest.AllowedSkillManifest("default-allowedVisibleSkill", null, null, null)));
+        manifest.setName("root-visible-skill");
+        manifest.setAllowedSkills(List.of(new YamlSkillManifest.AllowedSkillManifest("default:allowed-visible-skill", null, null, null)));
         manifest.setDescription("default-rootVisibleSkill");
         manifest.setModel("gpt-5");
         return new ai.loomspan.internal.skill.YamlSkillDefinition(ai.loomspan.internal.skill.YamlSkillDefinition.Form.MODEL, "default",
@@ -253,6 +253,6 @@ class DefaultCapabilityInvokerTest {
                         "openai/gpt-5",
                         "medium"),
                 ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(
-                        java.util.Map.of("vendorName", "default-allowedVisibleSkill")));
+                        java.util.Map.of("vendorName", "default:allowed-visible-skill")));
     }
 }

@@ -63,7 +63,7 @@ class DeclaredChildInputBindingsIntegrationTest {
         try (var server = new MockWebServer()) {
             server.setDispatcher(new Dispatcher() {
                 @Override public MockResponse dispatch(RecordedRequest request) {
-                    return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-10T00:00:00Z",
+                    return response(JSON.writeValueAsString(Map.of("capabilityName", "default:root", "createdAt", "2026-10-10T00:00:00Z",
                             "status", "VALID", "tasks", List.of(task("evaluation", List.of())))));
                 }
             });
@@ -87,7 +87,7 @@ class DeclaredChildInputBindingsIntegrationTest {
                 org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default", "root", Map.of("amount", "4", "candidates", candidates)))
                         .hasStackTraceContaining("binding_assembled_input_invalid")
                         .satisfies(error -> assertThat(((ai.loomspan.api.SkillException) error).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
-                            assertThat(diagnosis.skillName()).isEqualTo("default-evaluation");
+                            assertThat(diagnosis.skillName()).isEqualTo("default:evaluation");
                             assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_SCHEMA);
                             assertThat(diagnosis.issues()).anySatisfy(issue -> {
                                 assertThat(issue.path()).isEqualTo("/amount");
@@ -155,7 +155,7 @@ class DeclaredChildInputBindingsIntegrationTest {
                     String system = ai.loomspan.testkit.ResponsesFixtures.transcript(JSON.readTree(request.getBody().readUtf8())).get(0).path("content").asText();
                     assertThat(system).contains("Create an ordered flight plan");
                     if (scenario.equals("revoked")) revoked.set(true);
-                    return response(JSON.writeValueAsString(Map.of("capabilityName", "default-root", "createdAt", "2026-10-04T00:00:00Z",
+                    return response(JSON.writeValueAsString(Map.of("capabilityName", "default:root", "createdAt", "2026-10-04T00:00:00Z",
                             "status", "VALID", "tasks", scenario.equals("tool-quota")
                                     ? List.of(task("producer", List.of()), task("consumer", List.of("producer")))
                                     : List.of(task("producer", List.of())))));
@@ -163,7 +163,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             });
             server.start();
             new ApplicationContextRunner().withUserConfiguration(App.class).withBean(FixtureExecutor.class, () -> new FixtureExecutor(invocation -> {
-                if (invocation.skillName().equals("default-producer")) assertThat(invocation.input()).containsEntry("caseId", "case-one");
+                if (invocation.skillName().equals("default:producer")) assertThat(invocation.input()).containsEntry("caseId", "case-one");
                 if (scenario.equals("approval")) throw new org.springframework.security.access.AccessDeniedException("Explicit application approval absent");
                 sideEffects.incrementAndGet();
                 return "COMPLETE";
@@ -268,18 +268,18 @@ class DeclaredChildInputBindingsIntegrationTest {
                         if (system.contains("Create an ordered flight plan")) {
                             plannerCalls.incrementAndGet();
                             assertThat(system).contains("Declared child input dependencies", "exactly one", "Generate only inputs");
-                            return response(JSON.writeValueAsString(Map.of("capabilityName","default-root","createdAt","2026-10-04T00:00:00Z",
+                            return response(JSON.writeValueAsString(Map.of("capabilityName","default:root","createdAt","2026-10-04T00:00:00Z",
                                     "status","VALID","tasks",List.of(task("producer",List.of()),task("consumer",List.of("producer"))))));
                         }
                         if (system.contains("coordinator-assigned task")) {
-                            String child=system.contains("Exact capability/tool: default-producer") ? "producer" : "consumer";
+                            String child=system.contains("Exact capability/tool: default:producer") ? "producer" : "consumer";
                             assertThat(child).isEqualTo("consumer");
                             consumerDispatchCalls.incrementAndGet();
                             Map<String,Object> args=child.equals("consumer") && reasoning
                                     ? Map.of("context",Map.of("candidateReasoning","new reasoning")) : Map.of();
                             actions.add(args);
                             assertThat(system).contains("Framework supplies declared bound fields");
-                            return response(JSON.writeValueAsString(Map.of("stepAction","CALL_TOOL","taskId",child,"toolName","default-" + child,"toolArguments",args)));
+                            return response(JSON.writeValueAsString(Map.of("stepAction","CALL_TOOL","taskId",child,"toolName","default:" + child,"toolArguments",args)));
                         }
                         if (system.contains("PRODUCER")) {
                             if (modelProducerCalls.incrementAndGet() == 1) return response("{\"data\":9}");
@@ -296,7 +296,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             }); server.start();
             ApplicationContextRunner runner=new ApplicationContextRunner().withUserConfiguration(App.class)
                     .withBean(FixtureExecutor.class,()-> new FixtureExecutor(invocation -> {
-                        if (invocation.skillName().equals("default-producer")) {
+                        if (invocation.skillName().equals("default:producer")) {
                             assertThat(invocation.input()).containsEntry("caseId","case-one");
                             return JSON.writeValueAsString(Map.of("data",assessment("case-one")));
                         }
@@ -417,7 +417,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             """; }
     private static Map<String,Object> task(String child,List<String> dependencies) {
         Map<String,Object> task=new LinkedHashMap<>(); task.put("taskId",child);task.put("title",child);task.put("status","PENDING");
-        task.put("capabilityName","default-" + child);task.put("intent","Fulfill responsibility");task.put("dependsOn",dependencies);
+        task.put("capabilityName","default:" + child);task.put("intent","Fulfill responsibility");task.put("dependsOn",dependencies);
         task.put("expectedOutputs",List.of("complete result"));task.put("parallelGroup",null);task.put("note","");return task;
     }
     private static MockResponse response(String content) {

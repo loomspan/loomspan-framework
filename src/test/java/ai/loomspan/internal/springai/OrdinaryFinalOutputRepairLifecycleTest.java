@@ -82,7 +82,7 @@ class OrdinaryFinalOutputRepairLifecycleTest {
                 if (id.equals("parent")) {
                     String answer = TestExecutionBindings.callWithCurrentSessionMission(() -> {
                         var childBinding = ExecutionBindingScope.requireCurrent();
-                        var frame = reference.get().state.openFrame(childBinding.session(), TraceFrameType.MODEL_CALL, "default-root#child", Map.of());
+                        var frame = reference.get().state.openFrame(childBinding.session(), TraceFrameType.MODEL_CALL, "default:root#child", Map.of());
                         var child = new Invocation(childBinding.session(), childBinding);
                         childRef.set(child);
                         try { return call(reference.get(), child, "child"); }
@@ -131,7 +131,7 @@ class OrdinaryFinalOutputRepairLifecycleTest {
             var fixture = fixture(server, input -> { effects.incrementAndGet(); return "RESULT_cancel"; }, new LoomspanProperties.Session.Quotas());
             var invocation = invocation(fixture, "cancel");
             // A real linter recorder runs after receiving the invalid candidate and before rebuilding repair.
-            var linter = new LinterCallAdvisor("default-root", "regex", Pattern.compile("^OK_.*$"), "Return OK", 1,
+            var linter = new LinterCallAdvisor("default:root", "regex", Pattern.compile("^OK_.*$"), "Return OK", 1,
                     outcome -> { if (!outcome.passed()) Thread.currentThread().interrupt(); });
             var client = builder(fixture.runtime, fixture.state, fixture.usage, fixture.options).defaultAdvisors(linter).build();
             var cancellationFixture = new Fixture(fixture.runtime, fixture.state, fixture.usage, fixture.options,
@@ -161,9 +161,9 @@ class OrdinaryFinalOutputRepairLifecycleTest {
             var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]),
                     manifest, new EffectiveSkillExecutionConfiguration("fixture", "loopback", AiDriver.OPENAI, "gpt-test", null));
             var schema = definition.outputSchema();
-            var schemaAdvisor = new OutputSchemaCallAdvisor("default-root", schema, new OutputSchemaValidator(),
+            var schemaAdvisor = new OutputSchemaCallAdvisor("default:root", schema, new OutputSchemaValidator(),
                     new OutputSchemaPromptAugmentor(), 1, outcome -> {}).withOutputBindings(definition);
-            var linter = new LinterCallAdvisor("default-root", "regex", Pattern.compile(".*okay.*", Pattern.DOTALL),
+            var linter = new LinterCallAdvisor("default:root", "regex", Pattern.compile(".*okay.*", Pattern.DOTALL),
                     "Use okay", 1, outcome -> {});
             var client = builder(fixture.runtime, fixture.state, fixture.usage, fixture.options)
                     .defaultAdvisors(schemaAdvisor, linter).build();
@@ -229,10 +229,10 @@ class OrdinaryFinalOutputRepairLifecycleTest {
         var runtime = new SpringAiProviderIntegration().create("loopback", properties);
         var usage = new DefaultSessionUsageService(quotas, new NoOpUsageMetricsRecorder());
         var state = new DefaultExecutionStateService(Clock.systemUTC(), usage);
-        var callback = FunctionToolCallback.<Map<String,Object>,String>builder("test-lookup", effect)
+        var callback = FunctionToolCallback.<Map<String,Object>,String>builder("test--lookup", effect)
                 .description("sentinel").inputType(Map.class).inputSchema("{\"type\":\"object\",\"additionalProperties\":true}").build();
         var options = OpenAiResponsesChatOptions.builder().model("gpt-test").toolCallbacks(callback).build();
-        var linter = new LinterCallAdvisor("default-root", "regex", Pattern.compile("^OK_.*$"), "Return OK", 1, outcome -> {});
+        var linter = new LinterCallAdvisor("default:root", "regex", Pattern.compile("^OK_.*$"), "Return OK", 1, outcome -> {});
         var client = builder(runtime, state, usage, options).defaultAdvisors(linter).build();
         return new Fixture(runtime, state, usage, options, new SpringAiModelInteraction(client, ModelInteractionMode.STEP_EXECUTION));
     }
@@ -244,9 +244,9 @@ class OrdinaryFinalOutputRepairLifecycleTest {
     }
 
     private static Invocation invocation(Fixture fixture, String id) {
-        var session = TestLoomspanSessions.withId("repair-" + id, "default-root", 5);
+        var session = TestLoomspanSessions.withId("repair-" + id, "default:root", 5);
         var binding = TestExecutionBindings.missionBinding(session);
-        ExecutionBindingScope.runWith(binding, () -> fixture.state.openFrame(session, TraceFrameType.MODEL_CALL, "default-root#model", Map.of()));
+        ExecutionBindingScope.runWith(binding, () -> fixture.state.openFrame(session, TraceFrameType.MODEL_CALL, "default:root#model", Map.of()));
         return new Invocation(session, binding);
     }
 
@@ -256,7 +256,7 @@ class OrdinaryFinalOutputRepairLifecycleTest {
     }
 
     private static ModelTraceContext trace(String id) {
-        return new ModelTraceContext(new ModelExecutionIdentity("fixture", "loopback", AiDriver.OPENAI, "gpt-test"), "default-root", id);
+        return new ModelTraceContext(new ModelExecutionIdentity("fixture", "loopback", AiDriver.OPENAI, "gpt-test"), "default:root", id);
     }
 
     private static void assertCounts(Invocation invocation, int requests, long prompt, long completion) {
@@ -294,7 +294,7 @@ class OrdinaryFinalOutputRepairLifecycleTest {
     }
 
     private static MockResponse tool(String id) {
-        return json("{\"id\":\"response\",\"object\":\"response\",\"created_at\":1,\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":[{\"id\":\"fc_" + id + "\",\"type\":\"function_call\",\"call_id\":\"call_" + id + "\",\"name\":\"test-lookup\",\"arguments\":" + JSON.writeValueAsString("{\"id\":\"" + id + "\"}") + ",\"status\":\"completed\"}],\"usage\":{\"input_tokens\":2,\"output_tokens\":3,\"total_tokens\":5}}");
+        return json("{\"id\":\"response\",\"object\":\"response\",\"created_at\":1,\"model\":\"gpt-test\",\"status\":\"completed\",\"output\":[{\"id\":\"fc_" + id + "\",\"type\":\"function_call\",\"call_id\":\"call_" + id + "\",\"name\":\"test--lookup\",\"arguments\":" + JSON.writeValueAsString("{\"id\":\"" + id + "\"}") + ",\"status\":\"completed\"}],\"usage\":{\"input_tokens\":2,\"output_tokens\":3,\"total_tokens\":5}}");
     }
     private static MockResponse json(String body) { return new MockResponse().setHeader("Content-Type", "application/json").setBody(body); }
     private record Fixture(ProviderConnectionRuntime runtime, DefaultExecutionStateService state, DefaultSessionUsageService usage,

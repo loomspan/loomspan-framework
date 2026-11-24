@@ -67,7 +67,7 @@ class SpringAiChatClientAssemblerIntegrationTest
             assertThat(harness.session.getSessionUsage().orElseThrow().providerAttempts()).isEqualTo(3);
             var tools = JSON.readTree(server.takeRequest().getBody().readUtf8()).path("tools");
             assertThat(tools).extracting(tool -> tool.path("name").asString())
-                    .containsExactlyInAnyOrder("tax-lookup", PlannerInabilityTool.NAME);
+                    .containsExactlyInAnyOrder("tax--lookup", PlannerInabilityTool.NAME);
             server.takeRequest();
             assertCompletedRepair(JSON.readTree(server.takeRequest().getBody().readUtf8()));
         }
@@ -100,7 +100,7 @@ class SpringAiChatClientAssemblerIntegrationTest
         assertThat(input).filteredOn(item -> item.path("type").asText().equals("function_call"))
                 .singleElement().satisfies(item -> {
                     assertThat(item.path("call_id").asText()).isEqualTo("call-1");
-                    assertThat(item.path("name").asText()).isEqualTo("tax-lookup");
+                    assertThat(item.path("name").asText()).isEqualTo("tax--lookup");
                 });
         assertThat(input).filteredOn(item -> item.path("type").asText().equals("function_call_output"))
                 .singleElement().satisfies(item -> {
@@ -250,7 +250,7 @@ class SpringAiChatClientAssemblerIntegrationTest
         {
             String arguments = mixed ? "{\"reason\":\"blocked\"}" : "{ invalid JSON \r\n  ";
             var outputItems = new ArrayList<Map<String, Object>>();
-            if (mixed) outputItems.add(openAiToolItem(0, "tax-lookup", "same-id", "  {}\r\n"));
+            if (mixed) outputItems.add(openAiToolItem(0, "tax--lookup", "same-id", "  {}\r\n"));
             outputItems.add(openAiToolItem(outputItems.size(), PlannerInabilityTool.NAME, "same-id", arguments));
             server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody(JSON.writeValueAsString(Map.of(
                     "id", "tool", "object", "response", "created_at", 1, "model", "gpt-test", "output", outputItems,
@@ -461,15 +461,15 @@ class SpringAiChatClientAssemblerIntegrationTest
         DefaultSessionUsageService usage = new DefaultSessionUsageService(quotas, new NoOpUsageMetricsRecorder());
         DefaultExecutionStateService state = new DefaultExecutionStateService(Clock.systemUTC(), usage);
         var resolver = (ai.loomspan.internal.chat.SkillAdvisorResolver) ignored -> List.of(
-                new LinterCallAdvisor("default-test", "regex", Pattern.compile("^OK:.*$"), "Return OK", 1, fact -> { }));
+                new LinterCallAdvisor("default:test", "regex", Pattern.compile("^OK:.*$"), "Return OK", 1, fact -> { }));
         SpringAiModelInteractionFactory factory = new SpringAiModelInteractionFactory(
                 (skill, configuration) -> runtime, resolver, state, new ModelUsageExtractor(), usage,
                 new SpringAiChatOptionsContributor(), ObservationRegistry.NOOP);
-        LoomspanSession session = TestLoomspanSessions.withId("assembler", "default-test", 8);
+        LoomspanSession session = TestLoomspanSessions.withId("assembler", "default:test", 8);
         var binding = ai.loomspan.internal.core.TestExecutionBindings.missionBinding(session);
         ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> {
-            state.openMissionFrame(session, "default-test", Map.of());
-            state.openFrame(session, TraceFrameType.MODEL_CALL, "default-test#model", Map.of());
+            state.openMissionFrame(session, "default:test", Map.of());
+            state.openFrame(session, TraceFrameType.MODEL_CALL, "default:test#model", Map.of());
         });
         AtomicInteger executions = new AtomicInteger();
         AtomicReference<Map<String, Object>> observedArguments = new AtomicReference<>();
@@ -495,7 +495,7 @@ class SpringAiChatClientAssemblerIntegrationTest
                     factory.create(definition, mode).call(new ModelInteractionRequest(
                             "system", new RenderedMissionInput("user", List.of(), Map.of()),
                             new ModelTraceContext(ModelExecutionIdentity.from(definition.requireExecutionConfiguration()),
-                                    "default-test", "mission"), capabilities, planning, null)).content());
+                                    "default:test", "mission"), capabilities, planning, null)).content());
         }
     }
 
@@ -510,9 +510,9 @@ class SpringAiChatClientAssemblerIntegrationTest
     private static BoundCapability capability(AtomicInteger executions,
             AtomicReference<Map<String, Object>> observedArguments)
     {
-        CapabilityMetadata metadata = new CapabilityMetadata("test:lookup", "tax-lookup", "Look up",
+        CapabilityMetadata metadata = new CapabilityMetadata("test:lookup", "tax:lookup", "Look up",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), ignored -> null, SkillKind.YAML,
-                new CapabilityToolDescriptor("tax-lookup", "Look up",
+                new CapabilityToolDescriptor("tax:lookup", "Look up",
                         "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}", null),
                 SkillInputContract.genericObject(), null);
         return new BoundCapability(metadata, java.util.List.of(), (arguments, task, sourceResults) -> {
@@ -530,7 +530,7 @@ class SpringAiChatClientAssemblerIntegrationTest
     private static MockResponse toolCallArguments(String id, String arguments)
     {
         return new MockResponse().setHeader("Content-Type", "application/json").setBody("""
-                {"id":"tool","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"%s","name":"Tax-lookup","arguments":"%s","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
+                {"id":"tool","object":"response","created_at":1,"model":"gpt-test","status":"completed","output":[{"type":"function_call","id":"fc_0","call_id":"%s","name":"tax--lookup","arguments":"%s","status":"completed"}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}
                 """.formatted(id, arguments));
     }
 

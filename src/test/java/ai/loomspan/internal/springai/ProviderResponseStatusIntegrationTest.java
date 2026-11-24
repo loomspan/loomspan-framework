@@ -37,7 +37,7 @@ import static org.mockito.ArgumentMatchers.*;
 class ProviderResponseStatusIntegrationTest
 {
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final String TOOL = "default-test_lookup";
+    private static final String TOOL = "default--test-lookup";
     private static final String VALID_JSON = "{\"ok\":true}";
 
     @ParameterizedTest
@@ -52,15 +52,15 @@ class ProviderResponseStatusIntegrationTest
                     {"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}
                     """, ai.loomspan.internal.schema.StandardSchemaCompiler.Role.OUTPUT,
                     ai.loomspan.internal.schema.StandardSchemaCompiler.Origin.AUTHORED);
-            var validation = new OutputSchemaCallAdvisor("default-test_skill", schema,
+            var validation = new OutputSchemaCallAdvisor("default:test-skill", schema,
                     new OutputSchemaValidator(), new OutputSchemaPromptAugmentor(), 2, outcomes::add);
             var lintOutcomes = new AtomicInteger();
             var evidenceOutcomes = new AtomicInteger();
-            var linter = new ai.loomspan.internal.linter.LinterCallAdvisor("default-test_skill", "regex",
+            var linter = new ai.loomspan.internal.linter.LinterCallAdvisor("default:test-skill", "regex",
                     java.util.regex.Pattern.compile("MUST_NEVER_MATCH"), "correction forbidden", 2,
                     ignored -> lintOutcomes.incrementAndGet());
             var evidenceValidator = org.mockito.Mockito.mock(ai.loomspan.internal.runtime.evidence.EvidenceBackedOutputValidator.class);
-            var evidence = new ai.loomspan.internal.runtime.evidence.EvidenceContractCallAdvisor("default-test_skill",
+            var evidence = new ai.loomspan.internal.runtime.evidence.EvidenceContractCallAdvisor("default:test-skill",
                     ai.loomspan.internal.runtime.evidence.EvidenceContract.empty(), evidenceValidator, 2,
                     ignored -> evidenceOutcomes.incrementAndGet(), ignored -> evidenceOutcomes.incrementAndGet(), AdvisorTraceRecorder.noOp());
             assertThatThrownBy(() -> h.call(h.client(validation, linter, evidence)))
@@ -159,7 +159,7 @@ class ProviderResponseStatusIntegrationTest
     {
         try (Harness h = new Harness(driver))
         {
-            h.enqueue(text(driver, incomplete(driver), "{\"capabilityName\":\"default-test_skill\",\"tasks\":[]}"));
+            h.enqueue(text(driver, incomplete(driver), "{\"capabilityName\":\"default:test-skill\",\"tasks\":[]}"));
             var jsonParser = org.mockito.Mockito.mock(tools.jackson.databind.ObjectMapper.class);
             var planReader = org.mockito.Mockito.mock(tools.jackson.databind.ObjectReader.class);
             org.mockito.Mockito.when(jsonParser.reader()).thenReturn(planReader);
@@ -168,7 +168,7 @@ class ProviderResponseStatusIntegrationTest
             var planner = new ai.loomspan.internal.runtime.planning.DefaultPlanningService(h.state, jsonParser);
             org.mockito.Mockito.clearInvocations(jsonParser, planReader);
             var manifest = new YamlSkillManifest();
-            manifest.setName("test_skill");
+            manifest.setName("test-skill");
             manifest.setDescription("Fixture planner");
             manifest.setModel("fixture");
             var definition = new ai.loomspan.internal.skill.YamlSkillDefinition(
@@ -490,13 +490,13 @@ class ProviderResponseStatusIntegrationTest
             properties.getProviderRetry().setMaxBackoff(java.time.Duration.ZERO);
             properties.getProviderRetry().setJitter(0);
             runtime = new SpringAiProviderIntegration().create("fixture", properties);
-            session = TestLoomspanSessions.withId("status-" + driver + "-" + UUID.randomUUID(), "default-test_entry", 4);
+            session = TestLoomspanSessions.withId("status-" + driver + "-" + UUID.randomUUID(), "default:test-entry", 4);
             binding = TestExecutionBindings.missionBinding(session);
             ExecutionBindingScope.runWith(binding, () -> {
-                state.openMissionFrame(session, "default-test_skill", Map.of());
+                state.openMissionFrame(session, "default:test-skill", Map.of());
                 state.openFrame(session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
             });
-            context = new ModelTraceContext(new ModelExecutionIdentity("fixture", "fixture", driver, "fixture"), "default-test_skill", "mission");
+            context = new ModelTraceContext(new ModelExecutionIdentity("fixture", "fixture", driver, "fixture"), "default:test-skill", "mission");
         }
 
         void enqueue(Map<String, Object> body)

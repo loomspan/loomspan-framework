@@ -47,9 +47,9 @@ Partial generated-task fragment showing only grouping and dependencies (not a co
 
 ```json
 [
-  {"taskId":"fetch-a","capabilityName":"default-lookupA","dependsOn":[],"parallelGroup":"fetch"},
-  {"taskId":"fetch-b","capabilityName":"default-lookupB","dependsOn":[],"parallelGroup":"fetch"},
-  {"taskId":"combine","capabilityName":"default-combine","dependsOn":["fetch-a","fetch-b"],"parallelGroup":null}
+  {"taskId":"fetch-a","capabilityName":"default:lookup-a","dependsOn":[],"parallelGroup":"fetch"},
+  {"taskId":"fetch-b","capabilityName":"default:lookup-b","dependsOn":[],"parallelGroup":"fetch"},
+  {"taskId":"combine","capabilityName":"default:combine","dependsOn":["fetch-a","fetch-b"],"parallelGroup":null}
 ]
 ```
 
@@ -192,3 +192,20 @@ This contract does not provide per-skill parallelism limits, capability-level co
 ## Assembled completion
 
 `output_bindings` imposes producer uniqueness without adding dependencies. Independent producers may share a parallel group. Assembly starts only after all accepted tasks join successfully. Fully bound output requires N task slots and no synthetic final step; mixed output requires N+1. Output correction retains accepted child work and exact bound sources. Read [output assembly](output-contracts.md#declared-output-assembly).
+
+## Assigned tool identity
+
+A plan task's `capabilityName` and its worker prompt carry the exact qualified
+reference, such as `order-support:find-order`. The assigned worker returns that
+same reference in its structured action.
+
+```json
+{"stepAction":"CALL_TOOL","taskId":"lookup","toolName":"order-support:find-order","toolArguments":{"orderId":"42"}}
+```
+
+Only the assigned task and tool can execute, even when another child is visible.
+Provider function spelling `order-support--find-order` fails this worker boundary.
+Accepted qualified values and business arguments retain their content. Worker
+requests have no native function surface. `StepActionSelectionTest`,
+`StepActionValidatorTest` and `NamespaceExecutionAuthorityIntegrationTest` cover
+validation, assignment and actual execution.

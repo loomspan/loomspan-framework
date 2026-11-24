@@ -77,7 +77,7 @@ class OrdinaryNativeOutputIntegrationTest
     {
         local(identity, (server, runtime) -> {
             AtomicInteger effects = new AtomicInteger();
-            ToolCallback callback = FunctionToolCallback.<Map<String,Object>,String>builder("test-lookup", input -> {
+            ToolCallback callback = FunctionToolCallback.<Map<String,Object>,String>builder("test--lookup", input -> {
                 effects.incrementAndGet(); return "found";
             }).description("fixture").inputType(Map.class)
                     .inputSchema("{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}").build();
@@ -151,7 +151,7 @@ class OrdinaryNativeOutputIntegrationTest
     {
         local(identity, (server, runtime) -> {
             var effects = new AtomicInteger();
-            var callback = FunctionToolCallback.<Map<String,Object>,String>builder("test-lookup", input -> {
+            var callback = FunctionToolCallback.<Map<String,Object>,String>builder("test--lookup", input -> {
                 effects.incrementAndGet(); return "completed effect";
             }).description("fixture").inputType(Map.class)
                     .inputSchema("{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}").build();
@@ -254,7 +254,7 @@ class OrdinaryNativeOutputIntegrationTest
                     ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/bound", false),
                     ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT,
                     ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/source", true), null);
-            var composition = new OutputBindingComposition("default-root", original, List.of(binding), Map.of("source", "framework exact value"),
+            var composition = new OutputBindingComposition("default:root", original, List.of(binding), Map.of("source", "framework exact value"),
                     List.of(), "owner", ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree());
             CanonicalSchema projected = composition.projection().schema();
             server.enqueue(text(runtime.driver(), "{\"label\":\"okay\"}"));
@@ -276,7 +276,7 @@ class OrdinaryNativeOutputIntegrationTest
             ExecutionStateService state)
     {
         var builder = ChatClient.builder(runtime.chatModel(), io.micrometer.observation.ObservationRegistry.NOOP, null, null,
-                ToolCallingAdvisor.builder().toolCallingManager(new CanonicalToolCallingManager(ToolCallingManager.builder().build())))
+                ToolCallingAdvisor.builder().toolCallingManager(new RequestBoundToolCallingManager(ToolCallingManager.builder().build())))
                 .defaultOptions(options.mutate())
                 .defaultAdvisors(new ProviderAttemptCallAdvisor(runtime, state, new ModelUsageExtractor(), mock(SessionUsageService.class)));
         if (schema != null) builder.defaultAdvisors(new OutputSchemaCallAdvisor("ordinary-fixture", schema,
@@ -407,10 +407,10 @@ class OrdinaryNativeOutputIntegrationTest
                 "usageMetadata", Map.of("promptTokenCount", 1, "candidatesTokenCount", 1, "totalTokenCount", 2)));
     }
     private static MockResponse tool(AiDriver driver) {
-        if (driver == AiDriver.OPENAI) return ResponsesFixtures.response("fixture", "fixture", List.of(ResponsesFixtures.functionCall("test-lookup", "one", "{\"value\":\"x\"}")));
+        if (driver == AiDriver.OPENAI) return ResponsesFixtures.response("fixture", "fixture", List.of(ResponsesFixtures.functionCall("test--lookup", "one", "{\"value\":\"x\"}")));
         if (driver == AiDriver.ANTHROPIC) return response(Map.of("id", "fixture", "type", "message", "role", "assistant", "model", "fixture",
-                "content", List.of(Map.of("type", "tool_use", "id", "one", "name", "test-lookup", "input", Map.of("value", "x"))), "stop_reason", "tool_use", "usage", Map.of("input_tokens", 1, "output_tokens", 1)));
-        return response(Map.of("modelVersion", "fixture", "candidates", List.of(Map.of("content", Map.of("role", "model", "parts", List.of(Map.of("functionCall", Map.of("name", "test-lookup", "args", Map.of("value", "x"))))), "finishReason", "STOP")),
+                "content", List.of(Map.of("type", "tool_use", "id", "one", "name", "test--lookup", "input", Map.of("value", "x"))), "stop_reason", "tool_use", "usage", Map.of("input_tokens", 1, "output_tokens", 1)));
+        return response(Map.of("modelVersion", "fixture", "candidates", List.of(Map.of("content", Map.of("role", "model", "parts", List.of(Map.of("functionCall", Map.of("name", "test--lookup", "args", Map.of("value", "x"))))), "finishReason", "STOP")),
                 "usageMetadata", Map.of("promptTokenCount", 1, "candidatesTokenCount", 1, "totalTokenCount", 2)));
     }
     private static MockResponse error(AiDriver driver, int code, String detail) {
