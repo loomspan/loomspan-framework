@@ -2,8 +2,8 @@ name: evidence-contract-malformed-expression-skill
 description: Invalid malformed evidence expression
 model: gpt-5
 allowed_skills:
-  - name: default-invoiceParser
+  - name: default:invoice-parser
 output_schema:
   type: object
   properties:
-    vendorName: { type: string, x-loomspan-evidence: "default-invoiceParser and" }
+    vendorName: { type: string, x-loomspan-evidence: "default:invoice-parser and" }

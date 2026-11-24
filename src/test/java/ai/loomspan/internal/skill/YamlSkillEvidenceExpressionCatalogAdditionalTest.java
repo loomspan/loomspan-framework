@@ -65,7 +65,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                         .isNotNull()
                         .hasMessageContaining("field 'output_schema.properties.likelyCause.x-loomspan-evidence'")
                         .hasMessageContaining("column 1")
-                        .hasMessageContaining("skill 'default-checkDns' is not a direct allowed child"));
+                        .hasMessageContaining("skill 'default:check-dns' is not a direct allowed child"));
     }
 
     @Test
@@ -81,13 +81,13 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
     }
 
     @Test
-    void omitsSuggestionWhenCaseInsensitiveReferenceIsAmbiguous()
+    void rejectsUppercaseEvidenceComponentBeforeChildLookup()
     {
         contextRunner
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/evidence-contract-ambiguous-case-child-skill.yaml")
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
-                        .hasMessageContaining("skill 'default-INVOICEPARSER' is not a direct allowed child")
+                        .hasMessageContaining("invalid local name 'INVOICE-PARSER'")
                         .hasMessageNotContaining("did you mean"));
     }
 
@@ -110,7 +110,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("field 'output_schema.properties.vendorName.x-loomspan-evidence'")
-                        .hasMessageContaining("column 26")
+                        .hasMessageContaining("column 27")
                         .hasMessageContaining("expected a skill name or '('"));
     }
 
@@ -122,7 +122,7 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("field 'output_schema.properties.vendorName.x-loomspan-evidence'")
-                        .hasMessageContaining("column 23")
+                        .hasMessageContaining("column 24")
                         .hasMessageContaining("expected 'and', 'or', or end of expression"));
     }
 
@@ -134,10 +134,10 @@ class YamlSkillEvidenceExpressionCatalogAdditionalTest
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context.getBean(YamlSkillCatalog.class)
-                            .getSkill("default-evidenceOperatorSubstringSkill")
+                            .getSkill("default:evidence-operator-substring-skill")
                             .evidenceContract()
                             .canonicalExpressionForClaim("result"))
-                            .isEqualTo("default-androidCheck and (default-orderLookup or default-candyParser)");
+                            .isEqualTo("default:android-check and (default:order-lookup or default:candy-parser)");
                 });
     }
 }

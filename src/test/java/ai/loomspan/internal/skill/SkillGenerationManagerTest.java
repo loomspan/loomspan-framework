@@ -88,7 +88,7 @@ class SkillGenerationManagerTest
         var values = Map.of("fixture.key", "fixture");
         var executorNamespace = manager.prepare(manager.capturePreparation("default"), List.of(), configuration, visibility, values, null);
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, executorNamespace);
-        var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nexecutor: default-sql\noutput_schema: {type: object, properties: {value: {type: number}}}\n");
+        var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nexecutor: default:sql\noutput_schema: {type: object, properties: {value: {type: number}}}\n");
         var initial = manager.prepare(manager.capturePreparation("dep"), List.of(producer), configuration, visibility, values, null);
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, initial);
         var parent = new SkillDocument("parent", forwardingDocument("parent", "producer").yaml().replace("default-producer", "dep-producer"));
@@ -138,7 +138,7 @@ class SkillGenerationManagerTest
                 description: Bind named answers
                 model: model
                 planning_mode: true
-                allowed_skills: [{name: default-producer, max_tasks: 1}]
+                allowed_skills: [{name: default:producer, max_tasks: 1}]
                 output_schema:
                   type: object
                   properties:
@@ -146,7 +146,7 @@ class SkillGenerationManagerTest
                   required: [result]
                   additionalProperties: false
                 output_bindings:
-                  /result: {from: child_result, skill: default-producer, path: /category/choice}
+                  /result: {from: child_result, skill: default:producer, path: /category/choice}
                 """;
         var producer = new SkillDocument("opaque model label", leaf);
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), producer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
@@ -177,7 +177,7 @@ class SkillGenerationManagerTest
                 description: parent
                 model: model
                 planning_mode: true
-                allowed_skills: [{name: default-producer, max_tasks: 2}]
+                allowed_skills: [{name: default:producer, max_tasks: 2}]
                 input_schema:
                   type: object
                   properties:
@@ -192,7 +192,7 @@ class SkillGenerationManagerTest
                   additionalProperties: false
                 output_bindings:
                   /CaseId: {from: input, path: /id}
-                  /answer: {from: child_result, skill: default-producer, path: /value}
+                  /answer: {from: child_result, skill: default:producer, path: /value}
                 """;
         var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\noutput_schema: {type: object, properties: {value: {type: string}}, additionalProperties: false}\n");
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), producer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
@@ -283,9 +283,9 @@ class SkillGenerationManagerTest
     }
 
     private static String bindingParent(String outputSchema, String destination, String source) {
-        return "name: parent\ndescription: parent\nmodel: model\nplanning_mode: true\nallowed_skills: [{name: default-producer, max_tasks: 1}]\n"
+        return "name: parent\ndescription: parent\nmodel: model\nplanning_mode: true\nallowed_skills: [{name: default:producer, max_tasks: 1}]\n"
                 + "output_schema: " + outputSchema + "\noutput_bindings:\n  " + destination
-                + ": {from: child_result, skill: default-producer, path: " + source + "}\n";
+                + ": {from: child_result, skill: default:producer, path: " + source + "}\n";
     }
 
     @Test
@@ -307,12 +307,12 @@ class SkillGenerationManagerTest
                   required: [requestId]
                   additionalProperties: false
                 allowed_skills:
-                  - name: default-producer
+                  - name: default:producer
                     max_tasks: 1
-                  - name: default-consumer
+                  - name: default:consumer
                     input_bindings:
                       /caseId: {from: input, path: /requestId}
-                      /data: {from: child_result, skill: default-producer, path: /undeclaredOutput}
+                      /data: {from: child_result, skill: default:producer, path: /undeclaredOutput}
                 """;
         var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\n");
         var consumer = new SkillDocument("consumer", """
@@ -329,8 +329,8 @@ class SkillGenerationManagerTest
                 """);
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), producer, consumer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
         Map<String, String> bad = Map.of(
-                "unknown producer", parent.replace("skill: default-producer", "skill: default-other"),
-                "self", parent.replace("skill: default-producer", "skill: default-consumer"),
+                "unknown producer", parent.replace("skill: default:producer", "skill: default:other"),
+                "self", parent.replace("skill: default:producer", "skill: default:consumer"),
                 "impossible count", parent.replace("max_tasks: 1", "max_tasks: 0"),
                 "missing input field", parent.replace("path: /requestId", "path: /absent"),
                 "closed target", parent.replace("/caseId:", "/absent:"),
@@ -340,7 +340,7 @@ class SkillGenerationManagerTest
             assertThat(validation.valid()).as(entry.getKey()).isFalse();
             assertThat(validation.issues()).anyMatch(issue -> issue.fieldPath().equals("allowed_skills.input_bindings"));
         }
-        String cycle = parent.replace("    max_tasks: 1", "    max_tasks: 1\n    input_bindings:\n      /data: {from: child_result, skill: default-consumer, path: ''}");
+        String cycle = parent.replace("    max_tasks: 1", "    max_tasks: 1\n    input_bindings:\n      /data: {from: child_result, skill: default:consumer, path: ''}");
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", cycle), producer, consumer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).issues())
                 .anyMatch(issue -> issue.message().contains("cyclic"));
     }
@@ -357,7 +357,7 @@ class SkillGenerationManagerTest
                         name: producer
                         description: Produce an answer
                         model: model
-                        allowed_skills: [{name: default-fixedJava}]
+                        allowed_skills: [{name: default:fixed-java}]
                         output_schema:
                           type: object
                           properties:
@@ -409,8 +409,8 @@ class SkillGenerationManagerTest
             assertThat(manager.active("default").id()).isEqualTo(original);
         }
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(
-                new SkillDocument("a", "name: a\ndescription: a\nmodel: model\nallowed_skills: [{name: default-b}]\n"),
-                new SkillDocument("b", "name: b\ndescription: b\nmodel: model\nallowed_skills: [{name: default-a}]\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
+                new SkillDocument("a", "name: a\ndescription: a\nmodel: model\nallowed_skills: [{name: default:b}]\n"),
+                new SkillDocument("b", "name: b\ndescription: b\nmodel: model\nallowed_skills: [{name: default:a}]\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
     }
 
     private static SkillDocument forwardingDocument(String name, String child) {
@@ -419,8 +419,8 @@ class SkillGenerationManagerTest
                 description: Prepare and delegate
                 model: model
                 planning_mode: true
-                allowed_skills: [{name: default-%s, required: true, max_tasks: 1}]
-                output_from: {skill: default-%s}
+                allowed_skills: [{name: default:%s, required: true, max_tasks: 1}]
+                output_from: {skill: default:%s}
                 """.formatted(name, child, child));
     }
 
@@ -652,7 +652,7 @@ class SkillGenerationManagerTest
             assertThat(issue.fieldPath()).isEqualTo("name");
         });
         assertThatThrownBy(() -> manager.prepare(manager.capturePreparation("default"), conflict, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"), null)).hasMessageContaining("already registered");
-        List<SkillDocument> missing = List.of(new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: default-missing\n"));
+        List<SkillDocument> missing = List.of(new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: default:missing\n"));
         var missingFeedback = manager.validate(manager.capturePreparation("default"), missing, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(missingFeedback.skills()).isEmpty();
         assertThat(missingFeedback.issues()).extracting(issue -> issue.fieldPath())
@@ -689,7 +689,7 @@ class SkillGenerationManagerTest
         manager.afterSingletonsInstantiated();
         var result = manager.validate(manager.capturePreparation("default"), List.of(
                 new SkillDocument("bad", "name: couldExist\ndescription: bad\nrest: true\nmodel: forbidden\n"),
-                new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: default-couldExist\n  - name: default-certainlyMissing\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+                new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: default:could-exist\n  - name: default:certainly-missing\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(result.issues()).extracting(issue -> issue.message())
                 .anySatisfy(message -> assertThat(message).contains("certainlyMissing"))
                 .noneSatisfy(message -> assertThat(message).contains("Unknown child skill 'couldExist'"));

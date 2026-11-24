@@ -69,7 +69,7 @@ class SkillReachableAdmissionTest {
         var f = new Fixture(null);
         var dep = f.reloader.prepare("dep", List.of(model("leaf")), MODEL, NamespaceVisibility.PUBLIC);
         f.reloader.publish(dep);
-        f.reloader.publish(f.reloader.prepare("caller", List.of(calls("root", "dep-leaf"), model("safe")), MODEL));
+        f.reloader.publish(f.reloader.prepare("caller", List.of(calls("root", "dep:leaf"), model("safe")), MODEL));
         var router = mock(CapabilityExecutionRouter.class);
         var template = new DefaultSkillTemplate(f.manager, router, new LoomspanSessionRunner(4),
                 new tools.jackson.databind.ObjectMapper(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
@@ -84,7 +84,7 @@ class SkillReachableAdmissionTest {
         for (String namespace : List.of("default", "caller")) {
             var f = new Fixture(null);
             var dep = publish(f, "dep", List.of(model("leaf")), NamespaceVisibility.PUBLIC);
-            publish(f, namespace, List.of(calls("root", "dep-leaf"), model("safe")), NamespaceVisibility.PRIVATE);
+            publish(f, namespace, List.of(calls("root", "dep:leaf"), model("safe")), NamespaceVisibility.PRIVATE);
             var retained = f.reloader.snapshot(namespace);
             String descriptorName = retained.skill(namespace + "-root").orElseThrow().name();
             var router = mock(CapabilityExecutionRouter.class);
@@ -98,7 +98,7 @@ class SkillReachableAdmissionTest {
             var handoff = new DefaultSkillInvocationHandoff(template, f.lifecycle);
             try {
                 for (int revision = 0; revision < 2; revision++) {
-                    var current = publish(f, namespace, List.of(calls("root", "dep-leaf"), model("safe")), NamespaceVisibility.PRIVATE);
+                    var current = publish(f, namespace, List.of(calls("root", "dep:leaf"), model("safe")), NamespaceVisibility.PRIVATE);
                     publish(f, "dep", List.of(model("leaf")), NamespaceVisibility.PUBLIC);
                     // Namespace normalization applies; business data cannot choose another root.
                     String target = namespace.toUpperCase(Locale.ROOT) + "-root";
@@ -155,7 +155,7 @@ class SkillReachableAdmissionTest {
             var f = new Fixture(null);
             var leaf = SkillDependencyValidatorTest.producer("leaf", "string");
             publish(f, "dep", List.of(leaf), NamespaceVisibility.PUBLIC);
-            var docs = List.of(SkillDependencyValidatorTest.forward("root", "dep-leaf"), model("safe"));
+            var docs = List.of(SkillDependencyValidatorTest.forward("root", "dep:leaf"), model("safe"));
             publish(f, "caller", docs, NamespaceVisibility.PRIVATE);
             var router = mock(CapabilityExecutionRouter.class);
             when(router.execute(any(), any(), any(), any())).thenReturn("old");
@@ -183,7 +183,7 @@ class SkillReachableAdmissionTest {
         var f = new Fixture((p, policy) -> { builds.incrementAndGet(); return runtime(p, policy); });
         var child = new SkillDocument("leaf", model("leaf").yaml() + "rbac_roles: [ADMIN]\n");
         var dep = publish(f, "dep", List.of(child), NamespaceVisibility.PUBLIC);
-        var root = new SkillDocument("root", model("root").yaml() + "rbac_roles: [USER]\nplanning_mode: true\nallowed_skills: [{name: dep-leaf, required: false, max_tasks: 1}]\n");
+        var root = new SkillDocument("root", model("root").yaml() + "rbac_roles: [USER]\nplanning_mode: true\nallowed_skills: [{name: dep:leaf, required: false, max_tasks: 1}]\n");
         publish(f, "caller", List.of(root, model("safe")), NamespaceVisibility.PRIVATE);
         var router = mock(CapabilityExecutionRouter.class);
         var template = template(f, router);
@@ -213,7 +213,7 @@ class SkillReachableAdmissionTest {
     @Test void queuedWorkRetainsAllOldGenerationsVisibilityAndStableEntryId() {
         var f = new Fixture(null);
         var dep = publish(f, "dep", List.of(model("leaf")), NamespaceVisibility.PUBLIC);
-        var root = publish(f, "caller", List.of(calls("root", "dep-leaf")), NamespaceVisibility.PRIVATE);
+        var root = publish(f, "caller", List.of(calls("root", "dep:leaf")), NamespaceVisibility.PRIVATE);
         var retired = new CopyOnWriteArrayList<String>(); f.manager.onGenerationRetired(retired::add);
         var router = mock(CapabilityExecutionRouter.class);
         var sessions = new HashSet<String>();
@@ -305,7 +305,7 @@ class SkillReachableAdmissionTest {
         var f = new Fixture(null);
         var dep = publish(f, "dep", List.of(model("leaf")), NamespaceVisibility.PUBLIC);
         var config = new ExecutionConfiguration(MODEL.yaml() + "  session: {mission-timeout: 50ms}\n");
-        var root = f.reloader.prepare("caller", List.of(calls("root", "dep-leaf")), config); f.reloader.publish(root);
+        var root = f.reloader.prepare("caller", List.of(calls("root", "dep:leaf")), config); f.reloader.publish(root);
         var retired = new CopyOnWriteArrayList<String>(); var retirementComplete = new CountDownLatch(2);
         f.manager.onGenerationRetired(id -> { retired.add(id); retirementComplete.countDown(); });
         var started = new CountDownLatch(1); var release = new CountDownLatch(1);

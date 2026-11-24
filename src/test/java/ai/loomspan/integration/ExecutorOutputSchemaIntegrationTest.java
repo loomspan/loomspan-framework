@@ -149,7 +149,7 @@ class ExecutorOutputSchemaIntegrationTest {
     void admittedParentExposesSelectedChildDiagnosisWithoutObserver(boolean retained) throws Exception {
         write("triage", executor("triage") + transform(TRANSFORM) + SCHEMA);
         write("observe", executor("observe"));
-        write("parent", planned("parent", 2) + children(true) + "output_from: {skill: default-observe}\n");
+        write("parent", planned("parent", 2) + children(true) + "output_from: {skill: default:observe}\n");
         var observed = new ObservedExecutor(call -> "{}");
         try (var provider = new MockWebServer()) {
             provider.enqueue(plan("parent", task("triage"), task("observe", "triage")));
@@ -279,7 +279,7 @@ class ExecutorOutputSchemaIntegrationTest {
         String emptyInput = "input_schema: {type: object, additionalProperties: false}\n";
         write("first", executor("first") + emptyInput + SCHEMA);
         write("second", executor("second") + emptyInput + SCHEMA);
-        write("parent", planned("parent", 2) + "allowed_skills: [{name: default-first, required: true, max_tasks: 1}, {name: default-second, required: true, max_tasks: 1}]\noutput_from: {skill: default-first}\n");
+        write("parent", planned("parent", 2) + "allowed_skills: [{name: default:first, required: true, max_tasks: 1}, {name: default:second, required: true, max_tasks: 1}]\noutput_from: {skill: default:first}\n");
         var installed = new java.util.concurrent.CountDownLatch(1);
         var secondRecorded = new java.util.concurrent.CountDownLatch(1);
         var observed = new ObservedExecutor(call -> {
@@ -413,7 +413,7 @@ class ExecutorOutputSchemaIntegrationTest {
 
     @Test void allCallersReceiveTheValidatedCandidate() throws Exception {
         write("triage", executor("triage") + transform(TRANSFORM) + SCHEMA);
-        write("forward", planned("forward", 1) + children(false) + "output_from: {skill: default-triage}\n");
+        write("forward", planned("forward", 1) + children(false) + "output_from: {skill: default:triage}\n");
         write("ordinary", ExplicitJavaFailureHandlingIntegrationTest.parent("ordinary", "default-triage", false));
         var observed = new ObservedExecutor(call -> RAW);
         try (var provider = new MockWebServer()) {
@@ -444,7 +444,7 @@ class ExecutorOutputSchemaIntegrationTest {
     void schemaMismatchIsTerminalAcrossCallerRoutes(String route) throws Exception {
         write("triage", executor("triage") + SCHEMA);
         boolean direct = route.equals("direct");
-        if (route.equals("planned")) write("planned", planned("planned", 1) + children(false) + "output_from: {skill: default-triage}\n");
+        if (route.equals("planned")) write("planned", planned("planned", 1) + children(false) + "output_from: {skill: default:triage}\n");
         if (route.equals("ordinary")) write("ordinary", ExplicitJavaFailureHandlingIntegrationTest.parent("ordinary", "default-triage", false));
         var observed = new ObservedExecutor(call -> "{\"repeatContactProbability\":\"high\"}");
         try (var provider = new MockWebServer()) {
@@ -480,7 +480,7 @@ class ExecutorOutputSchemaIntegrationTest {
                   required: [probability]
                   additionalProperties: false
                 """);
-        write("assemble", planned("assemble", 2) + children(true) + "output_from: {skill: default-observe}\n");
+        write("assemble", planned("assemble", 2) + children(true) + "output_from: {skill: default:observe}\n");
         var observed = new ObservedExecutor(call -> call.skillName().equals("default-triage") ? (valid ? RAW : "{}") : "observed");
         try (var provider = new MockWebServer()) {
             provider.enqueue(plan("assemble", task("triage"), task("observe", "triage")));
@@ -556,17 +556,17 @@ class ExecutorOutputSchemaIntegrationTest {
     }
 
     private void write(String name, String yaml) throws Exception { Files.writeString(directory.resolve(name + ".yaml"), yaml); }
-    private static String executor(String name) { return "name: " + name + "\ndescription: Publish validated output\nexecutor: default-fixture\n"
+    private static String executor(String name) { return "name: " + name + "\ndescription: Publish validated output\nexecutor: default:fixture\n"
             + (name.equals("triage") ? "input_schema: {type: object, additionalProperties: false}\n" : ""); }
     private static String transform(String expression) { return "output_transform:\n  language: jslt\n  expression: |\n" + expression.indent(4); }
     private static String planned(String name, int steps) { return "name: " + name + "\ndescription: Consume validated output\nmodel: local\nplanning_mode: true\nmax_steps: " + steps + "\n"; }
     private static String children(boolean dependent) {
-        return "allowed_skills:\n  - name: default-triage\n    required: true\n    max_tasks: 1\n" + (dependent ? """
-                  - name: default-observe
+        return "allowed_skills:\n  - name: default:triage\n    required: true\n    max_tasks: 1\n" + (dependent ? """
+                  - name: default:observe
                     required: true
                     max_tasks: 1
                     input_bindings:
-                      /probability: {from: child_result, skill: default-triage, path: /repeatContactProbability}
+                      /probability: {from: child_result, skill: default:triage, path: /repeatContactProbability}
                 """ : "");
     }
     private static Map<String, Object> task(String name, String... dependencies) {

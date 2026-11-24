@@ -73,7 +73,7 @@ class ExecutorOutputTransformIntegrationTest {
             """;
     private static final String PLANNED_TRIAGE = """
             allowed_skills:
-              - name: default-triage
+              - name: default:triage
                 required: true
                 max_tasks: 1
                 input_bindings:
@@ -85,7 +85,7 @@ class ExecutorOutputTransformIntegrationTest {
 
     @Test void publishesOneResultToDirectForwardingAndOrdinaryToolCallers() throws Exception {
         write("triage", executor("triage") + CASE_SCHEMA + inputTransform("{\"requestId\": .caseId}") + outputTransform(TRIAGE));
-        write("forward", planned("forward", 1) + PLANNED_TRIAGE + "output_from: {skill: default-triage}\n");
+        write("forward", planned("forward", 1) + PLANNED_TRIAGE + "output_from: {skill: default:triage}\n");
         write("ordinary", ExplicitJavaFailureHandlingIntegrationTest.parent("ordinary", "default-triage", false));
         var executor = new ObservedExecutor(call -> RAW);
         try (var provider = new MockWebServer()) {
@@ -133,18 +133,18 @@ class ExecutorOutputTransformIntegrationTest {
                   additionalProperties: false
                 """);
         write("assemble", planned("assemble", 2) + PLANNED_TRIAGE + """
-                  - name: default-observe
+                  - name: default:observe
                     required: true
                     max_tasks: 1
                     input_bindings:
-                      /probability: {from: child_result, skill: default-triage, path: /repeatContactProbability}
+                      /probability: {from: child_result, skill: default:triage, path: /repeatContactProbability}
                 output_schema:
                   type: object
                   properties: {selected: {type: number, x-loomspan-evidence: triage}}
                   required: [selected]
                   additionalProperties: false
                 output_bindings:
-                  /selected: {from: child_result, skill: default-triage, path: /repeatContactProbability}
+                  /selected: {from: child_result, skill: default:triage, path: /repeatContactProbability}
                 """);
         var executor = new ObservedExecutor(call -> call.skillName().equals("default-triage") ? RAW : "observed");
         try (var provider = new MockWebServer()) {
@@ -173,7 +173,7 @@ class ExecutorOutputTransformIntegrationTest {
         write("triage", executor("triage") + (plannedChild ? CASE_SCHEMA : "") + outputTransform(expression));
         String entry = direct ? "default-triage" : "default-" + route;
         if (plannedChild) {
-            write("planned", planned("planned", 1) + PLANNED_TRIAGE + "output_from: {skill: default-triage}\n");
+            write("planned", planned("planned", 1) + PLANNED_TRIAGE + "output_from: {skill: default:triage}\n");
         } else if (!direct) {
             write("ordinary", ExplicitJavaFailureHandlingIntegrationTest.parent("ordinary", "default-triage", false));
         }
@@ -322,7 +322,7 @@ class ExecutorOutputTransformIntegrationTest {
     }
 
     private static String executor(String name) {
-        return "name: " + name + "\ndescription: Publish executor results\nexecutor: default-fixture\n";
+        return "name: " + name + "\ndescription: Publish executor results\nexecutor: default:fixture\n";
     }
 
     private static String planned(String name, int steps) {

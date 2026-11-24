@@ -38,12 +38,12 @@ class BindingIsolationIntegrationTest {
     void groupedBoundProducersJoinBeforeDeliveringExactInputs(boolean concurrent) throws Exception {
         Path skills = Files.createDirectory(directory.resolve("grouped"));
         String root = parent("root", false).replace("max_steps: 2", "max_steps: 3\nconcurrency: " + concurrent)
-                .replace("  - name: default-consumer", "  - name: default-secondProducer\n"
+                .replace("  - name: default:consumer", "  - name: default:second-producer\n"
                         + "    required: true\n    max_tasks: 1\n    input_bindings:\n"
-                        + "      /marker: {from: input, path: /marker}\n  - name: default-consumer")
-                .replace("      /evidence: {from: child_result, skill: default-producer, path: /data}",
-                        "      /evidence: {from: child_result, skill: default-producer, path: /data}\n"
-                                + "      /secondEvidence: {from: child_result, skill: default-secondProducer, path: /data}");
+                        + "      /marker: {from: input, path: /marker}\n  - name: default:consumer")
+                .replace("      /evidence: {from: child_result, skill: default:producer, path: /data}",
+                        "      /evidence: {from: child_result, skill: default:producer, path: /data}\n"
+                                + "      /secondEvidence: {from: child_result, skill: default:second-producer, path: /data}");
         Files.writeString(skills.resolve("root.yaml"), root);
         Files.writeString(skills.resolve("producer.yaml"), leaf("producer"));
         Files.writeString(skills.resolve("secondProducer.yaml"), leaf("secondProducer"));
@@ -278,18 +278,18 @@ class BindingIsolationIntegrationTest {
                   required: [marker]
                   additionalProperties: false
                 allowed_skills:
-                  - name: default-producer
+                  - name: default:producer
                     required: true
                     max_tasks: 1
                     input_bindings:
                       /marker: {from: input, path: %s}
-                  - name: default-consumer
+                  - name: default:consumer
                     required: true
                     max_tasks: 1
                     input_bindings:
                       /marker: {from: input, path: %s}
-                      /evidence: {from: child_result, skill: default-producer, path: /data}
-                output_from: {skill: default-consumer}
+                      /evidence: {from: child_result, skill: default:producer, path: /data}
+                output_from: {skill: default:consumer}
                 """.formatted(name, source, source);
     }
 
@@ -308,12 +308,12 @@ class BindingIsolationIntegrationTest {
               required: [outerMarker, marker]
               additionalProperties: false
             allowed_skills:
-              - name: default-middle
+              - name: default:middle
                 required: true
                 max_tasks: 1
                 input_bindings:
                   /marker: {from: input, path: /outerMarker}
-            output_from: {skill: default-middle}
+            output_from: {skill: default:middle}
             """; }
 
     private static String leaf(String name) { return """

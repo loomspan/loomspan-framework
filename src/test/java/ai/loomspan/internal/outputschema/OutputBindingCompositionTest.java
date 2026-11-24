@@ -12,7 +12,7 @@ class OutputBindingCompositionTest {
         assertThatThrownBy(() -> compose(schema, List.of(input("/a~1b~0c", "/source")), Map.of("source", "bad")))
                 .satisfies(failure -> {
                     var diagnosis = ((ai.loomspan.internal.core.ContractFailures.Owned) failure).diagnosis();
-                    assertThat(diagnosis.skillName()).isEqualTo("default-root");
+                    assertThat(diagnosis.skillName()).isEqualTo("default:root");
                     assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.OUTPUT_SCHEMA);
                     assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/a~1b~0c");
                     assertThat(diagnosis.issues().getFirst().code()).isEqualTo("type");
@@ -47,7 +47,7 @@ class OutputBindingCompositionTest {
         var s=schema("object"); var p=s.putObject("properties");properties.forEach(p::set);var r=s.putArray("required");for(var name:required)r.add(name);return s;
     }
     private ChildInputBinding input(String destination,String source) { return new ChildInputBinding(ObjectFieldPath.parse(destination,false),ChildInputBinding.SourceKind.INPUT,ObjectFieldPath.parse(source,true),null); }
-    private OutputBindingComposition compose(ObjectNode s,List<ChildInputBinding>b,Map<String,Object>input) { return new OutputBindingComposition("default-root", compile(s),b,input,List.of(),"owner",LoomspanJacksonCodecs.defaults().schemaTree()); }
+    private OutputBindingComposition compose(ObjectNode s,List<ChildInputBinding>b,Map<String,Object>input) { return new OutputBindingComposition("default:root", compile(s),b,input,List.of(),"owner",LoomspanJacksonCodecs.defaults().schemaTree()); }
     private CanonicalSchema compile(ObjectNode s) { return new StandardSchemaCompiler().compile(s,StandardSchemaCompiler.Role.OUTPUT,StandardSchemaCompiler.Origin.AUTHORED); }
     @Test void preservesOptionalAncestorRequiredSiblingAndNullableUnboundFields() {
         var nullable=schema("string");nullable.putArray("type").add("string").add("null");
@@ -89,15 +89,15 @@ class OutputBindingCompositionTest {
     @Test void exactChildValuesPlainTextArraysAndProvenanceRemainDetached() {
         var array=schema("array");array.set("items",schema("integer"));
         var root=object(Map.of("numbers",array,"text",schema("string")),"numbers","text");
-        var bindings=List.of(new ChildInputBinding(ObjectFieldPath.parse("/numbers",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("/values",true),"default-one"),new ChildInputBinding(ObjectFieldPath.parse("/text",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("",true),"default-two"));
-        var accepted=List.of(new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task1","default-one","{\"values\":[900719925474099312345,2]}"),new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task2","default-two","Plain text {not parsed}"));
-        var composition=new OutputBindingComposition("default-root", compile(root),bindings,Map.of(),accepted,"owner",LoomspanJacksonCodecs.defaults().schemaTree());
+        var bindings=List.of(new ChildInputBinding(ObjectFieldPath.parse("/numbers",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("/values",true),"default:one"),new ChildInputBinding(ObjectFieldPath.parse("/text",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("",true),"default:two"));
+        var accepted=List.of(new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task1","default:one","{\"values\":[900719925474099312345,2]}"),new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task2","default:two","Plain text {not parsed}"));
+        var composition=new OutputBindingComposition("default:root", compile(root),bindings,Map.of(),accepted,"owner",LoomspanJacksonCodecs.defaults().schemaTree());
         var result=composition.composeEmpty();
         assertThat(result.validation().valid()).isTrue();
         assertThat(result.content()).contains("[900719925474099312345,2]","Plain text {not parsed}");
         assertThat(result.provenance().getFirst()).containsEntry("sourceTaskId","task1").containsEntry("parentMissionFrameId","owner").doesNotContainKey("value");
         assertThat(accepted.getFirst().result()).isEqualTo("{\"values\":[900719925474099312345,2]}");
-        assertThatThrownBy(()->new OutputBindingComposition("default-root", compile(root),bindings,Map.of(),List.of(accepted.getFirst(),accepted.getFirst()),"owner",LoomspanJacksonCodecs.defaults().schemaTree())).hasMessageContaining("binding_source_ambiguous");
+        assertThatThrownBy(()->new OutputBindingComposition("default:root", compile(root),bindings,Map.of(),List.of(accepted.getFirst(),accepted.getFirst()),"owner",LoomspanJacksonCodecs.defaults().schemaTree())).hasMessageContaining("binding_source_ambiguous");
     }
     @Test void projectionPreservesEnumFormatDescriptionAndUnboundNestedOpenSpace() {
         var choice=schema("string");choice.putArray("enum").add("accepted").add("declined");choice.put("description","Reasoned decision");choice.putArray("type").add("string").add("null");
@@ -127,10 +127,10 @@ class OutputBindingCompositionTest {
     }
     @Test void unavailableChildAndMissingSubtreeNeverBecomeModelOwnedFallbacks() {
         var root=object(Map.of("value",schema("string"),"summary",schema("string")),"value","summary");
-        var binding=new ChildInputBinding(ObjectFieldPath.parse("/value",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("/missing",true),"default-producer");
-        assertThatThrownBy(()->new OutputBindingComposition("default-root", compile(root),List.of(binding),Map.of(),List.of(),"owner",LoomspanJacksonCodecs.defaults().schemaTree()))
+        var binding=new ChildInputBinding(ObjectFieldPath.parse("/value",false),ChildInputBinding.SourceKind.CHILD_RESULT,ObjectFieldPath.parse("/missing",true),"default:producer");
+        assertThatThrownBy(()->new OutputBindingComposition("default:root", compile(root),List.of(binding),Map.of(),List.of(),"owner",LoomspanJacksonCodecs.defaults().schemaTree()))
                 .hasMessageContaining("binding_source_unavailable");
-        assertThatThrownBy(()->new OutputBindingComposition("default-root", compile(root),List.of(binding),Map.of(),List.of(new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task","default-producer","{}")),"owner",LoomspanJacksonCodecs.defaults().schemaTree()))
+        assertThatThrownBy(()->new OutputBindingComposition("default:root", compile(root),List.of(binding),Map.of(),List.of(new ai.loomspan.internal.core.MissionContext.CompletedTaskResult("task","default:producer","{}")),"owner",LoomspanJacksonCodecs.defaults().schemaTree()))
                 .hasMessageContaining("binding_source_unavailable").hasMessageContaining("/missing");
     }
     @Test void standardOpennessAtRootAndNestedAncestorsControlsContribution() {

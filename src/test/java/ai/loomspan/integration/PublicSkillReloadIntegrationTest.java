@@ -101,7 +101,7 @@ class PublicSkillReloadIntegrationTest
                     model: selected
                     planning_mode: false
                     allowed_skills:
-                      - name: default-child
+                      - name: default:child
                     """), new SkillDocument("child", """
                     name: child
                     description: child model

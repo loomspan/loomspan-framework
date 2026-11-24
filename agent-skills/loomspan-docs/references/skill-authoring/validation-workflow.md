@@ -7,7 +7,7 @@ coverage: focused-source-verified
 
 # Validate a draft skill set
 
-Authored child references and binding producers MAY be local to the containing skill's namespace or explicitly qualified; local `search` in `sales` compiles to `sales-search`. Mixed spellings compare canonically and never search other namespaces. Runtime/model names remain qualified. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and boundary rules. Declarations keep local `name` components.
+Authored child references and binding producers use a local name in the containing skill's namespace or an explicit `namespace:local-name`. Local `search` in `sales` resolves to `sales:search`. Lookup ends on a missing target. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and access rules. Declarations keep local `name` components.
 
 ## Applies when
 

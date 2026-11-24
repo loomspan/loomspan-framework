@@ -224,9 +224,9 @@ class JavaSkillIntegrationTest
                 model: integration
                 planning_mode: false
                 allowed_skills:
-                  - name: default-securedEcho
-                  - name: default-alwaysDenied
-                  - name: default-yamlSibling
+                  - name: default:secured-echo
+                  - name: default:always-denied
+                  - name: default:yaml-sibling
                 """);
         Files.writeString(directory.resolve("sibling.yml"), """
                 name: yamlSibling

@@ -2,7 +2,7 @@ name: evidence-contract-boolean-expression-skill
 description: Invalid Boolean-valued evidence expression
 model: gpt-5
 allowed_skills:
-  - name: default-invoiceParser
+  - name: default:invoice-parser
 output_schema:
   type: object
   properties:

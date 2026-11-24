@@ -3,5 +3,5 @@ description: Constraint with planning disabled.
 model: gpt-5
 planning_mode: false
 allowed_skills:
-  - name: default-childOne
+  - name: default:child-one
     max_tasks: 1

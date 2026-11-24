@@ -39,7 +39,7 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                 .withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "*.yaml");
     }
     static SkillDocument leaf(String name, String roles) {
-        return new SkillDocument(name,"name: " + name + "\ndescription: secured leaf\nexecutor: default-write\nrbac_roles: [" + roles + "]\n");
+        return new SkillDocument(name,"name: " + name + "\ndescription: secured leaf\nexecutor: default:write\nrbac_roles: [" + roles + "]\n");
     }
     static void publish(SkillReloader reloader, List<SkillDocument> documents) {
         reloader.publish(reloader.prepare("default",documents,new ExecutionConfiguration("""
@@ -146,7 +146,7 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                         name: root
                         description: parent
                         model: model
-                        allowed_skills: [{name: default-leaf}, {name: default-yamlDenied}, {name: default-callable}]
+                        allowed_skills: [{name: default:leaf}, {name: default:yaml-denied}, {name: default:callable}]
                         """)));
                 var template = context.getBean(SkillTemplate.class);
                 var handoff = context.getBean(SkillInvocationHandoff.class);

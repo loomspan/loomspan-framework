@@ -170,7 +170,7 @@ class ConsoleRestFixtureCorpusTest
         result.put("forwarding-skill-detail.json", new ObservabilityDtos.SkillDetail(
                 "default-prepareReport", "YAML", "YAML", "opaque forwarding label", null, null, null,
                 "name: prepareReport\nmodel: local\ndescription: Prepare report\nplanning_mode: true\n"
-                        + "allowed_skills:\n  - {name: default-finishReport, required: true, max_tasks: 1}\noutput_from: {skill: default-finishReport}\n",
+                        + "allowed_skills:\n  - {name: default:finish-report, required: true, max_tasks: 1}\noutput_from: {skill: default:finish-report}\n",
                 "{\"type\":\"object\",\"properties\":{\"report\":{\"type\":\"string\"}},\"required\":[\"report\"],\"additionalProperties\":false}"));
         result.put("active-executions-page.json",
                 new ObservabilityDtos.ActivePage(List.of(active), false, null, OBSERVED, "9"));

@@ -2,9 +2,9 @@ name: output-schema-root-evidence-skill
 description: Invalid evidence on the root schema
 model: gpt-5
 allowed_skills:
-  - name: default-reviewSkill
+  - name: default:review-skill
 output_schema:
   type: object
-  x-loomspan-evidence: default-reviewSkill
+  x-loomspan-evidence: default:review-skill
   properties:
     result: { type: string }

@@ -46,7 +46,7 @@ class NamespaceObservationIntegrationTest
                                 name: entry
                                 description: finance caller
                                 model: model
-                                allowed_skills: [{name: shared-leaf}]
+                                allowed_skills: [{name: shared:leaf}]
                                 """)), configuration));
                         assertThatThrownBy(() -> reloader.prepare("finance", List.of(), new ExecutionConfiguration(
                                 "loomspan: {execution-trace: {persistence: always, directory: '" + redirected + "'}}")))
@@ -109,7 +109,7 @@ class NamespaceObservationIntegrationTest
                         name: fixed
                         description: calls the other fixed
                         model: model
-                        allowed_skills: [{name: dept-fixed}]
+                        allowed_skills: [{name: dept:fixed}]
                         """)), configuration);
                 reloader.publish(caller);
                 var pending = context.getBean(SkillInvocationHandoff.class).handoff("caller-fixed", Map.of());

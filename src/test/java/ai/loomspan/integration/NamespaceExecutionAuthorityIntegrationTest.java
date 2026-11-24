@@ -87,7 +87,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
                 for (String namespace : List.of("tax", "rates")) reload.publish(reload.prepare(namespace, List.of(zero),
                         config(server, namespace, 1, "never"), NamespaceVisibility.PUBLIC, Map.of("key", namespace)));
                 var root = new SkillDocument("root", "name: root\ndescription: parallel\nmodel: selected\nplanning_mode: true\nconcurrency: true\nmax_steps: 3\n"
-                        + "allowed_skills: [{name: tax-lookup}, {name: rates-lookup}]\n");
+                        + "allowed_skills: [{name: tax:lookup}, {name: rates:lookup}]\n");
                 reload.publish(reload.prepare("orders", List.of(root), config(server, "orders", 20, "always"), Map.of("key", "orders")));
                 var previous = SecurityContextHolder.getContext();
                 var security = SecurityContextHolder.createEmptyContext();
@@ -132,7 +132,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
                 reload.publish(reload.prepare("tax", List.of(new SkillDocument("lookup", executor().yaml() + schema)),
                         config(server, "tax", 1, "never"), NamespaceVisibility.PUBLIC, Map.of("key", "tax")));
                 String root = "name: root\ndescription: planner\nmodel: selected\nplanning_mode: true\nmax_steps: 3\n"
-                        + "allowed_skills: [{name: tax-lookup, required: true, max_tasks: 1}]\noutput_from: {skill: tax-lookup}\n";
+                        + "allowed_skills: [{name: tax:lookup, required: true, max_tasks: 1}]\noutput_from: {skill: tax:lookup}\n";
                 reload.publish(reload.prepare("orders", List.of(new SkillDocument("root", root)), config(server, "orders", 20, "always"), Map.of("key", "orders")));
                 Captures.values.clear();
                 assertThat(context.getBean(SkillTemplate.class).invoke("orders-root", Map.of())).isEqualTo("looked-up");

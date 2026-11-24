@@ -473,7 +473,7 @@ class StartupVariableResolutionIntegrationTest {
                     default: {settings: {consumer: {$var: consumer.value}}}
                     infra: {settings: {owner: {$var: owner.value}}}
                 """);
-        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: leaf\nexecutor: infra-foreign\nconfig: {leaf: {$var: leaf.value}}\n");
+        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: leaf\nexecutor: infra:foreign\nconfig: {leaf: {$var: leaf.value}}\n");
         context(settings).withUserConfiguration(ForeignBeans.class)
                 .withPropertyValues("consumer.value=consumer", "owner.value=owner", "leaf.value=leaf").run(context -> {
             assertThat(context).hasFailed();

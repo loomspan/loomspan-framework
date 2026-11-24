@@ -45,11 +45,11 @@ class YamlSkillEvidencePropertyCatalogTest
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class)
-                            .getSkill("default-outputSchemaPropertyEvidenceSkill");
+                            .getSkill("default:output-schema-property-evidence-skill");
 
                     assertThat(definition.evidenceContract().claims()).containsExactly("result");
                     assertThat(definition.evidenceContract().canonicalExpressionForClaim("result"))
-                            .isEqualTo("default-reviewSkill");
+                            .isEqualTo("default:review-skill");
                     assertThat(definition.outputSchema().tree().at("/properties/result/type").textValue())
                             .isEqualTo("string");
                     assertThat(definition.outputSchema().tree().path("required").valueStream().map(tools.jackson.databind.JsonNode::textValue).toList()).containsExactly("result");
@@ -64,12 +64,12 @@ class YamlSkillEvidencePropertyCatalogTest
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class)
-                            .getSkill("default-outputSchemaPropertyEvidenceTypesSkill");
+                            .getSkill("default:output-schema-property-evidence-types-skill");
 
                     assertThat(definition.evidenceContract().claims())
                             .containsExactly("ResultValue", "details", "rows");
                     assertThat(definition.evidenceContract().canonicalExpressionForClaim("ResultValue"))
-                            .isEqualTo("default-reviewSkill");
+                            .isEqualTo("default:review-skill");
                     assertThat(definition.evidenceContract().canonicalExpressionForClaim("unconstrained"))
                             .isNull();
                     assertThat(definition.outputSchema().tree().at("/properties/details/properties").has("note"))
@@ -85,7 +85,7 @@ class YamlSkillEvidencePropertyCatalogTest
         contextRunner
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/valid/output-schema-skill.yaml")
                 .run(context -> assertThat(context.getBean(YamlSkillCatalog.class)
-                        .getSkill("default-outputSchemaSkill").evidenceContract().isEmpty()).isTrue());
+                        .getSkill("default:output-schema-skill").evidenceContract().isEmpty()).isTrue());
     }
 
     @ParameterizedTest

@@ -161,7 +161,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                 name: checked
                 description: Validate the accepted result
                 model: local
-                allowed_skills: [{name: default-callable}]
+                allowed_skills: [{name: default:callable}]
                 output_schema_max_retries: 1
                 output_schema:
                   type: object
@@ -433,7 +433,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     @ParameterizedTest @ValueSource(booleans={false,true})
     void bothJavaFormsFailTruthfullyAcrossDirectStandardAndStep(boolean executor) throws Exception {
         String child = executor ? "default-leaf" : "default-callable";
-        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default-execute\n");
+        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false));
         Files.writeString(directory.resolve("step.yaml"), parent("step", child, true));
         var behavior = new Behavior();
@@ -514,7 +514,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     @ParameterizedTest @ValueSource(booleans={false,true})
     void terminalStandardFailureNeverBecomesFeedback(boolean executor) throws Exception {
         String child = executor ? "default-leaf" : "default-callable";
-        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default-execute\n");
+        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false));
         var behavior = new Behavior(); behavior.kind = "terminal";
         try (var server = new MockWebServer()) {
@@ -531,7 +531,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     @ParameterizedTest @ValueSource(booleans={false,true})
     void actualStandardCallbackKeepsSecurityCancellationAndShutdownTerminal(boolean executor) throws Exception {
         String child = executor ? "default-leaf" : "default-callable";
-        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default-execute\n");
+        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false));
         for (String control : List.of("security", "cancellation", "shutdown")) {
             var behavior = new Behavior(); behavior.kind = control;
@@ -555,8 +555,8 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     void normalReattemptAndAlternateSelectionCreditOnlyActualSuccess(boolean executor) throws Exception {
         String child = executor ? "default-leaf" : "default-callable";
         String alternate = executor ? "default-otherLeaf" : "default-otherCallable";
-        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default-execute\n");
-        Files.writeString(directory.resolve("other.yaml"), "name: otherLeaf\ndescription: Other leaf\nexecutor: default-execute\n");
+        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
+        Files.writeString(directory.resolve("other.yaml"), "name: otherLeaf\ndescription: Other leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false).replace("}]", "}, {name: " + alternate + "}]"));
         for (boolean changeTool : List.of(false,true)) {
             var behavior = new Behavior(); behavior.kind = "once";
@@ -593,7 +593,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     @ParameterizedTest @ValueSource(booleans={false,true})
     void failedContinuationConsumesEveryExistingBudget(boolean executor) throws Exception {
         String child = executor ? "default-leaf" : "default-callable";
-        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default-execute\n");
+        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false));
         for (String meter : List.of("tool-invocations", "skill-invocations", "provider-attempts", "model-calls", "usage-units")) {
             var behavior = new Behavior(); behavior.kind = "recoverable";
@@ -625,7 +625,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     @ParameterizedTest @ValueSource(booleans={false,true})
     void feedbackKeepsOriginalParentDeadline(boolean executor) throws Exception {
         String child = executor ? "default-leaf" : "default-callable";
-        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default-execute\n");
+        Files.writeString(directory.resolve("leaf.yaml"), "name: leaf\ndescription: Java leaf\nexecutor: default:execute\n");
         Files.writeString(directory.resolve("standard.yaml"), parent("standard", child, false));
         var behavior = new Behavior(); behavior.kind = "recoverable"; behavior.delayMillis = 450;
         try (var server = new MockWebServer()) {
@@ -727,7 +727,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
     }
     private static String stepSynthesis(String skill) {
         return "name: " + skill + "\ndescription: Synthesize after completing Java work\nmodel: local\nplanning_mode: true\n"
-                + "max_steps: 2\nallowed_skills: [{name: default-callable, required: true, max_tasks: 1}]\n";
+                + "max_steps: 2\nallowed_skills: [{name: default:callable, required: true, max_tasks: 1}]\n";
     }
     private static String stepInability(String reason) {
         return JSON.writeValueAsString(Map.of("stepAction", "CANNOT_COMPLETE", "reason", reason));

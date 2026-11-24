@@ -2,7 +2,7 @@ name: evidence-contract-null-expression-skill
 description: Invalid null evidence expression
 model: gpt-5
 allowed_skills:
-  - name: default-invoiceParser
+  - name: default:invoice-parser
 output_schema:
   type: object
   properties:

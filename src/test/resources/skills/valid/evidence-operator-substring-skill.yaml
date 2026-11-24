@@ -2,12 +2,12 @@ name: evidence-operator-substring-skill
 description: Valid operator substrings in evidence skill names
 model: gpt-5
 allowed_skills:
-  - name: default-androidCheck
-  - name: default-orderLookup
-  - name: default-candyParser
+  - name: default:android-check
+  - name: default:order-lookup
+  - name: default:candy-parser
 output_schema:
   type: object
   properties:
     result:
       type: string
-      x-loomspan-evidence: default-androidCheck and (default-orderLookup or default-candyParser)
+      x-loomspan-evidence: default:android-check and (default:order-lookup or default:candy-parser)

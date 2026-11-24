@@ -111,7 +111,7 @@ history as Java skills and let a planning parent call those allowed
 capabilities. See the [skill-tree guide](agent-skills/loomspan-docs/references/skill-authoring/mental-model.md).
 
 When one direct child supplies the complete answer, an explicit model planner
-can use `output_from: {skill: default-finish}` with a required, unique `finish` task. It
+can use `output_from: {skill: default:finish}` with a required, unique `finish` task. It
 still completes all accepted work, then returns that child's existing text
 unchanged without a parent synthesis request. See [output contracts](agent-skills/loomspan-docs/references/skill-authoring/output-contracts.md)
 for syntax, schema ownership, and model/Java/executor examples.
@@ -328,8 +328,8 @@ isolation. See the [publication guide](agent-skills/loomspan-docs/references/jav
 
 ### Deployment patterns
 
-An embedded application can load `default-parent` at startup with an
-`allowed_skills` reference to its fixed `default-local` Java method. Both belong
+An embedded application can load `default:parent` at startup with an
+`allowed_skills` reference to its fixed `default:local` Java method. Both belong
 to the same Private namespace and can execute immediately, without publication.
 Foreign startup references cannot bypass Private visibility. For managed sharing,
 start without local skill or execution-configuration files, publish the fixed
@@ -349,13 +349,13 @@ The host can publish these complete managed generations with an injected
 ```java
 try (PreparedSkillUpdate utility = reloader.prepare("utility", List.of(),
         new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PUBLIC)) {
-    reloader.publish(utility); // Retains utility-echo from the application bean.
+    reloader.publish(utility); // Retains utility:echo from the application bean.
 }
 SkillDocument caller = new SkillDocument("assistant", """
         name: assistant
         description: Echo using the shared Java capability
         model: assistant
-        allowed_skills: [{name: utility-echo}]
+        allowed_skills: [{name: utility:echo}]
         """);
 ExecutionConfiguration execution = new ExecutionConfiguration("""
         loomspan:
@@ -451,7 +451,7 @@ or historical readability guarantee.
 TypeSafe Choice, Noul, and Score are available through the independently versioned
 [Loomspan Decisions pack](../loomspan-extensions/extensions/decisions/README.md).
 The local unpublished artifact is `ai.loomspan:loomspan-decisions:0.1.0-SNAPSHOT`.
-It registers reference-only `default-typesafe`. Applications declare ordinary
+It registers reference-only `default:typesafe`. Applications declare ordinary
 `executor: typesafe` YAML leaves and pass a native request directly or build it
 with JSLT. They supply resolved connection settings in the captured executor
 namespace map.

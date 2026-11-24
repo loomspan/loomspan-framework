@@ -2,5 +2,5 @@ name: duplicate-constraint-parent
 description: Duplicate child names.
 model: gpt-5
 allowed_skills:
-  - name: default-childOne
-  - name: default-childOne
+  - name: default:child-one
+  - name: default:child-one

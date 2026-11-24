@@ -2,22 +2,22 @@ name: output-schema-property-evidence-types-skill
 description: Skill with evidence on scalar object and array root properties
 model: gpt-5
 allowed_skills:
-  - name: default-reviewSkill
-  - name: default-auditSkill
+  - name: default:review-skill
+  - name: default:audit-skill
 output_schema:
   type: object
   properties:
     ResultValue:
       type: string
-      x-loomspan-evidence: default-reviewSkill
+      x-loomspan-evidence: default:review-skill
     details:
       type: object
-      x-loomspan-evidence: default-reviewSkill and default-auditSkill
+      x-loomspan-evidence: default:review-skill and default:audit-skill
       properties:
         note: { type: string }
     rows:
       type: array
-      x-loomspan-evidence: default-reviewSkill or default-auditSkill
+      x-loomspan-evidence: default:review-skill or default:audit-skill
       items: { type: string }
     unconstrained:
       type: string

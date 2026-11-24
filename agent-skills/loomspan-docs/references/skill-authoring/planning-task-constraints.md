@@ -14,12 +14,12 @@ Use structured `allowed_skills` entries to declare a planning parent's direct ch
 ```yaml
 planning_mode: true
 allowed_skills:
-  - name: default-invoiceParser
+  - name: default:invoice-parser
     required: true
   - name: default:expense-lookup
     min_tasks: 1
     max_tasks: 2
-  - name: default-optionalReviewer
+  - name: default:optional-reviewer
 ```
 
 Scalar entries and scalar flow lists are invalid. An unconstrained child is still an object with `name`.
@@ -36,7 +36,7 @@ Scalar entries and scalar flow lists are invalid. An unconstrained child is stil
 
 The effective minimum is `max(min_tasks if present else 0, required == true ? 1 : 0)`. Therefore `required: false` does not negate `min_tasks`, and `max_tasks: 1` permits zero or one task.
 
-References MAY be local to the containing owner or explicitly qualified and MUST be unique after canonical resolution; see [canonical identity](mental-model.md#canonical-namespace-identity). Local `child` and owner-qualified `sales-child` are duplicates in sales. Bounds MUST be non-negative integers, `required` MUST be Boolean, and `max_tasks` MUST NOT be below the effective minimum. Unknown fields, null entries, mixed scalar/object sequences, and explicit null field values are rejected with an indexed `allowed_skills[index]...` path.
+References MAY be local to the containing owner or explicitly qualified and MUST be unique after canonical resolution; see [canonical identity](mental-model.md#canonical-namespace-identity). Local `child` and owner-qualified `sales:child` are duplicates in sales. Bounds MUST be non-negative integers, `required` MUST be Boolean, and `max_tasks` MUST NOT be below the effective minimum. Unknown fields, null entries, mixed scalar/object sequences, and explicit null field values are rejected with an indexed `allowed_skills[index]...` path.
 
 Declaring `min_tasks`, `max_tasks`, or `required` requires the parent to explicitly declare `planning_mode: true`; this includes `required: false`. A name-only object remains valid on an LLM-backed direct skill.
 
@@ -52,7 +52,7 @@ On the first count violation, Loomspan records `PLAN_VALIDATION_FAILED`, adds fe
 
 ## Designated result task
 
-With `output_from: {skill: default-finish}`, the selected exact direct child MUST have explicit `required: true` and `max_tasks: 1`; a minimum alone does not satisfy this declaration. This makes the accepted plan's designated task unique while retaining ordinary visibility preflight and combined one-correction validation. It does not skip other accepted work or replace execution-time authorization. Read [output contracts](output-contracts.md) for applicability, forbidden parent output policies, completion and schema metadata.
+With `output_from: {skill: default:finish}`, the selected exact direct child MUST have explicit `required: true` and `max_tasks: 1`; a minimum alone does not satisfy this declaration. This makes the accepted plan's designated task unique while retaining ordinary visibility preflight and combined one-correction validation. It does not skip other accepted work or replace execution-time authorization. Read [output contracts](output-contracts.md) for applicability, forbidden parent output policies, completion and schema metadata.
 
 ## Boundary from evidence
 

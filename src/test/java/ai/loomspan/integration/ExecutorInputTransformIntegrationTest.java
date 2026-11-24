@@ -83,7 +83,7 @@ class ExecutorInputTransformIntegrationTest {
                 max_steps: 1
                 input_schema: {type: object, additionalProperties: true}
                 allowed_skills:
-                  - name: default-evaluation
+                  - name: default:evaluation
                     required: true
                     max_tasks: 1
                     input_bindings:
@@ -91,7 +91,7 @@ class ExecutorInputTransformIntegrationTest {
                       /policy: {from: input, path: /policy}
                       /candidates: {from: input, path: /candidates}
                       /parameters: {from: input, path: /parameters}
-                output_from: {skill: default-evaluation}
+                output_from: {skill: default:evaluation}
                 """);
         var settings = Files.writeString(directory.resolve("application.yml"),
                 "loomspan: {executor-config: {default: {settings: {marker: executor-only}}}}\n");
@@ -172,7 +172,7 @@ class ExecutorInputTransformIntegrationTest {
                 name: parent
                 description: Pass a resolved file to the executor
                 model: local
-                allowed_skills: [{name: default-writeFile}, {name: default-identity}]
+                allowed_skills: [{name: default:write-file}, {name: default:identity}]
                 """);
         var calls = new AtomicInteger();
         var writer = new ExecutorApplicationIntegrationTest.FileWriter();
@@ -261,7 +261,7 @@ class ExecutorInputTransformIntegrationTest {
     }
 
     private static SkillDocument versioned(String expression) {
-        return new SkillDocument("leaf.yaml", "name: leaf\ndescription: Captured expression\nexecutor: default-fixture\n"
+        return new SkillDocument("leaf.yaml", "name: leaf\ndescription: Captured expression\nexecutor: default:fixture\n"
                 + transform(expression));
     }
 

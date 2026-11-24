@@ -2,11 +2,11 @@ name: evidence-contract-trailing-token-skill
 description: Invalid trailing evidence expression token
 model: gpt-5
 allowed_skills:
-  - name: default-invoiceParser
-  - name: default-expenseLookup
+  - name: default:invoice-parser
+  - name: default:expense-lookup
 output_schema:
   type: object
   properties:
     vendorName:
       type: string
-      x-loomspan-evidence: default-invoiceParser default-expenseLookup
+      x-loomspan-evidence: default:invoice-parser default:expense-lookup

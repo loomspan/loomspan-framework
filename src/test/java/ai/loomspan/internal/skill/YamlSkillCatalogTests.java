@@ -93,12 +93,12 @@ class YamlSkillCatalogTests {
                 Map.entry("missing path", "{/id: {from: input}}"),
                 Map.entry("null path", "{/id: {from: input, path: null}}"),
                 Map.entry("numeric path", "{/id: {from: input, path: 3}}"),
-                Map.entry("input skill", "{/id: {from: input, path: /id, skill: default-producer}}"),
+                Map.entry("input skill", "{/id: {from: input, path: /id, skill: default:producer}}"),
                 Map.entry("unknown field", "{/id: {from: input, path: /id, extra: true}}"),
                 Map.entry("root", "{'': {from: input, path: /id}}"),
                 Map.entry("overlap", "{/id: {from: input, path: /id}, /id/a: {from: input, path: /id}}"),
                 Map.entry("duplicate", "{/id: {from: input, path: /id}, /id: {from: input, path: /other}}"),
-                Map.entry("nonplanning child", "{/id: {from: child_result, skill: default-producer, path: ''}}"));
+                Map.entry("nonplanning child", "{/id: {from: child_result, skill: default:producer, path: ''}}"));
         return invalid.entrySet().stream().map(entry -> DynamicTest.dynamicTest(entry.getKey(), () -> {
             String yaml = "name: bound\ndescription: bound\nmodel: forward-model\noutput_schema: {type: object}\noutput_bindings: " + entry.getValue();
             var checked = new YamlSkillCatalog(forwardingProperties()).checkedSupplied(List.of(new SkillDocument("invalid-output-binding", yaml)), false);
@@ -158,7 +158,7 @@ class YamlSkillCatalogTests {
                 Map.entry("missing path", "{/id: {from: input}}"),
                 Map.entry("null path", "{/id: {from: input, path: null}}"),
                 Map.entry("numeric path", "{/id: {from: input, path: 12}}"),
-                Map.entry("input skill", "{/id: {from: input, path: /id, skill: default-producer}}"),
+                Map.entry("input skill", "{/id: {from: input, path: /id, skill: default:producer}}"),
                 Map.entry("missing producer", "{/id: {from: child_result, path: /id}}"),
                 Map.entry("unknown field", "{/id: {from: input, path: /id, field: value}}"),
                 Map.entry("nonpointer destination", "{id: {from: input, path: /id}}"),
@@ -186,19 +186,19 @@ class YamlSkillCatalogTests {
     @TestFactory
     java.util.stream.Stream<DynamicTest> rejectsInvalidForwardingDeclarations() {
         Map<String, String> invalid = Map.ofEntries(
-                Map.entry("null selector", forwardingYaml().replace("output_from:\n  skill: default-answer", "output_from: null")),
-                Map.entry("scalar selector", forwardingYaml().replace("output_from:\n  skill: default-answer", "output_from: answer")),
-                Map.entry("list selector", forwardingYaml().replace("output_from:\n  skill: default-answer", "output_from: [answer]")),
+                Map.entry("null selector", forwardingYaml().replace("output_from:\n  skill: default:answer", "output_from: null")),
+                Map.entry("scalar selector", forwardingYaml().replace("output_from:\n  skill: default:answer", "output_from: answer")),
+                Map.entry("list selector", forwardingYaml().replace("output_from:\n  skill: default:answer", "output_from: [answer]")),
                 Map.entry("unknown selector field", forwardingYaml() + "  field: value\n"),
-                Map.entry("blank child", forwardingYaml().replace("skill: default-answer", "skill: ' '")),
-                Map.entry("trimmed child", forwardingYaml().replace("skill: default-answer", "skill: ' answer'")),
-                Map.entry("number child", forwardingYaml().replace("skill: default-answer", "skill: 3")),
-                Map.entry("null child", forwardingYaml().replace("skill: default-answer", "skill: null")),
+                Map.entry("blank child", forwardingYaml().replace("skill: default:answer", "skill: ' '")),
+                Map.entry("trimmed child", forwardingYaml().replace("skill: default:answer", "skill: ' answer'")),
+                Map.entry("number child", forwardingYaml().replace("skill: default:answer", "skill: 3")),
+                Map.entry("null child", forwardingYaml().replace("skill: default:answer", "skill: null")),
                 Map.entry("nonplanning", forwardingYaml().replace("planning_mode: true", "planning_mode: false")),
                 Map.entry("missing explicit planning", forwardingYaml().replace("planning_mode: true\n", "")),
                 Map.entry("not required", forwardingYaml().replace("required: true", "min_tasks: 1")),
                 Map.entry("not unique", forwardingYaml().replace("max_tasks: 1", "max_tasks: 2")),
-                Map.entry("not allowed", forwardingYaml().replace("skill: default-answer", "skill: default-other")),
+                Map.entry("not allowed", forwardingYaml().replace("skill: default:answer", "skill: default:other")),
                 Map.entry("parent schema null", forwardingYaml() + "output_schema: null\n"),
                 Map.entry("parent retries null", forwardingYaml() + "output_schema_max_retries: null\n"),
                 Map.entry("parent linter null", forwardingYaml() + "linter: null\n"),
@@ -233,11 +233,11 @@ class YamlSkillCatalogTests {
                 model: forward-model
                 planning_mode: true
                 allowed_skills:
-                  - name: default-answer
+                  - name: default:answer
                     required: true
                     max_tasks: 1
                 output_from:
-                  skill: default-answer
+                  skill: default:answer
                 """;
     }
 
@@ -786,14 +786,14 @@ class YamlSkillCatalogTests {
                     YamlSkillDefinition definition = context.getBean(YamlSkillCatalog.class)
                             .getSkill("default:structured-constraint-parent");
                     assertThat(definition.allowedSkills())
-                            .containsExactly("default-requiredChild", "default-boundedChild", "default-optionalChild");
+                            .containsExactly("default:required-child", "default:bounded-child", "default:optional-child");
                     assertThat(definition.allowedSkillConstraints())
                             .extracting(AllowedSkillConstraint::effectiveMinTasks)
                             .containsExactly(1, 2, 0);
                     assertThat(definition.allowedSkillConstraints().get(1).maxTasks()).isEqualTo(3);
                     assertThat(definition.allowedSkillConstraints().get(2).required()).isFalse();
                     assertThatThrownBy(() -> definition.allowedSkillConstraints()
-                            .add(new AllowedSkillConstraint("default-other", null, null, false, java.util.List.of())))
+                            .add(new AllowedSkillConstraint("default:other", null, null, false, java.util.List.of())))
                             .isInstanceOf(UnsupportedOperationException.class);
                 });
     }
@@ -1073,7 +1073,7 @@ class YamlSkillCatalogTests {
                     assertThat(catalog.getSkill("default:evidence-contract-skill")).isNotNull();
                     assertThat(catalog.getSkill("default:evidence-contract-skill").evidenceContract()
                             .canonicalExpressionForClaim("isDuplicate"))
-                            .isEqualTo("default-invoiceParser and default-expenseLookup");
+                            .isEqualTo("default:invoice-parser and default:expense-lookup");
                 });
     }
 
@@ -1098,7 +1098,7 @@ class YamlSkillCatalogTests {
                             .getSkill("default:evidence-hash-name-skill")
                             .evidenceContract()
                             .canonicalExpressionForClaim("result"))
-                            .isEqualTo("default-reviewSkill");
+                            .isEqualTo("default:review-skill");
                 });
     }
 
@@ -1113,14 +1113,14 @@ class YamlSkillCatalogTests {
     }
 
     @Test
-    void rejectsWrongCaseDirectChildWithSuggestion() {
+    void rejectsWrongCaseEvidenceComponent() {
         contextRunner
                 .withPropertyValues("loomspan.skills.locations=classpath:/skills/invalid/evidence-contract-wrong-case-child-skill.yaml")
                 .run(context -> assertThat(context.getStartupFailure())
                         .isNotNull()
                         .hasMessageContaining("field 'output_schema.properties.vendorName.x-loomspan-evidence'")
                         .hasMessageContaining("column 1")
-                        .hasMessageContaining("did you mean 'default-invoiceParser'?"));
+                        .hasMessageContaining("invalid local name 'Invoice-parser'"));
     }
 
     @Test

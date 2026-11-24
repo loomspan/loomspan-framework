@@ -11,10 +11,10 @@ import static org.mockito.Mockito.*;
 
 class NamespaceAccessGuardTest {
     @Test void declaredPublicTargetStillRequiresRolesAndRetainedOwnership() {
-        var source = capability("orders-root");
-        var target = new CapabilityMetadata("tax", "tax-calculateTax", "tax", SkillExecutionDescriptor.none(),
+        var source = capability("orders:root");
+        var target = new CapabilityMetadata("tax", "tax:calculate-tax", "tax", SkillExecutionDescriptor.none(),
                 SkillAccessPolicy.yamlRoles(Set.of("TAX")), args -> "ok", SkillKind.YAML,
-                CapabilityToolDescriptor.generic("tax-calculateTax", "tax"), null);
+                CapabilityToolDescriptor.generic("tax:calculate-tax", "tax"), null);
         var orders = generation("orders", NamespaceVisibility.PRIVATE, source, List.of(target.name()));
         var tax = generation("tax", NamespaceVisibility.PUBLIC, target, List.of());
         var session = TestLoomspanSessions.withId("roles", source.name(), 8);
@@ -43,8 +43,8 @@ class NamespaceAccessGuardTest {
     }
 
     @Test void retainedMembershipDoesNotAuthorizeUndeclaredCallsAndPrivateRootIsAllowed() {
-        var source = capability("orders-root");
-        var target = capability("tax-leaf");
+        var source = capability("orders:root");
+        var target = capability("tax:leaf");
         var orders = generation("orders", NamespaceVisibility.PRIVATE, source, List.of());
         var tax = generation("tax", NamespaceVisibility.PUBLIC, target, List.of());
         var session = TestLoomspanSessions.withId("undeclared", source.name(), 8);
@@ -62,7 +62,7 @@ class NamespaceAccessGuardTest {
     }
 
     @Test void sameNamespacePrivateCallIsAllowedAndForeignGenerationCannotBeInstalled() {
-        var source = capability("orders-root"); var target = capability("orders-private");
+        var source = capability("orders:root"); var target = capability("orders:private");
         var definition = generation("orders", NamespaceVisibility.PRIVATE, source, List.of(target.name())).definition(source.name());
         var generation = new SkillGeneration("orders", "captured", Map.of(source.name(), source, target.name(), target),
                 Map.of(source.name(), definition), null,
@@ -76,8 +76,8 @@ class NamespaceAccessGuardTest {
     }
 
     @Test void deniesPrivateCallbackFromActualCurrentNamespace() {
-        var target = capability("orders-private");
-        var bridge = capability("pricing-bridge");
+        var target = capability("orders:private");
+        var bridge = capability("pricing:bridge");
         var orders = generation("orders", NamespaceVisibility.PRIVATE, target, List.of());
         var pricing = generation("pricing", NamespaceVisibility.PUBLIC, bridge, List.of(target.name()));
         var snapshot = new SkillAdmissionSnapshot(target.identity(), Map.of("orders", orders, "pricing", pricing));

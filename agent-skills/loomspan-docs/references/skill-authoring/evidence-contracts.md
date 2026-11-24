@@ -69,9 +69,9 @@ primary        := SKILL_NAME | "(" expression ")"
 
 - `and` binds more tightly than `or`; parentheses override precedence.
 - Operators are case-insensitive whole tokens and render canonically in lowercase.
-- Leaves MAY be local to the containing skill's owner or explicitly qualified. Each compiled identity MUST match a direct `allowed_skills` entry after namespace normalization; mixed spellings are equivalent and local-name case remains exact. Original expression text and 1-based token columns are preserved.
+- Leaves use a local name in the containing skill's owner or an explicit `namespace:local-name`. Both components follow the [exact identity grammar](mental-model.md#canonical-namespace-identity). Each compiled identity MUST match a direct `allowed_skills` entry. Original expression text and 1-based token columns are preserved.
 - Whitespace around and between tokens is insignificant.
-- `and` and `or` are reserved in every casing. Qualified identities such as `and-search`, `default-androidCheck` and `default-orderLookup` remain identifiers.
+- Bare `and` and `or` are operators in every casing. Qualified `orders:and` and `orders:or` are skill references. In `orders`, `orders:and or lookup` is a disjunction of exactly `orders:and` and `orders:lookup`. Hyphenated local names such as `android-check` remain identifiers.
 - Negation, `&&`, `||`, quoted names, implicit operators, predicates, and output-value conditions are unsupported. Only `and` and `or` are reserved operator tokens.
 
 ## Truth sets
@@ -110,7 +110,7 @@ Schema validity checks output structure, successful-child annotations check exec
 7. Test missing conjuncts, each OR alternative, failure/non-credit, optional omission, required failure, and nested isolation.
 8. Keep workflow sequencing and multi-intent branch policy in prompts and planning design.
 
-Catalog diagnostics identify the complete `output_schema...x-loomspan-evidence` path. Parser and reference failures include a 1-based expression column, and a uniquely identifiable casing mistake suggests the exact allowed spelling.
+Catalog diagnostics identify the complete `output_schema...x-loomspan-evidence` path. Parser and reference failures include a 1-based expression column. Invalid component spelling fails validation before direct-child lookup.
 
 ## Known limits
 
@@ -129,4 +129,6 @@ Evidence also does not impose unconditional generated-plan task cardinality. Use
 - `OutputSchemaCallAdvisorTest.java` (`src/test/java/ai/loomspan/internal/outputschema/OutputSchemaCallAdvisorTest.java`) and `StepPromptBuilderTest.java` (`src/test/java/ai/loomspan/internal/runtime/step/StepPromptBuilderTest.java`) protect metadata non-leakage.
 - `NestedSuccessfulSkillBoundaryTest.java` (`src/test/java/ai/loomspan/internal/runtime/tool/NestedSuccessfulSkillBoundaryTest.java`) protects nested boundary credit.
 
-Context/column evidence: `EvidenceExpressionParserTest#contextualLeavesPreserveGrammarTruthAndOriginalColumnsWithoutContextLeakage` and `NamespaceIdentityFoundationTest#localReferenceLimitsApplyToEveryStructuredPositionAndEvidenceColumnsStayAuthored`. Runtime truth sets contain the compiled qualified identities.
+Context/column evidence: `EvidenceExpressionParserTest#contextualLeavesPreserveGrammarTruthAndOriginalColumnsWithoutContextLeakage` and `NamespaceIdentityFoundationTest#evidenceErrorsRetainOriginalTokenColumns`. Runtime truth sets contain the compiled qualified identities.
+
+`EvidenceExpressionParserTest#qualifiedOperatorNamesRemainLeavesInOwningNamespace` verifies qualified operator leaves, exact ordered references, canonical text and truth sets.

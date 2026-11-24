@@ -20,7 +20,7 @@ An executor leaf declares an operation owned by application Java code, with YAML
 ```yaml
 name: fetch-account
 description: Fetch one account
-executor: infrastructure-http
+executor: infrastructure:http
 config:
   operation: accountLookup
 input_schema:
@@ -48,7 +48,7 @@ the captured YAML leaf generation.
 ```yaml
 name: lookup
 description: Look up one value
-executor: infrastructure-sql
+executor: infrastructure:sql
 input_schema:
   type: object
   properties:
@@ -60,7 +60,7 @@ input_transform:
   expression: '{"answer": .value}'
 ```
 
-With an application registration for `infrastructure-sql`, caller input
+With an application registration for `infrastructure:sql`, caller input
 `{"value":"case-17"}` delivers `{"answer":"case-17"}` in Java's `invocation.input()`.
 The leaf's ordinary `input_schema` defines caller and planner input. Parent
 bindings target that schema. On every direct or child execution, the leaf

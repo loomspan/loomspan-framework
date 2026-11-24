@@ -51,7 +51,7 @@ class DefaultRegisteredSkillCatalogTest
     @Test
     void preservesExecutorJavaKindAndYamlDeclaration() throws Exception
     {
-        String executorYaml = "name: fetch-dns\ndescription: fetch DNS\nexecutor: infrastructure-dns\n";
+        String executorYaml = "name: fetch-dns\ndescription: fetch DNS\nexecutor: infrastructure:dns\n";
         DefaultRegisteredSkillCatalog catalog = catalog(List.of(executorDefinition("fetch-dns", executorYaml)), false);
 
         assertThat(catalog.listAfter(null, 10)).singleElement().satisfies(summary ->

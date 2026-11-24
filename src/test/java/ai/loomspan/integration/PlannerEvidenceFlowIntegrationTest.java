@@ -171,11 +171,11 @@ class PlannerEvidenceFlowIntegrationTest {
                   required: [facts]
                   additionalProperties: false
                 allowed_skills:
-                  - {name: default-sourceA, required: true, max_tasks: 1}
-                  - {name: default-sourceB, required: true, max_tasks: 5}
-                  - {name: default-sourceC, required: true, max_tasks: 1}
-                  - {name: default-assess, required: true, max_tasks: 1}
-                  - {name: default-nested, required: true, max_tasks: 1}
+                  - {name: default:source-a, required: true, max_tasks: 1}
+                  - {name: default:source-b, required: true, max_tasks: 5}
+                  - {name: default:source-c, required: true, max_tasks: 1}
+                  - {name: default:assess, required: true, max_tasks: 1}
+                  - {name: default:nested, required: true, max_tasks: 1}
                 """.formatted(concurrent));
         Files.writeString(skills.resolve("assess.yaml"), """
                 name: assess
@@ -195,7 +195,7 @@ class PlannerEvidenceFlowIntegrationTest {
                 model: local
                 prompt: NESTED_COPY_SOURCE. Call nestedSource and return its exact complete result.
                 allowed_skills:
-                  - {name: default-nestedSource}
+                  - {name: default:nested-source}
                 """);
         if (expanded) Files.writeString(skills.resolve("nested.yaml"), """
                 name: nested
@@ -212,7 +212,7 @@ class PlannerEvidenceFlowIntegrationTest {
                   required: [quote, citation]
                   additionalProperties: false
                 allowed_skills:
-                  - {name: default-nestedSource, required: true}
+                  - {name: default:nested-source, required: true}
                 """);
         for (String name : List.of("sourceB", "sourceC", "nestedSource")) {
             Files.writeString(skills.resolve(name + ".yaml"), """

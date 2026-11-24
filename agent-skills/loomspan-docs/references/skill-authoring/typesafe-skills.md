@@ -18,7 +18,7 @@ The unpublished local artifact is `ai.loomspan:loomspan-decisions:0.1.0-SNAPSHOT
 Install it using the matching
 pack README (`../../../../../loomspan-extensions/extensions/decisions/README.md` in the sibling checkout)
 and add it as a normal Maven dependency. Its Boot auto-configuration registers
-reference-only `default-typesafe`; installation creates no callable skills.
+reference-only `default:typesafe`; installation creates no callable skills.
 Pack internal/autoconfigure Java types are not supported application APIs.
 
 Supply the selected executor map, even if empty, through YAML Config Data or
@@ -83,7 +83,7 @@ loomspan:
         api_key: example-billing-key
 ```
 
-In billing, declare `executor: default-typesafe` and optionally
+In billing, declare `executor: default:typesafe` and optionally
 `config: {max_attempts: 2}`. Two billing leaves share billing's key; a support
 parent reaching either leaf still uses billing's key. The owner needs no key when
 a consumer supplies one. Consumer-only publication rotates fresh calls while

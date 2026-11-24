@@ -941,14 +941,10 @@ public class YamlSkillCatalog implements InitializingBean
                 {
                     continue;
                 }
-                List<String> caseMatches = directChildren.stream()
-                        .filter(child -> child.equalsIgnoreCase(reference))
-                        .toList();
-                String suggestion = caseMatches.size() == 1 ? "; did you mean '" + caseMatches.getFirst() + "'?" : "";
                 throw invalidSkill(resource, fieldPath,
                         "invalid evidence expression at column " + referenceColumn(expression, reference)
                                 + ": skill '" + reference
-                                + "' is not a direct allowed child of '" + manifest.getName() + "'" + suggestion);
+                                + "' is not a direct allowed child of '" + manifest.getName() + "'");
             }
             compiled.put(claimName, expression);
         }

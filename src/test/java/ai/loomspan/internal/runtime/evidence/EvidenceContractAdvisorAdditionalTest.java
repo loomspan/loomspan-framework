@@ -33,9 +33,9 @@ class EvidenceContractAdvisorAdditionalTest
     {
         List<EvidenceCoverageResult> failures = new ArrayList<>();
         EvidenceContractCallAdvisor advisor = new EvidenceContractCallAdvisor(
-                "default-handleIncident",
+                "default:handle-incident",
                 TestEvidenceContracts.compiled(Map.of(
-                        "result", "default-classifyIncident and (default-investigateNetwork or default-investigateApp)")),
+                        "result", "default:classify-incident and (default:investigate-network or default:investigate-app)")),
                 new EvidenceBackedOutputValidator(),
                 1,
                 ignored -> { },
@@ -45,13 +45,13 @@ class EvidenceContractAdvisorAdditionalTest
                 "{\"result\":\"network issue\"}",
                 "{\"result\":\"network issue\"}"));
 
-        new LoomspanSessionRunner(3).callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        new LoomspanSessionRunner(3).callWithNewSession("default:test-entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
         {
             return TestExecutionBindings.callWithCurrentSessionMission(() -> {
-                ExecutionBindingScope.requireCurrent().requireMission().recordSuccessfulDirectSkill("default-classifyIncident");
+                ExecutionBindingScope.requireCurrent().requireMission().recordSuccessfulDirectSkill("default:classify-incident");
                 assertThatThrownBy(() -> advisor.adviseCall(request(), chain))
                         .isInstanceOf(LoomspanEvidenceValidationException.class)
-                        .hasMessageContaining("default-handleIncident")
+                        .hasMessageContaining("default:handle-incident")
                         .hasMessageContaining("2 attempt");
                 return null;
             });
@@ -61,15 +61,15 @@ class EvidenceContractAdvisorAdditionalTest
         assertThat(chain.copyInvocations.get()).isEqualTo(2);
         assertThat(chain.requests.get(1).prompt().getSystemMessage().getText())
                 .contains("Do NOT call any tools again")
-                .contains("default-classifyIncident and (default-investigateNetwork or default-investigateApp)")
-                .contains("successfully completed direct skills: [default-classifyIncident]");
+                .contains("default:classify-incident and (default:investigate-network or default:investigate-app)")
+                .contains("successfully completed direct skills: [default:classify-incident]");
         assertThat(failures).hasSize(2).allSatisfy(result ->
         {
-            assertThat(result.satisfiedSkills()).containsExactly("default-classifyIncident");
+            assertThat(result.satisfiedSkills()).containsExactly("default:classify-incident");
             assertThat(result.issues()).singleElement().satisfies(issue ->
             {
                 assertThat(issue.requiredExpression())
-                        .isEqualTo("default-classifyIncident and (default-investigateNetwork or default-investigateApp)");
+                        .isEqualTo("default:classify-incident and (default:investigate-network or default:investigate-app)");
                 assertThat(issue.unsatisfiedRequirements().getFirst().children().getFirst().mode()).isEqualTo("any");
             });
         });
@@ -81,12 +81,12 @@ class EvidenceContractAdvisorAdditionalTest
         var failures = new ArrayList<EvidenceCoverageResult>();
         var passes = new ArrayList<EvidenceCoverageResult>();
         var facts = new ArrayList<ai.loomspan.internal.core.AdvisorTraceFact>();
-        var advisor = new EvidenceContractCallAdvisor("default-parent", TestEvidenceContracts.compiled(Map.of("claim", "default-producer")),
+        var advisor = new EvidenceContractCallAdvisor("default:parent", TestEvidenceContracts.compiled(Map.of("claim", "default:producer")),
                 new EvidenceBackedOutputValidator(), budget, passes::add, failures::add, facts::add);
         var candidates = new ArrayList<String>();
         for (int attempt = 0; attempt <= budget; attempt++) candidates.add(terminalPass && attempt == budget ? "{}" : "{\"claim\":\"FULL_CANDIDATE\"}");
         var chain = new RecordingChain(candidates);
-        new LoomspanSessionRunner(3).callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        new LoomspanSessionRunner(3).callWithNewSession("default:test-entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 TestExecutionBindings.callWithCurrentSessionMission(() -> {
                     if (terminalPass) assertThat(advisor.adviseCall(request(), chain).chatResponse().getResult().getOutput().getText()).isEqualTo("{}");
                     else assertThatThrownBy(() -> advisor.adviseCall(request(), chain)).isInstanceOf(LoomspanEvidenceValidationException.class)

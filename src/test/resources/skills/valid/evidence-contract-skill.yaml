@@ -2,18 +2,18 @@ name: evidence-contract-skill
 description: Skill with an evidence contract
 model: gpt-5
 allowed_skills:
-  - name: default-invoiceParser
-  - name: default-expenseLookup
+  - name: default:invoice-parser
+  - name: default:expense-lookup
 output_schema:
   type: object
   additionalProperties: false
   properties:
     vendorName:
       type: string
-      x-loomspan-evidence: default-invoiceParser
+      x-loomspan-evidence: default:invoice-parser
     isDuplicate:
       type: boolean
-      x-loomspan-evidence: default-invoiceParser and default-expenseLookup
+      x-loomspan-evidence: default:invoice-parser and default:expense-lookup
   required:
     - vendorName
     - isDuplicate

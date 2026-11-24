@@ -16,9 +16,9 @@ class SkillDependencyBindingValidationTest {
         manifest.setName(name); manifest.setDescription(name); manifest.setModel("model");
         manifest.setOutputSchema(LoomspanJacksonCodecs.defaults().schemaTree().readTree(schema));
         if (destination != null) {
-            manifest.setAllowedSkills(List.of(new YamlSkillManifest.AllowedSkillManifest("default-producer", null, maxTasks, null)));
+            manifest.setAllowedSkills(List.of(new YamlSkillManifest.AllowedSkillManifest("default:producer", null, maxTasks, null)));
             var binding = new YamlSkillManifest.InputBindingManifest();
-            binding.setFrom("child_result"); binding.setSkill("default-producer"); binding.setPath(source);
+            binding.setFrom("child_result"); binding.setSkill("default:producer"); binding.setPath(source);
             manifest.setOutputBindings(Map.of(destination, binding));
         }
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0], name), manifest,

@@ -10,7 +10,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.*;
 
 class ExecutorDeclarationTests {
-    private static final String BASE = "name: lookup\ndescription: SQL lookup\nexecutor: infrastructure-sql\n";
+    private static final String BASE = "name: lookup\ndescription: SQL lookup\nexecutor: infrastructure:sql\n";
     private YamlSkillCatalog.CheckedDocuments check(String yaml) {
         return new YamlSkillCatalog(new LoomspanProperties()).checkedSupplied(List.of(new SkillDocument("executor-fixture.yml", yaml)), false);
     }
@@ -183,7 +183,7 @@ class ExecutorDeclarationTests {
         assertThat(checked.issues()).isEmpty();
         var definition = checked.definitions().getFirst();
         assertThat(definition.form()).isEqualTo(YamlSkillDefinition.Form.EXECUTOR);
-        assertThat(definition.executor()).isEqualTo("infrastructure-sql");
+        assertThat(definition.executor()).isEqualTo("infrastructure:sql");
         assertThat(definition.executionConfiguration()).isNull();
         assertThat(definition.rbacRoles()).containsExactly("reader");
         assertThat(definition.inputSchema().tree().path("properties").has("id")).isTrue();
@@ -234,9 +234,9 @@ class ExecutorDeclarationTests {
         for (String value : List.of("true", "false", "null", "", "{}", "[]"))
             assertThat(check("name: lookup\ndescription: lookup\nrest: " + value).issues()).singleElement()
                     .satisfies(issue -> assertThat(issue.toString()).contains("rest", "unknown field"));
-        for (String value : List.of("null", "", "' '", "' sql'", "'sql '", "{}", "[]", "true", "1", "a-b-c"))
+        for (String value : List.of("null", "", "' '", "' sql'", "'sql '", "{}", "[]", "true", "1", "a::b"))
             assertThat(check("name: lookup\ndescription: lookup\nexecutor: " + value).issues()).singleElement()
                     .satisfies(issue -> assertThat(issue.fieldPath()).isEqualTo("executor"));
-        assertThat(check(BASE.replace("infrastructure-sql", "sql")).definitions().getFirst().executor()).isEqualTo("default-sql");
+        assertThat(check(BASE.replace("infrastructure:sql", "sql")).definitions().getFirst().executor()).isEqualTo("default:sql");
     }
 }

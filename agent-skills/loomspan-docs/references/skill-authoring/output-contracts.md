@@ -7,7 +7,7 @@ coverage: local-canonical-bindings-and-ordinary-output
 
 # Output Contracts
 
-Authored child references and binding producers MAY be local to the containing skill's namespace or explicitly qualified; local `search` in `sales` compiles to `sales-search`. Mixed spellings compare canonically and never search other namespaces. Runtime/model names remain qualified. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and boundary rules. Declarations keep local `name` components.
+Authored child references and binding producers use a local name in the containing skill's namespace or an explicit `namespace:local-name`. Local `search` in `sales` resolves to `sales:search`. Lookup ends on a missing target. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and access rules. Declarations keep local `name` components.
 
 ## Applicability
 
@@ -50,7 +50,7 @@ validation, or linting. Prior successful task results remain available in the tr
 | Generate the whole output | Omit `output_from` and `output_bindings`; author a parent `output_schema` when structured output is required | The parent synthesizes and owns its final-output validation. |
 | Preserve selected input/child values in every output field | Declare `output_bindings` covering a closed output object | Framework assembles and validates it with no final model request. |
 | Preserve evidence while generating reasoning | Bind preserved fields and leave reasoning fields unbound | The model contributes only unbound fields; Framework validates the complete assembly. |
-| Orchestrate work while one direct child already supplies the complete intended answer | `output_from: {skill: default-finish}` | Runtime returns that accepted task's existing Framework String unchanged after all accepted work succeeds. |
+| Orchestrate work while one direct child already supplies the complete intended answer | `output_from: {skill: default:finish}` | Runtime returns that accepted task's existing Framework String unchanged after all accepted work succeeds. |
 
 Forwarding retains model planning, input preparation, explicit unbound child arguments, [author-declared input bindings](input-bindings.md), dependencies, and genuine orchestration duties. Authors SHOULD reconsider a wrapper with no additional responsibility. Do not instruct a forwarding parent to copy, quote, or reconstruct the child's answer.
 
@@ -149,8 +149,8 @@ input_schema:
   required: [caseId]
   additionalProperties: false
 allowed_skills:
-  - {name: default-assessEquipment, required: true, max_tasks: 1}
-  - {name: default-planResolution, required: true, max_tasks: 1}
+  - {name: default:assess-equipment, required: true, max_tasks: 1}
+  - {name: default:plan-resolution, required: true, max_tasks: 1}
 output_schema:
   type: object
   properties:
@@ -161,8 +161,8 @@ output_schema:
   additionalProperties: false
 output_bindings:
   /caseId: {from: input, path: /caseId}
-  /equipmentAssessment: {from: child_result, skill: default-assessEquipment, path: ""}
-  /recommendation: {from: child_result, skill: default-planResolution, path: ""}
+  /equipmentAssessment: {from: child_result, skill: default:assess-equipment, path: ""}
+  /recommendation: {from: child_result, skill: default:plan-resolution, path: ""}
 ```
 
 Every bound child producer must occur exactly once in the accepted plan, even when its allowed entry is optional. Impossible declared counts fail configuration validation. These output requirements add no dependency or false ordering; independent producers may run in parallel. All accepted work must succeed before assembly, including work unrelated to these bindings. Planning, access, invocation limits and cancellation still apply.

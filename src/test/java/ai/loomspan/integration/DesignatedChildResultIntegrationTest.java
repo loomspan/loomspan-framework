@@ -97,7 +97,7 @@ class DesignatedChildResultIntegrationTest {
     private Capture run(String kind, boolean chain) throws Exception {
         Path skills = Files.createDirectory(directory.resolve("skills"));
         String rootYaml = parent("root", chain ? "middle" : "producer", true);
-        if (kind.equals("synthesis")) rootYaml = rootYaml.replace("output_from: {skill: default-producer}\n", "").replace("max_steps: 2", "max_steps: 3");
+        if (kind.equals("synthesis")) rootYaml = rootYaml.replace("output_from: {skill: default:producer}\n", "").replace("max_steps: 2", "max_steps: 3");
         write(skills, "root", rootYaml);
         if (chain) write(skills, "middle", parent("middle", "producer", false));
         write(skills, "later", "name: later\ndescription: Complete later accepted work\nexecutor: fixture\n");
@@ -318,11 +318,11 @@ class DesignatedChildResultIntegrationTest {
                 planning_mode: true
                 max_steps: %d
                 prompt: %s. Determine the scope and supply explicit child arguments; complete all accepted work.
-                output_from: {skill: default-%s}
+                output_from: {skill: default:%s}
                 allowed_skills:
-                  - {name: default-%s, required: true, max_tasks: 1}
+                  - {name: default:%s, required: true, max_tasks: 1}
                 """.formatted(name, later ? 2 : 1, name.equals("middle") ? "MIDDLE_ORCHESTRATION" : "ROOT_ORCHESTRATION", child, child)
-                + (later ? "  - {name: default-later, required: true, max_tasks: 1}\n" : "");
+                + (later ? "  - {name: default:later, required: true, max_tasks: 1}\n" : "");
     }
 
     private static String expected(String kind) {

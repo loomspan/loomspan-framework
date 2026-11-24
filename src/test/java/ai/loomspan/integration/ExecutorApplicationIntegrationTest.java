@@ -70,7 +70,7 @@ class ExecutorApplicationIntegrationTest {
                     name: parent
                     description: Upload a session file
                     model: local
-                    allowed_skills: [{name: default-writeFile}, {name: default-http}]
+                    allowed_skills: [{name: default:write-file}, {name: default:http}]
                     """);
             provider.enqueue(tool("default-writeFile", "{}", "write"));
             provider.enqueue(tool("default-http", "{\"message\":\"upload\",\"attachment\":\"ref://payload.txt\"}", "upload"));

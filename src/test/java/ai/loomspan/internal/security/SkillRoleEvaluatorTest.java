@@ -47,7 +47,7 @@ class SkillRoleEvaluatorTest {
         assertThat(evaluator.canAccess(f.capability(),f.snapshot(),auth(test.authorities()))).isEqualTo(test.allowed());
         if (test.allowed()) evaluator.checkAccess(f.capability(),f.snapshot(),auth(test.authorities()));
         else assertThatThrownBy(() -> evaluator.checkAccess(f.capability(),f.snapshot(),auth(test.authorities())))
-                .isInstanceOf(AccessDeniedException.class).hasMessage("Access denied for capability 'caller-leaf'");
+                .isInstanceOf(AccessDeniedException.class).hasMessage("Access denied for capability 'caller:leaf'");
     }
     @Test void prefixesAndHierarchyApplyToBothConstituents() {
         var f = ExecutorPolicyFixture.create(roles("SALES"),roles("DATABASE_WRITE"));
@@ -68,7 +68,7 @@ class SkillRoleEvaluatorTest {
     }
     @Test void annotationOnlyJavaAndNonExecutorKindsKeepTheirSingleConstituent() {
         for (var kind : ai.loomspan.api.SkillKind.values()) {
-            var capability = new ai.loomspan.internal.core.CapabilityMetadata("test", "default-leaf", "leaf", null,
+            var capability = new ai.loomspan.internal.core.CapabilityMetadata("test", "default:leaf", "leaf", null,
                     SkillAccessPolicy.roles(List.of("READ")), arguments -> { throw new AssertionError(); },kind,null,null);
             var generation = new ai.loomspan.internal.skill.SkillGeneration("default","single",Map.of(capability.name(),capability),
                     Map.of(),null,new ai.loomspan.internal.runtime.observation.catalog.DefaultRegisteredSkillCatalog(List.of(),Map.of()));

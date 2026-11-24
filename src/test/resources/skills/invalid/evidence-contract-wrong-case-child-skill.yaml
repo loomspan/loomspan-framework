@@ -2,8 +2,8 @@ name: evidence-contract-wrong-case-child-skill
 description: Invalid wrong-case child reference
 model: gpt-5
 allowed_skills:
-  - name: default-invoiceParser
+  - name: default:invoice-parser
 output_schema:
   type: object
   properties:
-    vendorName: { type: string, x-loomspan-evidence: default-invoiceparser }
+    vendorName: { type: string, x-loomspan-evidence: default:Invoice-parser }

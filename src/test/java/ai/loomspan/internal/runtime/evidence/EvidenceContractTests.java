@@ -32,10 +32,10 @@ class EvidenceContractTests {
     @Test
     void caseAndWhitespaceDistinctClaimsHaveIndependentLookupAndPresence() {
         var expressions = new LinkedHashMap<String, String>();
-        expressions.put("Result", "default-upper");
-        expressions.put("result", "default-lower");
-        expressions.put(" result", "default-leading");
-        expressions.put("result ", "default-trailing");
+        expressions.put("Result", "default:upper");
+        expressions.put("result", "default:lower");
+        expressions.put(" result", "default:leading");
+        expressions.put("result ", "default:trailing");
         var contract = TestEvidenceContracts.compiled(expressions);
         var mapper = JsonMapper.builder().build();
         expressions.forEach((name, expression) -> {
@@ -55,36 +55,36 @@ class EvidenceContractTests {
     @Test
     void preservesDiagnosticClaimExpressionAndSkillOrder() {
         LinkedHashMap<String, String> requiredExpressions = new LinkedHashMap<>();
-        requiredExpressions.put("vendorName", "default-invoiceParser");
-        requiredExpressions.put("isDuplicate", "default-invoiceParser and default-expenseLookup");
+        requiredExpressions.put("vendorName", "default:invoice-parser");
+        requiredExpressions.put("isDuplicate", "default:invoice-parser and default:expense-lookup");
         EvidenceCoverageResult result = new EvidenceCoverageResult(
                 new LinkedHashSet<>(List.of("vendorName", "isDuplicate")),
                 requiredExpressions,
-                new LinkedHashSet<>(List.of("default-invoiceParser", "default-expenseLookup")),
+                new LinkedHashSet<>(List.of("default:invoice-parser", "default:expense-lookup")),
                 List.of());
 
         assertThat(result.evaluatedClaims()).containsExactly("vendorName", "isDuplicate");
         assertThat(result.requiredExpressions().keySet()).containsExactly("vendorName", "isDuplicate");
-        assertThat(result.satisfiedSkills()).containsExactly("default-invoiceParser", "default-expenseLookup");
+        assertThat(result.satisfiedSkills()).containsExactly("default:invoice-parser", "default:expense-lookup");
     }
 
     @Test
     void usesExactClaimsAndPreservesSkillIdentity() throws Exception {
         EvidenceContract contract = TestEvidenceContracts.compiled(Map.of(
-                "vendorName", "default-invoiceParser",
-                "isDuplicate", "default-invoiceParser and default-expenseLookup"));
+                "vendorName", "default:invoice-parser",
+                "isDuplicate", "default:invoice-parser and default:expense-lookup"));
         EvidenceBackedOutputValidator validator = new EvidenceBackedOutputValidator();
 
         assertThat(contract.canonicalExpressionForClaim("VENDORNAME")).isNull();
-        assertThat(contract.canonicalExpressionForClaim("vendorName")).isEqualTo("default-invoiceParser");
-        assertThat(contract.canonicalExpressionForClaim("isDuplicate")).isEqualTo("default-invoiceParser and default-expenseLookup");
+        assertThat(contract.canonicalExpressionForClaim("vendorName")).isEqualTo("default:invoice-parser");
+        assertThat(contract.canonicalExpressionForClaim("isDuplicate")).isEqualTo("default:invoice-parser and default:expense-lookup");
 
         EvidenceCoverageResult result = validator.validate(
                 JsonMapper.builder().findAndAddModules().build().readTree("""
                         {"vendorName":"Acme","isDuplicate":false}
                         """),
                 contract,
-                Set.of("default-invoiceParser"));
+                Set.of("default:invoice-parser"));
         assertThat(result.complete()).isFalse();
         assertThat(result.issues()).singleElement()
                 .extracting(EvidenceCoverageIssue::claimName)
@@ -94,8 +94,8 @@ class EvidenceContractTests {
     @Test
     void evidenceAdvisorPreservesExistingSkillPromptOnRetry() {
         EvidenceContractCallAdvisor advisor = new EvidenceContractCallAdvisor(
-                "default-evidence_skill",
-                TestEvidenceContracts.compiled(Map.of("vendorName", "default-invoiceParser")),
+                "default:evidence-skill",
+                TestEvidenceContracts.compiled(Map.of("vendorName", "default:invoice-parser")),
                 new EvidenceBackedOutputValidator(),
                 1,
                 result -> {
@@ -108,7 +108,7 @@ class EvidenceContractTests {
                 "{\"vendorName\":\"Acme\"}",
                 "{}"));
 
-        new LoomspanSessionRunner(3).callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        new LoomspanSessionRunner(3).callWithNewSession("default:test-entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() -> {
             ChatClientResponse response = advisor.adviseCall(
                     request("Return JSON", "SKILL_PROMPT_SENTINEL\n\nBase instructions."),

@@ -46,7 +46,7 @@ class ExecutorGenerationExecutionTest {
         assertThat(candidate.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("default-leaf");
         assertThat(candidate.registeredSkillCatalog().find("default-run")).isEmpty();
         var sameName = manager.prepare(manager.capturePreparation("default"),
-                List.of(new SkillDocument("opaque label", "# authored\r\nname: run\r\ndescription: leaf\r\nexecutor: default-run\r\n")),
+                List.of(new SkillDocument("opaque label", "# authored\r\nname: run\r\ndescription: leaf\r\nexecutor: default:run\r\n")),
                 new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE, null, null);
         assertThat(sameName.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("default-run");
         assertThat(sameName.registeredSkillCatalog().registeredSkillCount()).isOne();

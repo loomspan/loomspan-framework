@@ -20,7 +20,7 @@ exercises direct and bound-child invocation through `SkillTemplate`, including
 input rejection before executor dispatch. The complete example below is validated
 as one generation; it illustrates dataflow rather than provider fidelity.
 
-Authored child references and binding producers MAY be local to the containing skill's namespace or explicitly qualified; local `search` in `sales` compiles to `sales-search`. Mixed spellings compare canonically and never search other namespaces. Runtime/model names remain qualified. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and boundary rules. Declarations keep local `name` components.
+Authored child references and binding producers use a local name in the containing skill's namespace or an explicit `namespace:local-name`. Local `search` in `sales` resolves to `sales:search`. Lookup ends on a missing target. See [canonical namespace identity](mental-model.md#canonical-namespace-identity) for grammar, limits and access rules. Declarations keep local `name` components.
 
 ## Automatic assigned dispatch
 
@@ -122,7 +122,7 @@ allowed_skills:
     input_bindings:
       /caseId: {from: input, path: /requestId}
       /context/records: {from: input, path: /records}
-      /context/assessment: {from: child_result, skill: default-producer, path: /data}
+      /context/assessment: {from: child_result, skill: default:producer, path: /data}
 output_from: {skill: consumer}
 ```
 

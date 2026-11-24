@@ -17,7 +17,7 @@ class ChildInputBindingDeclarationsTest {
                 ObjectFieldPath.parse(source, true), null);
     }
     private static List<String> validate(SkillInputContract source, SkillInputContract receiver, ChildInputBinding binding) {
-        var child = new AllowedSkillConstraint("default-consumer", null, null, false, List.of(binding));
+        var child = new AllowedSkillConstraint("default:consumer", null, null, false, List.of(binding));
         return ChildInputBindingDeclarations.validate(source, List.of(child), Map.of(child.name(), receiver));
     }
     @Test void numericEscapedAndCaseDistinctPropertyNamesUseExactObjectLookup() {
@@ -67,7 +67,7 @@ class ChildInputBindingDeclarationsTest {
                 .singleElement().asString().contains("parent source", "prohibited field");
     }
     @Test void duplicateAndOverlappingDestinationsRemainRejected() {
-        var child = new AllowedSkillConstraint("default-consumer", null, null, false,
+        var child = new AllowedSkillConstraint("default:consumer", null, null, false,
                 List.of(binding("/context", ""), binding("/context/value", ""), binding("/context", "")));
         assertThat(ChildInputBindingDeclarations.validate(SkillInputContract.genericObject(), List.of(child), Map.of()))
                 .hasSize(3).allMatch(issue -> issue.contains("duplicate or overlapping destination"));

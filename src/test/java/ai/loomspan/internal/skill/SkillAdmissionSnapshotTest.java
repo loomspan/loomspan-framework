@@ -47,13 +47,13 @@ class SkillAdmissionSnapshotTest {
         var f = new Fixture(null);
         publish(f, "spare", model("leaf"));
         publish(f, "c", new SkillDocument("leaf", model("leaf").yaml() + "rbac_roles: [ADMIN]\n"));
-        publish(f, "b", calls("leaf", "c-leaf"));
+        publish(f, "b", calls("leaf", "c:leaf"));
         var root = new SkillDocument("root", model("root").yaml()
-                + "planning_mode: true\nallowed_skills: [{name: a-first}, {name: a-second, required: false}]\n");
-        publish(f, "a", root, calls("first", "b-leaf"), calls("second", "c-leaf"), calls("unused", "spare-leaf"));
+                + "planning_mode: true\nallowed_skills: [{name: a:first}, {name: a:second, required: false}]\n");
+        publish(f, "a", root, calls("first", "b:leaf"), calls("second", "c:leaf"), calls("unused", "spare:leaf"));
         // Introduce a normal call cycle through an already valid graph.
         publish(f, "b", new SkillDocument("leaf", model("leaf").yaml()
-                + "allowed_skills: [{name: c-leaf}, {name: a-root}]\n"));
+                + "allowed_skills: [{name: c:leaf}, {name: a:root}]\n"));
         f.reloader.remove("spare", f.manager.active("spare").id());
         var retired = new CopyOnWriteArrayList<String>();
         f.reloader.onGenerationRetired(retired::add);
@@ -79,10 +79,10 @@ class SkillAdmissionSnapshotTest {
         var f = new Fixture(null);
         publish(f, "b", model("bridge"));
         var root = new SkillDocument("root", model("root").yaml()
-                + "allowed_skills: [{name: a-target}, {name: b-bridge}]\n");
+                + "allowed_skills: [{name: a:target}, {name: b:bridge}]\n");
         publish(f, "a", root, model("target"));
         var pendingPrivate = f.reloader.prepare("a", List.of(root, model("target")), MODEL);
-        publish(f, "b", calls("bridge", "a-target"));
+        publish(f, "b", calls("bridge", "a:target"));
         f.reloader.publish(pendingPrivate);
         var capture = f.manager.capture(SkillIdentity.parse("a-root"));
         try {
@@ -99,7 +99,7 @@ class SkillAdmissionSnapshotTest {
         publish(f, "early", model("leaf"));
         publish(f, "late", model("leaf"));
         publish(f, "a", new SkillDocument("root", model("root").yaml()
-                + "planning_mode: true\nallowed_skills: [{name: early-leaf}, {name: late-leaf, required: false}]\n"));
+                + "planning_mode: true\nallowed_skills: [{name: early:leaf}, {name: late:leaf, required: false}]\n"));
         f.reloader.remove("late", f.manager.active("late").id());
         var retired = new CopyOnWriteArrayList<String>();
         f.reloader.onGenerationRetired(retired::add);
@@ -113,7 +113,7 @@ class SkillAdmissionSnapshotTest {
         var f = new Fixture(null);
         for (int iteration = 0; iteration < 12; iteration++) {
             publish(f, "dep", model("leaf"));
-            publish(f, "a", calls("root", "dep-leaf"));
+            publish(f, "a", calls("root", "dep:leaf"));
             String old = f.manager.active("dep").id();
             boolean remove = iteration % 2 == 0;
             var replacement = remove ? null : f.reloader.prepare("dep", List.of(model("leaf")), MODEL, NamespaceVisibility.PRIVATE);
@@ -165,7 +165,7 @@ class SkillAdmissionSnapshotTest {
         var lifecycle = new FrameworkExecutionLifecycle(mock(ApplicationContext.class), Duration.ofMillis(100), Executors.newSingleThreadExecutor());
         var reloader = new DefaultSkillReloader(manager, lifecycle);
         reloader.publish(reloader.prepare("dep", List.of(model("leaf")), MODEL, NamespaceVisibility.PUBLIC));
-        reloader.publish(reloader.prepare("a", List.of(calls("root", "dep-leaf")), MODEL));
+        reloader.publish(reloader.prepare("a", List.of(calls("root", "dep:leaf")), MODEL));
         var replacement = reloader.prepare("dep", List.of(model("leaf")), MODEL);
         var capture = manager.capture(SkillIdentity.parse("a-root"));
         blocked.set(true);

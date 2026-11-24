@@ -44,7 +44,18 @@ Qualified identities render as `namespace:local-name`. `(a-b, c)` and `(a, b-c)`
 therefore remain distinct. Local authored references resolve in the containing
 owner. Explicit `warehouse:lookup` selects that exact pair under the usual
 visibility and authorization checks. Missing local targets fail in their owner.
-Raw YAML, prompts, diagnostic labels and original evidence text retain their content.
+In `orders`, bare `warehouse-lookup` selects `orders:warehouse-lookup`, while
+`warehouse:lookup` selects the foreign callable. Removing the local declaration
+makes the bare reference fail even when the foreign callable is installed.
+`allowed_skills`, input/output binding producers, `output_from.skill` and evidence
+leaves select callable skills. The `executor` field selects only the executor
+index. Resolution precedes the selected target's visibility and authorization
+checks. Raw YAML, prompts, diagnostic labels and original evidence text retain their content.
+
+`NamespaceIdentityFoundationTest` covers every authored field and content fidelity.
+`SkillDependencyValidatorTest#ambiguousBareChildrenKeepTheirOwnerAndMissingLocalTargetsEndLookup`
+and `ExecutorDependencyResolutionTest#ambiguousExecutorNamesSelectExactOwnersAndCallableRoles`
+cover installed targets, misses and independent indexes.
 
 Declaration grammar, owner assignment and role uniqueness are covered by
 `SkillIdentityTest`, `SkillMethodBeanPostProcessorTest` and
@@ -145,7 +156,7 @@ A YAML skill can be a root in one tree and a nested specialist in another if its
 
 `allowed_skills` defines the candidate child Java, executor-backed YAML, or model-backed YAML skills for one LLM-backed skill. It is not transitive.
 
-If a root allows `network-investigate`, and that skill allows `network-checkDns`, the root sees `network-investigate`; it does not automatically see `network-checkDns`.
+If a root allows `network:investigate`, and that skill allows `network:check-dns`, the root sees `network:investigate`; it does not automatically see `network:check-dns`.
 
 Runtime authorization filters the declared tool surface again; see [authorization](authorization.md) for JSR-250, YAML roles, and trusted caller scope. Visibility is not authorization by itself, and authorization is enforced at execution as well as discovery.
 
@@ -280,6 +291,6 @@ Captured canonical observations and existing Console consumers are verified by `
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.
 
-Boundary evidence: `SkillReachableAdmissionTest#localDefaultReferencesMatchQualifiedAcrossAllRootOperations`, `NamespaceIdentityFoundationTest#localAndMixedAuthoredFieldsCompileWithoutRewritingContent`, and `NamespaceStartupIntegrationTest#suppliedLocalDocumentsValidateAndPrepareInEachOwnerBeforePublicationWithoutFallback`.
+Boundary evidence: `SkillReachableAdmissionTest#localDefaultReferencesMatchQualifiedAcrossAllRootOperations`, `NamespaceIdentityFoundationTest#sourcePromptSchemaAndRawEvidenceRetainAuthoredContent`, and `NamespaceStartupIntegrationTest#suppliedLocalDocumentsValidateAndPrepareInEachOwnerBeforePublicationWithoutFallback`.
 
 Executor YAML leaves execute through generation-owned Java registrations and captured configuration bindings. Their public execution kind is `JAVA`; diagnostics retain their YAML declaration/source plus resolved executor identity and Java implementation. Annotated Java methods retain bean/method provenance. Execution classification and declaration provenance are separate; see [HTTP diagnostics](observability-http.md#skill-classification-and-declaration). `rest:` is unsupported manifest syntax. Read [executor leaves](executor-skills.md) for declaration rules and limitations.

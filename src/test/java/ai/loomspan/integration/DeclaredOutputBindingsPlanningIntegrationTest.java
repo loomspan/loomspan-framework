@@ -37,7 +37,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                   required: [options]
                   additionalProperties: false
                 allowed_skills:
-                  - name: default-evaluation
+                  - name: default:evaluation
                     required: true
                     max_tasks: 1
                     input_bindings:
@@ -49,7 +49,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                   required: [selected]
                   additionalProperties: false
                 output_bindings:
-                  /selected: {from: child_result, skill: default-evaluation, path: %s}
+                  /selected: {from: child_result, skill: default:evaluation, path: %s}
                 """.formatted(output, pointer));
         Files.writeString(directory.resolve("evaluation.yaml"), """
                 name: evaluation
@@ -127,10 +127,10 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                 allowed_skills:
                   - {name: first, max_tasks: 2}
                   - {name: second, max_tasks: 2}
-                  - {name: default-later, required: true, max_tasks: 1}
+                  - {name: default:later, required: true, max_tasks: 1}
                 output_bindings:
                   /caseId: {from: input, path: /caseId}
-                  /assessment: {from: child_result, skill: default-first, path: /assessment}
+                  /assessment: {from: child_result, skill: default:first, path: /assessment}
                   /rows: {from: child_result, skill: second, path: ''}
                 output_schema_max_retries: 1
                 output_schema:

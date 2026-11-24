@@ -51,13 +51,13 @@ class DeclaredChildInputBindingsIntegrationTest {
                 max_steps: 1
                 input_schema: {type: object, additionalProperties: true}
                 allowed_skills:
-                  - name: default-evaluation
+                  - name: default:evaluation
                     required: true
                     max_tasks: 1
                     input_bindings:
                       /amount: {from: input, path: /amount}
                       /candidates: {from: input, path: /candidates}
-                output_from: {skill: default-evaluation}
+                output_from: {skill: default:evaluation}
                 """);
         var receivedInputs = new ArrayList<Map<String, Object>>();
         try (var server = new MockWebServer()) {
@@ -119,16 +119,16 @@ class DeclaredChildInputBindingsIntegrationTest {
                     requestId: {type: string}
                   additionalProperties: false
                 allowed_skills:
-                  - name: default-producer
+                  - name: default:producer
                     required: true
                     max_tasks: 1
                     input_bindings:
                       /caseId: {from: input, path: /requestId}
-                output_from: {skill: default-producer}
+                output_from: {skill: default:producer}
                 """;
         if (scenario.equals("tool-quota")) {
-            root = root.replace("max_steps: 1", "max_steps: 2").replace("output_from: {skill: default-producer}", "output_from: {skill: default-consumer}")
-                    .replace("output_from:", "  - {name: default-consumer, required: true, max_tasks: 1}\noutput_from:");
+            root = root.replace("max_steps: 1", "max_steps: 2").replace("output_from: {skill: default:producer}", "output_from: {skill: default:consumer}")
+                    .replace("output_from:", "  - {name: default:consumer, required: true, max_tasks: 1}\noutput_from:");
             Files.writeString(skills.resolve("consumer.yaml"), """
                     name: consumer
                     description: Second explicit task
@@ -231,10 +231,10 @@ class DeclaredChildInputBindingsIntegrationTest {
                 "loomspan.models.local.provider-model=deterministic").run(context -> {
             assertThat(context).hasNotFailed();
             var catalog=context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
-            assertThat(catalog.skill("default-root")).isPresent();
-            assertThat(catalog.skill("default-producer")).isPresent();
-            assertThat(catalog.skill("default-consumer")).isPresent();
-            assertThat(catalog.skill("default-consumer").orElseThrow().inputSchema()).contains("caseId", "records", "assessment");
+            assertThat(catalog.skill("default:root")).isPresent();
+            assertThat(catalog.skill("default:producer")).isPresent();
+            assertThat(catalog.skill("default:consumer")).isPresent();
+            assertThat(catalog.skill("default:consumer").orElseThrow().inputSchema()).contains("caseId", "records", "assessment");
         });
     }
 
@@ -358,7 +358,7 @@ class DeclaredChildInputBindingsIntegrationTest {
                 input_bindings:
                   /caseId: {from: input, path: /requestId}
                   /context/records: {from: input, path: /records}
-                  /context/assessment: {from: child_result, skill: default-producer, path: /data}
+                  /context/assessment: {from: child_result, skill: default:producer, path: /data}
             output_from: {skill: consumer}
             """; }
     private static String producer(String kind) { return """

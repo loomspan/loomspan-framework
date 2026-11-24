@@ -173,7 +173,7 @@ class DeclaredOutputBindingsOrdinaryIntegrationTest {
     }
     @Test void immutableBoundEvidenceFailureHasNoProviderFallbackOrAssembly() throws Exception {
         custom("""
-                allowed_skills: [{name: default-producer}]
+                allowed_skills: [{name: default:producer}]
                 output_schema:
                   type: object
                   properties:

@@ -136,7 +136,7 @@ class SkillReloaderTest {
 
     @Test void targetOnlyReplacementResetsVisibilityConfigurationAndOmittedSkills() {
         var fixture = new Fixture(null);
-        var a = fixture.reloader.prepare("A", List.of(model("old"), model("keep")), new ExecutionConfiguration(MODEL.yaml()+"  session: {max-depth: 100}\n"), NamespaceVisibility.PUBLIC);
+        var a = fixture.reloader.prepare("a", List.of(model("old"), model("keep")), new ExecutionConfiguration(MODEL.yaml()+"  session: {max-depth: 100}\n"), NamespaceVisibility.PUBLIC);
         fixture.reloader.publish(a);
         var b = fixture.reloader.prepare("b", List.of(), EMPTY); fixture.reloader.publish(b);
         var retained = fixture.reloader.snapshot("a");
@@ -145,8 +145,8 @@ class SkillReloaderTest {
         assertThat(fixture.manager.active("a").runtime().properties().getSession().getMaxDepth()).isEqualTo(32);
         assertThat(fixture.startup.getSession().getMaxDepth()).isEqualTo(91);
         assertThat(fixture.reloader.snapshot("b").generationId()).isEqualTo(b.generationId());
-        assertThat(fixture.reloader.snapshot("a").skill("a-old")).isEmpty();
-        assertThat(retained.skill("a-old")).isPresent();
+        assertThat(fixture.reloader.snapshot("a").skill("a:old")).isEmpty();
+        assertThat(retained.skill("a:old")).isPresent();
         assertThatThrownBy(() -> fixture.reloader.prepare("a", List.of(model("keep")), EMPTY)).isInstanceOf(SkillReloadException.class);
         var empty = fixture.reloader.prepare("a", List.of(), EMPTY); fixture.reloader.publish(empty);
         assertThat(fixture.reloader.snapshot("a").namespace()).isEqualTo("a");
@@ -160,7 +160,7 @@ class SkillReloaderTest {
         var third = f.reloader.prepare("default", List.of(), EMPTY); f.reloader.publish(third);
         assertThat(third.generationId()).isNotEqualTo(first).isNotEqualTo(second.generationId());
         var stale = f.reloader.prepare("default", List.of(), EMPTY);
-        f.reloader.remove("DEFAULT", third.generationId());
+        f.reloader.remove("default", third.generationId());
         assertThatThrownBy(() -> f.reloader.publish(stale)).hasMessageContaining("stale");
         var absent = f.reloader.prepare("default", List.of(), EMPTY);
         var incarnation = f.reloader.prepare("default", List.of(), EMPTY); f.reloader.publish(incarnation);
@@ -172,7 +172,7 @@ class SkillReloaderTest {
         f.reloader.remove("default", absent.generationId());
         f.manager.afterSingletonsInstantiated();
         assertThatThrownBy(() -> f.reloader.snapshot("default")).isInstanceOf(SkillReloadException.class);
-        assertThatThrownBy(() -> f.manager.capture(SkillIdentity.parse("default-root"))).isInstanceOf(SkillReloadException.class);
+        assertThatThrownBy(() -> f.manager.capture(SkillIdentity.parse("default:root"))).isInstanceOf(SkillReloadException.class);
         assertThatThrownBy(() -> f.reloader.remove("default", absent.generationId())).isInstanceOf(SkillReloadException.class);
     }
 
@@ -180,7 +180,7 @@ class SkillReloaderTest {
         for (String change : List.of("replace", "private", "remove", "recreate")) {
             var f = new Fixture(null);
             var dep = f.reloader.prepare("dep", List.of(model("leaf")), MODEL, NamespaceVisibility.PUBLIC); f.reloader.publish(dep);
-            var caller = f.reloader.prepare("caller", List.of(calls("root", "dep-leaf")), MODEL);
+            var caller = f.reloader.prepare("caller", List.of(calls("root", "dep:leaf")), MODEL);
             if (change.equals("remove") || change.equals("recreate")) f.reloader.remove("dep", dep.generationId());
             if (!change.equals("remove")) f.reloader.publish(f.reloader.prepare("dep", List.of(), EMPTY));
             f.reloader.publish(caller);
@@ -188,12 +188,18 @@ class SkillReloaderTest {
         }
     }
 
-    @Test void everyManagementBoundaryNormalizesAndChecksNamespaceLength() {
-        var f = new Fixture(null); String max = "n".repeat(32), tooLong = max+"n";
-        assertThat(f.reloader.validate(max.toUpperCase(), List.of(), EMPTY).valid()).isTrue();
-        var candidate = f.reloader.prepare(max.toUpperCase(), List.of(), EMPTY); f.reloader.publish(candidate);
-        assertThat(f.reloader.snapshot(max.toUpperCase()).namespace()).isEqualTo(max);
-        f.reloader.remove(max.toUpperCase(), candidate.generationId());
+    @Test void everyManagementBoundaryRequiresExactNamespaceAndChecksLength() {
+        var f = new Fixture(null); String max = "n".repeat(64), tooLong = max+"n";
+        assertThat(f.reloader.validate(max, List.of(), EMPTY).valid()).isTrue();
+        var candidate = f.reloader.prepare(max, List.of(), EMPTY); f.reloader.publish(candidate);
+        assertThat(f.reloader.snapshot(max).namespace()).isEqualTo(max);
+        f.reloader.remove(max, candidate.generationId());
+        for (String invalid : List.of("Default", " default", "default ", "a_b", "3namespace")) {
+            assertThatThrownBy(() -> f.reloader.validate(invalid, List.of(), EMPTY)).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> f.reloader.prepare(invalid, List.of(), EMPTY)).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> f.reloader.snapshot(invalid)).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> f.reloader.remove(invalid, "id")).isInstanceOf(IllegalArgumentException.class);
+        }
         assertThatThrownBy(() -> f.reloader.validate(tooLong, List.of(), EMPTY)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> f.reloader.prepare(tooLong, List.of(), EMPTY)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> f.reloader.snapshot(tooLong)).isInstanceOf(IllegalArgumentException.class);
@@ -219,11 +225,11 @@ class SkillReloaderTest {
                     var peer = workers.submit(() -> f.reloader.prepare(secondTarget, List.of(model("fast")), MODEL)).get(5, TimeUnit.SECONDS);
                     assertThat(workers.submit(() -> f.reloader.snapshot("default")).get(5, TimeUnit.SECONDS).namespace()).isEqualTo("default");
                     workers.submit(() -> f.reloader.publish(ready)).get(5, TimeUnit.SECONDS);
-                    assertThat(peer.snapshot().skill(secondTarget+"-fast")).isPresent();
+                    assertThat(peer.snapshot().skill(secondTarget+":fast")).isPresent();
                     release.countDown();
                     var slow = blocked.get(5, TimeUnit.SECONDS);
-                    assertThat(slow.snapshot().skill("default-slow")).isPresent();
-                    assertThat(slow.snapshot().skill("default-fast")).isEmpty();
+                    assertThat(slow.snapshot().skill("default:slow")).isPresent();
+                    assertThat(slow.snapshot().skill("default:fast")).isEmpty();
                     assertThat(slow.generationId()).isNotEqualTo(peer.generationId());
                     slow.close(); peer.close();
                 } finally { release.countDown(); }
@@ -278,7 +284,7 @@ class SkillReloaderTest {
     }
 
     @Test void removalRetainsOwnersAndCallbacksRunOutsideRegistryMonitor() throws Exception {
-        var f=new Fixture(null); f.reloader.publish(f.reloader.prepare("default", List.of(model("root")), MODEL)); var owner=f.manager.capture(SkillIdentity.parse("default-root"));String old=owner.snapshot().entryGeneration().id();
+        var f=new Fixture(null); f.reloader.publish(f.reloader.prepare("default", List.of(model("root")), MODEL)); var owner=f.manager.capture(SkillIdentity.parse("default:root"));String old=owner.snapshot().entryGeneration().id();
         var delivered=new CopyOnWriteArrayList<String>();var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
         f.reloader.onGenerationRetired(id->{entered.countDown();await(release);delivered.add(id);});
         f.reloader.onGenerationRetired(id->{throw new IllegalStateException("isolated listener");});
@@ -309,7 +315,7 @@ class SkillReloaderTest {
             f.reloader.publish(first);f.reloader.publish(second);
             assertThat(f.manager.active("a").runtime().properties().getConnections().get("api").getApiKey()).isEqualTo("first");
             assertThat(f.manager.active("b").runtime().properties().getConnections().get("api").getApiKey()).isEqualTo("second");
-            assertThat(first.snapshot().skill("a-one")).isPresent();assertThat(first.snapshot().skill("a-two")).isEmpty();
+            assertThat(first.snapshot().skill("a:one")).isPresent();assertThat(first.snapshot().skill("a:two")).isEmpty();
         }
     }
 
@@ -336,8 +342,8 @@ class SkillReloaderTest {
             for (String namespace : List.of("a", "b")) {
                 var capture=manager.capture(new SkillIdentity(namespace,"leaf"));
                 try {
-                    var binding=manager.validateAdmission(capture.snapshot()).executorBinding(namespace+"-leaf");
-                    assertThat(binding.registration().invoker().apply(ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(),Map.of(),binding.configuration(), binding.consumerConfiguration(),namespace+"-leaf",binding.generationId(), () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class)))).isEqualTo("ok");
+                    var binding=manager.validateAdmission(capture.snapshot()).executorBinding(namespace+":leaf");
+                    assertThat(binding.registration().invoker().apply(ai.loomspan.internal.core.ExecutorInvocations.create(Map.of(),Map.of(),binding.configuration(), binding.consumerConfiguration(),namespace+":leaf",binding.generationId(), () -> false, java.util.Optional::empty, org.mockito.Mockito.mock(ai.loomspan.api.extensions.v1.ExecutorDiagnostics.class)))).isEqualTo("ok");
                 } finally { capture.lease().close(); }
             }
             assertThat(invocations).hasValue(2);

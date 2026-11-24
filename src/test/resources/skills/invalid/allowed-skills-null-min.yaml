@@ -3,5 +3,5 @@ description: Null minimum.
 model: gpt-5
 planning_mode: true
 allowed_skills:
-  - name: default-childOne
+  - name: default:child-one
     min_tasks: null

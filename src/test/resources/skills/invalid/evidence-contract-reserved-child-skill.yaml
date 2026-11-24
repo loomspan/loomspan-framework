@@ -2,7 +2,7 @@ name: evidence-contract-reserved-child-skill
 description: Invalid reserved-word evidence child
 model: gpt-5
 allowed_skills:
-  - name: default-and
+  - name: default:and
 output_schema:
   type: object
   properties:

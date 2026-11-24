@@ -2,8 +2,8 @@ name: evidence-contract-nondirect-child-skill
 description: Invalid non-direct evidence child
 model: gpt-5
 allowed_skills:
-  - name: default-investigateNetwork
+  - name: default:investigate-network
 output_schema:
   type: object
   properties:
-    likelyCause: { type: string, x-loomspan-evidence: default-checkDns }
+    likelyCause: { type: string, x-loomspan-evidence: default:check-dns }

@@ -23,7 +23,7 @@ class DefaultAccessGuardTest {
 
     @Test
     void allowsUnprotectedCapabilityWithoutAuthentication() {
-        CapabilityMetadata capability = capability("default-publicSkill", Set.of());
+        CapabilityMetadata capability = capability("default:public-skill", Set.of());
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", capability.name(), 2);
 
         assertThat(canAccess(capability, session, null)).isTrue();
@@ -32,18 +32,18 @@ class DefaultAccessGuardTest {
 
     @Test
     void deniesProtectedCapabilityWithoutInvocationOrSessionAuthentication() {
-        CapabilityMetadata capability = capability("default-protectedSkill", Set.of("ALLOWED"));
+        CapabilityMetadata capability = capability("default:protected-skill", Set.of("ALLOWED"));
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", capability.name(), 2);
 
         assertThat(canAccess(capability, session, null)).isFalse();
         assertThatThrownBy(() -> checkAccess(capability, session, null))
                 .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("default-protectedSkill");
+                .hasMessageContaining("default:protected-skill");
     }
 
     @Test
     void usesSessionAuthenticationWhenInvocationAuthenticationIsNull() {
-        CapabilityMetadata capability = capability("default-protectedSkill", Set.of("ALLOWED"));
+        CapabilityMetadata capability = capability("default:protected-skill", Set.of("ALLOWED"));
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", capability.name(), 2);
         session.setAuthentication(authentication("ROLE_ALLOWED"));
 
@@ -53,7 +53,7 @@ class DefaultAccessGuardTest {
 
     @Test
     void prefersInvocationAuthenticationOverSessionAuthentication() {
-        CapabilityMetadata capability = capability("default-protectedSkill", Set.of("ALLOWED"));
+        CapabilityMetadata capability = capability("default:protected-skill", Set.of("ALLOWED"));
         LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", capability.name(), 2);
         session.setAuthentication(authentication("ROLE_ALLOWED"));
         Authentication invocationAuthentication = authentication("ROLE_OTHER");
