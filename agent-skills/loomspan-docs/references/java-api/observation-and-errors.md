@@ -40,8 +40,11 @@ view even without model or tool events.
 
 An invocation produces one session, canonical trace/event sequence and completed
 observer view across its captured namespaces. Semantic skill references in events,
-lookups and displays are complete `namespace-localName` strings, preserving local
-case. Do not shorten them or reinterpret model/planning operation routes as skills.
+lookups and displays are complete `namespace:local-name` strings. Both components
+use the exact lowercase declaration grammar. Provider function names such as
+`order-support--find-order` remain exact in raw model content, while resolved
+skill facts use `order-support:find-order`. Do not shorten these references or
+reinterpret model/planning operation routes as skills.
 Unknown-origin diagnostics retain their existing null/unavailable identity.
 
 Canonical `TRACE_STARTED` metadata and existing live/finalized trace metadata carry

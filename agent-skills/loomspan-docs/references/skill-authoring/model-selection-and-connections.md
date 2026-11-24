@@ -198,4 +198,13 @@ For chat drivers, the identical bounded guidance is recorded on every failed phy
 
 This topic does not fully specify provider SDK behavior or third-party compatibility guarantees. Inspect the pinned Spring AI version and the target service's protocol documentation when those details determine correctness.
 
-Canonical tool identities pass to providers unchanged, including underscores. Model plan, step and tool selections normalize namespace case through the common parser before exact bound matching; local-name case stays exact. Malformed, oversized and unbound choices fail. Provider-specific naming checks still apply without aliases or encoding. Raw model output and authored prompts remain unchanged. Evidence: `CanonicalToolCallingManagerTest`, `SpringAiChatClientAssemblerIntegrationTest`, and `NamespaceExecutionAuthorityIntegrationTest`.
+The provider adapter advertises a callable pair as `namespace--local-name`, such
+as `order-support--find-order`, and binds that exact function name to the resolved
+callback offered for the request. Returned function names select only those
+callbacks by exact lookup. Plans and assigned worker `CALL_TOOL.toolName` values
+use `namespace:local-name`, such as `order-support:find-order`, and must match the
+assigned target exactly. Both components follow the [declaration grammar](mental-model.md#canonical-namespace-identity).
+Raw model requests, responses and trace content retain the spelling exchanged.
+Separate resolved skill facts use the colon-qualified reference. Evidence:
+`RequestBoundToolCallingManagerTest`, `SpringAiToolCallbackAdapterTest`,
+`StepActionSelectionTest`, and `NamespaceExecutionAuthorityIntegrationTest`.

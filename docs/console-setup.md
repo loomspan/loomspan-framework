@@ -88,7 +88,7 @@ For direct adapter diagnosis, see the
    `LOOMSPAN_get_runtime`. Verify that the intended target is selected and inspect
    authentication and compatibility facts. A browser connection alone does not
    prove the assistant's MCP connection works.
-3. Ask it to follow `loomspan-console` to find the recent `triageSupportRequest`
+3. Ask it to follow `loomspan-console` to find the recent `default:triage-support-request`
    execution and inspect its finalized trace. Use returned `traceId` values;
    distinguish the observed outcome, captured content and usage from an inference
    about the quality of the triage brief. For your own application, select the
@@ -96,7 +96,7 @@ For direct adapter diagnosis, see the
 
 ```text
 Use loomspan-console to verify the selected target and inspect the recent
-triageSupportRequest execution. Discover the installed tools, check runtime
+default:triage-support-request execution. Discover the installed tools, check runtime
 status, then use the matching playbook to retrieve the finalized trace.
 Report its outcome, traceId, recorded model interaction and available usage.
 Distinguish recorded facts from your interpretation and identify missing evidence.

@@ -65,8 +65,10 @@ Evidence: `DefaultRegisteredSkillCatalogTest`, `RegisteredSkillEntryTest`,
 
 The existing skills list/detail/count inspect all currently published namespace
 metadata, including Private and role-restricted skills, under the existing
-observation key. Names and lookups use complete canonical `namespace-localName`
-identities; equal local names in different namespaces remain distinct. Runtime
+observation key. Catalog summaries and details expose the exact `namespace`,
+`localName` and colon-qualified `registeredName`. Names and lookups use complete
+`namespace:local-name` identities, such as `orders:lookup`; equal local names in
+different namespaces remain distinct. Runtime
 discovery is independently execution-permission filtered. `PUBLIC` permits
 cross-namespace skill calls. Observation and configuration use independent access boundaries.
 
