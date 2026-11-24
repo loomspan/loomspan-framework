@@ -23,7 +23,7 @@ type instanceResult struct {
 func addInstanceTool(server *mcp.Server, options ServerOptions) {
 	addValidatedTool(server, &mcp.Tool{
 		Name:        GetInstanceToolName,
-		Description: "Read instance and installed namespace generations/publication labels, including empty namespaces.",
+		Description: "Read instance facts.",
 		Annotations: readOnlyAnnotations,
 	}, instanceOutputSchema(), func(ctx context.Context, _ *mcp.CallToolRequest, _ emptyInput) (*mcp.CallToolResult, toolEnvelope[instanceResult], error) {
 		return handleGetInstance(ctx, options)
@@ -67,6 +67,7 @@ func instanceText(result instanceResult) string {
 		prefix := fmt.Sprintf("namespaces[%d].", index)
 		writer.quoted(prefix+"namespace", namespace.Namespace)
 		writer.quoted(prefix+"generationId", namespace.GenerationID)
+		writer.quoted(prefix+"tracePersistencePolicy", namespace.TracePersistencePolicy)
 		if namespace.PublicationVersion == nil {
 			writer.lines = append(writer.lines, prefix+"publicationVersion: null")
 		} else {
@@ -77,8 +78,9 @@ func instanceText(result instanceResult) string {
 }
 
 func instanceOutputSchema() *jsonschema.Schema {
-	namespace := compactObject([]string{"namespace", "generationId", "publicationVersion"}, map[string]*jsonschema.Schema{
+	namespace := compactObject([]string{"namespace", "generationId", "publicationVersion", "tracePersistencePolicy"}, map[string]*jsonschema.Schema{
 		"namespace": compactString(), "generationId": compactString(), "publicationVersion": {Types: []string{"string", "null"}},
+		"tracePersistencePolicy": {Enum: []any{"NEVER", "ONERROR", "ALWAYS"}},
 	}, true)
 	return compactEnvelopeSchema(compactObject([]string{"observedAt", "instanceId", "namespaces"}, map[string]*jsonschema.Schema{
 		"observedAt": compactString(), "instanceId": compactString(), "namespaces": compactArray(namespace),

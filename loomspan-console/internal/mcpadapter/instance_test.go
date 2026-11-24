@@ -20,7 +20,7 @@ func instanceWire(version any, generation string) []byte {
 		"observedAt": "2026-08-13T20:30:00.000000123Z", "liveMonitoringAvailable": true,
 		"registeredSkillCount": 0, "activeExecutionCount": 0, "catalogedTraceCount": 0,
 		"tracePersistencePolicy": "PERSISTENT", "completionGraceTtl": "PT2M", "traceCatalogMetadataTtl": "PT168H",
-		"namespaces": []any{map[string]any{"namespace": "empty", "generationId": generation, "publicationVersion": version}},
+		"namespaces": []any{map[string]any{"namespace": "empty", "generationId": generation, "publicationVersion": version, "tracePersistencePolicy": "NEVER"}},
 	})
 	return encoded
 }
@@ -39,7 +39,7 @@ func TestInstanceReadPreservesExactLabelsAndOmissionBeforeExecution(t *testing.T
 				t.Fatalf("result=%#v envelope=%#v err=%v", result, envelope, err)
 			}
 			namespace := envelope.Result.Namespaces[0]
-			if namespace.GenerationID != "g7" || envelope.Result.InstanceID != mcpTestInstanceID {
+			if namespace.TracePersistencePolicy != "NEVER" || !containsLine(result.Content[0].(*mcp.TextContent).Text, `namespaces[0].tracePersistencePolicy: "NEVER"`) || namespace.GenerationID != "g7" || envelope.Result.InstanceID != mcpTestInstanceID {
 				t.Fatalf("wrong facts %#v", envelope.Result)
 			}
 			if label == nil {

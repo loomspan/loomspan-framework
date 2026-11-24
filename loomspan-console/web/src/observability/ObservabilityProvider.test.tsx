@@ -219,12 +219,12 @@ test("manual refresh calls loadInstance again", async () => {
 
 test("a late instance response cannot overwrite the newly refreshed generation and label", async () => {
   let resolveOld: (value: Awaited<ReturnType<typeof getObservabilityInstance>>) => void = () => {};
-  const current = {
+  const current: InstanceStatus = {
     targetScopeId: "scope-1", instanceId: "test-id", consoleCompatibilityVersion: "1.0.0-beta.10-SNAPSHOT",
     observedAt: "2026-07-27T00:00:00Z", liveMonitoringAvailable: false,
     registeredSkillCount: 0, activeExecutionCount: 0, catalogedTraceCount: 0,
     tracePersistencePolicy: "PERSISTENT", completionGraceTtl: "PT2M", traceCatalogMetadataTtl: "PT168H",
-    namespaces: [{ namespace: "empty", generationId: "east-8", publicationVersion: "P8" }],
+    namespaces: [{ namespace: "empty", generationId: "east-8", publicationVersion: "P8", tracePersistencePolicy: "ONERROR" }],
   };
   vi.mocked(getObservabilityInstance)
     .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }))
@@ -234,17 +234,17 @@ test("a late instance response cannot overwrite the newly refreshed generation a
     const status = instance?.status as InstanceStatus | undefined;
     return <>
       <button onClick={() => void loadInstance()}>read</button>
-      <output>{status?.namespaces.map((namespace) => `${namespace.generationId} ${namespace.publicationVersion}`).join(",")}</output>
+      <output>{status?.namespaces.map((namespace) => `${namespace.generationId} ${namespace.publicationVersion} ${namespace.tracePersistencePolicy}`).join(",")}</output>
     </>;
   }
   render(<ObservabilityProvider><Publications /></ObservabilityProvider>);
   await act(async () => { screen.getByText("read").click(); });
   await act(async () => { screen.getByText("read").click(); });
-  expect(screen.getByRole("status")).toHaveTextContent("east-8 P8");
+  expect(screen.getByRole("status")).toHaveTextContent("east-8 P8 ONERROR");
   await act(async () => {
-    resolveOld({ ...current, namespaces: [{ namespace: "empty", generationId: "east-7", publicationVersion: "P7" }] });
+    resolveOld({ ...current, namespaces: [{ namespace: "empty", generationId: "east-7", publicationVersion: "P7", tracePersistencePolicy: "ONERROR" }] });
   });
-  expect(screen.getByRole("status")).toHaveTextContent("east-8 P8");
+  expect(screen.getByRole("status")).toHaveTextContent("east-8 P8 ONERROR");
 });
 
 test("successful empty collection loads only once", async () => {

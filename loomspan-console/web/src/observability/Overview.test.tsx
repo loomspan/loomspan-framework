@@ -183,17 +183,17 @@ test("overview lists every installed namespace and preserves exact publication l
     ...instanceStatus,
     registeredSkillCount: 0,
     namespaces: [
-      { namespace: "empty", generationId: "east-7", publicationVersion: "P7" },
-      { namespace: "omitted", generationId: "east-8", publicationVersion: null },
-      { namespace: "blank", generationId: "east-9", publicationVersion: "" },
-      { namespace: "exact", generationId: "east-10", publicationVersion: "  <b>P8</b>\n " },
+      { namespace: "empty", generationId: "east-7", publicationVersion: "P7", tracePersistencePolicy: "ALWAYS" },
+      { namespace: "omitted", generationId: "east-8", publicationVersion: null, tracePersistencePolicy: "NEVER" },
+      { namespace: "blank", generationId: "east-9", publicationVersion: "", tracePersistencePolicy: "ONERROR" },
+      { namespace: "exact", generationId: "east-10", publicationVersion: "  <b>P8</b>\n ", tracePersistencePolicy: "ONERROR" },
     ],
   };
   render(<ObservabilityOverview />);
   const table = screen.getByRole("region", { name: "Installed namespaces table" });
-  expect(within(table).getByRole("row", { name: "empty east-7 P7" })).toBeVisible();
-  expect(within(table).getByRole("row", { name: "omitted east-8 Not supplied" })).toBeVisible();
-  expect(within(table).getByRole("row", { name: "blank east-9 Empty string" })).toBeVisible();
+  expect(within(table).getByRole("row", { name: "empty east-7 P7 ALWAYS" })).toBeVisible();
+  expect(within(table).getByRole("row", { name: "omitted east-8 Not supplied NEVER" })).toBeVisible();
+  expect(within(table).getByRole("row", { name: "blank east-9 Empty string ONERROR" })).toBeVisible();
   const exact = within(table).getByRole("row", { name: /exact east-10/ });
   expect(exact.querySelector("code")?.textContent).toBe("  <b>P8</b>\n ");
   expect(exact.querySelector("b")).toBeNull();

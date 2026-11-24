@@ -26,6 +26,63 @@ class NamespacePublicationObservationIntegrationTest
     private static final ExecutionConfiguration EMPTY = new ExecutionConfiguration("loomspan: {}");
 
     @Test
+    void instanceReportsEffectiveNamespacePoliciesBeforeInvocation() throws Exception
+    {
+        try (var context = engine()) {
+            var reloader = context.getBean(SkillReloader.class);
+            var installed = reloader.prepare("empty", "P1", List.of(), policy("always"), NamespaceVisibility.PRIVATE);
+            reloader.publish(installed);
+            var snapshot = read(context);
+            assertPublication(snapshot, "default", reloader.snapshot("default").generationId(), null);
+            assertPublication(snapshot, "empty", installed.generationId(), "P1");
+            assertPolicy(snapshot, "default", "ONERROR");
+            assertPolicy(snapshot, "empty", "ALWAYS");
+            assertThat(snapshot.path("tracePersistencePolicy").asString()).isEqualTo("ONERROR");
+            assertThat(snapshot.path("activeExecutionCount").asInt()).isZero();
+            assertThat(snapshot.path("catalogedTraceCount").asInt()).isZero();
+
+            var replacement = reloader.prepare("empty", "P2", List.of(), policy("never"), NamespaceVisibility.PRIVATE);
+            assertPublication(read(context), "empty", installed.generationId(), "P1");
+            assertPolicy(read(context), "empty", "ALWAYS");
+            reloader.publish(replacement);
+            assertPublication(read(context), "empty", replacement.generationId(), "P2");
+            assertPolicy(read(context), "empty", "NEVER");
+
+            var unlabeled = reloader.prepare("unlabeled", List.of(), policy("never"));
+            reloader.publish(unlabeled);
+            assertPublication(read(context), "unlabeled", unlabeled.generationId(), null);
+            assertPolicy(read(context), "unlabeled", "NEVER");
+
+            var defaultReplacement = reloader.prepare("default", List.of(), policy("never"));
+            reloader.publish(defaultReplacement);
+            assertThat(read(context).path("tracePersistencePolicy").asString()).isEqualTo("NEVER");
+            var always = reloader.prepare("always", List.of(), policy("always"));
+            reloader.publish(always);
+            reloader.remove("default", defaultReplacement.generationId());
+            var withoutDefault = read(context);
+            assertThat(withoutDefault.path("tracePersistencePolicy").asString()).isEqualTo("ONERROR");
+            assertPolicy(withoutDefault, "always", "ALWAYS");
+        }
+    }
+
+    private static ExecutionConfiguration policy(String value)
+    {
+        return new ExecutionConfiguration("loomspan: {execution-trace: {persistence: " + value + "}}");
+    }
+
+    private static void assertPolicy(JsonNode instance, String namespace, String policy)
+    {
+        for (var row : instance.path("namespaces")) {
+            if (row.path("namespace").asString().equals(namespace)) {
+                assertThat(row.has("tracePersistencePolicy")).isTrue();
+                assertThat(row.path("tracePersistencePolicy").asString()).isEqualTo(policy);
+                return;
+            }
+        }
+        throw new AssertionError("Missing namespace " + namespace);
+    }
+
+    @Test
     void independentEnginesExposeOnlySuccessfulPublicationsAndRestartInstallation() throws Exception
     {
         String eastGeneration;

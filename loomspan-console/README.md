@@ -258,7 +258,8 @@ The read-only tool surface is:
 
 - `LOOMSPAN_get_runtime` for side-effect-free Console/target status;
 - `LOOMSPAN_get_instance` for the selected process identity and every installed
-  namespace's active generation ID and optional host publication version;
+  namespace's active generation ID, optional host publication version and effective
+  trace persistence policy;
 - `LOOMSPAN_list_skills` and `LOOMSPAN_get_skill` for registered skill
   metadata and unchanged YAML;
 - `LOOMSPAN_list_executions` and `LOOMSPAN_get_execution` for bounded,
@@ -280,10 +281,12 @@ Ordinary MCP `tools/list` is the inventory for these fourteen tools.
 
 Call `LOOMSPAN_get_instance` with `{}` to read current namespace publications
 before any skill executes, including empty and Private namespaces. Each row
-contains `namespace`, `generationId` and nullable `publicationVersion`, alongside
+contains `namespace`, `generationId`, nullable `publicationVersion` and required
+`tracePersistencePolicy` (`NEVER`, `ONERROR` or `ALWAYS`), alongside
 the upstream `instanceId` and `observedAt`. Every call reads the selected target
 through its authenticated observation connection. Fresh sessions and reconnects
-read the current installed publication.
+read the current installed publication. Each row's ID, version and policy come
+from one active generation, including during concurrent publication.
 
 The host defines publication labels and whether equal labels identify equal
 content across engines. Supplied strings are preserved exactly. Null means the
@@ -294,11 +297,14 @@ reinstalling the namespace.
 Instance Overview shows the same namespace inventory for the selected target.
 Use **Refresh** for a current read. Reopening the page and reconnecting also read
 the active inventory. **Not supplied** indicates null, and **Empty string**
-indicates a supplied empty label. The table includes empty namespaces.
+indicates a supplied empty label. The table includes empty namespaces and each
+namespace's Trace persistence policy.
 
 An embedding service can read the engine directly through authenticated
 `GET /_loomspan/observability/v1/instance` with its observation API key. Its
-`namespaces` array contains the same active generation and publication facts.
+`namespaces` array contains the same active generation, publication and policy facts.
+The top-level `tracePersistencePolicy` reports active `default`, with `ONERROR` when
+its generation or runtime is absent.
 
 To inspect planner inability, select the error in **Records** or its originating
 frame in **Timeline**. The failure remains inspectable even after a successful

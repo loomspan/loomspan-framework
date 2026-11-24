@@ -137,15 +137,21 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
         return new ai.loomspan.internal.runtime.observation.catalog.DefaultRegisteredSkillCatalog(catalogs);
     }
 
-    /** Current immutable namespace metadata, including installed empty namespaces. */
-    public List<ai.loomspan.api.SkillCatalog> namespaceCatalogs()
+    /** Immutable facts captured from each installed generation under the publication monitor. */
+    public List<NamespaceSnapshot> namespaceSnapshots()
     {
-        List<ai.loomspan.api.SkillCatalog> catalogs;
+        List<NamespaceSnapshot> snapshots;
         synchronized (generationMonitor) {
-            catalogs = active.values().stream().map(SkillGeneration::skillCatalog).toList();
+            snapshots = active.values().stream().map(generation -> new NamespaceSnapshot(
+                    generation.namespace(), generation.id(), generation.skillCatalog().publicationVersion().orElse(null),
+                    generation.runtime() == null ? TracePersistencePolicy.ONERROR : generation.runtime().tracePersistence()))
+                    .toList();
         }
-        return catalogs.stream().sorted(Comparator.comparing(ai.loomspan.api.SkillCatalog::namespace)).toList();
+        return snapshots.stream().sorted(Comparator.comparing(NamespaceSnapshot::namespace)).toList();
     }
+
+    public record NamespaceSnapshot(String namespace, String generationId, String publicationVersion,
+            TracePersistencePolicy tracePersistencePolicy) {}
 
     /** Immutable independently usable metadata; no runtime/client/invoker is read during validation. */
     public record PreparationView(String namespace, String baseId, Map<String, SkillGeneration> namespaces) {}

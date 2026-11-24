@@ -6,13 +6,14 @@ type NamespacePublication = {
   namespace: string;
   generationId: string;
   publicationVersion: string | null;
+  tracePersistencePolicy: "NEVER" | "ONERROR" | "ALWAYS";
 };
 
 async function engine(instanceId: string, generationId: string) {
   const state = {
     available: true,
     instanceId,
-    namespaces: [{ namespace: "empty", generationId, publicationVersion: "P7" }] as NamespacePublication[],
+    namespaces: [{ namespace: "empty", generationId, publicationVersion: "P7", tracePersistencePolicy: "ONERROR" }] as NamespacePublication[],
   };
   const server = http.createServer((request, response) => {
     if (!state.available) {
@@ -72,18 +73,18 @@ test("namespace publications are current before execution across target selectio
     await page.goto(consoleProcess.pairingUrl);
     await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
     await selectTarget(page, consoleProcess.origin, east.origin, false);
-    await expect(page.getByRole("row", { name: "empty east-7 P7" })).toBeVisible();
+    await expect(page.getByRole("row", { name: "empty east-7 P7 ONERROR" })).toBeVisible();
 
     await page.getByRole("button", { name: "Refresh", exact: true }).click();
-    await expect(page.getByRole("row", { name: "empty east-7 P7" })).toBeVisible();
-    east.state.namespaces = [{ namespace: "empty", generationId: "east-8", publicationVersion: "P8" }];
+    await expect(page.getByRole("row", { name: "empty east-7 P7 ONERROR" })).toBeVisible();
+    east.state.namespaces = [{ namespace: "empty", generationId: "east-8", publicationVersion: "P8", tracePersistencePolicy: "ONERROR" }];
     await page.reload();
-    await expect(page.getByRole("row", { name: "empty east-8 P8" })).toBeVisible();
+    await expect(page.getByRole("row", { name: "empty east-8 P8 ONERROR" })).toBeVisible();
 
     await selectTarget(page, consoleProcess.origin, west.origin, true);
-    await expect(page.getByRole("row", { name: "empty west-7 P7" })).toBeVisible();
+    await expect(page.getByRole("row", { name: "empty west-7 P7 ONERROR" })).toBeVisible();
     await selectTarget(page, consoleProcess.origin, east.origin, true);
-    await expect(page.getByRole("row", { name: "empty east-8 P8" })).toBeVisible();
+    await expect(page.getByRole("row", { name: "empty east-8 P8 ONERROR" })).toBeVisible();
 
     east.state.available = false;
     await page.goto(`${consoleProcess.origin}/target`);
@@ -91,20 +92,20 @@ test("namespace publications are current before execution across target selectio
     const targetContext = page.getByRole("complementary", { name: "Current target and live context" });
     await expect(targetContext).toContainText("ConnectionUNAVAILABLE");
     east.state.available = true;
-    east.state.namespaces = [{ namespace: "empty", generationId: "east-reconnected", publicationVersion: "P8-reconnected" }];
+    east.state.namespaces = [{ namespace: "empty", generationId: "east-reconnected", publicationVersion: "P8-reconnected", tracePersistencePolicy: "ONERROR" }];
     await page.getByRole("button", { name: "Recheck target", exact: true }).click();
     await expect(targetContext).toContainText("ConnectionREACHABLE");
     await page.getByRole("link", { name: "Overview", exact: true }).click();
-    await expect(page.getByRole("row", { name: "empty east-reconnected P8-reconnected" })).toBeVisible();
+    await expect(page.getByRole("row", { name: "empty east-reconnected P8-reconnected ONERROR" })).toBeVisible();
 
-    east.state.namespaces = [{ namespace: "empty", generationId: "east-9", publicationVersion: null }];
+    east.state.namespaces = [{ namespace: "empty", generationId: "east-9", publicationVersion: null, tracePersistencePolicy: "ONERROR" }];
     await page.getByRole("button", { name: "Refresh", exact: true }).click();
-    await expect(page.getByRole("row", { name: "empty east-9 Not supplied" })).toBeVisible();
+    await expect(page.getByRole("row", { name: "empty east-9 Not supplied ONERROR" })).toBeVisible();
 
     east.state.instanceId = "33333333-3333-4333-8333-333333333333";
-    east.state.namespaces = [{ namespace: "empty", generationId: "east-restarted-1", publicationVersion: "P7" }];
+    east.state.namespaces = [{ namespace: "empty", generationId: "east-restarted-1", publicationVersion: "P7", tracePersistencePolicy: "ONERROR" }];
     await page.reload();
-    await expect(page.getByRole("row", { name: "empty east-restarted-1 P7" })).toBeVisible();
+    await expect(page.getByRole("row", { name: "empty east-restarted-1 P7 ONERROR" })).toBeVisible();
     await expect(page.getByRole("complementary", { name: "Current target and live context" })).toContainText(east.state.instanceId);
     east.state.namespaces = [];
     await page.getByRole("button", { name: "Refresh", exact: true }).click();

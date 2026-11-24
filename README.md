@@ -281,7 +281,10 @@ After restart, the host reinstalls the namespace and supplies its label again.
 
 Authenticated `GET /_loomspan/observability/v1/instance` returns every installed
 namespace in `namespaces`, including empty and Private namespaces, with `namespace`,
-`generationId` and nullable `publicationVersion` before any invocation. Console MCP
+`generationId`, nullable `publicationVersion` and effective `tracePersistencePolicy`
+before any invocation. Policy is `NEVER`, `ONERROR` or `ALWAYS`. Each row captures
+its ID, version and policy from one active generation. The top-level policy describes
+`default` and uses `ONERROR` when its generation or runtime is absent. Console MCP
 clients use `LOOMSPAN_get_instance` for the selected target. Operators see these rows
 in Instance Overview on connection, refresh, reconnect and reopening. The UI displays
 “Not supplied” for omission. See [HTTP observation](agent-skills/loomspan-docs/references/skill-authoring/observability-http.md)

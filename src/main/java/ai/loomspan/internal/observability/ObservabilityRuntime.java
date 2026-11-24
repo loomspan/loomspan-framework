@@ -31,7 +31,7 @@ public final class ObservabilityRuntime implements AutoCloseable
     private final ActivityReplayBuffer replayBuffer;
     private final LiveMonitoringAvailability liveMonitoring;
     private final Supplier<RegisteredSkillCatalog> skills;
-    private final Supplier<java.util.List<ai.loomspan.api.SkillCatalog>> namespaces;
+    private final Supplier<java.util.List<ai.loomspan.internal.skill.SkillGenerationManager.NamespaceSnapshot>> namespaces;
     private final FinalizedTraceCatalog traces;
     private final LoomspanProperties.Observability configuration;
     private final LoomspanProperties.Session.Quotas quotas;
@@ -50,7 +50,7 @@ public final class ObservabilityRuntime implements AutoCloseable
             ActivityReplayBuffer replayBuffer,
             LiveMonitoringAvailability liveMonitoring,
             Supplier<RegisteredSkillCatalog> skills,
-            Supplier<java.util.List<ai.loomspan.api.SkillCatalog>> namespaces,
+            Supplier<java.util.List<ai.loomspan.internal.skill.SkillGenerationManager.NamespaceSnapshot>> namespaces,
             FinalizedTraceCatalog traces,
             LoomspanProperties.Observability configuration,
             LoomspanProperties.Session.Quotas quotas,
@@ -73,7 +73,7 @@ public final class ObservabilityRuntime implements AutoCloseable
             ActivityReplayBuffer replayBuffer,
             LiveMonitoringAvailability liveMonitoring,
             Supplier<RegisteredSkillCatalog> skills,
-            Supplier<java.util.List<ai.loomspan.api.SkillCatalog>> namespaces,
+            Supplier<java.util.List<ai.loomspan.internal.skill.SkillGenerationManager.NamespaceSnapshot>> namespaces,
             FinalizedTraceCatalog traces,
             LoomspanProperties.Observability configuration,
             LoomspanProperties.Session.Quotas quotas,
@@ -111,7 +111,7 @@ public final class ObservabilityRuntime implements AutoCloseable
     public ActivityReplayBuffer replayBuffer() { return replayBuffer; }
     public LiveMonitoringAvailability liveMonitoring() { return liveMonitoring; }
     public RegisteredSkillCatalog skills() { return skills.get(); }
-    public java.util.List<ai.loomspan.api.SkillCatalog> namespaces() { return namespaces.get(); }
+    public java.util.List<ai.loomspan.internal.skill.SkillGenerationManager.NamespaceSnapshot> namespaces() { return namespaces.get(); }
     public FinalizedTraceCatalog traces() { return traces; }
     public LoomspanProperties.Observability configuration() { return configuration; }
     public LoomspanProperties.Session.Quotas quotas() { return quotas; }

@@ -25,9 +25,10 @@ type InstanceStatus struct {
 }
 
 type NamespacePublication struct {
-	Namespace          string  `json:"namespace"`
-	GenerationID       string  `json:"generationId"`
-	PublicationVersion *string `json:"publicationVersion"`
+	Namespace              string  `json:"namespace"`
+	GenerationID           string  `json:"generationId"`
+	PublicationVersion     *string `json:"publicationVersion"`
+	TracePersistencePolicy string  `json:"tracePersistencePolicy"`
 }
 
 func (status *InstanceStatus) UnmarshalJSON(data []byte) error {
@@ -65,6 +66,11 @@ func (namespace *NamespacePublication) UnmarshalJSON(data []byte) error {
 	}
 	if !skillidentity.ValidNamespace(decoded.Namespace) || strings.TrimSpace(decoded.GenerationID) == "" {
 		return fmt.Errorf("namespace or generation ID is invalid")
+	}
+	switch decoded.TracePersistencePolicy {
+	case "NEVER", "ONERROR", "ALWAYS":
+	default:
+		return fmt.Errorf("tracePersistencePolicy must be NEVER, ONERROR or ALWAYS")
 	}
 	*namespace = NamespacePublication(decoded)
 	return nil

@@ -33,7 +33,8 @@ public final class ObservabilityDtos
             List<NamespaceStatus> namespaces) {}
 
     public record NamespaceStatus(String namespace, String generationId,
-            @JsonInclude(JsonInclude.Include.ALWAYS) String publicationVersion) {}
+            @JsonInclude(JsonInclude.Include.ALWAYS) String publicationVersion,
+            TracePersistencePolicy tracePersistencePolicy) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record SkillSummary(String registeredName, String namespace, String localName, String kind, String declaration, String sourcePath, String executorName, String beanName, String method, String href)

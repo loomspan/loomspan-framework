@@ -65,7 +65,7 @@ public final class ObservabilityRestController
                 runtime.configuration().getCompletionGraceTtl(),
                 runtime.configuration().getTraceCatalogMetadataTtl(), runtime.namespaces().stream()
                         .map(catalog -> new ObservabilityDtos.NamespaceStatus(catalog.namespace(), catalog.generationId(),
-                                catalog.publicationVersion().orElse(null))).toList())));
+                                catalog.publicationVersion(), catalog.tracePersistencePolicy())).toList())));
     }
 
     public ResponseEntity<byte[]> skills(HttpServletRequest request)

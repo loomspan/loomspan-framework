@@ -126,6 +126,7 @@ export type NamespacePublication = {
   namespace: string;
   generationId: string;
   publicationVersion: string | null;
+  tracePersistencePolicy: "NEVER" | "ONERROR" | "ALWAYS";
 };
 
 type SkillLocation =

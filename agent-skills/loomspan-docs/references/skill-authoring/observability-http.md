@@ -75,20 +75,29 @@ cross-namespace skill calls. Observation and configuration use independent acces
 `GET /_loomspan/observability/v1/instance` returns the current process `instanceId`
 and a required `namespaces` array, sorted by namespace. Every installed namespace,
 including Private and empty namespaces, has one row with required `namespace`,
-`generationId` and `publicationVersion`. The version is the exact supplied string
-or JSON null when omitted. A supplied empty string is distinct from null. The array
+`generationId`, `publicationVersion` and `tracePersistencePolicy`. Policy is always
+present and is `NEVER`, `ONERROR` or `ALWAYS`, including when the publication version
+is null. It is the effective policy of that namespace's active runtime. The version
+is the exact supplied string or JSON null when omitted. A supplied empty string is distinct from null. The array
 is empty when every namespace has been removed.
 
 The host labels a complete documents-and-configuration publication at preparation
-and defines its meaning across engines. Active ID and label come from one immutable
-generation and become visible together after successful publication. Prepared or
-abandoned updates leave active reads unchanged. Each replacement supplies its own
+and defines its meaning across engines. Active ID, label and policy come from one
+immutable generation and become visible together after successful publication. A
+publication overlapping a snapshot produces the complete prior or replacement
+generation's values within each row. Prepared or abandoned updates leave active
+reads unchanged. Each replacement supplies its own
 optional label. Restart requires host reinstallation and label supply and produces
 new process/generation identities.
 
+The top-level `tracePersistencePolicy` reports the active `default` namespace policy
+and uses `ONERROR` when its generation or runtime is absent. Other namespaces do
+not determine this top-level value.
+
 Current reads work before any invocation and use the existing observation key.
 Console MCP clients call `LOOMSPAN_get_instance` for the selected target. Operators
-use the namespace table in Instance Overview, where null displays as “Not supplied”.
+use the namespace table in Instance Overview, which includes Trace persistence
+and displays a null version as “Not supplied”.
 Fresh connections, refresh, reconnect and reopening read current state. Current
 publication metadata is independent of captured invocation metadata.
 
@@ -130,6 +139,8 @@ download filenames never expose or derive from the internal artifact path.
 
 Namespace metadata and semantic agreement are exercised by
 `NamespaceObservationIntegrationTest`, `NamespacePublicationObservationIntegrationTest`,
+`SkillGenerationManagerTest#namespaceSnapshotRetainsOneGenerationDuringPublication`,
+`SkillGenerationManagerTest#defaultPolicyFallsBackWhenGenerationOrRuntimeIsAbsent`,
 `ConsoleRestFixtureCorpusTest` and `ConsoleTraceFixtureCorpusTest`.
 The preserved contracts are exercised by `ObservabilityArtifactIntegrationTest`,
 `ObservabilityRestIntegrationTest`, and `ObservabilityHostSecurityIntegrationTest`.

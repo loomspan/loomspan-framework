@@ -77,6 +77,7 @@ export function ObservabilityOverview() {
                       <th scope="col">Namespace</th>
                       <th scope="col">Active generation</th>
                       <th scope="col">Publication version</th>
+                      <th scope="col">Trace persistence</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -89,6 +90,7 @@ export function ObservabilityOverview() {
                             namespace.publicationVersion === "" ? "Empty string" :
                               <code className="publication-version">{namespace.publicationVersion}</code>}
                         </td>
+                        <td>{namespace.tracePersistencePolicy}</td>
                       </tr>
                     ))}
                   </tbody>

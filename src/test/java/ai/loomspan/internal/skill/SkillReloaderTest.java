@@ -126,8 +126,8 @@ class SkillReloaderTest {
             var b = workers.submit(() -> publishAfter(start, fixture.reloader, second));
             start.countDown();
             for (int index = 0; index < 100; index++) {
-                var catalog = fixture.manager.namespaceCatalogs().stream().filter(item -> item.namespace().equals("empty")).findFirst().orElseThrow();
-                assertThat(catalog.publicationVersion()).contains(labels.get(catalog.generationId()));
+                var catalog = fixture.manager.namespaceSnapshots().stream().filter(item -> item.namespace().equals("empty")).findFirst().orElseThrow();
+                assertThat(catalog.publicationVersion()).isEqualTo(labels.get(catalog.generationId()));
             }
             assertThat(List.of(a.get(5, TimeUnit.SECONDS), b.get(5, TimeUnit.SECONDS))).containsExactlyInAnyOrder(true, false);
         }

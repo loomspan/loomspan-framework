@@ -26,9 +26,9 @@ func TestInstanceStatusDecodesFromFixture(t *testing.T) {
 	}
 	label := "P7"
 	want := []NamespacePublication{
-		{Namespace: "default", GenerationID: "generation-fixture"},
-		{Namespace: "empty", GenerationID: "generation-empty", PublicationVersion: &label},
-		{Namespace: "unlabeled", GenerationID: "generation-unlabeled"},
+		{Namespace: "default", GenerationID: "generation-fixture", TracePersistencePolicy: "ONERROR"},
+		{Namespace: "empty", GenerationID: "generation-empty", PublicationVersion: &label, TracePersistencePolicy: "ALWAYS"},
+		{Namespace: "unlabeled", GenerationID: "generation-unlabeled", TracePersistencePolicy: "NEVER"},
 	}
 	if !reflect.DeepEqual(status.Namespaces, want) {
 		t.Fatalf("namespace publications disagree with Java fixture: %#v", status.Namespaces)
@@ -414,7 +414,7 @@ func TestSkillDecodersRejectInapplicableFieldsByPresence(t *testing.T) {
 }
 
 func TestInstanceNamespaceWireValidation(t *testing.T) {
-	valid := []string{`[]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":null}]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":""}]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":"  P7 ☃\n<b>  "}]`}
+	valid := []string{`[]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":null,"tracePersistencePolicy":"NEVER"}]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":null,"tracePersistencePolicy":"ALWAYS"}]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":null,"tracePersistencePolicy":"ONERROR"}]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":"","tracePersistencePolicy":"ONERROR"}]`, `[{"namespace":"empty","generationId":"g7","publicationVersion":"  P7 ☃\n<b>  ","tracePersistencePolicy":"ONERROR"}]`}
 	for _, namespaces := range valid {
 		var status InstanceStatus
 		if err := json.Unmarshal([]byte(`{"namespaces":`+namespaces+`}`), &status); err != nil {
@@ -427,14 +427,18 @@ func TestInstanceNamespaceWireValidation(t *testing.T) {
 		}
 	}
 	invalid := []string{
+		`{"namespaces":[{"namespace":"empty","generationId":"g","publicationVersion":null}]}`,
+		`{"namespaces":[{"namespace":"empty","generationId":"g","publicationVersion":null,"tracePersistencePolicy":null}]}`,
+		`{"namespaces":[{"namespace":"empty","generationId":"g","publicationVersion":null,"tracePersistencePolicy":""}]}`,
+		`{"namespaces":[{"namespace":"empty","generationId":"g","publicationVersion":null,"tracePersistencePolicy":"UNKNOWN"}]}`,
 		`{}`, `{"namespaces":null}`, `{"namespaces":{}}`,
 		`{"namespaces":[null]}`, `{"namespaces":[{}]}`,
-		`{"namespaces":[{"namespace":"bad_name","generationId":"g","publicationVersion":null}]}`,
-		`{"namespaces":[{"namespace":"empty","generationId":" ","publicationVersion":null}]}`,
-		`{"namespaces":[{"namespace":"empty","publicationVersion":null}]}`,
+		`{"namespaces":[{"namespace":"bad_name","generationId":"g","publicationVersion":null,"tracePersistencePolicy":"ONERROR"}]}`,
+		`{"namespaces":[{"namespace":"empty","generationId":" ","publicationVersion":null,"tracePersistencePolicy":"ONERROR"}]}`,
+		`{"namespaces":[{"namespace":"empty","publicationVersion":null,"tracePersistencePolicy":"ONERROR"}]}`,
 		`{"namespaces":[{"namespace":"empty","generationId":"g"}]}`,
-		`{"namespaces":[{"namespace":"empty","generationId":"g","publicationVersion":7}]}`,
-		`{"namespaces":[{"namespace":"empty","generationId":"g","publicationVersion":null},{"namespace":"empty","generationId":"h","publicationVersion":"P8"}]}`,
+		`{"namespaces":[{"namespace":"empty","generationId":"g","publicationVersion":7,"tracePersistencePolicy":"ONERROR"}]}`,
+		`{"namespaces":[{"namespace":"empty","generationId":"g","publicationVersion":null,"tracePersistencePolicy":"ONERROR"},{"namespace":"empty","generationId":"h","publicationVersion":"P8","tracePersistencePolicy":"ONERROR"}]}`,
 	}
 	for _, wire := range invalid {
 		var status InstanceStatus

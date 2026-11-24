@@ -34,6 +34,66 @@ import static org.mockito.Mockito.when;
 class SkillGenerationManagerTest
 {
     @Test
+    void namespaceSnapshotRetainsOneGenerationDuringPublication() throws Exception
+    {
+        var manager = manager(mock(SkillMethodBeanPostProcessor.class), () -> catalog());
+        var catalog = mock(ai.loomspan.api.SkillCatalog.class);
+        when(catalog.namespace()).thenReturn("default");
+        when(catalog.generationId()).thenReturn("old");
+        var extracting = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        when(catalog.publicationVersion()).thenAnswer(invocation -> {
+            extracting.countDown();
+            assertThat(release.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            return java.util.Optional.of("old-version");
+        });
+        var oldRuntime = mock(ExecutionRuntime.class);
+        when(oldRuntime.tracePersistence()).thenReturn(ai.loomspan.internal.core.TracePersistencePolicy.ONERROR);
+        var old = new SkillGeneration("default", "old", Map.of(), Map.of(), catalog, null, oldRuntime);
+        var newRuntime = mock(ExecutionRuntime.class);
+        when(newRuntime.tracePersistence()).thenReturn(ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS);
+        var replacement = new SkillGeneration("default", "new", Map.of(), Map.of(), null, null, newRuntime,
+                ai.loomspan.api.NamespaceVisibility.PRIVATE, Map.of(), Map.of(), "new-version");
+        manager.publish(old, null);
+        try (var workers = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var snapshot = workers.submit(manager::namespaceSnapshots);
+            assertThat(extracting.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var publishing = new java.util.concurrent.CountDownLatch(1);
+            var publication = workers.submit(() -> {
+                publishing.countDown();
+                SkillGenerationManager.dispatch(manager.publish(replacement, "old"));
+            });
+            assertThat(publishing.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            release.countDown();
+            var retained = snapshot.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            publication.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(retained).containsExactly(new SkillGenerationManager.NamespaceSnapshot(
+                    "default", "old", "old-version", ai.loomspan.internal.core.TracePersistencePolicy.ONERROR));
+            assertThat(manager.namespaceSnapshots()).containsExactly(new SkillGenerationManager.NamespaceSnapshot(
+                    "default", "new", "new-version", ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS));
+        } finally {
+            release.countDown();
+            manager.destroy();
+        }
+    }
+
+    @Test
+    void defaultPolicyFallsBackWhenGenerationOrRuntimeIsAbsent()
+    {
+        var manager = manager(mock(SkillMethodBeanPostProcessor.class), () -> catalog());
+        var runtime = mock(ExecutionRuntime.class);
+        when(runtime.tracePersistence()).thenReturn(ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS);
+        manager.publish(new SkillGeneration("other", "other-id", Map.of(), Map.of(), null, null, runtime), null);
+        assertThat(manager.activeTracePersistence()).isEqualTo(ai.loomspan.internal.core.TracePersistencePolicy.ONERROR);
+        manager.publish(new SkillGeneration("default", "default-id", Map.of(), Map.of()), null);
+        assertThat(manager.activeTracePersistence()).isEqualTo(ai.loomspan.internal.core.TracePersistencePolicy.ONERROR);
+        assertThat(manager.namespaceSnapshots()).containsExactly(
+                new SkillGenerationManager.NamespaceSnapshot("default", "default-id", null, ai.loomspan.internal.core.TracePersistencePolicy.ONERROR),
+                new SkillGenerationManager.NamespaceSnapshot("other", "other-id", null, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS));
+        manager.destroy();
+    }
+
+    @Test
     void executorAndForwardersExposeSchemasUsedByExistingBindingChecks(@TempDir Path directory) {
         var javaSkills = mock(SkillMethodBeanPostProcessor.class);
         when(javaSkills.capabilities()).thenReturn(List.of());

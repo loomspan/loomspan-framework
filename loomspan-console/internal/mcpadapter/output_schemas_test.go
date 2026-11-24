@@ -180,6 +180,21 @@ func TestRecordFailureSchemaValidatesPlannerInabilityKind(t *testing.T) {
 	}
 }
 
+func TestInstanceSchemaRequiresNamespacePolicy(t *testing.T) {
+	for _, policy := range []any{"NEVER", "ONERROR", "ALWAYS", nil, "", "UNKNOWN", 1} {
+		row := map[string]any{"namespace": "empty", "generationId": "g7", "publicationVersion": nil, "tracePersistencePolicy": policy}
+		instance := map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "instanceId": "instance", "namespaces": []any{row}}}
+		valid := policy == "NEVER" || policy == "ONERROR" || policy == "ALWAYS"
+		if err := validateCompactInstance(t, instanceOutputSchema(), instance); (err == nil) != valid {
+			t.Fatalf("policy=%v valid=%v err=%v", policy, valid, err)
+		}
+		delete(row, "tracePersistencePolicy")
+		if err := validateCompactInstance(t, instanceOutputSchema(), instance); err == nil {
+			t.Fatal("namespace policy omission was accepted")
+		}
+	}
+}
+
 func TestCompactSchemasRetainDecisionAndNavigationFields(t *testing.T) {
 	summary := traceSummaryOutputSchema().Properties["result"].Properties["summary"]
 	terminalFailure := summary.Properties["terminalFailureId"]
@@ -197,7 +212,7 @@ func TestCompactSchemasRetainDecisionAndNavigationFields(t *testing.T) {
 		instance any
 	}{
 		{"runtime", runtimeOutputSchema(), map[string]any{"observedAt": "2026-08-19T00:00:00Z", "targetSelection": "NONE", "targetConnection": "DISCONNECTED", "targetAuthentication": "UNKNOWN", "javaGoCompatibility": "UNKNOWN", "runtimeIdentity": "UNKNOWN", "liveMonitoring": "UNAVAILABLE"}},
-		{"instance", instanceOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "instanceId": "instance", "namespaces": []any{map[string]any{"namespace": "empty", "generationId": "g7", "publicationVersion": nil}}}}},
+		{"instance", instanceOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "instanceId": "instance", "namespaces": []any{map[string]any{"namespace": "empty", "generationId": "g7", "publicationVersion": nil, "tracePersistencePolicy": "ONERROR"}}}}},
 		{"skills-list", skillListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"registeredName": "default:skill", "namespace": "default", "localName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml"}}, "hasMore": false}}},
 		{"skill-detail", skillDetailOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "skill": map[string]any{"registeredName": "default:skill", "namespace": "default", "localName": "skill", "kind": "YAML", "declaration": "YAML", "sourcePath": "skill.yaml", "yaml": "name: skill", "outputSchema": nil}}}},
 		{"executions-list", executionListOutputSchema(), map[string]any{"result": map[string]any{"observedAt": "2026-08-19T00:00:00Z", "items": []any{map[string]any{"sessionId": "s", "traceId": "t", "status": "RUNNING", "phase": "STEP", "updatedAt": "2026-08-19T00:00:00Z", "activeBranchCount": 0}}, "hasMore": false}}},
