@@ -31,27 +31,27 @@ class CapabilityExecutionRouterTest {
         var coordinator = mock(ExecutionCoordinator.class);
         var router = new CapabilityExecutionRouter(new StaticListableBeanFactory(java.util.Map.of("executionCoordinator", coordinator))
                 .getBeanProvider(ExecutionCoordinator.class), new DefaultAccessGuard());
-        var session = ai.loomspan.internal.core.TestLoomspanSessions.create("bound-dispatch", "default-bound", 3);
+        var session = ai.loomspan.internal.core.TestLoomspanSessions.create("bound-dispatch", "default:bound", 3);
         var contract = new SkillInputContractResolver().resolveJavaCapability("""
                 {"type":"object","properties":{"count":{"type":"integer"}},"required":["count"],"additionalProperties":false}
                 """);
-        var metadata = new CapabilityMetadata("java:bound", "default-bound", "bound", SkillExecutionDescriptor.none(),
+        var metadata = new CapabilityMetadata("java:bound", "default:bound", "bound", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(), arguments -> "unused", SkillKind.JAVA,
-                CapabilityToolDescriptor.generic("default-bound", "bound"), contract, null);
+                CapabilityToolDescriptor.generic("default:bound", "bound"), contract, null);
         var binding = new ai.loomspan.internal.runtime.input.ChildInputBinding(
                 ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/count", false),
                 ai.loomspan.internal.runtime.input.ChildInputBinding.SourceKind.INPUT,
                 ai.loomspan.internal.runtime.input.ObjectFieldPath.parse("/source", true), null);
         var assembled = new ai.loomspan.internal.runtime.input.ChildInputBindingAssembler().assemble(Map.of(), List.of(binding),
-                Map.of("source", "123"), List.of(), "default-parent");
+                Map.of("source", "123"), List.of(), "default:parent");
         assertThatThrownBy(() -> TestExecutionBindings.callWithGeneration(session,
                 ai.loomspan.testkit.TestSkillGenerations.of(metadata),
                 () -> router.executeAssembled(metadata, assembled.arguments(), session, null, assembled.exactPaths())))
                 .isInstanceOf(ai.loomspan.api.SkillInputValidationException.class).hasMessageContaining("binding_assembled_input_invalid");
-        var denied = new CapabilityMetadata("java:bound-denied", "default-bound_denied", "bound", SkillExecutionDescriptor.none(),
+        var denied = new CapabilityMetadata("java:bound-denied", "default:bound-denied", "bound", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")), arguments -> "unused",
-                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-bound_denied", "bound"), contract, null);
-        var deniedSession = ai.loomspan.internal.core.TestLoomspanSessions.create("bound-denied", "default-bound_denied", 3);
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default:bound-denied", "bound"), contract, null);
+        var deniedSession = ai.loomspan.internal.core.TestLoomspanSessions.create("bound-denied", "default:bound-denied", 3);
         assertThatThrownBy(() -> TestExecutionBindings.callWithGeneration(deniedSession,
                 ai.loomspan.testkit.TestSkillGenerations.of(denied),
                 () -> router.executeAssembled(denied, Map.of("count", 123), deniedSession,
@@ -68,10 +68,10 @@ class CapabilityExecutionRouterTest {
         CapabilityExecutionRouter router = new CapabilityExecutionRouter(
                 beanFactory.getBeanProvider(ExecutionCoordinator.class),
                 new DefaultAccessGuard());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-test_entry", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default:test-entry", 2);
         CapabilityMetadata capability = new CapabilityMetadata(
                 "yaml:child",
-                "default-childLlmSkill",
+                "default:child-llm-skill",
                 "child",
                 SkillExecutionDescriptor.from(new ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration(
                         "gpt-5",
@@ -80,12 +80,12 @@ class CapabilityExecutionRouterTest {
                         "medium")), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
                 SkillKind.YAML,
-                CapabilityToolDescriptor.generic("default-childLlmSkill", "child"),
+                CapabilityToolDescriptor.generic("default:child-llm-skill", "child"),
                 null);
         when(coordinator.execute(eq(capability), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap(), eq(session), eq(null)))
                 .thenReturn("child result");
 
-        MissionContext parent = new MissionContext(session, "default-test_entry", "parent-frame", null);
+        MissionContext parent = new MissionContext(session, "default:test-entry", "parent-frame", null);
         Object result = ExecutionBindingScope.supplyWith(
                 ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, new PhysicalBranchContext(session), generation(capability)),
                 () -> router.execute(capability, Map.of("topic", "mars"), session, null));
@@ -99,10 +99,10 @@ class CapabilityExecutionRouterTest {
         CapabilityExecutionRouter router = new CapabilityExecutionRouter(
                 new StaticListableBeanFactory().getBeanProvider(ExecutionCoordinator.class),
                 new DefaultAccessGuard());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-childLlmSkill", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default:child-llm-skill", 2);
         CapabilityMetadata capability = new CapabilityMetadata(
                 "yaml:child",
-                "default-childLlmSkill",
+                "default:child-llm-skill",
                 "child",
                 SkillExecutionDescriptor.from(new ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration(
                         "gpt-5",
@@ -110,7 +110,7 @@ class CapabilityExecutionRouterTest {
                         "openai/gpt-5",
                         "medium")), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")),
                 arguments -> "unused", SkillKind.JAVA,
-                CapabilityToolDescriptor.generic("default-childLlmSkill", "child"), null);
+                CapabilityToolDescriptor.generic("default:child-llm-skill", "child"), null);
 
         assertThatThrownBy(() -> TestExecutionBindings.callWithGeneration(session, generation(capability), () -> router.execute(
                 capability,
@@ -121,7 +121,7 @@ class CapabilityExecutionRouterTest {
                         "pw",
                         AuthorityUtils.createAuthorityList("ROLE_OTHER")))))
                 .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("default-childLlmSkill");
+                .hasMessageContaining("default:child-llm-skill");
     }
 
     @Test
@@ -132,14 +132,14 @@ class CapabilityExecutionRouterTest {
         CapabilityExecutionRouter router = new CapabilityExecutionRouter(
                 beanFactory.getBeanProvider(ExecutionCoordinator.class),
                 new DefaultAccessGuard());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-test_entry", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default:test-entry", 2);
         session.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
                 "user",
                 "pw",
                 AuthorityUtils.createAuthorityList("ROLE_ALLOWED")));
         CapabilityMetadata capability = new CapabilityMetadata(
                 "yaml:child",
-                "default-childLlmSkill",
+                "default:child-llm-skill",
                 "child",
                 SkillExecutionDescriptor.from(new ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration(
                         "gpt-5",
@@ -148,12 +148,12 @@ class CapabilityExecutionRouterTest {
                         "medium")), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of("ALLOWED")),
                 arguments -> "unused",
                 SkillKind.YAML,
-                CapabilityToolDescriptor.generic("default-childLlmSkill", "child"),
+                CapabilityToolDescriptor.generic("default:child-llm-skill", "child"),
                 null);
         when(coordinator.execute(eq(capability), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap(), eq(session), eq(null)))
                 .thenReturn("child result");
 
-        MissionContext parent = new MissionContext(session, "default-test_entry", "parent-frame", null);
+        MissionContext parent = new MissionContext(session, "default:test-entry", "parent-frame", null);
         Object result = ExecutionBindingScope.supplyWith(
                 ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, new PhysicalBranchContext(session), generation(capability)),
                 () -> router.execute(capability, Map.of("topic", "mars"), session, null));
@@ -170,7 +170,7 @@ class CapabilityExecutionRouterTest {
                 java.time.Clock.fixed(java.time.Instant.parse("2026-03-15T12:00:00Z"), java.time.ZoneOffset.UTC));
         CapabilityMetadata capability = new CapabilityMetadata(
                 "yaml:child",
-                "default-childLlmSkill",
+                "default:child-llm-skill",
                 "child",
                 SkillExecutionDescriptor.from(new ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration(
                         "gpt-5",
@@ -179,14 +179,14 @@ class CapabilityExecutionRouterTest {
                         "medium")), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
                 SkillKind.YAML,
-                CapabilityToolDescriptor.generic("default-childLlmSkill", "child"),
+                CapabilityToolDescriptor.generic("default:child-llm-skill", "child"),
                 null);
         TestCapabilityRegistry capabilityRegistry = mock(TestCapabilityRegistry.class);
-        when(capabilityRegistry.getCapability("default-childLlmSkill")).thenReturn(capability);
+        when(capabilityRegistry.getCapability("default:child-llm-skill")).thenReturn(capability);
 
         ai.loomspan.internal.skill.YamlSkillManifest manifest = new ai.loomspan.internal.skill.YamlSkillManifest();
-        manifest.setName("childLlmSkill");
-        manifest.setDescription("default-childLlmSkill");
+        manifest.setName("child-llm-skill");
+        manifest.setDescription("default:child-llm-skill");
         manifest.setModel("gpt-5");
         ai.loomspan.internal.skill.YamlSkillDefinition definition = new ai.loomspan.internal.skill.YamlSkillDefinition(ai.loomspan.internal.skill.YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
@@ -197,7 +197,7 @@ class CapabilityExecutionRouterTest {
                         "openai/gpt-5",
                         "medium"));
         ai.loomspan.internal.skill.YamlSkillCatalog catalog = mock(ai.loomspan.internal.skill.YamlSkillCatalog.class);
-        when(catalog.getSkill("default-childLlmSkill")).thenReturn(definition);
+        when(catalog.getSkill("default:child-llm-skill")).thenReturn(definition);
 
         ai.loomspan.internal.model.ModelInteractionFactory chatClientFactory =
                 (ignored, mode) -> request -> ai.loomspan.internal.model.ModelInteractionResult.content("unused");
@@ -205,7 +205,7 @@ class CapabilityExecutionRouterTest {
         ai.loomspan.internal.runtime.MissionExecutionEngine engine = (session, skillDefinition, objective, missionInput, chatClient, visibleTools, planningEnabled, authentication) -> {
             MissionContext child = ExecutionBindingScope.requireCurrent().requireMission();
             assertThat(child.successfulDirectSkills()).isEmpty();
-            child.recordSuccessfulDirectSkill("default-expense_match_search");
+            child.recordSuccessfulDirectSkill("default:expense-match-search");
             return "child result";
         };
         ExecutionCoordinator coordinator = new ExecutionCoordinator(
@@ -223,12 +223,12 @@ class CapabilityExecutionRouterTest {
         CapabilityExecutionRouter router = new CapabilityExecutionRouter(
                 beanFactory.getBeanProvider(ExecutionCoordinator.class),
                 new DefaultAccessGuard());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-test_entry", 2);
-        MissionContext parent = new MissionContext(session, "default-test_entry", "parent-frame", null);
-        parent.recordSuccessfulDirectSkill("default-parsed_invoice");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default:test-entry", 2);
+        MissionContext parent = new MissionContext(session, "default:test-entry", "parent-frame", null);
+        parent.recordSuccessfulDirectSkill("default:parsed-invoice");
         PhysicalBranchContext branch = new PhysicalBranchContext(session);
         Object result = ExecutionBindingScope.supplyWith(ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, branch, generation(capability)), () -> {
-            ExecutionFrame parentFrame = stateService.openMissionFrame(session, "default-test_entry", Map.of("objective", "default-parent"));
+            ExecutionFrame parentFrame = stateService.openMissionFrame(session, "default:test-entry", Map.of("objective", "default:parent"));
             try {
                 return router.execute(capability, Map.of("topic", "mars"), session, null);
             }
@@ -238,7 +238,7 @@ class CapabilityExecutionRouterTest {
         });
 
         assertThat(result).isEqualTo("child result");
-        assertThat(parent.successfulDirectSkills()).containsExactly("default-parsed_invoice");
+        assertThat(parent.successfulDirectSkills()).containsExactly("default:parsed-invoice");
     }
 
     @Test
@@ -249,10 +249,10 @@ class CapabilityExecutionRouterTest {
         CapabilityExecutionRouter router = new CapabilityExecutionRouter(
                 beanFactory.getBeanProvider(ExecutionCoordinator.class),
                 new DefaultAccessGuard());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-test_entry", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default:test-entry", 2);
         CapabilityMetadata capability = new CapabilityMetadata(
                 "yaml:child",
-                "default-childLlmSkill",
+                "default:child-llm-skill",
                 "child",
                 SkillExecutionDescriptor.from(new ai.loomspan.internal.skill.EffectiveSkillExecutionConfiguration(
                         "gpt-5",
@@ -261,7 +261,7 @@ class CapabilityExecutionRouterTest {
                         "medium")), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
                 SkillKind.YAML,
-                CapabilityToolDescriptor.generic("default-childLlmSkill", "child"),
+                CapabilityToolDescriptor.generic("default:child-llm-skill", "child"),
                 new SkillInputContractResolver().resolveFromToolSchema("""
                         {
                           "type": "object",
@@ -273,11 +273,11 @@ class CapabilityExecutionRouterTest {
                         }
                         """),
                 null);
-        when(coordinator.execute(eq(capability), eq("Fulfill the mission for skill 'default-childLlmSkill' using the provided mission input object."),
+        when(coordinator.execute(eq(capability), eq("Fulfill the mission for skill 'default:child-llm-skill' using the provided mission input object."),
                 eq(Map.of("invoiceId", "INV-7")), eq(session), eq(null)))
                 .thenReturn("child result");
 
-        MissionContext parent = new MissionContext(session, "default-test_entry", "parent-frame", null);
+        MissionContext parent = new MissionContext(session, "default:test-entry", "parent-frame", null);
         Object result = ExecutionBindingScope.supplyWith(
                 ai.loomspan.testkit.TestSkillGenerations.binding(session, parent, new PhysicalBranchContext(session), generation(capability)),
                 () -> router.execute(capability, Map.of("invoiceId", "INV-7"), session, null));
@@ -290,15 +290,15 @@ class CapabilityExecutionRouterTest {
     @Test
     void javaCapabilityAcceptsDirectRefBackedObjectsThroughRootCoordinator() {
         RefResolver refResolver = mock(RefResolver.class);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-binaryTool", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default:binary-tool", 2);
         ByteArrayResource payload = new ByteArrayResource(new byte[]{1, 2, 3});
         CapabilityMetadata capability = new CapabilityMetadata(
                 "yaml:binaryTool",
-                "default-binaryTool",
+                "default:binary-tool",
                 "binary tool",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> { assertThat(arguments.get("payload")).isSameAs(payload); return "binary-result"; }, SkillKind.JAVA,
-                new CapabilityToolDescriptor("default-binaryTool", "binary tool", """
+                new CapabilityToolDescriptor("default:binary-tool", "binary tool", """
                         {
                           "type": "object",
                           "properties": {
@@ -343,7 +343,7 @@ class CapabilityExecutionRouterTest {
         RefResolver refResolver = (value, ignoredSession) -> {
             throw new AssertionError("Unconstrained strings must not be resolved as VFS references");
         };
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-genericMapTarget", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default:generic-map-target", 2);
         java.util.concurrent.atomic.AtomicReference<Map<String, Object>> received = new java.util.concurrent.atomic.AtomicReference<>();
         SkillInputContractResolver contractResolver = new SkillInputContractResolver();
         String schema = """
@@ -365,11 +365,11 @@ class CapabilityExecutionRouterTest {
                 """;
         CapabilityMetadata capability = new CapabilityMetadata(
                 "yaml:genericMapTarget",
-                "default-genericMapTarget",
+                "default:generic-map-target",
                 "generic map target",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> { received.set(arguments); return "unchanged"; }, SkillKind.JAVA,
-                new CapabilityToolDescriptor("default-genericMapTarget", "generic map target", schema, null),
+                new CapabilityToolDescriptor("default:generic-map-target", "generic map target", schema, null),
                 contractResolver.resolveFromToolSchema(schema), null);
         Map<String, Object> input = Map.of(
                 "value", "ref://artifacts/missing-value.txt",
@@ -393,10 +393,10 @@ class CapabilityExecutionRouterTest {
                   "count":{"type":"integer"}}}
                 """);
         var effects=new java.util.concurrent.atomic.AtomicInteger();
-        var capability=new CapabilityMetadata("java:ingress","default-ingress","ingress",SkillExecutionDescriptor.none(),
+        var capability=new CapabilityMetadata("java:ingress","default:ingress","ingress",SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),input->{effects.incrementAndGet();return "unexpected";},
-                SkillKind.JAVA,CapabilityToolDescriptor.generic("default-ingress","ingress"),contract,null);
-        var session=ai.loomspan.internal.core.TestLoomspanSessions.create("ingress","default-ingress",3);
+                SkillKind.JAVA,CapabilityToolDescriptor.generic("default:ingress","ingress"),contract,null);
+        var session=ai.loomspan.internal.core.TestLoomspanSessions.create("ingress","default:ingress",3);
         var handle=new org.springframework.core.io.AbstractResource(){public String getDescription(){return "unread";}public java.io.InputStream getInputStream(){throw new AssertionError("do not open");}};
         for(Map<String,Object> input:List.<Map<String,Object>>of(Map.of("value",List.of(handle,"ref://bad"),"count",1),Map.of("value",List.of(handle),"count","1"),Map.of("value",List.of(handle),"count",1,"extra",true),Map.of("value",List.of(handle,handle,handle),"count",1))) {
             assertThatThrownBy(()->TestExecutionBindings.callWithGeneration(session,ai.loomspan.testkit.TestSkillGenerations.of(capability),
@@ -442,7 +442,7 @@ class CapabilityExecutionRouterTest {
         }
         // These nested-call fixtures have an explicit model-backed source with exactly this child.
         var parent = new ai.loomspan.internal.skill.YamlSkillManifest();
-        parent.setName("test_entry"); parent.setDescription("Parent fixture"); parent.setModel("gpt-5");
+        parent.setName("test-entry"); parent.setDescription("Parent fixture"); parent.setModel("gpt-5");
         parent.setAllowedSkills(List.of(new ai.loomspan.internal.skill.YamlSkillManifest.AllowedSkillManifest(
                 capability.name(), null, null, null)));
         var source = new ai.loomspan.internal.skill.YamlSkillDefinition(ai.loomspan.internal.skill.YamlSkillDefinition.Form.MODEL, "default",

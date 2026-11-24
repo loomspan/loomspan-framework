@@ -53,7 +53,7 @@ class ExecutorGenerationExecutionIntegrationTest {
                             .active("sales").runtime().properties().getConnections().get("primary");
                     assertThat(connection.getApiKey()).isEqualTo("demo-key");
                     assertThat(connection.getHeaders()).containsEntry("X-Region", "west");
-                    assertThat(context.getBean(SkillTemplate.class).invoke("sales", "read_record", Map.of("recordId", "42"))).isEqualTo("record");
+                    assertThat(context.getBean(SkillTemplate.class).invoke("sales", "read-record", Map.of("recordId", "42"))).isEqualTo("record");
                     var invocation = context.getBean(SalesHttp.class).invocation;
                     var records = (Map<?, ?>) invocation.executorConfig().get("records");
                     assertThat(records.get("base-url")).isEqualTo("https://records.example.test");
@@ -75,7 +75,7 @@ class ExecutorGenerationExecutionIntegrationTest {
                     var reloader = context.getBean(SkillReloader.class);
                     var ownerConfig = new ExecutionConfiguration("loomspan: {executor-config: {infra: {settings: {version: {$var: shared}}}}}");
                     var consumerConfig = new ExecutionConfiguration("loomspan: {executor-config: {caller: {settings: {key: {$var: shared}}}}}");
-                    var leaf = new SkillDocument("leaf", leaf("leaf", "infra-configured").yaml()
+                    var leaf = new SkillDocument("leaf", leaf("leaf", "infra:configured").yaml()
                             .replace("operation: echo", "operation: echo, value: {$var: shared}"));
                     var owner = reloader.prepare("infra", "same", List.of(), ownerConfig, NamespaceVisibility.PUBLIC, Map.of("shared", "owner-first"));
                     reloader.publish(owner);
@@ -136,8 +136,8 @@ class ExecutorGenerationExecutionIntegrationTest {
             var startupId = reloader.snapshot("infra").generationId();
             var infra1 = publish(reloader, "infra", List.of(leaf("same", "configured")), config("startup"), NamespaceVisibility.PUBLIC);
             assertThat(reloader.snapshot("infra").skill("same").orElseThrow().kind()).isEqualTo(SkillKind.JAVA);
-            publish(reloader, "caller", List.of(new SkillDocument("leaf", leaf("leaf", "infra-configured").yaml()
-                            + "input_schema: {type: object, properties: {attachment: {type: string, x-loomspan-attachment: {media_type: file, allowed_content_types: [application/octet-stream]}}}, additionalProperties: true}\n"), leaf("empty", "infra-plain")),
+            publish(reloader, "caller", List.of(new SkillDocument("leaf", leaf("leaf", "infra:configured").yaml()
+                            + "input_schema: {type: object, properties: {attachment: {type: string, x-loomspan-attachment: {media_type: file, allowed_content_types: [application/octet-stream]}}}, additionalProperties: true}\n"), leaf("empty", "infra:plain")),
                     new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE);
             assertThat(bean.invocations).isEmpty();
             var principal = UsernamePasswordAuthenticationToken.authenticated("reader", "unused", List.of());
@@ -165,7 +165,7 @@ class ExecutorGenerationExecutionIntegrationTest {
                 assertThat(invocation.input().get("attachment")).isSameAs(resource);
                 assertThat(invocation.skillConfig()).containsEntry("operation", "echo");
                 assertThat(invocation.executorConfig()).containsEntry("version", "startup").containsKey("literal.dot");
-                assertThat(invocation.skillName()).isEqualTo("caller-leaf");
+                assertThat(invocation.skillName()).isEqualTo("caller:leaf");
                 assertThat(invocation.executorConfigGenerationId()).isEqualTo(infra1.generationId()).isNotEqualTo(startupId);
                 assertThat(bean.authentications).allSatisfy(authentication -> assertThat(authentication).isSameAs(principal));
                 assertThat(SecurityContextHolder.getContext().getAuthentication()).isSameAs(principal);
@@ -191,7 +191,7 @@ class ExecutorGenerationExecutionIntegrationTest {
             assertThat(context).hasNotFailed();
             var reloader = context.getBean(SkillReloader.class);
             var infra = publish(reloader, "infra", List.of(), config("one"), NamespaceVisibility.PUBLIC);
-            var candidate = reloader.prepare("caller", List.of(leaf("leaf", "infra-configured")), new ExecutionConfiguration("loomspan: {}"));
+            var candidate = reloader.prepare("caller", List.of(leaf("leaf", "infra:configured")), new ExecutionConfiguration("loomspan: {}"));
             var retired = new ArrayList<String>(); reloader.onGenerationRetired(retired::add);
             var replacement = publish(reloader, "infra", List.of(), config("two"), NamespaceVisibility.PRIVATE);
             assertThat(retired).contains(infra.generationId());
@@ -214,7 +214,7 @@ class ExecutorGenerationExecutionIntegrationTest {
             var bean = context.getBean(Executors.class);
             var reloader = context.getBean(SkillReloader.class);
             publish(reloader, "infra", List.of(), config("one"), NamespaceVisibility.PUBLIC);
-            publish(reloader, "caller", List.of(leaf("blocked", "infra-plain")), new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE);
+            publish(reloader, "caller", List.of(leaf("blocked", "infra:plain")), new ExecutionConfiguration("loomspan: {}"), NamespaceVisibility.PRIVATE);
             var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
             var view = new java.util.concurrent.atomic.AtomicReference<SkillExecutionView>();
             Thread caller = Thread.ofPlatform().unstarted(() -> {
@@ -249,7 +249,7 @@ class ExecutorGenerationExecutionIntegrationTest {
             var handoff = context.getBean(SkillInvocationHandoff.class);
             var bean = context.getBean(Executors.class);
             var first = publish(reloader,"infra",List.of(),config("first"),NamespaceVisibility.PUBLIC);
-            var secured = new SkillDocument("secured",leaf("secured","infra-secured").yaml()+"rbac_roles: [SALES]\n");
+            var secured = new SkillDocument("secured",leaf("secured","infra:secured").yaml()+"rbac_roles: [SALES]\n");
             publish(reloader,"caller",List.of(secured),consumerConfig("caller", "secured-consumer"),NamespaceVisibility.PRIVATE);
             var previous = SecurityContextHolder.getContext();
             var captured = SecurityContextHolder.createEmptyContext();
@@ -303,9 +303,9 @@ class ExecutorGenerationExecutionIntegrationTest {
                 var bean = context.getBean(Executors.class);
                 var owner = publish(reloader, "infra", List.of(leaf("same", "configured")), config("owner"), NamespaceVisibility.PUBLIC);
                 var leaves = List.of("one", "two").stream().map(name -> new SkillDocument(name,
-                        leaf(name, "infra-configured").yaml() + "input_schema: {type: object, properties: {value: {type: string}}, required: [value], additionalProperties: false}\n")).toList();
+                        leaf(name, "infra:configured").yaml() + "input_schema: {type: object, properties: {value: {type: string}}, required: [value], additionalProperties: false}\n")).toList();
                 publish(reloader, "billing", leaves, consumerConfig("billing", "billing-v1"), NamespaceVisibility.PUBLIC);
-                publish(reloader, "other", List.of(leaf("one", "infra-configured")), consumerConfig("other", "other-key"), NamespaceVisibility.PRIVATE);
+                publish(reloader, "other", List.of(leaf("one", "infra:configured")), consumerConfig("other", "other-key"), NamespaceVisibility.PRIVATE);
                 var parent = new SkillDocument("root", """
                         name: root
                         description: Forward explicit business input to billing
@@ -314,12 +314,12 @@ class ExecutorGenerationExecutionIntegrationTest {
                         max_steps: 1
                         input_schema: {type: object, additionalProperties: true}
                         allowed_skills:
-                          - name: billing-one
+                          - name: billing:one
                             required: true
                             max_tasks: 1
                             input_bindings:
                               /value: {from: input, path: /value}
-                        output_from: {skill: billing-one}
+                        output_from: {skill: billing:one}
                         """);
                 String models = "loomspan:\n  executor-config: {support: {settings: {key: wrong-parent}}}\n"
                         + "  connections: {local: {driver: openai, base-url: '" + planner.url("/v1") + "', api-key: {$var: fixture}}}\n"
@@ -336,7 +336,7 @@ class ExecutorGenerationExecutionIntegrationTest {
                     assertThat(call.consumerExecutorConfig()).isEqualTo(name.startsWith("billing") ? Map.of("key", "billing-v1")
                             : name.startsWith("other") ? Map.of("key", "other-key") : Map.of());
                 }
-                String plan = "{\"capabilityName\":\"support-root\",\"createdAt\":\"2026-11-20T00:00:00Z\",\"status\":\"VALID\",\"tasks\":[{\"taskId\":\"one\",\"title\":\"one\",\"status\":\"PENDING\",\"capabilityName\":\"billing-one\",\"intent\":\"Forward\",\"dependsOn\":[],\"expectedOutputs\":[],\"parallelGroup\":null,\"note\":\"\"}]}";
+                String plan = "{\"capabilityName\":\"support:root\",\"createdAt\":\"2026-11-20T00:00:00Z\",\"status\":\"VALID\",\"tasks\":[{\"taskId\":\"one\",\"title\":\"one\",\"status\":\"PENDING\",\"capabilityName\":\"billing:one\",\"intent\":\"Forward\",\"dependsOn\":[],\"expectedOutputs\":[],\"parallelGroup\":null,\"note\":\"\"}]}";
                 planner.enqueue(plannerResponse(plan));
                 assertThat(template.invoke("support", "root", Map.of("value", "business"))).isEqualTo("owner");
                 assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "billing-v1");

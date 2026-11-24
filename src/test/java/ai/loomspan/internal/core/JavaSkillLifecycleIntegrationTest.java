@@ -36,21 +36,21 @@ class JavaSkillLifecycleIntegrationTest {
         var registry = new TestCapabilityRegistry();
         var coordinator = new AtomicReference<ExecutionCoordinator>();
 
-        var session = TestLoomspanSessions.withId("java-nested", "default-javaRoot", 5, null, TracePersistencePolicy.ALWAYS);
+        var session = TestLoomspanSessions.withId("java-nested", "default:java-root", 5, null, TracePersistencePolicy.ALWAYS);
 
-        registry.register("default-javaChild", javaSkill("default-javaChild", args -> {
+        registry.register("default:java-child", javaSkill("default:java-child", args -> {
 
-            assertThat(ExecutionBindingScope.requireCurrent().requireMission().skillName()).isEqualTo("default-javaChild");
+            assertThat(ExecutionBindingScope.requireCurrent().requireMission().skillName()).isEqualTo("default:java-child");
 
             return "child result";
 
         }));
 
-        registry.register("default-javaRoot", javaSkill("default-javaRoot", args -> {
+        registry.register("default:java-root", javaSkill("default:java-root", args -> {
 
             var parent = ExecutionBindingScope.requireCurrent().requireMission();
 
-            assertThatThrownBy(() -> coordinator.get().execute("default-javaChild", "child", Map.of(), session, null))
+            assertThatThrownBy(() -> coordinator.get().execute("default:java-child", "child", Map.of(), session, null))
                     .isInstanceOf(AccessDeniedException.class).hasMessageContaining("current captured source");
 
             assertThat(ExecutionBindingScope.requireCurrent().requireMission()).isSameAs(parent);
@@ -61,17 +61,17 @@ class JavaSkillLifecycleIntegrationTest {
 
         coordinator.set(coordinator(registry));
 
-        assertThat(coordinator.get().execute("default-javaRoot", "root", Map.of("input", "safe"), session, null)).isEqualTo("root result");
+        assertThat(coordinator.get().execute("default:java-root", "root", Map.of("input", "safe"), session, null)).isEqualTo("root result");
 
         var records = records(session);
 
         assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.FRAME_OPENED))
 
-                .extracting(TraceRecord::route).containsExactly("default-javaRoot");
+                .extracting(TraceRecord::route).containsExactly("default:java-root");
 
         assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.FRAME_CLOSED))
 
-                .extracting(TraceRecord::route).containsExactly("default-javaRoot");
+                .extracting(TraceRecord::route).containsExactly("default:java-root");
 
         assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.TRACE_COMPLETED)).hasSize(1);
 
@@ -88,11 +88,11 @@ class JavaSkillLifecycleIntegrationTest {
         for (RuntimeException failure : List.of(new AccessDeniedException("default-denied"), new CancellationException("cancelled"))) {
 
             var registry = new TestCapabilityRegistry();
-            registry.register("default-javaRoot", javaSkill("default-javaRoot", args -> { throw failure; }));
+            registry.register("default:java-root", javaSkill("default:java-root", args -> { throw failure; }));
 
-            var session = TestLoomspanSessions.withId("java-failure-" + failure.getClass().getSimpleName(), "default-javaRoot", 3);
+            var session = TestLoomspanSessions.withId("java-failure-" + failure.getClass().getSimpleName(), "default:java-root", 3);
 
-            assertThatThrownBy(() -> coordinator(registry).execute("default-javaRoot", "root", session, null)).isSameAs(failure);
+            assertThatThrownBy(() -> coordinator(registry).execute("default:java-root", "root", session, null)).isSameAs(failure);
 
             var records = records(session);
 

@@ -96,10 +96,10 @@ class SpringAiObservationIntegrationTest
             DefaultSessionUsageService usage = new DefaultSessionUsageService(
                     new LoomspanProperties().getSession().getQuotas(), new NoOpUsageMetricsRecorder());
             DefaultExecutionStateService state = new DefaultExecutionStateService(Clock.systemUTC(), usage);
-            LoomspanSession session = TestLoomspanSessions.withId("observation-retry", "default-test_skill", 8);
+            LoomspanSession session = TestLoomspanSessions.withId("observation-retry", "default:test-skill", 8);
             var binding = TestExecutionBindings.missionBinding(session);
             ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> {
-                state.openMissionFrame(session, "default-test_skill", Map.of());
+                state.openMissionFrame(session, "default:test-skill", Map.of());
                 state.openFrame(session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
             });
             AtomicInteger toolExecutions = new AtomicInteger();
@@ -121,7 +121,7 @@ class SpringAiObservationIntegrationTest
                     .tools(tool)
                     .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY,
                             new ModelTraceContext(new ModelExecutionIdentity("gpt-test", "openai", AiDriver.OPENAI,
-                                    "gpt-test"), "default-test_skill", "mission")))
+                                    "gpt-test"), "default:test-skill", "mission")))
                     .call().content());
 
             assertThat(result).isEqualTo("complete");
@@ -159,10 +159,10 @@ class SpringAiObservationIntegrationTest
             DefaultSessionUsageService usage = new DefaultSessionUsageService(
                     new LoomspanProperties().getSession().getQuotas(), new NoOpUsageMetricsRecorder());
             DefaultExecutionStateService state = new DefaultExecutionStateService(Clock.systemUTC(), usage);
-            LoomspanSession session = TestLoomspanSessions.withId("observation-failure", "default-test_skill", 4);
+            LoomspanSession session = TestLoomspanSessions.withId("observation-failure", "default:test-skill", 4);
             var binding = TestExecutionBindings.missionBinding(session);
             ai.loomspan.internal.core.ExecutionBindingScope.runWith(binding, () -> {
-                state.openMissionFrame(session, "default-test_skill", Map.of());
+                state.openMissionFrame(session, "default:test-skill", Map.of());
                 state.openFrame(session, TraceFrameType.MODEL_CALL, "test.skill#model", Map.of());
             });
             ChatClient client = ChatClient.builder(runtime.chatModel(), registry, null, null)
@@ -174,7 +174,7 @@ class SpringAiObservationIntegrationTest
                     .options(OpenAiResponsesChatOptions.builder().model("gpt-test"))
                     .advisors(spec -> spec.param(ModelTraceContext.REQUEST_CONTEXT_KEY,
                             new ModelTraceContext(new ModelExecutionIdentity("gpt-test", "openai", AiDriver.OPENAI,
-                                    "gpt-test"), "default-test_skill", "mission")))
+                                    "gpt-test"), "default:test-skill", "mission")))
                     .call().content())).isInstanceOf(RuntimeException.class);
 
             assertThat(server.getRequestCount()).isOne();

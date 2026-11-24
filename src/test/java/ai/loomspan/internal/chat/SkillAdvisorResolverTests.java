@@ -88,7 +88,7 @@ class SkillAdvisorResolverTests {
         CallAdvisor advisor = (CallAdvisor) failingResolver.resolve(definition(true)).getFirst();
         LoomspanSessionRunner runner = new LoomspanSessionRunner(3);
 
-        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
+        assertThatThrownBy(() -> runner.callWithNewSession("default:test-entry", ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()), session ->
                 ai.loomspan.internal.core.TestExecutionBindings.callWithCurrentSessionMission(() ->
                         advisor.adviseCall(request("Write YAML"), new RecordingChain(List.of("bad", "OK"))))))
                 .isInstanceOf(IllegalStateException.class)
@@ -105,14 +105,14 @@ class SkillAdvisorResolverTests {
 
     private YamlSkillDefinition definition(boolean withLinter, boolean withOutputSchema, boolean withEvidenceContract) {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName(withLinter ? "lintedSkill" : "plain_skill");
+        manifest.setName(withLinter ? "linted-skill" : "plain-skill");
         manifest.setDescription(manifest.getName());
         manifest.setModel("gpt-5");
         if (withOutputSchema) {
             var schema = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().createObjectNode();
             schema.put("type", "object").put("additionalProperties", false);
             var vendorName = schema.putObject("properties").putObject("vendorName").put("type", "string");
-            if (withEvidenceContract) vendorName.put("x-loomspan-evidence", "default-invoiceParser");
+            if (withEvidenceContract) vendorName.put("x-loomspan-evidence", "default:invoice-parser");
             schema.putArray("required").add("vendorName");
             manifest.setOutputSchema(schema);
             manifest.setOutputSchemaMaxRetries(2);
@@ -133,7 +133,7 @@ class SkillAdvisorResolverTests {
                 new EffectiveSkillExecutionConfiguration("gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium"),
                 withEvidenceContract
                         ? ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(
-                                java.util.Map.of("vendorName", "default-invoiceParser"))
+                                java.util.Map.of("vendorName", "default:invoice-parser"))
                         : EvidenceContract.empty());
     }
 

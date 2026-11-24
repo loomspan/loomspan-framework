@@ -57,10 +57,10 @@ class FrameworkShutdownIntegrationTest
                 ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
-        CapabilityMetadata metadata = new CapabilityMetadata("test:root", "default-root", "Root",
+        CapabilityMetadata metadata = new CapabilityMetadata("test:root", "default:root", "Root",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
-                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-root", "Root"), null);
-        registry.register("default-root", metadata);
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default:root", "Root"), null);
+        registry.register("default:root", metadata);
         var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
@@ -165,9 +165,9 @@ class FrameworkShutdownIntegrationTest
                 ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
-        registry.register("default-root", new CapabilityMetadata("test:root", "default-root", "Root",
+        registry.register("default:root", new CapabilityMetadata("test:root", "default:root", "Root",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
-                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-root", "Root"), null));
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default:root", "Root"), null));
         var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         context.addApplicationListener(lifecycle);
@@ -327,10 +327,10 @@ class FrameworkShutdownIntegrationTest
                 new LoomspanProperties.Session.Quotas(), codecs.canonicalTrace(), lifecycle,
                 ai.loomspan.internal.runtime.trace.DefaultExecutionTraceHandle.defaultDirectory());
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
-        CapabilityMetadata metadata = new CapabilityMetadata("test:root", "default-root", "Root",
+        CapabilityMetadata metadata = new CapabilityMetadata("test:root", "default:root", "Root",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), arguments -> "ok",
-                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-root", "Root"), null);
-        registry.register("default-root", metadata);
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default:root", "Root"), null);
+        registry.register("default:root", metadata);
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         org.mockito.Mockito.when(router.execute(any(), any(), any(), any())).thenReturn("ok");
         var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),

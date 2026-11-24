@@ -21,7 +21,7 @@ class CapabilityMetadataTest
     void rejectsNullSkillKind()
     {
         assertThatThrownBy(() -> new CapabilityMetadata(
-                "id", "default-name", "description", SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), arguments -> "ok", null, CapabilityToolDescriptor.generic("default-name", "description"), null))
+                "id", "default:name", "description", SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), arguments -> "ok", null, CapabilityToolDescriptor.generic("default:name", "description"), null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("kind must not be null");
     }
@@ -30,7 +30,7 @@ class CapabilityMetadataTest
     void rejectsProviderToolNameThatDoesNotMatchPublicYamlName()
     {
         assertThatThrownBy(() -> new CapabilityMetadata(
-                "id", "default-public_skill", "description", SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), arguments -> "ok", SkillKind.YAML,
+                "id", "default:public-skill", "description", SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), arguments -> "ok", SkillKind.YAML,
                 CapabilityToolDescriptor.generic("bean#method", "description"), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("tool.name")

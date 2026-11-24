@@ -34,20 +34,20 @@ class DefaultExecutionTraceRecorderAttachmentTest
     @Test
     void bindsCollectionToCapturedMissionWhileAnotherFrameIsActive()
     {
-        var session = TestLoomspanSessions.create("attachment-recorder-owner", "default-owner", 5, null, TracePersistencePolicy.ALWAYS);
+        var session = TestLoomspanSessions.create("attachment-recorder-owner", "default:owner", 5, null, TracePersistencePolicy.ALWAYS);
         var binding = TestExecutionBindings.missionBinding(session);
         var missionId = binding.requireMission().missionFrameId();
-        binding.branch().push(frame("planning", missionId, TraceFrameType.PLANNING, "default-owner#planning"));
-        binding.branch().push(frame("model", "planning", TraceFrameType.MODEL_CALL, "default-owner#model"));
+        binding.branch().push(frame("planning", missionId, TraceFrameType.PLANNING, "default:owner#planning"));
+        binding.branch().push(frame("model", "planning", TraceFrameType.MODEL_CALL, "default:owner#model"));
         var descriptors = List.of(descriptor("/a.b", "ref://one.pdf"), descriptor("/a/b", "resource"));
-        ExecutionBindingScope.runWith(binding, () -> recorder.recordAttachments(session, "default-owner", descriptors));
+        ExecutionBindingScope.runWith(binding, () -> recorder.recordAttachments(session, "default:owner", descriptors));
         var records = attachmentRecords(session);
         assertThat(records).hasSize(1);
         var record = records.getFirst();
         assertThat(record.recordType()).isEqualTo(TraceRecordType.FRAME_METADATA_RECORDED);
         assertThat(record.frameId()).isEqualTo(missionId);
         assertThat(record.frameType()).isEqualTo(TraceFrameType.ROOT_MISSION);
-        assertThat(record.route()).isEqualTo("default-owner");
+        assertThat(record.route()).isEqualTo("default:owner");
         assertThat(record.data().path("attachments").get(0).path("fieldPath").asText()).isEqualTo("/a.b");
         assertThat(record.data().path("attachments").get(1).path("fieldPath").asText()).isEqualTo("/a/b");
         assertThat(record.data().path("attachments").get(0).path("name").isNull()).isTrue();
@@ -58,16 +58,16 @@ class DefaultExecutionTraceRecorderAttachmentTest
     @Test
     void isolatesNestedSameRouteMissionMetadataByFrameIdentity()
     {
-        var session = TestLoomspanSessions.create("attachment-recorder-nested", "default-owner", 5, null, TracePersistencePolicy.ALWAYS);
+        var session = TestLoomspanSessions.create("attachment-recorder-nested", "default:owner", 5, null, TracePersistencePolicy.ALWAYS);
         var parent = TestExecutionBindings.missionBinding(session);
         var parentId = parent.requireMission().missionFrameId();
-        var childFrame = frame("child", parentId, TraceFrameType.SKILL_EXECUTION, "default-owner");
+        var childFrame = frame("child", parentId, TraceFrameType.SKILL_EXECUTION, "default:owner");
         parent.branch().push(childFrame);
-        var childMission = new MissionContext(session, "default-owner", "child", parent.requireMission());
+        var childMission = new MissionContext(session, "default:owner", "child", parent.requireMission());
         var child = parent.withMission(childMission);
-        ExecutionBindingScope.runWith(child, () -> recorder.recordAttachments(session, "default-owner", List.of(descriptor("/child", "resource"))));
+        ExecutionBindingScope.runWith(child, () -> recorder.recordAttachments(session, "default:owner", List.of(descriptor("/child", "resource"))));
         parent.branch().close(childFrame);
-        ExecutionBindingScope.runWith(parent, () -> recorder.recordAttachments(session, "default-owner", List.of(descriptor("/parent", "ref://parent.pdf"))));
+        ExecutionBindingScope.runWith(parent, () -> recorder.recordAttachments(session, "default:owner", List.of(descriptor("/parent", "ref://parent.pdf"))));
         var records = attachmentRecords(session);
         assertThat(records).extracting(TraceRecord::frameId).containsExactly("child", parentId);
         assertThat(records).extracting(record -> record.data().path("attachments").get(0).path("fieldPath").asText())
@@ -77,15 +77,15 @@ class DefaultExecutionTraceRecorderAttachmentTest
     @Test
     void rejectsWrongMissionOrSessionAndDoesNotInventEmptyCollections()
     {
-        var session = TestLoomspanSessions.create("attachment-recorder-guards", "default-owner", 3, null, TracePersistencePolicy.ALWAYS);
+        var session = TestLoomspanSessions.create("attachment-recorder-guards", "default:owner", 3, null, TracePersistencePolicy.ALWAYS);
         var binding = TestExecutionBindings.missionBinding(session);
-        var other = TestLoomspanSessions.create("attachment-recorder-other", "default-owner", 3, null, TracePersistencePolicy.ALWAYS);
+        var other = TestLoomspanSessions.create("attachment-recorder-other", "default:owner", 3, null, TracePersistencePolicy.ALWAYS);
         ExecutionBindingScope.runWith(binding, () -> {
-            assertThatThrownBy(() -> recorder.recordAttachments(session, "default-other", List.of(descriptor("/x", "resource"))))
+            assertThatThrownBy(() -> recorder.recordAttachments(session, "default:other", List.of(descriptor("/x", "resource"))))
                     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("owning mission");
-            assertThatThrownBy(() -> recorder.recordAttachments(other, "default-owner", List.of(descriptor("/x", "resource"))))
+            assertThatThrownBy(() -> recorder.recordAttachments(other, "default:owner", List.of(descriptor("/x", "resource"))))
                     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("session");
-            recorder.recordAttachments(session, "default-owner", List.of());
+            recorder.recordAttachments(session, "default:owner", List.of());
         });
         var records = attachmentRecords(session);
         assertThat(records).isEmpty();

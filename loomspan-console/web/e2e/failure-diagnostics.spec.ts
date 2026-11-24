@@ -80,7 +80,7 @@ test("selects nested synthesis inability after root success and inspects the par
   await expect(panel.getByText("Final synthesis reported planner inability")).toBeVisible();
   await expect(panel.getByText("synthesis-step", { exact: true })).toBeVisible();
   await expect(panel.getByText("gather-records", { exact: true })).toBeVisible();
-  await expect(panel.getByText("default-summarize#step-2", { exact: true }).first()).toBeVisible();
+  await expect(panel.getByText("default:summarize#step-2", { exact: true }).first()).toBeVisible();
   expect(await panel.locator(".failure-diagnostics pre").textContent()).toBe("  Records disagree.\r\n雪\t");
   await panel.getByRole("button", { name: "Load diagnostic 2" }).click();
   const signal = panel.locator(".failure-diagnostic-output pre");

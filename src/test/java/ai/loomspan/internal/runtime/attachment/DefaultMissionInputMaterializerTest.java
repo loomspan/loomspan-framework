@@ -31,7 +31,7 @@ class DefaultMissionInputMaterializerTest
     @Test
     void materializesRefAttachmentToDescriptorAndResource() throws Exception
     {
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_entry");
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default:test-entry");
         Path file = tempDir.resolve(session.getSessionId()).resolve("forms").resolve("ticket.jpg");
         Files.createDirectories(file.getParent());
         Files.write(file, jpegBytes());
@@ -63,7 +63,7 @@ class DefaultMissionInputMaterializerTest
         };
 
         assertThatThrownBy(() -> materializer(DataSize.ofMegabytes(1)).materialize(
-                ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_entry"),
+                ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default:test-entry"),
                 definition(),
                 "Extract ticket",
                 Map.of("image", text)))
@@ -85,7 +85,7 @@ class DefaultMissionInputMaterializerTest
         };
 
         assertThatThrownBy(() -> materializer(DataSize.ofMegabytes(1)).materialize(
-                ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_entry"),
+                ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default:test-entry"),
                 definition(),
                 "Extract ticket",
                 Map.of("image", textNamedJpeg)))
@@ -107,7 +107,7 @@ class DefaultMissionInputMaterializerTest
         };
 
         assertThatThrownBy(() -> materializer(DataSize.ofMegabytes(1)).materialize(
-                ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_entry"),
+                ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default:test-entry"),
                 definition(),
                 "Extract ticket",
                 Map.of("image", streamResource)))
@@ -119,7 +119,7 @@ class DefaultMissionInputMaterializerTest
     void rejectsMissingRefWithFieldSpecificMessage()
     {
         assertThatThrownBy(() -> materializer(DataSize.ofMegabytes(1)).materialize(
-                ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_entry"),
+                ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default:test-entry"),
                 definition(),
                 "Extract ticket",
                 Map.of("image", "ref://forms/missing.jpg")))
@@ -141,7 +141,7 @@ class DefaultMissionInputMaterializerTest
         };
 
         assertThatThrownBy(() -> materializer(DataSize.ofBytes(3)).materialize(
-                ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default-test_entry"),
+                ai.loomspan.internal.core.TestLoomspanSessions.create(8, "default:test-entry"),
                 definition(),
                 "Extract ticket",
                 Map.of("image", image)))
@@ -159,7 +159,7 @@ class DefaultMissionInputMaterializerTest
     private YamlSkillDefinition definition()
     {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("attachmentSkill");
+        manifest.setName("attachment-skill");
         manifest.setDescription("Attachment skill");
         manifest.setModel("model");
 

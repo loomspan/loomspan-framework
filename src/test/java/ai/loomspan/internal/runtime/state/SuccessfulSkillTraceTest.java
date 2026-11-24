@@ -24,23 +24,23 @@ class SuccessfulSkillTraceTest
     {
         DefaultExecutionStateService state = new DefaultExecutionStateService(Clock.fixed(
                 Instant.parse("2026-03-15T12:00:00Z"), ZoneOffset.UTC));
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("trace", "default-test_entry", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("trace", "default:test-entry", 3);
         TestExecutionBindings.callWithSession(session, () -> {
         ExecutionFrame frame = state.openMissionFrame(session, "handleIncident", Map.of());
 
-        state.recordSuccessfulSkill("default-investigateNetwork", "task-1", false);
-        state.recordSuccessfulSkill("default-investigateNetwork", "task-2", false);
+        state.recordSuccessfulSkill("default:investigate-network", "task-1", false);
+        state.recordSuccessfulSkill("default:investigate-network", "task-2", false);
         state.closeMissionFrame(session, frame);
 
         assertThat(ExecutionBindingScope.requireCurrent().requireMission().successfulDirectSkills())
-                .containsExactly("default-investigateNetwork");
+                .containsExactly("default:investigate-network");
         List<TraceRecord> records = new ArrayList<>();
         session.readTraceRecords(records::add);
         assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.EVIDENCE_RECORDED)
                 .hasSize(2)
                 .allSatisfy(record ->
                 {
-                    assertThat(record.data().path("successfulSkill").asText()).isEqualTo("default-investigateNetwork");
+                    assertThat(record.data().path("successfulSkill").asText()).isEqualTo("default:investigate-network");
                     assertThat(record.data().path("successfulDirectSkills")).hasSize(1);
                     assertThat(record.data().has("evidenceTypes")).isFalse();
                     assertThat(record.data().has("ledger")).isFalse();

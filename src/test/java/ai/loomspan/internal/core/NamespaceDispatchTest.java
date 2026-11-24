@@ -23,20 +23,20 @@ class NamespaceDispatchTest {
     @Test void everyDirectAndAssembledRouteIndependentlyChecksSourceBeforeSwitching() {
         for (boolean declared : List.of(false, true)) for (var visibility : NamespaceVisibility.values()) {
             var count = new AtomicInteger();
-            var target = new CapabilityMetadata("target", "tax-leaf", "leaf", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), input -> {
+            var target = new CapabilityMetadata("target", "tax:leaf", "leaf", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), input -> {
                 count.incrementAndGet();
                 var selected = ExecutionBindingScope.requireCurrent();
                 assertThat(selected.currentNamespace()).isEqualTo("tax");
                 assertThat(selected.entryNamespace()).isEqualTo("orders");
-                assertThat(selected.mission().parent().orElseThrow().skillName()).isEqualTo("orders-root");
+                assertThat(selected.mission().parent().orElseThrow().skillName()).isEqualTo("orders:root");
                 return "ok";
-            }, SkillKind.JAVA, CapabilityToolDescriptor.generic("tax-leaf", "leaf"), null);
+            }, SkillKind.JAVA, CapabilityToolDescriptor.generic("tax:leaf", "leaf"), null);
             var manifest = new YamlSkillManifest(); manifest.setName("root");
             var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "orders", new ByteArrayResource(new byte[0]), manifest,
                     new EffectiveSkillExecutionConfiguration("model", "connection", ai.loomspan.autoconfigure.AiDriver.OPENAI, "provider", null),
                     null, null, declared ? List.of(new AllowedSkillConstraint(target.name(), null, null, false, List.of())) : List.of());
-            var root = new CapabilityMetadata("source", "orders-root", "root", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), input -> "unused",
-                    SkillKind.YAML, CapabilityToolDescriptor.generic("orders-root", "root"), null);
+            var root = new CapabilityMetadata("source", "orders:root", "root", SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), input -> "unused",
+                    SkillKind.YAML, CapabilityToolDescriptor.generic("orders:root", "root"), null);
             var emptyCatalog = new ai.loomspan.internal.runtime.observation.catalog.DefaultRegisteredSkillCatalog(List.of(), Map.of());
             var orders = new SkillGeneration("orders", "orders-old", Map.of(root.name(), root), Map.of(root.name(), definition), null, emptyCatalog);
             var tax = new SkillGeneration("tax", "tax-old", Map.of(target.name(), target), Map.of(), null, emptyCatalog, null, visibility);

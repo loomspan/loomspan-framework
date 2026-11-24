@@ -29,8 +29,8 @@ class JavaSkillMissionCutoffTest
     @Test
     void completedExceptionalFutureStillPropagatesInstalledFrameworkPrimary()
     {
-        var session = TestLoomspanSessions.withId("java-framework-race", "default-javaRoot", 3);
-        var mission = new MissionContext(session, "default-javaRoot", "frame", null);
+        var session = TestLoomspanSessions.withId("java-framework-race", "default:java-root", 3);
+        var mission = new MissionContext(session, "default:java-root", "frame", null);
         var binding = ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
         mission.lifecycle().frameworkCutoff(System.nanoTime());
         var state = new DefaultExecutionStateService(Clock.systemUTC());
@@ -39,15 +39,15 @@ class JavaSkillMissionCutoffTest
                 state, Duration.ofSeconds(5), executor, new NoOpSessionUsageService());
 
         assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(
-                binding, () -> workExecutor.execute(session, "default-javaRoot", () -> "unreachable")))
+                binding, () -> workExecutor.execute(session, "default:java-root", () -> "unreachable")))
                 .isInstanceOf(FrameworkShutdownException.class);
     }
 
     @Test
     void frameworkCutoffDoesNotReplaceAnAlreadyCompletedApplicationFailure()
     {
-        var session = TestLoomspanSessions.withId("java-application-failure-race", "default-javaRoot", 3);
-        var mission = new MissionContext(session, "default-javaRoot", "frame", null);
+        var session = TestLoomspanSessions.withId("java-application-failure-race", "default:java-root", 3);
+        var mission = new MissionContext(session, "default:java-root", "frame", null);
         var binding = ai.loomspan.testkit.TestSkillGenerations.binding(session, mission, new PhysicalBranchContext(session), ai.loomspan.testkit.TestSkillGenerations.empty());
         var state = new DefaultExecutionStateService(Clock.systemUTC());
         var executor = new InlineExecutor(() -> mission.lifecycle().frameworkCutoff(System.nanoTime()));
@@ -56,7 +56,7 @@ class JavaSkillMissionCutoffTest
         var applicationFailure = new IllegalArgumentException("application failed before cutoff");
 
         assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(
-                binding, () -> workExecutor.execute(session, "default-javaRoot", () -> { throw applicationFailure; })))
+                binding, () -> workExecutor.execute(session, "default:java-root", () -> { throw applicationFailure; })))
                 .isSameAs(applicationFailure);
     }
 
@@ -66,12 +66,12 @@ class JavaSkillMissionCutoffTest
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         AtomicBoolean lateWrite = new AtomicBoolean();
-        var session = TestLoomspanSessions.withId("java-timeout", "default-javaRoot", 3);
+        var session = TestLoomspanSessions.withId("java-timeout", "default:java-root", 3);
         var executor = new ControlledTimeoutExecutor(started);
         try
         {
             var coordinator = coordinator(executor, arguments -> work(started, release, lateWrite));
-            assertThatThrownBy(() -> coordinator.execute("default-javaRoot", "root", session, null))
+            assertThatThrownBy(() -> coordinator.execute("default:java-root", "root", session, null))
                     .isInstanceOf(LoomspanMissionTimeoutException.class);
             var before = records(session);
             assertClosedOnce(before);
@@ -96,11 +96,11 @@ class JavaSkillMissionCutoffTest
         AtomicBoolean lateWrite = new AtomicBoolean();
         AtomicBoolean callerInterrupted = new AtomicBoolean();
         AtomicReference<Throwable> failure = new AtomicReference<>();
-        var session = TestLoomspanSessions.withId("java-interrupted", "default-javaRoot", 3);
+        var session = TestLoomspanSessions.withId("java-interrupted", "default:java-root", 3);
         var executor = Executors.newVirtualThreadPerTaskExecutor();
         var coordinator = coordinator(executor, arguments -> work(started, release, lateWrite));
         Thread caller = Thread.ofPlatform().unstarted(() -> {
-            try { coordinator.execute("default-javaRoot", "root", session, null); }
+            try { coordinator.execute("default:java-root", "root", session, null); }
             catch (Throwable ex) { failure.set(ex); callerInterrupted.set(Thread.currentThread().isInterrupted()); }
         });
         try
@@ -145,9 +145,9 @@ class JavaSkillMissionCutoffTest
     private static ExecutionCoordinator coordinator(ExecutorService executor, CapabilityInvoker invoker)
     {
         var registry = new TestCapabilityRegistry();
-        registry.register("default-javaRoot", new CapabilityMetadata("default-javaRoot", "default-javaRoot", "Java work",
+        registry.register("default:java-root", new CapabilityMetadata("default:java-root", "default:java-root", "Java work",
                 SkillExecutionDescriptor.none(), SkillAccessPolicy.unrestricted(), invoker, SkillKind.JAVA,
-                CapabilityToolDescriptor.generic("default-javaRoot", "Java work"), new SkillSource(null, "bean", "work()", null)));
+                CapabilityToolDescriptor.generic("default:java-root", "Java work"), new SkillSource(null, "bean", "work()", null)));
         var state = new DefaultExecutionStateService(Clock.systemUTC());
         MissionExecutionEngine noModel = (s,d,o,i,m,t,p,a) -> { throw new AssertionError("Java dispatched model work"); };
         var generation = registry.generation();

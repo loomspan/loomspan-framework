@@ -37,9 +37,9 @@ class BoundCapabilityTest
 
     private static CapabilityMetadata metadata()
     {
-        return new CapabilityMetadata("test:null", "default-nullableTool", "Nullable tool",
+        return new CapabilityMetadata("test:null", "default:nullable-tool", "Nullable tool",
                 SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()), ignored -> null, SkillKind.YAML,
-                new CapabilityToolDescriptor("default-nullableTool", "Nullable tool",
+                new CapabilityToolDescriptor("default:nullable-tool", "Nullable tool",
                         "{\"type\":\"object\",\"properties\":{\"optional\":{\"type\":\"string\"}}}", null),
                 null, null);
     }

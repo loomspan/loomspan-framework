@@ -66,9 +66,9 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                 new DefaultSkillAdvisorResolver(stateService).resolve(definition),
                 List.of("not-json", "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}"));
         ExecutionCoordinator coordinator = coordinator(definition, chatClient, stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-outputSchemaSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default:output-schema-skill", 3);
 
-        String response = coordinator.execute("default-outputSchemaSkill", "Extract invoice", session, null);
+        String response = coordinator.execute("default:output-schema-skill", "Extract invoice", session, null);
 
         assertThat(response).isEqualTo("{\"vendorName\":\"Acme\",\"totalAmount\":42.5}");
         assertThat(chatClient.callCount).isEqualTo(2);
@@ -105,9 +105,9 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                         "{\"vendorName\":\"Acme\",\"totalAmount\":42.5}",
                         "{\"vendorName\":\"Acme\",\"totalAmount\":42.5,\"status\":\"OK\"}"));
         ExecutionCoordinator coordinator = coordinator(definition, chatClient, stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-2", "default-outputSchemaSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-2", "default:output-schema-skill", 3);
 
-        String response = coordinator.execute("default-outputSchemaSkill", "Extract invoice", session, null);
+        String response = coordinator.execute("default:output-schema-skill", "Extract invoice", session, null);
 
         assertThat(response).isEqualTo("{\"vendorName\":\"Acme\",\"totalAmount\":42.5,\"status\":\"OK\"}");
         assertThat(chatClient.callCount).isEqualTo(3);
@@ -132,8 +132,8 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                 List.of(rawJson));
         ExecutionCoordinator coordinator = coordinator(definition, chatClient, stateService);
 
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-3", "default-outputSchemaSkill", 3);
-        String response = coordinator.execute("default-outputSchemaSkill", "Extract invoice", session, null);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-3", "default:output-schema-skill", 3);
+        String response = coordinator.execute("default:output-schema-skill", "Extract invoice", session, null);
 
         assertThat(response).isEqualTo(rawJson);
     }
@@ -198,8 +198,8 @@ class ExecutionCoordinatorOutputSchemaIntegrationTest {
                 "openai/gpt-5",
                 "medium");
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("outputSchemaSkill");
-        manifest.setDescription("default-outputSchemaSkill");
+        manifest.setName("output-schema-skill");
+        manifest.setDescription("default:output-schema-skill");
         manifest.setModel("gpt-5");
         manifest.setAllowedSkills(List.of());
         manifest.setPlanningMode(false);

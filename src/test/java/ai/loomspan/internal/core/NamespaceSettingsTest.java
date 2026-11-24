@@ -19,10 +19,10 @@ class NamespaceSettingsTest {
         var properties = new LoomspanProperties(); properties.getSession().getAttachments().setMaxSize(DataSize.ofBytes(20));
         var smaller = new LoomspanProperties(); smaller.getSession().getAttachments().setMaxSize(DataSize.ofBytes(3));
         var orders = generation("orders", properties); var tax = generation("tax", smaller);
-        var snapshot = new SkillAdmissionSnapshot(SkillIdentity.parse("orders-root"), Map.of("orders", orders, "tax", tax));
-        var session = TestLoomspanSessions.withId("attachments", "orders-root", 8);
-        var parent = ExecutionBinding.sessionOnly(session, snapshot).withMission(new MissionContext(session, "orders-root", "root", null));
-        var child = new ExecutionBinding(session, new MissionContext(session, "tax-child", "child", parent.mission()), parent.branch(), tax, snapshot);
+        var snapshot = new SkillAdmissionSnapshot(SkillIdentity.parse("orders:root"), Map.of("orders", orders, "tax", tax));
+        var session = TestLoomspanSessions.withId("attachments", "orders:root", 8);
+        var parent = ExecutionBinding.sessionOnly(session, snapshot).withMission(new MissionContext(session, "orders:root", "root", null));
+        var child = new ExecutionBinding(session, new MissionContext(session, "tax:child", "child", parent.mission()), parent.branch(), tax, snapshot);
         var materializer = new ai.loomspan.internal.runtime.attachment.DefaultMissionInputMaterializer(mock(ai.loomspan.internal.vfs.RefResolver.class));
         var manifest = new YamlSkillManifest(); manifest.setName("child");
         manifest.setInputSchema(ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
@@ -42,8 +42,8 @@ class NamespaceSettingsTest {
             assertThat(ExecutionBindingScope.requireCurrent()).isSameAs(parent);
         });
         // A large current limit is not reduced to the entry's smaller attachment setting.
-        var reverse = new SkillAdmissionSnapshot(SkillIdentity.parse("tax-root"), Map.of("orders", orders, "tax", tax));
-        var reverseSession = TestLoomspanSessions.withId("reverse", "tax-root", 8);
+        var reverse = new SkillAdmissionSnapshot(SkillIdentity.parse("tax:root"), Map.of("orders", orders, "tax", tax));
+        var reverseSession = TestLoomspanSessions.withId("reverse", "tax:root", 8);
         var current = new ExecutionBinding(reverseSession, null, new PhysicalBranchContext(reverseSession), orders, reverse);
         ExecutionBindingScope.runWith(current, () -> assertThat(materializer.materialize(reverseSession, definition, "input", input).attachments()).hasSize(1));
     }
@@ -53,24 +53,24 @@ class NamespaceSettingsTest {
             var parentSettings = new LoomspanProperties(); parentSettings.getSession().setMissionTimeout(Duration.ofMillis(parentExpires ? 400 : 3000));
             var childSettings = new LoomspanProperties(); childSettings.getSession().setMissionTimeout(Duration.ofMillis(parentExpires ? 3000 : 100));
             var orders = generation("orders", parentSettings); var tax = generation("tax", childSettings);
-            var snapshot = new SkillAdmissionSnapshot(SkillIdentity.parse("orders-root"), Map.of("orders", orders, "tax", tax));
-            var session = TestLoomspanSessions.withId("timeouts" + parentExpires, "orders-root", 8);
-            var parent = ExecutionBinding.sessionOnly(session, snapshot).withMission(new MissionContext(session, "orders-root", "root", null));
-            var child = new ExecutionBinding(session, new MissionContext(session, "tax-child", "child", parent.mission()), parent.branch(), tax, snapshot);
+            var snapshot = new SkillAdmissionSnapshot(SkillIdentity.parse("orders:root"), Map.of("orders", orders, "tax", tax));
+            var session = TestLoomspanSessions.withId("timeouts" + parentExpires, "orders:root", 8);
+            var parent = ExecutionBinding.sessionOnly(session, snapshot).withMission(new MissionContext(session, "orders:root", "root", null));
+            var child = new ExecutionBinding(session, new MissionContext(session, "tax:child", "child", parent.mission()), parent.branch(), tax, snapshot);
             var started = new CountDownLatch(1); var returned = new CountDownLatch(1);
             try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 var state = mock(ExecutionStateService.class);
                 when(state.recordFailure(eq(session), any(Throwable.class), anyMap())).thenReturn("failure");
                 var worker = new MissionWorkExecutor(state, Duration.ofSeconds(30), executor, new NoOpSessionUsageService());
-                assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(parent, () -> worker.execute(session, "orders-root", () -> {
+                assertThatThrownBy(() -> ExecutionBindingScope.supplyWith(parent, () -> worker.execute(session, "orders:root", () -> {
                     Thread.sleep(50); // Child starts after the parent's own timeout is already running.
-                    return ExecutionBindingScope.supplyWith(child, () -> worker.execute(session, "tax-child", () -> {
+                    return ExecutionBindingScope.supplyWith(child, () -> worker.execute(session, "tax:child", () -> {
                         started.countDown();
                         try { new CountDownLatch(1).await(5, TimeUnit.SECONDS); return "unreachable"; }
                         finally { returned.countDown(); }
                     }));
                 }))).isInstanceOf(LoomspanMissionTimeoutException.class)
-                        .hasMessageContaining(parentExpires ? "orders-root after PT0.4S" : "tax-child after PT0.1S");
+                        .hasMessageContaining(parentExpires ? "orders:root after PT0.4S" : "tax:child after PT0.1S");
                 assertThat(started.await(1, TimeUnit.SECONDS)).isTrue();
                 assertThat(returned.await(2, TimeUnit.SECONDS)).isTrue();
                 assertThat(ExecutionBindingScope.current()).isEmpty();

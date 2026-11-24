@@ -63,8 +63,8 @@ class ExecutionCoordinatorLinterIntegrationTest {
                 "openai/gpt-5",
                 "medium");
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("lintedSkill");
-        manifest.setDescription("default-lintedSkill");
+        manifest.setName("linted-skill");
+        manifest.setDescription("default:linted-skill");
         manifest.setModel("gpt-5");
         manifest.setAllowedSkills(List.of());
         manifest.setPlanningMode(false);
@@ -82,12 +82,12 @@ class ExecutionCoordinatorLinterIntegrationTest {
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
         CapabilityMetadata metadata = new CapabilityMetadata(
                 "yaml:linted",
-                "default-lintedSkill",
-                "default-lintedSkill",
+                "default:linted-skill",
+                "default:linted-skill",
                 SkillExecutionDescriptor.from(executionConfiguration), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(java.util.Set.of()),
                 arguments -> "unused",
                 SkillKind.YAML,
-                CapabilityToolDescriptor.generic("default-lintedSkill", "default-lintedSkill"),
+                CapabilityToolDescriptor.generic("default:linted-skill", "default:linted-skill"),
                 null);
         registry.register(metadata.name(), metadata);
 
@@ -97,10 +97,10 @@ class ExecutionCoordinatorLinterIntegrationTest {
                 List.of("not ok", "OK: corrected"));
         ExecutionCoordinator coordinator = coordinator(catalog, registry,
                 (ignored, mode) -> chatClient, stateService);
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default-lintedSkill", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.create("session-1", "default:linted-skill", 3);
 
         String response = TestExecutionBindings.callWithGeneration(session, registry.generation(catalog),
-                () -> coordinator.execute("default-lintedSkill", "Produce YAML", session, null));
+                () -> coordinator.execute("default:linted-skill", "Produce YAML", session, null));
 
         assertThat(response).isEqualTo("OK: corrected");
         assertThat(chatClient.callCount).isEqualTo(2);

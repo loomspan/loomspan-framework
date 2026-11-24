@@ -30,17 +30,17 @@ class SkillVisibilityResolverTest {
         catalog.afterPropertiesSet();
         SkillGeneration generation = generation(catalog);
         DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(new DefaultAccessGuard());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-rootVisibleSkill", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default:root-visible-skill", 2);
         List<CapabilityMetadata> visible = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
                 ai.loomspan.internal.core.TestExecutionBindings.missionBinding(session, generation), () -> resolver.visibleSkillsFor(
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 session,
                 UsernamePasswordAuthenticationToken.authenticated(
                         "user",
                         "pw",
                         AuthorityUtils.createAuthorityList("ROLE_ALLOWED"))));
 
-        assertThat(visible).extracting(CapabilityMetadata::name).containsExactly("default-allowedVisibleSkill");
+        assertThat(visible).extracting(CapabilityMetadata::name).containsExactly("default:allowed-visible-skill");
     }
 
     @Test
@@ -49,17 +49,17 @@ class SkillVisibilityResolverTest {
         catalog.afterPropertiesSet();
         SkillGeneration generation = generation(catalog);
         DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(new DefaultAccessGuard());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-rootVisibleSkill", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default:root-visible-skill", 2);
         List<CapabilityMetadata> visible = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
                 ai.loomspan.internal.core.TestExecutionBindings.missionBinding(session, generation), () -> resolver.visibleSkillsFor(
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 session,
                 UsernamePasswordAuthenticationToken.authenticated(
                         "user",
                         "pw",
                         AuthorityUtils.createAuthorityList("ROLE_ALLOWED"))));
 
-        assertThat(visible).extracting(CapabilityMetadata::name).containsExactly("default-allowedVisibleSkill");
+        assertThat(visible).extracting(CapabilityMetadata::name).containsExactly("default:allowed-visible-skill");
     }
 
     @Test
@@ -68,10 +68,10 @@ class SkillVisibilityResolverTest {
         catalog.afterPropertiesSet();
         SkillGeneration generation = generation(catalog);
         DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(new DefaultAccessGuard());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-rootVisibleSkill", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default:root-visible-skill", 2);
         List<CapabilityMetadata> visible = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
                 ai.loomspan.internal.core.TestExecutionBindings.missionBinding(session, generation), () -> resolver.visibleSkillsFor(
-                "default-rootVisibleSkill",
+                "default:root-visible-skill",
                 session,
                 null));
 
@@ -84,7 +84,7 @@ class SkillVisibilityResolverTest {
         catalog.afterPropertiesSet();
         SkillGeneration generation = generation(catalog);
         DefaultSkillVisibilityResolver resolver = new DefaultSkillVisibilityResolver(new DefaultAccessGuard());
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default-rootVisibleSkill", 2);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("session-1", "default:root-visible-skill", 2);
         session.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
                 "user",
                 "pw",
@@ -92,9 +92,9 @@ class SkillVisibilityResolverTest {
 
         List<CapabilityMetadata> visible = ai.loomspan.internal.core.ExecutionBindingScope.supplyWith(
                 ai.loomspan.internal.core.TestExecutionBindings.missionBinding(session, generation),
-                () -> resolver.visibleSkillsFor("default-rootVisibleSkill", session, null));
+                () -> resolver.visibleSkillsFor("default:root-visible-skill", session, null));
 
-        assertThat(visible).extracting(CapabilityMetadata::name).containsExactly("default-allowedVisibleSkill");
+        assertThat(visible).extracting(CapabilityMetadata::name).containsExactly("default:allowed-visible-skill");
     }
 
     private static YamlSkillCatalog catalog(String... locations) {

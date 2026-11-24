@@ -110,9 +110,7 @@ final class PreparedCandidateVariables {
             selected = map.get(prefix);
         }
         if (!(selected instanceof Map<?, ?> namespaces)) return false;
-        selected = null;
-        for (var entry : namespaces.entrySet())
-            if (entry.getKey() instanceof String key && key.equalsIgnoreCase(namespace)) selected = entry.getValue();
+        selected = namespaces.get(namespace);
         return selection(selected, path.split("\\.", -1), 0) == Selection.UNRESOLVED;
     }
 

@@ -139,18 +139,18 @@ function makeTargetServer(initial: TargetState) {
     if (pathname === "/_loomspan/observability/v1/skills") {
       response.writeHead(200, headers);
       response.end(JSON.stringify({
-        items: [{ registeredName: "default:root-skill", namespace: "default", localName: "root-skill", kind: "JAVA", declaration: "YAML", executorName: "default:fetch-dns", beanName: "dnsSkills", method: "example.DnsSkills.fetch()", sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml", href: "skills/default-root_skill" }],
+        items: [{ registeredName: "default:root-skill", namespace: "default", localName: "root-skill", kind: "JAVA", declaration: "YAML", executorName: "default:fetch-dns", beanName: "dnsSkills", method: "example.DnsSkills.fetch()", sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml", href: "skills/default:root-skill" }],
         hasMore: false, nextCursor: null, observedAt: "2026-07-27T00:00:00Z",
       }));
       return;
     }
-    if (pathname === "/_loomspan/observability/v1/skills/default-root_skill") {
+    if (pathname === "/_loomspan/observability/v1/skills/default:root-skill") {
       response.writeHead(200, headers);
       response.end(JSON.stringify({
         registeredName: "default:root-skill", namespace: "default", localName: "root-skill",
         kind: "JAVA", declaration: "YAML", executorName: "default:fetch-dns", beanName: "dnsSkills", method: "example.DnsSkills.fetch()",
         sourcePath: "classpath:/skills/<script>alert(1)</script>.yaml",
-        yaml: "name: default-root_skill\ndescription: inert executor fixture\nexecutor: fetchDns\ninstructions: '<script>window.location=\\\"https://attacker.invalid\\\"</script><a href=\\\"/target\\\">connect</a>'\n",
+        yaml: "name: root-skill\ndescription: inert executor fixture\nexecutor: fetch-dns\ninstructions: '<script>window.location=\\\"https://attacker.invalid\\\"</script><a href=\\\"/target\\\">connect</a>'\n",
       }));
       return;
     }
@@ -280,11 +280,11 @@ async function navigateToTraceDetail(page: import("@playwright/test").Page, cons
   await expect(page.getByRole("heading", { name: "Trace Catalog" })).toBeVisible();
   await expect(page.getByRole("columnheader").first()).toHaveText("Entry skill");
   const traceRow = page.locator("tbody tr", { hasText: traceId });
-  await expect(traceRow.getByRole("cell").first()).toHaveText("default-test_entry");
+  await expect(traceRow.getByRole("cell").first()).toHaveText("default:test-entry");
   await page.getByRole("link", { name: traceId }).click();
   await expect(page.getByRole("heading", { name: "Trace Detail" })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator("dt", { hasText: "Entry skill" }).locator("xpath=following-sibling::dd[1]"))
-    .toHaveText("default-test_entry");
+    .toHaveText("default:test-entry");
 }
 
 async function acquireAndOpenExplorer(page: import("@playwright/test").Page, consoleProcess: { origin: string }, traceId: string) {
@@ -459,18 +459,18 @@ test("WF-UNFAMILIAR-SKILL-PATH retains repeated invocation selection across view
   await repeated.nth(1).click();
   await expect(page).toHaveURL(/frameId=skill-2/);
   await page.getByRole("tab", { name: "Timeline" }).click();
-  await expect(page.locator('.trace-timeline-row[aria-current="true"]')).toContainText("default-root_skill");
+  await expect(page.locator('.trace-timeline-row[aria-current="true"]')).toContainText("default:root-skill");
   await page.reload();
-  await expect(page.locator('.trace-timeline-row[aria-current="true"]')).toContainText("default-root_skill", { timeout: 15_000 });
+  await expect(page.locator('.trace-timeline-row[aria-current="true"]')).toContainText("default:root-skill", { timeout: 15_000 });
   await expectNoSeriousAccessibilityViolations(page);
   await page.getByRole("tab", { name: "Timeline" }).click();
-  const skillLink = page.getByRole("link", { name: "default-root_skill" });
+  const skillLink = page.getByRole("link", { name: "default:root-skill" });
   await expect(skillLink).toBeVisible();
   await skillLink.click();
   await expect(page.getByRole("heading", { name: "Skill Detail" })).toBeVisible();
   await expect(page.getByText("Java", { exact: true })).toBeVisible();
   await expect(page.getByText("classpath:/skills/<script>alert(1)</script>.yaml", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Skill YAML source")).toContainText("executor: fetchDns");
+  await expect(page.getByLabel("Skill YAML source")).toContainText("executor: fetch-dns");
   await expect(page.getByLabel("Skill YAML source")).toContainText("<script>window.location");
   await expect(page.getByText("Bean", { exact: true })).toBeVisible();
   await expect(page.getByText("Method", { exact: true })).toBeVisible();
@@ -620,7 +620,7 @@ test("WF-AS-04 installed evidence remains after auth rejection while raw downloa
   await page.goto(`${consoleProcess.origin}/traces/trace-single-attempt-success?targetScopeId=${encodeURIComponent(scopeId)}`);
   await expect(page.getByRole("heading", { name: "Trace Detail" })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator("dt", { hasText: "Entry skill" }).locator("xpath=following-sibling::dd[1]"))
-    .toHaveText("default-test_entry");
+    .toHaveText("default:test-entry");
   await expect(page.getByRole("heading", { name: "Trace explorer" })).toBeVisible({ timeout: 15_000 });
 
   // Restore the credential. The local copy remains installed (so acquisition

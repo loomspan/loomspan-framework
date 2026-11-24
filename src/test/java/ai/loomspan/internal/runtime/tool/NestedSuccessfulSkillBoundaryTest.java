@@ -50,8 +50,8 @@ class NestedSuccessfulSkillBoundaryTest
         ExecutionBindingScope.runWith(harness.binding, () -> harness.callback.invoke(Map.of(), null));
 
         assertThat(harness.mission().successfulDirectSkills())
-                .containsExactly("default-classifyIncident", "default-investigateNetwork")
-                .doesNotContain("default-checkDns");
+                .containsExactly("default:classify-incident", "default:investigate-network")
+                .doesNotContain("default:check-dns");
         EvidenceContract parentContract = parentContract();
         assertThat(new EvidenceCoverageValidator().validateEvidenceForClaims(
                 Set.of("likelyCause"), harness.mission().successfulDirectSkills(), parentContract).complete()).isTrue();
@@ -69,15 +69,15 @@ class NestedSuccessfulSkillBoundaryTest
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("nested failure");
         assertThat(harness.mission().successfulDirectSkills())
-                .containsExactly("default-classifyIncident")
-                .doesNotContain("default-investigateNetwork", "default-checkDns");
+                .containsExactly("default:classify-incident")
+                .doesNotContain("default:investigate-network", "default:check-dns");
     }
 
     private static Harness harness(boolean fail)
     {
         DefaultExecutionStateService state = new DefaultExecutionStateService(Clock.fixed(
                 Instant.parse("2026-03-15T12:00:00Z"), ZoneOffset.UTC));
-        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("nested", "default-handleIncident", 3);
+        LoomspanSession session = ai.loomspan.internal.core.TestLoomspanSessions.withId("nested", "default:handle-incident", 3);
         CapabilityMetadata capability = capability();
         var source = definition();
         var sourceMetadata = new CapabilityMetadata("yaml:source", source.identity().toString(), "source",
@@ -89,7 +89,7 @@ class NestedSuccessfulSkillBoundaryTest
                 Map.of(source.identity().toString(), source));
         ExecutionBinding binding = TestExecutionBindings.missionBinding(session, generation);
         ExecutionBindingScope.runWith(binding,
-                () -> state.recordSuccessfulSkill("default-classifyIncident", "task-classify", false));
+                () -> state.recordSuccessfulSkill("default:classify-incident", "task-classify", false));
 
         ExecutionCoordinator coordinator = mock(ExecutionCoordinator.class);
         when(coordinator.execute(any(CapabilityMetadata.class), any(), any(), eq(session), eq(null)))
@@ -99,7 +99,7 @@ class NestedSuccessfulSkillBoundaryTest
                     {
                         assertThat(ExecutionBindingScope.requireCurrent().requireMission()
                                 .successfulDirectSkills()).isEmpty();
-                        state.recordSuccessfulSkill("default-checkDns", "task-dns", false);
+                        state.recordSuccessfulSkill("default:check-dns", "task-dns", false);
                         if (fail) throw new IllegalStateException("nested failure");
                         return "network result";
                     });
@@ -119,23 +119,23 @@ class NestedSuccessfulSkillBoundaryTest
     {
         return new CapabilityMetadata(
                 "yaml:investigateNetwork",
-                "default-investigateNetwork",
+                "default:investigate-network",
                 "Investigate network",
                 SkillExecutionDescriptor.from(new EffectiveSkillExecutionConfiguration(
                         "gpt-5", "test-connection", AiDriver.OPENAI, "openai/gpt-5", "medium")), ai.loomspan.internal.security.SkillAccessPolicy.yamlRoles(Set.of()),
                 arguments -> "unused",
                 SkillKind.YAML,
-                CapabilityToolDescriptor.generic("default-investigateNetwork", "Investigate network"),
+                CapabilityToolDescriptor.generic("default:investigate-network", "Investigate network"),
                 null);
     }
 
     private static YamlSkillDefinition definition()
     {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("handleIncident");
+        manifest.setName("handle-incident");
         manifest.setDescription("Handle incident");
         manifest.setModel("gpt-5");
-        manifest.setAllowedSkills(List.of(new YamlSkillManifest.AllowedSkillManifest("default-investigateNetwork", null, null, null)));
+        manifest.setAllowedSkills(List.of(new YamlSkillManifest.AllowedSkillManifest("default:investigate-network", null, null, null)));
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default",
                 new org.springframework.core.io.ByteArrayResource(new byte[0]),
                 manifest,
@@ -146,8 +146,8 @@ class NestedSuccessfulSkillBoundaryTest
     private static EvidenceContract parentContract()
     {
         return ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(Map.of(
-                "likelyCause", "default-classifyIncident and default-investigateNetwork",
-                "internalProbe", "default-checkDns"));
+                "likelyCause", "default:classify-incident and default:investigate-network",
+                "internalProbe", "default:check-dns"));
     }
 
     private record Harness(LoomspanSession session, ExecutionBinding binding, BoundCapability callback)

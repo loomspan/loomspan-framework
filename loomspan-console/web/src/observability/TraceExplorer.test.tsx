@@ -539,8 +539,10 @@ test("expired local artifact clears explorer state and requests reacquisition", 
   api.getTraceAnalysisSummary.mockRejectedValueOnce(new api.BrowserAPIError("ARTIFACT_EXPIRED", "The local artifact expired."));
   render(<MemoryRouter initialEntries={["/?view=records&frameId=f-1&recordSequence=1&failureId=bad"]}><TraceExplorer traceId="trace-1" onArtifactUnavailable={unavailable} /><LocationProbe /></MemoryRouter>);
   await vi.waitFor(() => expect(unavailable).toHaveBeenCalledWith(expect.objectContaining({ code: "ARTIFACT_EXPIRED" })));
-  expect(screen.getByLabelText("location")).not.toHaveTextContent("frameId");
-  expect(screen.getByLabelText("location")).not.toHaveTextContent("recordSequence");
+  await vi.waitFor(() => {
+    expect(screen.getByLabelText("location")).not.toHaveTextContent("frameId");
+    expect(screen.getByLabelText("location")).not.toHaveTextContent("recordSequence");
+  });
   expect(screen.queryByText(/FAILED/)).toBeNull();
 });
 

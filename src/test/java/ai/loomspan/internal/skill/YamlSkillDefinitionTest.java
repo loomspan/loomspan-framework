@@ -20,7 +20,7 @@ class YamlSkillDefinitionTest
     @Test
     void executorTransformsRemainPreparedAcrossDefensiveManifestCopies() {
         var manifest = manifest("transformed");
-        manifest.setExecutor("default-sql");
+        manifest.setExecutor("default:sql");
         var declaration = new YamlSkillManifest.TransformDeclaration("jslt", "{\"answer\": .question}");
         var compiled = ExecutorTransform.compile(declaration.expression(), "copy fixture");
         manifest.inputTransform(declaration, compiled);
@@ -57,8 +57,8 @@ class YamlSkillDefinitionTest
         nested.put("Long", 7L);
         var items = new java.util.ArrayList<Object>();
         items.add(nested);
-        var manifest = manifest("executorCopy");
-        manifest.setExecutor("default-sql");
+        var manifest = manifest("executor-copy");
+        manifest.setExecutor("default:sql");
         manifest.setConfig(Map.of("items", items));
         var definition = new YamlSkillDefinition(YamlSkillDefinition.Form.EXECUTOR, "default", resource(), manifest, null);
         nested.clear(); items.clear(); manifest.setConfig(Map.of());
@@ -72,7 +72,7 @@ class YamlSkillDefinitionTest
     @Test
     void preservesDeclaredFieldsAcrossDefinitionDefensiveCopies()
     {
-        YamlSkillManifest manifest = manifest("llm_copy_skill");
+        YamlSkillManifest manifest = manifest("llm-copy-skill");
         manifest.setModel(null);
         manifest.setThinkingLevel(" ");
         manifest.setPrompt(null);
@@ -96,7 +96,7 @@ class YamlSkillDefinitionTest
         assertThat(secondCopy.getRbacRoles()).isEmpty();
         assertThat(new ObjectMapper().valueToTree(firstCopy).has("declaredFields")).isFalse();
 
-        YamlSkillManifest omitted = manifest("llm_omitted_copy_skill");
+        YamlSkillManifest omitted = manifest("llm-omitted-copy-skill");
         YamlSkillDefinition llm = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", resource(), omitted, CONFIGURATION);
         assertThat(llm.manifest().declaredFields()).isEmpty();
 
@@ -107,29 +107,29 @@ class YamlSkillDefinitionTest
     {
         var root = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().readTree("""
                 {"type":"object","properties":{
-                  "ResultValue":{"type":"string","x-loomspan-evidence":"default-reviewSkill"},
+                  "ResultValue":{"type":"string","x-loomspan-evidence":"default:review-skill"},
                   "notes":{"type":"array","items":{"type":"string"}}}}
                 """);
 
-        YamlSkillManifest manifest = manifest("llm_evidence_copy_skill");
+        YamlSkillManifest manifest = manifest("llm-evidence-copy-skill");
         manifest.setOutputSchema(root);
         EvidenceContract contract = ai.loomspan.internal.runtime.evidence.TestEvidenceContracts.compiled(
-                Map.of("ResultValue", "default-reviewSkill"));
+                Map.of("ResultValue", "default:review-skill"));
         YamlSkillDefinition definition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", resource(), manifest, CONFIGURATION, contract);
 
         var first = definition.outputSchema().tree();
-        assertThat(first.at("/properties/ResultValue/x-loomspan-evidence").textValue()).isEqualTo("default-reviewSkill");
+        assertThat(first.at("/properties/ResultValue/x-loomspan-evidence").textValue()).isEqualTo("default:review-skill");
         assertThat(first.at("/properties/notes").has("x-loomspan-evidence")).isFalse();
         assertThat(first.at("/properties/notes/items").has("x-loomspan-evidence")).isFalse();
         ((tools.jackson.databind.node.ObjectNode) first.at("/properties/ResultValue")).put("x-loomspan-evidence", "mutated");
         assertThat(definition.outputSchema().tree().at("/properties/ResultValue/x-loomspan-evidence").textValue())
-                .isEqualTo("default-reviewSkill");
+                .isEqualTo("default:review-skill");
     }
 
     @Test
     void enforcesExecutionConfigurationInvariantByImplementationType()
     {
-        YamlSkillManifest llm = manifest("llm_skill");
+        YamlSkillManifest llm = manifest("llm-skill");
         YamlSkillDefinition llmDefinition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", resource(), llm, CONFIGURATION);
         assertThat(llmDefinition.requireExecutionConfiguration()).isSameAs(CONFIGURATION);
 
@@ -143,20 +143,20 @@ class YamlSkillDefinitionTest
     @Test
     void resolvesPlanningConcurrencyAndPreservesItsDeclaration()
     {
-        YamlSkillManifest omitted = manifest("planner_omitted");
+        YamlSkillManifest omitted = manifest("planner-omitted");
         omitted.setPlanningMode(true);
         YamlSkillDefinition omittedDefinition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", resource(), omitted, CONFIGURATION);
         assertThat(omittedDefinition.concurrencyEnabled()).isTrue();
         assertThat(omittedDefinition.manifest().isDeclared(YamlSkillManifest.Field.CONCURRENCY)).isFalse();
 
-        YamlSkillManifest enabled = manifest("planner_enabled");
+        YamlSkillManifest enabled = manifest("planner-enabled");
         enabled.setPlanningMode(true);
         enabled.setConcurrency(true);
         YamlSkillDefinition enabledDefinition = new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", resource(), enabled, CONFIGURATION);
         assertThat(enabledDefinition.concurrencyEnabled()).isTrue();
         assertThat(enabledDefinition.manifest().isDeclared(YamlSkillManifest.Field.CONCURRENCY)).isTrue();
 
-        YamlSkillManifest disabled = manifest("planner_disabled");
+        YamlSkillManifest disabled = manifest("planner-disabled");
         disabled.setPlanningMode(true);
         disabled.setConcurrency(false);
         assertThat(new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", resource(), disabled, CONFIGURATION).concurrencyEnabled()).isFalse();

@@ -15,6 +15,6 @@
   "values": {"provider.key":"demo-key","app.region":"west","records.url":"https://records.example.test","records.lookup-path":"/v2/records/{recordId}"},
   "resolved": [
     {"loomspan":{"connections":{"primary":{"driver":"openai","api-key":"demo-key","headers":{"X-Region":"west"}}},"executor-config":{"sales":{"targets":{"records":{"base-url":"https://records.example.test","headers":{"X-Region":"west","Accept":"application/json"},"regions":[{"values":["west"]}]}}}}}},
-    {"name":"read_record","description":"Read a record from the configured service","executor":"http","config":{"target":"records","method":"GET","path":"/v2/records/{recordId}"}}
+    {"name":"read-record","description":"Read a record from the configured service","executor":"http","config":{"target":"records","method":"GET","path":"/v2/records/{recordId}"}}
   ]
 }

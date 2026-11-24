@@ -89,11 +89,11 @@ class ConcurrentGroupedExecutionIntegrationTest
     @Test
     void concurrentNestedDirectAndPlanningMissionsKeepStateAndDiagnosticsIsolated() throws Exception
     {
-        String root = "default-rootPlanner";
-        String directChild = "default-directChild";
-        String planningChild = "default-planningChild";
-        String leafA = "default-leafA";
-        String leafB = "default-leafB";
+        String root = "default:root-planner";
+        String directChild = "default:direct-child";
+        String planningChild = "default:planning-child";
+        String leafA = "default:leaf-a";
+        String leafB = "default:leaf-b";
         Authentication authentication = allowedAuthentication();
         LoomspanSession session = session("concurrent-nested", root, 6, authentication);
         DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
@@ -209,10 +209,10 @@ class ConcurrentGroupedExecutionIntegrationTest
     @Test
     void actualNestedDepthFailureIsAnOrdinaryMemberOutcomeAndDoesNotCancelSibling()
     {
-        String root = "default-depthRoot";
-        String deepChild = "default-deepChild";
-        String grandchild = "default-grandchild";
-        String successfulChild = "default-successfulChild";
+        String root = "default:depth-root";
+        String deepChild = "default:deep-child";
+        String grandchild = "default:grandchild";
+        String successfulChild = "default:successful-child";
         Authentication authentication = allowedAuthentication();
         LoomspanSession session = session("concurrent-depth", root, 2, authentication);
         DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
@@ -229,7 +229,7 @@ class ConcurrentGroupedExecutionIntegrationTest
         MissionExecutionEngine directEngine = (currentSession, definition, objective, missionInput, model,
                 visibleTools, planningEnabled, currentAuthentication) -> switch (definition.identity().toString())
         {
-            case "default-deepChild" -> {
+            case "default:deep-child" -> {
                 deepStarted.countDown();
                 await(siblingStarted, "sibling must start before the nested depth failure");
                 try
@@ -241,13 +241,13 @@ class ConcurrentGroupedExecutionIntegrationTest
                     depthAttempted.countDown();
                 }
             }
-            case "default-successfulChild" -> {
+            case "default:successful-child" -> {
                 siblingStarted.countDown();
                 await(deepStarted, "deep child must start concurrently");
                 await(depthAttempted, "sibling must remain alive through the nested depth failure");
                 yield "sibling complete";
             }
-            case "default-grandchild" -> {
+            case "default:grandchild" -> {
                 grandchildEngineCalls.incrementAndGet();
                 yield "unreachable";
             }
@@ -285,9 +285,9 @@ class ConcurrentGroupedExecutionIntegrationTest
     @Test
     void nestedChildTimeoutIsMemberFailureAndDoesNotCancelSibling()
     {
-        String root = "default-timeoutRoot";
-        String timeoutChild = "default-timeoutChild";
-        String successfulChild = "default-timeoutSibling";
+        String root = "default:timeout-root";
+        String timeoutChild = "default:timeout-child";
+        String successfulChild = "default:timeout-sibling";
         Authentication authentication = allowedAuthentication();
         LoomspanSession session = session("concurrent-child-timeout", root, 4, authentication);
         DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
@@ -304,12 +304,12 @@ class ConcurrentGroupedExecutionIntegrationTest
         MissionExecutionEngine directEngine = (currentSession, definition, objective, missionInput, model,
                 visibleTools, planningEnabled, currentAuthentication) -> switch (definition.identity().toString())
         {
-            case "default-timeoutChild" -> {
+            case "default:timeout-child" -> {
                 await(siblingStarted, "sibling must start before the nested timeout");
                 timeoutThrown.countDown();
                 throw expected;
             }
-            case "default-timeoutSibling" -> {
+            case "default:timeout-sibling" -> {
                 siblingStarted.countDown();
                 await(timeoutThrown, "sibling must remain alive through the nested timeout");
                 yield "sibling complete";
@@ -345,8 +345,8 @@ class ConcurrentGroupedExecutionIntegrationTest
     @Test
     void parentTimeoutRevokesLateWritesFromAnActualNestedDirectMission() throws Exception
     {
-        String root = "default-parentTimeoutRoot";
-        String child = "default-lateNestedChild";
+        String root = "default:parent-timeout-root";
+        String child = "default:late-nested-child";
         Authentication authentication = allowedAuthentication();
         LoomspanSession session = session("concurrent-parent-timeout", root, 4, authentication);
         DefaultExecutionStateService state = new DefaultExecutionStateService(FIXED_CLOCK);
@@ -422,9 +422,9 @@ class ConcurrentGroupedExecutionIntegrationTest
     @Test
     void quotaFailureBecomesMemberOutcomeWithoutRefundingSiblingWork()
     {
-        String root = "default-quotaRoot";
-        String quotaChild = "default-quotaChild";
-        String successfulChild = "default-quotaSibling";
+        String root = "default:quota-root";
+        String quotaChild = "default:quota-child";
+        String successfulChild = "default:quota-sibling";
         Authentication authentication = allowedAuthentication();
         LoomspanSession session = session("concurrent-quota", root, 4, authentication);
         LoomspanProperties.Session.Quotas quotas = new LoomspanProperties.Session.Quotas();
@@ -442,13 +442,13 @@ class ConcurrentGroupedExecutionIntegrationTest
         MissionExecutionEngine directEngine = (currentSession, definition, objective, missionInput, model,
                 visibleTools, planningEnabled, currentAuthentication) -> switch (definition.identity().toString())
         {
-            case "default-quotaSibling" -> {
+            case "default:quota-sibling" -> {
                 usage.reserveProviderAttempt(currentSession, successfulChild);
                 siblingReserved.countDown();
                 await(quotaAttempted, "successful sibling must finish after the rejected reservation");
                 yield "paid work retained";
             }
-            case "default-quotaChild" -> {
+            case "default:quota-child" -> {
                 await(siblingReserved, "successful sibling must reserve the only provider attempt first");
                 try
                 {

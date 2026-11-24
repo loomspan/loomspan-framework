@@ -84,7 +84,7 @@ class ExecutorDiagnosticsIntegrationTest
             assertThat(authored.getLast().data().path("dataState").asText()).isEqualTo("UNAVAILABLE");
             assertThat(records).noneMatch(r -> r.recordType() == TraceRecordType.ERROR_RECORDED);
             var frame = records.stream().filter(r -> r.recordType() == TraceRecordType.FRAME_OPENED).findFirst().orElseThrow();
-            assertThat(frame.data().path("executorName").asText()).isEqualTo("default-decide");
+            assertThat(frame.data().path("executorName").asText()).isEqualTo("default:decide");
             assertThat(frame.data().path("executorConfigGenerationId").asText()).isEqualTo(bean.call.executorConfigGenerationId());
             assertThat(records).anySatisfy(r -> {
                 assertThat(r.recordType()).isEqualTo(TraceRecordType.FRAME_METADATA_RECORDED);

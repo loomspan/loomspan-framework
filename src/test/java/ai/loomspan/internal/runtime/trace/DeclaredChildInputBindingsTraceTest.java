@@ -28,17 +28,17 @@ class DeclaredChildInputBindingsTraceTest {
         var contract = resolver.resolveFromToolSchema("""
                 {"type":"object","properties":{"caseId":{"type":"string"},"evidence":{"type":"object","additionalProperties":true},"count":{"type":"integer"}},"required":["caseId","evidence","count"],"additionalProperties":false}
                 """);
-        return new CapabilityMetadata("java:consumer", "default-consumer", "consume", SkillExecutionDescriptor.none(),
+        return new CapabilityMetadata("java:consumer", "default:consumer", "consume", SkillExecutionDescriptor.none(),
                 SkillAccessPolicy.unrestricted(), args -> "DONE", SkillKind.JAVA,
-                new CapabilityToolDescriptor("default-consumer", "consume", resolver.toJsonSchema(contract), null), contract, null);
+                new CapabilityToolDescriptor("default:consumer", "consume", resolver.toJsonSchema(contract), null), contract, null);
     }
     private static YamlSkillDefinition definition(List<ChildInputBinding> bindings) {
         YamlSkillManifest manifest = new YamlSkillManifest();
-        manifest.setName("parent"); manifest.setDescription("default-parent"); manifest.setModel("model"); manifest.setPlanningMode(true);
+        manifest.setName("parent"); manifest.setDescription("default:parent"); manifest.setModel("model"); manifest.setPlanningMode(true);
         return new YamlSkillDefinition(YamlSkillDefinition.Form.MODEL, "default", new ByteArrayResource(new byte[0]), manifest,
                 new EffectiveSkillExecutionConfiguration("model", "local", AiDriver.OPENAI, "local", null),
                 ai.loomspan.internal.runtime.evidence.EvidenceContract.empty(), null,
-                List.of(new AllowedSkillConstraint("default-consumer", null, null, false, bindings)));
+                List.of(new AllowedSkillConstraint("default:consumer", null, null, false, bindings)));
     }
     private static PlanTask task(String id, String skill, PlanTaskStatus status, List<String> dependencies) {
         return new PlanTask(id, id, status, skill, "work", dependencies, List.of(), null, null);
@@ -47,21 +47,21 @@ class DeclaredChildInputBindingsTraceTest {
         List<TraceRecord> records = new ArrayList<>(); session.readTraceRecords(records::add); return records;
     }
     @Test void canonicalEvidenceDistinguishesRawArgumentsDeliveredInputAndSourceProvenance() {
-        var session = TestLoomspanSessions.withId("binding-trace", "default-parent", 5);
+        var session = TestLoomspanSessions.withId("binding-trace", "default:parent", 5);
         var execution = TestExecutionBindings.missionBinding(session);
         var mission = execution.requireMission();
         mission.captureInput(Map.of("requestId", "source-case"));
         String originalResult = "{\"data\":{\"amount\":12345,\"facts\":[\"unchanged\"]}}";
-        mission.recordCompletedTaskResult("producer-task", "default-producer", originalResult);
-        mission.storePlan(new ExecutionPlan("plan", "default-parent", CLOCK.instant(), List.of(
-                task("producer-task", "default-producer", PlanTaskStatus.COMPLETED, List.of()),
-                task("consumer-task", "default-consumer", PlanTaskStatus.PENDING, List.of("producer-task")))));
+        mission.recordCompletedTaskResult("producer-task", "default:producer", originalResult);
+        mission.storePlan(new ExecutionPlan("plan", "default:parent", CLOCK.instant(), List.of(
+                task("producer-task", "default:producer", PlanTaskStatus.COMPLETED, List.of()),
+                task("consumer-task", "default:consumer", PlanTaskStatus.PENDING, List.of("producer-task")))));
         var router = mock(CapabilityExecutionRouter.class);
         when(router.executeAssembled(any(), anyMap(), eq(session), isNull(), anyList())).thenReturn("DONE");
         var state = new DefaultExecutionStateService(CLOCK);
         var invoker = new DefaultCapabilityInvoker(router, mock(PlanningService.class), state);
         var bindings = List.of(binding("/caseId", ChildInputBinding.SourceKind.INPUT, "/requestId", null),
-                binding("/evidence", ChildInputBinding.SourceKind.CHILD_RESULT, "/data", "default-producer"));
+                binding("/evidence", ChildInputBinding.SourceKind.CHILD_RESULT, "/data", "default:producer"));
         Map<String,Object> rawArguments = Map.of("count", 7);
         ExecutionBindingScope.supplyWith(execution, () -> {
             state.recordStepEvent(session, execution.branch().leaf().orElseThrow(), TraceRecordType.STEP_ACTION_PROPOSED,
@@ -89,7 +89,7 @@ class DeclaredChildInputBindingsTraceTest {
         assertThat(result.path("sourceKind").asText()).isEqualTo("child_result");
         assertThat(result.path("sourcePath").asText()).isEqualTo("/data");
         assertThat(result.path("sourceTaskId").asText()).isEqualTo("producer-task");
-        assertThat(result.path("sourceSkill").asText()).isEqualTo("default-producer");
+        assertThat(result.path("sourceSkill").asText()).isEqualTo("default:producer");
         assertThat(result.path("parentMissionFrameId").asText()).isEqualTo(mission.missionFrameId());
         assertThat(result.propertyNames()).containsExactlyInAnyOrder("destination", "sourceKind", "sourcePath", "sourceTaskId", "sourceSkill", "parentMissionFrameId");
         assertThat(provenance.toString()).doesNotContain("12345", "unchanged");
@@ -99,7 +99,7 @@ class DeclaredChildInputBindingsTraceTest {
         verify(router).executeAssembled(any(), argThat(args -> args.get("caseId").equals("source-case")), eq(session), isNull(), anyList());
     }
     @Test void failedSourceRecordsRawArgumentsAndAttributableBindingWithoutDispatch() {
-        var session = TestLoomspanSessions.withId("binding-failed-trace", "default-parent", 5);
+        var session = TestLoomspanSessions.withId("binding-failed-trace", "default:parent", 5);
         var execution = TestExecutionBindings.missionBinding(session);
         execution.requireMission().captureInput(Map.of("requestId", "source-case"));
         var router = mock(CapabilityExecutionRouter.class);

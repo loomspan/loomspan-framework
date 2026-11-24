@@ -57,9 +57,9 @@ class PreparedCandidateVariablesTest {
                 var generation = f.manager.active("sales");
                 assertThat(generation.runtime().properties().getConnections().get("api").getApiKey()).isEqualTo(expected);
                 assertThat(generation.executorConfiguration().get("targets")).isEqualTo(Map.of("value", expected, "literal", "${region}"));
-                assertThat(generation.definition("sales-leaf").manifest().getConfig()).containsEntry("value", expected)
+                assertThat(generation.definition("sales:leaf").manifest().getConfig()).containsEntry("value", expected)
                         .containsEntry("literal", "${region}");
-                assertThat(new String(generation.definition("sales-leaf").source().bytes(), java.nio.charset.StandardCharsets.UTF_8)).contains("{$var: shared}");
+                assertThat(new String(generation.definition("sales:leaf").source().bytes(), java.nio.charset.StandardCharsets.UTF_8)).contains("{$var: shared}");
                 candidate.close();
             }
         }
@@ -89,7 +89,14 @@ class PreparedCandidateVariablesTest {
         try (var f = new Fixture()) {
             var dynamic = new ExecutionConfiguration("loomspan: {executor-config: {sales: {{$var: selector}: {value: literal}}}}");
             assertThat(f.reloader.validate("sales", List.of(LEAF), dynamic).valid()).isTrue();
-            assertThat(f.reloader.validate("sales", List.of(LEAF), new ExecutionConfiguration(dynamic.yaml().replace("sales:", "Sales:"))).valid()).isTrue();
+            var invalidOwner = new ExecutionConfiguration(dynamic.yaml().replace("sales:", "Sales:"));
+            assertThat(f.reloader.validate("sales", List.of(LEAF), invalidOwner).valid()).isFalse();
+            assertThatThrownBy(() -> f.reloader.prepare("sales", List.of(LEAF), invalidOwner,
+                    Map.of("selector", "targets", "shared", "value")))
+                    .isInstanceOf(SkillReloadException.class).hasMessageContaining("Sales");
+            var staged = new PreparedCandidateVariables(dynamic, List.of(LEAF));
+            assertThat(staged.unknownSelector("sales", "targets")).isTrue();
+            assertThat(staged.unknownSelector("Sales", "targets")).isFalse();
             assertThatThrownBy(() -> f.reloader.prepare("sales", List.of(LEAF), dynamic,
                     Map.of("selector", "other", "shared", "value"))).hasMessageContaining("must select a map");
             try (var candidate = f.reloader.prepare("sales", List.of(LEAF), dynamic,
@@ -109,7 +116,7 @@ class PreparedCandidateVariablesTest {
             var empty = new ExecutionConfiguration("loomspan: {executor-config: {sales: {targets: {}}}}");
             try (var candidate = f.reloader.prepare("sales", List.of(LEAF), empty, Map.of("shared", "leaf-only"))) {
                 f.reloader.publish(candidate);
-                assertThat(f.manager.active("sales").definition("sales-leaf").manifest().getConfig()).containsEntry("value", "leaf-only");
+                assertThat(f.manager.active("sales").definition("sales:leaf").manifest().getConfig()).containsEntry("value", "leaf-only");
             }
             for (Map<String, String> map : List.of(Map.<String, String>of(), Map.of("Shared", "different-case"),
                     Map.of("shared", "\u00a0"), Map.of("shared", "value", "extra", "private-supplied-value"))) {
@@ -137,7 +144,7 @@ class PreparedCandidateVariablesTest {
             var next = f.reloader.prepare("sales", "version", List.of(edited), CONFIG, NamespaceVisibility.PRIVATE,
                     Map.of("shared", "second", "added", "a: b\n- c\n"));
             f.reloader.publish(next);
-            assertThat(f.manager.active("sales").definition("sales-leaf").manifest().getConfig()).containsEntry("value", "a: b\n- c\n");
+            assertThat(f.manager.active("sales").definition("sales:leaf").manifest().getConfig()).containsEntry("value", "a: b\n- c\n");
             assertThat(next.generationId()).isNotEqualTo(first.generationId());
         }
     }
@@ -183,18 +190,18 @@ class PreparedCandidateVariablesTest {
             var first = f.reloader.prepare("sales", "same", List.of(leaf), configuration, NamespaceVisibility.PRIVATE);
             f.environment.withProperty("report.label", "east");
             f.reloader.publish(first);
-            assertThat(f.manager.active("sales").definition("sales-leaf").manifest().getConfig()).containsEntry("value", "west");
+            assertThat(f.manager.active("sales").definition("sales:leaf").manifest().getConfig()).containsEntry("value", "west");
             assertThat(f.environment.lookups).containsEntry("report.label", 1);
             var second = f.reloader.prepare("sales", "same", List.of(leaf), configuration, NamespaceVisibility.PRIVATE);
             f.reloader.publish(second);
-            assertThat(f.manager.active("sales").definition("sales-leaf").manifest().getConfig()).containsEntry("value", "east");
+            assertThat(f.manager.active("sales").definition("sales:leaf").manifest().getConfig()).containsEntry("value", "east");
             assertThat(f.environment.lookups).containsEntry("report.label", 2);
             f.environment.direct.put("report.label", "${still.literal}");
             var third = f.reloader.prepare("sales", "same", List.of(leaf), configuration, NamespaceVisibility.PRIVATE);
             f.reloader.publish(third);
             var generation = f.manager.active("sales");
             assertThat(generation.runtime().properties().getConnections().get("api").getApiKey()).isEqualTo("${still.literal}");
-            assertThat(generation.definition("sales-leaf").manifest().getConfig()).containsEntry("value", "${still.literal}");
+            assertThat(generation.definition("sales:leaf").manifest().getConfig()).containsEntry("value", "${still.literal}");
             assertThat(f.environment.lookups).containsEntry("report.label", 3).doesNotContainKey("still.literal");
         }
     }
@@ -206,7 +213,7 @@ class PreparedCandidateVariablesTest {
                     + decimal + ", maximum: " + decimal + "}\n");
             try (var candidate = f.reloader.prepare("sales", List.of(document), CONFIG, Map.of("shared", "a: b\n- c\n"))) {
                 f.reloader.publish(candidate);
-                var definition = f.manager.active("sales").definition("sales-leaf");
+                var definition = f.manager.active("sales").definition("sales:leaf");
                 assertThat(new String(definition.source().bytes(), java.nio.charset.StandardCharsets.UTF_8)).isEqualTo(document.yaml());
                 assertThat(definition.source().diagnosticName()).isEqualTo("precise.yaml");
                 assertThat(definition.manifest().getInputSchema().toString()).contains(decimal);

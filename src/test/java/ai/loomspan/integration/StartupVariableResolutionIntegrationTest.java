@@ -477,7 +477,7 @@ class StartupVariableResolutionIntegrationTest {
         context(settings).withUserConfiguration(ForeignBeans.class)
                 .withPropertyValues("consumer.value=consumer", "owner.value=owner", "leaf.value=leaf").run(context -> {
             assertThat(context).hasFailed();
-            assertThat(context.getStartupFailure()).hasStackTraceContaining("Unknown executor 'infra-foreign'");
+            assertThat(context.getStartupFailure()).hasStackTraceContaining("Unknown executor 'infra:foreign'");
         });
     }
 

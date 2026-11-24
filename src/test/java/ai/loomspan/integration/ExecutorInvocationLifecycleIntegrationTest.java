@@ -68,22 +68,22 @@ class ExecutorInvocationLifecycleIntegrationTest
     void childObservesOriginalParentBudgetAfterPlanningDelay(boolean explicit) throws Exception
     {
         leaf();
-        Files.writeString(directory.resolve("parent.yaml"), ExplicitJavaFailureHandlingIntegrationTest.parent("parent", "default-leaf", explicit));
+        Files.writeString(directory.resolve("parent.yaml"), ExplicitJavaFailureHandlingIntegrationTest.parent("parent", "default:leaf", explicit));
         try (var provider = new MockWebServer())
         {
             if (explicit)
             {
                 var json = new tools.jackson.databind.ObjectMapper();
                 provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.text(json.writeValueAsString(Map.of(
-                        "capabilityName", "default-parent", "createdAt", "2026-11-01T00:00:00Z", "status", "VALID",
-                        "tasks", List.of(ExplicitJavaFailureHandlingIntegrationTest.task("default-leaf")))))
+                        "capabilityName", "default:parent", "createdAt", "2026-11-01T00:00:00Z", "status", "VALID",
+                        "tasks", List.of(ExplicitJavaFailureHandlingIntegrationTest.task("default:leaf")))))
                         .setBodyDelay(700, TimeUnit.MILLISECONDS));
                 provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.text(json.writeValueAsString(Map.of(
-                        "stepAction", "CALL_TOOL", "taskId", "child", "toolName", "default-leaf", "toolArguments", Map.of()))));
+                        "stepAction", "CALL_TOOL", "taskId", "child", "toolName", "default:leaf", "toolArguments", Map.of()))));
             }
             else
             {
-                provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.tool("default-leaf").setBodyDelay(700, TimeUnit.MILLISECONDS));
+                provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.tool("default:leaf").setBodyDelay(700, TimeUnit.MILLISECONDS));
                 provider.enqueue(ExplicitJavaFailureHandlingIntegrationTest.text("approved"));
             }
             provider.start();
@@ -96,15 +96,15 @@ class ExecutorInvocationLifecycleIntegrationTest
                 assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of())).isEqualTo("approved");
                 // Child gets its own five-second budget; the already-spent parent budget must win.
                 assertThat(bean.entryRemaining).isPositive().isLessThan(Duration.ofMillis(4500));
-                assertThat(bean.call.skillName()).isEqualTo("default-leaf");
+                assertThat(bean.call.skillName()).isEqualTo("default:leaf");
                 var records = ai.loomspan.internal.core.ExecutorDiagnosticTestSupport.logicalRecords(bean.session);
                 var diagnostics = records.stream().filter(r -> r.recordType() == ai.loomspan.internal.core.TraceRecordType.EXECUTOR_DIAGNOSTIC_RECORDED).toList();
                 assertThat(diagnostics).hasSize(1);
-                assertThat(diagnostics.getFirst().route()).isEqualTo("default-leaf");
+                assertThat(diagnostics.getFirst().route()).isEqualTo("default:leaf");
                 assertThat(records).anySatisfy(r -> {
                     assertThat(r.recordType()).isEqualTo(ai.loomspan.internal.core.TraceRecordType.FRAME_OPENED);
                     assertThat(r.frameId()).isEqualTo(diagnostics.getFirst().frameId());
-                    assertThat(r.route()).isEqualTo("default-leaf");
+                    assertThat(r.route()).isEqualTo("default:leaf");
                 });
                 assertThat(records.stream().filter(r -> r.recordType() == ai.loomspan.internal.core.TraceRecordType.TOOL_CALL_STARTED)).hasSize(1);
                 assertThat(records.stream().filter(r -> r.recordType() == ai.loomspan.internal.core.TraceRecordType.TOOL_CALL_COMPLETED)).hasSize(1);
@@ -171,10 +171,10 @@ class ExecutorInvocationLifecycleIntegrationTest
                     factory.registerSingleton("LoomspanMissionExecutor", worker))).run(context -> {
                 assertThat(context).hasNotFailed();
                 var manager = context.getBean(SkillGenerationManager.class);
-                var capture = manager.capture(SkillIdentity.parse("default-leaf"));
+                var capture = manager.capture(SkillIdentity.parse("default:leaf"));
                 try (var lease = capture.lease())
                 {
-                    var definition = capture.snapshot().generation("default").definition("default-leaf");
+                    var definition = capture.snapshot().generation("default").definition("default:leaf");
                     Object manifest = ReflectionTestUtils.getField(definition, "manifest");
                     Object transform = ReflectionTestUtils.getField(manifest, "compiledInputTransform");
                     var prepared = (Expression) ReflectionTestUtils.getField(transform, "expression");
