@@ -76,11 +76,11 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
             ).run(context -> {
                 assertThat(context).hasNotFailed(); var template = context.getBean(SkillTemplate.class);
                 var input = Map.<String,Object>of("options", scenario.equals("dynamic-missing-probability") ? Map.of("RuntimeKey", "first") : Map.of("A", "first", "B", "second"));
-                String registeredSchema = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skill("default-evaluation").orElseThrow().outputSchema();
+                String registeredSchema = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skill("evaluation").orElseThrow().outputSchema();
                 assertThat(registeredSchema).isNull();
                 if (scenario.endsWith("allowed") && !scenario.endsWith("disallowed") || scenario.equals("singleton"))
-                    assertThat(JSON.readTree(template.invoke("default-root", input)).path("selected").asText()).isEqualTo(scenario.equals("singleton") ? "choice" : "A");
-                else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", input))
+                    assertThat(JSON.readTree(template.invoke("default", "root", input)).path("selected").asText()).isEqualTo(scenario.equals("singleton") ? "choice" : "A");
+                else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default", "root", input))
                         .hasStackTraceContaining(probability ? "binding_source_unavailable" : "binding_output_validation")
                         .satisfies(failure -> {
                             var diagnosis = ((ai.loomspan.api.SkillException) failure).getFailureDiagnosis();
@@ -92,7 +92,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                                 assertThat(detail.issues().getFirst().code()).isEqualTo("enum");
                             });
                         });
-                assertThat(context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skill("default-evaluation").orElseThrow().outputSchema()).isEqualTo(registeredSchema);
+                assertThat(context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skill("evaluation").orElseThrow().outputSchema()).isEqualTo(registeredSchema);
             });
             assertThat(calls).hasValue(1);
         }
@@ -191,7 +191,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
             if(kind.equals("java")) runner = runner.withBean(JavaProducer.class,JavaProducer::new);
             runner.run(context -> {
                         assertThat(context).hasNotFailed();
-                        var result=JSON.readTree(context.getBean(SkillTemplate.class).invoke("default-root",Map.of("caseId","C-1")));
+                        var result=JSON.readTree(context.getBean(SkillTemplate.class).invoke("default", "root",Map.of("caseId","C-1")));
                         assertThat(result.path("caseId").asText()).isEqualTo("C-1");
                         assertThat(result.path("assessment").path("number").asText()).isEqualTo("123456789012345678901234567890");
                         assertThat(result.path("assessment").path("text").asText()).isEqualTo("{looks:json}");
@@ -273,7 +273,7 @@ class DeclaredOutputBindingsPlanningIntegrationTest {
                             "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=deterministic")
                     .run(context -> {
                         assertThat(context).hasNotFailed();
-                        String result = context.getBean(SkillTemplate.class).invoke("default-root", Map.of("value", "exact"));
+                        String result = context.getBean(SkillTemplate.class).invoke("default", "root", Map.of("value", "exact"));
                         assertThat(result).contains("exact");
                         if (modelOwnedSpace) assertThat(result).contains("extra", "reasoned");
                     });

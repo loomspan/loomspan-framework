@@ -37,7 +37,7 @@ class ExecutorDiagnosticsIntegrationTest
         bean.action = call -> call.diagnostics().info("request ready", Map.of("token", "kept verbatim"));
         runner(bean).run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(context.getBean(SkillTemplate.class).invoke("default-leaf", Map.of())).isEqualTo("approved");
+            assertThat(context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of())).isEqualTo("approved");
             var records = bean.records();
             var diagnostic = records.stream().filter(r -> r.recordType().name().equals("EXECUTOR_DIAGNOSTIC_RECORDED")).toList();
             assertThat(diagnostic).hasSize(1);
@@ -70,7 +70,7 @@ class ExecutorDiagnosticsIntegrationTest
         };
         runner(bean).run(context -> {
             var skills = context.getBean(SkillTemplate.class);
-            assertThat(skills.invoke("default-leaf", Map.of())).isEqualTo("approved");
+            assertThat(skills.invoke("default", "leaf", Map.of())).isEqualTo("approved");
             var first = bean.session;
             var records = bean.records();
             var authored = records.stream().filter(r -> r.recordType() == TraceRecordType.EXECUTOR_DIAGNOSTIC_RECORDED).toList();
@@ -93,7 +93,7 @@ class ExecutorDiagnosticsIntegrationTest
             bean.call.diagnostics().info("after close", new Object());
             assertThat(bean.records()).hasSize(records.size());
             bean.action = call -> call.diagnostics().info("second invocation");
-            assertThat(skills.invoke("default-leaf", Map.of())).isEqualTo("approved");
+            assertThat(skills.invoke("default", "leaf", Map.of())).isEqualTo("approved");
             assertThat(bean.session).isNotSameAs(first);
             assertThat(bean.records().stream().filter(r -> r.recordType() == TraceRecordType.EXECUTOR_DIAGNOSTIC_RECORDED)).hasSize(1);
         });
@@ -106,7 +106,7 @@ class ExecutorDiagnosticsIntegrationTest
         bean.action = call -> { ExecutorDiagnosticTestSupport.fail(call, seam); call.diagnostics().error("failure seam", new Object()); };
         runner(bean).run(context -> {
             var skills = context.getBean(SkillTemplate.class);
-            assertThat(skills.invoke("default-leaf", Map.of())).isEqualTo("approved");
+            assertThat(skills.invoke("default", "leaf", Map.of())).isEqualTo("approved");
             assertThat(bean.records()).noneMatch(r -> r.recordType() == TraceRecordType.ERROR_RECORDED);
             var sentinel = new RecoverableSkillException("original feedback", new IllegalStateException("original cause"));
             bean.action = call -> {
@@ -114,7 +114,7 @@ class ExecutorDiagnosticsIntegrationTest
                 call.diagnostics().error("failure seam", new Object());
                 throw sentinel;
             };
-            assertThatThrownBy(() -> skills.invoke("default-leaf", Map.of())).isSameAs(sentinel);
+            assertThatThrownBy(() -> skills.invoke("default", "leaf", Map.of())).isSameAs(sentinel);
             var failed = bean.records();
             assertThat(failed).noneMatch(r -> r.recordType() == TraceRecordType.FRAME_METADATA_RECORDED && r.data().has("executorOutput"));
             int count = failed.size(); bean.call.diagnostics().info("late after failure"); assertThat(bean.records()).hasSize(count);
@@ -124,7 +124,7 @@ class ExecutorDiagnosticsIntegrationTest
                 call.diagnostics().warn("failure seam", new Object());
                 throw terminal;
             };
-            assertThatThrownBy(() -> skills.invoke("default-leaf", Map.of())).hasRootCause(terminal);
+            assertThatThrownBy(() -> skills.invoke("default", "leaf", Map.of())).hasRootCause(terminal);
         });
     }
 
@@ -134,13 +134,13 @@ class ExecutorDiagnosticsIntegrationTest
         bean.action = call -> { for (int i = 0; i < 200; i++) call.diagnostics().info("event " + i); };
         runner(bean).run(context -> {
             var skills = context.getBean(SkillTemplate.class);
-            assertThat(skills.invoke("default-leaf", Map.of())).isEqualTo("approved");
+            assertThat(skills.invoke("default", "leaf", Map.of())).isEqualTo("approved");
             var records = bean.records();
             assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.EXECUTOR_DIAGNOSTIC_RECORDED)).hasSize(128);
             assertThat(records.stream().filter(r -> r.recordType() == TraceRecordType.EXECUTOR_DIAGNOSTIC_SYSTEM_NOTICE_RECORDED))
                     .singleElement().satisfies(r -> assertThat(r.data().path("reason").asText()).isEqualTo("INVOCATION_EVENT_LIMIT"));
             bean.action = call -> call.diagnostics().info("fresh budget");
-            assertThat(skills.invoke("default-leaf", Map.of())).isEqualTo("approved");
+            assertThat(skills.invoke("default", "leaf", Map.of())).isEqualTo("approved");
             assertThat(bean.records().stream().filter(r -> r.recordType() == TraceRecordType.EXECUTOR_DIAGNOSTIC_RECORDED)).hasSize(1);
         });
     }
@@ -150,7 +150,7 @@ class ExecutorDiagnosticsIntegrationTest
         var bean = new Decisions();
         var original = new IllegalStateException("caller expression");
         bean.action = call -> call.diagnostics().info("not entered", expression(original));
-        runner(bean).run(context -> assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default-leaf", Map.of()))
+        runner(bean).run(context -> assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of()))
                 .hasRootCause(original));
     }
 

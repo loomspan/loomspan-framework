@@ -21,6 +21,6 @@ public interface SkillCatalog
 
     List<SkillDescriptor> skills();
 
-    /** Qualified lookup within this catalog; malformed references fail, absent/foreign identities return empty. */
-    Optional<SkillDescriptor> skill(String name);
+    /** Exact local-name lookup in this namespace; malformed names fail and absent names return empty. */
+    Optional<SkillDescriptor> skill(String localName);
 }

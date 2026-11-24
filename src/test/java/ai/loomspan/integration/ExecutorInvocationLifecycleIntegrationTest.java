@@ -53,7 +53,7 @@ class ExecutorInvocationLifecycleIntegrationTest
         runner(bean).run(context -> {
             assertThat(context).hasNotFailed();
             var value = new java.math.BigDecimal("0.12345678901234567890123456789");
-            assertThat(context.getBean(SkillTemplate.class).invoke("default-leaf", Map.of("probability", value)))
+            assertThat(context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of("probability", value)))
                     .isEqualTo("approved");
             assertThat(bean.call.input()).containsEntry("probability", value);
             assertThat(bean.call.skillConfig()).containsEntry("question", "approve");
@@ -93,7 +93,7 @@ class ExecutorInvocationLifecycleIntegrationTest
                     "loomspan.connections.local.provider-retry.enabled=false", "loomspan.models.local.connection=local",
                     "loomspan.models.local.provider-model=fixture").run(context -> {
                 assertThat(context).hasNotFailed();
-                assertThat(context.getBean(SkillTemplate.class).invoke("default-parent", Map.of())).isEqualTo("approved");
+                assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of())).isEqualTo("approved");
                 // Child gets its own five-second budget; the already-spent parent budget must win.
                 assertThat(bean.entryRemaining).isPositive().isLessThan(Duration.ofMillis(4500));
                 assertThat(bean.call.skillName()).isEqualTo("default-leaf");
@@ -122,7 +122,7 @@ class ExecutorInvocationLifecycleIntegrationTest
             var failure = new AtomicReference<Throwable>();
             var callerInterrupted = new AtomicBoolean();
             Thread caller = Thread.ofPlatform().unstarted(() -> {
-                try { context.getBean(SkillTemplate.class).invoke("default-leaf", Map.of()); }
+                try { context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of()); }
                 catch (Throwable thrown) { failure.set(thrown); callerInterrupted.set(Thread.currentThread().isInterrupted()); }
             });
             try
@@ -193,7 +193,7 @@ class ExecutorInvocationLifecycleIntegrationTest
                 }
                 var template = context.getBean(SkillTemplate.class);
                 Thread caller = Thread.ofPlatform().start(() -> {
-                    try { template.invoke("default-leaf", Map.of()); }
+                    try { template.invoke("default", "leaf", Map.of()); }
                     catch (Throwable thrown) { invocationFailure.set(thrown); }
                 });
                 try
@@ -227,7 +227,7 @@ class ExecutorInvocationLifecycleIntegrationTest
             assertThat(context).hasNotFailed();
             var failure = new AtomicReference<Throwable>();
             Thread caller = Thread.ofPlatform().unstarted(() -> {
-                try { context.getBean(SkillTemplate.class).invoke("default-leaf", Map.of()); }
+                try { context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of()); }
                 catch (Throwable thrown) { failure.set(thrown); }
             });
             try

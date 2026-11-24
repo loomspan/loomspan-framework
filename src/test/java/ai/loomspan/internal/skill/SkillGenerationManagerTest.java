@@ -52,21 +52,21 @@ class SkillGenerationManagerTest
                 """);
         var documents = List.of(producer, forwardingDocument("inner", "producer"), forwardingDocument("outer", "inner"),
                 new SkillDocument("other", producer.yaml().replace("name: producer", "name: other").replace("type: number", "type: integer")),
-                new SkillDocument("plain", "name: plain\ndescription: plain\nexecutor: sql\n"), forwardingDocument("plainParent", "plain"));
+                new SkillDocument("plain", "name: plain\ndescription: plain\nexecutor: sql\n"), forwardingDocument("plain-parent", "plain"));
         var generation = manager.prepare(manager.capturePreparation("default"), documents,
                 ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, Map.of("fixture.key", "fixture"), null);
-        String schema = generation.capability("default-producer").tool().outputSchema();
+        String schema = generation.capability("default:producer").tool().outputSchema();
         assertThat(schema).contains("Probability", "minimum", "maximum", "required", "additionalProperties");
         for (String name : List.of("producer", "inner", "outer")) {
-            assertThat(generation.capability("default-" + name).tool().outputSchema()).isEqualTo(schema);
-            assertThat(generation.skillCatalog().skill("default-" + name).orElseThrow().outputSchema()).isEqualTo(schema);
-            assertThat(generation.registeredSkillCatalog().find("default-" + name).orElseThrow().outputSchema()).isEqualTo(schema);
+            assertThat(generation.capability("default:" + name).tool().outputSchema()).isEqualTo(schema);
+            assertThat(generation.skillCatalog().skill(name).orElseThrow().outputSchema()).isEqualTo(schema);
+            assertThat(generation.registeredSkillCatalog().find("default:" + name).orElseThrow().outputSchema()).isEqualTo(schema);
         }
-        assertThat(generation.definition("default-inner").outputSchema()).isNull();
-        assertThat(generation.definition("default-outer").outputSchema()).isNull();
-        assertThat(generation.capability("default-other").tool().outputSchema()).contains("integer").isNotEqualTo(schema);
-        for (String name : List.of("plain", "plainParent"))
-            assertThat(generation.capability("default-" + name).tool().outputSchema()).isNull();
+        assertThat(generation.definition("default:inner").outputSchema()).isNull();
+        assertThat(generation.definition("default:outer").outputSchema()).isNull();
+        assertThat(generation.capability("default:other").tool().outputSchema()).contains("integer").isNotEqualTo(schema);
+        for (String name : List.of("plain", "plain-parent"))
+            assertThat(generation.capability("default:" + name).tool().outputSchema()).isNull();
         String parent = bindingParent("{type: object, properties: {result: {type: number}}, additionalProperties: false}", "/result", "/value");
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(producer, new SkillDocument("parent", parent)),
                 ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
@@ -91,20 +91,20 @@ class SkillGenerationManagerTest
         var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nexecutor: default:sql\noutput_schema: {type: object, properties: {value: {type: number}}}\n");
         var initial = manager.prepare(manager.capturePreparation("dep"), List.of(producer), configuration, visibility, values, null);
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, initial);
-        var parent = new SkillDocument("parent", forwardingDocument("parent", "producer").yaml().replace("default-producer", "dep-producer"));
+        var parent = new SkillDocument("parent", forwardingDocument("parent", "producer").yaml().replace("default:producer", "dep:producer"));
         var caller = manager.prepare(manager.capturePreparation("caller"), List.of(parent), configuration, visibility, values, null);
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, caller);
-        var retained = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("caller-parent"));
+        var retained = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("caller:parent"));
         try {
             var replacement = manager.prepare(manager.capturePreparation("dep"), List.of(new SkillDocument("producer", producer.yaml().replace("type: number", "type: string"))), configuration, visibility, values, null);
             ai.loomspan.testkit.TestSkillGenerations.activate(manager, replacement);
             manager.validateAdmission(retained.snapshot());
-            var fresh = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("caller-parent"));
+            var fresh = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("caller:parent"));
             try { assertThatThrownBy(() -> manager.validateAdmission(fresh.snapshot())).hasMessageContaining("contract"); }
             finally { fresh.lease().close(); }
             var republished = manager.prepare(manager.capturePreparation("caller"), List.of(parent), configuration, visibility, values, null);
             ai.loomspan.testkit.TestSkillGenerations.activate(manager, republished);
-            var admitted = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("caller-parent"));
+            var admitted = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("caller:parent"));
             try { manager.validateAdmission(admitted.snapshot()); }
             finally { admitted.lease().close(); }
         } finally { retained.lease().close(); }
@@ -151,11 +151,11 @@ class SkillGenerationManagerTest
         var producer = new SkillDocument("opaque model label", leaf);
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), producer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
         var generation = manager.prepare(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), producer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"), null);
-        var schema = generation.capability("default-producer").tool().outputSchema();
-        assertThat(generation.skillCatalog().skill("default-producer").orElseThrow().outputSchema()).isEqualTo(schema);
-        assertThat(generation.registeredSkillCatalog().find("default-producer").orElseThrow().outputSchema()).isEqualTo(schema);
-        assertThat(generation.registeredSkillCatalog().find("default-producer").orElseThrow().sourcePath()).isEqualTo("opaque model label");
-        assertThat(generation.registeredSkillCatalog().find("default-producer").orElseThrow().yaml()).isEqualTo(leaf);
+        var schema = generation.capability("default:producer").tool().outputSchema();
+        assertThat(generation.skillCatalog().skill("producer").orElseThrow().outputSchema()).isEqualTo(schema);
+        assertThat(generation.registeredSkillCatalog().find("default:producer").orElseThrow().outputSchema()).isEqualTo(schema);
+        assertThat(generation.registeredSkillCatalog().find("default:producer").orElseThrow().sourcePath()).isEqualTo("opaque model label");
+        assertThat(generation.registeredSkillCatalog().find("default:producer").orElseThrow().yaml()).isEqualTo(leaf);
         for (String invalid : List.of(parent.replace("enum: [A, Z]", "enum: [Z]"),
                 parent.replace("enum: [A, Z]", "enum: [score]").replace("path: /category/choice", "path: /category/type"),
                 parent.replace("type: string, enum: [A, Z]", "type: integer").replace("path: /category/choice", "path: /severity/score"))) {
@@ -197,7 +197,7 @@ class SkillGenerationManagerTest
         var producer = new SkillDocument("producer", "name: producer\ndescription: producer\nmodel: model\noutput_schema: {type: object, properties: {value: {type: string}}, additionalProperties: false}\n");
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), producer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
         var generation = manager.prepare(manager.capturePreparation("default"), List.of(new SkillDocument("parent", parent), producer), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"), null);
-        assertThat(generation.definition("default-parent").outputBindings().getFirst().destination().pointer()).isEqualTo("/CaseId");
+        assertThat(generation.definition("default:parent").outputBindings().getFirst().destination().pointer()).isEqualTo("/CaseId");
         Map<String, String> invalid = Map.ofEntries(
                 Map.entry("count zero", parent.replace("max_tasks: 2", "max_tasks: 0")),
                 Map.entry("count minimum", parent.replace("max_tasks: 2", "min_tasks: 2")),
@@ -348,7 +348,7 @@ class SkillGenerationManagerTest
     @Test
     void resolvesForwardingMetadataThroughChainsWithoutInheritingEvidence(@TempDir Path directory) {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
-        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));
+        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixed-java")));
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
                 () -> new YamlSkillCatalog(loadingProperties(directory)), new SkillInputContractResolver());
         manager.afterSingletonsInstantiated();
@@ -361,33 +361,33 @@ class SkillGenerationManagerTest
                         output_schema:
                           type: object
                           properties:
-                            answer: {type: [string, "null"], x-loomspan-evidence: default-fixedJava}
+                            answer: {type: [string, "null"], x-loomspan-evidence: default:fixed-java}
                           required: [answer]
                           additionalProperties: false
                         """),
-                forwardingDocument("javaParent", "fixedJava"), forwardingDocument("restParent", "restLeaf"),
-                new SkillDocument("restLeaf", "name: restLeaf\ndescription: Unspecified output model leaf\nmodel: model\n"),
-                forwardingDocument("plainParent", "plain"),
+                forwardingDocument("java-parent", "fixed-java"), forwardingDocument("rest-parent", "rest-leaf"),
+                new SkillDocument("rest-leaf", "name: rest-leaf\ndescription: Unspecified output model leaf\nmodel: model\n"),
+                forwardingDocument("plain-parent", "plain"),
                 new SkillDocument("plain", "name: plain\ndescription: plain\nmodel: model\n"));
         assertThat(manager.validate(manager.capturePreparation("default"), documents, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
         SkillGeneration generation = manager.prepare(manager.capturePreparation("default"), documents, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"), null);
-        String schema = generation.skillCatalog().skill("default-producer").orElseThrow().outputSchema();
+        String schema = generation.skillCatalog().skill("producer").orElseThrow().outputSchema();
         assertThat(schema).contains("answer", "null", "additionalProperties").doesNotContain("evidence");
-        assertThat(generation.definition("default-producer").evidenceContract().isEmpty()).isFalse();
-        assertThat(generation.definition("default-inner").outputSchema()).isNull();
-        assertThat(generation.definition("default-inner").evidenceContract().isEmpty()).isTrue();
+        assertThat(generation.definition("default:producer").evidenceContract().isEmpty()).isFalse();
+        assertThat(generation.definition("default:inner").outputSchema()).isNull();
+        assertThat(generation.definition("default:inner").evidenceContract().isEmpty()).isTrue();
         for (String name : List.of("outer", "inner", "producer")) {
-            assertThat(generation.skillCatalog().skill("default-" + name).orElseThrow().outputSchema()).isEqualTo(schema);
-            assertThat(generation.registeredSkillCatalog().find("default-" + name).orElseThrow().outputSchema()).isEqualTo(schema);
+            assertThat(generation.skillCatalog().skill(name).orElseThrow().outputSchema()).isEqualTo(schema);
+            assertThat(generation.registeredSkillCatalog().find("default:" + name).orElseThrow().outputSchema()).isEqualTo(schema);
         }
-        for (String name : List.of("javaParent", "fixedJava", "restParent", "restLeaf", "plainParent", "plain"))
-            assertThat(generation.skillCatalog().skill("default-" + name).orElseThrow().outputSchema()).isNull();
+        for (String name : List.of("java-parent", "fixed-java", "rest-parent", "rest-leaf", "plain-parent", "plain"))
+            assertThat(generation.skillCatalog().skill(name).orElseThrow().outputSchema()).isNull();
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, generation);
-        var captured = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("default-outer"));
-        var replacement = manager.prepare(manager.capturePreparation("default"), List.of(forwardingDocument("outer", "fixedJava")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"), null);
+        var captured = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("default:outer"));
+        var replacement = manager.prepare(manager.capturePreparation("default"), List.of(forwardingDocument("outer", "fixed-java")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"), null);
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, replacement);
-        assertThat(captured.snapshot().entryGeneration().skillCatalog().skill("default-outer").orElseThrow().outputSchema()).isEqualTo(schema);
-        assertThat(manager.active("default").skillCatalog().skill("default-outer").orElseThrow().outputSchema()).isNull();
+        assertThat(captured.snapshot().entryGeneration().skillCatalog().skill("outer").orElseThrow().outputSchema()).isEqualTo(schema);
+        assertThat(manager.active("default").skillCatalog().skill("outer").orElseThrow().outputSchema()).isNull();
         captured.lease().close();
     }
 
@@ -472,7 +472,7 @@ class SkillGenerationManagerTest
                 """;
         SkillGeneration first = manager.prepare(manager.capturePreparation("default"), List.of(new SkillDocument("leaf", "name: leaf\ndescription: fixture\nmodel: chosen\n")), new ExecutionConfiguration(template.formatted(3, 4)), ai.loomspan.api.NamespaceVisibility.PRIVATE, Map.of("host.key", "key-A"), null);
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, first);
-        var owner = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("default-leaf"));
+        var owner = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("default:leaf"));
         SkillGeneration second = manager.prepare(manager.capturePreparation("default"), List.of(), new ExecutionConfiguration(template.formatted(7, 9)), ai.loomspan.api.NamespaceVisibility.PRIVATE, Map.of("host.key", "key-B"), null);
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, second);
         assertThat(owner.snapshot().entryGeneration().runtime().properties().getConnections().get("primary").getApiKey())
@@ -499,14 +499,14 @@ class SkillGenerationManagerTest
         manager.afterSingletonsInstantiated();
         var firstRegistry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
         var secondRegistry = mock(ai.loomspan.internal.autoconfigure.NamedAiConnectionRegistry.class);
-        SkillGeneration first = new SkillGeneration("default", "first", Map.of("default-leaf", ai.loomspan.testkit.TestSkillGenerations.leaf()), Map.of(), null, null,
+        SkillGeneration first = new SkillGeneration("default", "first", Map.of("default:leaf", ai.loomspan.testkit.TestSkillGenerations.leaf()), Map.of(), null, null,
                 new ExecutionRuntime(new LoomspanProperties(), ai.loomspan.internal.core.TracePersistencePolicy.ONERROR,
                         firstRegistry));
         SkillGeneration second = new SkillGeneration("default", "second", Map.of(), Map.of(), null, null,
                 new ExecutionRuntime(new LoomspanProperties(), ai.loomspan.internal.core.TracePersistencePolicy.ONERROR,
                         secondRegistry));
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, first);
-        var captured = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("default-leaf"));
+        var captured = manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("default:leaf"));
         ai.loomspan.testkit.TestSkillGenerations.activate(manager, second);
         org.mockito.Mockito.verifyNoInteractions(firstRegistry);
         captured.lease().close();
@@ -521,7 +521,7 @@ class SkillGenerationManagerTest
     void validationReturnsCompleteSortedKindsForProposedCandidate(@TempDir Path directory) throws Exception
     {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
-        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("Zjava")));
+        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("z-java")));
         AtomicInteger executorCalls = new AtomicInteger();
         when(javaSkills.executors()).thenReturn(List.of(executor("sql", executorCalls)));
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
@@ -532,28 +532,28 @@ class SkillGenerationManagerTest
         manager.onGenerationRetired(ignored -> retirements.incrementAndGet());
         var first = manager.validate(manager.capturePreparation("default"), List.of(
                 new SkillDocument("opaque model source", "name: ayaml\ndescription: model\nmodel: model\n"),
-                new SkillDocument("opaque executor source", "name: Bexecutor\ndescription: route\nexecutor: sql\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
+                new SkillDocument("opaque executor source", "name: b-executor\ndescription: route\nexecutor: sql\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(first.valid()).isTrue();
         assertThat(first.skills()).containsExactly(
-                new ValidatedSkill("default-Bexecutor", SkillKind.JAVA),
-                new ValidatedSkill("default-Zjava", SkillKind.JAVA),
-                new ValidatedSkill("default-ayaml", SkillKind.YAML));
-        assertThat(first.skills()).extracting(ValidatedSkill::name).doesNotHaveDuplicates();
+                new ValidatedSkill("default", "ayaml", SkillKind.YAML),
+                new ValidatedSkill("default", "b-executor", SkillKind.JAVA),
+                new ValidatedSkill("default", "z-java", SkillKind.JAVA));
+        assertThat(first.skills()).extracting(ValidatedSkill::qualifiedName).doesNotHaveDuplicates();
         assertThat(manager.active("default").id()).isEqualTo(activeId);
-        assertThat(manager.active("default").skillCatalog().skill("default-Bexecutor")).isEmpty();
+        assertThat(manager.active("default").skillCatalog().skill("b-executor")).isEmpty();
         assertThat(executorCalls).hasValue(0);
         assertThat(retirements).hasValue(0);
 
         var replacement = manager.validate(manager.capturePreparation("default"), List.of(
                 new SkillDocument("kind changed", "name: ayaml\ndescription: route\nexecutor: sql\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(replacement.skills()).containsExactly(
-                new ValidatedSkill("default-Zjava", SkillKind.JAVA),
-                new ValidatedSkill("default-ayaml", SkillKind.JAVA));
+                new ValidatedSkill("default", "ayaml", SkillKind.JAVA),
+                new ValidatedSkill("default", "z-java", SkillKind.JAVA));
         assertThat(first.skills()).containsExactly(
-                new ValidatedSkill("default-Bexecutor", SkillKind.JAVA),
-                new ValidatedSkill("default-Zjava", SkillKind.JAVA),
-                new ValidatedSkill("default-ayaml", SkillKind.YAML));
-        assertThat(manager.validate(manager.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).skills()).containsExactly(new ValidatedSkill("default-Zjava", SkillKind.JAVA));
+                new ValidatedSkill("default", "ayaml", SkillKind.YAML),
+                new ValidatedSkill("default", "b-executor", SkillKind.JAVA),
+                new ValidatedSkill("default", "z-java", SkillKind.JAVA));
+        assertThat(manager.validate(manager.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).skills()).containsExactly(new ValidatedSkill("default", "z-java", SkillKind.JAVA));
         assertThat(retirements).hasValue(0);
         assertThat(manager.prepare(manager.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"), null).id()).endsWith("-2");
         assertThat(executorCalls).hasValue(0);
@@ -574,7 +574,7 @@ class SkillGenerationManagerTest
         Files.writeString(directory.resolve("configured.yaml"), yaml);
         var configured = manager.validate(manager.capturePreparation("default"), ai.loomspan.testkit.PublicationFixtures.documents(loadingProperties(directory)), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         var supplied = manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("diagnostic label", yaml)), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
-        assertThat(configured.skills()).containsExactly(new ValidatedSkill("default-only", SkillKind.YAML));
+        assertThat(configured.skills()).containsExactly(new ValidatedSkill("default", "only", SkillKind.YAML));
         assertThat(supplied.skills()).isEqualTo(configured.skills());
 
         var malformed = manager.validate(manager.capturePreparation("default"), List.of(new SkillDocument("good", yaml),
@@ -588,15 +588,15 @@ class SkillGenerationManagerTest
         assertThat(duplicate.skills()).isEmpty();
         assertThat(duplicate.issues()).anySatisfy(issue -> assertThat(issue.message()).contains("only"));
         Files.writeString(directory.resolve("configured.yaml"), yaml.replace("only", "later"));
-        assertThat(manager.validate(manager.capturePreparation("default"), ai.loomspan.testkit.PublicationFixtures.documents(loadingProperties(directory)), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).skills()).containsExactly(new ValidatedSkill("default-later", SkillKind.YAML));
-        assertThat(configured.skills()).containsExactly(new ValidatedSkill("default-only", SkillKind.YAML));
+        assertThat(manager.validate(manager.capturePreparation("default"), ai.loomspan.testkit.PublicationFixtures.documents(loadingProperties(directory)), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).skills()).containsExactly(new ValidatedSkill("default", "later", SkillKind.YAML));
+        assertThat(configured.skills()).containsExactly(new ValidatedSkill("default", "only", SkillKind.YAML));
     }
 
     @Test
     void warningOnlyValidationRetainsCompleteMetadata(@TempDir Path directory) throws Exception
     {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
-        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));
+        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixed-java")));
         LoomspanProperties properties = loadingProperties(directory);
         properties.setModels(Map.of("gpt-5", properties.getModels().get("model")));
         SkillGenerationManager manager = manager(javaSkills, () -> new YamlSkillCatalog(properties));
@@ -607,15 +607,15 @@ class SkillGenerationManagerTest
         assertThat(feedback.issues()).isNotEmpty().allSatisfy(issue ->
                 assertThat(issue.severity()).isEqualTo(SkillValidationIssue.Severity.WARNING));
         assertThat(feedback.skills()).containsExactly(
-                new ValidatedSkill("default-fixedJava", SkillKind.JAVA),
-                new ValidatedSkill("default-outputSchemaComplexSkill", SkillKind.YAML));
+                new ValidatedSkill("default", "fixed-java", SkillKind.JAVA),
+                new ValidatedSkill("default", "output-schema-complex-skill", SkillKind.YAML));
     }
 
     @Test
     void validationIsRepeatableAndLeavesIdsExecutorsAndFixedSnapshotUntouched(@TempDir Path directory)
     {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
-        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));
+        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixed-java")));
         AtomicInteger executorCalls = new AtomicInteger();
         when(javaSkills.executors()).thenReturn(List.of(executor("sql", executorCalls)));
         SkillGenerationManager manager = new SkillGenerationManager(javaSkills,
@@ -624,7 +624,7 @@ class SkillGenerationManagerTest
                 .hasMessageContaining("startup");
         manager.afterSingletonsInstantiated();
         String activeId = manager.active("default").id();
-        List<SkillDocument> proposed = List.of(new SkillDocument("draft", "name: restSkill\ndescription: model\nmodel: model\n"));
+        List<SkillDocument> proposed = List.of(new SkillDocument("draft", "name: rest-skill\ndescription: model\nmodel: model\n"));
         var first = manager.validate(manager.capturePreparation("default"), proposed, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         var second = manager.validate(manager.capturePreparation("default"), proposed, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(first.valid()).isTrue();
@@ -641,10 +641,10 @@ class SkillGenerationManagerTest
     void validationMatchesPreparationForConflictsAndReferences(@TempDir Path directory)
     {
         SkillMethodBeanPostProcessor javaSkills = mock(SkillMethodBeanPostProcessor.class);
-        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixedJava")));
+        when(javaSkills.capabilities()).thenReturn(List.of(javaSkill("fixed-java")));
         SkillGenerationManager manager = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
         manager.afterSingletonsInstantiated();
-        List<SkillDocument> conflict = List.of(new SkillDocument("conflict", "name: fixedJava\ndescription: conflict\nmodel: model\n"));
+        List<SkillDocument> conflict = List.of(new SkillDocument("conflict", "name: fixed-java\ndescription: conflict\nmodel: model\n"));
         var conflictFeedback = manager.validate(manager.capturePreparation("default"), conflict, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(conflictFeedback.skills()).isEmpty();
         assertThat(conflictFeedback.issues()).anySatisfy(issue -> {
@@ -660,7 +660,7 @@ class SkillGenerationManagerTest
         assertThatThrownBy(() -> manager.prepare(manager.capturePreparation("default"), missing, ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"), null)).hasMessageContaining("Unknown child skill");
         assertThat(manager.validate(manager.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE).valid()).isTrue();
         assertThat(manager.prepare(manager.capturePreparation("default"), List.of(), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE, java.util.Map.of("fixture.key", "fixture"), null).capabilities()).extracting(CapabilityMetadata::name)
-                .containsExactly("default-fixedJava");
+                .containsExactly("default:fixed-java");
     }
 
     @Test
@@ -688,11 +688,11 @@ class SkillGenerationManagerTest
         SkillGenerationManager manager = manager(javaSkills, () -> new YamlSkillCatalog(loadingProperties(directory)));
         manager.afterSingletonsInstantiated();
         var result = manager.validate(manager.capturePreparation("default"), List.of(
-                new SkillDocument("bad", "name: couldExist\ndescription: bad\nrest: true\nmodel: forbidden\n"),
+                new SkillDocument("bad", "name: could-exist\ndescription: bad\nrest: true\nmodel: forbidden\n"),
                 new SkillDocument("parent", "name: parent\ndescription: parent\nmodel: model\nallowed_skills:\n  - name: default:could-exist\n  - name: default:certainly-missing\n")), ai.loomspan.testkit.PublicationFixtures.configuration(), ai.loomspan.api.NamespaceVisibility.PRIVATE);
         assertThat(result.issues()).extracting(issue -> issue.message())
-                .anySatisfy(message -> assertThat(message).contains("certainlyMissing"))
-                .noneSatisfy(message -> assertThat(message).contains("Unknown child skill 'couldExist'"));
+                .anySatisfy(message -> assertThat(message).contains("certainly-missing"))
+                .noneSatisfy(message -> assertThat(message).contains("Unknown child skill 'could-exist'"));
     }
     private static SkillGenerationManager manager(SkillMethodBeanPostProcessor javaSkills,
             java.util.function.Supplier<YamlSkillCatalog> catalogs)
@@ -732,7 +732,7 @@ class SkillGenerationManagerTest
 
     private static CapabilityMetadata javaSkill(String name)
     {
-        String canonical = "default-" + name;
+        String canonical = "default:" + name;
         return new CapabilityMetadata("java:" + name, canonical, name, SkillExecutionDescriptor.none(),
                 SkillAccessPolicy.unrestricted(), arguments -> name, SkillKind.JAVA,
                 CapabilityToolDescriptor.generic(canonical, name),
@@ -746,7 +746,7 @@ class SkillGenerationManagerTest
         manifest.setDescription(name);
         manifest.setModel("model");
         manifest.setAllowedSkills(allowed.stream()
-                .map(child -> new YamlSkillManifest.AllowedSkillManifest("default-" + child, null, null, null)).toList());
+                .map(child -> new YamlSkillManifest.AllowedSkillManifest("default:" + child, null, null, null)).toList());
         byte[] yaml = ("name: " + name + "\ndescription: " + name + "\nmodel: model\n")
                 .getBytes(StandardCharsets.UTF_8);
         ByteArrayResource resource = new ByteArrayResource(yaml, name + ".yaml")

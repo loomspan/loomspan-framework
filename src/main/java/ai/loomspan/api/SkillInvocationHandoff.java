@@ -4,8 +4,8 @@ import java.util.Map;
 
 /**
  * Atomically transfers a prepared root invocation to Loomspan without executing it.
- * Local target names always select {@code default}, regardless of ambient execution;
- * explicit qualified names retain their namespace. Resolution, reachable generation capture,
+ * Every target supplies its exact namespace and local name separately, using the
+ * component grammar and combined limit described by {@link SkillTemplate}. Reachable generation capture,
  * conversion, dependency/input validation
  * and entry authorization happen before admission. The current authentication is
  * captured at handoff and authorization is still enforced during execution. A pending admission
@@ -16,20 +16,22 @@ public interface SkillInvocationHandoff
     /**
      * Prepares and admits an exact-name invocation with object input.
      *
-     * @param skillName local name in default, or qualified namespace-localName as returned by a catalog descriptor
+     * @param namespace exact owning namespace
+     * @param localName exact local skill name
      * @param input object input to convert and validate
      * @return one pending, single-use admitted invocation
      * @throws SkillException if preparation fails or framework admission is closed
      */
-    AdmittedSkillInvocation handoff(String skillName, Object input);
+    AdmittedSkillInvocation handoff(String namespace, String localName, Object input);
 
     /**
      * Prepares and admits an exact-name invocation with map input.
      *
-     * @param skillName local name in default, or qualified namespace-localName as returned by a catalog descriptor
+     * @param namespace exact owning namespace
+     * @param localName exact local skill name
      * @param input map input to validate
      * @return one pending, single-use admitted invocation
      * @throws SkillException if preparation fails or framework admission is closed
      */
-    AdmittedSkillInvocation handoff(String skillName, Map<String, Object> input);
+    AdmittedSkillInvocation handoff(String namespace, String localName, Map<String, Object> input);
 }

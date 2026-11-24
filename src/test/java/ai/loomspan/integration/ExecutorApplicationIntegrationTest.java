@@ -38,19 +38,19 @@ class ExecutorApplicationIntegrationTest {
                 assertThat(context).hasNotFailed();
                 var skills = context.getBean(SkillTemplate.class);
                 var views = new ArrayList<SkillExecutionView>();
-                assertThat(skills.invoke("default-http", Map.of("message", "hello"), views::add))
+                assertThat(skills.invoke("default", "http", Map.of("message", "hello"), views::add))
                         .isEqualTo("  application result\n");
                 assertThat(beans.httpInvocation.skillName()).isEqualTo("default-http");
                 assertThat(beans.httpInvocation.skillConfig()).containsEntry("path", "/operation");
                 var catalog = context.getBean(SkillReloader.class).snapshot("default");
-                assertThat(catalog.skill("default-http").orElseThrow().kind()).isEqualTo(SkillKind.JAVA);
-                assertThat(catalog.skill("default-httpExecutor")).isEmpty();
+                assertThat(catalog.skill("http").orElseThrow().kind()).isEqualTo(SkillKind.JAVA);
+                assertThat(catalog.skill("httpExecutor")).isEmpty();
                 assertThat(beans.httpInvocation.executorConfigGenerationId()).isEqualTo(catalog.generationId());
                 assertThat(views).hasSize(1);
                 assertThat(views.getFirst().events()).isNotEmpty();
-                assertThatThrownBy(() -> skills.invoke("default-http", Map.of("message", 42)))
+                assertThatThrownBy(() -> skills.invoke("default", "http", Map.of("message", 42)))
                         .isInstanceOf(SkillInputValidationException.class);
-                assertThatThrownBy(() -> skills.invoke("default-http", Map.of()))
+                assertThatThrownBy(() -> skills.invoke("default", "http", Map.of()))
                         .isInstanceOf(SkillInputValidationException.class);
             });
             var request = application.takeRequest(2, TimeUnit.SECONDS);
@@ -86,12 +86,12 @@ class ExecutorApplicationIntegrationTest {
                         writer.vfs = context.getBean(SessionLocalVirtualFileSystem.class);
                         try {
                             var views = new ArrayList<SkillExecutionView>();
-                            assertThat(context.getBean(SkillTemplate.class).invoke("default-parent", Map.of(), views::add)).isEqualTo("DONE");
+                            assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of(), views::add)).isEqualTo("DONE");
                             assertThat(beans.httpInvocation.input().get("attachment")).isInstanceOf(Resource.class);
                             assertThat(beans.httpInvocation.skillName()).isEqualTo("default-http");
                             assertThat(views).hasSize(1);
                             assertThat(views.getFirst().events()).anySatisfy(event -> assertThat(event.route()).isEqualTo("default-http"));
-                            assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default-http",
+                            assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "http",
                                     Map.of("message", "missing", "attachment", "ref://unknown.txt")))
                                     .isInstanceOf(SkillException.class).hasStackTraceContaining("Unknown ref");
                         } finally { writer.cleanup(); }
@@ -112,7 +112,7 @@ class ExecutorApplicationIntegrationTest {
             runner(beans).run(context -> {
                 assertThat(context).hasNotFailed();
                 var skills = context.getBean(SkillTemplate.class);
-                assertThat(skills.invoke("default-query", Map.of("id", 7))).isEqualTo("archive|select :id|7");
+                assertThat(skills.invoke("default", "query", Map.of("id", 7))).isEqualTo("archive|select :id|7");
                 var call = beans.sqlInvocation;
                 assertThat(call.skillConfig()).containsEntry("database", "archive").containsEntry("nullable", null);
                 assertThat(call.executorConfig()).containsEntry("sql", "select :id").containsEntry("nullable", null);
@@ -123,9 +123,9 @@ class ExecutorApplicationIntegrationTest {
                         new ExecutionConfiguration("loomspan: {executor-config: {default: {http: {}, sql: {sql: select}}}}"));
                 assertThat(beans.sqlCalls).isEqualTo(1);
                 reloader.publish(candidate);
-                skills.validate("default-bad", Map.of());
+                skills.validate("default", "bad", Map.of());
                 assertThat(beans.sqlCalls).isEqualTo(1);
-                assertThatThrownBy(() -> skills.invoke("default-bad", Map.of()))
+                assertThatThrownBy(() -> skills.invoke("default", "bad", Map.of()))
                         .isInstanceOf(SkillException.class).hasStackTraceContaining("Application database unavailable");
                 assertThat(beans.sqlCalls).isEqualTo(2);
             });

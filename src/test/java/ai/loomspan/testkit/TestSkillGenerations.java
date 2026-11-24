@@ -25,10 +25,10 @@ public final class TestSkillGenerations
     public static SkillGeneration empty() { return EMPTY; }
 
     public static CapabilityMetadata leaf() {
-        return new CapabilityMetadata("test:leaf", "default-leaf", "fixture",
+        return new CapabilityMetadata("test:leaf", "default:leaf", "fixture",
                 ai.loomspan.internal.core.SkillExecutionDescriptor.none(), ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(),
                 input -> "ok", ai.loomspan.api.SkillKind.JAVA,
-                ai.loomspan.internal.core.CapabilityToolDescriptor.generic("default-leaf", "fixture"),
+                ai.loomspan.internal.core.CapabilityToolDescriptor.generic("default:leaf", "fixture"),
                 new ai.loomspan.internal.core.SkillSource(null, "fixture", "leaf()", null));
     }
 

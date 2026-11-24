@@ -56,7 +56,7 @@ class ExecutorOutputSchemaIntegrationTest {
         var observed = new ObservedExecutor(call -> raw);
         runner(observed).run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(context.getBean(SkillTemplate.class).invoke("default-triage", Map.of())).isEqualTo(raw);
+            assertThat(context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of())).isEqualTo(raw);
             assertOutcome(observed, OutputSchemaOutcomeStatus.PASSED);
             assertThat(observed.calls).hasSize(1);
             assertThat(completion(observed.records()).data().path("executorOutput").textValue()).isEqualTo(raw);
@@ -70,7 +70,7 @@ class ExecutorOutputSchemaIntegrationTest {
         var observed = new ObservedExecutor(call -> RAW);
         runner(observed).run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(context.getBean(SkillTemplate.class).invoke("default-triage", Map.of())).isEqualTo(PUBLISHED);
+            assertThat(context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of())).isEqualTo(PUBLISHED);
             assertOutcome(observed, OutputSchemaOutcomeStatus.PASSED);
             assertThat(completion(observed.records()).data().path("executorOutput").textValue()).isEqualTo(RAW);
             assertThat(completion(observed.records()).data().path("outputTransformStatus").textValue()).isEqualTo("succeeded");
@@ -84,8 +84,8 @@ class ExecutorOutputSchemaIntegrationTest {
         runner(observed).run(context -> {
             assertThat(context).hasNotFailed();
             var skills = context.getBean(SkillTemplate.class);
-            assertThat(skills.invoke("default-accepted", Map.of())).isEqualTo(PUBLISHED);
-            assertThatThrownBy(() -> skills.invoke("default-rejected", Map.of()))
+            assertThat(skills.invoke("default", "accepted", Map.of())).isEqualTo(PUBLISHED);
+            assertThatThrownBy(() -> skills.invoke("default", "rejected", Map.of()))
                     .hasStackTraceContaining("default-rejected").hasStackTraceContaining("maximum");
             assertThat(observed.calls).hasSize(2);
         });
@@ -105,7 +105,7 @@ class ExecutorOutputSchemaIntegrationTest {
         var observed = new ObservedExecutor(call -> raw == null ? "" : raw);
         runner(observed).run(context -> {
             assertThat(context).hasNotFailed();
-            var failure = catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default-triage", Map.of()));
+            var failure = catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of()));
             assertThat(failure).isInstanceOf(SkillException.class).hasStackTraceContaining("default-triage");
             assertThat(((SkillException) failure).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
                 assertThat(diagnosis.skillName()).isEqualTo("default-triage");
@@ -135,7 +135,7 @@ class ExecutorOutputSchemaIntegrationTest {
         var observed = new ObservedExecutor(call -> raw);
         runner(observed).run(context -> {
             assertThat(context).hasNotFailed();
-            var failure = catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default-triage", Map.of()));
+            var failure = catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of()));
             assertThat(schemaFailure(failure).getRawOutput()).isEqualTo("{\"repeatContactProbability\":" + value + "}");
             assertOutcome(observed, OutputSchemaOutcomeStatus.EXHAUSTED);
             var metadata = completion(observed.records());
@@ -158,7 +158,7 @@ class ExecutorOutputSchemaIntegrationTest {
                     .withPropertyValues("loomspan.execution-trace.persistence=" + (retained ? "always" : "never"))
                     .run(context -> {
                 assertThat(context).hasNotFailed();
-                var admitted = context.getBean(SkillInvocationHandoff.class).handoff("default-parent", Map.of());
+                var admitted = context.getBean(SkillInvocationHandoff.class).handoff("default", "parent", Map.of());
                 try {
                     var failure = catchThrowable(admitted::invoke);
                     assertThat(failure).isInstanceOf(SkillException.class);
@@ -193,8 +193,8 @@ class ExecutorOutputSchemaIntegrationTest {
             assertThat(context).hasNotFailed();
             var skills = context.getBean(SkillTemplate.class);
             var handoff = context.getBean(SkillInvocationHandoff.class);
-            for (Throwable failure : List.of(catchThrowable(() -> skills.invoke("default-receiver", Map.of("value", "bad"))),
-                    catchThrowable(() -> handoff.handoff("default-receiver", Map.of("value", "bad"))))) {
+            for (Throwable failure : List.of(catchThrowable(() -> skills.invoke("default", "receiver", Map.of("value", "bad"))),
+                    catchThrowable(() -> handoff.handoff("default", "receiver", Map.of("value", "bad"))))) {
                 assertThat(failure).isInstanceOf(SkillInputValidationException.class);
                 var inputFailure = (SkillInputValidationException) failure;
                 assertThat(inputFailure.getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
@@ -220,14 +220,14 @@ class ExecutorOutputSchemaIntegrationTest {
         runner(observed).withPropertyValues("loomspan.execution-trace.persistence=never").run(context -> {
             assertThat(context).hasNotFailed();
             var skills = context.getBean(SkillTemplate.class);
-            var original = (SkillException) catchThrowable(() -> skills.invoke("default-triage", Map.of()));
+            var original = (SkillException) catchThrowable(() -> skills.invoke("default", "triage", Map.of()));
             var diagnosis = original.getFailureDiagnosis().orElseThrow();
             for (SkillException shared : List.of(original, new SkillException("application supplied", null, diagnosis))) {
                 reused.set(shared);
                 try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
-                    var one = executor.submit(() -> catchThrowable(() -> skills.invoke("default-reuse", Map.of())));
-                    var two = executor.submit(() -> catchThrowable(() -> skills.invoke("default-reuse", Map.of())));
-                    var actualContract = executor.submit(() -> catchThrowable(() -> skills.invoke("default-triage", Map.of())));
+                    var one = executor.submit(() -> catchThrowable(() -> skills.invoke("default", "reuse", Map.of())));
+                    var two = executor.submit(() -> catchThrowable(() -> skills.invoke("default", "reuse", Map.of())));
+                    var actualContract = executor.submit(() -> catchThrowable(() -> skills.invoke("default", "triage", Map.of())));
                     for (var result : List.of(one, two)) {
                         try {
                             assertThat(result.get(10, TimeUnit.SECONDS)).isInstanceOf(SkillException.class).hasCause(shared)
@@ -258,7 +258,7 @@ class ExecutorOutputSchemaIntegrationTest {
         });
         runner(observed).run(context -> {
             assertThat(context).hasNotFailed();
-            var failure = (SkillException) catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default-triage", Map.of()));
+            var failure = (SkillException) catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of()));
             assertThat(failure.getFailureDiagnosis()).isEmpty();
             var records = observed.records();
             assertThat(records).anySatisfy(record -> {
@@ -301,7 +301,7 @@ class ExecutorOutputSchemaIntegrationTest {
             provider.enqueue(plan("parent", first, second)); provider.start();
             withProvider(runner(observed), provider).run(context -> {
                 assertThat(context).hasNotFailed();
-                var failure = (SkillException) catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default-parent", Map.of()));
+                var failure = (SkillException) catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of()));
                 if (unrelatedFirst) assertThat(failure.getFailureDiagnosis()).isEmpty();
                 else assertThat(failure.getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
                     assertThat(diagnosis.skillName()).isEqualTo("default-first");
@@ -327,9 +327,9 @@ class ExecutorOutputSchemaIntegrationTest {
             withProvider(runner(observed), provider).withPropertyValues("loomspan.execution-trace.persistence=never").run(context -> {
                 assertThat(context).hasNotFailed();
                 var skills = context.getBean(SkillTemplate.class);
-                if (corrected) assertThat(skills.invoke("default-model", Map.of())).isEqualTo(PUBLISHED);
+                if (corrected) assertThat(skills.invoke("default", "model", Map.of())).isEqualTo(PUBLISHED);
                 else {
-                    var failure = (SkillException) catchThrowable(() -> skills.invoke("default-model", Map.of()));
+                    var failure = (SkillException) catchThrowable(() -> skills.invoke("default", "model", Map.of()));
                     assertThat(failure.getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
                         assertThat(diagnosis.skillName()).isEqualTo("default-model");
                         assertThat(diagnosis.stage()).isEqualTo(SkillContractStage.OUTPUT_SCHEMA);
@@ -348,7 +348,7 @@ class ExecutorOutputSchemaIntegrationTest {
         var observed = new ObservedExecutor(call -> RAW);
         runner(observed).run(context -> {
             assertThat(context).hasNotFailed();
-            var failure = catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default-triage", Map.of()));
+            var failure = catchThrowable(() -> context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of()));
             assertThat(schemaFailure(failure).getValidationIssues()).anyMatch(issue -> "required".equals(issue.code()));
         });
     }
@@ -360,7 +360,7 @@ class ExecutorOutputSchemaIntegrationTest {
         var observed = new ObservedExecutor(call -> value);
         runner(observed).run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(context.getBean(SkillTemplate.class).invoke("default-triage", Map.of())).isEqualTo(value);
+            assertThat(context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of())).isEqualTo(value);
             assertThat(observed.sessions.getLast().getLastOutputSchemaOutcome()).isEmpty();
         });
     }
@@ -376,8 +376,8 @@ class ExecutorOutputSchemaIntegrationTest {
         runner(observed).run(context -> {
             assertThat(context).hasNotFailed();
             var skills = context.getBean(SkillTemplate.class);
-            if (valid) assertThat(skills.invoke("default-triage", Map.of())).isEqualTo(PUBLISHED);
-            else assertThat(schemaFailure(catchThrowable(() -> skills.invoke("default-triage", Map.of()))))
+            if (valid) assertThat(skills.invoke("default", "triage", Map.of())).isEqualTo(PUBLISHED);
+            else assertThat(schemaFailure(catchThrowable(() -> skills.invoke("default", "triage", Map.of()))))
                     .isNotNull();
             assertThat(observed.calls).hasSize(1);
         });
@@ -388,7 +388,7 @@ class ExecutorOutputSchemaIntegrationTest {
         var observed = new ObservedExecutor(call -> PUBLISHED);
         runner(observed).withPropertyValues("loomspan.execution-trace.persistence=never").run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(context.getBean(SkillTemplate.class).invoke("default-triage", Map.of())).isEqualTo(PUBLISHED);
+            assertThat(context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of())).isEqualTo(PUBLISHED);
             assertOutcome(observed, OutputSchemaOutcomeStatus.PASSED);
         });
     }
@@ -404,8 +404,8 @@ class ExecutorOutputSchemaIntegrationTest {
         runner(observed).run(context -> {
             assertThat(context).hasNotFailed();
             var skills = context.getBean(SkillTemplate.class);
-            assertThatThrownBy(() -> skills.invoke("default-executorFailure", Map.of())).isSameAs(original);
-            assertThatThrownBy(() -> skills.invoke("default-transformFailure", Map.of()))
+            assertThatThrownBy(() -> skills.invoke("default", "executorFailure", Map.of())).isSameAs(original);
+            assertThatThrownBy(() -> skills.invoke("default", "transformFailure", Map.of()))
                     .hasStackTraceContaining("original transform failure");
             assertThat(observed.sessions).allSatisfy(session -> assertThat(session.getLastOutputSchemaOutcome()).isEmpty());
         });
@@ -424,9 +424,9 @@ class ExecutorOutputSchemaIntegrationTest {
             withProvider(runner(observed), provider).run(context -> {
                 assertThat(context).hasNotFailed();
                 var skills = context.getBean(SkillTemplate.class);
-                assertThat(skills.invoke("default-triage", Map.of())).isEqualTo(PUBLISHED);
-                assertThat(skills.invoke("default-forward", Map.of())).isEqualTo(PUBLISHED);
-                assertThat(skills.invoke("default-ordinary", Map.of())).isEqualTo("ordinary done");
+                assertThat(skills.invoke("default", "triage", Map.of())).isEqualTo(PUBLISHED);
+                assertThat(skills.invoke("default", "forward", Map.of())).isEqualTo(PUBLISHED);
+                assertThat(skills.invoke("default", "ordinary", Map.of())).isEqualTo("ordinary done");
                 assertThat(observed.calls).hasSize(3);
                 assertThat(observed.records()).filteredOn(record -> record.recordType() == TraceRecordType.TOOL_CALL_COMPLETED)
                         .singleElement().satisfies(record -> assertThat(record.data().at("/details/result").textValue()).isEqualTo(PUBLISHED));
@@ -453,7 +453,7 @@ class ExecutorOutputSchemaIntegrationTest {
             withProvider(runner(observed), provider).run(context -> {
                 assertThat(context).hasNotFailed();
                 var events = new ArrayList<SkillExecutionView>();
-                assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke(direct ? "default-triage" : "default-" + route, Map.of(), events::add))
+                assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", direct ? "triage" : route, Map.of(), events::add))
                         .isInstanceOf(SkillException.class).hasStackTraceContaining("default-triage");
                 assertThat(observed.calls).hasSize(1);
                 assertThat(events).singleElement().satisfies(view -> assertThat(view.events()).anySatisfy(event -> {
@@ -489,11 +489,11 @@ class ExecutorOutputSchemaIntegrationTest {
                 assertThat(context).hasNotFailed();
                 var skills = context.getBean(SkillTemplate.class);
                 if (valid) {
-                    assertThat(skills.invoke("default-assemble", Map.of())).isEqualTo("observed");
+                    assertThat(skills.invoke("default", "assemble", Map.of())).isEqualTo("observed");
                     assertThat(observed.calls).hasSize(2);
                     assertThat(observed.calls.getLast().input()).isEqualTo(Map.of("probability", new BigDecimal("0.95")));
                 } else {
-                    assertThatThrownBy(() -> skills.invoke("default-assemble", Map.of())).hasStackTraceContaining("default-triage");
+                    assertThatThrownBy(() -> skills.invoke("default", "assemble", Map.of())).hasStackTraceContaining("default-triage");
                     assertThat(observed.calls).extracting(SkillExecutorInvocation::skillName).containsExactly("default-triage");
                 }
             });
@@ -510,7 +510,7 @@ class ExecutorOutputSchemaIntegrationTest {
             reloader.publish(reloader.prepare("default", List.of(), config, NamespaceVisibility.PUBLIC));
             var old = reloader.prepare("work", List.of(new SkillDocument("leaf.yaml", executor("leaf") + SCHEMA)), config);
             reloader.publish(old);
-            var retained = context.getBean(SkillInvocationHandoff.class).handoff("work-leaf", Map.of());
+            var retained = context.getBean(SkillInvocationHandoff.class).handoff("work", "leaf", Map.of());
             try {
                 var replacement = reloader.prepare("work", List.of(new SkillDocument("leaf.yaml", executor("leaf") + SCHEMA.replace("maximum: 1", "maximum: 0.5"))), config);
                 reloader.publish(replacement);
@@ -522,7 +522,7 @@ class ExecutorOutputSchemaIntegrationTest {
                 assertThat(reloader.snapshot("work").generationId()).isEqualTo(replacement.generationId());
                 assertThat(retained.generationId()).isEqualTo(old.generationId());
                 assertThat(retained.invoke()).isEqualTo(PUBLISHED);
-                assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("work-leaf", Map.of()))
+                assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("work", "leaf", Map.of()))
                         .hasStackTraceContaining("maximum");
                 assertThat(observed.calls).hasSize(2);
             } finally { retained.release(); }

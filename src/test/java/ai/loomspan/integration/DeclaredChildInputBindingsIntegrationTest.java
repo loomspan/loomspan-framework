@@ -79,12 +79,12 @@ class DeclaredChildInputBindingsIntegrationTest {
                 assertThat(context).hasNotFailed();
                 var template = context.getBean(SkillTemplate.class);
                 var candidates = Map.of("KeepCase", Map.of("description", "original"));
-                org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-evaluation", Map.of("amount", "4", "candidates", candidates)))
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default", "evaluation", Map.of("amount", "4", "candidates", candidates)))
                         .isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
                 assertThat(receivedInputs).isEmpty();
-                assertThat(template.invoke("default-evaluation", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{\"answers\":{}}");
-                assertThat(template.invoke("default-root", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{\"answers\":{}}");
-                org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", Map.of("amount", "4", "candidates", candidates)))
+                assertThat(template.invoke("default", "evaluation", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{\"answers\":{}}");
+                assertThat(template.invoke("default", "root", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{\"answers\":{}}");
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default", "root", Map.of("amount", "4", "candidates", candidates)))
                         .hasStackTraceContaining("binding_assembled_input_invalid")
                         .satisfies(error -> assertThat(((ai.loomspan.api.SkillException) error).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
                             assertThat(diagnosis.skillName()).isEqualTo("default-evaluation");
@@ -181,8 +181,8 @@ class DeclaredChildInputBindingsIntegrationTest {
                         try {
                             var template = context.getBean(SkillTemplate.class);
                             Map<String, Object> input = scenario.equals("missing") ? Map.of() : Map.of("requestId", "case-one");
-                            if (scenario.equals("success")) assertThat(template.invoke("default-root", input, view -> observerCalls.incrementAndGet())).isEqualTo("COMPLETE");
-                            else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default-root", input, view -> observerCalls.incrementAndGet()))
+                            if (scenario.equals("success")) assertThat(template.invoke("default", "root", input, view -> observerCalls.incrementAndGet())).isEqualTo("COMPLETE");
+                            else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default", "root", input, view -> observerCalls.incrementAndGet()))
                                     .hasStackTraceContaining(switch (scenario) {
                                         case "missing" -> "binding_source_unavailable";
                                         case "approval" -> "Explicit application approval absent";
@@ -231,10 +231,10 @@ class DeclaredChildInputBindingsIntegrationTest {
                 "loomspan.models.local.provider-model=deterministic").run(context -> {
             assertThat(context).hasNotFailed();
             var catalog=context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
-            assertThat(catalog.skill("default:root")).isPresent();
-            assertThat(catalog.skill("default:producer")).isPresent();
-            assertThat(catalog.skill("default:consumer")).isPresent();
-            assertThat(catalog.skill("default:consumer").orElseThrow().inputSchema()).contains("caseId", "records", "assessment");
+            assertThat(catalog.skill("root")).isPresent();
+            assertThat(catalog.skill("producer")).isPresent();
+            assertThat(catalog.skill("consumer")).isPresent();
+            assertThat(catalog.skill("consumer").orElseThrow().inputSchema()).contains("caseId", "records", "assessment");
         });
     }
 
@@ -310,7 +310,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             if (consumerKind.equals("java")) runner=runner.withBean(JavaConsumer.class,()->new JavaConsumer(received));
             runner.run(context -> {
                 assertThat(context).hasNotFailed();
-                String result=context.getBean(SkillTemplate.class).invoke("default-root", input);
+                String result=context.getBean(SkillTemplate.class).invoke("default", "root", input);
                 assertThat(result).isEqualTo("COMPLETE");
             });
         }

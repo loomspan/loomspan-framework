@@ -24,20 +24,20 @@ class SkillAdmissionSnapshotTest {
         var properties = new LoomspanProperties();
         properties.getSkills().setLocations(List.of("classpath:/publication-no-files/*.yaml"));
         var javaSkills = mock(SkillMethodBeanPostProcessor.class);
-        var leaf = new CapabilityMetadata("java:leaf", "default-leaf", "leaf", SkillExecutionDescriptor.none(),
+        var leaf = new CapabilityMetadata("java:leaf", "default:leaf", "leaf", SkillExecutionDescriptor.none(),
                 ai.loomspan.internal.security.SkillAccessPolicy.unrestricted(), arguments -> invoked.incrementAndGet(),
-                SkillKind.JAVA, CapabilityToolDescriptor.generic("default-leaf", "leaf"), new SkillSource(null, "bean", "leaf()", null));
+                SkillKind.JAVA, CapabilityToolDescriptor.generic("default:leaf", "leaf"), new SkillSource(null, "bean", "leaf()", null));
         when(javaSkills.capabilities()).thenReturn(List.of(leaf));
         var manager = new SkillGenerationManager(javaSkills, () -> new YamlSkillCatalog(properties),
                 new SkillInputContractResolver(), properties, null,
                 (p, policy) -> { built.incrementAndGet(); return runtime(p, policy); });
         manager.initializeStartup();
         int completedStartupBuilds = built.get();
-        var capture = manager.capture(SkillIdentity.parse("default-leaf"));
+        var capture = manager.capture(SkillIdentity.parse("default:leaf"));
         try {
             manager.validateAdmission(capture.snapshot());
             assertThat(capture.snapshot().generations()).containsOnlyKeys("default");
-            assertThat(capture.snapshot().entryGeneration().capability("default-leaf")).isSameAs(leaf);
+            assertThat(capture.snapshot().entryGeneration().capability("default:leaf")).isSameAs(leaf);
             assertThat(built).hasValue(completedStartupBuilds);
             assertThat(invoked).hasValue(0);
         } finally { capture.lease().close(); manager.destroy(); }
@@ -57,10 +57,10 @@ class SkillAdmissionSnapshotTest {
         f.reloader.remove("spare", f.manager.active("spare").id());
         var retired = new CopyOnWriteArrayList<String>();
         f.reloader.onGenerationRetired(retired::add);
-        var capture = f.manager.capture(SkillIdentity.parse("a-root"));
+        var capture = f.manager.capture(SkillIdentity.parse("a:root"));
         try {
             assertThat(capture.snapshot().generations()).containsOnlyKeys("a", "b", "c");
-            assertThat(capture.snapshot().entry()).isEqualTo(SkillIdentity.parse("a-root"));
+            assertThat(capture.snapshot().entry()).isEqualTo(SkillIdentity.parse("a:root"));
             assertThat(capture.snapshot().entryGeneration()).isSameAs(f.manager.active("a"));
             assertThatThrownBy(() -> capture.snapshot().generations().clear()).isInstanceOf(UnsupportedOperationException.class);
             f.manager.validateAdmission(capture.snapshot());
@@ -84,12 +84,12 @@ class SkillAdmissionSnapshotTest {
         var pendingPrivate = f.reloader.prepare("a", List.of(root, model("target")), MODEL);
         publish(f, "b", calls("bridge", "a:target"));
         f.reloader.publish(pendingPrivate);
-        var capture = f.manager.capture(SkillIdentity.parse("a-root"));
+        var capture = f.manager.capture(SkillIdentity.parse("a:root"));
         try {
             assertThatThrownBy(() -> f.manager.validateAdmission(capture.snapshot())).hasMessageContaining("Private");
         } finally { capture.lease().close(); }
         // Private is still valid for direct entry and same-namespace access.
-        var direct = f.manager.capture(SkillIdentity.parse("a-target"));
+        var direct = f.manager.capture(SkillIdentity.parse("a:target"));
         try { f.manager.validateAdmission(direct.snapshot()); }
         finally { direct.lease().close(); }
     }
@@ -103,7 +103,7 @@ class SkillAdmissionSnapshotTest {
         f.reloader.remove("late", f.manager.active("late").id());
         var retired = new CopyOnWriteArrayList<String>();
         f.reloader.onGenerationRetired(retired::add);
-        assertThatThrownBy(() -> f.manager.capture(SkillIdentity.parse("a-root"))).hasMessageContaining("late");
+        assertThatThrownBy(() -> f.manager.capture(SkillIdentity.parse("a:root"))).hasMessageContaining("late");
         String a = f.manager.active("a").id(), early = f.manager.active("early").id();
         f.reloader.remove("a", a); f.reloader.remove("early", early);
         assertThat(retired).containsExactlyInAnyOrder(a, early);
@@ -123,7 +123,7 @@ class SkillAdmissionSnapshotTest {
                 var start = new CyclicBarrier(2);
                 var selection = workers.submit(() -> {
                     SkillDependencyValidatorTest.barrier(start);
-                    try { return f.manager.capture(SkillIdentity.parse("a-root")); }
+                    try { return f.manager.capture(SkillIdentity.parse("a:root")); }
                     catch (SkillReloadException failure) { assertThat(remove).isTrue(); return null; }
                 });
                 var mutation = workers.submit(() -> {
@@ -167,7 +167,7 @@ class SkillAdmissionSnapshotTest {
         reloader.publish(reloader.prepare("dep", List.of(model("leaf")), MODEL, NamespaceVisibility.PUBLIC));
         reloader.publish(reloader.prepare("a", List.of(calls("root", "dep:leaf")), MODEL));
         var replacement = reloader.prepare("dep", List.of(model("leaf")), MODEL);
-        var capture = manager.capture(SkillIdentity.parse("a-root"));
+        var capture = manager.capture(SkillIdentity.parse("a:root"));
         blocked.set(true);
         try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
             var validation = workers.submit(() -> manager.validateAdmission(capture.snapshot()));

@@ -17,12 +17,12 @@ class SkillAdmissionContractsTest {
             var f = new Fixture(null);
             publish(f, "dep", producer("leaf", "string"));
             publish(f, "a", forward("root", "dep:leaf"));
-            String preparedSchema = f.reloader.snapshot("a").skill("a-root").orElseThrow().outputSchema();
+            String preparedSchema = f.reloader.snapshot("a").skill("root").orElseThrow().outputSchema();
             publish(f, "dep", changed);
-            assertThatThrownBy(() -> validate(f, "a-root")).hasMessageContaining("a-root");
-            assertThat(f.reloader.snapshot("a").skill("a-root").orElseThrow().outputSchema()).isEqualTo(preparedSchema);
+            assertThatThrownBy(() -> validate(f, "a:root")).hasMessageContaining("a:root");
+            assertThat(f.reloader.snapshot("a").skill("root").orElseThrow().outputSchema()).isEqualTo(preparedSchema);
             publish(f, "a", forward("root", "dep:leaf"));
-            validate(f, "a-root");
+            validate(f, "a:root");
         }
     }
 
@@ -30,14 +30,14 @@ class SkillAdmissionContractsTest {
         var f = new Fixture(null);
         publish(f, "dep", producer("leaf", "string"));
         publish(f, "bridge", forward("hop", "dep:leaf"));
-        publish(f, "a", forward("root", "bridge-hop"));
+        publish(f, "a", forward("root", "bridge:hop"));
         publish(f, "dep", output("leaf", "{value: {type: string}, added: {type: boolean}}"));
-        assertThatThrownBy(() -> validate(f, "a-root")).hasMessageContaining("contract");
+        assertThatThrownBy(() -> validate(f, "a:root")).hasMessageContaining("contract");
         // Refreshing just the outer caller cannot repair the bridge's own stale prepared contract.
-        publish(f, "a", forward("root", "bridge-hop"));
-        assertThatThrownBy(() -> validate(f, "a-root")).hasMessageContaining("bridge-hop");
+        publish(f, "a", forward("root", "bridge:hop"));
+        assertThatThrownBy(() -> validate(f, "a:root")).hasMessageContaining("bridge:hop");
         publish(f, "bridge", forward("hop", "dep:leaf"));
-        validate(f, "a-root");
+        validate(f, "a:root");
     }
 
     @Test void equivalentSchemaFormattingAndObjectOrderRemainAdmissible() {
@@ -53,7 +53,7 @@ class SkillAdmissionContractsTest {
                       type: string
                   type: object
                 """));
-        validate(f, "a-root");
+        validate(f, "a:root");
     }
 
     @Test void unrelatedBoundChildOutputAdditionRemainsAdmissibleButChangedSelectedTypeRejects() {
@@ -61,12 +61,12 @@ class SkillAdmissionContractsTest {
         publish(f, "dep", producer("leaf", "string"));
         publish(f, "a", outputBoundRoot());
         publish(f, "dep", output("leaf", "{value: {type: string}, added: {type: boolean}}"));
-        validate(f, "a-root");
+        validate(f, "a:root");
         publish(f, "dep", producer("leaf", "integer"));
-        assertThatThrownBy(() -> validate(f, "a-root")).hasMessageContaining("incompatible");
+        assertThatThrownBy(() -> validate(f, "a:root")).hasMessageContaining("incompatible");
         publish(f, "dep", new SkillDocument("closed leaf", model("leaf").yaml()
                 + "output_schema: {type: object, properties: {other: {type: string}}, additionalProperties: false}\n"));
-        assertThatThrownBy(() -> validate(f, "a-root")).hasMessageContaining("undeclared");
+        assertThatThrownBy(() -> validate(f, "a:root")).hasMessageContaining("undeclared");
     }
 
     @Test void ordinaryChildSchemaChangesAreNotPinned() {
@@ -75,9 +75,9 @@ class SkillAdmissionContractsTest {
         publish(f, "a", calls("root", "dep:leaf"));
         publish(f, "dep", new SkillDocument("leaf", producer("leaf", "integer").yaml()
                 + "input_schema: {type: object, properties: {requiredLater: {type: boolean}}, required: [requiredLater]}\n"));
-        validate(f, "a-root");
+        validate(f, "a:root");
         publish(f, "dep", model("leaf"));
-        validate(f, "a-root");
+        validate(f, "a:root");
     }
 
     @Test void changedInputBindingReceiverPathConstraintRejects() {
@@ -91,9 +91,9 @@ class SkillAdmissionContractsTest {
                     input_bindings:
                       /id: {from: input, path: /id}
                 """));
-        validate(f, "a-root");
+        validate(f, "a:root");
         publish(f, "dep", new SkillDocument("leaf", receiver("string").yaml().replace("{id:", "{other:").replace("required: [id]", "required: [other]")));
-        assertThatThrownBy(() -> validate(f, "a-root")).hasMessageContaining("undeclared");
+        assertThatThrownBy(() -> validate(f, "a:root")).hasMessageContaining("undeclared");
     }
 
     @Test void preparedCallerPublishesAfterEachDependencyOnlyChangeButAffectedAdmissionsFail() {
@@ -101,7 +101,7 @@ class SkillAdmissionContractsTest {
             var f = new Fixture(null);
             publish(f, "dep", producer("leaf", "string"));
             publish(f, "a", forward("root", "dep:leaf"), model("safe"));
-            var old = f.manager.capture(SkillIdentity.parse("a-root"));
+            var old = f.manager.capture(SkillIdentity.parse("a:root"));
             try {
                 var caller = f.reloader.prepare("a", List.of(forward("root", "dep:leaf"), model("safe")), MODEL);
                 if (change.equals("deletion")) f.reloader.remove("dep", f.manager.active("dep").id());
@@ -109,9 +109,9 @@ class SkillAdmissionContractsTest {
                 else publish(f, "dep", producer("leaf", "integer"));
                 f.reloader.publish(caller);
                 assertThat(f.reloader.snapshot("a").generationId()).isEqualTo(caller.generationId());
-                assertThat(f.reloader.snapshot("a").skill("a-root").orElseThrow().outputSchema()).contains("string");
-                assertThatThrownBy(() -> validate(f, "a-root")).isInstanceOf(RuntimeException.class);
-                validate(f, "a-safe");
+                assertThat(f.reloader.snapshot("a").skill("root").orElseThrow().outputSchema()).contains("string");
+                assertThatThrownBy(() -> validate(f, "a:root")).isInstanceOf(RuntimeException.class);
+                validate(f, "a:safe");
                 f.manager.validateAdmission(old.snapshot());
                 assertThat(old.snapshot().generations().get("dep").visibility()).isEqualTo(NamespaceVisibility.PUBLIC);
             } finally { old.lease().close(); }

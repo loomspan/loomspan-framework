@@ -20,28 +20,28 @@ class DefaultSkillCatalogTest
         String yamlSchema = "{ \"type\" : \"object\", \"x\" : 1 }";
         String executorSchema = "{\n  \"type\": \"object\"\n}";
         List<CapabilityMetadata> capabilities = List.of(
-                metadata("default-beta", SkillKind.JAVA, "{\"type\":\"object\"}", SkillAccessPolicy.unrestricted()),
-                metadata("default-Alpha", SkillKind.YAML, yamlSchema, SkillAccessPolicy.yamlRoles(java.util.Set.of("ADMIN"))),
-                metadata("default-zExecutorLeaf", SkillKind.JAVA, executorSchema, SkillAccessPolicy.denied()),
-                metadata("default-modelLeaf", SkillKind.YAML, yamlSchema, SkillAccessPolicy.unrestricted()));
+                metadata("default:beta", SkillKind.JAVA, "{\"type\":\"object\"}", SkillAccessPolicy.unrestricted()),
+                metadata("default:alpha", SkillKind.YAML, yamlSchema, SkillAccessPolicy.yamlRoles(java.util.Set.of("ADMIN"))),
+                metadata("default:z-executor-leaf", SkillKind.JAVA, executorSchema, SkillAccessPolicy.denied()),
+                metadata("default:model-leaf", SkillKind.YAML, yamlSchema, SkillAccessPolicy.unrestricted()));
 
         DefaultSkillCatalog catalog = new DefaultSkillCatalog("default", "test-generation", null, capabilities);
 
         assertThat(catalog.generationId()).isEqualTo("test-generation");
 
-        assertThat(catalog.skills()).extracting(descriptor -> descriptor.name())
-                .containsExactly("default-Alpha", "default-beta", "default-modelLeaf", "default-zExecutorLeaf");
+        assertThat(catalog.skills()).extracting(descriptor -> descriptor.qualifiedName())
+                .containsExactly("default:alpha", "default:beta", "default:model-leaf", "default:z-executor-leaf");
         assertThat(catalog.skills()).extracting(descriptor -> descriptor.kind())
                 .containsExactly(SkillKind.YAML, SkillKind.JAVA, SkillKind.YAML, SkillKind.JAVA);
-        assertThat(catalog.skill("default-Alpha")).get().extracting(descriptor -> descriptor.inputSchema())
+        assertThat(catalog.skill("alpha")).get().extracting(descriptor -> descriptor.inputSchema())
                 .isEqualTo(yamlSchema);
-        assertThat(catalog.skill("default-zExecutorLeaf")).get().extracting(descriptor -> descriptor.inputSchema())
+        assertThat(catalog.skill("z-executor-leaf")).get().extracting(descriptor -> descriptor.inputSchema())
                 .isEqualTo(executorSchema);
-        assertThat(catalog.skill("default-modelLeaf")).get().extracting(descriptor -> descriptor.inputSchema())
+        assertThat(catalog.skill("model-leaf")).get().extracting(descriptor -> descriptor.inputSchema())
                 .isEqualTo(yamlSchema);
-        assertThat(catalog.skill("default-modelLeaf")).get().extracting(descriptor -> descriptor.outputSchema())
+        assertThat(catalog.skill("model-leaf")).get().extracting(descriptor -> descriptor.outputSchema())
                 .isEqualTo(yamlSchema);
-        assertThat(catalog.skill("default-missing")).isEmpty();
+        assertThat(catalog.skill("missing")).isEmpty();
         assertThatThrownBy(() -> catalog.skills().clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 
@@ -49,37 +49,58 @@ class DefaultSkillCatalogTest
     void rejectsDuplicateNamesDefensively()
     {
         List<CapabilityMetadata> capabilities = List.of(
-                metadata("default-same", SkillKind.YAML, "{}", SkillAccessPolicy.unrestricted()),
-                metadata("default-same", SkillKind.JAVA, "{}", SkillAccessPolicy.unrestricted()));
+                metadata("default:same", SkillKind.YAML, "{}", SkillAccessPolicy.unrestricted()),
+                metadata("default:same", SkillKind.JAVA, "{}", SkillAccessPolicy.unrestricted()));
 
         assertThatThrownBy(() -> new DefaultSkillCatalog("default", "test-generation", null, capabilities))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Duplicate registered skill name 'default-same'");
+                .hasMessage("Duplicate registered skill name 'default:same'");
     }
 
     @Test
-    void rejectsUnqualifiedLookup()
+    void namespaceScopedLookupSelectsOnlyTheExactLocalName()
     {
-        var catalog = new DefaultSkillCatalog("default", "red-test", null, List.of());
-        assertThatThrownBy(() -> catalog.skill("unqualified")).isInstanceOf(IllegalArgumentException.class);
+        var orders = new DefaultSkillCatalog("orders", "orders-generation", null, List.of(
+                metadata("orders:lookup", SkillKind.JAVA, "{}", SkillAccessPolicy.unrestricted()),
+                metadata("orders:warehouse-lookup", SkillKind.YAML, "{}", SkillAccessPolicy.unrestricted())));
+        var warehouse = new DefaultSkillCatalog("warehouse", "warehouse-generation", null, List.of(
+                metadata("warehouse:lookup", SkillKind.JAVA, "{}", SkillAccessPolicy.unrestricted())));
+        var selected = orders.skill("lookup").orElseThrow();
+        assertThat(selected.namespace()).isEqualTo("orders");
+        assertThat(selected.localName()).isEqualTo("lookup");
+        assertThat(selected.qualifiedName()).isEqualTo("orders:lookup");
+        assertThat(warehouse.skill("lookup").orElseThrow().qualifiedName()).isEqualTo("warehouse:lookup");
+        assertThat(orders.skill("warehouse-lookup").orElseThrow().qualifiedName()).isEqualTo("orders:warehouse-lookup");
+        var removed = new DefaultSkillCatalog("orders", "removed", null, List.of());
+        assertThat(removed.skill("warehouse-lookup")).isEmpty();
+        assertThat(warehouse.skill("lookup")).isPresent();
+        assertThat(orders.skill("missing")).isEmpty();
+        assertThat(orders.skill("lookup-3pl")).isEmpty();
     }
 
-    @Test void identifiesEmptyCatalogAndRejectsForeignOwnership() {
-        var empty = new DefaultSkillCatalog("Tax", "empty", null, List.of());
-        assertThat(empty.namespace()).isEqualTo("tax");
-        assertThat(empty.skill("tax-missing")).isEmpty();
-        assertThat(empty.skill("other-search")).isEmpty();
-        assertThatThrownBy(() -> new DefaultSkillCatalog("tax", "id", null, List.of(
-                metadata("other-search", SkillKind.JAVA, "{}", SkillAccessPolicy.unrestricted()))))
-                .isInstanceOf(IllegalArgumentException.class);
+    @Test
+    void rejectsMalformedComponentsAndAppliesPairLimitEvenOnMissingNames()
+    {
+        var catalog = new DefaultSkillCatalog("order-support", "id", null, List.of());
+        for (String invalid : List.of("", " ", " lookup", "lookup ", "Lookup", "lookup_name", "a--b", "1lookup", "\u00e9",
+                "claude", "x-anthropic", "orders:lookup", "a:b:c", "orders--lookup", "a/b", "a".repeat(65)))
+            assertThatThrownBy(() -> catalog.skill(invalid)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> catalog.skill(null)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(catalog.skill("a".repeat(49))).isEmpty();
+        assertThatThrownBy(() -> catalog.skill("a".repeat(50))).isInstanceOf(IllegalArgumentException.class);
+        for (String owner : List.of("Tax", " tax", "tax ", "tax_name", "claude", "1tax"))
+            assertThatThrownBy(() -> new DefaultSkillCatalog(owner, "id", null, List.of())).isInstanceOf(IllegalArgumentException.class);
     }
-    @Test void normalizesLookupNamespaceAndPreservesLocalCase() {
-        var catalog = new DefaultSkillCatalog("Tax", "id", null, List.of(
-                metadata("tax-search", SkillKind.JAVA, "{}", SkillAccessPolicy.unrestricted())));
-        assertThat(catalog.skill("TAX-search")).isPresent();
-        assertThat(catalog.skill("tax-Search")).isEmpty();
-        assertThat(catalog.skill("other-search")).isEmpty();
-        assertThatThrownBy(() -> catalog.skill("tax/search")).isInstanceOf(IllegalArgumentException.class);
+
+    @Test
+    void identifiesEmptyCatalogAndRejectsForeignOwnership()
+    {
+        var empty = new DefaultSkillCatalog("tax", "empty", null, List.of());
+        assertThat(empty.namespace()).isEqualTo("tax");
+        assertThat(empty.skill("missing")).isEmpty();
+        assertThatThrownBy(() -> new DefaultSkillCatalog("tax", "id", null, List.of(
+                metadata("other:search", SkillKind.JAVA, "{}", SkillAccessPolicy.unrestricted()))))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private CapabilityMetadata metadata(String name, SkillKind kind, String schema,

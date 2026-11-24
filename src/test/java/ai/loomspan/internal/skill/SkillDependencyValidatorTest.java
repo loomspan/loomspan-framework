@@ -47,8 +47,9 @@ class SkillDependencyValidatorTest {
         ((tools.jackson.databind.node.ObjectNode) schema.structuralTree()).removeAll();
         assertThat(schema.tree()).isEqualTo(canonical);
         var json = ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree();
-        for (String name : List.of("a:leaf", "a:bridge", "a:root")) {
-            String displayed = generation.skillCatalog().skill(name).orElseThrow().outputSchema();
+        for (String localName : List.of("leaf", "bridge", "root")) {
+            String name = "a:" + localName;
+            String displayed = generation.skillCatalog().skill(localName).orElseThrow().outputSchema();
             var registered = generation.registeredSkillCatalog().find(name).orElseThrow();
             assertThat(json.readTree(displayed)).isEqualTo(expected);
             assertThat(registered.outputSchema()).isEqualTo(displayed);
@@ -74,7 +75,7 @@ class SkillDependencyValidatorTest {
         f.reloader.publish(f.reloader.prepare("b",List.of(forward("bridge","a:leaf")),MODEL,NamespaceVisibility.PUBLIC));
         var changed=List.of(producer("leaf","integer"),forward("root","b:bridge"));
         var candidate=f.reloader.prepare("a",changed,MODEL,NamespaceVisibility.PUBLIC);
-        assertThat(candidate.snapshot().skill("a:root").orElseThrow().outputSchema()).contains("integer");
+        assertThat(candidate.snapshot().skill("root").orElseThrow().outputSchema()).contains("integer");
         candidate.close();
         assertThat(f.reloader.validate("a",changed,MODEL).issues()).anyMatch(i->i.message().contains("Private"));
         assertThat(f.reloader.validate("a",List.of(forward("root","b:bridge")),MODEL,NamespaceVisibility.PUBLIC).issues()).anyMatch(i->i.message().contains("a:leaf"));
@@ -105,7 +106,7 @@ class SkillDependencyValidatorTest {
         verify(registries.get(1),times(1)).destroy();
         f.reloader.publish(f.reloader.prepare("dep",List.of(producer("leaf","integer")),MODEL));
         var built=f.manager.prepare(captured,List.of(forward("root","dep:leaf")),MODEL,NamespaceVisibility.PRIVATE,null, null);
-        assertThat(built.skillCatalog().skill("a:root").orElseThrow().outputSchema()).contains("string");
+        assertThat(built.skillCatalog().skill("root").orElseThrow().outputSchema()).contains("string");
         built.close();
         assertThat(f.reloader.validate("a",List.of(forward("root","dep:leaf")),MODEL).issues()).anyMatch(i->i.message().contains("Private"));
         // No executable dependency owner was retained while preparing or staging the candidate.
@@ -128,7 +129,7 @@ class SkillDependencyValidatorTest {
                 if(result.valid()) {
                     var prepared=f.manager.prepare(view,List.of(forward("root","dep:leaf")),MODEL,NamespaceVisibility.PRIVATE,null, null);
                     String expected=view.namespaces().get("dep").id().equals(dep.generationId())?"string":"integer";
-                    assertThat(prepared.skillCatalog().skill("a:root").orElseThrow().outputSchema()).contains(expected);
+                    assertThat(prepared.skillCatalog().skill("root").orElseThrow().outputSchema()).contains(expected);
                     prepared.close();
                 }
             }
@@ -143,9 +144,9 @@ class SkillDependencyValidatorTest {
                     forward("local", "warehouse-lookup"), forward("foreign", "warehouse:lookup")), MODEL));
             var generation = fixture.manager.active("orders");
             assertThat(generation.definition("orders:local").outputFromSkill()).isEqualTo("orders:warehouse-lookup");
-            assertThat(generation.skillCatalog().skill("orders:local").orElseThrow().outputSchema()).contains("string");
+            assertThat(generation.skillCatalog().skill("local").orElseThrow().outputSchema()).contains("string");
             assertThat(generation.definition("orders:foreign").outputFromSkill()).isEqualTo("warehouse:lookup");
-            assertThat(generation.skillCatalog().skill("orders:foreign").orElseThrow().outputSchema()).contains("integer");
+            assertThat(generation.skillCatalog().skill("foreign").orElseThrow().outputSchema()).contains("integer");
             var capture = fixture.manager.capture(ai.loomspan.internal.core.SkillIdentity.parse("orders:local"));
             try {
                 var admitted = fixture.manager.validateAdmission(capture.snapshot());

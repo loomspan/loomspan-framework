@@ -17,6 +17,22 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ApplicationApiValueTest
 {
     @Test
+    void rootOperationsRequireExplicitIdentityComponents() throws Exception
+    {
+        for (Class<?> input : List.of(Object.class, Map.class))
+        {
+            assertThat(SkillTemplate.class.getMethod("validate", String.class, String.class, input).getReturnType())
+                    .isEqualTo(void.class);
+            assertThat(SkillTemplate.class.getMethod("invoke", String.class, String.class, input).getReturnType())
+                    .isEqualTo(String.class);
+            assertThat(SkillTemplate.class.getMethod("invoke", String.class, String.class, input,
+                    java.util.function.Consumer.class).getReturnType()).isEqualTo(String.class);
+            assertThat(SkillInvocationHandoff.class.getMethod("handoff", String.class, String.class, input).getReturnType())
+                    .isEqualTo(AdmittedSkillInvocation.class);
+        }
+    }
+
+    @Test
     void plannerInabilityUsesTheSupportedRecoverableContract() throws Exception
     {
         String reason = "  no evidence\r\n\u96ea\t";
@@ -37,13 +53,14 @@ class ApplicationApiValueTest
         assertThat(SkillDescriptor.class.getRecordComponents())
                 .extracting(component -> List.of(component.getName(), component.getType()))
                 .containsExactly(
-                        List.of("name", String.class),
+                        List.of("namespace", String.class),
+                        List.of("localName", String.class),
                         List.of("description", String.class),
                         List.of("kind", SkillKind.class),
                         List.of("inputSchema", String.class),
                         List.of("outputSchema", String.class));
         assertThat(SkillDescriptor.class.getConstructors()).hasSize(1);
-        assertThat(SkillDescriptor.class.getConstructors()[0].getParameterCount()).isEqualTo(5);
+        assertThat(SkillDescriptor.class.getConstructors()[0].getParameterCount()).isEqualTo(6);
         assertThat(SkillCatalog.class.getDeclaredMethods())
                 .extracting(java.lang.reflect.Method::getName)
                 .containsExactlyInAnyOrder("namespace", "generationId", "publicationVersion", "skills", "skill");
@@ -61,11 +78,11 @@ class ApplicationApiValueTest
         assertThat(skillMethod.getReturnType()).isEqualTo(java.util.Optional.class);
         assertThat(skillMethod.getGenericReturnType().getTypeName())
                 .isEqualTo("java.util.Optional<ai.loomspan.api.SkillDescriptor>");
-        assertThat(SkillTemplate.class.getMethod("validate", String.class, Object.class).getReturnType())
+        assertThat(SkillTemplate.class.getMethod("validate", String.class, String.class, Object.class).getReturnType())
                 .isEqualTo(void.class);
-        assertThat(SkillTemplate.class.getMethod("validate", String.class, Map.class).getReturnType())
+        assertThat(SkillTemplate.class.getMethod("validate", String.class, String.class, Map.class).getReturnType())
                 .isEqualTo(void.class);
-        assertThatThrownBy(() -> new SkillDescriptor(" ", "description", SkillKind.YAML, "{}", null))
+        assertThatThrownBy(() -> new SkillDescriptor("default", " ", "description", SkillKind.YAML, "{}", null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -75,8 +92,8 @@ class ApplicationApiValueTest
         assertThat(SkillInvocationHandoff.class.getDeclaredMethods())
                 .extracting(method -> List.of(method.getName(), method.getReturnType(), List.of(method.getParameterTypes())))
                 .containsExactlyInAnyOrder(
-                        List.of("handoff", AdmittedSkillInvocation.class, List.of(String.class, Object.class)),
-                        List.of("handoff", AdmittedSkillInvocation.class, List.of(String.class, Map.class)));
+                        List.of("handoff", AdmittedSkillInvocation.class, List.of(String.class, String.class, Object.class)),
+                        List.of("handoff", AdmittedSkillInvocation.class, List.of(String.class, String.class, Map.class)));
         assertThat(AdmittedSkillInvocation.class.getDeclaredMethods())
                 .extracting(method -> List.of(method.getName(), method.getReturnType(), List.of(method.getParameterTypes())))
                 .containsExactlyInAnyOrder(
@@ -85,6 +102,51 @@ class ApplicationApiValueTest
                         List.of("invoke", String.class, List.of(java.util.function.Consumer.class)),
                         List.of("release", void.class, List.of()));
         assertThat(SkillTemplate.class.getDeclaredMethods()).hasSize(6);
+    }
+
+    @Test
+    void metadataExposesValidatedReusableIdentityComponents() throws Exception
+    {
+        assertThat(ValidatedSkill.class.getRecordComponents())
+                .extracting(component -> List.of(component.getName(), component.getType()))
+                .containsExactly(List.of("namespace", String.class), List.of("localName", String.class),
+                        List.of("kind", SkillKind.class));
+        assertThat(ValidatedSkill.class.getConstructors()).hasSize(1);
+        assertThat(ValidatedSkill.class.getConstructors()[0].getParameterTypes())
+                .containsExactly(String.class, String.class, SkillKind.class);
+        assertThatThrownBy(() -> ValidatedSkill.class.getMethod("name")).isInstanceOf(NoSuchMethodException.class);
+        assertThatThrownBy(() -> SkillDescriptor.class.getMethod("name")).isInstanceOf(NoSuchMethodException.class);
+        for (var pair : List.of(List.of("orders", "lookup"), List.of("order-support", "find-order")))
+        {
+            var validated = new ValidatedSkill(pair.get(0), pair.get(1), SkillKind.JAVA);
+            var descriptor = new SkillDescriptor(pair.get(0), pair.get(1), "  exact description  ", SkillKind.JAVA, " { } ", null);
+            assertThat(validated.namespace()).isEqualTo(pair.get(0));
+            assertThat(validated.localName()).isEqualTo(pair.get(1));
+            assertThat(validated.qualifiedName()).isEqualTo(pair.get(0) + ":" + pair.get(1));
+            assertThat(descriptor.namespace()).isEqualTo(validated.namespace());
+            assertThat(descriptor.localName()).isEqualTo(validated.localName());
+            assertThat(descriptor.qualifiedName()).isEqualTo(validated.qualifiedName());
+            assertThat(descriptor.description()).isEqualTo("  exact description  ");
+            assertThat(descriptor.inputSchema()).isEqualTo(" { } ");
+            assertThat(descriptor.outputSchema()).isNull();
+            assertThat(validated).isEqualTo(new ValidatedSkill(pair.get(0), pair.get(1), SkillKind.JAVA));
+        }
+        for (String invalid : List.of("", " ", "Orders", "lookup_name", "a--b", "1lookup", "\u00e9", "claude", "x-anthropic", "orders:lookup", "a".repeat(65)))
+        {
+            assertThatThrownBy(() -> new ValidatedSkill(invalid, "lookup", SkillKind.YAML)).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> new SkillDescriptor("orders", invalid, "description", SkillKind.YAML, "{}", null)).isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(new ValidatedSkill("order-support", "a".repeat(49), SkillKind.YAML).localName()).hasSize(49);
+        assertThatThrownBy(() -> new ValidatedSkill("order-support", "a".repeat(50), SkillKind.YAML)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new SkillDescriptor("order-support", "a".repeat(50), "description", SkillKind.YAML, "{}", null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ValidatedSkill(null, "lookup", SkillKind.JAVA)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new ValidatedSkill("orders", null, SkillKind.JAVA)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new ValidatedSkill("orders", "lookup", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillDescriptor(null, "lookup", "description", SkillKind.JAVA, "{}", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillDescriptor("orders", null, "description", SkillKind.JAVA, "{}", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillDescriptor("orders", "lookup", null, SkillKind.JAVA, "{}", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillDescriptor("orders", "lookup", "description", null, "{}", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillDescriptor("orders", "lookup", "description", SkillKind.JAVA, null, null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test

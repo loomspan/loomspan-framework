@@ -70,11 +70,11 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                 try {
                     for (var unauthorized : List.of(auth("ROLE_SALES"), auth("ROLE_DATABASE_WRITE"))) {
                         caller.setAuthentication(unauthorized);
-                        assertThatThrownBy(() -> template.invoke("transformed", Map.of()))
+                        assertThatThrownBy(() -> template.invoke("default", "transformed", Map.of()))
                                 .isInstanceOf(AccessDeniedException.class).hasMessageNotContaining("transform evaluated");
                     }
                     caller.setAuthentication(auth("ROLE_SALES", "ROLE_DATABASE_WRITE"));
-                    assertThatThrownBy(() -> template.invoke("transformed", Map.of()))
+                    assertThatThrownBy(() -> template.invoke("default", "transformed", Map.of()))
                             .isInstanceOf(SkillException.class).hasStackTraceContaining("transform evaluated");
                     assertThat(context.getBean(State.class).calls).isZero();
                 } finally {
@@ -99,9 +99,9 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                 var principal = auth("ROLE_SALES","ROLE_DATABASE_WRITE"); caller.setAuthentication(principal);
                 SecurityContextHolder.setContext(caller);
                 try {
-                    for (String skill : List.of("default-callable","default-leaf")) {
-                        template.validate(skill,Map.of("value","reject"));
-                        var pending = handoff.handoff(skill,Map.of("value","ok"));
+                    for (String skill : List.of("callable","leaf")) {
+                        template.validate("default", skill,Map.of("value","reject"));
+                        var pending = handoff.handoff("default", skill,Map.of("value","ok"));
                         assertThat(state.calls).isZero();
                         var ambient = SecurityContextHolder.createEmptyContext(); ambient.setAuthentication(auth("ROLE_OTHER"));
                         SecurityContextHolder.setContext(ambient);
@@ -110,12 +110,12 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                         assertThat(state.thread).isNotSameAs(Thread.currentThread());
                         restored(worker,sentinel,ambient);
                         SecurityContextHolder.setContext(caller);
-                        assertThat(template.invoke(skill,Map.of("value","ok"))).isEqualTo("ok");
+                        assertThat(template.invoke("default", skill,Map.of("value","ok"))).isEqualTo("ok");
                         assertThat(state.authentication).isSameAs(principal);
                         restored(worker,sentinel,caller);
                         int before = state.calls;
                         var views = new ArrayList<SkillExecutionView>();
-                        assertThatThrownBy(() -> template.invoke(skill,Map.of("value","reject"),views::add))
+                        assertThatThrownBy(() -> template.invoke("default", skill,Map.of("value","reject"),views::add))
                                 .isInstanceOf(AccessDeniedException.class);
                         assertThat(state.calls).isEqualTo(before);
                         assertThat(views).hasSize(1);
@@ -124,7 +124,7 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                             assertThat(event.details()).containsEntry("status","failed");
                         });
                         restored(worker,sentinel,caller);
-                        assertThatThrownBy(() -> template.invoke(skill,Map.of("value","fail")))
+                        assertThatThrownBy(() -> template.invoke("default", skill,Map.of("value","fail")))
                                 .isInstanceOf(SkillException.class).hasStackTraceContaining("business failure");
                         restored(worker,sentinel,caller);
                         state.calls = 0;
@@ -162,15 +162,15 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                     for (var denied : List.of(auth("ROLE_SALES"),auth("ROLE_DATABASE_WRITE"))) {
                         caller.setAuthentication(denied);
                         var observations = new ArrayList<SkillExecutionView>();
-                        assertThatThrownBy(() -> template.validate("leaf",Map.of())).isInstanceOf(AccessDeniedException.class);
-                        assertThatThrownBy(() -> handoff.handoff("leaf",Map.of())).isInstanceOf(AccessDeniedException.class);
-                        assertThatThrownBy(() -> template.invoke("leaf",Map.of(),observations::add)).isInstanceOf(AccessDeniedException.class);
+                        assertThatThrownBy(() -> template.validate("default", "leaf",Map.of())).isInstanceOf(AccessDeniedException.class);
+                        assertThatThrownBy(() -> handoff.handoff("default", "leaf",Map.of())).isInstanceOf(AccessDeniedException.class);
+                        assertThatThrownBy(() -> template.invoke("default", "leaf",Map.of(),observations::add)).isInstanceOf(AccessDeniedException.class);
                         assertThat(observations).isEmpty();
-                        template.validate("root",Map.of()); // child policy is checked when that child is considered/called
+                        template.validate("default", "root",Map.of()); // child policy is checked when that child is considered/called
                     }
                     caller.setAuthentication(both);
-                    template.validate("leaf",Map.of("value","reject"));
-                    assertThat(reload.snapshot("default").skills()).extracting(SkillDescriptor::name)
+                    template.validate("default", "leaf",Map.of("value","reject"));
+                    assertThat(reload.snapshot("default").skills()).extracting(SkillDescriptor::qualifiedName)
                             .contains("default-leaf","default-yamlDenied","default-callable").doesNotContain("default-write");
                     var capture = manager.capture(SkillIdentity.parse("default-root"));
                     try {

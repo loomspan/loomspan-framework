@@ -9,7 +9,7 @@ coverage: source-verified
 
 ## Declare one skill
 
-Use `@SkillMethod` on an application-owned Spring bean method to declare one directly callable Java skill. No companion YAML is required. `SkillTemplate` and a YAML parent's `allowed_skills` both use its exact registered name.
+Use `@SkillMethod` on an application-owned Spring bean method to declare one directly callable Java skill. No companion YAML is required. `SkillTemplate` takes its exact namespace and local name separately. A YAML parent's `allowed_skills` uses an owner-relative or qualified authored reference.
 
 ```java
 import ai.loomspan.api.SkillMethod;
@@ -26,7 +26,7 @@ public class InvoiceLookup {
 }
 ```
 
-Call this skill with `skills.invoke("default:invoice-exists", Map.of("reference", "INV-42"))`, where `skills` is the injected `SkillTemplate`.
+Call this skill with `skills.invoke("default", "invoice-exists", Map.of("reference", "INV-42"))`, where `skills` is the injected `SkillTemplate`.
 
 The runtime method annotation has three elements:
 
@@ -61,7 +61,7 @@ The example registers `default:invoice-exists`. See the [identity rules](../skil
 
 `@SkillParam` is a runtime parameter annotation with `description() default ""` and `required() default true`. Descriptions SHOULD explain meaning and constraints. Optional parameters MUST use nullable reference types: omission binds null, so an optional primitive fails startup.
 
-The Java signature and parameter metadata produce a compiled canonical input contract and tool schema. Generation uses resolved inherited generic types and the application mapper's binding names. Complete root validation and planner integration are currently unavailable while canonical consumers remain inconsistent. Read [reflected Java input contracts](../skill-authoring/input-contracts.md) for scalars, Object, generic and typed maps, DTOs, collections, runtime references, and null semantics.
+The Java signature and parameter metadata produce a compiled canonical input contract and tool schema. Generation uses resolved inherited generic types and the application mapper's binding names. Root validation checks the compiled contract before invocation. Read [reflected Java input contracts](../skill-authoring/input-contracts.md) for scalars, Object, generic and typed maps, DTOs, collections, runtime references, and null semantics.
 
 Successful Java values use one conversion contract for both declaration roles:
 

@@ -19,9 +19,11 @@ host defines label meaning and supplies it on each replacement or restart instal
 Acquisition selects the current namespace generation once; a missing namespace fails.
 
 `skills()` is immutable, unfiltered and deterministically sorted by qualified name.
-`skill("Tax-search")` normalizes namespace case and preserves local-name case.
-Malformed/unqualified arguments fail; valid unknown or foreign-namespace identities
-return empty without consulting another catalog. Every registered kind is included
+`skill("lookup")` accepts a local name in the selected namespace. For example,
+`reloader.snapshot("orders").skill("lookup")` selects `orders:lookup`.
+A qualified argument such as `orders:lookup` fails local-name validation. Both
+components and their combined limit follow the declaration rules, even on a miss.
+A valid unknown local name returns empty after one lookup in that catalog. Every registered kind is included
 even when authorization denies execution. Catalogs remain unchanged after replacement
 or removal and hold no executable resource lease, authorization or execution reservation.
 
@@ -29,16 +31,17 @@ Both annotated methods and executor-backed YAML have `kind: JAVA`; reference-onl
 executor registrations are absent. Declaration provenance is internal diagnostic
 metadata, inspected through Console or [HTTP diagnostics](../skill-authoring/observability-http.md#skill-classification-and-declaration), rather than another application Java API.
 
-Each `SkillDescriptor` has five components: `name`, `description`, `kind`,
+Each `SkillDescriptor` has six components: `namespace`, `localName`, `description`, `kind`,
 `inputSchema`, and nullable `outputSchema`. `inputSchema` is the exact registered
 JSON input-schema string shown to models. `outputSchema` is normalized effective
 output metadata: the ordinary model producer's shape inherited through a
-forwarding chain, or null for Java (including executor YAML) and model producers without a schema.
+forwarding chain or executor YAML leaf, or null for annotation-only Java and producers without a schema.
 Child-local evidence annotations are omitted from metadata; it does not install
 a parent validator or guarantee factual correctness. See [output contracts](../skill-authoring/output-contracts.md). Retain a catalog as metadata or acquire another through `SkillReloader.snapshot(namespace)` for current discovery. Discovery is not authorization. See [skill-reload.md](skill-reload.md).
 
-Use `SkillTemplate.validate(name, map)` or `validate(name, object)` before asynchronous
-dispatch. Both freshly capture the entry's entire declared reachable graph and perform the same local-to-default or explicit-qualified resolution, conversion, input/dependency contract checks, error mapping, and entry role-policy evaluation used by invocation preparation. A null Object is
+Use `SkillTemplate.validate(namespace, localName, map)` or
+`validate(namespace, localName, object)` before asynchronous
+dispatch. Both freshly capture the entry's entire declared reachable graph and perform the same exact pair validation, conversion, input/dependency contract checks, error mapping, and entry role-policy evaluation used by invocation preparation. A null Object is
 always rejected before conversion; a null Map is accepted only for generic or
 empty-permitting contracts. Authorization denial remains an unwrapped Spring Security
 `AccessDeniedException` with the capability name.
@@ -57,9 +60,24 @@ than `validate`: handoff prepares the input and reserves one lifecycle admission
 while execution still enforces authorization with the authentication captured at
 handoff. See [invocation.md](invocation.md).
 
-Pass `descriptor.name()` directly to invocation, validation or handoff; do not split
-it when invoking a non-default target. Local names are accepted by root operations only as default references; `SkillCatalog.skill(...)` remains qualified-only. A retained catalog continues describing its prepared contracts; it never pins later
-validation, invocation or handoff. Each operation captures the then-current active view.
+Both descriptors and successful validation's `ValidatedSkill` records expose
+`namespace()`, `localName()` and derived `qualifiedName()`. For `orders:lookup`
+these return `orders`, `lookup` and `orders:lookup`. `ValidatedSkill` contains the
+two identity components and `kind`. Use the components directly.
+
+```java
+var descriptor = reloader.snapshot("orders").skill("lookup").orElseThrow();
+skills.validate(descriptor.namespace(), descriptor.localName(), Map.of());
+String result = skills.invoke(descriptor.namespace(), descriptor.localName(), Map.of());
+var admitted = handoff.handoff(descriptor.namespace(), descriptor.localName(), Map.of());
+try { admitted.invoke(); }
+finally { admitted.release(); }
+```
+
+A hyphenated local `warehouse-lookup` in the orders catalog selects only
+`orders:warehouse-lookup`. It cannot select `warehouse:lookup`. A retained catalog
+continues describing its prepared contracts. Each validation, invocation or handoff
+captures the then-current active view.
 
 ## Source Anchors
 
@@ -67,6 +85,7 @@ validation, invocation or handoff. Each operation captures the then-current acti
   protects snapshot order, scope, immutability, kind mapping, and schema fidelity.
 - `DefaultSkillTemplateTest#validateUsesInvocationPreparationAndCallingAuthenticationWithoutExecution`
   protects session-free calling-authentication authorization.
+- `ApplicationApiValueTest` and `PortableDeclarationIdentityIntegrationTest#validatedAndCataloguedComponentsSelectTheSameRealInvocation` protect exact metadata components and their reuse through real execution.
 - `LoomspanPublicSurfaceArchitectureTest`
   protects the closed public surface.
 - `SkillReloaderTest#publicationLabelsBelongToTheImmutableWinningGeneration` and

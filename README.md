@@ -91,7 +91,7 @@ input_schema:
 In an embedded Java application, invoke it through an injected `SkillTemplate`:
 
 ```java
-String triage = skills.invoke("default:triage-support-request", Map.of("customerMessage", """
+String triage = skills.invoke("default", "triage-support-request", Map.of("customerMessage", """
         Since this morning's deployment, checkout times out after payment.
         Three customers say they were charged but received no order confirmation.
         Retrying sometimes creates two orders. Browsing and cart updates still work.
@@ -187,11 +187,22 @@ Inject `SkillReloader` and acquire `SkillCatalog catalog = reloader.snapshot("de
 There is no injected startup catalog or no-argument acquisition. `namespace()` and
 `generationId()` identify the catalog's owner and opaque generation, even when empty.
 `publicationVersion()` returns its optional host-supplied publication label.
-Descriptors and validation feedback carry qualified names. `SkillCatalog.skill(...)` requires qualification and rejects local or malformed
-references and returns empty for valid unknown or foreign identities. Retained
-catalogs are immutable, sorted, unfiltered metadata with no resource lease or
-execution reservation. Pass `descriptor.name()` directly to invocation/validation
-or handoff; the catalog does not authorize or pin that later admission.
+Descriptors and validation feedback expose `namespace()`, `localName()` and
+`qualifiedName()`. A namespace snapshot accepts only a local name, such as
+`reloader.snapshot("orders").skill("lookup")`. Malformed local names, including
+`orders:lookup`, fail validation. A valid missing local name returns empty.
+Retained catalogs are immutable, sorted, unfiltered metadata with no resource lease
+or execution reservation. Pass the two components to invocation, validation or handoff.
+
+```java
+var descriptor = reloader.snapshot("orders").skill("lookup").orElseThrow();
+skills.validate(descriptor.namespace(), descriptor.localName(), Map.of());
+String result = skills.invoke(descriptor.namespace(), descriptor.localName(), Map.of());
+```
+
+Every root operation requires both exact components, including `"default"` for a
+default-owned skill. It applies the declaration grammar and combined limit before
+capturing the selected target. A catalog does not authorize or pin that admission.
 
 Every root invocation and handoff freshly captures exactly the namespace generations
 reached by the entry's declared child graph and its executor dependencies, including
@@ -371,7 +382,7 @@ try (PreparedSkillUpdate department = reloader.prepare("department", List.of(cal
         execution, Map.of("provider-key", providerKey))) {
     reloader.publish(department);
 }
-// An injected SkillTemplate now admits department-assistant freshly on each call.
+// An injected SkillTemplate invokes skills.invoke("department", "assistant", input).
 ```
 
 The model alias and provider model are illustrative host choices. A department's
@@ -534,12 +545,12 @@ See the [executor API contract](agent-skills/loomspan-docs/references/java-api/j
 Failed direct and admitted invocations expose optional terminal contract detail
 through `SkillException.getFailureDiagnosis()`, including input rejection during
 handoff preparation. This works with diagnostics set to `NEVER` and without an
-observer. Keep the requested root name separately from the diagnosis's canonical
+observer. Keep the requested root components separately from the diagnosis's canonical
 receiving or publishing `skillName()`.
 
 ```java
 try {
-    return skills.invoke(requestedSkill, input);
+    return skills.invoke(requestedNamespace, requestedLocalName, input);
 } catch (SkillException failure) {
     failure.getFailureDiagnosis().ifPresent(diagnosis -> {
         logger.warn("Skill {} failed at {} with {}", diagnosis.skillName(),
@@ -583,8 +594,8 @@ advice. Actual invocation supplies real arguments to Spring advice, which can st
 a validated candidate; caller security contexts restore after success or failure.
 See [Java declarations and results](agent-skills/loomspan-docs/references/java-api/java-skills.md).
 
-The catalog descriptor is `SkillDescriptor(name, description, kind, inputSchema,
-outputSchema)`; `SkillKind` includes `YAML` and `JAVA`.
+The catalog descriptor is `SkillDescriptor(namespace, localName, description, kind,
+inputSchema, outputSchema)`; `SkillKind` includes `YAML` and `JAVA`.
 Nullable `outputSchema` describes effective output shape, including
 forwarding chains. Executor YAML leaves validate their declared output schema at
 publication, and forwarding parents use the accepted result. Annotation-only Java

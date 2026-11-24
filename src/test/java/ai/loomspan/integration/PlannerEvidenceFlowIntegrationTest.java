@@ -330,11 +330,11 @@ class PlannerEvidenceFlowIntegrationTest {
                         SkillTemplate facade = context.getBean(SkillTemplate.class);
                         // Public direct invocation returns full text; it is not a planner evidence reader.
                         if (!expanded) {
-                            assertThat(facade.invoke("default-sourceA", Map.of())).contains("FACT_A_TAIL");
-                            assertThat(facade.invoke("default-sourceB", Map.of())).contains("FACT_B_TAIL");
-                        } else assertThat(facade.invoke("default-sourceB", Map.of("unrelated", true))).isEqualTo("UNRELATED_MISSION_SENTINEL");
-                        capture.result = facade.invoke("default-root", Map.of("caseId", "local-case"), capture.observed::set);
-                        if (expanded) assertThat(facade.invoke("default-sourceB", Map.of("unrelated", true)))
+                            assertThat(facade.invoke("default", "sourceA", Map.of())).contains("FACT_A_TAIL");
+                            assertThat(facade.invoke("default", "sourceB", Map.of())).contains("FACT_B_TAIL");
+                        } else assertThat(facade.invoke("default", "sourceB", Map.of("unrelated", true))).isEqualTo("UNRELATED_MISSION_SENTINEL");
+                        capture.result = facade.invoke("default", "root", Map.of("caseId", "local-case"), capture.observed::set);
+                        if (expanded) assertThat(facade.invoke("default", "sourceB", Map.of("unrelated", true)))
                                 .isEqualTo("UNRELATED_MISSION_SENTINEL");
                     });
         } finally {

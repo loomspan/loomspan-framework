@@ -135,21 +135,21 @@ class NamespaceIdentityFoundationTest {
         var result = manager.validate(manager.capturePreparation("alpha"), docs,
                 ai.loomspan.testkit.PublicationFixtures.configuration(), NamespaceVisibility.PRIVATE);
         assertThat(result.valid()).isTrue();
-        assertThat(result.skills()).extracting(ValidatedSkill::name).containsExactly("alpha:fixed", "alpha:search");
+        assertThat(result.skills()).extracting(ValidatedSkill::qualifiedName).containsExactly("alpha:fixed", "alpha:search");
         var alpha = manager.prepare(manager.capturePreparation("alpha"), docs,
                 ai.loomspan.testkit.PublicationFixtures.configuration(), NamespaceVisibility.PRIVATE,
                 Map.of("fixture.key", "fixture"), null);
         var beta = manager.prepare(manager.capturePreparation("beta"), docs,
                 ai.loomspan.testkit.PublicationFixtures.configuration(), NamespaceVisibility.PRIVATE,
                 Map.of("fixture.key", "fixture"), null);
-        assertThat(alpha.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("alpha:fixed", "alpha:search");
-        assertThat(beta.skillCatalog().skills()).extracting(SkillDescriptor::name).containsExactly("beta:fixed", "beta:search");
+        assertThat(alpha.skillCatalog().skills()).extracting(SkillDescriptor::qualifiedName).containsExactly("alpha:fixed", "alpha:search");
+        assertThat(beta.skillCatalog().skills()).extracting(SkillDescriptor::qualifiedName).containsExactly("beta:fixed", "beta:search");
         assertThat(alpha.definitions()).containsOnlyKeys("alpha:search");
         assertThat(alpha.id()).isNotEqualTo(beta.id());
         var retained = alpha.skillCatalog();
         alpha.close();
-        assertThat(retained.skill("alpha:search")).isPresent();
-        assertThat(retained.skill("beta:search")).isEmpty();
+        assertThat(retained.skill("search")).isPresent();
+        assertThatThrownBy(() -> retained.skill("beta:search")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> manager.capturePreparation("Alpha")).isInstanceOf(IllegalArgumentException.class);
         beta.close();
         manager.destroy();

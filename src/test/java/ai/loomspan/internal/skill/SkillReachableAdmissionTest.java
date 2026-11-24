@@ -25,46 +25,54 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class SkillReachableAdmissionTest {
-    @Test void localDefaultReferencesMatchQualifiedAcrossAllRootOperations() {
+    @Test void explicitPairsSelectExactTargetsAcrossAllRootOperations() {
         var f = new Fixture(null);
-        var root = publish(f, "default", List.of(model("root")), NamespaceVisibility.PRIVATE);
-        publish(f, "sales", List.of(model("root")), NamespaceVisibility.PUBLIC);
+        var expected = new HashMap<SkillIdentity, String>();
+        for (String owner : List.of("default", "orders", "warehouse")) {
+            var root = publish(f, owner, List.of(model("lookup"), model("warehouse-lookup")), NamespaceVisibility.PRIVATE);
+            expected.put(new SkillIdentity(owner, "lookup"), root.generationId());
+            expected.put(new SkillIdentity(owner, "warehouse-lookup"), root.generationId());
+        }
         var router = mock(CapabilityExecutionRouter.class);
         when(router.execute(any(), any(), any(), any())).thenAnswer(call -> {
             var binding = ExecutionBindingScope.requireCurrent();
-            assertThat(binding.snapshot().entry().toString()).isEqualTo("default-root");
+            CapabilityMetadata selected = call.getArgument(0);
+            assertThat(selected.identity()).isEqualTo(binding.snapshot().entry());
+            assertThat(binding.generation().id()).isEqualTo(expected.get(selected.identity()));
             return binding.generation().id();
         });
         var template = template(f, router);
         var handoff = new DefaultSkillInvocationHandoff(template, f.lifecycle);
         try {
-            for (String name : List.of("root", "default-root")) {
-                template.validate(name, Map.of());
-                template.validate(name, (Object) Map.of());
-                assertThat(template.invoke(name, Map.of())).isEqualTo(root.generationId());
-                assertThat(template.invoke(name, (Object) Map.of())).isEqualTo(root.generationId());
-                var views = new AtomicInteger();
-                Consumer<SkillExecutionView> observer = view -> views.incrementAndGet();
-                assertThat(template.invoke(name, Map.of(), observer)).isEqualTo(root.generationId());
-                assertThat(template.invoke(name, (Object) Map.of(), observer)).isEqualTo(root.generationId());
-                try (var admitted = owned(handoff.handoff(name, Map.of()))) {
-                    assertThat(admitted.generationId()).isEqualTo(root.generationId());
-                    assertThat(admitted.invoke()).isEqualTo(root.generationId());
-                }
-                try (var admitted = owned(handoff.handoff(name, (Object) Map.of()))) {
-                    assertThat(admitted.invoke(observer)).isEqualTo(root.generationId());
-                }
-                assertThat(views).hasValue(3);
-            }
-            var captured = handoff.handoff("root", Map.of());
+            for (var identity : expected.keySet())
+                assertAllOperationsSelect(template, handoff, identity.namespace(), identity.localName(), expected.get(identity));
+            var captured = handoff.handoff("orders", "warehouse-lookup", Map.of());
             try {
-                f.reloader.remove("default", root.generationId());
-                assertAllOperationsReject(template, handoff, "root");
-                assertThat(captured.invoke()).isEqualTo(root.generationId());
+                publish(f, "orders", List.of(model("lookup")), NamespaceVisibility.PRIVATE);
+                assertAllOperationsReject(template, handoff, "orders", "warehouse-lookup");
+                assertThat(template.invoke("warehouse", "lookup", Map.of())).isEqualTo(expected.get(new SkillIdentity("warehouse", "lookup")));
+                assertThat(captured.invoke()).isEqualTo(expected.get(new SkillIdentity("orders", "warehouse-lookup")));
             } finally { captured.release(); }
         } finally { f.lifecycle.destroy(); f.manager.destroy(); }
     }
+
     @AfterEach void clearAuthentication() { SecurityContextHolder.clearContext(); }
+    @Test void entryAuthorizationUsesTheExactOwnerDespiteAPermittedEqualLocalName() {
+        var f = new Fixture(null);
+        publish(f, "orders", List.of(new SkillDocument("restricted", model("lookup").yaml() + "rbac_roles: [ADMIN]\n")), NamespaceVisibility.PRIVATE);
+        publish(f, "warehouse", List.of(model("lookup")), NamespaceVisibility.PRIVATE);
+        var router = mock(CapabilityExecutionRouter.class);
+        when(router.execute(any(), any(), any(), any())).thenReturn("warehouse");
+        var template = template(f, router);
+        var handoff = new DefaultSkillInvocationHandoff(template, f.lifecycle);
+        try {
+            authenticate("user", "USER");
+            for (var operation : rootOperations(template, handoff, "orders", "lookup"))
+                assertThatThrownBy(operation).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            verifyNoInteractions(router);
+            assertAllOperationsSelect(template, handoff, "warehouse", "lookup", "warehouse");
+        } finally { f.lifecycle.destroy(); f.manager.destroy(); }
+    }
     @Test void validationRejectsRemovedOptionalReachableDependencyButIgnoresUnreachableBrokenSkill() {
         var f = new Fixture(null);
         var dep = f.reloader.prepare("dep", List.of(model("leaf")), MODEL, NamespaceVisibility.PUBLIC);
@@ -74,8 +82,8 @@ class SkillReachableAdmissionTest {
         var template = new DefaultSkillTemplate(f.manager, router, new LoomspanSessionRunner(4),
                 new tools.jackson.databind.ObjectMapper(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         f.reloader.remove("dep", dep.generationId());
-        assertThatThrownBy(() -> template.validate("caller-root", Map.of())).isInstanceOf(SkillException.class);
-        template.validate("caller-safe", Map.of());
+        assertThatThrownBy(() -> template.validate("caller", "root", Map.of())).isInstanceOf(SkillException.class);
+        template.validate("caller", "safe", Map.of());
         verifyNoInteractions(router);
         f.manager.destroy();
     }
@@ -86,7 +94,7 @@ class SkillReachableAdmissionTest {
             var dep = publish(f, "dep", List.of(model("leaf")), NamespaceVisibility.PUBLIC);
             publish(f, namespace, List.of(calls("root", "dep:leaf"), model("safe")), NamespaceVisibility.PRIVATE);
             var retained = f.reloader.snapshot(namespace);
-            String descriptorName = retained.skill(namespace + "-root").orElseThrow().name();
+            String descriptorName = retained.skill("root").orElseThrow().qualifiedName();
             var router = mock(CapabilityExecutionRouter.class);
             when(router.execute(any(), any(), any(), any())).thenAnswer(call -> {
                 var binding = ExecutionBindingScope.requireCurrent();
@@ -100,52 +108,61 @@ class SkillReachableAdmissionTest {
                 for (int revision = 0; revision < 2; revision++) {
                     var current = publish(f, namespace, List.of(calls("root", "dep:leaf"), model("safe")), NamespaceVisibility.PRIVATE);
                     publish(f, "dep", List.of(model("leaf")), NamespaceVisibility.PUBLIC);
-                    // Namespace normalization applies; business data cannot choose another root.
-                    String target = namespace.toUpperCase(Locale.ROOT) + "-root";
+                    // Business data cannot choose another root.
+                    String localName = "root";
                     Map<String, Object> input = Map.of("namespace", "missing", "skill", "dep-leaf");
-                    template.validate(descriptorName, input);
-                    template.validate(target, (Object) input);
-                    assertThat(template.invoke(descriptorName, input)).isEqualTo(current.generationId());
-                    assertThat(template.invoke(target, (Object) input)).isEqualTo(current.generationId());
+                    template.validate(namespace, localName, input);
+                    template.validate(namespace, localName, (Object) input);
+                    assertThat(template.invoke(namespace, localName, input)).isEqualTo(current.generationId());
+                    assertThat(template.invoke(namespace, localName, (Object) input)).isEqualTo(current.generationId());
                     var views = new AtomicInteger();
                     Consumer<SkillExecutionView> observer = view -> views.incrementAndGet();
-                    assertThat(template.invoke(target, input, observer)).isEqualTo(current.generationId());
-                    assertThat(template.invoke(target, (Object) input, observer)).isEqualTo(current.generationId());
-                    try (var admitted = owned(handoff.handoff(target, input))) {
+                    assertThat(template.invoke(namespace, localName, input, observer)).isEqualTo(current.generationId());
+                    assertThat(template.invoke(namespace, localName, (Object) input, observer)).isEqualTo(current.generationId());
+                    try (var admitted = owned(handoff.handoff(namespace, localName, input))) {
                         assertThat(admitted.generationId()).isEqualTo(current.generationId());
                         assertThat(admitted.invoke()).isEqualTo(current.generationId());
                     }
-                    try (var admitted = owned(handoff.handoff(descriptorName, (Object) input))) {
+                    try (var admitted = owned(handoff.handoff(namespace, localName, (Object) input))) {
                         assertThat(admitted.invoke(observer)).isEqualTo(current.generationId());
                     }
                     assertThat(views).hasValue(3);
                     assertThat(retained.generationId()).isNotEqualTo(current.generationId());
                     f.reloader.remove(namespace, current.generationId());
-                    assertAllOperationsReject(template, handoff, target);
+                    assertAllOperationsReject(template, handoff, namespace, "root");
                 }
                 f.reloader.remove("dep", f.manager.active("dep").id());
                 // Missing namespaces are not created by any root overload.
-                assertAllOperationsReject(template, handoff, descriptorName);
+                assertAllOperationsReject(template, handoff, namespace, "root");
                 assertThatThrownBy(() -> f.manager.active(namespace)).isInstanceOf(SkillReloadException.class);
             } finally { f.lifecycle.destroy(); f.manager.destroy(); }
         }
     }
 
-    @Test void rootBoundariesEnforceBothSizeLimitsAndPreserveLocalNameCase() {
+    @Test void rootBoundariesEnforceExactComponentsAndBothSizeLimits() {
         var f = new Fixture(null);
         var router = mock(CapabilityExecutionRouter.class);
+        when(router.execute(any(), any(), any(), any())).thenReturn("selected");
         var template = template(f, router);
         var handoff = new DefaultSkillInvocationHandoff(template, f.lifecycle);
-        String namespace = "n".repeat(32), local = "L".repeat(31);
-        publish(f, namespace, List.of(model(local)), NamespaceVisibility.PRIVATE);
-        publish(f, "default", List.of(model("Case"), model("s".repeat(56))), NamespaceVisibility.PRIVATE);
+        publish(f, "order-support", List.of(model("a".repeat(49))), NamespaceVisibility.PRIVATE);
+        publish(f, "orders", List.of(model("lookup-3pl")), NamespaceVisibility.PRIVATE);
         try {
-            template.validate(namespace.toUpperCase(Locale.ROOT) + "-" + local, Map.of());
-            template.validate("Case", Map.of());
-            template.validate("s".repeat(56), (Object) Map.of());
-            for (String invalid : List.of("root", "case", "s".repeat(57), "a-b-c", "n".repeat(33) + "-x", namespace + "-" + local + "L",
-                    namespace + "-" + local.toLowerCase(Locale.ROOT), "missing-root"))
-                assertAllOperationsReject(template, handoff, invalid);
+            assertAllOperationsSelect(template, handoff, "order-support", "a".repeat(49), "selected");
+            assertAllOperationsSelect(template, handoff, "orders", "lookup-3pl", "selected");
+            clearInvocations(router);
+            var invalid = new ArrayList<String>(List.of("", " ", "Orders", " lookup", "lookup ", "lookup_name", "a--b", "a/b", "a:b", "1lookup", "\u00e9", "claude", "x-anthropic", "a".repeat(65)));
+            invalid.add(null);
+            for (String component : invalid) {
+                assertAllOperationsReject(template, handoff, component, "lookup");
+                assertAllOperationsReject(template, handoff, "orders", component);
+            }
+            assertAllOperationsReject(template, handoff, "order-support", "a".repeat(50));
+            assertAllOperationsReject(template, handoff, "orders", "orders:lookup");
+            assertAllOperationsReject(template, handoff, "orders", "orders--lookup");
+            assertAllOperationsReject(template, handoff, "orders", "missing");
+            assertAllOperationsReject(template, handoff, "absent", "lookup");
+            assertThatThrownBy(() -> f.manager.active("absent")).isInstanceOf(SkillReloadException.class);
             verifyNoInteractions(router);
         } finally { f.lifecycle.destroy(); f.manager.destroy(); }
     }
@@ -160,20 +177,20 @@ class SkillReachableAdmissionTest {
             var router = mock(CapabilityExecutionRouter.class);
             when(router.execute(any(), any(), any(), any())).thenReturn("old");
             var template = template(f, router); var handoff = new DefaultSkillInvocationHandoff(template, f.lifecycle);
-            var admitted = handoff.handoff("caller-root", Map.of());
+            var admitted = handoff.handoff("caller", "root", Map.of());
             var candidate = f.reloader.prepare("caller", docs, MODEL);
-            String schema = candidate.snapshot().skill("caller-root").orElseThrow().outputSchema();
+            String schema = candidate.snapshot().skill("root").orElseThrow().outputSchema();
             try {
                 if (change.equals("delete")) f.reloader.remove("dep", f.manager.active("dep").id());
                 else publish(f, "dep", List.of(change.equals("contract") ? SkillDependencyValidatorTest.producer("leaf", "integer") : leaf),
                         change.equals("private") ? NamespaceVisibility.PRIVATE : NamespaceVisibility.PUBLIC);
                 f.reloader.publish(candidate);
-                assertAllOperationsReject(template, handoff, "caller-root");
+                assertAllOperationsReject(template, handoff, "caller", "root");
                 verifyNoInteractions(router);
-                template.validate("caller-safe", Map.of());
-                assertThat(template.invoke("caller-safe", Map.of())).isEqualTo("old");
+                template.validate("caller", "safe", Map.of());
+                assertThat(template.invoke("caller", "safe", Map.of())).isEqualTo("old");
                 assertThat(admitted.invoke()).isEqualTo("old");
-                assertThat(f.reloader.snapshot("caller").skill("caller-root").orElseThrow().outputSchema()).isEqualTo(schema);
+                assertThat(f.reloader.snapshot("caller").skill("root").orElseThrow().outputSchema()).isEqualTo(schema);
             } finally { admitted.release(); candidate.close(); f.lifecycle.destroy(); f.manager.destroy(); }
         }
     }
@@ -192,21 +209,21 @@ class SkillReachableAdmissionTest {
         int before = builds.get();
         try {
             authenticate("user", "USER");
-            template.validate("caller-root", Map.of());
-            try (var admitted = owned(handoff.handoff("caller-root", Map.of()))) {
+            template.validate("caller", "root", Map.of());
+            try (var admitted = owned(handoff.handoff("caller", "root", Map.of()))) {
                 assertThat(admitted.generationId()).isEqualTo(f.manager.active("caller").id());
             }
             assertThat(builds).hasValue(before);
             verifyNoInteractions(router);
             SecurityContextHolder.clearContext();
-            assertThatThrownBy(() -> template.validate("caller-root", Map.of())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-            assertThatThrownBy(() -> handoff.handoff("caller-root", Map.of())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThatThrownBy(() -> template.validate("caller", "root", Map.of())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThatThrownBy(() -> handoff.handoff("caller", "root", Map.of())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
             authenticate("user", "USER");
             f.reloader.remove("dep", dep.generationId());
             assertThat(retired).contains(dep.generationId()); // No validation or abandoned handoff reservation remains.
-            assertAllOperationsReject(template, handoff, "caller-root");
-            template.validate("caller-safe", Map.of());
-            assertThat(template.invoke("caller-safe", Map.of())).isEqualTo("null");
+            assertAllOperationsReject(template, handoff, "caller", "root");
+            template.validate("caller", "safe", Map.of());
+            assertThat(template.invoke("caller", "safe", Map.of())).isEqualTo("null");
         } finally { f.lifecycle.destroy(); f.manager.destroy(); }
     }
 
@@ -227,8 +244,8 @@ class SkillReachableAdmissionTest {
         });
         var template = template(f, router);
         var handoff = new DefaultSkillInvocationHandoff(template, f.lifecycle);
-        var first = handoff.handoff("caller-root", Map.of());
-        var abandoned = handoff.handoff("caller-root", (Object) Map.of());
+        var first = handoff.handoff("caller", "root", Map.of());
+        var abandoned = handoff.handoff("caller", "root", (Object) Map.of());
         try {
             f.reloader.remove("caller", root.generationId()); f.reloader.remove("dep", dep.generationId());
             publish(f, "dep", List.of(model("leaf")), NamespaceVisibility.PRIVATE);
@@ -253,22 +270,22 @@ class SkillReachableAdmissionTest {
         var pending = new AtomicReference<AdmittedSkillInvocation>();
         when(router.execute(any(), any(), any(), any())).thenAnswer(call -> {
             CapabilityMetadata cap = call.getArgument(0);
-            if (cap.name().equals("default-leaf")) {
+            if (cap.name().equals("default:leaf")) {
                 assertThat(ExecutionBindingScope.requireCurrent().generation().id()).isEqualTo(defaultLeaf.generationId());
                 return "leaf";
             }
             var outer = ExecutionBindingScope.requireCurrent();
-            template.validate("leaf", Map.of());
-            pending.set(handoff.handoff("leaf", Map.of()));
-            assertThatThrownBy(() -> template.invoke("leaf", Map.of())).isInstanceOf(SkillException.class);
-            try (var nested = owned(handoff.handoff("leaf", Map.of()))) {
+            template.validate("default", "leaf", Map.of());
+            pending.set(handoff.handoff("default", "leaf", Map.of()));
+            assertThatThrownBy(() -> template.invoke("default", "leaf", Map.of())).isInstanceOf(SkillException.class);
+            try (var nested = owned(handoff.handoff("default", "leaf", Map.of()))) {
                 assertThatThrownBy(nested::invoke).isInstanceOf(SkillException.class);
             }
             assertThat(ExecutionBindingScope.requireCurrent()).isSameAs(outer);
             return "root";
         });
         try {
-            assertThat(template.invoke("caller-root", Map.of())).isEqualTo("root");
+            assertThat(template.invoke("caller", "root", Map.of())).isEqualTo("root");
             f.reloader.remove("default", defaultLeaf.generationId());
             publish(f, "default", List.of(model("leaf")), NamespaceVisibility.PRIVATE);
             assertThat(pending.get().invoke()).isEqualTo("leaf");
@@ -288,14 +305,14 @@ class SkillReachableAdmissionTest {
         var template = template(f, router); var handoff = new DefaultSkillInvocationHandoff(template, f.lifecycle);
         try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
             var start = new CyclicBarrier(2);
-            var a = workers.submit(() -> { authenticate("alice"); start.await(5, TimeUnit.SECONDS); return template.invoke("A-root", Map.of()); });
-            var b = workers.submit(() -> { authenticate("bob"); start.await(5, TimeUnit.SECONDS); return template.invoke("B-root", Map.of()); });
-            assertThat(a.get(5, TimeUnit.SECONDS)).isEqualTo("a-root:alice");
-            assertThat(b.get(5, TimeUnit.SECONDS)).isEqualTo("b-root:bob");
+            var a = workers.submit(() -> { authenticate("alice"); start.await(5, TimeUnit.SECONDS); return template.invoke("a", "root", Map.of()); });
+            var b = workers.submit(() -> { authenticate("bob"); start.await(5, TimeUnit.SECONDS); return template.invoke("b", "root", Map.of()); });
+            assertThat(a.get(5, TimeUnit.SECONDS)).isEqualTo("a:root:alice");
+            assertThat(b.get(5, TimeUnit.SECONDS)).isEqualTo("b:root:bob");
             authenticate("captured");
-            try (var admitted = owned(handoff.handoff("a-root", Map.of()))) {
+            try (var admitted = owned(handoff.handoff("a", "root", Map.of()))) {
                 authenticate("worker");
-                assertThat(workers.submit(() -> admitted.invoke()).get(5, TimeUnit.SECONDS)).isEqualTo("a-root:captured");
+                assertThat(workers.submit(() -> admitted.invoke()).get(5, TimeUnit.SECONDS)).isEqualTo("a:root:captured");
                 assertThat(SecurityContextHolder.getContext().getAuthentication().getName()).isEqualTo("worker");
             }
         } finally { f.lifecycle.destroy(); f.manager.destroy(); }
@@ -316,8 +333,8 @@ class SkillReachableAdmissionTest {
                 physical, new ai.loomspan.internal.runtime.usage.NoOpSessionUsageService());
         when(router.execute(any(), any(), any(), any())).thenAnswer(call -> {
             var binding = ExecutionBindingScope.requireCurrent();
-            var mission = new MissionContext(binding.session(), "caller-root", "mission", null);
-            return ExecutionBindingScope.supplyWith(binding.withMission(mission), () -> work.execute(binding.session(), "caller-root", () -> {
+            var mission = new MissionContext(binding.session(), "caller:root", "mission", null);
+            return ExecutionBindingScope.supplyWith(binding.withMission(mission), () -> work.execute(binding.session(), "caller:root", () -> {
                 started.countDown();
                 while (release.getCount() != 0) try { release.await(); } catch (InterruptedException ignored) { }
                 return "late";
@@ -325,7 +342,7 @@ class SkillReachableAdmissionTest {
         });
         var template = template(f, router);
         try (var callers = Executors.newVirtualThreadPerTaskExecutor()) {
-            var response = callers.submit(() -> org.assertj.core.api.Assertions.catchThrowable(() -> template.invoke("caller-root", Map.of())));
+            var response = callers.submit(() -> org.assertj.core.api.Assertions.catchThrowable(() -> template.invoke("caller", "root", Map.of())));
             assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
             f.reloader.remove("caller", root.generationId()); f.reloader.remove("dep", dep.generationId());
             assertThat(response.get(5, TimeUnit.SECONDS)).isInstanceOf(SkillException.class)
@@ -354,14 +371,36 @@ class SkillReachableAdmissionTest {
                 Arrays.stream(roles).map(role -> new SimpleGrantedAuthority("ROLE_" + role)).toList()));
     }
 
-    private static void assertAllOperationsReject(DefaultSkillTemplate template, DefaultSkillInvocationHandoff handoff, String name) {
-        List<org.assertj.core.api.ThrowableAssert.ThrowingCallable> operations = List.of(
-                () -> template.validate(name, Map.of()), () -> template.validate(name, (Object) Map.of()),
-                () -> template.invoke(name, Map.of()), () -> template.invoke(name, (Object) Map.of()),
-                () -> template.invoke(name, Map.of(), view -> { throw new AssertionError("unexpected observer"); }),
-                () -> template.invoke(name, (Object) Map.of(), view -> { throw new AssertionError("unexpected observer"); }),
-                () -> handoff.handoff(name, Map.of()), () -> handoff.handoff(name, (Object) Map.of()));
-        operations.forEach(operation -> assertThatThrownBy(operation).isInstanceOf(SkillException.class));
+    private static void assertAllOperationsSelect(DefaultSkillTemplate template, DefaultSkillInvocationHandoff handoff,
+            String namespace, String localName, String expected) {
+        template.validate(namespace, localName, Map.of());
+        template.validate(namespace, localName, (Object) Map.of());
+        assertThat(template.invoke(namespace, localName, Map.of())).isEqualTo(expected);
+        assertThat(template.invoke(namespace, localName, (Object) Map.of())).isEqualTo(expected);
+        var views = new AtomicInteger();
+        Consumer<SkillExecutionView> observer = view -> views.incrementAndGet();
+        assertThat(template.invoke(namespace, localName, Map.of(), observer)).isEqualTo(expected);
+        assertThat(template.invoke(namespace, localName, (Object) Map.of(), observer)).isEqualTo(expected);
+        try (var admitted = owned(handoff.handoff(namespace, localName, Map.of()))) {
+            assertThat(admitted.invoke()).isEqualTo(expected);
+        }
+        try (var admitted = owned(handoff.handoff(namespace, localName, (Object) Map.of()))) {
+            assertThat(admitted.invoke(observer)).isEqualTo(expected);
+        }
+        assertThat(views).hasValue(3);
+    }
+
+    private static void assertAllOperationsReject(DefaultSkillTemplate template, DefaultSkillInvocationHandoff handoff, String namespace, String localName) {
+        rootOperations(template, handoff, namespace, localName).forEach(operation -> assertThatThrownBy(operation).isInstanceOf(SkillException.class));
+    }
+    private static List<org.assertj.core.api.ThrowableAssert.ThrowingCallable> rootOperations(
+            DefaultSkillTemplate template, DefaultSkillInvocationHandoff handoff, String namespace, String localName) {
+        return List.of(
+                () -> template.validate(namespace, localName, Map.of()), () -> template.validate(namespace, localName, (Object) Map.of()),
+                () -> template.invoke(namespace, localName, Map.of()), () -> template.invoke(namespace, localName, (Object) Map.of()),
+                () -> template.invoke(namespace, localName, Map.of(), view -> { throw new AssertionError("unexpected observer"); }),
+                () -> template.invoke(namespace, localName, (Object) Map.of(), view -> { throw new AssertionError("unexpected observer"); }),
+                () -> handoff.handoff(namespace, localName, Map.of()), () -> handoff.handoff(namespace, localName, (Object) Map.of()));
     }
     private static Owned owned(AdmittedSkillInvocation admitted) { return new Owned(admitted); }
     private record Owned(AdmittedSkillInvocation admitted) implements AutoCloseable {

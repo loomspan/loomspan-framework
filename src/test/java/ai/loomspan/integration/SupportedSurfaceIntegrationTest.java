@@ -47,24 +47,24 @@ class SupportedSurfaceIntegrationTest
         NamespaceStartupIntegrationTest.runner().withBean(JavaFoundation.class).run(context -> {
             assertThat(context).hasNotFailed();
             var skills = context.getBean(SkillTemplate.class);
-            assertThat(skills.invoke("default-foundationText", Map.of())).isEqualTo("  exact text\n");
-            assertThat(skills.invoke("default-foundationNull", Map.of())).isEmpty();
-            var recoverable = org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default-foundationRecoverable", Map.of()));
+            assertThat(skills.invoke("default", "foundation-text", Map.of())).isEqualTo("  exact text\n");
+            assertThat(skills.invoke("default", "foundation-null", Map.of())).isEmpty();
+            var recoverable = org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default", "foundation-recoverable", Map.of()));
             assertThat(recoverable).isInstanceOf(ai.loomspan.api.RecoverableSkillException.class).hasMessage("correct input");
-            var terminal = org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default-foundationTerminal", Map.of()));
+            var terminal = org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default", "foundation-terminal", Map.of()));
             assertThat(terminal).isInstanceOf(SkillException.class).hasRootCauseInstanceOf(IllegalStateException.class);
             assertThat(context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skills())
-                    .extracting(ai.loomspan.api.SkillDescriptor::name).doesNotContain("default-foundationExecutor");
-            assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default-foundationExecutor", Map.of())))
+                    .extracting(ai.loomspan.api.SkillDescriptor::qualifiedName).doesNotContain("default:foundation-executor");
+            assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default", "foundation-executor", Map.of())))
                     .isInstanceOf(SkillException.class);
             assertThat(context.getBean(JavaFoundation.class).executorCalls).hasValue(0);
             for (Throwable failure : List.of(
-                    org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default-foundationInput", Map.of("count", "bad"))),
+                    org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default", "foundation-input", Map.of("count", "bad"))),
                     org.assertj.core.api.Assertions.catchThrowable(() -> context.getBean(SkillInvocationHandoff.class)
-                            .handoff("default-foundationInput", Map.of("count", "bad"))))) {
+                            .handoff("default", "foundation-input", Map.of("count", "bad"))))) {
                 assertThat(failure).isInstanceOf(SkillInputValidationException.class);
                 assertThat(((SkillException) failure).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
-                    assertThat(diagnosis.skillName()).isEqualTo("default-foundationInput");
+                    assertThat(diagnosis.skillName()).isEqualTo("default:foundation-input");
                     assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_SCHEMA);
                     assertThat(diagnosis.issues().getFirst().path()).isEqualTo("/count");
                     assertThat(diagnosis.issues().getFirst().code()).isEqualTo("type");
@@ -76,14 +76,14 @@ class SupportedSurfaceIntegrationTest
     static class JavaFoundation
     {
         final AtomicInteger executorCalls = new AtomicInteger();
-        @SkillMethod(name="foundationText", description="Exact text") public String text() { return "  exact text\n"; }
-        @SkillMethod(name="foundationInput", description="Generated input") public String input(@SkillParam(description="Count") int count) { return "count " + count; }
-        @SkillMethod(name="foundationNull", description="Empty text") public void empty() {}
-        @SkillMethod(name="foundationRecoverable", description="Designated failure") public String recoverable() {
+        @SkillMethod(name="foundation-text", description="Exact text") public String text() { return "  exact text\n"; }
+        @SkillMethod(name="foundation-input", description="Generated input") public String input(@SkillParam(description="Count") int count) { return "count " + count; }
+        @SkillMethod(name="foundation-null", description="Empty text") public void empty() {}
+        @SkillMethod(name="foundation-recoverable", description="Designated failure") public String recoverable() {
             throw new ai.loomspan.api.RecoverableSkillException("correct input");
         }
-        @SkillMethod(name="foundationTerminal", description="Terminal failure") public String terminal() { throw new IllegalStateException("terminal"); }
-        @ai.loomspan.api.SkillExecutor(name="foundationExecutor") public String execute(ai.loomspan.api.extensions.v1.SkillExecutorInvocation invocation) {
+        @SkillMethod(name="foundation-terminal", description="Terminal failure") public String terminal() { throw new IllegalStateException("terminal"); }
+        @ai.loomspan.api.SkillExecutor(name="foundation-executor") public String execute(ai.loomspan.api.extensions.v1.SkillExecutorInvocation invocation) {
             executorCalls.incrementAndGet(); return invocation.skillName();
         }
     }
@@ -92,8 +92,10 @@ class SupportedSurfaceIntegrationTest
         NamespaceStartupIntegrationTest.runner().run(context -> {
             var reloader=context.getBean(ai.loomspan.api.SkillReloader.class);
             var configuration=new ai.loomspan.api.ExecutionConfiguration("loomspan: {}");
-            assertThat(reloader.validate("EMPTY", List.of(), configuration).valid()).isTrue();
-            try(var candidate=reloader.prepare("EMPTY", "P7", List.of(), configuration,
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> reloader.snapshot("EMPTY")).isInstanceOf(IllegalArgumentException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> reloader.validate("EMPTY", List.of(), configuration)).isInstanceOf(IllegalArgumentException.class);
+            assertThat(reloader.validate("empty", List.of(), configuration).valid()).isTrue();
+            try(var candidate=reloader.prepare("empty", "P7", List.of(), configuration,
                     ai.loomspan.api.NamespaceVisibility.PUBLIC, Map.of())) {
                 reloader.publish(candidate);
                 var catalog=reloader.snapshot("empty");
@@ -101,7 +103,7 @@ class SupportedSurfaceIntegrationTest
                 assertThat(catalog.generationId()).isEqualTo(candidate.generationId());
                 assertThat(catalog.publicationVersion()).contains("P7");
                 assertThat(catalog.skills()).isEmpty();
-                reloader.remove("Empty", catalog.generationId());
+                reloader.remove("empty", catalog.generationId());
             }
             try(var recreated=reloader.prepare("empty", List.of(), configuration)) {
                 reloader.publish(recreated);
@@ -170,26 +172,26 @@ class SupportedSurfaceIntegrationTest
                         SkillInvocationHandoff handoff = context.getBean(SkillInvocationHandoff.class);
                         SkillCatalog catalog = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("DEFAULT");
                         assertThat(catalog.namespace()).isEqualTo("default");
-                        assertThat(catalog.skills()).extracting(descriptor -> descriptor.name())
+                        assertThat(catalog.skills()).extracting(descriptor -> descriptor.qualifiedName())
                                 .isSorted()
                                 .contains("default-supportedSurfaceSkill", "default-supportedJavaLeaf", "default-supportedExecutorLeaf");
-                        assertThat(catalog.skill("default-supportedJavaLeaf")).get()
+                        assertThat(catalog.skill("supportedJavaLeaf")).get()
                                 .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.JAVA);
-                        assertThat(catalog.skill("default-supportedExecutorLeaf")).get()
+                        assertThat(catalog.skill("supportedExecutorLeaf")).get()
                                 .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.JAVA);
-                        assertThat(catalog.skill("default-supportedSurfaceSkill")).get()
+                        assertThat(catalog.skill("supportedSurfaceSkill")).get()
                                 .extracting(descriptor -> descriptor.kind()).isEqualTo(SkillKind.YAML);
-                        assertThat(catalog.skill("default-missing")).isEmpty();
+                        assertThat(catalog.skill("missing")).isEmpty();
                         AtomicReference<SkillExecutionView> observed = new AtomicReference<>();
                         var authorized = UsernamePasswordAuthenticationToken.authenticated(
                                 "supported-caller", "unused", AuthorityUtils.createAuthorityList("ROLE_EXECUTOR_USER"));
                         try {
                             SecurityContextHolder.getContext().setAuthentication(authorized);
-                            skills.validate("default-supportedSurfaceSkill",
+                            skills.validate("default", "supportedSurfaceSkill",
                                     Map.of("message", "hello through the public API"));
-                            skills.validate("default-supportedJavaLeaf", new DirectRequest("precheck"));
-                            skills.validate("default-supportedExecutorLeaf", new DirectRequest("precheck"));
-                            var admitted = handoff.handoff("default-supportedExecutorLeaf", new DirectRequest("handed-off"));
+                            skills.validate("default", "supportedJavaLeaf", new DirectRequest("precheck"));
+                            skills.validate("default", "supportedExecutorLeaf", new DirectRequest("precheck"));
+                            var admitted = handoff.handoff("default", "supportedExecutorLeaf", new DirectRequest("handed-off"));
                             assertThat(admitted.generationId()).isEqualTo(catalog.generationId());
                             SecurityContextHolder.clearContext();
                             assertThat(admitted.invoke()).isEqualTo("EXECUTOR: handed-off");
@@ -202,7 +204,7 @@ class SupportedSurfaceIntegrationTest
                                     .hasValue("supported-caller");
                             SecurityContextHolder.getContext().setAuthentication(authorized);
                             var admittedRoot = handoff.handoff(
-                                    "default-supportedSurfaceSkill",
+                                    "default", "supportedSurfaceSkill",
                                     Map.of("message", "hello through the public API"));
                             assertThat(admittedRoot.generationId()).isEqualTo(catalog.generationId());
                             assertThat(admittedRoot.invoke(observed::set))
@@ -220,7 +222,7 @@ class SupportedSurfaceIntegrationTest
                             Map<String, Object> mutableInput = new LinkedHashMap<>();
                             mutableInput.put("message", "direct");
                             mutableInput.put("values", mutableValues);
-                            assertThat(skills.invoke("default-supportedExecutorLeaf", mutableInput))
+                            assertThat(skills.invoke("default", "supportedExecutorLeaf", mutableInput))
                                     .isEqualTo("EXECUTOR: direct");
                             mutableValues.add("late");
                             assertThat((List<Object>) SupportedSkillConfiguration.lastInvocation.get().input().get("values"))
@@ -234,7 +236,7 @@ class SupportedSurfaceIntegrationTest
 
                             AtomicInteger preSessionObserverCalls = new AtomicInteger();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
-                                    "default-supportedExecutorLeaf", Map.of(), ignored -> preSessionObserverCalls.incrementAndGet())))
+                                    "default", "supportedExecutorLeaf", Map.of(), ignored -> preSessionObserverCalls.incrementAndGet())))
                                     .isInstanceOf(SkillInputValidationException.class)
                                     .satisfies(error -> assertThat(((SkillException) error).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
                                         assertThat(diagnosis.skillName()).isEqualTo("default-supportedExecutorLeaf");
@@ -245,7 +247,7 @@ class SupportedSurfaceIntegrationTest
 
                             AtomicReference<SkillExecutionView> failedView = new AtomicReference<>();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
-                                    "default-supportedExecutorLeaf", Map.of("message", "fail"), failedView::set)))
+                                    "default", "supportedExecutorLeaf", Map.of("message", "fail"), failedView::set)))
                                     .isInstanceOf(SkillException.class)
                                     .hasMessage("Skill 'default-supportedExecutorLeaf' execution failed.");
                             assertThat(failedView.get()).isNotNull();
@@ -255,14 +257,14 @@ class SupportedSurfaceIntegrationTest
                                     UsernamePasswordAuthenticationToken.authenticated(
                                             "denied-caller", "unused", AuthorityUtils.NO_AUTHORITIES));
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(
-                                    () -> skills.validate("default-supportedExecutorLeaf", Map.of("message", "denied"))))
+                                    () -> skills.validate("default", "supportedExecutorLeaf", Map.of("message", "denied"))))
                                     .isInstanceOf(AccessDeniedException.class);
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(
-                                    () -> skills.validate("default-supportedJavaLeaf", Map.of("message", "denied"))))
+                                    () -> skills.validate("default", "supportedJavaLeaf", Map.of("message", "denied"))))
                                     .isInstanceOf(AccessDeniedException.class);
                             AtomicReference<SkillExecutionView> rejectedView = new AtomicReference<>();
                             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke(
-                                    "default-supportedExecutorLeaf", Map.of("message", "denied"), rejectedView::set)))
+                                    "default", "supportedExecutorLeaf", Map.of("message", "denied"), rejectedView::set)))
                                     .isInstanceOf(AccessDeniedException.class)
                                     .hasMessage("Access denied for capability 'default-supportedExecutorLeaf'");
                             assertThat(rejectedView.get()).isNull();

@@ -31,7 +31,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
                 var old = reload.prepare("risk",List.of(leaf),providerConfiguration,NamespaceVisibility.PUBLIC,Map.of("key","captured-old"));
                 reload.publish(old);
                 reload.publish(reload.prepare("orders",List.of(model("root","risk-judge")),config(chat,"orders",20,"always"),Map.of("key","chat")));
-                var pending = context.getBean(SkillInvocationHandoff.class).handoff("orders-root",Map.of());
+                var pending = context.getBean(SkillInvocationHandoff.class).handoff("orders", "root",Map.of());
                 var nextConfiguration = new ExecutionConfiguration(config(replacement,"replacement",1,"never").yaml());
                 reload.publish(reload.prepare("risk",List.of(leaf),nextConfiguration,NamespaceVisibility.PUBLIC,Map.of("key","captured-new")));
                 assertThat(pending.invoke()).isEqualTo("done");
@@ -51,7 +51,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
                 reload.publish(reload.prepare("tax", List.of(executor()), config(server,"tax",1,"always"), NamespaceVisibility.PUBLIC,Map.of("key","tax")));
                 reload.publish(reload.prepare("orders",List.of(model("root","tax-lookup")),config(server,"orders",20,"never"),Map.of("key","orders")));
                 Captures.values.clear();
-                assertThat(context.getBean(SkillTemplate.class).invoke("orders-root",Map.of())).isEqualTo("done");
+                assertThat(context.getBean(SkillTemplate.class).invoke("orders", "root",Map.of())).isEqualTo("done");
                 assertThat(Captures.values).hasSize(1);
                 assertThat(Captures.values.getFirst().persistence).isEqualTo(TracePersistencePolicy.NEVER);
                 assertThat(Captures.values.getFirst().configuredLimits).containsEntry("maxModelCalls",20);
@@ -65,7 +65,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
                 var configuration = new ExecutionConfiguration(config(server, "tax", 1, "never").yaml().replace("mission-timeout: 10s", "mission-timeout: 100ms"));
                 var prepared = reload.prepare("tax", List.of(executor()), configuration, Map.of("key", "tax"));
                 reload.publish(prepared);
-                var pending = context.getBean(SkillInvocationHandoff.class).handoff("tax-lookup", Map.of());
+                var pending = context.getBean(SkillInvocationHandoff.class).handoff("tax", "lookup", Map.of());
                 try { Thread.sleep(180); } catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
                 reload.remove("tax", prepared.generationId());
                 assertThat(pending.invoke()).isEqualTo("looked-up");
@@ -97,8 +97,8 @@ class NamespaceExecutionAuthorityIntegrationTest {
                 Captures.failureName = fails ? "tax-lookup" : null;
                 try {
                     var template = context.getBean(SkillTemplate.class);
-                    if (fails) assertThatThrownBy(() -> template.invoke("orders-root", Map.of())).isInstanceOf(SkillException.class);
-                    else assertThat(template.invoke("orders-root", Map.of())).isEqualTo("joined");
+                    if (fails) assertThatThrownBy(() -> template.invoke("orders", "root", Map.of())).isInstanceOf(SkillException.class);
+                    else assertThat(template.invoke("orders", "root", Map.of())).isEqualTo("joined");
                     assertThat(ExecutionBindingScope.current()).isEmpty();
                     assertThat(SecurityContextHolder.getContext()).isSameAs(security);
                     assertThat(Captures.values).hasSize(2);
@@ -135,7 +135,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
                         + "allowed_skills: [{name: tax:lookup, required: true, max_tasks: 1}]\noutput_from: {skill: tax:lookup}\n";
                 reload.publish(reload.prepare("orders", List.of(new SkillDocument("root", root)), config(server, "orders", 20, "always"), Map.of("key", "orders")));
                 Captures.values.clear();
-                assertThat(context.getBean(SkillTemplate.class).invoke("orders-root", Map.of())).isEqualTo("looked-up");
+                assertThat(context.getBean(SkillTemplate.class).invoke("orders", "root", Map.of())).isEqualTo("looked-up");
                 assertThat(Captures.values).hasSize(1);
                 assertThat(Captures.values.getFirst().invocation.skillName()).isEqualTo("tax-lookup");
                 if (!automatic) assertThat(Captures.values.getFirst().invocation.input()).containsEntry("value", "unchanged");
@@ -165,7 +165,7 @@ class NamespaceExecutionAuthorityIntegrationTest {
                 var security = SecurityContextHolder.createEmptyContext(); security.setAuthentication(caller);
                 SecurityContextHolder.setContext(security);
                 try {
-                    var admitted = context.getBean(SkillInvocationHandoff.class).handoff("orders-root", Map.of());
+                    var admitted = context.getBean(SkillInvocationHandoff.class).handoff("orders", "root", Map.of());
                     assertThat(admitted.generationId()).isEqualTo(orders.generationId());
                     reload.publish(reload.prepare("pricing", List.of(model("model")), config(replacementServer, "new", 1, "never"), NamespaceVisibility.PUBLIC, Map.of("key", "new-key")));
                     reload.remove("tax", tax.generationId());

@@ -33,7 +33,7 @@ public final class DefaultSkillCatalog implements SkillCatalog
         {
             if (!metadata.identity().namespace().equals(this.namespace))
                 throw new IllegalArgumentException("catalog capability belongs to another namespace: " + metadata.name());
-            SkillDescriptor descriptor = new SkillDescriptor(metadata.name(), metadata.description(),
+            SkillDescriptor descriptor = new SkillDescriptor(metadata.identity().namespace(), metadata.identity().localName(), metadata.description(),
                     metadata.kind(), metadata.tool().inputSchema(), metadata.tool().outputSchema());
             if (built.putIfAbsent(metadata.name(), descriptor) != null)
             {
@@ -58,9 +58,9 @@ public final class DefaultSkillCatalog implements SkillCatalog
     }
 
     @Override
-    public Optional<SkillDescriptor> skill(String name)
+    public Optional<SkillDescriptor> skill(String localName)
     {
-        var identity = SkillIdentity.parse(name);
+        var identity = new SkillIdentity(namespace, localName);
         return Optional.ofNullable(entries.get(identity.toString()));
     }
 }

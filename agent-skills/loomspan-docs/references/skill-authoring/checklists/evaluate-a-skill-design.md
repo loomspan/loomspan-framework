@@ -34,8 +34,8 @@ Reject an entry design that requires callers to understand internal child propag
 
 ## 3. Design the Capability Surface
 
-- Does every Java, executor-backed YAML, or model-backed YAML registered name match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` and use the exact same case in every reference?
-- Do `SkillTemplate`, `allowed_skills`, plans, and evidence-expression references use registered names rather than bean/method diagnostic locations?
+- Do the namespace and local name each match `[a-z][a-z0-9]*(?:-[a-z0-9]+)*`, use 1–64 ASCII characters, exclude `anthropic` and `claude`, and satisfy `namespace.length() + 2 + localName.length() <= 64`?
+- Do root calls supply the exact namespace and local name separately, catalog lookups supply a local name, and authored child/evidence references select an owner-relative or colon-qualified target?
 - Which direct child capabilities does each LLM-backed skill need?
 - Are those children declared locally through `allowed_skills`?
 - Is the surface narrower than the global catalog?

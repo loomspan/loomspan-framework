@@ -234,12 +234,12 @@ public final class SkillGenerationManager implements SmartInitializingSingleton,
             return new SkillValidationResult(issues, List.of());
         List<ValidatedSkill> skills = new ArrayList<>();
         for (CapabilityMetadata javaCapability : fixedJavaCapabilities.stream().filter(cap -> cap.identity().namespace().equals(checked.namespace())).toList())
-            skills.add(new ValidatedSkill(javaCapability.name(), javaCapability.kind()));
+            skills.add(new ValidatedSkill(javaCapability.identity().namespace(), javaCapability.identity().localName(), javaCapability.kind()));
         for (YamlSkillDefinition definition : checked.definitions())
-            skills.add(new ValidatedSkill(definition.identity().toString(),
+            skills.add(new ValidatedSkill(definition.identity().namespace(), definition.identity().localName(),
                     definition.form() == YamlSkillDefinition.Form.EXECUTOR ? SkillKind.JAVA
                             : SkillKind.YAML));
-        skills.sort(Comparator.comparing(ValidatedSkill::name));
+        skills.sort(Comparator.comparing(ValidatedSkill::qualifiedName));
         return new SkillValidationResult(issues, skills);
     }
 

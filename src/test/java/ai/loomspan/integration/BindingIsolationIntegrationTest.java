@@ -102,7 +102,7 @@ class BindingIsolationIntegrationTest {
                             "loomspan.session.mission-timeout=30s").run(context -> {
                         assertThat(context).hasNotFailed();
                         try (var worker = Executors.newSingleThreadExecutor()) {
-                            var result = worker.submit(() -> context.getBean(SkillTemplate.class).invoke("default-root", Map.of("marker", "original")));
+                            var result = worker.submit(() -> context.getBean(SkillTemplate.class).invoke("default", "root", Map.of("marker", "original")));
                             try {
                                 await(firstEntered);
                                 if (concurrent) await(secondEntered); // Both handlers are active before either may return.
@@ -159,7 +159,7 @@ class BindingIsolationIntegrationTest {
                             "loomspan.session.quotas.max-tool-invocations=" + (quota ? 1 : 100), "loomspan.session.mission-timeout=30s")
                     .run(context -> {
                         assertThat(context).hasNotFailed();
-                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default-root", Map.of("marker", "123")))
+                        assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "root", Map.of("marker", "123")))
                                 .hasStackTraceContaining(quota ? "MAX_TOOL_INVOCATIONS" : "binding_assembled_input_invalid");
                     });
         }
@@ -233,7 +233,7 @@ class BindingIsolationIntegrationTest {
                             if (reload) {
                                 var reloader = context.getBean(SkillReloader.class);
                                 var captured = reloader.snapshot("default");
-                                var held = workers.submit(() -> template.invoke("default-root", Map.of("marker", "held", "freshMarker", "incorrect")));
+                                var held = workers.submit(() -> template.invoke("default", "root", Map.of("marker", "held", "freshMarker", "incorrect")));
                                 try {
                                     await(entered);
                                     try (var update = reloader.prepare("default", List.of(new SkillDocument("new-root", parent("root", true)),
@@ -241,15 +241,15 @@ class BindingIsolationIntegrationTest {
                                         reloader.publish(update);
                                     }
                                     assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(captured.generationId());
-                                    assertThat(JSON.readTree(template.invoke("default-root", Map.of("marker", "incorrect", "freshMarker", "fresh")))
+                                    assertThat(JSON.readTree(template.invoke("default", "root", Map.of("marker", "incorrect", "freshMarker", "fresh")))
                                             .path("marker").asText()).isEqualTo("fresh");
                                 } finally { release.countDown(); }
                                 assertThat(JSON.readTree(held.get(10, TimeUnit.SECONDS)).path("marker").asText()).isEqualTo("held");
                             } else {
                                 Map<String,Object> first = nested ? Map.of("outerMarker", "one", "marker", "foreign-root") : Map.of("marker", "one");
                                 Map<String,Object> second = nested ? Map.of("outerMarker", "two", "marker", "foreign-root") : Map.of("marker", "two");
-                                var one = workers.submit(() -> template.invoke("default-root", first));
-                                var two = workers.submit(() -> template.invoke("default-root", second));
+                                var one = workers.submit(() -> template.invoke("default", "root", first));
+                                var two = workers.submit(() -> template.invoke("default", "root", second));
                                 assertThat(JSON.readTree(one.get(10, TimeUnit.SECONDS)).path("marker").asText()).isEqualTo("one");
                                 assertThat(JSON.readTree(two.get(10, TimeUnit.SECONDS)).path("marker").asText()).isEqualTo("two");
                             }

@@ -13,18 +13,24 @@ Inject `ai.loomspan.api.SkillTemplate` into application code. It has four invoke
 overloads and two advisory validation overloads:
 
 ```java
-String invoke(String skillName, Object input);
-String invoke(String skillName, Map<String, Object> input);
-String invoke(String skillName, Object input,
+String invoke(String namespace, String localName, Object input);
+String invoke(String namespace, String localName, Map<String, Object> input);
+String invoke(String namespace, String localName, Object input,
               Consumer<SkillExecutionView> observer);
-String invoke(String skillName, Map<String, Object> input,
+String invoke(String namespace, String localName, Map<String, Object> input,
               Consumer<SkillExecutionView> observer);
-void validate(String skillName, Object input);
-void validate(String skillName, Map<String, Object> input);
+void validate(String namespace, String localName, Object input);
+void validate(String namespace, String localName, Map<String, Object> input);
 ```
 
-`skillName` MUST identify a registered Java, executor-backed YAML, or model-backed YAML skill by its exact name.
-For Java, combine its owning annotation namespace with the local annotation name (or canonical method name when omitted). Pass a catalog descriptor name unchanged. Every invoke/validate/observer overload and both handoff forms accept local `search` as `default-search`, always independent of any ambient namespace. Explicit `tax-search` stays tax-scoped. Resolution happens before capture with no fallback or namespace search: namespace case normalizes, local-name case remains exact, namespace length is at most 32 and total identity length at most 64. Missing namespaces fail without creation.
+Supply `namespace` and `localName` separately for a registered Java,
+executor-backed YAML, or model-backed YAML skill. Both components use the exact
+ASCII grammar `[a-z][a-z0-9]*(?:-[a-z0-9]+)*`, contain 1–64 characters and exclude
+`anthropic` and `claude`. The pair must satisfy
+`namespace.length() + 2 + localName.length() <= 64`. Every root shape validates the
+pair before capture, independent of ambient execution. Missing namespaces fail
+without creation, and a missing target ends lookup. Metadata's `namespace()` and
+`localName()` values pass directly to these arguments.
 Bean names and method signatures are diagnostics, never invocation aliases.
 
 ```java
@@ -40,7 +46,7 @@ public final class InvoiceWorkflow {
 
     public String check(String invoiceText) {
         return skills.invoke(
-                "duplicateInvoiceChecker",
+                "default", "duplicate-invoice-checker",
                 Map.of("payload", invoiceText));
     }
 }
@@ -105,7 +111,7 @@ session so authorization is evaluated with the caller's security context.
 Preparation preserves the overload-specific error order. The lifecycle is:
 
 ```text
-local or qualified target -> resolve (local uses default) and capture reachable generations/leases atomically with publication
+namespace and localName -> validate exact pair and capture reachable generations/leases atomically with publication
 Object input -> reject null -> convert with Jackson -> prepared map
 Map input -> normalize an allowed null map to {} -> prepared map
 prepared map -> validate the entry input contract
@@ -135,8 +141,9 @@ exposing events, or when defining exception handling.
 
 Inject `SkillInvocationHandoff` when an application must transfer a request to
 Loomspan while holding its own dispatch gate, then execute it after releasing
-that gate. `handoff(name, object)` and `handoff(name, map)` perform the same
-default-local/explicit-qualified target resolution, reachable snapshot checks, conversion, input validation and entry RBAC as direct invocation, capture
+that gate. `handoff(namespace, localName, object)` and `handoff(namespace, localName, map)`
+perform the same exact pair validation, reachable snapshot checks, conversion,
+input validation and entry RBAC as direct invocation, capture
 the current Spring Security authentication, and atomically reserve one root.
 They do not create a session, submit work, invoke an observer, or wait.
 
@@ -145,7 +152,7 @@ AdmittedSkillInvocation admitted;
 synchronized (dispatchGate) {
     if (dispatchClosed) return;
     SecurityContextHolder.getContext().setAuthentication(authentication);
-    admitted = handoff.handoff("duplicateInvoiceChecker", input);
+    admitted = handoff.handoff("default", "duplicate-invoice-checker", input);
 }
 try {
     String snapshotId = snapshotByGeneration.get(admitted.generationId());
@@ -213,4 +220,4 @@ the real facade; see [compatibility-and-boundaries.md](compatibility-and-boundar
 - `DefaultSkillTemplateTest#capturesCurrentSecurityContextAuthenticationForRootInvocation`
   protects security-context capture.
 
-Boundary evidence: `SkillReachableAdmissionTest#localDefaultReferencesMatchQualifiedAcrossAllRootOperations` and `#nestedExecutionRejectsAndReleasesWhileValidationAndHandoffPreparationStayAllowed` cover local equivalence, no fallback and captured default preparation inside foreign execution.
+Boundary evidence: `SkillReachableAdmissionTest#explicitPairsSelectExactTargetsAcrossAllRootOperations` and `#nestedExecutionRejectsAndReleasesWhileValidationAndHandoffPreparationStayAllowed` cover explicit pair selection, missing-target rejection and captured preparation inside foreign execution.

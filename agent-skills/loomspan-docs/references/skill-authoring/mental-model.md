@@ -111,7 +111,7 @@ String/null/JSON boundary; no generated output schema is supplied.
 
 ### Entry skill
 
-An entry is any registered Java, executor-backed YAML, or model-backed YAML skill invoked through `SkillTemplate`. The facade accepts a map or an object convertible to a map, validates its effective input contract, and creates a fresh session. Callers SHOULD understand the entry contract without understanding the tree below it.
+An entry is any registered Java, executor-backed YAML, or model-backed YAML skill invoked through `SkillTemplate`. The facade requires the exact namespace and local name separately, accepts a map or an object convertible to a map, validates its effective input contract, and creates a fresh session. Callers SHOULD understand the entry contract without understanding the tree below it.
 
 ### Model-backed YAML skill
 
@@ -291,6 +291,6 @@ Captured canonical observations and existing Console consumers are verified by `
 
 Evidence: `SkillReloaderTest`, `SkillDependencyValidatorTest`, `NamespaceStartupIntegrationTest`.
 
-Boundary evidence: `SkillReachableAdmissionTest#localDefaultReferencesMatchQualifiedAcrossAllRootOperations`, `NamespaceIdentityFoundationTest#sourcePromptSchemaAndRawEvidenceRetainAuthoredContent`, and `NamespaceStartupIntegrationTest#suppliedLocalDocumentsValidateAndPrepareInEachOwnerBeforePublicationWithoutFallback`.
+Boundary evidence: `SkillReachableAdmissionTest#explicitPairsSelectExactTargetsAcrossAllRootOperations`, `NamespaceIdentityFoundationTest#sourcePromptSchemaAndRawEvidenceRetainAuthoredContent`, and `NamespaceStartupIntegrationTest#suppliedLocalDocumentsValidateAndPrepareInEachOwnerBeforePublicationWithoutFallback`.
 
 Executor YAML leaves execute through generation-owned Java registrations and captured configuration bindings. Their public execution kind is `JAVA`; diagnostics retain their YAML declaration/source plus resolved executor identity and Java implementation. Annotated Java methods retain bean/method provenance. Execution classification and declaration provenance are separate; see [HTTP diagnostics](observability-http.md#skill-classification-and-declaration). `rest:` is unsupported manifest syntax. Read [executor leaves](executor-skills.md) for declaration rules and limitations.

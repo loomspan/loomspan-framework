@@ -30,13 +30,50 @@ class PortableDeclarationIdentityIntegrationTest {
     private static SkillDocument document(String source, String name) {
         return new SkillDocument(source, "name: '" + name + "'\ndescription: fixture\nexecutor: fixture\n");
     }
+    @Test void validatedAndCataloguedComponentsSelectTheSameRealInvocation() {
+        runner().run(context -> {
+            assertThat(context).hasNotFailed();
+            var reloader = context.getBean(SkillReloader.class);
+            var skills = context.getBean(SkillTemplate.class);
+            var handoff = context.getBean(SkillInvocationHandoff.class);
+            for (String owner : List.of("orders", "warehouse")) {
+                var documents = List.of(new SkillDocument("lookup", "name: lookup\ndescription: lookup\nexecutor: lookup\n"),
+                        new SkillDocument("hyphenated local", "name: warehouse-lookup\ndescription: local lookup\nexecutor: lookup\n"));
+                var feedback = reloader.validate(owner, documents, EMPTY);
+                assertThat(feedback.valid()).as(feedback.issues().toString()).isTrue();
+                var checked = feedback.skills().stream().filter(skill -> skill.localName().equals("lookup")).findFirst().orElseThrow();
+                assertThat(checked.namespace()).isEqualTo(owner);
+                assertThat(checked.localName()).isEqualTo("lookup");
+                assertThat(checked.qualifiedName()).isEqualTo(owner + ":lookup");
+                try (var candidate = reloader.prepare(owner, documents, EMPTY)) {
+                    var descriptor = candidate.snapshot().skill("lookup").orElseThrow();
+                    assertThat(descriptor.namespace()).isEqualTo(checked.namespace());
+                    assertThat(descriptor.localName()).isEqualTo(checked.localName());
+                    assertThat(descriptor.qualifiedName()).isEqualTo(checked.qualifiedName());
+                    assertThat(candidate.snapshot().skills()).extracting(SkillDescriptor::localName)
+                            .containsExactly("lookup", "warehouse-lookup");
+                    reloader.publish(candidate);
+                }
+                skills.validate(checked.namespace(), checked.localName(), Map.of());
+                assertThat(skills.invoke(checked.namespace(), checked.localName(), Map.of())).isEqualTo(owner);
+                var descriptor = reloader.snapshot(owner).skill("lookup").orElseThrow();
+                assertThat(skills.invoke(descriptor.namespace(), descriptor.localName(), (Object) Map.of())).isEqualTo(owner);
+                var admitted = handoff.handoff(descriptor.namespace(), descriptor.localName(), Map.of());
+                try { assertThat(admitted.invoke()).isEqualTo(owner); }
+                finally { admitted.release(); }
+            }
+            assertThat(skills.invoke("orders", "warehouse-lookup", Map.of())).isEqualTo("orders");
+            assertThat(skills.invoke("warehouse", "lookup", Map.of())).isEqualTo("warehouse");
+            assertThat(skills.invoke("accounting", "lookup", Map.of())).isEqualTo("accounting");
+        });
+    }
     @Test void nestedStartupYamlAlwaysBelongsToDefault(@TempDir Path directory) throws Exception {
         Path nested = Files.createDirectories(directory.resolve("other"));
         Files.writeString(nested.resolve("lookup.yaml"), document("unused", "lookup-3pl").yaml());
         runner().withPropertyValues("loomspan.skills.locations=" + directory.toUri() + "**/*.yaml").run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(SkillReloader.class).snapshot("default").skills())
-                    .extracting(SkillDescriptor::name).contains("default:lookup-3pl");
+                    .extracting(SkillDescriptor::qualifiedName).contains("default:lookup-3pl");
         });
     }
     @Test void suppliedYamlUsesExactOwnerAndEnforcesNamesAndLimits() {
@@ -47,16 +84,16 @@ class PortableDeclarationIdentityIntegrationTest {
                 var documents = List.of(document("Orders import #42", "lookup-3pl"));
                 var result = reloader.validate(owner, documents, EMPTY);
                 assertThat(result.valid()).as(result.issues().toString()).isTrue();
-                assertThat(result.skills()).extracting(ValidatedSkill::name).contains(owner + ":lookup-3pl");
+                assertThat(result.skills()).extracting(ValidatedSkill::qualifiedName).contains(owner + ":lookup-3pl");
                 try (var candidate = reloader.prepare(owner, documents, EMPTY)) {
                     assertThat(candidate.snapshot().namespace()).isEqualTo(owner);
-                    assertThat(candidate.snapshot().skills()).extracting(SkillDescriptor::name).contains(owner + ":lookup-3pl");
+                    assertThat(candidate.snapshot().skills()).extracting(SkillDescriptor::qualifiedName).contains(owner + ":lookup-3pl");
                 }
             }
             var accepted = List.of(document("limit", "s".repeat(49)));
             assertThat(reloader.validate("order-support", accepted, EMPTY).valid()).isTrue();
             try (var candidate = reloader.prepare("order-support", accepted, EMPTY)) {
-                assertThat(candidate.snapshot().skills()).extracting(SkillDescriptor::name).contains("order-support:" + "s".repeat(49));
+                assertThat(candidate.snapshot().skills()).extracting(SkillDescriptor::qualifiedName).contains("order-support:" + "s".repeat(49));
             }
             for (String name : List.of("Lookup", " lookup", "lookup ", "lookup_name", "3pl-lookup", "lookup--3pl", "myclaudeskill", "s".repeat(50))) {
                 var invalid = List.of(document("Orders/lookup.yaml", name));
@@ -84,7 +121,7 @@ class PortableDeclarationIdentityIntegrationTest {
             var crossRole = List.of(document("cross-role", "fixture"));
             assertThat(reloader.validate("default", crossRole, EMPTY).valid()).isTrue();
             try (var candidate = reloader.prepare("default", crossRole, EMPTY)) {
-                assertThat(candidate.snapshot().skills()).extracting(SkillDescriptor::name).contains("default:fixture", "default:fixed");
+                assertThat(candidate.snapshot().skills()).extracting(SkillDescriptor::qualifiedName).contains("default:fixture", "default:fixed");
             }
             assertThat(reloader.validate("other", duplicateJava, EMPTY).valid()).isTrue();
         });
@@ -137,5 +174,8 @@ class PortableDeclarationIdentityIntegrationTest {
         @SkillExecutor(namespace="order-support", name="fixture") String orders(SkillExecutorInvocation invocation) { return "ok"; }
         @SkillExecutor(namespace="other", name="fixture") String other(SkillExecutorInvocation invocation) { return "ok"; }
         @SkillExecutor(namespace="orders", name="fixture") String orderFixture(SkillExecutorInvocation invocation) { return "ok"; }
+        @SkillExecutor(namespace="orders", name="lookup") String ordersLookup(SkillExecutorInvocation invocation) { return "orders"; }
+        @SkillExecutor(namespace="warehouse", name="lookup") String warehouseLookup(SkillExecutorInvocation invocation) { return "warehouse"; }
+        @SkillMethod(namespace="accounting", name="lookup", description="Java lookup") String accountingLookup() { return "accounting"; }
     }
 }

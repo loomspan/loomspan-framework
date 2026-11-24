@@ -52,7 +52,7 @@ class NamespaceObservationIntegrationTest
                                 "loomspan: {execution-trace: {persistence: always, directory: '" + redirected + "'}}")))
                                 .isInstanceOf(SkillReloadException.class).hasMessageContaining("loomspan.execution-trace.directory");
                         var observations = new ArrayList<SkillExecutionView>();
-                        assertThat(template.invoke("FiNaNcE-entry", Map.of(), observations::add)).contains("finance complete");
+                        assertThat(template.invoke("FiNaNcE", "entry", Map.of(), observations::add)).contains("finance complete");
                         try {
                             assertThat(root.resolve("shared")).doesNotExist();
                             Path financeTrace;
@@ -75,7 +75,7 @@ class NamespaceObservationIntegrationTest
                                 assertThat(record.path("route").asText()).isEqualTo("shared-leaf");
                                 assertThat(record.path("metadata").path("executingNamespace").asText()).isEqualTo("shared");
                             });
-                            assertThat(template.invoke("shared-leaf", Map.of())).contains("executor");
+                            assertThat(template.invoke("shared", "leaf", Map.of())).contains("executor");
                             try (var paths = Files.list(root.resolve("shared"))) {
                                 assertThat(paths.toList()).hasSize(1).allSatisfy(path -> assertThat(path).isRegularFile());
                             }
@@ -112,9 +112,9 @@ class NamespaceObservationIntegrationTest
                         allowed_skills: [{name: dept:fixed}]
                         """)), configuration);
                 reloader.publish(caller);
-                var pending = context.getBean(SkillInvocationHandoff.class).handoff("caller-fixed", Map.of());
+                var pending = context.getBean(SkillInvocationHandoff.class).handoff("caller", "fixed", Map.of());
                 reloader.remove("dept", shared.generationId());
-                assertThatThrownBy(() -> template.invoke("caller-fixed", Map.of())).isInstanceOf(SkillException.class);
+                assertThatThrownBy(() -> template.invoke("caller", "fixed", Map.of())).isInstanceOf(SkillException.class);
                 var replacement = reloader.prepare("dept", List.of(), NamespaceStartupIntegrationTest.EMPTY, NamespaceVisibility.PUBLIC);
                 reloader.publish(replacement);
                 assertThat(replacement.generationId()).isNotEqualTo(shared.generationId());

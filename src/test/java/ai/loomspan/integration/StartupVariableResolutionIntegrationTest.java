@@ -64,7 +64,7 @@ class StartupVariableResolutionIntegrationTest {
                     assertThat(connection.getDriver()).isEqualTo(AiDriver.OPENAI);
                     assertThat(connection.getApiKey()).isEqualTo("local-demo-key");
                     assertThat(connection.getHeaders()).containsEntry("X-Region", "west").containsEntry("Accept", "application/json");
-                    assertThat(context.getBean(SkillTemplate.class).invoke("leaf", Map.of())).isEqualTo("captured");
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of())).isEqualTo("captured");
                     var invocation = context.getBean(Executor.class).invocation;
                     assertThat(invocation.executorConfig()).containsEntry("region", "west");
                     assertThat(invocation.skillConfig()).containsEntry("region", "west");
@@ -147,7 +147,7 @@ class StartupVariableResolutionIntegrationTest {
                     .containsEntry("X-Host", "west").containsEntry("X-Terminal", "returned-${region}");
             assertThat(properties.getModels().get("primary").getProviderModel()).isEqualTo("west");
             assertThat(context.getEnvironment().getProperty("copied")).isEqualTo("west");
-            context.getBean(SkillTemplate.class).invoke("leaf", Map.of());
+            context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of());
             var invocation = context.getBean(Executor.class).invocation;
             for (var data : java.util.List.of(invocation.executorConfig(), invocation.skillConfig()))
                 assertThat(data).containsEntry("literal", "${region}").containsEntry("host", "west")
@@ -448,10 +448,10 @@ class StartupVariableResolutionIntegrationTest {
                     .run(context -> {
                         assertThat(context).hasNotFailed();
                         var template = context.getBean(SkillTemplate.class);
-                        template.invoke("leaf", Map.of());
+                        template.invoke("default", "leaf", Map.of());
                         assertThat(context.getBean(Executor.class).invocation.skillConfig()).containsEntry("region", startupValue);
                         values.put("shared", "rotated");
-                        template.invoke("leaf", Map.of());
+                        template.invoke("default", "leaf", Map.of());
                         assertThat(context.getBean(Executor.class).invocation.executorConfig()).containsEntry("region", startupValue);
                         assertThat(counts).containsExactly(Map.entry("shared", 1));
                         var reloader = context.getBean(ai.loomspan.api.SkillReloader.class);
@@ -459,7 +459,7 @@ class StartupVariableResolutionIntegrationTest {
                                 new ai.loomspan.api.ExecutionConfiguration(execution))) {
                             reloader.publish(candidate);
                         }
-                        template.invoke("leaf", Map.of());
+                        template.invoke("default", "leaf", Map.of());
                         assertThat(context.getBean(Executor.class).invocation.skillConfig()).containsEntry("region", "rotated");
                         assertThat(counts).containsExactly(Map.entry("shared", 2));
                     });

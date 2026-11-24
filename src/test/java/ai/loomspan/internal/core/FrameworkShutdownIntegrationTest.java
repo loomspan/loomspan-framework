@@ -65,7 +65,7 @@ class FrameworkShutdownIntegrationTest
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
         org.mockito.Mockito.when(router.execute(any(), any(), any(), any())).thenReturn("ok");
-        var admitted = handoff.handoff("default-root", Map.of());
+        var admitted = handoff.handoff("default", "root", Map.of());
         String generationId = admitted.generationId();
         assertThat(generationId).isEqualTo(registry.manager().active("default").id());
         assertThat(lifecycle.activeRootCount()).isOne();
@@ -81,7 +81,7 @@ class FrameworkShutdownIntegrationTest
         assertThat(stopper.isAlive()).isFalse();
         assertThat(lifecycle.activeRootCount()).isZero();
         verify(router).execute(any(), any(), any(), any());
-        assertThatThrownBy(() -> handoff.handoff("default-root", Map.of()))
+        assertThatThrownBy(() -> handoff.handoff("default", "root", Map.of()))
                 .isInstanceOf(ai.loomspan.api.SkillException.class)
                 .hasCauseInstanceOf(RejectedExecutionException.class);
         lifecycle.destroy();
@@ -173,10 +173,10 @@ class FrameworkShutdownIntegrationTest
         context.addApplicationListener(lifecycle);
         context.refresh();
 
-        template.validate("default-root", Map.of());
+        template.validate("default", "root", Map.of());
         context.publishEvent(new ContextClosedEvent(context));
 
-        assertThatThrownBy(() -> template.invoke("default-root", Map.of()))
+        assertThatThrownBy(() -> template.invoke("default", "root", Map.of()))
                 .isInstanceOf(ai.loomspan.api.SkillException.class)
                 .hasCauseInstanceOf(java.util.concurrent.RejectedExecutionException.class);
         verify(router, never()).execute(any(), any(), any(), any());
@@ -351,7 +351,7 @@ class FrameworkShutdownIntegrationTest
             context.addApplicationListener(lifecycle);
             context.addApplicationListener(hostCloseListener);
         }
-        var admitted = hostGate.handoff("default-root", Map.of());
+        var admitted = hostGate.handoff("default", "root", Map.of());
         assertThat(admitted).isNotNull();
 
         context.publishEvent(new ContextClosedEvent(context));
@@ -361,7 +361,7 @@ class FrameworkShutdownIntegrationTest
         assertThatThrownBy(lifecycle::admitRoot).isInstanceOf(RejectedExecutionException.class);
         assertThat(admitted.invoke()).isEqualTo("ok");
         verify(router).execute(any(), any(), any(), any());
-        assertThat(hostGate.handoff("default-root", Map.of())).isNull();
+        assertThat(hostGate.handoff("default", "root", Map.of())).isNull();
         assertThat(hostGate.handoffAttempts()).isOne();
         admitted.release();
         lifecycle.stop();
@@ -380,11 +380,11 @@ class FrameworkShutdownIntegrationTest
             this.handoff = handoff;
         }
 
-        synchronized AdmittedSkillInvocation handoff(String skillName, Map<String, Object> input)
+        synchronized AdmittedSkillInvocation handoff(String namespace, String localName, Map<String, Object> input)
         {
             if (closed) return null;
             handoffAttempts++;
-            return handoff.handoff(skillName, input);
+            return handoff.handoff(namespace, localName, input);
         }
 
         synchronized void close() { closed = true; }

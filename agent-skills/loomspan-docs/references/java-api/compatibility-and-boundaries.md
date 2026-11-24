@@ -24,10 +24,10 @@ and diagnostic capability in `ai.loomspan.api.extensions.v1`:
 | `ExecutionConfiguration` | Supply reference-only authored YAML for a complete execution candidate |
 | `SkillValidationResult` | Inspect issues and complete candidate names/kinds after successful validation |
 | `SkillValidationIssue` | Inspect structured draft diagnostics |
-| `ValidatedSkill` | Read an exact proposed callable name and public kind |
+| `ValidatedSkill` | Read a proposed callable's namespace, local name, qualified name and public kind |
 | `PreparedSkillUpdate` | Read a frozen candidate's ID and catalog and close it if unused |
 | `SkillCatalog` | Discover an immutable immutable namespace generation catalog, acquired explicitly or from a prepared candidate |
-| `SkillDescriptor` | Read a registered skill's public metadata and exact tool schema |
+| `SkillDescriptor` | Read a registered skill's namespace, local name, qualified name and exact tool schema |
 | `SkillKind` | Distinguish YAML and JAVA registrations |
 | `SkillExecutionView` | Observe the completed invocation session |
 | `SkillExecutionEvent` | Read a current-version diagnostic event |

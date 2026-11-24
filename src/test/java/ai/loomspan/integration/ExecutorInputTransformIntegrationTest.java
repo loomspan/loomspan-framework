@@ -112,14 +112,14 @@ class ExecutorInputTransformIntegrationTest {
                 var template = context.getBean(SkillTemplate.class);
                 var invalid = Map.of("context", "invalid", "policy", input.get("policy"),
                         "candidates", input.get("candidates"), "parameters", input.get("parameters"));
-                assertThatThrownBy(() -> template.invoke("default-evaluation", invalid))
+                assertThatThrownBy(() -> template.invoke("default", "evaluation", invalid))
                         .isInstanceOf(SkillInputValidationException.class);
-                assertThatThrownBy(() -> template.invoke("default-root", invalid))
+                assertThatThrownBy(() -> template.invoke("default", "root", invalid))
                         .hasStackTraceContaining("binding_assembled_input_invalid");
                 assertThat(executor.calls).isEmpty();
 
-                assertThat(template.invoke("default-evaluation", input)).isEqualTo("accepted");
-                assertThat(template.invoke("default-root", input)).isEqualTo("accepted");
+                assertThat(template.invoke("default", "evaluation", input)).isEqualTo("accepted");
+                assertThat(template.invoke("default", "root", input)).isEqualTo("accepted");
                 assertThat(executor.calls).hasSize(2).allSatisfy(call -> {
                     assertThat(call.input()).isEqualTo(expected);
                     assertThat(call.skillConfig()).isEqualTo(Map.of("marker", "skill-only"));
@@ -129,7 +129,7 @@ class ExecutorInputTransformIntegrationTest {
                 assertThat(executor.remainingTimes).hasSize(2).allSatisfy(remaining ->
                         assertThat(remaining).isPositive().isLessThanOrEqualTo(Duration.ofSeconds(20)));
 
-                var descriptor = context.getBean(SkillReloader.class).snapshot("default").skill("default-evaluation").orElseThrow();
+                var descriptor = context.getBean(SkillReloader.class).snapshot("default").skill("evaluation").orElseThrow();
                 assertThat(descriptor.kind()).isEqualTo(SkillKind.JAVA);
                 var schema = JSON.readTree(descriptor.inputSchema());
                 assertThat(schema.path("properties").propertyNames())
@@ -147,7 +147,7 @@ class ExecutorInputTransformIntegrationTest {
                                         assertThat(record.data().path("missionInput")).isEqualTo(JSON.valueToTree(input))));
 
                 var configBoundaryInput = Map.<String, Object>of("business", "case");
-                assertThat(template.invoke("default-configBoundary", configBoundaryInput)).isEqualTo("accepted");
+                assertThat(template.invoke("default", "configBoundary", configBoundaryInput)).isEqualTo("accepted");
                 assertThat(executor.calls).hasSize(3);
                 var configBoundaryCall = executor.calls.getLast();
                 assertThat(configBoundaryCall.input()).isEqualTo(configBoundaryInput);
@@ -189,10 +189,10 @@ class ExecutorInputTransformIntegrationTest {
                 assertThat(context).hasNotFailed();
                 writer.vfs = context.getBean(SessionLocalVirtualFileSystem.class);
                 var template = context.getBean(SkillTemplate.class);
-                assertThatThrownBy(() -> template.invoke("identity", Map.of("file", new ByteArrayResource(new byte[0]))))
+                assertThatThrownBy(() -> template.invoke("default", "identity", Map.of("file", new ByteArrayResource(new byte[0]))))
                         .isInstanceOf(SkillException.class)
                         .hasStackTraceContaining("Input at /file must be a JSON value; found org.springframework.core.io.ByteArrayResource");
-                assertThatThrownBy(() -> template.invoke("scalar", Map.of()))
+                assertThatThrownBy(() -> template.invoke("default", "scalar", Map.of()))
                         .isInstanceOf(SkillException.class).hasStackTraceContaining("result must be a JSON object")
                         .satisfies(error -> assertThat(((SkillException) error).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
                             assertThat(diagnosis.skillName()).isEqualTo("default-scalar");
@@ -200,7 +200,7 @@ class ExecutorInputTransformIntegrationTest {
                             assertThat(diagnosis.issues()).isEmpty();
                         }));
                 var events = new ArrayList<SkillExecutionView>();
-                assertThatThrownBy(() -> template.invoke("failure", Map.of(), events::add))
+                assertThatThrownBy(() -> template.invoke("default", "failure", Map.of(), events::add))
                         .isInstanceOf(SkillException.class).hasRootCauseInstanceOf(JsltException.class)
                         .hasStackTraceContaining("default-failure' input_transform failed")
                         .hasStackTraceContaining("fixture evaluation failure");
@@ -209,7 +209,7 @@ class ExecutorInputTransformIntegrationTest {
                     assertThat(event.details()).containsEntry("status", "failed");
                 }));
                 try {
-                    assertThatThrownBy(() -> template.invoke("parent", Map.of()))
+                    assertThatThrownBy(() -> template.invoke("default", "parent", Map.of()))
                             .isInstanceOf(SkillException.class)
                             .hasStackTraceContaining("Input at /file must be a JSON value; found org.springframework.core.io.FileSystemResource");
                     assertThat(writer.file).isNotNull().exists();
@@ -236,7 +236,7 @@ class ExecutorInputTransformIntegrationTest {
             reloader.publish(reloader.prepare("default", List.of(), config, NamespaceVisibility.PUBLIC));
             var old = reloader.prepare("work", List.of(versioned("{\"version\": \"old\"}")), config);
             reloader.publish(old);
-            var retained = handoffs.handoff("work-leaf", Map.of("business", "captured"));
+            var retained = handoffs.handoff("work", "leaf", Map.of("business", "captured"));
             try {
                 var current = reloader.prepare("work", List.of(versioned("{\"version\": \"new\"}")), config);
                 reloader.publish(current);
@@ -250,7 +250,7 @@ class ExecutorInputTransformIntegrationTest {
                 assertThat(calls).isEmpty();
                 assertThat(retained.generationId()).isEqualTo(old.generationId());
                 assertThat(reloader.snapshot("work").generationId()).isEqualTo(current.generationId()).isNotEqualTo(old.generationId());
-                assertThat(template.invoke("work-leaf", Map.of())).isEqualTo("new");
+                assertThat(template.invoke("work", "leaf", Map.of())).isEqualTo("new");
                 assertThat(retained.invoke()).isEqualTo("old");
             } finally {
                 retained.release();

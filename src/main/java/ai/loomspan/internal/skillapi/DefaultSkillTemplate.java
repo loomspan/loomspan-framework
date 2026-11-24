@@ -78,44 +78,44 @@ public class DefaultSkillTemplate implements SkillTemplate
     }
 
     @Override
-    public void validate(String skillName, Object input)
+    public void validate(String namespace, String localName, Object input)
     {
-        validatePrepared(skillName, prepareObject(skillName, input));
+        validatePrepared(prepareObject(namespace, localName, input));
     }
 
     @Override
-    public void validate(String skillName, Map<String, Object> input)
+    public void validate(String namespace, String localName, Map<String, Object> input)
     {
-        validatePrepared(skillName, prepareMap(skillName, input));
+        validatePrepared(prepareMap(namespace, localName, input));
     }
 
     @Override
-    public String invoke(String skillName, Object input)
+    public String invoke(String namespace, String localName, Object input)
     {
-        return invoke(skillName, input, null);
+        return invoke(namespace, localName, input, null);
     }
 
     @Override
-    public String invoke(String skillName, Map<String, Object> input)
+    public String invoke(String namespace, String localName, Map<String, Object> input)
     {
-        return invoke(skillName, input, null);
+        return invoke(namespace, localName, input, null);
     }
 
     @Override
-    public String invoke(String skillName, Object input, Consumer<SkillExecutionView> observer)
+    public String invoke(String namespace, String localName, Object input, Consumer<SkillExecutionView> observer)
     {
-        return invokePrepared(skillName, prepareObject(skillName, input), observer);
+        return invokePrepared(prepareObject(namespace, localName, input), observer);
     }
 
     @Override
-    public String invoke(String skillName, Map<String, Object> input, Consumer<SkillExecutionView> observer)
+    public String invoke(String namespace, String localName, Map<String, Object> input, Consumer<SkillExecutionView> observer)
     {
-        return invokePrepared(skillName, prepareMap(skillName, input), observer);
+        return invokePrepared(prepareMap(namespace, localName, input), observer);
     }
 
-    PreparedInput prepareObject(String skillName, Object input)
+    PreparedInput prepareObject(String namespace, String localName, Object input)
     {
-        SkillGenerationManager.Capture captured = captureRoot(skillName);
+        SkillGenerationManager.Capture captured = captureRoot(namespace, localName);
         try
         {
             if (input == null)
@@ -132,7 +132,7 @@ public class DefaultSkillTemplate implements SkillTemplate
         catch (RuntimeException ex)
         {
             captured.lease().close();
-            throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+            throw new SkillException("Skill '" + namespace + ":" + localName + "' execution failed.", ex);
         }
         catch (Error ex)
         {
@@ -141,19 +141,19 @@ public class DefaultSkillTemplate implements SkillTemplate
         }
     }
 
-    PreparedInput prepareMap(String skillName, Map<String, Object> input)
+    PreparedInput prepareMap(String namespace, String localName, Map<String, Object> input)
     {
-        var captured = captureRoot(skillName);
+        var captured = captureRoot(namespace, localName);
         return prepareMap(captured, captured.snapshot().entry().toString(), input);
     }
 
-    private SkillGenerationManager.Capture captureRoot(String skillName)
+    private SkillGenerationManager.Capture captureRoot(String namespace, String localName)
     {
-        try { return generationManager.capture(SkillIdentity.resolve(skillName, "default")); }
+        try { return generationManager.capture(new SkillIdentity(namespace, localName)); }
         catch (SkillException ex) { throw ex; }
         catch (RuntimeException ex)
         {
-            throw new SkillException("Skill '" + skillName + "' execution failed.", ex);
+            throw new SkillException("Skill '" + namespace + ":" + localName + "' execution failed.", ex);
         }
     }
 
@@ -193,8 +193,9 @@ public class DefaultSkillTemplate implements SkillTemplate
         }
     }
 
-    private void validatePrepared(String skillName, PreparedInput prepared)
+    private void validatePrepared(PreparedInput prepared)
     {
+        String skillName = prepared.capability().name();
         try
         {
             Authentication authentication = securityContextStrategy.getContext().getAuthentication();
@@ -211,14 +212,15 @@ public class DefaultSkillTemplate implements SkillTemplate
         finally { prepared.lease().close(); }
     }
 
-    private String invokePrepared(String skillName, PreparedInput prepared, Consumer<SkillExecutionView> observer)
+    private String invokePrepared(PreparedInput prepared, Consumer<SkillExecutionView> observer)
     {
-        return invokePrepared(skillName, prepared, observer, null);
+        return invokePrepared(prepared, observer, null);
     }
 
-    String invokePrepared(String skillName, PreparedInput prepared, Consumer<SkillExecutionView> observer,
+    String invokePrepared(PreparedInput prepared, Consumer<SkillExecutionView> observer,
             @Nullable ai.loomspan.internal.core.FrameworkExecutionLifecycle.AdmittedRoot admittedRoot)
     {
+        String skillName = prepared.capability().name();
         Authentication authentication;
         try
         {
@@ -240,13 +242,14 @@ public class DefaultSkillTemplate implements SkillTemplate
             prepared.lease().close();
             throw ex;
         }
-        return invokePrepared(skillName, prepared, observer, authentication, admittedRoot);
+        return invokePrepared(prepared, observer, authentication, admittedRoot);
     }
 
-    String invokePrepared(String skillName, PreparedInput prepared, Consumer<SkillExecutionView> observer,
+    String invokePrepared(PreparedInput prepared, Consumer<SkillExecutionView> observer,
             @Nullable Authentication authentication,
             @Nullable ai.loomspan.internal.core.FrameworkExecutionLifecycle.AdmittedRoot admittedRoot)
     {
+        String skillName = prepared.capability().name();
         var selected = new java.util.concurrent.atomic.AtomicReference<ai.loomspan.api.SkillFailureDiagnosis>();
         try
         {

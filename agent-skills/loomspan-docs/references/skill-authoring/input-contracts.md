@@ -92,7 +92,7 @@ Map<String, Object> rank(
 }
 ```
 
-The exact callable name is `default:rank-transport-options`; use it in `SkillTemplate` or a YAML parent's `allowed_skills`. No YAML wrapper is required or accepted.
+Invoke with `skills.invoke("default", "rank-transport-options", input)`. A YAML parent's `allowed_skills` uses `default:rank-transport-options`, or `rank-transport-options` when owned by `default`. No YAML wrapper is required or accepted.
 
 ## Generated Input Guidance
 

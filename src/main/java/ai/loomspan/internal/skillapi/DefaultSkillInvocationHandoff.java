@@ -27,25 +27,26 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
     }
 
     @Override
-    public AdmittedSkillInvocation handoff(String skillName, Object input)
+    public AdmittedSkillInvocation handoff(String namespace, String localName, Object input)
     {
-        return admit(skillName, template.prepareObject(skillName, input));
+        return admit(template.prepareObject(namespace, localName, input));
     }
 
     @Override
-    public AdmittedSkillInvocation handoff(String skillName, Map<String, Object> input)
+    public AdmittedSkillInvocation handoff(String namespace, String localName, Map<String, Object> input)
     {
-        return admit(skillName, template.prepareMap(skillName, input));
+        return admit(template.prepareMap(namespace, localName, input));
     }
 
-    private AdmittedSkillInvocation admit(String skillName, DefaultSkillTemplate.PreparedInput prepared)
+    private AdmittedSkillInvocation admit(DefaultSkillTemplate.PreparedInput prepared)
     {
+        String skillName = prepared.capability().name();
         try
         {
             Authentication authentication = template.currentAuthentication();
             template.authorize(prepared, authentication);
             return new DefaultAdmittedSkillInvocation(
-                    skillName, prepared, authentication, lifecycle.admitRoot(prepared.lease()));
+                    prepared, authentication, lifecycle.admitRoot(prepared.lease()));
         }
         catch (AccessDeniedException | SkillException ex)
         {
@@ -71,14 +72,13 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
         private final String skillName;
         private final FrameworkExecutionLifecycle.AdmittedRoot root;
 
-        private DefaultAdmittedSkillInvocation(String skillName,
-                DefaultSkillTemplate.PreparedInput prepared,
+        private DefaultAdmittedSkillInvocation(DefaultSkillTemplate.PreparedInput prepared,
                 Authentication authentication,
                 FrameworkExecutionLifecycle.AdmittedRoot root)
         {
-            this.skillName = skillName;
+            this.skillName = prepared.capability().name();
             this.generationId = prepared.snapshot().entryGeneration().id();
-            this.payload = new AtomicReference<>(new Payload(skillName, prepared, authentication));
+            this.payload = new AtomicReference<>(new Payload(prepared, authentication));
             this.root = root;
             root.onPendingTermination(() -> payload.set(null));
         }
@@ -102,7 +102,7 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
             if (claimed == null)
                 throw new SkillException("Skill '" + skillName + "' execution failed.",
                         new RejectedExecutionException("Loomspan invocation admission is no longer executable"));
-            return template.invokePrepared(claimed.skillName(), claimed.prepared(), observer,
+            return template.invokePrepared(claimed.prepared(), observer,
                     claimed.authentication(), root);
         }
 
@@ -113,7 +113,7 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
             root.close();
         }
 
-        private record Payload(String skillName, DefaultSkillTemplate.PreparedInput prepared,
+        private record Payload(DefaultSkillTemplate.PreparedInput prepared,
                 Authentication authentication) {}
     }
 }

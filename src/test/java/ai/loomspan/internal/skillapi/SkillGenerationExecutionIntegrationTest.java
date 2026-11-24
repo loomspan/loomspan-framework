@@ -79,9 +79,9 @@ class SkillGenerationExecutionIntegrationTest
                 mock(LoomspanSessionRunner.class), mapper, new SkillInputValidator(),
                 new SkillRoleEvaluator(null, null), null);
 
-        template.validate("default-invoiceParser", new Object());
+        template.validate("default", "invoice-parser", new Object());
         assertThat(retired).containsExactly(oldId);
-        assertThatThrownBy(() -> template.validate("default-invoiceParser", Map.of("payload", "hello")))
+        assertThatThrownBy(() -> template.validate("default", "invoice-parser", Map.of("payload", "hello")))
                 .isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
         ai.loomspan.testkit.TestSkillGenerations.activate(generations, TestSkillGenerations.empty());
         assertThat(retired).containsExactly(oldId, replacementGeneration.id());
@@ -117,7 +117,7 @@ class SkillGenerationExecutionIntegrationTest
         var template = new DefaultSkillTemplate(generations, router, runner, new ObjectMapper(),
                 new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
         var admitted = new DefaultSkillInvocationHandoff(template, lifecycle)
-                .handoff("default-invoiceParser", Map.of("payload", "hello"));
+                .handoff("default", "invoice-parser", Map.of("payload", "hello"));
         assertThat(admitted.generationId()).isEqualTo(oldGeneration.id()).isNotBlank();
 
         ai.loomspan.testkit.TestSkillGenerations.activate(generations, replacementGeneration);
@@ -127,7 +127,7 @@ class SkillGenerationExecutionIntegrationTest
         {
             assertThat(admitted.invoke()).isEqualTo("old-result");
             assertThat(admitted.generationId()).isEqualTo(oldGeneration.id());
-            assertThatThrownBy(() -> template.invoke("default-invoiceParser", Map.of("payload", "hello")))
+            assertThatThrownBy(() -> template.invoke("default", "invoice-parser", Map.of("payload", "hello")))
                     .isInstanceOf(AccessDeniedException.class);
             verify(coordinator).execute(eq(oldCapability), any(), any(), any(), eq(null));
             verify(coordinator, never()).execute(eq(replacementCapability), any(), any(), any(), eq(null));
@@ -180,10 +180,10 @@ class SkillGenerationExecutionIntegrationTest
         var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
         try
         {
-            var old = handoff.handoff("default-invoiceParser", new OldInput("hello"));
+            var old = handoff.handoff("default", "invoice-parser", new OldInput("hello"));
             assertThat(generations.active("default").id()).isEqualTo(replacement.id());
             assertThat(old.generationId()).isEqualTo(oldId).isNotBlank();
-            var current = handoff.handoff("default-invoiceParser", Map.of("replacementPayload", "new"));
+            var current = handoff.handoff("default", "invoice-parser", Map.of("replacementPayload", "new"));
             assertThat(current.generationId()).isEqualTo(replacement.id());
             assertThat(old.invoke()).isEqualTo("old-result");
             assertThat(current.invoke()).isEqualTo("replacement-result");
@@ -210,8 +210,8 @@ class SkillGenerationExecutionIntegrationTest
                         ai.loomspan.internal.serialization.LoomspanJacksonCodecs.defaults().schemaTree().writeValueAsString(Map.of(
                                 "type", "object", "properties", Map.of(requiredField, Map.of("type", "string")),
                                 "required", List.of(requiredField), "additionalProperties", false))));
-        return new CapabilityMetadata(id, "default-invoiceParser", "Invoice parser",
+        return new CapabilityMetadata(id, "default:invoice-parser", "Invoice parser",
                 SkillExecutionDescriptor.none(), policy, arguments -> "unused", SkillKind.JAVA,
-                CapabilityToolDescriptor.generic("default-invoiceParser", "Invoice parser"), input, null);
+                CapabilityToolDescriptor.generic("default:invoice-parser", "Invoice parser"), input, null);
     }
 }

@@ -34,7 +34,7 @@ replacement. Visibility changes are complete publications and allocate fresh IDs
 Namespaces use their exact supplied spelling and the declaration component grammar.
 Each skill pair satisfies `namespace.length() + 2 + localName.length() <= 64`.
 Catalogs and validation feedback contain only the target's supplied declarations
-and assigned fixed Java methods; qualified catalog lookup never searches elsewhere.
+and assigned fixed Java methods; catalog lookup accepts a local name and never searches another namespace.
 Empty supplied declarations are valid when ordinary validation permits them, and
 an empty published namespace still has its namespace and generation ID.
 

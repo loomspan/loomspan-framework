@@ -145,8 +145,8 @@ class SkillReloaderTest {
         assertThat(fixture.manager.active("a").runtime().properties().getSession().getMaxDepth()).isEqualTo(32);
         assertThat(fixture.startup.getSession().getMaxDepth()).isEqualTo(91);
         assertThat(fixture.reloader.snapshot("b").generationId()).isEqualTo(b.generationId());
-        assertThat(fixture.reloader.snapshot("a").skill("a:old")).isEmpty();
-        assertThat(retained.skill("a:old")).isPresent();
+        assertThat(fixture.reloader.snapshot("a").skill("old")).isEmpty();
+        assertThat(retained.skill("old")).isPresent();
         assertThatThrownBy(() -> fixture.reloader.prepare("a", List.of(model("keep")), EMPTY)).isInstanceOf(SkillReloadException.class);
         var empty = fixture.reloader.prepare("a", List.of(), EMPTY); fixture.reloader.publish(empty);
         assertThat(fixture.reloader.snapshot("a").namespace()).isEqualTo("a");
@@ -225,11 +225,11 @@ class SkillReloaderTest {
                     var peer = workers.submit(() -> f.reloader.prepare(secondTarget, List.of(model("fast")), MODEL)).get(5, TimeUnit.SECONDS);
                     assertThat(workers.submit(() -> f.reloader.snapshot("default")).get(5, TimeUnit.SECONDS).namespace()).isEqualTo("default");
                     workers.submit(() -> f.reloader.publish(ready)).get(5, TimeUnit.SECONDS);
-                    assertThat(peer.snapshot().skill(secondTarget+":fast")).isPresent();
+                    assertThat(peer.snapshot().skill("fast")).isPresent();
                     release.countDown();
                     var slow = blocked.get(5, TimeUnit.SECONDS);
-                    assertThat(slow.snapshot().skill("default:slow")).isPresent();
-                    assertThat(slow.snapshot().skill("default:fast")).isEmpty();
+                    assertThat(slow.snapshot().skill("slow")).isPresent();
+                    assertThat(slow.snapshot().skill("fast")).isEmpty();
                     assertThat(slow.generationId()).isNotEqualTo(peer.generationId());
                     slow.close(); peer.close();
                 } finally { release.countDown(); }
@@ -315,7 +315,7 @@ class SkillReloaderTest {
             f.reloader.publish(first);f.reloader.publish(second);
             assertThat(f.manager.active("a").runtime().properties().getConnections().get("api").getApiKey()).isEqualTo("first");
             assertThat(f.manager.active("b").runtime().properties().getConnections().get("api").getApiKey()).isEqualTo("second");
-            assertThat(first.snapshot().skill("a:one")).isPresent();assertThat(first.snapshot().skill("a:two")).isEmpty();
+            assertThat(first.snapshot().skill("one")).isPresent();assertThat(first.snapshot().skill("two")).isEmpty();
         }
     }
 

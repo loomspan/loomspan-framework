@@ -184,15 +184,15 @@ class DesignatedChildResultIntegrationTest {
             runner.run(context -> {
                 assertThat(context).hasNotFailed();
                 var catalog = context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default");
-                String schema = catalog.skill("default-root").orElseThrow().outputSchema();
+                String schema = catalog.skill("root").orElseThrow().outputSchema();
                 if (kind.equals("model")) {
                     assertThat(JSON.readTree(schema).path("properties").path("report").path("type").asText()).isEqualTo("string");
-                    assertThat(schema).isEqualTo(catalog.skill("default-producer").orElseThrow().outputSchema());
-                    if (chain) assertThat(schema).isEqualTo(catalog.skill("default-middle").orElseThrow().outputSchema());
+                    assertThat(schema).isEqualTo(catalog.skill("producer").orElseThrow().outputSchema());
+                    if (chain) assertThat(schema).isEqualTo(catalog.skill("middle").orElseThrow().outputSchema());
                 } else assertThat(schema).isNull();
                 if (kind.equals("envelope-failure")) org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-                        context.getBean(SkillTemplate.class).invoke("default-root", Map.of(), capture.observed::set)).hasStackTraceContaining("executor failed");
-                else capture.result = context.getBean(SkillTemplate.class).invoke("default-root", Map.of(), capture.observed::set);
+                        context.getBean(SkillTemplate.class).invoke("default", "root", Map.of(), capture.observed::set)).hasStackTraceContaining("executor failed");
+                else capture.result = context.getBean(SkillTemplate.class).invoke("default", "root", Map.of(), capture.observed::set);
             });
         }
         assertThat(capture.failure.get()).isNull();
@@ -260,11 +260,11 @@ class DesignatedChildResultIntegrationTest {
                         SkillTemplate facade = context.getBean(SkillTemplate.class);
                         SkillReloader reloader = context.getBean(SkillReloader.class);
                         SkillCatalog capturedCatalog = reloader.snapshot("default");
-                        String oldSchema = capturedCatalog.skill("default-root").orElseThrow().outputSchema();
+                        String oldSchema = capturedCatalog.skill("root").orElseThrow().outputSchema();
                         assertThat(oldSchema).contains("oldReport");
                         try (var executor = Executors.newFixedThreadPool(2)) {
                             if (reload) {
-                                var oldResult = executor.submit(() -> facade.invoke("default-root", Map.of("marker", "held")));
+                                var oldResult = executor.submit(() -> facade.invoke("default", "root", Map.of("marker", "held")));
                                 try {
                                     await(heldProducer);
                                     try (var update = reloader.prepare("default", List.of(
@@ -273,14 +273,14 @@ class DesignatedChildResultIntegrationTest {
                                         reloader.publish(update);
                                     }
                                     assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(capturedCatalog.generationId());
-                                    assertThat(reloader.snapshot("default").skill("default-root").orElseThrow().outputSchema()).contains("newReport");
-                                    assertThat(capturedCatalog.skill("default-root").orElseThrow().outputSchema()).isEqualTo(oldSchema);
-                                    assertThat(JSON.readTree(facade.invoke("default-root", Map.of("marker", "fresh"))).path("newReport").asText()).isEqualTo("fresh");
+                                    assertThat(reloader.snapshot("default").skill("root").orElseThrow().outputSchema()).contains("newReport");
+                                    assertThat(capturedCatalog.skill("root").orElseThrow().outputSchema()).isEqualTo(oldSchema);
+                                    assertThat(JSON.readTree(facade.invoke("default", "root", Map.of("marker", "fresh"))).path("newReport").asText()).isEqualTo("fresh");
                                 } finally { releaseProducer.countDown(); }
                                 assertThat(JSON.readTree(oldResult.get(15, TimeUnit.SECONDS)).path("oldReport").asText()).isEqualTo("held");
                             } else {
-                                var a = executor.submit(() -> facade.invoke("default-root", Map.of("marker", "A")));
-                                var b = executor.submit(() -> facade.invoke("default-root", Map.of("marker", "B")));
+                                var a = executor.submit(() -> facade.invoke("default", "root", Map.of("marker", "A")));
+                                var b = executor.submit(() -> facade.invoke("default", "root", Map.of("marker", "B")));
                                 assertThat(JSON.readTree(a.get(15, TimeUnit.SECONDS)).path("oldReport").asText()).isEqualTo("A");
                                 assertThat(JSON.readTree(b.get(15, TimeUnit.SECONDS)).path("oldReport").asText()).isEqualTo("B");
                             }
