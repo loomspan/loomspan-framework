@@ -8,12 +8,14 @@ import ai.loomspan.internal.runtime.observation.LiveMonitoringAvailability;
 import ai.loomspan.internal.runtime.observation.ReplayResult;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -268,33 +270,31 @@ class ObservabilityActivityDeliveryTest
     @Test
     void shutdownRejectsAdmissionAndStopsOwnedThreads() throws Exception
     {
-        ObservabilityActivityDelivery delivery = delivery(new InMemoryActivityReplayBuffer());
-        var admission = delivery.admit(0);
-        delivery.scheduleDeadline(() -> {}, java.time.Duration.ofHours(1));
-        delivery.activityAvailable();
-
-        delivery.close();
-        admission.close();
-
-        assertThatThrownBy(() -> delivery.admit(0))
-                .isInstanceOfSatisfying(ObservabilityException.class,
-                        failure -> assertThat(failure.problem().status()).isEqualTo(503));
-        long limit = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (hasDeliveryThread() && System.nanoTime() < limit)
+        var threadFactory = Thread.ofPlatform().daemon().factory();
+        ExecutorService dispatcher = Executors.newSingleThreadExecutor(threadFactory);
+        ScheduledExecutorService deadlines = Executors.newSingleThreadScheduledExecutor(threadFactory);
+        try (ObservabilityActivityDelivery delivery = new ObservabilityActivityDelivery(
+                "123e4567-e89b-12d3-a456-426614174000",
+                new InMemoryActivityReplayBuffer(),
+                new LiveMonitoringAvailability(),
+                new ObservabilityDtoMapper(),
+                new ObservabilityJsonCodec(),
+                dispatcher,
+                deadlines);
+             var admission = delivery.admit(0))
         {
-            Thread.onSpinWait();
-        }
-        assertThat(hasDeliveryThread()).isFalse();
-        assertThat(delivery.admittedCount()).isZero();
-    }
+            delivery.scheduleDeadline(() -> {}, Duration.ofHours(1));
+            delivery.activityAvailable();
 
-    private static boolean hasDeliveryThread()
-    {
-        return Thread.getAllStackTraces().keySet().stream()
-                .filter(Thread::isAlive)
-                .map(Thread::getName)
-                .anyMatch(name -> name.startsWith("loomspan-activity-delivery-")
-                        || name.startsWith("loomspan-activity-deadline-"));
+            delivery.close();
+
+            assertThatThrownBy(() -> delivery.admit(0))
+                    .isInstanceOfSatisfying(ObservabilityException.class,
+                            failure -> assertThat(failure.problem().status()).isEqualTo(503));
+            assertThat(dispatcher.awaitTermination(5, TimeUnit.SECONDS)).as("activity dispatcher terminated").isTrue();
+            assertThat(deadlines.awaitTermination(5, TimeUnit.SECONDS)).as("deadline scheduler terminated").isTrue();
+            assertThat(delivery.admittedCount()).isZero();
+        }
     }
 
     private static ObservabilityActivityDelivery delivery(InMemoryActivityReplayBuffer replay)
