@@ -44,6 +44,34 @@ import static org.mockito.Mockito.when;
 class LoomspanSessionRunnerTest {
 
     @Test
+    void identityNotificationPrecedesSessionInitialization()
+    {
+        var notified = new AtomicReference<String>();
+        var initialized = new AtomicReference<String>();
+        var failure = new IllegalStateException("trace initialization failed");
+        var runner = new LoomspanSessionRunner(4, TracePersistencePolicy.NEVER, Clock.systemUTC(),
+                (id, entry) -> {
+                    assertThat(notified).hasValue(id);
+                    return ai.loomspan.internal.runtime.observation.NoOpExecutionObservationHandleFactory.INSTANCE.create(id, entry);
+                }, (id, entry, metadata, policy, clock, observation) -> {
+                    initialized.set(id);
+                    assertThat(notified).hasValue(id);
+                    throw failure;
+                });
+        LoomspanSessionRunner.RootCompletion<String, String> completion = new LoomspanSessionRunner.RootCompletion<>() {
+            @Override public void started(String id) { notified.set(id); }
+            @Override public String complete(String result, LoomspanSession session, Throwable error)
+            {
+                throw new AssertionError("session initialization must fail");
+            }
+        };
+        assertThatThrownBy(() -> runner.callWithNewSession("default-test_entry",
+                ai.loomspan.testkit.TestSkillGenerations.snapshot(ai.loomspan.testkit.TestSkillGenerations.empty()),
+                null, session -> "unused", completion)).isSameAs(failure);
+        assertThat(notified.get()).isNotBlank().isEqualTo(initialized.get());
+    }
+
+    @Test
     void realRenameFailureUsesSessionFinalizationErrorAndFailedObservation(
             @org.junit.jupiter.api.io.TempDir Path root) throws Exception {
         var observation = new RecordingObservationFactory();

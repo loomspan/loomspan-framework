@@ -49,7 +49,7 @@ class NamespaceStartupIntegrationTest {
                         server.enqueue(tool(owner + "--leaf", "{}"));
                         server.enqueue(text("done"));
                         var views = new ArrayList<SkillExecutionView>();
-                        assertThat(template.invoke(owner, "parent", Map.of(), views::add)).contains("done");
+                        assertThat(template.invoke(owner, "parent", Map.of(), views::add).text()).contains("done");
                         assertThat(views.getFirst().events()).extracting(SkillExecutionEvent::route).contains(owner + ":leaf");
                     }
                 }
@@ -64,7 +64,7 @@ class NamespaceStartupIntegrationTest {
                 reloader.publish(reloader.prepare("dept", List.of(caller("fixed")), configuration));
                 server.enqueue(tool("dept--fixed", "{\"value\":\"same owner\"}"));
                 server.enqueue(text("Java done"));
-                assertThat(template.invoke("dept", "parent", Map.of())).contains("Java done");
+                assertThat(template.invoke("dept", "parent", Map.of()).text()).contains("Java done");
                 assertThat(context.getBean(Methods.class).calls).hasValue(1);
             });
             assertThat(server.getRequestCount()).isEqualTo(8);
@@ -81,7 +81,7 @@ class NamespaceStartupIntegrationTest {
             assertThat(context).hasNotFailed();var reloader=context.getBean(SkillReloader.class);var template=context.getBean(SkillTemplate.class);
             var bean=context.getBean(Methods.class);var startup=reloader.snapshot("dept");ids.add(startup.generationId());
             assertThat(startup.skills()).extracting(SkillDescriptor::qualifiedName).containsExactly("dept:fixed");
-            assertThat(template.invoke("dept", "fixed",Map.of("value","initial"))).contains("initial");
+            assertThat(template.invoke("dept", "fixed",Map.of("value","initial")).text()).contains("initial");
             assertThat(reloader.validate("caller",List.of(caller("dept:fixed")),model).valid()).isFalse();
             var publicJava=reloader.prepare("dept",List.of(),EMPTY,NamespaceVisibility.PUBLIC);reloader.publish(publicJava);
             var callers=reloader.prepare("caller",List.of(caller("dept:fixed")),model);reloader.publish(callers);
@@ -95,7 +95,7 @@ class NamespaceStartupIntegrationTest {
             // Omitted visibility is Private on replacement; fresh admission fails, captured work still runs.
             assertThatThrownBy(() -> template.invoke("caller", "parent", Map.of())).isInstanceOf(SkillException.class);
             var observed = new ArrayList<SkillExecutionView>();
-            assertThat(pendingCaller.invoke(observed::add)).contains("managed");
+            assertThat(pendingCaller.invoke(observed::add).text()).contains("managed");
             assertThat(observed).hasSize(1);
             assertThat(observed.getFirst().events()).extracting(SkillExecutionEvent::route)
                     .contains("caller:parent", "dept:fixed");
@@ -107,16 +107,16 @@ class NamespaceStartupIntegrationTest {
             assertThat(bean.destroyed).hasValue(0);
             assertThatThrownBy(()->reloader.snapshot("dept")).isInstanceOf(SkillReloadException.class);
             assertThatThrownBy(()->template.invoke("dept", "fixed",Map.of("value","withdrawn"))).isInstanceOf(RuntimeException.class);
-            assertThat(admitted.invoke()).contains("retained");assertThat(bean.destroyed).hasValue(0);
+            assertThat(admitted.invoke().text()).contains("retained");assertThat(bean.destroyed).hasValue(0);
             var recreated=reloader.prepare("dept",List.of(),EMPTY);reloader.publish(recreated);
             assertThat(recreated.generationId()).isNotEqualTo(current).isNotEqualTo(startup.generationId());
-            assertThat(template.invoke("dept", "fixed",Map.of("value","recreated"))).contains("recreated");
+            assertThat(template.invoke("dept", "fixed",Map.of("value","recreated")).text()).contains("recreated");
             assertThat(bean.calls).hasValue(4);
             String defaultId=reloader.snapshot("default").generationId();reloader.remove("default",defaultId);
             assertThatThrownBy(()->reloader.snapshot("default")).isInstanceOf(SkillReloadException.class);
             assertThatThrownBy(()->template.invoke("default", "local",Map.of())).isInstanceOf(RuntimeException.class);
             reloader.publish(reloader.prepare("default",List.of(),EMPTY));
-            assertThat(template.invoke("default", "local",Map.of())).contains("local");
+            assertThat(template.invoke("default", "local",Map.of()).text()).contains("local");
             });
             assertThat(server.getRequestCount()).isEqualTo(2);
         }
@@ -137,7 +137,7 @@ class NamespaceStartupIntegrationTest {
                 var reloader = context.getBean(SkillReloader.class);
                 var startup = reloader.snapshot("default");
                 assertThat(startup.skills()).extracting(SkillDescriptor::qualifiedName).contains("default:parent","default:local");
-                assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of())).contains("local");
+                assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of()).text()).contains("local");
                 assertThat(context.getBean(Methods.class).localCalls).hasValue(1);
                 assertThat(reloader.snapshot("default").generationId()).isEqualTo(startup.generationId());
             });

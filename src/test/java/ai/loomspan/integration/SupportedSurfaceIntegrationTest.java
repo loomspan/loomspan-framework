@@ -47,12 +47,18 @@ class SupportedSurfaceIntegrationTest
         NamespaceStartupIntegrationTest.runner().withBean(JavaFoundation.class).run(context -> {
             assertThat(context).hasNotFailed();
             var skills = context.getBean(SkillTemplate.class);
-            assertThat(skills.invoke("default", "foundation-text", Map.of())).isEqualTo("  exact text\n");
-            assertThat(skills.invoke("default", "foundation-null", Map.of())).isEmpty();
+            var text = skills.invoke("default", "foundation-text", Map.of());
+            assertThat(text.text()).isEqualTo("  exact text\n");
+            assertThat(text.sessionId()).isNotBlank();
+            var empty = skills.invoke("default", "foundation-null", Map.of());
+            assertThat(empty.text()).isEmpty();
+            assertThat(empty.sessionId()).isNotBlank().isNotEqualTo(text.sessionId());
             var recoverable = org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default", "foundation-recoverable", Map.of()));
             assertThat(recoverable).isInstanceOf(ai.loomspan.api.RecoverableSkillException.class).hasMessage("correct input");
+            assertThat(((SkillException) recoverable).getSessionId()).isNotBlank();
             var terminal = org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default", "foundation-terminal", Map.of()));
             assertThat(terminal).isInstanceOf(SkillException.class).hasRootCauseInstanceOf(IllegalStateException.class);
+            assertThat(((SkillException) terminal).getSessionId()).isNotBlank();
             assertThat(context.getBean(ai.loomspan.api.SkillReloader.class).snapshot("default").skills())
                     .extracting(ai.loomspan.api.SkillDescriptor::qualifiedName).doesNotContain("default:foundation-executor");
             assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> skills.invoke("default", "foundation-executor", Map.of())))
@@ -63,6 +69,7 @@ class SupportedSurfaceIntegrationTest
                     org.assertj.core.api.Assertions.catchThrowable(() -> context.getBean(SkillInvocationHandoff.class)
                             .handoff("default", "foundation-input", Map.of("count", "bad"))))) {
                 assertThat(failure).isInstanceOf(SkillInputValidationException.class);
+                assertThat(((SkillException) failure).getSessionId()).isNull();
                 assertThat(((SkillException) failure).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
                     assertThat(diagnosis.skillName()).isEqualTo("default:foundation-input");
                     assertThat(diagnosis.stage()).isEqualTo(ai.loomspan.api.SkillContractStage.INPUT_SCHEMA);
@@ -194,7 +201,7 @@ class SupportedSurfaceIntegrationTest
                             var admitted = handoff.handoff("default", "supported-executor-leaf", new DirectRequest("handed-off"));
                             assertThat(admitted.generationId()).isEqualTo(catalog.generationId());
                             SecurityContextHolder.clearContext();
-                            assertThat(admitted.invoke()).isEqualTo("EXECUTOR: handed-off");
+                            assertThat(admitted.invoke().text()).isEqualTo("EXECUTOR: handed-off");
                             assertThat(SupportedSkillConfiguration.lastInvocation.get().executorConfigGenerationId())
                                     .isEqualTo(admitted.generationId());
                             assertThat(SupportedSkillConfiguration.lastInvocation.get().skillName())
@@ -207,8 +214,9 @@ class SupportedSurfaceIntegrationTest
                                     "default", "supported-surface-skill",
                                     Map.of("message", "hello through the public API"));
                             assertThat(admittedRoot.generationId()).isEqualTo(catalog.generationId());
-                            assertThat(admittedRoot.invoke(observed::set))
-                                    .isEqualTo("supported surface response");
+                            var rootResult = admittedRoot.invoke(observed::set);
+                            assertThat(rootResult.text()).isEqualTo("supported surface response");
+                            assertThat(rootResult.sessionId()).isEqualTo(observed.get().sessionId());
                             assertThat(SupportedSkillConfiguration.lastInvocation.get().executorConfigGenerationId())
                                     .isEqualTo(admittedRoot.generationId());
                             admittedRoot.release();
@@ -222,7 +230,7 @@ class SupportedSurfaceIntegrationTest
                             Map<String, Object> mutableInput = new LinkedHashMap<>();
                             mutableInput.put("message", "direct");
                             mutableInput.put("values", mutableValues);
-                            assertThat(skills.invoke("default", "supported-executor-leaf", mutableInput))
+                            assertThat(skills.invoke("default", "supported-executor-leaf", mutableInput).text())
                                     .isEqualTo("EXECUTOR: direct");
                             mutableValues.add("late");
                             assertThat((List<Object>) SupportedSkillConfiguration.lastInvocation.get().input().get("values"))

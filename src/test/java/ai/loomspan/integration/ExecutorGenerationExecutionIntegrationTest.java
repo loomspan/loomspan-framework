@@ -53,7 +53,7 @@ class ExecutorGenerationExecutionIntegrationTest {
                             .active("sales").runtime().properties().getConnections().get("primary");
                     assertThat(connection.getApiKey()).isEqualTo("demo-key");
                     assertThat(connection.getHeaders()).containsEntry("X-Region", "west");
-                    assertThat(context.getBean(SkillTemplate.class).invoke("sales", "read-record", Map.of("recordId", "42"))).isEqualTo("record");
+                    assertThat(context.getBean(SkillTemplate.class).invoke("sales", "read-record", Map.of("recordId", "42")).text()).isEqualTo("record");
                     var invocation = context.getBean(SalesHttp.class).invocation;
                     var records = (Map<?, ?>) invocation.executorConfig().get("records");
                     assertThat(records.get("base-url")).isEqualTo("https://records.example.test");
@@ -86,11 +86,11 @@ class ExecutorGenerationExecutionIntegrationTest {
                     reloader.publish(nextOwner);
                     var nextConsumer = reloader.prepare("caller", "same", List.of(leaf), consumerConfig, NamespaceVisibility.PRIVATE, Map.of("shared", "consumer-second"));
                     reloader.publish(nextConsumer);
-                    assertThat(context.getBean(SkillTemplate.class).invoke("caller", "leaf", Map.of())).isEqualTo("owner-second");
+                    assertThat(context.getBean(SkillTemplate.class).invoke("caller", "leaf", Map.of()).text()).isEqualTo("owner-second");
                     var bean = context.getBean(Executors.class);
                     assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "consumer-second");
                     assertThat(bean.invocations.getLast().skillConfig()).containsEntry("value", "consumer-second");
-                    assertThat(retained.invoke()).isEqualTo("owner-first");
+                    assertThat(retained.invoke().text()).isEqualTo("owner-first");
                     assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "consumer-first");
                     assertThat(bean.invocations.getLast().skillConfig()).containsEntry("value", "consumer-first");
                     assertThat(bean.invocations.getLast().input()).containsEntry("value", "business");
@@ -109,12 +109,12 @@ class ExecutorGenerationExecutionIntegrationTest {
             assertThat(context).hasNotFailed();
             var bean = context.getBean(DefaultExecutor.class);
             var template = context.getBean(SkillTemplate.class);
-            assertThat(template.invoke("default", "startup", Map.of())).isEqualTo("selected");
+            assertThat(template.invoke("default", "startup", Map.of()).text()).isEqualTo("selected");
             var startup = bean.invocation;
             var reloader = context.getBean(SkillReloader.class);
             var published = publish(reloader, "default", List.of(document),
                     new ExecutionConfiguration("loomspan: {executor-config: {default: {settings: " + data + "}}}"), NamespaceVisibility.PRIVATE);
-            assertThat(template.invoke("default", "startup", Map.of())).isEqualTo("selected");
+            assertThat(template.invoke("default", "startup", Map.of()).text()).isEqualTo("selected");
             assertThat(bean.invocation.executorConfig()).isEqualTo(startup.executorConfig())
                     .containsEntry("placeholder", "${UNSET_EXECUTOR_VALUE}").containsEntry("api-key-ref", "ordinary");
             assertThat(bean.invocation.executorConfigGenerationId()).isEqualTo(published.generationId())
@@ -152,14 +152,14 @@ class ExecutorGenerationExecutionIntegrationTest {
                 var pendingAtRemoval = handoff.handoff("caller", "leaf", Map.of("value", "removed"));
                 var infra2 = publish(reloader, "infra", List.of(), config("second"), NamespaceVisibility.PUBLIC);
                 assertThat(retired).doesNotContain(infra1.generationId());
-                assertThat(template.invoke("caller", "leaf", Map.of("value", "fresh"))).isEqualTo("second");
+                assertThat(template.invoke("caller", "leaf", Map.of("value", "fresh")).text()).isEqualTo("second");
                 assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(infra2.generationId());
                 reloader.remove("infra", infra2.generationId());
                 assertThatThrownBy(() -> handoff.handoff("caller", "leaf", Map.of())).isInstanceOf(SkillException.class);
-                assertThat(pendingAtRemoval.invoke()).isEqualTo("startup");
+                assertThat(pendingAtRemoval.invoke().text()).isEqualTo("startup");
                 var infra3 = publish(reloader, "infra", List.of(), config("third"), NamespaceVisibility.PUBLIC);
-                assertThat(template.invoke("caller", "leaf", Map.of("value", "new"))).isEqualTo("third");
-                assertThat(old.invoke()).isEqualTo("startup");
+                assertThat(template.invoke("caller", "leaf", Map.of("value", "new")).text()).isEqualTo("third");
+                assertThat(old.invoke().text()).isEqualTo("startup");
                 var invocation = bean.invocations.getLast();
                 assertThat(invocation.input()).containsEntry("value", "old");
                 assertThat(invocation.input().get("attachment")).isSameAs(resource);
@@ -171,11 +171,11 @@ class ExecutorGenerationExecutionIntegrationTest {
                 assertThat(SecurityContextHolder.getContext().getAuthentication()).isSameAs(principal);
                 assertThat(retired).containsOnlyOnce(infra1.generationId());
                 assertThat(destroyed).hasValue(0);
-                assertThat(template.invoke("caller", "empty", Map.of())).isEqualTo("plain");
+                assertThat(template.invoke("caller", "empty", Map.of()).text()).isEqualTo("plain");
                 assertThat(bean.invocations.getLast().executorConfig()).isEmpty();
                 assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(infra3.generationId());
                 var views = new ArrayList<SkillExecutionView>();
-                assertThat(template.invoke("caller", "leaf", Map.of(), views::add)).isEqualTo("third");
+                assertThat(template.invoke("caller", "leaf", Map.of(), views::add).text()).isEqualTo("third");
                 assertThat(views).hasSize(1);
                 assertThat(views.getFirst().events()).isNotEmpty();
             } finally { SecurityContextHolder.clearContext(); }
@@ -260,17 +260,17 @@ class ExecutorGenerationExecutionIntegrationTest {
                 var old = handoff.handoff("caller", "secured",Map.of("value","old"));
                 var removed = handoff.handoff("caller", "secured",Map.of("value","removed"));
                 var next = publish(reloader,"infra",List.of(),config("second"),NamespaceVisibility.PUBLIC);
-                assertThat(template.invoke("caller", "secured",Map.of())).isEqualTo("second");
+                assertThat(template.invoke("caller", "secured",Map.of()).text()).isEqualTo("second");
                 assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(next.generationId());
                 reloader.remove("infra",next.generationId());
                 assertThatThrownBy(() -> handoff.handoff("caller", "secured",Map.of())).isInstanceOf(SkillException.class);
                 var ambient = SecurityContextHolder.createEmptyContext();
                 ambient.setAuthentication(UsernamePasswordAuthenticationToken.authenticated("other","unused",List.of()));
                 SecurityContextHolder.setContext(ambient);
-                assertThat(removed.invoke()).isEqualTo("first");
+                assertThat(removed.invoke().text()).isEqualTo("first");
                 assertThat(SecurityContextHolder.getContext()).isSameAs(ambient);
                 var recreated = publish(reloader,"infra",List.of(),config("third"),NamespaceVisibility.PUBLIC);
-                assertThat(old.invoke()).isEqualTo("first");
+                assertThat(old.invoke().text()).isEqualTo("first");
                 assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "secured-consumer");
                 assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(first.generationId());
                 assertThat(bean.authentications).allSatisfy(authentication -> assertThat(authentication).isSameAs(principal));
@@ -279,7 +279,7 @@ class ExecutorGenerationExecutionIntegrationTest {
                         .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
                 assertThat(bean.invocations).hasSize(beforeDenied);
                 SecurityContextHolder.setContext(captured);
-                assertThat(template.invoke("caller", "secured",Map.of())).isEqualTo("third");
+                assertThat(template.invoke("caller", "secured",Map.of()).text()).isEqualTo("third");
                 assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(recreated.generationId());
                 publish(reloader,"caller",List.of(new SkillDocument("secured",secured.yaml().replace("[SALES]","[OTHER]"))),
                         new ExecutionConfiguration("loomspan: {}"),NamespaceVisibility.PRIVATE);
@@ -328,7 +328,7 @@ class ExecutorGenerationExecutionIntegrationTest {
                 reloader.publish(prepared);
                 for (var identity : List.of(new ai.loomspan.internal.core.SkillIdentity("billing", "one"), new ai.loomspan.internal.core.SkillIdentity("billing", "two"), new ai.loomspan.internal.core.SkillIdentity("other", "one"), new ai.loomspan.internal.core.SkillIdentity("infra", "same"))) {
                     String name = identity.toString();
-                    assertThat(template.invoke(identity.namespace(), identity.localName(), Map.of("value", "business"))).isEqualTo("owner");
+                    assertThat(template.invoke(identity.namespace(), identity.localName(), Map.of("value", "business")).text()).isEqualTo("owner");
                     var call = bean.invocations.getLast();
                     assertThat(call.executorConfig()).containsEntry("version", "owner");
                     assertThat(call.skillConfig()).containsEntry("operation", "echo");
@@ -338,7 +338,7 @@ class ExecutorGenerationExecutionIntegrationTest {
                 }
                 String plan = "{\"capabilityName\":\"support:root\",\"createdAt\":\"2026-11-20T00:00:00Z\",\"status\":\"VALID\",\"tasks\":[{\"taskId\":\"one\",\"title\":\"one\",\"status\":\"PENDING\",\"capabilityName\":\"billing:one\",\"intent\":\"Forward\",\"dependsOn\":[],\"expectedOutputs\":[],\"parallelGroup\":null,\"note\":\"\"}]}";
                 planner.enqueue(plannerResponse(plan));
-                assertThat(template.invoke("support", "root", Map.of("value", "business"))).isEqualTo("owner");
+                assertThat(template.invoke("support", "root", Map.of("value", "business")).text()).isEqualTo("owner");
                 assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "billing-v1");
                 assertThat(bean.invocations.getLast().input()).containsEntry("value", "business");
                 var billingId = reloader.snapshot("billing").generationId();
@@ -362,7 +362,7 @@ class ExecutorGenerationExecutionIntegrationTest {
                 template.invoke("billing", "one", Map.of("value", "business"));
                 assertThat(bean.invocations.getLast().consumerExecutorConfig()).isEmpty();
                 publish(reloader, "infra", List.of(), config("new-owner"), NamespaceVisibility.PUBLIC);
-                assertThat(retained.invoke()).isEqualTo("owner");
+                assertThat(retained.invoke().text()).isEqualTo("owner");
                 assertThat(bean.invocations.getLast().consumerExecutorConfig()).containsEntry("key", "billing-v1");
                 assertThat(bean.invocations.getLast().executorConfigGenerationId()).isEqualTo(owner.generationId());
             });

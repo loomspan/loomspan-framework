@@ -82,8 +82,8 @@ class DeclaredChildInputBindingsIntegrationTest {
                 org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default", "evaluation", Map.of("amount", "4", "candidates", candidates)))
                         .isInstanceOf(ai.loomspan.api.SkillInputValidationException.class);
                 assertThat(receivedInputs).isEmpty();
-                assertThat(template.invoke("default", "evaluation", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{\"answers\":{}}");
-                assertThat(template.invoke("default", "root", Map.of("amount", 4.0d, "candidates", candidates))).isEqualTo("{\"answers\":{}}");
+                assertThat(template.invoke("default", "evaluation", Map.of("amount", 4.0d, "candidates", candidates)).text()).isEqualTo("{\"answers\":{}}");
+                assertThat(template.invoke("default", "root", Map.of("amount", 4.0d, "candidates", candidates)).text()).isEqualTo("{\"answers\":{}}");
                 org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default", "root", Map.of("amount", "4", "candidates", candidates)))
                         .hasStackTraceContaining("binding_assembled_input_invalid")
                         .satisfies(error -> assertThat(((ai.loomspan.api.SkillException) error).getFailureDiagnosis()).hasValueSatisfying(diagnosis -> {
@@ -181,7 +181,7 @@ class DeclaredChildInputBindingsIntegrationTest {
                         try {
                             var template = context.getBean(SkillTemplate.class);
                             Map<String, Object> input = scenario.equals("missing") ? Map.of() : Map.of("requestId", "case-one");
-                            if (scenario.equals("success")) assertThat(template.invoke("default", "root", input, view -> observerCalls.incrementAndGet())).isEqualTo("COMPLETE");
+                            if (scenario.equals("success")) assertThat(template.invoke("default", "root", input, view -> observerCalls.incrementAndGet()).text()).isEqualTo("COMPLETE");
                             else org.assertj.core.api.Assertions.assertThatThrownBy(() -> template.invoke("default", "root", input, view -> observerCalls.incrementAndGet()))
                                     .hasStackTraceContaining(switch (scenario) {
                                         case "missing" -> "binding_source_unavailable";
@@ -310,7 +310,7 @@ class DeclaredChildInputBindingsIntegrationTest {
             if (consumerKind.equals("java")) runner=runner.withBean(JavaConsumer.class,()->new JavaConsumer(received));
             runner.run(context -> {
                 assertThat(context).hasNotFailed();
-                String result=context.getBean(SkillTemplate.class).invoke("default", "root", input);
+                String result=context.getBean(SkillTemplate.class).invoke("default", "root", input).text();
                 assertThat(result).isEqualTo("COMPLETE");
             });
         }

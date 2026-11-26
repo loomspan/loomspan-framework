@@ -123,13 +123,15 @@ public class DemoApplication {
     @Bean
     ApplicationRunner demo(SkillTemplate skills) {
         return args -> {
-            String http = skills.invoke("default", "send", Map.of("message", "hello"));
-            String sql = skills.invoke("default", "query", Map.of("id", 7));
-            if (!"service:hello".equals(http) || !"archive|select :id|7".equals(sql)) {
+            var http = skills.invoke("default", "send", Map.of("message", "hello"));
+            var sql = skills.invoke("default", "query", Map.of("id", 7));
+            if (!"service:hello".equals(http.text()) || !"archive|select :id|7".equals(sql.text())) {
                 throw new IllegalStateException("Unexpected executor output: " + http + " / " + sql);
             }
-            System.out.println(http);
-            System.out.println(sql);
+            System.out.println(http.text());
+            System.out.println(sql.text());
+            System.out.println("HTTP session " + http.sessionId());
+            System.out.println("SQL session " + sql.sessionId());
         };
     }
 
@@ -188,9 +190,12 @@ After startup logs, the application prints and verifies:
 ```text
 service:hello
 archive|select :id|7
+HTTP session <root-session-id>
+SQL session <root-session-id>
 ```
 
-It then exits and closes its resources. No fixed listening port is required.
+Each invocation prints its own session ID. The application then exits and closes
+its resources. No fixed listening port is required.
 The two configuration maps are separate general application data: both may
 contain SQL, database selectors, HTTP settings or other domain values. Their
 interpretation belongs to the executor; Loomspan performs no merge or domain

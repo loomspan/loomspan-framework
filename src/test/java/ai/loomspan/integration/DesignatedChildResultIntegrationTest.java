@@ -192,7 +192,7 @@ class DesignatedChildResultIntegrationTest {
                 } else assertThat(schema).isNull();
                 if (kind.equals("envelope-failure")) org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                         context.getBean(SkillTemplate.class).invoke("default", "root", Map.of(), capture.observed::set)).hasStackTraceContaining("executor failed");
-                else capture.result = context.getBean(SkillTemplate.class).invoke("default", "root", Map.of(), capture.observed::set);
+                else capture.result = context.getBean(SkillTemplate.class).invoke("default", "root", Map.of(), capture.observed::set).text();
             });
         }
         assertThat(capture.failure.get()).isNull();
@@ -264,7 +264,7 @@ class DesignatedChildResultIntegrationTest {
                         assertThat(oldSchema).contains("oldReport");
                         try (var executor = Executors.newFixedThreadPool(2)) {
                             if (reload) {
-                                var oldResult = executor.submit(() -> facade.invoke("default", "root", Map.of("marker", "held")));
+                                var oldResult = executor.submit(() -> facade.invoke("default", "root", Map.of("marker", "held")).text());
                                 try {
                                     await(heldProducer);
                                     try (var update = reloader.prepare("default", List.of(
@@ -275,12 +275,12 @@ class DesignatedChildResultIntegrationTest {
                                     assertThat(reloader.snapshot("default").generationId()).isNotEqualTo(capturedCatalog.generationId());
                                     assertThat(reloader.snapshot("default").skill("root").orElseThrow().outputSchema()).contains("newReport");
                                     assertThat(capturedCatalog.skill("root").orElseThrow().outputSchema()).isEqualTo(oldSchema);
-                                    assertThat(JSON.readTree(facade.invoke("default", "root", Map.of("marker", "fresh"))).path("newReport").asText()).isEqualTo("fresh");
+                                    assertThat(JSON.readTree(facade.invoke("default", "root", Map.of("marker", "fresh")).text()).path("newReport").asText()).isEqualTo("fresh");
                                 } finally { releaseProducer.countDown(); }
                                 assertThat(JSON.readTree(oldResult.get(15, TimeUnit.SECONDS)).path("oldReport").asText()).isEqualTo("held");
                             } else {
-                                var a = executor.submit(() -> facade.invoke("default", "root", Map.of("marker", "A")));
-                                var b = executor.submit(() -> facade.invoke("default", "root", Map.of("marker", "B")));
+                                var a = executor.submit(() -> facade.invoke("default", "root", Map.of("marker", "A")).text());
+                                var b = executor.submit(() -> facade.invoke("default", "root", Map.of("marker", "B")).text());
                                 assertThat(JSON.readTree(a.get(15, TimeUnit.SECONDS)).path("oldReport").asText()).isEqualTo("A");
                                 assertThat(JSON.readTree(b.get(15, TimeUnit.SECONDS)).path("oldReport").asText()).isEqualTo("B");
                             }

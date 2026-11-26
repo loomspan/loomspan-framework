@@ -7,6 +7,33 @@ coverage: source-verified
 
 # Observation Values and Facade Errors
 
+## Caller session identity
+
+Every successful `SkillTemplate.invoke` and `AdmittedSkillInvocation.invoke`
+returns `SkillInvocationResult`. Its `text()` preserves the original result
+text, and its non-null, nonblank `sessionId()` is the root execution ID used by
+the canonical trace and any delivered execution view.
+
+`SkillException.getSessionId()` returns a nullable String. Null indicates that
+the invocation failed before root identity allocation. Failures after allocation
+carry that root ID, including runtime failures during initialization, execution,
+finalization, requested public mapping, observer delivery or ownership release.
+Post-session access denial uses `SkillAccessDeniedException`, a Spring
+`AccessDeniedException` subtype with a direct `getSessionId()` getter. An entry
+denial before allocation retains Spring's existing denial behavior.
+
+Public invocation failures are immutable metadata snapshots. Their causes retain
+the original failures, and their suppressed exceptions retain secondary failure
+evidence. Built-in designated failure subtypes, exact authored messages, input
+issues and the current session's selected diagnosis are preserved. Reusing an
+application exception across roots cannot supply another root's identity or
+selected diagnosis. JVM `Error` continues to propagate through its existing
+fatal-failure boundary.
+
+Identity is available without an observer and independently of whether a trace
+was retained. The no-observer path skips public view and event conversion. Use
+the ID with existing authorized trace access and retention rules.
+
 ## Completed Execution View
 
 Pass a `Consumer<SkillExecutionView>` to an observer overload of
@@ -125,21 +152,30 @@ application callback.
 | --- | --- |
 | Caller input violates the skill contract | `SkillInputValidationException` |
 | Skill is unknown, mismatched, or otherwise fails through the facade | `SkillException` or a subtype |
-| Spring Security denies access | The original `AccessDeniedException` propagates |
+| Spring Security denies access | Before root allocation, Spring denial behavior applies. Afterward, `SkillAccessDeniedException` carries root identity and the original denial as cause |
 | Spring authentication failure at a Java proxy | Remains a failure; never successful tool text |
 | Designated Java `RecoverableSkillException` | Propagates as a `SkillException` subtype; exact message and optional diagnostic cause retained |
 | Standard or explicit-step planner declares inability | Direct and admitted callers receive `PlannerInabilityException` with the exact reason |
 | Runtime implementation or Java serialization failure | Safe `SkillException` message with the original cause |
 | Admitted handle already executed, released, or cut off | Safe `SkillException`; no new session or work |
-| Observer throws after success | The observer's runtime exception propagates unchanged |
-| Mapping or observer throws after execution failure | The original execution failure remains primary; the later failure is suppressed |
+| Mapping or observer throws after success | A session-bearing public failure retains the mapping or observer failure as cause |
+| Mapping or observer throws after execution failure | The execution failure remains primary; the later failure is suppressed and retained on the public snapshot |
 | JVM `Error` | Not caught by the facade |
 
-`SkillException` extends `RuntimeException`. Its existing message and message/cause
-constructors remain available. The additive three-argument constructor accepts a
-`SkillFailureDiagnosis`, and `getFailureDiagnosis()` returns an `Optional`.
-`SkillInputValidationException` also accepts an optional diagnosis alongside its
-message and original issues.
+`SkillException` extends `RuntimeException`. Its message, message/cause and
+message/cause/diagnosis constructors initialize session identity to null.
+`getFailureDiagnosis()` returns an `Optional`. The full constructor is
+`SkillException(String message, Throwable cause, SkillFailureDiagnosis diagnosis, String sessionId)`.
+`SkillAccessDeniedException(String message, Throwable cause, String sessionId)`
+requires a non-null, nonblank session ID.
+
+The built-in subtype construction paths also support immutable invocation
+snapshots. `RecoverableSkillException` and `PlannerInabilityException` accept
+`(String message, Throwable cause, SkillFailureDiagnosis diagnosis, String sessionId)`.
+`SkillInputValidationException` accepts
+`(String message, Throwable cause, List<SkillInputValidationIssue> issues, SkillFailureDiagnosis diagnosis, String sessionId)`.
+Application construction of ordinary failures can use the shorter message and
+cause constructors.
 
 `SkillInputValidationException` extends `SkillException`. Its `getIssues()`
 method returns an immutable defensive copy; a null issue list normalizes to an
@@ -163,8 +199,9 @@ classification. An ordinary application wrapper remains terminal. Direct invocat
 failed-call feedback after failure recording; no automatic replay or explicit-step
 correction loop is added. See [Java failures](java-skills.md#designated-java-failures).
 
-`PlannerInabilityException` extends `RecoverableSkillException` and has one public
-constructor, `PlannerInabilityException(String reason)`. The reason must be non-null
+`PlannerInabilityException` extends `RecoverableSkillException`. Its
+`PlannerInabilityException(String reason)` constructor is the ordinary declaration
+path. The reason must be non-null
 and nonblank. Use the subtype to handle unsuccessful completion explicitly and read
 the exact reason from `getMessage()`. A model can declare inability in standard
 execution or during explicit-step assigned action generation or final synthesis.
@@ -228,11 +265,16 @@ protects exact root, escaped and control-containing paths.
 - `SkillExecutorTest` and `SharedJavaDiscoveryInvocationTest` protect designated failure constructors, exact messages, shared propagation and infrastructure/application wrapper distinctions.
 - `ApplicationApiValueTest` protects record shape, immutability, detail-value
   validation, normalization, and public exception constructors.
-- `DefaultSkillTemplateTest#preservesAccessDeniedExceptionInstance` protects
-  the authorization boundary.
-- `DefaultSkillTemplateTest#preservesExistingSkillExceptionInstance` and
-  `#executionFailureDeliversAvailableHistoryOnceWithoutChangingFacadeFailure`
-  protect exception passthrough, safe wrapping, and failure-history delivery.
+- `DefaultSkillTemplateTest` protects session-bearing failure snapshots,
+  Spring denial catchability, optional mapping, observer precedence and
+  failure-history delivery.
+- `DefaultSkillTemplateTest#initializationFailureStillExposesAllocatedIdentity`
+  and `#mappingFailureAfterSuccessStillExposesRootIdentity` protect failures
+  around session setup and optional public view construction.
+- `DefaultSkillTemplateTest#callerIdentityMatchesCanonicalTraceAcrossRetentionPolicies`
+  checks caller, view and canonical identity across persistence policies.
+- `ExecutorOutputSchemaIntegrationTest#publicFailureSnapshotsIgnoreReusedOrApplicationSuppliedDiagnosis`
+  protects isolation when exceptions are reused across invocations.
 - `SkillExecutionViewMapperTest#refusesToMapSessionWithoutRetainedFinalizedHistory`
   protects the available-history limit after finalization failure.
 - `DefaultSkillTemplateTest#doesNotCatchError` protects the fatal-error boundary.

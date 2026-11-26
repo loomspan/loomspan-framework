@@ -266,7 +266,7 @@ class LoomspanAutoConfigurationTests {
                             .active("default").capability("default:deterministic-target");
                     assertThat(metadata.skillExecution().configured()).isFalse();
                     assertThat(context.getBean(SkillTemplate.class)
-                            .invoke("default", "deterministic-target", Map.of("input", "alpha")))
+                            .invoke("default", "deterministic-target", Map.of("input", "alpha")).text())
                             .isEqualTo("mapped:alpha");
                 });
     }

@@ -111,9 +111,11 @@ class SkillExecutorTest
         assertThat(new RecoverableSkillException(message)).hasMessage(message).hasNoCause();
         assertThat(new RecoverableSkillException(message, cause)).hasMessage(message).hasCause(cause).isInstanceOf(SkillException.class);
         assertThat(new RecoverableSkillException(message, null)).hasMessage(message).hasNoCause();
-        assertThat(RecoverableSkillException.class.getConstructors()).hasSize(2);
+        assertThat(RecoverableSkillException.class.getConstructors()).hasSize(3);
         assertThatCode(() -> RecoverableSkillException.class.getConstructor(String.class)).doesNotThrowAnyException();
         assertThatCode(() -> RecoverableSkillException.class.getConstructor(String.class, Throwable.class)).doesNotThrowAnyException();
+        assertThatCode(() -> RecoverableSkillException.class.getConstructor(String.class, Throwable.class,
+                SkillFailureDiagnosis.class, String.class)).doesNotThrowAnyException();
         for (String invalid : Arrays.asList(null, "", " \t\n"))
         {
             assertThatThrownBy(() -> new RecoverableSkillException(invalid)).isInstanceOf(invalid == null ? NullPointerException.class : IllegalArgumentException.class);

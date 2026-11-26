@@ -15,6 +15,11 @@ public class RecoverableSkillException extends SkillException
         super(requireMessage(message), cause);
     }
 
+    public RecoverableSkillException(String message, Throwable cause, SkillFailureDiagnosis failureDiagnosis, String sessionId)
+    {
+        super(requireMessage(message), cause, failureDiagnosis, sessionId);
+    }
+
     private static String requireMessage(String message)
     {
         Objects.requireNonNull(message, "message must not be null");

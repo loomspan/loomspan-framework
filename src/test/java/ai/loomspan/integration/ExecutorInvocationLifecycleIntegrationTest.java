@@ -53,7 +53,7 @@ class ExecutorInvocationLifecycleIntegrationTest
         runner(bean).run(context -> {
             assertThat(context).hasNotFailed();
             var value = new java.math.BigDecimal("0.12345678901234567890123456789");
-            assertThat(context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of("probability", value)))
+            assertThat(context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of("probability", value)).text())
                     .isEqualTo("approved");
             assertThat(bean.call.input()).containsEntry("probability", value);
             assertThat(bean.call.skillConfig()).containsEntry("question", "approve");
@@ -93,7 +93,7 @@ class ExecutorInvocationLifecycleIntegrationTest
                     "loomspan.connections.local.provider-retry.enabled=false", "loomspan.models.local.connection=local",
                     "loomspan.models.local.provider-model=fixture").run(context -> {
                 assertThat(context).hasNotFailed();
-                assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of())).isEqualTo("approved");
+                assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of()).text()).isEqualTo("approved");
                 // Child gets its own five-second budget; the already-spent parent budget must win.
                 assertThat(bean.entryRemaining).isPositive().isLessThan(Duration.ofMillis(4500));
                 assertThat(bean.call.skillName()).isEqualTo("default:leaf");

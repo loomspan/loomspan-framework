@@ -31,6 +31,30 @@ for an agent, not runtime enforcement over client tools, model behavior, or
 provider retention. The source-verification, sensitivity, stable-identity, and
 uncertainty rules below continue to govern author-facing conclusions.
 
+## Correlate a caller with its trace
+
+Successful direct and admitted Java invocations return `SkillInvocationResult`.
+Read `text()` for the original published result and `sessionId()` for the root
+execution ID. A failed invocation exposes the ID through
+`SkillException.getSessionId()` after root identity allocation. A failure before
+allocation, such as invalid input during handoff, has a null ID. Post-session
+denial uses `SkillAccessDeniedException.getSessionId()` and remains catchable as
+Spring `AccessDeniedException`.
+
+This is the same ID used in the canonical trace and any delivered execution
+view. Callers receive it without an observer, even when requested view mapping
+fails or trace retention removes the file. The ID can identify a retained trace
+through existing authorized Console inspection. Access and retention determine
+whether the evidence is available. Read the
+[public failure contract](../java-api/observation-and-errors.md#caller-session-identity)
+for initialization, completion and observer failure behavior.
+
+`ApplicationApiValueTest` and `SupportedSurfaceIntegrationTest` cover the caller
+contract. `DefaultSkillTemplateTest#callerIdentityMatchesCanonicalTraceAcrossRetentionPolicies`
+checks trace retention and identity correlation, while
+`#invocationIdentityMatchesRootWithoutPublicMapping` checks the no-observer path.
+`ExecutorOutputSchemaIntegrationTest` covers reused exception isolation.
+
 ## Terminal contract diagnosis
 
 Java callers can read `SkillException.getFailureDiagnosis()` through direct and

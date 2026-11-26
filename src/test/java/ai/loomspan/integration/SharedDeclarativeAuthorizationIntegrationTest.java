@@ -105,12 +105,12 @@ class SharedDeclarativeAuthorizationIntegrationTest {
                         assertThat(state.calls).isZero();
                         var ambient = SecurityContextHolder.createEmptyContext(); ambient.setAuthentication(auth("ROLE_OTHER"));
                         SecurityContextHolder.setContext(ambient);
-                        assertThat(pending.invoke()).isEqualTo("ok");
+                        assertThat(pending.invoke().text()).isEqualTo("ok");
                         assertThat(state.authentication).isSameAs(principal);
                         assertThat(state.thread).isNotSameAs(Thread.currentThread());
                         restored(worker,sentinel,ambient);
                         SecurityContextHolder.setContext(caller);
-                        assertThat(template.invoke("default", skill,Map.of("value","ok"))).isEqualTo("ok");
+                        assertThat(template.invoke("default", skill,Map.of("value","ok")).text()).isEqualTo("ok");
                         assertThat(state.authentication).isSameAs(principal);
                         restored(worker,sentinel,caller);
                         int before = state.calls;

@@ -55,16 +55,16 @@ class PortableDeclarationIdentityIntegrationTest {
                     reloader.publish(candidate);
                 }
                 skills.validate(checked.namespace(), checked.localName(), Map.of());
-                assertThat(skills.invoke(checked.namespace(), checked.localName(), Map.of())).isEqualTo(owner);
+                assertThat(skills.invoke(checked.namespace(), checked.localName(), Map.of()).text()).isEqualTo(owner);
                 var descriptor = reloader.snapshot(owner).skill("lookup").orElseThrow();
-                assertThat(skills.invoke(descriptor.namespace(), descriptor.localName(), (Object) Map.of())).isEqualTo(owner);
+                assertThat(skills.invoke(descriptor.namespace(), descriptor.localName(), (Object) Map.of()).text()).isEqualTo(owner);
                 var admitted = handoff.handoff(descriptor.namespace(), descriptor.localName(), Map.of());
-                try { assertThat(admitted.invoke()).isEqualTo(owner); }
+                try { assertThat(admitted.invoke().text()).isEqualTo(owner); }
                 finally { admitted.release(); }
             }
-            assertThat(skills.invoke("orders", "warehouse-lookup", Map.of())).isEqualTo("orders");
-            assertThat(skills.invoke("warehouse", "lookup", Map.of())).isEqualTo("warehouse");
-            assertThat(skills.invoke("accounting", "lookup", Map.of())).isEqualTo("accounting");
+            assertThat(skills.invoke("orders", "warehouse-lookup", Map.of()).text()).isEqualTo("orders");
+            assertThat(skills.invoke("warehouse", "lookup", Map.of()).text()).isEqualTo("warehouse");
+            assertThat(skills.invoke("accounting", "lookup", Map.of()).text()).isEqualTo("accounting");
         });
     }
     @Test void nestedStartupYamlAlwaysBelongsToDefault(@TempDir Path directory) throws Exception {

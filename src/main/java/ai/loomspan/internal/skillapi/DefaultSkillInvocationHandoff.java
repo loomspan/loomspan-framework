@@ -4,6 +4,7 @@ import ai.loomspan.api.AdmittedSkillInvocation;
 import ai.loomspan.api.SkillException;
 import ai.loomspan.api.SkillExecutionView;
 import ai.loomspan.api.SkillInvocationHandoff;
+import ai.loomspan.api.SkillInvocationResult;
 import ai.loomspan.internal.core.FrameworkExecutionLifecycle;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -51,6 +52,8 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
         catch (AccessDeniedException | SkillException ex)
         {
             prepared.lease().close();
+            if (ex instanceof SkillException skillFailure && skillFailure.getSessionId() != null)
+                throw DefaultSkillTemplate.failureSnapshot(skillName, skillFailure, null, null);
             throw ex;
         }
         catch (RuntimeException ex)
@@ -90,13 +93,13 @@ public final class DefaultSkillInvocationHandoff implements SkillInvocationHando
         }
 
         @Override
-        public String invoke()
+        public SkillInvocationResult invoke()
         {
             return invoke(null);
         }
 
         @Override
-        public String invoke(Consumer<SkillExecutionView> observer)
+        public SkillInvocationResult invoke(Consumer<SkillExecutionView> observer)
         {
             Payload claimed = payload.getAndSet(null);
             if (claimed == null)

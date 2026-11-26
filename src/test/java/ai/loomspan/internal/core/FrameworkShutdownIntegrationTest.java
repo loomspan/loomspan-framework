@@ -75,7 +75,7 @@ class FrameworkShutdownIntegrationTest
         while (lifecycle.deadlineNanos() == Long.MAX_VALUE && System.nanoTime() < deadline)
             Thread.onSpinWait();
 
-        assertThat(admitted.invoke()).isEqualTo("ok");
+        assertThat(admitted.invoke().text()).isEqualTo("ok");
         assertThat(admitted.generationId()).isEqualTo(generationId);
         stopper.join(Duration.ofSeconds(1));
         assertThat(stopper.isAlive()).isFalse();
@@ -83,7 +83,8 @@ class FrameworkShutdownIntegrationTest
         verify(router).execute(any(), any(), any(), any());
         assertThatThrownBy(() -> handoff.handoff("default", "root", Map.of()))
                 .isInstanceOf(ai.loomspan.api.SkillException.class)
-                .hasCauseInstanceOf(RejectedExecutionException.class);
+                .hasCauseInstanceOf(RejectedExecutionException.class)
+                .satisfies(failure -> assertThat(((ai.loomspan.api.SkillException) failure).getSessionId()).isNull());
         lifecycle.destroy();
         context.close();
     }
@@ -178,7 +179,8 @@ class FrameworkShutdownIntegrationTest
 
         assertThatThrownBy(() -> template.invoke("default", "root", Map.of()))
                 .isInstanceOf(ai.loomspan.api.SkillException.class)
-                .hasCauseInstanceOf(java.util.concurrent.RejectedExecutionException.class);
+                .hasCauseInstanceOf(java.util.concurrent.RejectedExecutionException.class)
+                .satisfies(failure -> assertThat(((ai.loomspan.api.SkillException) failure).getSessionId()).isNull());
         verify(router, never()).execute(any(), any(), any(), any());
         lifecycle.stop();
         lifecycle.destroy();
@@ -359,7 +361,7 @@ class FrameworkShutdownIntegrationTest
         assertThat(hostGate.closed()).isTrue();
         assertThat(eventReturns).hasValue(1);
         assertThatThrownBy(lifecycle::admitRoot).isInstanceOf(RejectedExecutionException.class);
-        assertThat(admitted.invoke()).isEqualTo("ok");
+        assertThat(admitted.invoke().text()).isEqualTo("ok");
         verify(router).execute(any(), any(), any(), any());
         assertThat(hostGate.handoff("default", "root", Map.of())).isNull();
         assertThat(hostGate.handoffAttempts()).isOne();

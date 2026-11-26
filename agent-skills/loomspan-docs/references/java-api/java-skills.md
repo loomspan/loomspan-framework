@@ -27,6 +27,8 @@ public class InvoiceLookup {
 ```
 
 Call this skill with `skills.invoke("default", "invoice-exists", Map.of("reference", "INV-42"))`, where `skills` is the injected `SkillTemplate`.
+Read the returned `SkillInvocationResult.text()` for the converted Java value
+and `sessionId()` for the root execution identity.
 
 The runtime method annotation has three elements:
 
@@ -70,6 +72,10 @@ Successful Java values use one conversion contract for both declaration roles:
 | `null` or `void` | Empty String |
 | Non-null `String`, including empty or whitespace-only text | Exact original String, without JSON quoting |
 | Any other non-null value | JSON using the application Jackson mapper |
+
+The public root facade returns this converted text in `SkillInvocationResult.text()`
+alongside the root `sessionId()`. The ID matches the canonical trace and any
+delivered execution view, including when diagnostic retention removes the trace.
 
 An executor YAML leaf with
 [`output_transform`](../skill-authoring/executor-skills.md#publish-a-transformed-executor-result)
@@ -227,14 +233,22 @@ real `ref://` Resource resolution and invocation-only domain checks.
 
 ## Designated Java failures
 
-`RecoverableSkillException extends SkillException` has exactly two constructors:
+`RecoverableSkillException extends SkillException` has these constructors.
 
 ```java
 RecoverableSkillException(String message);
 RecoverableSkillException(String message, Throwable cause);
+RecoverableSkillException(String message, Throwable cause,
+                          SkillFailureDiagnosis diagnosis, String sessionId);
 ```
 
 Messages MUST be non-null and nonblank. Valid messages, including surrounding whitespace, remain unchanged. An optional cause supplies diagnostics and never substitutes its message as feedback. The shared policy recognizes this subtype through transparent reflection/proxy (`InvocationTargetException`, `UndeclaredThrowableException`), worker-future (`ExecutionException`), and Spring AI callback (`ToolExecutionException`) wrappers. An ordinary application wrapper around it is a distinct terminal failure; classification never searches arbitrary causes.
+
+Direct and admitted failures use per-invocation public snapshots with the current
+root ID in `getSessionId()`. The original exception is retained as cause, and
+designated subtype and exact message remain available. Read the
+[failure contract](observation-and-errors.md#caller-session-identity) for
+pre-session null identity and Spring access-denied handling.
 
 | Invocation route | Designated recoverable failure | Other failure |
 | --- | --- | --- |

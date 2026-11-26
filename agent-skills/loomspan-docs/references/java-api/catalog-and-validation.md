@@ -68,7 +68,9 @@ two identity components and `kind`. Use the components directly.
 ```java
 var descriptor = reloader.snapshot("orders").skill("lookup").orElseThrow();
 skills.validate(descriptor.namespace(), descriptor.localName(), Map.of());
-String result = skills.invoke(descriptor.namespace(), descriptor.localName(), Map.of());
+var result = skills.invoke(descriptor.namespace(), descriptor.localName(), Map.of());
+String text = result.text();
+String sessionId = result.sessionId();
 var admitted = handoff.handoff(descriptor.namespace(), descriptor.localName(), Map.of());
 try { admitted.invoke(); }
 finally { admitted.release(); }

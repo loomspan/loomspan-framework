@@ -28,6 +28,8 @@ class LoomspanPublicSurfaceArchitectureTest
 {
     private static final Set<String> API_TYPES = Set.of(
             "ai.loomspan.api.SkillTemplate",
+            "ai.loomspan.api.SkillInvocationResult",
+            "ai.loomspan.api.SkillAccessDeniedException",
             "ai.loomspan.api.SkillInvocationHandoff",
             "ai.loomspan.api.AdmittedSkillInvocation",
             "ai.loomspan.api.SkillExecutionView",

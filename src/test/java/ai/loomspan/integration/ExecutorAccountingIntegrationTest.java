@@ -47,7 +47,7 @@ class ExecutorAccountingIntegrationTest {
                     "loomspan.models.local.connection=local", "loomspan.models.local.provider-model=fixture",
                     "loomspan.session.quotas.max-provider-attempts=2").run(context -> {
                 assertThat(context).hasNotFailed();
-                assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of())).isEqualTo("DONE");
+                assertThat(context.getBean(SkillTemplate.class).invoke("default", "parent", Map.of()).text()).isEqualTo("DONE");
                 var usage = bean.session.getSessionUsage().orElseThrow();
                 assertThat(usage.providerAttempts()).isEqualTo(2);
                 assertThat(usage.modelCalls()).isEqualTo(2);
@@ -80,7 +80,7 @@ class ExecutorAccountingIntegrationTest {
             application.enqueue(new MockResponse().setBody("{\"result\":\"approved\"}")); application.start();
             var bean = new Executor(application, false);
             runner(bean).withPropertyValues("loomspan.session.quotas.max-provider-attempts=1").run(context -> {
-                assertThat(context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of())).isEqualTo("approved");
+                assertThat(context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of()).text()).isEqualTo("approved");
                 var usage = bean.session.getSessionUsage().orElseThrow();
                 assertThat(usage.providerAttempts()).isZero(); assertThat(usage.modelCalls()).isZero();
                 assertThat(usage.usageUnits()).isZero(); assertThat(usage.unavailableModelResponses()).isZero();
@@ -96,7 +96,10 @@ class ExecutorAccountingIntegrationTest {
             var bean = new Executor(application, true);
             runner(bean).run(context -> {
                 assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of()))
-                        .isSameAs(bean.designated);
+                        .isInstanceOf(ai.loomspan.api.RecoverableSkillException.class)
+                        .hasMessage(bean.designated.getMessage()).hasCause(bean.designated)
+                        .satisfies(failure -> assertThat(((ai.loomspan.api.SkillException) failure).getSessionId())
+                                .isEqualTo(bean.session.getSessionId()));
                 var records = bean.records();
                 assertThat(records).anySatisfy(r -> {
                     assertThat(r.recordType()).isEqualTo(TraceRecordType.EXECUTOR_DIAGNOSTIC_RECORDED);

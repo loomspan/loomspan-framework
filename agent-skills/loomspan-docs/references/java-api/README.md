@@ -29,6 +29,8 @@ The allowlist currently contains only:
 - `SkillTemplate`
 - `SkillInvocationHandoff`
 - `AdmittedSkillInvocation`
+- `SkillInvocationResult`
+- `SkillAccessDeniedException`
 - `SkillReloader`
 - `NamespaceVisibility`
 - `SkillDocument`
@@ -57,7 +59,7 @@ The allowlist currently contains only:
 - `SkillContractStage`
 - `SkillContractIssue`
 
-The thirty supported types comprise twenty-eight in `ai.loomspan.api` and
+The thirty-two supported types comprise thirty in `ai.loomspan.api` and
 exactly `SkillExecutorInvocation` and `ExecutorDiagnostics` in
 `ai.loomspan.api.extensions.v1`. Arbitrary types in that package are not approved. A Java
 `public` modifier does not make any other Loomspan type supported API. Read
@@ -101,13 +103,13 @@ Run the complete executor quickstart (`docs/quickstart-executors.md` in the matc
 
 | Topic | Coverage | Notes |
 | --- | --- | --- |
-| Supported public types | Source-verified | Exact thirty-type allowlist, selected v1 types and package boundaries |
+| Supported public types | Source-verified | Exact thirty-two-type allowlist, selected v1 types and package boundaries |
 | Catalog and pre-checks | Source-verified | Explicit namespace acquisition, reusable namespace/localName metadata with derived qualifiedName (ApplicationApiValueTest and PortableDeclarationIdentityIntegrationTest), local-only catalog lookup and explicit pair invoke/validate/handoff (DefaultSkillCatalogTest and SkillReachableAdmissionTest), malformed/missing lookup, candidate IDs and exact optional publication labels, active namespace registry and removal; fresh reachable admission and temporary validation are covered by SkillReachableAdmissionTest; shared composed executor entry/filter/dispatch checks are covered by `SharedDeclarativeAuthorizationIntegrationTest` |
 | Two-stage skill updates | Source-verified | Complete skill and execution candidate, candidate-wide Environment or copied exact-map variable markers, frozen generation, exact host-owned publication label, process-local ID, one-shot publication, candidate disposal, safe retirement callback, and application-owned readiness and cleanup. Executor namespace IDs can key application-owned resources through existing retirement listeners; shutdown remains application-owned. `PortableDeclarationIdentityIntegrationTest#suppliedLabelsRemainExactThroughValidationAndPreparation` verifies exact diagnostic labels with normal and explicit-map preparation; `StartupSkillPathTest` verifies loader-owned filesystem, classpath and JAR path checks. |
-| Skill invocation | Source-verified | Explicit namespace/localName invocation and atomic single-use handoff (ApplicationApiValueTest and SkillReachableAdmissionTest) with captured generation ID, input normalization and validation, result, session, security context, and observer timing |
+| Skill invocation | Source-verified | Explicit namespace/localName invocation and atomic single-use handoff with captured generation ID, exact result text and root session ID. `ApplicationApiValueTest`, `DefaultSkillTemplateTest` and `SupportedSurfaceIntegrationTest` cover signatures, values, optional mapping and caller identity; `SkillReachableAdmissionTest` covers admission. |
 | Java declarations and results | Source-verified | Callable/executor discovery shares proxy/security checks; exact string/null/JSON results, constructor copying and designated failures are covered by `SkillExecutorTest`, `SharedJavaDiscoveryInvocationTest` and `SupportedSurfaceIntegrationTest`. Independent owner/leaf-consumer maps, complete consumer publication and retained capture (`ExecutorDependencyResolutionTest`, `ExecutorGenerationExecutionIntegrationTest`); captured YAML executor binding/policy and secured retained execution are covered by `ExecutorDependencyResolutionTest` and `ExecutorGenerationExecutionIntegrationTest`; actual argument advice on root/child mission workers and context restoration for both forms by `SharedDeclarativeAuthorizationIntegrationTest`; designated standard feedback, direct/step termination and exact messages are covered by `ExplicitJavaFailureHandlingIntegrationTest`; no automatic replay or step correction loop. Reflected callable inputs live in `skill-authoring`. `ExecutorApplicationIntegrationTest` adds actual HTTP root/standard-child execution, Config Data, default ref-to-Resource resolution and SQL-shaped domain neutrality; the runnable executor quickstart verifies separate application composition. `ExecutorInvocationLifecycleIntegrationTest` and `MissionLifecycleTest` cover live cancellation, original parent budgets, no deadline/expiry and cleanup-grace separation; bounded diagnostic snapshots, states, containment and canonical ordering are covered by `ExecutorDiagnosticsIntegrationTest`, `BoundedExecutorDiagnosticCaptureTest` and `DefaultExecutorDiagnosticsTest`. |
 | Execution observations | Source-verified | Immutable completed view/event values, canonical namespace identities, entry versus target generation facts, one observer flow and unchanged trust boundary; NamespaceObservationIntegrationTest and ConsoleTraceFixtureCorpusTest |
-| Facade failures | Source-verified | Optional selected contract diagnosis on direct/admitted failures, exact pointers, pre-session validation, authorization, wrapping, observer failures, and fatal errors. `ExecutorOutputSchemaIntegrationTest`, `SupportedSurfaceIntegrationTest`, `LoomspanSessionTest` and `StepLoopMissionExecutionEngineTest` cover origin, absence, reuse and canonical selection. |
+| Facade failures | Source-verified | Nullable pre-session identity and immutable session-bearing failure snapshots, Spring-compatible post-session denial, optional selected contract diagnosis, observer failure precedence and fatal errors. `DefaultSkillTemplateTest`, `ExecutorOutputSchemaIntegrationTest`, `SupportedSurfaceIntegrationTest`, `LoomspanSessionTest` and `StepLoopMissionExecutionEngineTest` cover identity isolation, origin, absence, reuse and canonical selection. |
 | Configuration properties | Not documented here | Public configuration behavior is user-facing but its binding types are not application Java API |
 | Framework extension SPI | Source-verified | No supported Java SPI or internal bean-replacement contract; annotations register application-owned methods |
 

@@ -64,7 +64,7 @@ class StartupVariableResolutionIntegrationTest {
                     assertThat(connection.getDriver()).isEqualTo(AiDriver.OPENAI);
                     assertThat(connection.getApiKey()).isEqualTo("local-demo-key");
                     assertThat(connection.getHeaders()).containsEntry("X-Region", "west").containsEntry("Accept", "application/json");
-                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of())).isEqualTo("captured");
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "leaf", Map.of()).text()).isEqualTo("captured");
                     var invocation = context.getBean(Executor.class).invocation;
                     assertThat(invocation.executorConfig()).containsEntry("region", "west");
                     assertThat(invocation.skillConfig()).containsEntry("region", "west");

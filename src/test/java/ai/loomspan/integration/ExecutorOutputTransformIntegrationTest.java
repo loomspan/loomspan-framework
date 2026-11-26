@@ -96,10 +96,10 @@ class ExecutorOutputTransformIntegrationTest {
             withProvider(runner(executor), provider).run(context -> {
                 assertThat(context).hasNotFailed();
                 var skills = context.getBean(SkillTemplate.class);
-                String direct = skills.invoke("default", "triage", CASE);
+                String direct = skills.invoke("default", "triage", CASE).text();
                 assertThat(direct).isEqualTo(PUBLISHED);
-                assertThat(skills.invoke("default", "forward", CASE)).isEqualTo(direct);
-                assertThat(skills.invoke("default", "ordinary", Map.of())).isEqualTo("ordinary done");
+                assertThat(skills.invoke("default", "forward", CASE).text()).isEqualTo(direct);
+                assertThat(skills.invoke("default", "ordinary", Map.of()).text()).isEqualTo("ordinary done");
                 assertThat(executor.calls).hasSize(3).allSatisfy(call ->
                         assertThat(call.input()).isEqualTo(Map.of("requestId", "case-17")));
                 assertThat(executor.sessions).hasSize(3).allSatisfy(session -> {
@@ -152,7 +152,7 @@ class ExecutorOutputTransformIntegrationTest {
             provider.start();
             withProvider(runner(executor), provider).run(context -> {
                 assertThat(context).hasNotFailed();
-                assertThat(context.getBean(SkillTemplate.class).invoke("default", "assemble", CASE))
+                assertThat(context.getBean(SkillTemplate.class).invoke("default", "assemble", CASE).text())
                         .isEqualTo("{\"selected\":0.95}");
                 assertThat(executor.calls).extracting(SkillExecutorInvocation::skillName)
                         .containsExactly("default:triage", "default:observe");
@@ -226,7 +226,8 @@ class ExecutorOutputTransformIntegrationTest {
         runner(executor).run(context -> {
             assertThat(context).hasNotFailed();
             assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of()))
-                    .isSameAs(original);
+                    .isInstanceOf(RecoverableSkillException.class).hasMessage(original.getMessage()).hasCause(original)
+                    .satisfies(failure -> assertThat(((ai.loomspan.api.SkillException) failure).getSessionId()).isNotBlank());
             assertThat(executor.calls).hasSize(1);
             assertThat(executor.records()).noneMatch(record -> record.recordType() == TraceRecordType.FRAME_METADATA_RECORDED
                     && (record.data().has("executorOutput") || record.data().has("outputTransformStatus")));
@@ -245,7 +246,7 @@ class ExecutorOutputTransformIntegrationTest {
         runner(executor).run(context -> {
             assertThat(context).hasNotFailed();
             var skills = context.getBean(SkillTemplate.class);
-            assertThat(skills.invoke("default", "success", Map.of())).isEqualTo(PUBLISHED);
+            assertThat(skills.invoke("default", "success", Map.of()).text()).isEqualTo(PUBLISHED);
             assertThatThrownBy(() -> skills.invoke("default", "failure", Map.of()))
                     .hasRootCauseInstanceOf(JsltException.class)
                     .hasStackTraceContaining("original transform exception");
@@ -264,7 +265,7 @@ class ExecutorOutputTransformIntegrationTest {
         var executor = new ObservedExecutor(call -> raw);
         runner(executor).run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of())).isEqualTo(raw);
+            assertThat(context.getBean(SkillTemplate.class).invoke("default", "triage", Map.of()).text()).isEqualTo(raw);
             assertThat(executor.sessions.getLast().getLastOutputSchemaOutcome()).isEmpty();
             var metadata = completion(executor.records(), "default:triage");
             assertThat(metadata.data().path("executorOutput").textValue()).isEqualTo(raw);
@@ -296,8 +297,8 @@ class ExecutorOutputTransformIntegrationTest {
                 assertThat(executor.calls).isEmpty();
                 assertThat(reloader.snapshot("work").generationId()).isEqualTo(current.generationId());
                 assertThat(retained.generationId()).isEqualTo(old.generationId());
-                assertThat(skills.invoke("work", "leaf", Map.of())).isEqualTo("{\"version\":\"new\"}");
-                assertThat(retained.invoke()).isEqualTo("{\"version\":\"old\"}");
+                assertThat(skills.invoke("work", "leaf", Map.of()).text()).isEqualTo("{\"version\":\"new\"}");
+                assertThat(retained.invoke().text()).isEqualTo("{\"version\":\"old\"}");
                 assertThat(executor.calls).extracting(SkillExecutorInvocation::input)
                         .containsExactly(Map.of(), Map.of("version", "old input"));
             } finally {

@@ -49,7 +49,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                         assertThatThrownBy(() -> template.invoke("default", "standard", Map.of()))
                                 .isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(parentReason);
                     } else {
-                        assertThat(template.invoke("default", "standard", Map.of())).isEqualTo("DONE");
+                        assertThat(template.invoke("default", "standard", Map.of()).text()).isEqualTo("DONE");
                     }
                     assertThat(behavior.calls).hasValue(1);
                     assertThat(behavior.parent.get().successfulDirectSkills()).containsExactly("default:callable");
@@ -136,7 +136,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
             server.start();
             runner(server, behavior).run(context -> {
                 assertThat(context).hasNotFailed();
-                assertThat(context.getBean(SkillTemplate.class).invoke("default", "standard", Map.of())).isEqualTo("DONE");
+                assertThat(context.getBean(SkillTemplate.class).invoke("default", "standard", Map.of()).text()).isEqualTo("DONE");
                 var records = new ArrayList<TraceRecord>();
                 behavior.session.get().readTraceRecords(records::add);
                 assertThat(records).filteredOn(record -> record.recordType() == TraceRecordType.ERROR_RECORDED)
@@ -201,7 +201,9 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                 var template = context.getBean(SkillTemplate.class);
                 var direct = new ArrayList<SkillExecutionView>();
                 assertThatThrownBy(() -> template.invoke("default", "checked", input, direct::add))
-                        .isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(EXACT);
+                        .isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(EXACT)
+                        .satisfies(failure -> assertThat(((SkillException) failure).getSessionId())
+                                .isEqualTo(direct.getFirst().sessionId()));
                 var observerFailure = new IllegalStateException("Observer failed");
                 var admitted = context.getBean(SkillInvocationHandoff.class).handoff("default", "checked", input);
                 var observed = new ArrayList<SkillExecutionView>();
@@ -211,6 +213,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                 } catch (RecoverableSkillException failure) {
                     assertThat(failure).isExactlyInstanceOf(PlannerInabilityException.class).hasMessage(EXACT);
                     assertThat(failure.getSuppressed()).containsExactly(observerFailure);
+                    assertThat(failure.getSessionId()).isEqualTo(observed.getFirst().sessionId());
                 }
                 for (var views : List.of(direct, observed)) {
                     assertThat(views).singleElement().satisfies(view -> assertThat(view.events())
@@ -219,7 +222,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                                             .containsEntry("exceptionMessage", EXACT)));
                 }
                 assertThat(behavior.calls).hasValue(0);
-                assertThat(template.invoke("default", "checked", input)).isEqualTo(candidate);
+                assertThat(template.invoke("default", "checked", input).text()).isEqualTo(candidate);
                 assertThat(behavior.calls).hasValue(1);
             });
             assertThat(server.getRequestCount()).isEqualTo(4);
@@ -351,7 +354,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
             int requests = interveningStep ? 7 : 5;
             runner(server, behavior).run(context -> {
                 assertThat(context).hasNotFailed();
-                assertThat(context.getBean(SkillTemplate.class).invoke("default", "standard", Map.of())).isEqualTo("DONE");
+                assertThat(context.getBean(SkillTemplate.class).invoke("default", "standard", Map.of()).text()).isEqualTo("DONE");
                 assertThat(behavior.calls).hasValue(1);
                 var caller = behavior.parent.get().parent().orElseThrow();
                 assertNoAcceptedResult(caller, "default:child");
@@ -483,7 +486,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                         requests.set(0); feedback.set(null); behavior.calls.set(0); behavior.session.set(null);
                         var views = new ArrayList<SkillExecutionView>();
                         if (route.equals("standard") && recoverable) {
-                            assertThat(template.invoke("default", route, Map.of(), views::add)).isEqualTo("DONE");
+                            assertThat(template.invoke("default", route, Map.of(), views::add).text()).isEqualTo("DONE");
                             assertThat(feedback.get()).isNotNull();
                             assertThat(requests).hasValue(2);
                             var usage = behavior.session.get().getSessionUsage().orElseThrow();
@@ -577,7 +580,7 @@ class ExplicitJavaFailureHandlingIntegrationTest {
                 }); server.start();
                 runner(server, behavior).run(context -> {
                     assertThat(context).hasNotFailed();
-                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "standard", Map.of())).isEqualTo("DONE");
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "standard", Map.of()).text()).isEqualTo("DONE");
                     assertThat(observed.get()).isNull(); assertThat(behavior.calls).hasValue(2);
                     var records = new ArrayList<TraceRecord>(); behavior.session.get().readTraceRecords(records::add);
                     assertThat(records.stream().filter(record -> record.recordType() == TraceRecordType.TOOL_CALL_FAILED)).hasSize(1);

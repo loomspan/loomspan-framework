@@ -56,6 +56,265 @@ import static org.mockito.Mockito.when;
 class DefaultSkillTemplateTest {
 
     @Test
+    void invocationIdentityMatchesRootWithoutPublicMapping()
+    {
+        var registry = new TestCapabilityRegistry();
+        registry.register("default:invoice-parser", yamlSkillMetadata());
+        var router = mock(CapabilityExecutionRouter.class);
+        var mapper = mock(SkillExecutionViewMapper.class);
+        var rootId = new AtomicReference<String>();
+        var failure = new AtomicReference<RuntimeException>();
+        when(router.execute(any(), any(), any(), eq(null))).thenAnswer(call -> {
+            ai.loomspan.internal.core.LoomspanSession session = call.getArgument(2);
+            rootId.set(session.getSessionId());
+            if (failure.get() != null) throw failure.get();
+            return "  {\"value\":42}\r\n";
+        });
+        var template = new DefaultSkillTemplate(registry.manager(), router, new LoomspanSessionRunner(4),
+                new ObjectMapper(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), null, mapper);
+        var lifecycle = new FrameworkExecutionLifecycle(new StaticApplicationContext(), Duration.ofSeconds(1),
+                Executors.newSingleThreadExecutor());
+        var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
+        try
+        {
+            List<java.util.function.Supplier<ai.loomspan.api.SkillInvocationResult>> operations = List.of(
+                    () -> template.invoke("default", "invoice-parser", Map.of("payload", "hello")),
+                    () -> template.invoke("default", "invoice-parser", new InvoiceRequest("hello")),
+                    () -> template.invoke("default", "invoice-parser", Map.of("payload", "hello"), null),
+                    () -> template.invoke("default", "invoice-parser", new InvoiceRequest("hello"), null),
+                    () -> handoff.handoff("default", "invoice-parser", Map.of("payload", "hello")).invoke(),
+                    () -> handoff.handoff("default", "invoice-parser", Map.of("payload", "hello")).invoke(null));
+            var ids = new java.util.HashSet<String>();
+            for (var operation : operations)
+            {
+                var result = operation.get();
+                assertThat(result.text()).isEqualTo("  {\"value\":42}\r\n");
+                assertThat(result.sessionId()).isEqualTo(rootId.get()).isNotBlank();
+                assertThat(ids.add(result.sessionId())).isTrue();
+            }
+            for (RuntimeException source : List.of(new IllegalStateException("execution"),
+                    new SkillException("authored"), new ai.loomspan.api.RecoverableSkillException("recover"),
+                    new ai.loomspan.api.PlannerInabilityException("unable"),
+                    new SkillInputValidationException("invalid", List.of()), new AccessDeniedException("denied")))
+            {
+                failure.set(source);
+                for (var operation : operations)
+                    assertThatThrownBy(operation::get).hasCause(source).satisfies(error -> {
+                        if (error instanceof ai.loomspan.api.SkillAccessDeniedException denial)
+                            assertThat(denial.getSessionId()).isEqualTo(rootId.get());
+                        else
+                        {
+                            assertThat(error).isInstanceOf(source instanceof SkillException ? source.getClass() : SkillException.class);
+                            assertThat(((SkillException) error).getSessionId()).isEqualTo(rootId.get());
+                        }
+                    });
+            }
+            org.mockito.Mockito.verifyNoInteractions(mapper);
+        }
+        finally { lifecycle.destroy(); }
+    }
+
+    @Test
+    void mappingFailureAfterSuccessStillExposesRootIdentity()
+    {
+        var registry = new TestCapabilityRegistry();
+        registry.register("default:invoice-parser", yamlSkillMetadata());
+        var router = mock(CapabilityExecutionRouter.class);
+        var mapper = mock(SkillExecutionViewMapper.class);
+        var rootId = new AtomicReference<String>();
+        var mappingFailure = new IllegalArgumentException("mapping failed");
+        when(router.execute(any(), any(), any(), eq(null))).thenAnswer(call -> {
+            ai.loomspan.internal.core.LoomspanSession session = call.getArgument(2);
+            rootId.set(session.getSessionId());
+            return "ok";
+        });
+        when(mapper.map(any())).thenThrow(mappingFailure);
+        var template = new DefaultSkillTemplate(registry.manager(), router, new LoomspanSessionRunner(4),
+                new ObjectMapper(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), null, mapper);
+        assertThatThrownBy(() -> template.invoke("default", "invoice-parser", Map.of("payload", "hello"),
+                view -> { throw new AssertionError("mapping must fail first"); }))
+                .isInstanceOf(SkillException.class).hasCause(mappingFailure)
+                .satisfies(error -> assertThat(((SkillException) error).getSessionId()).isEqualTo(rootId.get()));
+    }
+
+    @Test
+    void initializationFailureStillExposesAllocatedIdentity()
+    {
+        var registry = new TestCapabilityRegistry();
+        registry.register("default:invoice-parser", yamlSkillMetadata());
+        var router = mock(CapabilityExecutionRouter.class);
+        var rootId = new AtomicReference<String>();
+        var initializationFailure = new IllegalStateException("initialization failed");
+        var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.NEVER,
+                fixedClock(), (id, entry) -> { rootId.set(id); throw initializationFailure; });
+        var template = new DefaultSkillTemplate(registry.manager(), router, runner,
+                new ObjectMapper(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
+        assertThatThrownBy(() -> template.invoke("default", "invoice-parser", Map.of("payload", "hello")))
+                .isInstanceOf(SkillException.class).hasCause(initializationFailure)
+                .satisfies(error -> assertThat(((SkillException) error).getSessionId()).isEqualTo(rootId.get()).isNotBlank());
+        org.mockito.Mockito.verifyNoInteractions(router);
+    }
+
+    @Test
+    void preSessionFailureCannotReuseAnotherInvocationsIdentity()
+    {
+        var registry = new TestCapabilityRegistry();
+        registry.register("default:invoice-parser", yamlSkillMetadata());
+        var router = mock(CapabilityExecutionRouter.class);
+        var strategy = mock(SecurityContextHolderStrategy.class);
+        var foreign = new SkillException("previous", null, null, "another-root");
+        when(strategy.getContext()).thenThrow(foreign);
+        var template = new DefaultSkillTemplate(registry.manager(), router, new LoomspanSessionRunner(4),
+                new ObjectMapper(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), strategy);
+        var lifecycle = new FrameworkExecutionLifecycle(new StaticApplicationContext(), Duration.ofSeconds(1),
+                Executors.newSingleThreadExecutor());
+        try
+        {
+            var handoff = new DefaultSkillInvocationHandoff(template, lifecycle);
+            for (org.assertj.core.api.ThrowableAssert.ThrowingCallable operation :
+                    List.<org.assertj.core.api.ThrowableAssert.ThrowingCallable>of(
+                            () -> template.invoke("default", "invoice-parser", Map.of("payload", "hello")),
+                            () -> handoff.handoff("default", "invoice-parser", Map.of("payload", "hello"))))
+                assertThatThrownBy(operation).isInstanceOf(SkillException.class).hasCause(foreign)
+                        .satisfies(error -> assertThat(((SkillException) error).getSessionId()).isNull());
+            assertThat(foreign.getSessionId()).isEqualTo("another-root");
+            org.mockito.Mockito.verifyNoInteractions(router);
+        }
+        finally { lifecycle.destroy(); }
+    }
+
+    @Test
+    void ownershipReleaseFailureStillExposesRootIdentity()
+    {
+        var registry = new TestCapabilityRegistry();
+        registry.register("default:invoice-parser", yamlSkillMetadata());
+        var router = mock(CapabilityExecutionRouter.class);
+        var template = new DefaultSkillTemplate(registry.manager(), router, new LoomspanSessionRunner(4),
+                new ObjectMapper(), new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
+        var rootId = new AtomicReference<String>();
+        when(router.execute(any(), any(), any(), eq(null))).thenAnswer(call -> {
+            ai.loomspan.internal.core.LoomspanSession session = call.getArgument(2);
+            rootId.set(session.getSessionId());
+            return "ok";
+        });
+        var original = template.prepareMap("default", "invoice-parser", Map.of("payload", "hello"));
+        var lease = mock(ai.loomspan.internal.skill.SkillGenerationManager.OwnerLease.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("release failed")).when(lease).close();
+        var prepared = new DefaultSkillTemplate.PreparedInput(original.snapshot(), original.capability(), original.validation(), lease);
+        try
+        {
+            assertThatThrownBy(() -> template.invokePrepared(prepared, null, null, null))
+                    .isInstanceOf(SkillException.class).hasCauseInstanceOf(IllegalStateException.class)
+                    .satisfies(error -> assertThat(((SkillException) error).getSessionId()).isEqualTo(rootId.get()));
+        }
+        finally { original.lease().close(); }
+    }
+
+    @Test
+    void callerIdentityMatchesCanonicalTraceAcrossRetentionPolicies(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root)
+            throws Exception
+    {
+        for (var policy : ai.loomspan.internal.core.TracePersistencePolicy.values())
+            for (boolean admitted : List.of(false, true))
+                for (boolean observe : List.of(false, true))
+                    for (boolean fail : List.of(false, true))
+                    {
+                        var registry = new TestCapabilityRegistry();
+                        registry.register("default:invoice-parser", yamlSkillMetadata());
+                        var router = mock(CapabilityExecutionRouter.class);
+                        var rootId = new AtomicReference<String>();
+                        var activePath = new AtomicReference<String>();
+                        var view = new AtomicReference<SkillExecutionView>();
+                        when(router.execute(any(), any(), any(), eq(null))).thenAnswer(call -> {
+                            ai.loomspan.internal.core.LoomspanSession session = call.getArgument(2);
+                            rootId.set(session.getSessionId());
+                            activePath.set(session.getExecutionTrace().filePath());
+                            if (fail) throw new IllegalStateException("execution failed");
+                            return "exact";
+                        });
+                        var lifecycle = new FrameworkExecutionLifecycle(new StaticApplicationContext(), Duration.ofSeconds(1),
+                                Executors.newSingleThreadExecutor());
+                        var runner = new LoomspanSessionRunner(4, policy, fixedClock(), NoOpExecutionObservationHandleFactory.INSTANCE,
+                                ImmediateCompletionRetention.INSTANCE, new LoomspanProperties.Session.Quotas(),
+                                LoomspanJacksonCodecs.defaults().canonicalTrace(), lifecycle, root);
+                        var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
+                                new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
+                        java.util.function.Consumer<SkillExecutionView> observer = observe ? view::set : null;
+                        java.util.function.Supplier<ai.loomspan.api.SkillInvocationResult> invoke = admitted
+                                ? () -> new DefaultSkillInvocationHandoff(template, lifecycle)
+                                        .handoff("default", "invoice-parser", Map.of("payload", "hello")).invoke(observer)
+                                : () -> template.invoke("default", "invoice-parser", Map.of("payload", "hello"), observer);
+                        try
+                        {
+                            String callerId;
+                            if (fail)
+                            {
+                                var failure = org.assertj.core.api.Assertions.catchThrowableOfType(SkillException.class, invoke::get);
+                                callerId = failure.getSessionId();
+                            }
+                            else
+                            {
+                                var result = invoke.get();
+                                assertThat(result.text()).isEqualTo("exact");
+                                callerId = result.sessionId();
+                            }
+                            assertThat(callerId).isNotBlank().isEqualTo(rootId.get());
+                            if (observe) assertThat(view.get().sessionId()).isEqualTo(callerId);
+                            else assertThat(view).hasNullValue();
+                            String active = activePath.get();
+                            var trace = java.nio.file.Path.of(active.substring(0, active.length() - ".in-progress".length()));
+                            boolean retained = policy == ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS
+                                    || (policy == ai.loomspan.internal.core.TracePersistencePolicy.ONERROR && fail);
+                            assertThat(java.nio.file.Files.exists(trace)).isEqualTo(retained);
+                            if (retained)
+                            {
+                                var records = new java.util.ArrayList<ai.loomspan.internal.core.TraceRecord>();
+                                ai.loomspan.internal.runtime.trace.ExecutionTraceReaders.ndjson().read(trace, records::add);
+                                assertThat(records).isNotEmpty().allSatisfy(record -> assertThat(record.sessionId()).isEqualTo(callerId));
+                                assertThat(records.getFirst().data().path("sessionId").asText()).isEqualTo(callerId);
+                            }
+                        }
+                        finally { lifecycle.destroy(); }
+                    }
+    }
+
+    @Test
+    void finalizationFailureStillExposesIdentityWhenRequestedViewIsUnavailable(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path root)
+    {
+        var registry = new TestCapabilityRegistry();
+        registry.register("default:invoice-parser", yamlSkillMetadata());
+        var router = mock(CapabilityExecutionRouter.class);
+        var rootId = new AtomicReference<String>();
+        when(router.execute(any(), any(), any(), eq(null))).thenAnswer(call -> {
+            ai.loomspan.internal.core.LoomspanSession session = call.getArgument(2);
+            rootId.set(session.getSessionId());
+            String active = session.getExecutionTrace().filePath();
+            var completed = java.nio.file.Path.of(active.substring(0, active.length() - ".in-progress".length()));
+            java.nio.file.Files.createDirectory(completed);
+            java.nio.file.Files.writeString(completed.resolve("marker"), "owned");
+            return "ok";
+        });
+        var lifecycle = new FrameworkExecutionLifecycle(new StaticApplicationContext(), Duration.ofSeconds(1), Executors.newSingleThreadExecutor());
+        var runner = new LoomspanSessionRunner(4, ai.loomspan.internal.core.TracePersistencePolicy.ALWAYS, fixedClock(),
+                NoOpExecutionObservationHandleFactory.INSTANCE, ImmediateCompletionRetention.INSTANCE,
+                new LoomspanProperties.Session.Quotas(), LoomspanJacksonCodecs.defaults().canonicalTrace(), lifecycle, root);
+        var template = new DefaultSkillTemplate(registry.manager(), router, runner, new ObjectMapper(),
+                new SkillInputValidator(), new SkillRoleEvaluator(null, null), null);
+        try
+        {
+            assertThatThrownBy(() -> template.invoke("default", "invoice-parser", Map.of("payload", "hello"),
+                    view -> { throw new AssertionError("view unavailable"); }))
+                    .isInstanceOf(SkillException.class).hasCauseInstanceOf(IllegalStateException.class)
+                    .satisfies(error -> {
+                        assertThat(((SkillException) error).getSessionId()).isEqualTo(rootId.get()).isNotBlank();
+                        assertThat(error.getSuppressed()).singleElement().isInstanceOf(IllegalStateException.class);
+                    });
+        }
+        finally { lifecycle.destroy(); }
+    }
+
+    @Test
     void handoffCapturesPreparedInputAndCallingAuthentication()
     {
         TestCapabilityRegistry registry = new TestCapabilityRegistry();
@@ -94,7 +353,7 @@ class DefaultSkillTemplateTest {
         mutableInput.clear();
         SecurityContextHolder.getContext().setAuthentication(worker);
 
-        assertThat(admitted.invoke()).isEqualTo("ok");
+        assertThat(admitted.invoke().text()).isEqualTo("ok");
         assertThat(admitted.generationId()).isEqualTo(generationId);
         assertThat(((AtomicReference<?>) org.springframework.test.util.ReflectionTestUtils
                 .getField(admitted, "payload")).get()).isNull();
@@ -190,7 +449,7 @@ class DefaultSkillTemplateTest {
             for (var read : executingReads)
                 assertThat(read.get(2, TimeUnit.SECONDS)).isEqualTo(id);
             finish.countDown();
-            assertThat(invocation.get(2, TimeUnit.SECONDS)).isEqualTo("ok");
+            assertThat(invocation.get(2, TimeUnit.SECONDS).text()).isEqualTo("ok");
             assertThat(admitted.generationId()).isEqualTo(id);
             assertThatThrownBy(admitted::invoke).isInstanceOf(SkillException.class);
         }
@@ -237,25 +496,27 @@ class DefaultSkillTemplateTest {
     }
 
     @Test
-    void preservesAccessDeniedExceptionInstance() {
+    void snapshotsAccessDeniedExceptionWithSessionIdentity() {
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         DefaultSkillTemplate template = templateWithRegisteredSkill(router);
         AccessDeniedException failure = new AccessDeniedException("default-denied");
         when(router.execute(any(), any(), any(), eq(null))).thenThrow(failure);
 
         assertThatThrownBy(() -> template.invoke("default", "invoice-parser", Map.of("payload", "hello")))
-                .isSameAs(failure);
+                .isInstanceOf(ai.loomspan.api.SkillAccessDeniedException.class).hasCause(failure)
+                .satisfies(error -> assertThat(((ai.loomspan.api.SkillAccessDeniedException) error).getSessionId()).isNotBlank());
     }
 
     @Test
-    void preservesExistingSkillExceptionInstance() {
+    void snapshotsExistingSkillExceptionWithSessionIdentity() {
         CapabilityExecutionRouter router = mock(CapabilityExecutionRouter.class);
         DefaultSkillTemplate template = templateWithRegisteredSkill(router);
         SkillException failure = new SkillException("safe");
         when(router.execute(any(), any(), any(), eq(null))).thenThrow(failure);
 
         assertThatThrownBy(() -> template.invoke("default", "invoice-parser", Map.of("payload", "hello")))
-                .isSameAs(failure);
+                .isInstanceOf(SkillException.class).hasCause(failure)
+                .satisfies(error -> assertThat(((SkillException) error).getSessionId()).isNotBlank());
     }
 
     @Test
@@ -279,7 +540,8 @@ class DefaultSkillTemplateTest {
                 }))
                 .isInstanceOf(SkillException.class)
                 .hasMessage("Skill 'default:invoice-parser' execution failed.")
-                .hasCause(failure);
+                .hasCause(failure)
+                .satisfies(error -> assertThat(((SkillException) error).getSessionId()).isEqualTo(observed.get().sessionId()));
         assertThat(observerCalls).hasValue(1);
         assertThat(observed.get().events()).extracting(event -> event.type())
                 .containsExactly("ERROR", "ERROR");
@@ -542,10 +804,11 @@ class DefaultSkillTemplateTest {
                 .isInstanceOf(SkillInputValidationException.class);
 
         AtomicReference<SkillExecutionView> observed = new AtomicReference<>();
-        String result = template.invoke("default", "invoice-parser", Map.of("payload", "hello"), observed::set);
+        var result = template.invoke("default", "invoice-parser", Map.of("payload", "hello"), observed::set);
 
-        assertThat(result).isEqualTo("\"ok\"");
+        assertThat(result.text()).isEqualTo("\"ok\"");
         assertThat(observed.get()).isNotNull();
+        assertThat(result.sessionId()).isEqualTo(observed.get().sessionId());
         assertThat(observed.get().sessionId()).isNotBlank();
         assertThat(observed.get().events()).isNotNull();
 
@@ -568,9 +831,9 @@ class DefaultSkillTemplateTest {
         registry.register("default:invoice-parser", yamlSkill);
         when(router.execute(eq(yamlSkill), eq(Map.of("payload", "hello")), any(), eq(null))).thenReturn("\"ok\"");
 
-        String result = template.invoke("default", "invoice-parser", new InvoiceRequest("hello"));
+        var result = template.invoke("default", "invoice-parser", new InvoiceRequest("hello"));
 
-        assertThat(result).isEqualTo("\"ok\"");
+        assertThat(result.text()).isEqualTo("\"ok\"");
         verify(router).execute(eq(yamlSkill), eq(Map.of("payload", "hello")), any(), eq(null));
     }
 
@@ -591,8 +854,8 @@ class DefaultSkillTemplateTest {
         assertThatThrownBy(() -> template.invoke("default", "invoice-parser", Map.of("payload", "hello"), view -> {
             throw new IllegalStateException("observer failed");
         }))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("observer failed");
+                .isInstanceOf(SkillException.class)
+                .hasCauseInstanceOf(IllegalStateException.class);
         verify(router).execute(eq(yamlSkill), eq(Map.of("payload", "hello")), any(), eq(null));
     }
 
@@ -669,9 +932,9 @@ class DefaultSkillTemplateTest {
             Map<String,Object> received=call.getArgument(1);assertThat(received).containsKey("value").doesNotContainKey("optional");return "ok";
         });
         var input=new LinkedHashMap<String,Object>();input.put("value",null);
-        template.validate(capability.identity().namespace(), capability.identity().localName(),input);assertThat(template.invoke(capability.identity().namespace(), capability.identity().localName(),input)).isEqualTo("ok");assertThat(input).containsEntry("value",null).doesNotContainKey("optional");
+        template.validate(capability.identity().namespace(), capability.identity().localName(),input);assertThat(template.invoke(capability.identity().namespace(), capability.identity().localName(),input).text()).isEqualTo("ok");assertThat(input).containsEntry("value",null).doesNotContainKey("optional");
         var exact=new java.math.BigDecimal("0.12345678901234567890123456789");input.put("value",Map.of("literal","ref://ordinary","number",exact));
-        assertThat(template.invoke(capability.identity().namespace(), capability.identity().localName(),input)).isEqualTo("ok");assertThat(((Map<?,?>)input.get("value")).get("number")).isSameAs(exact);
+        assertThat(template.invoke(capability.identity().namespace(), capability.identity().localName(),input).text()).isEqualTo("ok");assertThat(((Map<?,?>)input.get("value")).get("number")).isSameAs(exact);
         assertThatThrownBy(()->template.invoke(capability.identity().namespace(), capability.identity().localName(),Map.of())).isInstanceOf(SkillInputValidationException.class);
     }
     private CapabilityMetadata yamlSkillMetadata() {

@@ -93,6 +93,11 @@ Map<String, Object> rank(
 ```
 
 Invoke with `skills.invoke("default", "rank-transport-options", input)`. A YAML parent's `allowed_skills` uses `default:rank-transport-options`, or `rank-transport-options` when owned by `default`. No YAML wrapper is required or accepted.
+The caller receives `SkillInvocationResult`, with the published text in `text()`
+and the root execution ID in `sessionId()`. Input rejection before session
+allocation exposes a null `SkillInputValidationException.getSessionId()`.
+`ApplicationApiValueTest` and `DefaultSkillTemplateTest` protect these caller
+boundaries.
 
 ## Generated Input Guidance
 

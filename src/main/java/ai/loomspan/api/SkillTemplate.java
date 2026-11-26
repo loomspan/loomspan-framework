@@ -11,8 +11,10 @@ import java.util.function.Consumer;
  * have a maximum length of 64.
  * Each operation captures the entry's declared reachable namespace generations and checks dependencies,
  * input and entry authorization before execution. Catalog and validation metadata expose both components.
- * Results are text; observers receive an available completed view after successful execution or
- * an execution failure that occurs after session creation.
+ * Results contain exact text and root session identity. Observers receive an available completed view
+ * after successful execution or an execution failure that occurs after session creation.
+ * {@link SkillException#getSessionId()} identifies failures after root identity allocation.
+ * Post-session access denials expose identity through {@link SkillAccessDeniedException}.
  */
 public interface SkillTemplate
 {
@@ -22,11 +24,11 @@ public interface SkillTemplate
     /** Checks reachable dependencies, input and entry access with temporary ownership, without reserving admission. */
     void validate(String namespace, String localName, Map<String, Object> input);
 
-    String invoke(String namespace, String localName, Object input);
+    SkillInvocationResult invoke(String namespace, String localName, Object input);
 
-    String invoke(String namespace, String localName, Map<String, Object> input);
+    SkillInvocationResult invoke(String namespace, String localName, Map<String, Object> input);
 
-    String invoke(String namespace, String localName, Object input, Consumer<SkillExecutionView> observer);
+    SkillInvocationResult invoke(String namespace, String localName, Object input, Consumer<SkillExecutionView> observer);
 
-    String invoke(String namespace, String localName, Map<String, Object> input, Consumer<SkillExecutionView> observer);
+    SkillInvocationResult invoke(String namespace, String localName, Map<String, Object> input, Consumer<SkillExecutionView> observer);
 }

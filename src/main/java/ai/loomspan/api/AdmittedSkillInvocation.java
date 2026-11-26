@@ -8,6 +8,8 @@ import java.util.function.Consumer;
  * framework cutoff fail without starting skill work. Applications must {@link #release()} an
  * admission they abandon before execution; release is idempotent and harmless after execution
  * has claimed the admission.
+ * Results identify the root execution. Failures after root identity allocation expose that identity
+ * through {@link SkillException#getSessionId()} or {@link SkillAccessDeniedException#getSessionId()}.
  */
 public interface AdmittedSkillInvocation
 {
@@ -25,22 +27,22 @@ public interface AdmittedSkillInvocation
     /**
      * Executes the admitted invocation on the calling thread.
      *
-     * @return the skill result as text
+     * @return the exact result text and root session identity
      * @throws org.springframework.security.access.AccessDeniedException if the captured caller is not authorized
      * @throws SkillException if the admission is no longer executable or execution otherwise fails
      */
-    String invoke();
+    SkillInvocationResult invoke();
 
     /**
      * Executes the admitted invocation and delivers the available completed view before framework
      * ownership is released.
      *
      * @param observer callback for the available completed execution view; may be {@code null}
-     * @return the skill result as text
+     * @return the exact result text and root session identity
      * @throws org.springframework.security.access.AccessDeniedException if the captured caller is not authorized
      * @throws SkillException if the admission is no longer executable or execution otherwise fails
      */
-    String invoke(Consumer<SkillExecutionView> observer);
+    SkillInvocationResult invoke(Consumer<SkillExecutionView> observer);
 
     /** Releases this admission if it is still pending. */
     void release();

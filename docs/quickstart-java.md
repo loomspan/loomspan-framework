@@ -128,12 +128,16 @@ public class DemoApplication {
 
     @Bean
     ApplicationRunner triage(SkillTemplate skills) {
-        return args -> System.out.println(skills.invoke("default", "triage-support-request",
-            Map.of("customerMessage", """
-                Since this morning's deployment, checkout times out after payment.
-                Three customers say they were charged but received no order confirmation.
-                Retrying sometimes creates two orders. Browsing and cart updates still work.
-                """)));
+        return args -> {
+            var result = skills.invoke("default", "triage-support-request",
+                    Map.of("customerMessage", """
+                        Since this morning's deployment, checkout times out after payment.
+                        Three customers say they were charged but received no order confirmation.
+                        Retrying sometimes creates two orders. Browsing and cart updates still work.
+                        """));
+            System.out.println(result.text());
+            System.out.println("Session " + result.sessionId());
+        };
     }
 }
 ```
@@ -146,7 +150,7 @@ From the new application's directory:
 mvn spring-boot:run
 ```
 
-The application prints a textual triage brief and closes. An illustrative brief
+The application prints a textual triage brief, its session ID and then closes. An illustrative brief
 would identify reported charges without order confirmations and duplicate orders
 as urgent customer impact, treat the deployment as a possible cause rather than a
 proven one, and suggest correlating payment and order records and checking retry

@@ -118,8 +118,8 @@ class ExecutorInputTransformIntegrationTest {
                         .hasStackTraceContaining("binding_assembled_input_invalid");
                 assertThat(executor.calls).isEmpty();
 
-                assertThat(template.invoke("default", "evaluation", input)).isEqualTo("accepted");
-                assertThat(template.invoke("default", "root", input)).isEqualTo("accepted");
+                assertThat(template.invoke("default", "evaluation", input).text()).isEqualTo("accepted");
+                assertThat(template.invoke("default", "root", input).text()).isEqualTo("accepted");
                 assertThat(executor.calls).hasSize(2).allSatisfy(call -> {
                     assertThat(call.input()).isEqualTo(expected);
                     assertThat(call.skillConfig()).isEqualTo(Map.of("marker", "skill-only"));
@@ -147,7 +147,7 @@ class ExecutorInputTransformIntegrationTest {
                                         assertThat(record.data().path("missionInput")).isEqualTo(JSON.valueToTree(input))));
 
                 var configBoundaryInput = Map.<String, Object>of("business", "case");
-                assertThat(template.invoke("default", "config-boundary", configBoundaryInput)).isEqualTo("accepted");
+                assertThat(template.invoke("default", "config-boundary", configBoundaryInput).text()).isEqualTo("accepted");
                 assertThat(executor.calls).hasSize(3);
                 var configBoundaryCall = executor.calls.getLast();
                 assertThat(configBoundaryCall.input()).isEqualTo(configBoundaryInput);
@@ -250,8 +250,8 @@ class ExecutorInputTransformIntegrationTest {
                 assertThat(calls).isEmpty();
                 assertThat(retained.generationId()).isEqualTo(old.generationId());
                 assertThat(reloader.snapshot("work").generationId()).isEqualTo(current.generationId()).isNotEqualTo(old.generationId());
-                assertThat(template.invoke("work", "leaf", Map.of())).isEqualTo("new");
-                assertThat(retained.invoke()).isEqualTo("old");
+                assertThat(template.invoke("work", "leaf", Map.of()).text()).isEqualTo("new");
+                assertThat(retained.invoke().text()).isEqualTo("old");
             } finally {
                 retained.release();
             }

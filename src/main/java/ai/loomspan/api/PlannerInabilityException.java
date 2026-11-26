@@ -7,4 +7,9 @@ public final class PlannerInabilityException extends RecoverableSkillException
     {
         super(reason);
     }
+
+    public PlannerInabilityException(String reason, Throwable cause, SkillFailureDiagnosis failureDiagnosis, String sessionId)
+    {
+        super(reason, cause, failureDiagnosis, sessionId);
+    }
 }

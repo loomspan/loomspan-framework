@@ -17,6 +17,44 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ApplicationApiValueTest
 {
     @Test
+    void rootInvocationReturnsTextAndSessionIdentity() throws Exception
+    {
+        Class<?> result = SkillTemplate.class.getMethod("invoke", String.class, String.class, Map.class).getReturnType();
+        assertThat(result.getSimpleName()).isEqualTo("SkillInvocationResult");
+        assertThat(result.getRecordComponents())
+                .extracting(component -> List.of(component.getName(), component.getType()))
+                .containsExactly(List.of("text", String.class), List.of("sessionId", String.class));
+    }
+
+    @Test
+    void invocationValuesPreserveTextAndImmutableIdentity()
+    {
+        String text = "  {\"answer\":42}\r\n";
+        assertThat(new SkillInvocationResult(text, "root").text()).isEqualTo(text);
+        assertThat(new SkillInvocationResult(text, "root").sessionId()).isEqualTo("root");
+        assertThatThrownBy(() -> new SkillInvocationResult(null, "root")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillInvocationResult("", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillInvocationResult("", " \n")).isInstanceOf(IllegalArgumentException.class);
+        var cause = new IllegalStateException("original");
+        var failure = new SkillException("failure", cause, null, "root");
+        assertThat(failure.getSessionId()).isEqualTo("root");
+        assertThat(failure).hasCause(cause);
+        assertThat(new SkillException("before").getSessionId()).isNull();
+        assertThat(new SkillException("before", cause).getSessionId()).isNull();
+        assertThat(new SkillException("before", cause, null).getSessionId()).isNull();
+        var denial = new SkillAccessDeniedException("denied", cause, "root");
+        assertThat(denial).isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasCause(cause);
+        assertThat(denial.getSessionId()).isEqualTo("root");
+        assertThatThrownBy(() -> new SkillAccessDeniedException("denied", cause, null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new SkillAccessDeniedException("denied", cause, " ")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(new PlannerInabilityException("reason", cause, null, "root").getSessionId()).isEqualTo("root");
+        assertThat(new RecoverableSkillException("reason", cause, null, "root").getSessionId()).isEqualTo("root");
+        var input = new SkillInputValidationException("invalid", cause, List.of(), null, "root");
+        assertThat(input.getSessionId()).isEqualTo("root");
+        assertThat(input).hasCause(cause);
+    }
+
+    @Test
     void rootOperationsRequireExplicitIdentityComponents() throws Exception
     {
         for (Class<?> input : List.of(Object.class, Map.class))
@@ -24,9 +62,9 @@ class ApplicationApiValueTest
             assertThat(SkillTemplate.class.getMethod("validate", String.class, String.class, input).getReturnType())
                     .isEqualTo(void.class);
             assertThat(SkillTemplate.class.getMethod("invoke", String.class, String.class, input).getReturnType())
-                    .isEqualTo(String.class);
+                    .isEqualTo(SkillInvocationResult.class);
             assertThat(SkillTemplate.class.getMethod("invoke", String.class, String.class, input,
-                    java.util.function.Consumer.class).getReturnType()).isEqualTo(String.class);
+                    java.util.function.Consumer.class).getReturnType()).isEqualTo(SkillInvocationResult.class);
             assertThat(SkillInvocationHandoff.class.getMethod("handoff", String.class, String.class, input).getReturnType())
                     .isEqualTo(AdmittedSkillInvocation.class);
         }
@@ -39,7 +77,7 @@ class ApplicationApiValueTest
         RecoverableSkillException failure = new PlannerInabilityException(reason);
         assertThat(failure).hasMessage(reason);
         assertThat(PlannerInabilityException.class.getConstructors())
-                .containsExactly(PlannerInabilityException.class.getConstructor(String.class));
+                .containsExactlyInAnyOrder(PlannerInabilityException.class.getConstructor(String.class), PlannerInabilityException.class.getConstructor(String.class, Throwable.class, SkillFailureDiagnosis.class, String.class));
         assertThat(PlannerInabilityException.class.getDeclaredMethods()).isEmpty();
         assertThatThrownBy(() -> new PlannerInabilityException(null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new PlannerInabilityException("")).isInstanceOf(IllegalArgumentException.class);
@@ -98,8 +136,8 @@ class ApplicationApiValueTest
                 .extracting(method -> List.of(method.getName(), method.getReturnType(), List.of(method.getParameterTypes())))
                 .containsExactlyInAnyOrder(
                         List.of("generationId", String.class, List.of()),
-                        List.of("invoke", String.class, List.of()),
-                        List.of("invoke", String.class, List.of(java.util.function.Consumer.class)),
+                        List.of("invoke", SkillInvocationResult.class, List.of()),
+                        List.of("invoke", SkillInvocationResult.class, List.of(java.util.function.Consumer.class)),
                         List.of("release", void.class, List.of()));
         assertThat(SkillTemplate.class.getDeclaredMethods()).hasSize(6);
     }
@@ -272,7 +310,7 @@ class ApplicationApiValueTest
                 .containsExactlyInAnyOrder(
                         List.of(String.class),
                         List.of(String.class, Throwable.class),
-                        List.of(String.class, Throwable.class, SkillFailureDiagnosis.class));
+                        List.of(String.class, Throwable.class, SkillFailureDiagnosis.class), List.of(String.class, Throwable.class, SkillFailureDiagnosis.class, String.class));
     }
 
     @Test

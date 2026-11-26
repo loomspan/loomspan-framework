@@ -91,11 +91,13 @@ input_schema:
 In an embedded Java application, invoke it through an injected `SkillTemplate`:
 
 ```java
-String triage = skills.invoke("default", "triage-support-request", Map.of("customerMessage", """
+var triage = skills.invoke("default", "triage-support-request", Map.of("customerMessage", """
         Since this morning's deployment, checkout times out after payment.
         Three customers say they were charged but received no order confirmation.
         Retrying sometimes creates two orders. Browsing and cart updates still work.
         """));
+String text = triage.text();
+String sessionId = triage.sessionId();
 ```
 
 This illustrates the declaration and call; the `assistant` model alias still
@@ -197,7 +199,9 @@ or execution reservation. Pass the two components to invocation, validation or h
 ```java
 var descriptor = reloader.snapshot("orders").skill("lookup").orElseThrow();
 skills.validate(descriptor.namespace(), descriptor.localName(), Map.of());
-String result = skills.invoke(descriptor.namespace(), descriptor.localName(), Map.of());
+var result = skills.invoke(descriptor.namespace(), descriptor.localName(), Map.of());
+String text = result.text();
+String sessionId = result.sessionId();
 ```
 
 Every root operation requires both exact components, including `"default"` for a
@@ -534,7 +538,8 @@ from the same revision as the runtime. The first production release will be `1.0
 The supported Java API is the closed allowlist in `ai.loomspan.api` and the exact v1 executor types in
 `ai.loomspan.api.extensions.v1`, summarized
 in the [public API reference](agent-skills/loomspan-docs/references/java-api/compatibility-and-boundaries.md).
-It contains 30 public top-level types, including `SkillExecutor`, the
+It contains 32 public top-level types, including `SkillInvocationResult`,
+`SkillAccessDeniedException`, `SkillExecutor`, the
 Framework-created `SkillExecutorInvocation` class and `ExecutorDiagnostics` capability, `RecoverableSkillException`, `PlannerInabilityException`, `SkillFailureDiagnosis`, `SkillContractStage`, and `SkillContractIssue`. Java callable
 methods and reference-only executors share discovery and proxy invocation. Successful
 null/void results become empty text, Strings remain exact, and other results become
@@ -556,6 +561,16 @@ when executor work ends or its lifecycle is cut off. Ordinary diagnostic failure
 are contained; caller argument evaluation and JVM-wide failures are excluded.
 System notices are separate and best effort; severity never changes execution.
 See the [executor API contract](agent-skills/loomspan-docs/references/java-api/java-skills.md#bounded-executor-diagnostics).
+
+Direct and admitted invocations return `SkillInvocationResult` with the original
+`text()` and the root execution's non-null `sessionId()`. After session identity
+allocation, failures expose that ID through `SkillException.getSessionId()` or
+`SkillAccessDeniedException.getSessionId()`. The latter remains catchable as
+Spring's `AccessDeniedException`. A `SkillException` raised before session creation
+has a null ID. These values are available without an observer, independently of
+trace retention. The no-observer path skips public execution-view construction.
+The ID correlates with any delivered view and canonical trace. Trace access still
+requires the existing authorization.
 
 Failed direct and admitted invocations expose optional terminal contract detail
 through `SkillException.getFailureDiagnosis()`, including input rejection during

@@ -19,6 +19,11 @@ import ai.loomspan.api.SkillExecutionView;
 import ai.loomspan.api.SkillInputValidationException;
 import ai.loomspan.api.SkillInputValidationIssue;
 import ai.loomspan.api.SkillTemplate;
+import ai.loomspan.api.SkillInvocationResult;
+import ai.loomspan.api.SkillAccessDeniedException;
+import ai.loomspan.api.SkillFailureDiagnosis;
+import ai.loomspan.api.RecoverableSkillException;
+import ai.loomspan.api.PlannerInabilityException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -90,25 +95,25 @@ public class DefaultSkillTemplate implements SkillTemplate
     }
 
     @Override
-    public String invoke(String namespace, String localName, Object input)
+    public SkillInvocationResult invoke(String namespace, String localName, Object input)
     {
         return invoke(namespace, localName, input, null);
     }
 
     @Override
-    public String invoke(String namespace, String localName, Map<String, Object> input)
+    public SkillInvocationResult invoke(String namespace, String localName, Map<String, Object> input)
     {
         return invoke(namespace, localName, input, null);
     }
 
     @Override
-    public String invoke(String namespace, String localName, Object input, Consumer<SkillExecutionView> observer)
+    public SkillInvocationResult invoke(String namespace, String localName, Object input, Consumer<SkillExecutionView> observer)
     {
         return invokePrepared(prepareObject(namespace, localName, input), observer);
     }
 
     @Override
-    public String invoke(String namespace, String localName, Map<String, Object> input, Consumer<SkillExecutionView> observer)
+    public SkillInvocationResult invoke(String namespace, String localName, Map<String, Object> input, Consumer<SkillExecutionView> observer)
     {
         return invokePrepared(prepareMap(namespace, localName, input), observer);
     }
@@ -127,6 +132,8 @@ public class DefaultSkillTemplate implements SkillTemplate
         catch (AccessDeniedException | SkillException ex)
         {
             captured.lease().close();
+            if (ex instanceof SkillException skillFailure && skillFailure.getSessionId() != null)
+                throw failureSnapshot(captured.snapshot().entry().toString(), skillFailure, null, null);
             throw ex;
         }
         catch (RuntimeException ex)
@@ -150,7 +157,11 @@ public class DefaultSkillTemplate implements SkillTemplate
     private SkillGenerationManager.Capture captureRoot(String namespace, String localName)
     {
         try { return generationManager.capture(new SkillIdentity(namespace, localName)); }
-        catch (SkillException ex) { throw ex; }
+        catch (SkillException ex)
+        {
+            if (ex.getSessionId() != null) throw failureSnapshot(namespace + ":" + localName, ex, null, null);
+            throw ex;
+        }
         catch (RuntimeException ex)
         {
             throw new SkillException("Skill '" + namespace + ":" + localName + "' execution failed.", ex);
@@ -179,6 +190,8 @@ public class DefaultSkillTemplate implements SkillTemplate
         catch (AccessDeniedException | SkillException ex)
         {
             captured.lease().close();
+            if (ex instanceof SkillException skillFailure && skillFailure.getSessionId() != null)
+                throw failureSnapshot(captured.snapshot().entry().toString(), skillFailure, null, null);
             throw ex;
         }
         catch (RuntimeException ex)
@@ -212,12 +225,12 @@ public class DefaultSkillTemplate implements SkillTemplate
         finally { prepared.lease().close(); }
     }
 
-    private String invokePrepared(PreparedInput prepared, Consumer<SkillExecutionView> observer)
+    private SkillInvocationResult invokePrepared(PreparedInput prepared, Consumer<SkillExecutionView> observer)
     {
         return invokePrepared(prepared, observer, null);
     }
 
-    String invokePrepared(PreparedInput prepared, Consumer<SkillExecutionView> observer,
+    SkillInvocationResult invokePrepared(PreparedInput prepared, Consumer<SkillExecutionView> observer,
             @Nullable ai.loomspan.internal.core.FrameworkExecutionLifecycle.AdmittedRoot admittedRoot)
     {
         String skillName = prepared.capability().name();
@@ -230,6 +243,8 @@ public class DefaultSkillTemplate implements SkillTemplate
         catch (AccessDeniedException | SkillException ex)
         {
             prepared.lease().close();
+            if (ex instanceof SkillException skillFailure && skillFailure.getSessionId() != null)
+                throw failureSnapshot(skillName, skillFailure, null, null);
             throw ex;
         }
         catch (RuntimeException ex)
@@ -245,20 +260,31 @@ public class DefaultSkillTemplate implements SkillTemplate
         return invokePrepared(prepared, observer, authentication, admittedRoot);
     }
 
-    String invokePrepared(PreparedInput prepared, Consumer<SkillExecutionView> observer,
+    SkillInvocationResult invokePrepared(PreparedInput prepared, Consumer<SkillExecutionView> observer,
             @Nullable Authentication authentication,
             @Nullable ai.loomspan.internal.core.FrameworkExecutionLifecycle.AdmittedRoot admittedRoot)
     {
         String skillName = prepared.capability().name();
         var selected = new java.util.concurrent.atomic.AtomicReference<ai.loomspan.api.SkillFailureDiagnosis>();
+        var sessionId = new java.util.concurrent.atomic.AtomicReference<String>();
         try
         {
             java.util.function.Function<LoomspanSession, String> action =
                     session -> executeValidated(prepared.capability(), prepared.validation(), session);
-            LoomspanSessionRunner.RootCompletion<String, String> completion = (result, session, failure) -> {
-                selected.set(session.terminalDiagnosis().orElse(null));
-                if (observer != null) observer.accept(executionViewMapper.map(session));
-                return result;
+            LoomspanSessionRunner.RootCompletion<String, SkillInvocationResult> completion = new LoomspanSessionRunner.RootCompletion<>() {
+                @Override
+                public void started(String id)
+                {
+                    sessionId.set(id);
+                }
+
+                @Override
+                public SkillInvocationResult complete(String result, LoomspanSession session, Throwable failure)
+                {
+                    selected.set(session.terminalDiagnosis().orElse(null));
+                    if (observer != null) observer.accept(executionViewMapper.map(session));
+                    return failure == null ? new SkillInvocationResult(result, session.getSessionId()) : null;
+                }
             };
             return admittedRoot == null
                     ? sessionRunner.callWithNewSession(
@@ -267,21 +293,39 @@ public class DefaultSkillTemplate implements SkillTemplate
                     : sessionRunner.callWithAdmittedSession(
                             prepared.capability().name(), prepared.snapshot(), authentication, admittedRoot, action, completion);
         }
-        catch (LoomspanSessionRunner.CompletionPhaseFailure ex)
-        {
-            throw ex.original();
-        }
         catch (AccessDeniedException ex)
         {
-            throw ex;
+            if (sessionId.get() == null) throw ex;
+            var failure = new SkillAccessDeniedException(ex.getMessage(), ex, sessionId.get());
+            copySuppressed(ex, failure);
+            throw failure;
         }
         catch (RuntimeException ex)
         {
-            if (ex instanceof SkillException skillFailure
-                    && java.util.Objects.equals(skillFailure.getFailureDiagnosis().orElse(null), selected.get()))
-                throw skillFailure;
-            throw new SkillException("Skill '" + skillName + "' execution failed.", ex, selected.get());
+            throw failureSnapshot(skillName, ex, selected.get(), sessionId.get());
         }
+    }
+
+    static SkillException failureSnapshot(String skillName, RuntimeException original,
+            SkillFailureDiagnosis diagnosis, String sessionId)
+    {
+        SkillException failure;
+        if (original instanceof PlannerInabilityException)
+            failure = new PlannerInabilityException(original.getMessage(), original, diagnosis, sessionId);
+        else if (original instanceof RecoverableSkillException)
+            failure = new RecoverableSkillException(original.getMessage(), original, diagnosis, sessionId);
+        else if (original instanceof SkillInputValidationException input)
+            failure = new SkillInputValidationException(input.getMessage(), original, input.getIssues(), diagnosis, sessionId);
+        else
+            failure = new SkillException(original instanceof SkillException ? original.getMessage()
+                    : "Skill '" + skillName + "' execution failed.", original, diagnosis, sessionId);
+        copySuppressed(original, failure);
+        return failure;
+    }
+
+    private static void copySuppressed(Throwable original, Throwable failure)
+    {
+        for (Throwable suppressed : original.getSuppressed()) failure.addSuppressed(suppressed);
     }
 
     Authentication currentAuthentication()

@@ -58,7 +58,7 @@ class JavaSkillIntegrationTest
                 assertThat(context).hasNotFailed();
                 var observed = new AtomicReference<SkillExecutionView>();
                 var skills = context.getBean(SkillTemplate.class);
-                assertThat(skills.invoke("default", "plain-echo", Map.of("message", "hello"), observed::set))
+                assertThat(skills.invoke("default", "plain-echo", Map.of("message", "hello"), observed::set).text())
                         .isEqualTo("{\"message\":\"hello\"}");
                 assertThat(observed.get()).isNotNull();
                 assertThat(observed.get().sessionId()).isNotBlank();
@@ -87,15 +87,22 @@ class JavaSkillIntegrationTest
                         SecurityContextHolder.setContext(caller);
                         try
                         {
-                            assertThat(skills.invoke("default", "secured-echo", Map.of("message", "hello"))).isEqualTo("alice:hello");
+                            assertThat(skills.invoke("default", "secured-echo", Map.of("message", "hello")).text()).isEqualTo("alice:hello");
                             assertThat(SecurityContextHolder.getContext()).isSameAs(caller);
-                            assertThatThrownBy(() -> skills.invoke("default", "always-denied", Map.of())).isInstanceOf(AccessDeniedException.class);
+                            var deniedView = new AtomicReference<SkillExecutionView>();
+                            assertThatThrownBy(() -> skills.invoke("default", "always-denied", Map.of(), deniedView::set))
+                                    .isExactlyInstanceOf(AccessDeniedException.class);
+                            assertThat(deniedView).hasNullValue();
+                            assertThatThrownBy(() -> skills.invoke("default", "runtime-denied", Map.of(), deniedView::set))
+                                    .isInstanceOf(ai.loomspan.api.SkillAccessDeniedException.class)
+                                    .satisfies(failure -> assertThat(((ai.loomspan.api.SkillAccessDeniedException) failure).getSessionId())
+                                            .isEqualTo(deniedView.get().sessionId()));
                             assertThat(SecurityContextHolder.getContext()).isSameAs(caller);
                             SecurityContext empty = new SecurityContextImpl();
                             SecurityContextHolder.setContext(empty);
                             assertThatThrownBy(() -> skills.invoke("default", "secured-echo", Map.of("message", "hidden")))
                                     .isInstanceOf(AccessDeniedException.class);
-                            assertThat(skills.invoke("default", "outside-permit", Map.of())).isEqualTo("public");
+                            assertThat(skills.invoke("default", "outside-permit", Map.of()).text()).isEqualTo("public");
                             assertThat(SecurityContextHolder.getContext()).isSameAs(empty);
                             assertThat(calls).hasValue(1);
                         }
@@ -116,7 +123,7 @@ class JavaSkillIntegrationTest
                 try
                 {
                     SecurityContextHolder.setContext(new SecurityContextImpl(authentication("alice", "ROLE_READ")));
-                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "generic-echo", Map.of("message", "hello")))
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "generic-echo", Map.of("message", "hello")).text())
                             .isEqualTo("hello");
                     SecurityContextHolder.setContext(new SecurityContextImpl());
                     assertThatThrownBy(() -> context.getBean(SkillTemplate.class).invoke("default", "generic-echo", Map.of("message", "denied")))
@@ -159,7 +166,7 @@ class JavaSkillIntegrationTest
         probe.callerThreads.add(Thread.currentThread().threadId());
         try
         {
-            return skills.invoke("default", "parallel-echo", Map.of("message", "hello"));
+            return skills.invoke("default", "parallel-echo", Map.of("message", "hello")).text();
         }
         finally
         {
@@ -209,7 +216,7 @@ class JavaSkillIntegrationTest
                 });
                 runner(server).withBean("plainState", Object.class, () -> target).run(context -> {
                     assertThat(context).hasNotFailed();
-                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "exposed", Map.of())).isEqualTo("initialized");
+                    assertThat(context.getBean(SkillTemplate.class).invoke("default", "exposed", Map.of()).text()).isEqualTo("initialized");
                 });
             }
         }
@@ -250,11 +257,11 @@ class JavaSkillIntegrationTest
                         try
                         {
                             SecurityContextHolder.setContext(new SecurityContextImpl(authentication("alice", "ROLE_READ")));
-                            assertThat(context.getBean(SkillTemplate.class).invoke("default", "secured-parent", Map.of("objective", "run child")))
+                            assertThat(context.getBean(SkillTemplate.class).invoke("default", "secured-parent", Map.of("objective", "run child")).text())
                                     .isEqualTo("done");
                             assertThat(calls).hasValue(1);
                             SecurityContextHolder.setContext(new SecurityContextImpl());
-                            assertThat(context.getBean(SkillTemplate.class).invoke("default", "secured-parent", Map.of("objective", "no restricted children")))
+                            assertThat(context.getBean(SkillTemplate.class).invoke("default", "secured-parent", Map.of("objective", "no restricted children")).text())
                                     .isEqualTo("done");
                             assertThat(calls).hasValue(1);
                         }
@@ -322,6 +329,8 @@ class JavaSkillIntegrationTest
         { calls.incrementAndGet(); return SecurityContextHolder.getContext().getAuthentication().getName() + ":" + message; }
         @SkillMethod(name = "always-denied", description = "Never available") @DenyAll
         public String alwaysDenied() { calls.incrementAndGet(); return "bad"; }
+        @SkillMethod(name = "runtime-denied", description = "Deny resource access during execution") @PermitAll
+        public String runtimeDenied() { throw new AccessDeniedException("Resource denied"); }
         @SkillMethod(name = "outside-permit", description = "Public but outside the parent allowlist") @PermitAll
         public String outsidePermit() { return "public"; }
     }

@@ -13,11 +13,11 @@ Inject `ai.loomspan.api.SkillTemplate` into application code. It has four invoke
 overloads and two advisory validation overloads:
 
 ```java
-String invoke(String namespace, String localName, Object input);
-String invoke(String namespace, String localName, Map<String, Object> input);
-String invoke(String namespace, String localName, Object input,
+SkillInvocationResult invoke(String namespace, String localName, Object input);
+SkillInvocationResult invoke(String namespace, String localName, Map<String, Object> input);
+SkillInvocationResult invoke(String namespace, String localName, Object input,
               Consumer<SkillExecutionView> observer);
-String invoke(String namespace, String localName, Map<String, Object> input,
+SkillInvocationResult invoke(String namespace, String localName, Map<String, Object> input,
               Consumer<SkillExecutionView> observer);
 void validate(String namespace, String localName, Object input);
 void validate(String namespace, String localName, Map<String, Object> input);
@@ -35,6 +35,7 @@ Bean names and method signatures are diagnostics, never invocation aliases.
 
 ```java
 import ai.loomspan.api.SkillTemplate;
+import ai.loomspan.api.SkillInvocationResult;
 import java.util.Map;
 
 public final class InvoiceWorkflow {
@@ -44,7 +45,7 @@ public final class InvoiceWorkflow {
         this.skills = skills;
     }
 
-    public String check(String invoiceText) {
+    public SkillInvocationResult check(String invoiceText) {
         return skills.invoke(
                 "default", "duplicate-invoice-checker",
                 Map.of("payload", invoiceText));
@@ -52,12 +53,15 @@ public final class InvoiceWorkflow {
 }
 ```
 
-The return value is text. A caller that requires machine-readable output
-SHOULD give the producing model YAML skill an `output_schema` and then parse the returned JSON
+The return value is `SkillInvocationResult(String text, String sessionId)`. Both
+components are non-null, and the root session ID is nonblank. Read `text()` for
+the original result and `sessionId()` for correlation with the canonical trace
+and any delivered observer view. A caller that requires machine-readable output
+SHOULD give the producing model YAML skill an `output_schema` and then parse `result.text()` as JSON
 according to the application's own boundary policy. Java null/void results become empty text, Strings remain exact, and other values
 use Jackson JSON. Java methods have no YAML output schema; see [Java results](java-skills.md#inputs-results-and-lifecycle).
 
-[TypeSafe pack leaves](../skill-authoring/typesafe-skills.md) use the same String
+[TypeSafe pack leaves](../skill-authoring/typesafe-skills.md) use the same result
 facade. With `output_transform` omitted, they publish the complete provider JSON,
 including its envelope, JSON null and quoted strings. In that shape, consumer
 bindings can use `/answers/...`. An
@@ -76,7 +80,33 @@ once against the published value. A forwarding parent returns that accepted chil
 text without adding parent validation. Effective catalog schema describes this
 shape; annotation-only Java methods have no YAML output schema. Read [output contracts](../skill-authoring/output-contracts.md).
 
-A failed direct or admitted invocation exposes optional terminal contract detail
+A failed direct or admitted invocation exposes the root ID through
+`SkillException.getSessionId()`. The getter returns null when failure occurs
+before root identity allocation, including invalid handoff input or a rejected
+admission. After allocation, initialization, execution, finalization, public
+mapping, observer and ownership-release runtime failures retain that identity.
+A post-session denial is `SkillAccessDeniedException`, with the same getter,
+and remains catchable as Spring `AccessDeniedException`.
+
+The caller receives identity independently of observers and trace retention.
+Invoking without an observer skips public execution-view construction and public
+event conversion. Trace lookup remains subject to existing access and retention
+rules. JVM `Error` propagation keeps its existing fatal-failure boundary.
+
+```java
+try {
+    var result = skills.invoke("support", "summarize", input);
+    logger.info("Session {} returned {}", result.sessionId(), result.text());
+} catch (SkillAccessDeniedException failure) {
+    logger.warn("Session {} denied access", failure.getSessionId());
+    throw failure;
+} catch (SkillException failure) {
+    logger.warn("Session {} failed", failure.getSessionId(), failure);
+    throw failure;
+}
+```
+
+A failed invocation also exposes optional terminal contract detail
 through `SkillException.getFailureDiagnosis()`. Input rejection during handoff
 preparation exposes it on `SkillInputValidationException`. Availability is
 independent of observers and diagnostic retention. Read the
@@ -119,15 +149,15 @@ prepared map -> validate the entry input contract
     -> capture the calling authentication and check entry RBAC
     -> reserve admission, create and execute a new root session
     -> finalize available execution history and restore the execution binding
-    -> build the public execution view
-    -> call the optional observer with available completed history
-    -> return the textual result or rethrow the execution failure
+    -> if an observer was supplied, build its public view and deliver available completed history
+    -> return SkillInvocationResult or throw a failure carrying root identity
 ```
 
 The observer runs synchronously after session completion on success or a post-session
-failure when history can be mapped. If it throws after success, its exception propagates
-unchanged. On execution failure, mapping or observer failure is suppressed behind the
-original failure. Keep observers small and reliable because they remain within root
+failure when history can be mapped. If mapping or the observer throws after
+success, a session-bearing public failure retains that exception as its cause.
+On execution failure, mapping or observer failure is suppressed behind the
+execution failure and retained on its public snapshot. Keep observers small and reliable because they remain within root
 ownership and the shutdown deadline.
 
 Java roots use the same mission and observer lifecycle without a framework model
@@ -158,7 +188,9 @@ try {
     String snapshotId = snapshotByGeneration.get(admitted.generationId());
     if (snapshotId == null) throw new IllegalStateException("Missing snapshot mapping");
     invocationRecords.record(snapshotId, admitted.generationId());
-    admitted.invoke(observer);
+    var result = admitted.invoke(observer);
+    String text = result.text();
+    String sessionId = result.sessionId();
 } finally {
     admitted.release();
 }
@@ -175,6 +207,10 @@ prior security context is restored. Mission timeout accounting begins when
 ordinary mission work is submitted. If shutdown has begun, a pending handle may
 start only during the remaining single framework budget and is invalidated at
 cutoff. Finalization and observer delivery remain within root ownership.
+
+Both `admitted.invoke()` and `admitted.invoke(observer)` return the same
+`SkillInvocationResult` shape as direct invocation. `generationId()` identifies
+the captured entry generation. `result.sessionId()` identifies this root execution.
 
 ## Reachable retention and nesting
 
@@ -204,7 +240,12 @@ the real facade; see [compatibility-and-boundaries.md](compatibility-and-boundar
 
 ## Source Anchors
 
-- `SkillTemplate.java` defines the supported signatures.
+- `SkillTemplate.java`, `SkillInvocationResult.java` and `ApplicationApiValueTest`
+  define the supported signatures and result value contract.
+- `DefaultSkillTemplateTest#invocationIdentityMatchesRootWithoutPublicMapping`
+  protects the no-observer path and root identity.
+- `LoomspanSessionRunnerTest#identityNotificationPrecedesSessionInitialization`
+  protects authoritative identity allocation before session collaborators.
 - `SkillInvocationHandoff.java` and `AdmittedSkillInvocation.java` define the
   supported ownership-transfer and single-use handle signatures.
 - `DefaultSkillTemplateTest#handoffCapturesPreparedInputAndCallingAuthentication`

@@ -125,7 +125,7 @@ class SkillGenerationExecutionIntegrationTest
 
         try
         {
-            assertThat(admitted.invoke()).isEqualTo("old-result");
+            assertThat(admitted.invoke().text()).isEqualTo("old-result");
             assertThat(admitted.generationId()).isEqualTo(oldGeneration.id());
             assertThatThrownBy(() -> template.invoke("default", "invoice-parser", Map.of("payload", "hello")))
                     .isInstanceOf(AccessDeniedException.class);
@@ -185,8 +185,8 @@ class SkillGenerationExecutionIntegrationTest
             assertThat(old.generationId()).isEqualTo(oldId).isNotBlank();
             var current = handoff.handoff("default", "invoice-parser", Map.of("replacementPayload", "new"));
             assertThat(current.generationId()).isEqualTo(replacement.id());
-            assertThat(old.invoke()).isEqualTo("old-result");
-            assertThat(current.invoke()).isEqualTo("replacement-result");
+            assertThat(old.invoke().text()).isEqualTo("old-result");
+            assertThat(current.invoke().text()).isEqualTo("replacement-result");
             assertThat(old.generationId()).isEqualTo(oldId);
         }
         finally

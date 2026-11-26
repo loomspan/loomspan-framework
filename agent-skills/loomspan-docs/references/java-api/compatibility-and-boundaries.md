@@ -9,8 +9,8 @@ coverage: source-verified
 
 ## Supported Surface
 
-Application code MAY depend on the thirty types in the closed
-allowlist: twenty-eight types in `ai.loomspan.api`, plus exactly the invocation
+Application code MAY depend on the thirty-two types in the closed
+allowlist, comprising thirty types in `ai.loomspan.api`, plus exactly the invocation
 and diagnostic capability in `ai.loomspan.api.extensions.v1`:
 
 | Type | Supported purpose |
@@ -18,6 +18,8 @@ and diagnostic capability in `ai.loomspan.api.extensions.v1`:
 | `SkillTemplate` | Validate or invoke a named Java, executor-backed YAML, or model-backed YAML skill |
 | `SkillInvocationHandoff` | Atomically transfer a prepared root invocation to framework ownership |
 | `AdmittedSkillInvocation` | Read the captured generation ID, execute once, or release an already-admitted root invocation |
+| `SkillInvocationResult` | Read exact successful result text and the root session ID |
+| `SkillAccessDeniedException` | Read a post-session denial's root ID while retaining Spring access-denied catchability |
 | `SkillReloader` | Validate, prepare, publish, snapshot or remove a complete namespace generation |
 | `NamespaceVisibility` | Select Private or explicit Public on a complete publication |
 | `SkillDocument` | Supply one in-memory YAML document and a diagnostic source label |
@@ -38,7 +40,7 @@ and diagnostic capability in `ai.loomspan.api.extensions.v1`:
 | `RecoverableSkillException` | Signal a designated Java failure with exact corrective text and an optional diagnostic cause |
 | `PlannerInabilityException` | Catch unsuccessful invocation completion and read its exact reason through `getMessage()` |
 | `SkillParam` | Describe and declare requiredness for a Java skill parameter |
-| `SkillException` | Catch a safe Loomspan facade failure |
+| `SkillException` | Catch a Loomspan facade failure and read nullable session identity and optional terminal diagnosis |
 | `SkillReloadException` | Catch an operational preparation or publication failure |
 | `SkillInputValidationException` | Distinguish invalid caller input |
 | `SkillInputValidationIssue` | Inspect structured validation issues |
@@ -109,7 +111,7 @@ view.
 
 `LoomspanPublicSurfaceArchitectureTest` protects these boundaries:
 
-- the API packages contain exactly the thirty allowlisted public top-level types;
+- the API packages contain exactly the thirty-two allowlisted public top-level types;
 - the separately classified `autoconfigure` types are framework integration,
   not application API;
 - every externally accessible Loomspan top-level type is classified;

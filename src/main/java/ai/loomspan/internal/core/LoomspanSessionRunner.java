@@ -308,6 +308,8 @@ public class LoomspanSessionRunner
                     "Loomspan invocation admission is no longer executable");
         try
         {
+            if (ExecutionBindingScope.current().isPresent())
+                throw new IllegalArgumentException("Cannot bind an execution from a different session inside the current scope.");
             var captured = generation.runtime();
             InternalExecutionTraceHandleFactory selectedTraceFactory = captured == null || generationTraceRetention == null
                     ? traceHandleFactory
@@ -317,8 +319,10 @@ public class LoomspanSessionRunner
                                     generationTraceRetention,
                                     ConfiguredLimitsSnapshot.from(captured.properties().getSession().getQuotas()),
                                     canonicalTraceMapper);
+            String sessionId = UUID.randomUUID().toString();
+            completion.started(sessionId);
             LoomspanSession session = new LoomspanSession(
-                UUID.randomUUID().toString(),
+                sessionId,
                 entrySkill,
                 CapturedNamespaceMetadata.from(snapshot),
                 captured == null ? maxDepth : captured.properties().getSession().getMaxDepth(),
@@ -354,8 +358,7 @@ public class LoomspanSessionRunner
                 }
                 throw failure;
             }
-            try { return completion.complete(result, session, null); }
-            catch (RuntimeException ex) { throw new CompletionPhaseFailure(ex); }
+            return completion.complete(result, session, null);
         }
         finally
         {
@@ -366,13 +369,9 @@ public class LoomspanSessionRunner
     @FunctionalInterface
     public interface RootCompletion<T, R>
     {
-        R complete(@Nullable T result, LoomspanSession session, @Nullable Throwable failure);
-    }
+        default void started(String sessionId) {}
 
-    public static final class CompletionPhaseFailure extends RuntimeException
-    {
-        private CompletionPhaseFailure(RuntimeException cause) { super(cause); }
-        public RuntimeException original() { return (RuntimeException) getCause(); }
+        R complete(@Nullable T result, LoomspanSession session, @Nullable Throwable failure);
     }
 
     private void finalizeSessionTrace(LoomspanSession session, @Nullable Throwable failure)

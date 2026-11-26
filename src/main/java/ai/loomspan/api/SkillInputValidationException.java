@@ -23,4 +23,11 @@ public class SkillInputValidationException extends SkillException
     {
         return issues;
     }
+
+    public SkillInputValidationException(String message, Throwable cause, List<SkillInputValidationIssue> issues,
+            SkillFailureDiagnosis failureDiagnosis, String sessionId)
+    {
+        super(message, cause, failureDiagnosis, sessionId);
+        this.issues = issues == null ? List.of() : List.copyOf(issues);
+    }
 }

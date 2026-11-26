@@ -52,7 +52,7 @@ class NamespaceObservationIntegrationTest
                                 "loomspan: {execution-trace: {persistence: always, directory: '" + redirected + "'}}")))
                                 .isInstanceOf(SkillReloadException.class).hasMessageContaining("loomspan.execution-trace.directory");
                         var observations = new ArrayList<SkillExecutionView>();
-                        assertThat(template.invoke("finance", "entry", Map.of(), observations::add)).contains("finance complete");
+                        assertThat(template.invoke("finance", "entry", Map.of(), observations::add).text()).contains("finance complete");
                         try {
                             assertThat(root.resolve("shared")).doesNotExist();
                             Path financeTrace;
@@ -75,7 +75,7 @@ class NamespaceObservationIntegrationTest
                                 assertThat(record.path("route").asText()).isEqualTo("shared:leaf");
                                 assertThat(record.path("metadata").path("executingNamespace").asText()).isEqualTo("shared");
                             });
-                            assertThat(template.invoke("shared", "leaf", Map.of())).contains("executor");
+                            assertThat(template.invoke("shared", "leaf", Map.of()).text()).contains("executor");
                             try (var paths = Files.list(root.resolve("shared"))) {
                                 assertThat(paths.toList()).hasSize(1).allSatisfy(path -> assertThat(path).isRegularFile());
                             }
@@ -119,7 +119,7 @@ class NamespaceObservationIntegrationTest
                 reloader.publish(replacement);
                 assertThat(replacement.generationId()).isNotEqualTo(shared.generationId());
                 var observed = new ArrayList<SkillExecutionView>();
-                assertThat(pending.invoke(observed::add)).contains("unchanged result");
+                assertThat(pending.invoke(observed::add).text()).contains("unchanged result");
                 assertThat(observed).hasSize(1);
                 String sessionId = observed.getFirst().sessionId();
                 try (var paths = Files.list(Path.of(System.getProperty("java.io.tmpdir"), "loomspan-traces", "caller")))
